@@ -1,5 +1,24 @@
-node_modules
+# Ignorar dependências (pastas pesadas)
+**/node_modules/
+backend-simec/node_modules/
+frontend-simec/node_modules/
+
+# Ignorar arquivos de configuração e senhas
 .env
-dist
-uploads/*
-!uploads/.gitkeep
+backend-simec/.env
+frontend-simec/.env
+frontend-simec/.env.local
+
+# Ignorar pastas de compilação (geradas automaticamente)
+dist/
+frontend-simec/dist/
+build/
+
+# Ignorar logs do sistema
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Manter a pasta de uploads no servidor, mas não enviar as fotos de teste
+backend-simec/uploads/*
+!backend-simec/uploads/.gitkeep
