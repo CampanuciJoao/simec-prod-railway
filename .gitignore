@@ -1,25 +1,5 @@
-# Arquivo de configuração de ambiente (NUNCA ENVIE ISSO)
+node_modules
 .env
-.env.*
-
-# Dependências (são instaladas via npm)
-node_modules/
-dist/
-/backend-simec/uploads/
-/frontend-simec/dist/
-
-# Logs e arquivos temporários
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Arquivos de sistema operacional
-.DS_Store
-Thumbs.db
-
-# Arquivos de cache e de IDE
-.idea/
-.vscode/
-*.swp
+dist
+uploads/*
+!uploads/.gitkeep
