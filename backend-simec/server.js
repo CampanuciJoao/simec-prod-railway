@@ -103,7 +103,7 @@ const checkIntervalMs = 60 * 1000; // 1 minuto
 setInterval(executarTarefasDeFundo, checkIntervalMs);
 
 // --- 10. Inicialização do Servidor ---
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Servidor backend a rodar na porta ${PORT}`);
   
   // Executa a verificação inicial na ordem correta também.
