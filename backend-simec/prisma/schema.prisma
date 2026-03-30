@@ -73,6 +73,7 @@ model Equipamento {
   manutencoes       Manutencao[]
   seguros           Seguro[]
   anexos            Anexo[]
+  ocorrencias       Ocorrencia[]
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   @@map("equipamentos")
@@ -195,6 +196,21 @@ model LogAuditoria {
   autor      Usuario    @relation(fields: [autorId], references: [id], onDelete: Cascade)
   autorId    String     @map("autor_id")
   @@map("log_auditoria")
+}
+
+// Modelo para a Ficha Técnica / Ocorrências Avulsas
+model Ocorrencia {
+  id            String   @id @default(uuid())
+  data          DateTime @default(now())
+  titulo        String   // Ex: "Ajuste de brilho no monitor", "Queda de energia"
+  descricao     String?  @db.Text
+  tipo          String   // Ex: "Operacional", "Software", "Infraestrutura", "Ajuste"
+  tecnico       String?  // Nome de quem realizou/registrou
+  
+  equipamento   Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
+  equipamentoId String
+  
+  @@map("ocorrencias")
 }
 
 model Anexo {

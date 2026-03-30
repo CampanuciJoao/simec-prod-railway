@@ -37,6 +37,7 @@ import segurosRoutes from './routes/segurosRoutes.js';
 import auditoriaRoutes from './routes/auditoriaRoutes.js';
 import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
+import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 
 // --- 4. Importação dos Serviços e Middlewares ---
 import { atualizarStatusManutencoes, processarAlertasEEnviarNotificacoes } from './services/alertasService.js';
@@ -54,6 +55,7 @@ app.listen(PORT, '0.0.0.0', () => {
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
 
 // --- 7. Servir Arquivos Estáticos (Uploads) ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -78,6 +80,7 @@ app.use('/api/seguros', segurosRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
+app.use('/api/ocorrencias', ocorrenciasRoutes);
 
 
 // --- 9. Rota Raiz e Tarefas Agendadas ---
