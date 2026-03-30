@@ -1,14 +1,10 @@
 // Ficheiro: src/utils/pdfUtils.js
-// VERSÃO FINAL CORRIGIDA - COM SUPORTE A RELATÓRIOS GERAIS E AUDITORIA DE EQUIPAMENTO
+// VERSÃO CORRIGIDA - REMOVIDO IMPORT INVÁLIDO
 
-import jsPDF from 'jsgrid'; // Nota: Certifique-se que o import é 'jspdf' (erro comum de digitação)
-import jsPDFReal from 'jspdf';
+import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
 import logoSimec from '../assets/images/logo-simec-base64'; 
-
-// Usamos o jsPDF importado corretamente
-const jsPDFDoc = jsPDFReal;
 
 // Função para gerar o cabeçalho padrão dos relatórios (Compartilhada)
 const adicionarCabecalho = (doc, titulo) => {
@@ -23,10 +19,9 @@ const adicionarCabecalho = (doc, titulo) => {
 
 /**
  * RELATÓRIO 1: Exportar Relatórios Gerais (Inventário, Manutenções Realizadas)
- * Mantido conforme sua versão original.
  */
 export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
-    const doc = new jsPDFDoc();
+    const doc = new jsPDF();
     let headers = [];
     let body = [];
     let tituloRelatorio = "Relatório";
@@ -58,7 +53,7 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
             break;
 
         default:
-            console.error('Tipo de relatório não suportado para exportação:', resultado.tipoRelatorio);
+            console.error('Tipo de relatório não suportado:', resultado.tipoRelatorio);
             return;
     }
 
@@ -83,14 +78,12 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
 
 /**
  * RELATÓRIO 2: Exportar Histórico de Auditoria de um Equipamento Específico
- * NOVA FUNÇÃO - UNIFICA MANUTENÇÕES E OCORRÊNCIAS NO PDF
  */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
-    const doc = new jsPDFDoc();
+    const doc = new jsPDF();
     
     adicionarCabecalho(doc, "Relatório de Auditoria de Ativo");
 
-    // Informações extras abaixo do cabeçalho
     doc.setFontSize(11);
     doc.setTextColor(60);
     doc.text(`Equipamento: ${info.nome}`, 14, 48);
@@ -126,7 +119,6 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
         alternateRowStyles: { fillColor: [248, 250, 252] }
     });
 
-    // Rodapé de página
     const pageCount = doc.internal.getNumberOfPages();
     for(let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
