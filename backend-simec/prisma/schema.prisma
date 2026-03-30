@@ -206,6 +206,12 @@ model Ocorrencia {
   descricao     String?  @db.Text
   tipo          String   // Ex: "Operacional", "Software", "Infraestrutura", "Ajuste"
   tecnico       String?  // Nome de quem realizou/registrou
+
+   // NOVOS CAMPOS PARA SOLUÇÃO
+  resolvido       Boolean   @default(false)
+  solucao         String?   @db.Text
+  dataResolucao   DateTime?
+  tecnicoResolucao String?
   
   equipamento   Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
   equipamentoId String
