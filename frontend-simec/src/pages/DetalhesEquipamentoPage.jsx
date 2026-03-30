@@ -92,7 +92,7 @@ function DetalhesEquipamentoPage() {
           {abaAtiva === 'detalhes' && <TabCadastro equipamentoInicial={equipamento} onUpdate={refetchEquipamento} />}
           {abaAtiva === 'acessorios' && <TabAcessorios equipamentoId={equipamentoId} />}
           {abaAtiva === 'anexos' && <TabAnexos equipamentoId={equipamentoId} anexosIniciais={equipamento.anexos} onUpdate={refetchEquipamento} />}
-          {abaAtiva === 'historico' && <TabHistorico equipamentoId={equipamentoId} />}
+          {abaAtiva === 'historico' && <TabHistorico equipamento={equipamento} />}
         </div>
       </section>
     </div>

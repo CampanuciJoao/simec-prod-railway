@@ -4,13 +4,8 @@ import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
 import logoSimec from '../assets/images/logo-simec-base64'; 
 
-// Função auxiliar para o cabeçalho (padrão da empresa)
 const adicionarCabecalho = (doc, titulo) => {
-    try {
-        doc.addImage(logoSimec, 'PNG', 14, 12, 25, 25);
-    } catch (e) {
-        console.warn("Logo não encontrado ou formato inválido");
-    }
+    try { doc.addImage(logoSimec, 'PNG', 14, 12, 25, 25); } catch (e) {}
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(`Gerado em: ${formatarDataHora(new Date())}`, 200, 18, { align: 'right' });
@@ -20,59 +15,59 @@ const adicionarCabecalho = (doc, titulo) => {
 };
 
 /**
- * Exporta Relatórios Gerais (Inventário, Manutenções)
+ * RELATÓRIO GERAL (Inventário / Manutenções)
  */
 export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     const doc = new jsPDF();
     let headers = [["Modelo", "Nº de Série", "Fabricante", "Registro ANVISA", "Status", "Unidade"]];
     let body = resultado.dados.map(item => [
-        item.modelo || 'N/A',
-        item.tag || 'N/A',
-        item.fabricante || 'N/A',
-        item.registroAnvisa || 'N/A',
-        item.status || 'N/A',
-        item.unidade?.nomeSistema || 'N/A'
+        item.modelo || 'N/A', item.tag || 'N/A', item.fabricante || 'N/A',
+        item.registroAnvisa || 'N/A', item.status || 'N/A', item.unidade?.nomeSistema || 'N/A'
     ]);
 
     adicionarCabecalho(doc, "Relatório de Inventário");
     autoTable(doc, {
-        head: headers,
-        body: body,
-        startY: 45,
-        theme: 'striped',
+        head: headers, body: body, startY: 45, theme: 'striped',
         headStyles: { fillColor: [30, 41, 59], halign: 'center' },
-        columnStyles: {
-            0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' },
-            3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' },
-        }
+        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } }
     });
     doc.save(`${nomeArquivo}.pdf`);
 };
 
 /**
- * Exporta o Histórico Unificado de Auditoria
+ * RELATÓRIO DE AUDITORIA DE ATIVO (Histórico Unificado)
  */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     const doc = new jsPDF();
-    
-    // PROTEÇÃO: Garante que nome nunca seja undefined para evitar erro de .replace()
-    const nomeSeguro = info.nome || 'Equipamento';
-
     adicionarCabecalho(doc, "Relatório de Auditoria de Ativo");
 
-    doc.setFontSize(11);
-    doc.setTextColor(60);
-    doc.text(`Equipamento: ${nomeSeguro}`, 14, 48);
+    // --- BLOCO DE INFORMAÇÕES DO ATIVO ---
+    doc.setFillColor(248, 250, 252);
+    doc.rect(14, 42, 182, 24, 'F'); 
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(14, 42, 182, 24, 'S');
+
+    doc.setFontSize(10);
+    doc.setTextColor(30);
+    doc.setFont(undefined, 'bold');
+    doc.text(`Modelo:`, 18, 48);
+    doc.text(`Nº Série (Tag):`, 18, 54);
+    doc.text(`Unidade:`, 18, 60);
+    
+    doc.setFont(undefined, 'normal');
+    doc.text(`${info.modelo || 'N/A'}`, 45, 48);
+    doc.text(`${info.tag || 'N/A'}`, 45, 54);
+    doc.text(`${info.unidade || 'N/A'}`, 45, 60);
     
     const periodoTxt = info.inicio || info.fim 
-        ? `Período: ${info.inicio || 'Início'} até ${info.fim || 'Hoje'}` 
+        ? `Período Auditado: ${info.inicio || 'Início'} até ${info.fim || 'Hoje'}` 
         : "Período: Histórico Completo";
-    doc.text(periodoTxt, 14, 54);
+    doc.text(periodoTxt, 110, 48);
 
-    const headers = [["Data / Hora", "Origem", "Evento / OS", "Responsável", "Status"]];
+    const headers = [["Data Execução", "Categoria", "Evento / OS", "Responsável", "Status"]];
     const body = dados.map(item => [
         formatarDataHora(item.data),
-        item.tipo,
+        item.categoria, 
         item.titulo,
         item.responsavel || 'N/A',
         item.status
@@ -81,20 +76,18 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     autoTable(doc, {
         head: headers,
         body: body,
-        startY: 60,
+        startY: 72,
         theme: 'grid',
-        headStyles: { fillColor: [30, 41, 59], textColor: 255, halign: 'center' },
+        headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 9 },
         columnStyles: {
             0: { halign: 'center', cellWidth: 35 },
-            1: { halign: 'center', cellWidth: 25 },
-            2: { halign: 'left' },
+            1: { halign: 'center', cellWidth: 30 },
             3: { halign: 'center' },
             4: { halign: 'center' },
         },
         styles: { fontSize: 8 }
     });
 
-    // Nome do arquivo sem espaços
-    const fileName = `auditoria_${nomeSeguro.replace(/\s+/g, '_')}.pdf`;
+    const fileName = `auditoria_${(info.tag || 'Equipamento').replace(/\s+/g, '_')}.pdf`;
     doc.save(fileName);
 };
