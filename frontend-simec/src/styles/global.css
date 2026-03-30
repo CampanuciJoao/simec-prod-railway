@@ -1,4 +1,4 @@
-/* INÍCIO DO ARQUIVO COMPLETO: src/styles/global.css */
+/* ARQUIVO COMPLETO: src/styles/global.css */
 
 /* ====================================================== */
 /* ===== DEFINIÇÃO DE VARIÁVEIS CSS (PALETA REFINADA) ===== */
@@ -55,7 +55,6 @@
     --status-os-aguardando-confirmacao-bg-light: var(--status-os-emandamento-bg-light);
     --status-os-aguardando-confirmacao-texto-light: var(--status-os-emandamento-texto-light);
 
-
     --btn-success-bg-light: #22C55E;
     --btn-success-hover-bg-light: #1aa04c;
     --btn-warning-bg-light: #FACC15;
@@ -105,25 +104,10 @@ body.dark-mode {
     --status-pendente-texto-dark: #FFEDD5;
     
     --status-operando-com-limitacoes-bg-dark: var(--status-manutencao-bg-dark);
-    --status-operando-com-limitacoes-texto-dark: var(--status-manutencao-texto-dark);
+    --status-operando-com-limitacoes-texto-dark: var(--status-manutencao-dark);
     
     --status-default-bg-dark: #374151; 
     --status-default-texto-dark: var(--cor-texto-secundario-dark);
-
-    /* Badges de Status para Manutenções - Dark Mode */
-    --status-os-agendada-bg-dark: var(--cor-primaria-dark);
-    --status-os-agendada-texto-dark: var(--cor-sidebar-ativo-texto-dark);
-    --status-os-emandamento-bg-dark: var(--btn-warning-bg-dark);
-    --status-os-emandamento-texto-dark: var(--btn-warning-texto-dark);
-    --status-os-concluida-bg-dark: var(--btn-success-bg-dark);
-    --status-os-concluida-texto-dark: white;
-    --status-os-cancelada-bg-dark: var(--btn-danger-bg-dark);
-    --status-os-cancelada-texto-dark: white;
-    --status-os-atrasada-bg-dark: var(--btn-danger-bg-dark);
-    --status-os-atrasada-texto-dark: white;
-
-    --status-os-aguardando-confirmacao-bg-dark: var(--status-os-emandamento-bg-dark);
-    --status-os-aguardando-confirmacao-texto-dark: var(--status-os-emandamento-texto-dark);
 
     --btn-success-bg-dark: #16A34A;
     --btn-success-hover-bg-dark: #15803d;
@@ -156,6 +140,113 @@ body.dark-mode {
 }
 
 /* ============================================================== */
+/* ===== ESTILOS DA FICHA TÉCNICA / HISTÓRICO UNIFICADO ===== */
+/* ============================================================== */
+
+.unified-history-wrapper {
+    padding: 10px 0;
+}
+
+.history-card-new {
+    background: var(--cor-fundo-card-light);
+    border-radius: 10px;
+    border: 1px solid var(--cor-borda-light);
+    margin-bottom: 15px;
+    box-shadow: var(--sombra-card-light);
+    overflow: hidden;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+body.dark-mode .history-card-new {
+    background: var(--cor-fundo-card-dark);
+    border-color: var(--cor-borda-dark);
+}
+
+.history-card-new:hover {
+    box-shadow: var(--sombra-card-hover-light);
+}
+
+/* Bordas Laterais por Status */
+.os-border { border-left: 6px solid var(--cor-primaria-light); }
+.pendente-border { border-left: 6px solid var(--btn-danger-bg-light); }
+.resolvido-border { border-left: 6px solid var(--btn-success-bg-light); }
+
+.history-card-header-new {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    gap: 20px;
+}
+
+.card-header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    flex: 1;
+}
+
+/* Lógica de Data acima do Título */
+.title-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+}
+
+.card-date {
+    font-size: 0.72rem;
+    color: var(--cor-texto-secundario-light);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.card-title {
+    margin: 0;
+    font-size: 1.05rem;
+    color: var(--cor-texto-principal-light);
+    font-weight: 700;
+    line-height: 1.2;
+}
+
+body.dark-mode .card-title { color: var(--cor-texto-principal-dark); }
+
+.icon-circle {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+    flex-shrink: 0;
+}
+
+.os-icon { background: #eff6ff; color: #3b82f6; }
+.pendente-icon { background: #fef2f2; color: #ef4444; }
+.resolvido-icon { background: #ecfdf5; color: #10b981; }
+
+.history-card-body-new {
+    padding: 20px 20px 20px 82px; /* Alinhado com o ícone e gap */
+    background: rgba(0,0,0,0.01);
+    border-top: 1px solid var(--cor-borda-light);
+}
+
+body.dark-mode .history-card-body-new { border-color: var(--cor-borda-dark); }
+
+.solution-box-active {
+    background: var(--status-ativo-bg-light);
+    border: 1px solid #dcfce7;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.solution-box-active h5 { color: var(--status-ativo-texto-light); margin: 0 0 5px 0; }
+
+/* ============================================================== */
 /* >> ESTILOS PARA IMPRESSÃO DE RELATÓRIO (VERSÃO FINAL) << */
 /* ============================================================== */
 @media print {
@@ -165,15 +256,13 @@ body.dark-mode {
     print-color-adjust: exact !important;
   }
 
-  /* Esconde a sidebar, os botões de ação e qualquer elemento com a classe .no-print */
   .sidebar, .header-actions, .no-print {
     display: none !important;
   }
 
-  /* Garante que o conteúdo principal ocupe toda a largura da página */
   .main-content {
     margin: 0 !important;
-    padding: 25px !important; /* Margem interna da folha de papel */
+    padding: 25px !important;
     width: 100% !important;
     height: auto !important;
     overflow: visible !important;
@@ -184,18 +273,16 @@ body.dark-mode {
     max-width: 100% !important;
   }
   
-  /* Remove sombras e ajusta bordas para um visual de relatório */
   .page-section {
     box-shadow: none !important;
     border: 1px solid #ccc !important;
     margin-bottom: 20px;
     padding: 15px !important;
-    page-break-inside: avoid; /* Tenta não quebrar seções no meio da página */
+    page-break-inside: avoid;
   }
   
-  /* Cabeçalho que só aparece na impressão */
   .print-header {
-    display: flex !important; /* Força a exibição na impressão */
+    display: flex !important;
     justify-content: space-between;
     align-items: center;
     border-bottom: 2px solid #000;
@@ -208,161 +295,14 @@ body.dark-mode {
     margin: 0;
     color: #000 !important;
   }
-  .print-header .os-info {
-    text-align: right;
-  }
-  .print-header .os-info p {
-    margin: 0;
-    font-size: 1.1em;
-    font-weight: bold;
-  }
   
-  /* Ajustes de link para impressão */
-  a, a:visited {
-    text-decoration: none;
-    color: #000 !important;
-  }
-  /* Remove as URLs dos links para um visual mais limpo */
-  a[href]:after { content: ""; }
-  a[href^="/"]:after, a[href^="#"]:after { content: ""; }
-
-  /* Padroniza fontes e cores para impressão */
   body, .page-section, p, li, td, th {
     font-size: 10pt !important;
     color: #000 !important;
     background: #fff !important;
   }
-  
-  .info-grid p {
-    border-bottom: 1px dotted #ccc !important;
-  }
-
-  .list-group {
-    border: 1px solid #ccc !important;
-  }
-  .list-group-item {
-    border-bottom: 1px solid #ccc !important;
-  }
 }
 
-/* Esconde o cabeçalho de impressão na visualização normal */
 .print-header {
   display: none;
 }
-
-/* Container Principal */
-.unified-history-wrapper { padding: 5px; }
-
-.tab-header-action {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 25px;
-    border-bottom: 2px solid #f1f5f9;
-    padding-bottom: 15px;
-}
-
-/* Card de Registro Rápido */
-.quick-form-card {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 30px;
-}
-
-/* Novo Estilo de Card de Histórico */
-.history-card-new {
-    background: #ffffff;
-    border-radius: 10px;
-    border: 1px solid #e2e8f0;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    transition: transform 0.2s, box-shadow 0.2s;
-    overflow: hidden;
-}
-
-.history-card-new:hover {
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-}
-
-/* Bordas Laterais por Status */
-.os-border { border-left: 6px solid #3b82f6; }
-.pendente-border { border-left: 6px solid #ef4444; }
-.resolvido-border { border-left: 6px solid #10b981; }
-
-.history-card-header-new {
-    padding: 16px 20px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    cursor: pointer;
-}
-
-.card-header-left { display: flex; align-items: center; gap: 15px; }
-
-.icon-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.1em;
-}
-
-.os-icon { background: #eff6ff; color: #3b82f6; }
-.pendente-icon { background: #fef2f2; color: #ef4444; }
-.resolvido-icon { background: #ecfdf5; color: #10b981; }
-
-.title-group { display: flex; flexDirection: column; }
-.card-date { font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
-.card-title { margin: 0; font-size: 1rem; color: #1e293b; font-weight: 700; }
-
-.type-badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.os-badge { background: #dbeafe; color: #1e40af; }
-.oc-badge { background: #f1f5f9; color: #475569; }
-
-.history-card-body-new {
-    padding: 20px 20px 20px 75px;
-    background: #fdfdfd;
-    border-top: 1px solid #f8fafc;
-}
-
-/* Seção de Solução */
-.solution-box-active {
-    background: #f0fdf4;
-    border: 1px solid #dcfce7;
-    padding: 15px;
-    border-radius: 8px;
-    margin-top: 15px;
-}
-
-.solution-box-active h5 { color: #166534; font-size: 0.9rem; margin-top: 0; }
-.solution-box-active p { color: #15803d; font-size: 0.9rem; margin: 5px 0; }
-
-.resolver-form {
-    margin-top: 15px;
-    background: #fff;
-    padding: 15px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-}
-
-.resolver-form textarea { width: 100%; height: 80px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 10px; }
-.resolver-form input { width: 100%; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; }
-
-.btn-link-os {
-    color: #3b82f6;
-    font-weight: 600;
-    text-decoration: none;
-    font-size: 0.9rem;
-}
-
-.btn-link-os:hover { text-decoration: underline; }
