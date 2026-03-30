@@ -249,3 +249,120 @@ body.dark-mode {
 .print-header {
   display: none;
 }
+
+/* Container Principal */
+.unified-history-wrapper { padding: 5px; }
+
+.tab-header-action {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 25px;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 15px;
+}
+
+/* Card de Registro Rápido */
+.quick-form-card {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 30px;
+}
+
+/* Novo Estilo de Card de Histórico */
+.history-card-new {
+    background: #ffffff;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden;
+}
+
+.history-card-new:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+
+/* Bordas Laterais por Status */
+.os-border { border-left: 6px solid #3b82f6; }
+.pendente-border { border-left: 6px solid #ef4444; }
+.resolvido-border { border-left: 6px solid #10b981; }
+
+.history-card-header-new {
+    padding: 16px 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.card-header-left { display: flex; align-items: center; gap: 15px; }
+
+.icon-circle {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.1em;
+}
+
+.os-icon { background: #eff6ff; color: #3b82f6; }
+.pendente-icon { background: #fef2f2; color: #ef4444; }
+.resolvido-icon { background: #ecfdf5; color: #10b981; }
+
+.title-group { display: flex; flexDirection: column; }
+.card-date { font-size: 0.75rem; color: #64748b; font-weight: 600; text-transform: uppercase; }
+.card-title { margin: 0; font-size: 1rem; color: #1e293b; font-weight: 700; }
+
+.type-badge {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.os-badge { background: #dbeafe; color: #1e40af; }
+.oc-badge { background: #f1f5f9; color: #475569; }
+
+.history-card-body-new {
+    padding: 20px 20px 20px 75px;
+    background: #fdfdfd;
+    border-top: 1px solid #f8fafc;
+}
+
+/* Seção de Solução */
+.solution-box-active {
+    background: #f0fdf4;
+    border: 1px solid #dcfce7;
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.solution-box-active h5 { color: #166534; font-size: 0.9rem; margin-top: 0; }
+.solution-box-active p { color: #15803d; font-size: 0.9rem; margin: 5px 0; }
+
+.resolver-form {
+    margin-top: 15px;
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
+
+.resolver-form textarea { width: 100%; height: 80px; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 10px; }
+.resolver-form input { width: 100%; margin-bottom: 10px; border: 1px solid #cbd5e1; border-radius: 4px; padding: 8px; }
+
+.btn-link-os {
+    color: #3b82f6;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.btn-link-os:hover { text-decoration: underline; }
