@@ -1,15 +1,13 @@
 // Ficheiro: src/components/abas-equipamento/TabHistorico.jsx
-// VERSÃO 12.0 - HISTÓRICO AUDITÁVEL COM FILTRO DE DATA E EXPORTAÇÃO PDF
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getManutencoes, getOcorrenciasPorEquipamento } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { formatarDataHora } from '../../utils/timeUtils';
-import { exportarHistoricoEquipamentoPDF } from '../../utils/pdfUtils'; // Vamos criar esta função
+import { exportarHistoricoEquipamentoPDF } from '../../utils/pdfUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faHistory, faSpinner, faFilePdf, faFilter,
-  faWrench, faCheckCircle, faExclamationTriangle, faChevronDown, faChevronUp, faUser, faInfoCircle
+  faHistory, faSpinner, faFilePdf, faWrench, faCheckCircle, 
+  faExclamationTriangle, faChevronDown, faChevronUp, faUser, faInfoCircle 
 } from '@fortawesome/free-solid-svg-icons';
 import DateInput from '../DateInput';
 
@@ -19,11 +17,10 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
   const [loading, setLoading] = useState(true);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
   
-  // Estados para o Filtro de Auditoria
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
-  const carregarTudo = useCallback(async () => {
+  const carregarDados = useCallback(async () => {
     if (!equipamentoId) return;
     setLoading(true);
     try {
@@ -33,13 +30,13 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
       ]);
       setHistoricoBruto({ manutencoes: manuts || [], ocorrencias: ocorrs || [] });
     } catch (error) {
-      addToast('Erro ao carregar histórico.', 'error');
+      addToast('Erro ao buscar histórico.', 'error');
     } finally {
       setLoading(false);
     }
   }, [equipamentoId, addToast]);
 
-  useEffect(() => { carregarTudo(); }, [carregarTudo]);
+  useEffect(() => { carregarDados(); }, [carregarDados]);
 
   const toggleExpandir = (id) => {
     const novosExpandidos = new Set(itensExpandidos);
@@ -47,9 +44,9 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
     setItensExpandidos(novosExpandidos);
   };
 
-  // LÓGICA DE FILTRAGEM E MISTURA
   const linhaDoTempo = useMemo(() => {
-    const m = historicoBruto.manutencoes.map(item => ({
+    // 1. Mapeia Manutenções
+    const m = (historicoBruto.manutencoes || []).map(item => ({
       uniqueId: `os-${item.id}`,
       data: item.dataHoraAgendamentoInicio,
       tipo: 'Manutenção',
@@ -61,7 +58,8 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
       isOS: true
     }));
 
-    const o = historicoBruto.ocorrencias.map(item => ({
+    // 2. Mapeia Ocorrências
+    const o = (historicoBruto.ocorrencias || []).map(item => ({
       uniqueId: `oc-${item.id}`,
       data: item.data,
       tipo: 'Ocorrência',
@@ -71,18 +69,20 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
       responsavel: item.tecnico || 'N/A',
       status: item.resolvido ? 'Resolvido' : 'Pendente',
       isOS: false,
-      solucao: item.solucao // Campo extra para o PDF
+      solucao: item.solucao
     }));
 
     let unificado = [...m, ...o];
 
-    // Aplicar Filtro de Data
+    // 3. APLICA FILTRO DE DATA (CORRIGIDO)
     if (dataInicio) {
-        unificado = unificado.filter(item => new Date(item.data) >= new Date(dataInicio));
+        const dIni = new Date(dataInicio);
+        dIni.setHours(0, 0, 0, 0); 
+        unificado = unificado.filter(item => new Date(item.data) >= dIni);
     }
     if (dataFim) {
         const dFim = new Date(dataFim);
-        dFim.setHours(23, 59, 59);
+        dFim.setHours(23, 59, 59, 999);
         unificado = unificado.filter(item => new Date(item.data) <= dFim);
     }
 
@@ -90,9 +90,7 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
   }, [historicoBruto, dataInicio, dataFim]);
 
   const handleExportarPDF = () => {
-    if (linhaDoTempo.length === 0) {
-        return addToast('Não há dados para exportar no período selecionado.', 'info');
-    }
+    if (linhaDoTempo.length === 0) return addToast('Sem dados no período.', 'info');
     exportarHistoricoEquipamentoPDF(linhaDoTempo, { 
         nome: equipamentoNome, 
         inicio: dataInicio, 
@@ -105,18 +103,17 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
       <div className="tab-header-action" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '15px'}}>
         <h3 className="tab-inner-title"><FontAwesomeIcon icon={faHistory} /> Auditoria do Ativo</h3>
         
-        {/* BARRA DE FILTRO DE AUDITORIA */}
         <div className="audit-filter-bar" style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', width: '100%', background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
             <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.8rem' }}>Data Inicial</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Data Inicial</label>
                 <DateInput value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.8rem' }}>Data Final</label>
+                <label style={{ fontSize: '0.8rem', fontWeight: 'bold' }}>Data Final</label>
                 <DateInput value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
             </div>
             <button className="btn btn-danger" onClick={handleExportarPDF} style={{ height: '42px' }}>
-                <FontAwesomeIcon icon={faFilePdf} /> Gerar Relatório de Auditoria
+                <FontAwesomeIcon icon={faFilePdf} /> Gerar PDF
             </button>
             {(dataInicio || dataFim) && (
                 <button className="btn btn-secondary" onClick={() => { setDataInicio(''); setDataFim(''); }} style={{ height: '42px' }}>Limpar</button>
@@ -125,9 +122,9 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
       </div>
 
       {loading ? (
-        <div className="loader-container" style={{textAlign: 'center', padding: '40px'}}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
+        <div style={{textAlign: 'center', padding: '40px'}}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
       ) : (
-        <div className="timeline-cards-list">
+        <div className="timeline-cards-list" style={{ marginTop: '20px' }}>
           {linhaDoTempo.length === 0 ? (
               <p className="no-data-message">Nenhum registro encontrado para este período.</p>
           ) : (
@@ -156,9 +153,9 @@ function TabHistorico({ equipamentoId, equipamentoNome }) {
                     {expandido && (
                     <div className="history-card-body-new">
                         <div className="content-section">
-                        <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao || 'Sem detalhes informados.'}</p>
+                        <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao || 'Sem detalhes.'}</p>
                         <p><strong><FontAwesomeIcon icon={faUser} /> Responsável:</strong> {item.responsavel}</p>
-                        {item.solucao && <p style={{color: '#10b981'}}><strong><FontAwesomeIcon icon={faCheckCircle} /> Solução:</strong> {item.solucao}</p>}
+                        {item.solucao && <p style={{color: '#10b981'}}><strong>Solução:</strong> {item.solucao}</p>}
                         </div>
                     </div>
                     )}
