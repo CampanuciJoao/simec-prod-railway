@@ -1,45 +1,40 @@
 // Ficheiro: frontend-simec/src/components/GlobalFilterBar.jsx
-// VERSÃO FINAL, COMPLETA E COM O CAMINHO DO CSS CORRIGIDO
+// VERSÃO 6.0 - COM LIMPEZA DE BUSCA E FORMATAÇÃO DE RÓTULOS AVANÇADA
 
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faFilter } from '@fortawesome/free-solid-svg-icons';
+import { faSearch, faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 
-// >> CORREÇÃO PRINCIPAL APLICADA AQUI <<
-// O caminho foi corrigido para refletir a localização real do seu arquivo CSS.
-// O componente agora sobe um nível ('../') para sair de 'components' e
-// então entra em 'styles/components' para encontrar o arquivo.
+// Importação do CSS mantendo o caminho corrigido que você já utiliza
 import '../styles/components/GlobalFilterBar.css'; 
 
 /**
  * @function formatarLabel
- * @description Uma função utilitária interna que transforma valores de Enum (CamelCase)
- * em rótulos legíveis (com espaços). Ex: "EmManutencao" -> "Em Manutenção".
- * @param {string} valor - O valor a ser formatado.
- * @returns {string} O rótulo formatado.
+ * @description Transforma valores de Enum (CamelCase) em textos legíveis.
+ * Ex: "UsoLimitado" -> "Uso Limitado"
  */
 const formatarLabel = (valor) => {
   if (!valor) return '';
-  // Usa uma expressão regular para inserir um espaço antes de cada letra maiúscula.
+  // Insere um espaço antes de letras maiúsculas que não sejam a primeira
   return valor.replace(/([A-Z])/g, ' $1').trim();
 };
 
 /**
  * @component CustomSelect
- * @description Subcomponente que agora contém a lógica de formatação de rótulos.
+ * @description Componente interno para os menus de seleção (filtros laterais).
  */
 const CustomSelect = ({ config }) => (
   <div className="filter-select-wrapper">
     <FontAwesomeIcon icon={faFilter} className="filter-icon" />
     <select
       id={config.id}
-      value={config.value}
+      value={config.value || ''}
       onChange={(e) => config.onChange(e.target.value)}
       className="filter-select"
     >
       <option value="">{config.defaultLabel}</option>
       {config.options.map(opt => {
-        // Lógica inteligente que lida com opções como string ou objeto
+        // Lógica que aceita tanto objetos {value, label} quanto strings simples
         const valor = typeof opt === 'object' ? opt.value : opt;
         const rotulo = typeof opt === 'object' ? opt.label : formatarLabel(opt);
 
@@ -55,26 +50,50 @@ const CustomSelect = ({ config }) => (
 
 /**
  * @component GlobalFilterBar
- * @description Barra de filtros reutilizável. Agora é resiliente e não exige que
- * os componentes pais formatem os dados de 'options'.
+ * @description Barra de ferramentas principal para busca e filtragem.
  */
 function GlobalFilterBar({ searchTerm, onSearchChange, searchPlaceholder, selectFilters = [] }) {
+  
+  /**
+   * @function handleClearSearch
+   * @description Reseta o campo de busca textual.
+   */
+  const handleClearSearch = () => {
+    onSearchChange({ target: { value: '' } });
+  };
+
   return (
     <div className="global-filter-bar">
+      
+      {/* SEÇÃO 1: INPUT DE BUSCA COM ÍCONES E BOTÃO DE LIMPAR */}
       <div className="search-input-wrapper">
-          <input
+        <FontAwesomeIcon icon={faSearch} className="search-icon" />
+        <input
           type="text"
           placeholder={searchPlaceholder || "Buscar..."}
           value={searchTerm}
           onChange={onSearchChange}
           className="filter-input"
         />
+        {/* O botão "X" só aparece se houver algo digitado */}
+        {searchTerm && (
+          <button 
+            className="clear-search-btn" 
+            onClick={handleClearSearch} 
+            title="Limpar busca"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+          </button>
+        )}
       </div>
+
+      {/* SEÇÃO 2: CONTAINER DE FILTROS (SELECTS) DINÂMICOS */}
       <div className="select-filters-container">
         {selectFilters.map(filterConfig => (
           <CustomSelect key={filterConfig.id} config={filterConfig} />
         ))}
       </div>
+
     </div>
   );
 }
