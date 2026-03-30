@@ -1,5 +1,5 @@
 // Ficheiro: src/components/EquipamentoForm.jsx
-// VERSÃO FINAL, COMPLETA E COM JSX CORRIGIDO
+// VERSÃO 8.0 - COM CHECKBOX INTELIGENTE PARA "SEM PATRIMÔNIO"
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -29,17 +29,27 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [error, setError] = useState('');
+  
+  // NOVO: Estado para o checkbox de Sem Patrimônio
+  const [semPatrimonio, setSemPatrimonio] = useState(false);
+
   const { addToast } = useToast();
   const navigate = useNavigate();
 
+  // Carrega as unidades ao montar o componente
   useEffect(() => {
     getUnidades()
       .then(data => setUnidadesDisponiveis(data.sort((a, b) => a.nomeSistema.localeCompare(b.nomeSistema))))
       .catch(() => addToast('Erro ao carregar lista de unidades.', 'error'));
   }, [addToast]);
 
+  // Preenche o formulário se estiver em modo de edição
   useEffect(() => {
     if (isEditing && initialData) {
+      // Verifica se o patrimônio vindo do banco é "Sem Patrimônio" para marcar o checkbox
+      const isSemPat = initialData.numeroPatrimonio?.toLowerCase() === "sem patrimônio";
+      setSemPatrimonio(isSemPat);
+
       setFormData({
         tag: initialData.tag || '',
         modelo: initialData.modelo || '',
@@ -56,12 +66,27 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
       });
     } else {
       setFormData(ESTADO_INICIAL_VAZIO);
+      setSemPatrimonio(false);
     }
   }, [initialData, isEditing]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  // NOVO: Handler para o Checkbox de Sem Patrimônio
+  const handleCheckboxChange = (e) => {
+    const checked = e.target.checked;
+    setSemPatrimonio(checked);
+    
+    if (checked) {
+      // Se marcou, preenche com o texto padrão
+      setFormData(prev => ({ ...prev, numeroPatrimonio: 'Sem Patrimônio' }));
+    } else {
+      // Se desmarcou, limpa para o usuário digitar um número real
+      setFormData(prev => ({ ...prev, numeroPatrimonio: '' }));
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -85,14 +110,11 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
     if (onCancel) {
       onCancel();
     } else {
-      navigate('/cadastros/equipamentos');
+      navigate('/equipamentos');
     }
   };
 
   return (
-    // ==========================================================================
-    // >> O JSX AQUI FOI TOTALMENTE REVISADO PARA GARANTIR QUE ESTÁ CORRETO <<
-    // ==========================================================================
     <form onSubmit={handleSubmit} className="form-elegante">
       {error && <p className="form-error">{error}</p>}
       
@@ -150,10 +172,31 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
               <label htmlFor="dataInstalacao">Data Instalação</label>
               <DateInput id="dataInstalacao" name="dataInstalacao" value={formData.dataInstalacao} onChange={handleChange} />
             </div>
+
+            {/* CAMPO DE PATRIMÔNIO ATUALIZADO COM CHECKBOX */}
             <div className="form-group">
               <label htmlFor="numeroPatrimonio">Número de Patrimônio</label>
-              <input type="text" id="numeroPatrimonio" name="numeroPatrimonio" value={formData.numeroPatrimonio} onChange={handleChange} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <input 
+                  type="text" 
+                  id="numeroPatrimonio" 
+                  name="numeroPatrimonio" 
+                  value={formData.numeroPatrimonio} 
+                  onChange={handleChange} 
+                  disabled={semPatrimonio}
+                  placeholder={semPatrimonio ? "" : "Digite o número"}
+                />
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82em', cursor: 'pointer', fontWeight: 'normal', color: 'var(--cor-texto-secundario-light)' }}>
+                  <input 
+                    type="checkbox" 
+                    checked={semPatrimonio} 
+                    onChange={handleCheckboxChange} 
+                  />
+                  Equipamento sem etiqueta de patrimônio
+                </label>
+              </div>
             </div>
+
             <div className="form-group">
               <label htmlFor="registroAnvisa">Registro ANVISA</label>
               <input type="text" id="registroAnvisa" name="registroAnvisa" value={formData.registroAnvisa} onChange={handleChange} />

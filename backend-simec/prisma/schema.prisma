@@ -63,7 +63,7 @@ model Equipamento {
   anoFabricacao     String?           @map("ano_fabricacao")
   dataInstalacao    DateTime?         @map("data_instalacao")
   status            StatusEquipamento @default(Operante)
-  numeroPatrimonio  String?           @unique @map("numero_patrimonio")
+  numeroPatrimonio  String?           @map("numero_patrimonio")
   registroAnvisa    String?           @map("registro_anvisa")
   observacoes       String?           @db.Text
   unidadeId         String

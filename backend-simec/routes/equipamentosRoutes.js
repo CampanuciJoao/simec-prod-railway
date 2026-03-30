@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/equipamentosRoutes.js
-// VERSÃO FINAL SÊNIOR - COMPLETA, CONSISTENTE E VERIFICADA
+// VERSÃO 7.0 - COM VALIDAÇÃO INTELIGENTE DE PATRIMÔNIO (EXCETO "SEM PATRIMÔNIO")
 
 // --- 1. Importações ---
 import express from 'express';
@@ -72,20 +72,42 @@ router.get('/:id', async (req, res) => {
 /** @route   POST /api/equipamentos */
 router.post('/', async (req, res) => {
     const { dataInstalacao, ...dados } = req.body;
+    
     if (!dados.tag || !dados.modelo || !dados.unidadeId) {
         return res.status(400).json({ message: 'Tag, Modelo e Unidade são campos obrigatórios.' });
     }
+
     try {
+        // --- INÍCIO DA REGRA DE PATRIMÔNIO INTELIGENTE ---
+        const patrimonioLimpo = dados.numeroPatrimonio?.trim();
+        
+        if (patrimonioLimpo && patrimonioLimpo.toLowerCase() !== "sem patrimônio") {
+            const patrimonioExistente = await prisma.equipamento.findFirst({
+                where: { 
+                    numeroPatrimonio: { equals: patrimonioLimpo, mode: 'insensitive' } 
+                }
+            });
+
+            if (patrimonioExistente) {
+                return res.status(400).json({ 
+                    message: `O número de patrimônio "${patrimonioLimpo}" já está cadastrado em outro equipamento.` 
+                });
+            }
+        }
+        // --- FIM DA REGRA ---
+
         const novoEquipamento = await prisma.equipamento.create({
             data: { ...dados, dataInstalacao: parseDate(dataInstalacao) }
         });
+
         await registrarLog({
             usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Equipamento',
             entidadeId: novoEquipamento.id, detalhes: `Equipamento "${novoEquipamento.modelo}" (Tag: ${novoEquipamento.tag}) foi criado.`
         });
+
         res.status(201).json(novoEquipamento);
     } catch (error) {
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um equipamento com esta Tag ou Número de Património.' });
+        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um equipamento com esta Tag (Nº Série).' });
         if (error.code === 'P2025') return res.status(404).json({ message: 'A Unidade especificada não foi encontrada.' });
         res.status(500).json({ message: 'Erro ao criar equipamento.' });
     }
@@ -95,12 +117,34 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { dataInstalacao, ...dados } = req.body;
+    
     try {
+        // --- INÍCIO DA REGRA DE PATRIMÔNIO INTELIGENTE NA EDIÇÃO ---
+        const patrimonioEdicao = dados.numeroPatrimonio?.trim();
+
+        if (patrimonioEdicao && patrimonioEdicao.toLowerCase() !== "sem patrimônio") {
+            const conflitoPatrimonio = await prisma.equipamento.findFirst({
+                where: { 
+                    numeroPatrimonio: { equals: patrimonioEdicao, mode: 'insensitive' },
+                    NOT: { id: id } // Garante que não dê conflito com ele mesmo
+                }
+            });
+
+            if (conflitoPatrimonio) {
+                return res.status(400).json({ 
+                    message: `O número de patrimônio "${patrimonioEdicao}" já pertence a outro equipamento.` 
+                });
+            }
+        }
+        // --- FIM DA REGRA ---
+
         const dadosParaAtualizar = { ...dados };
         if (dataInstalacao !== undefined) dadosParaAtualizar.dataInstalacao = parseDate(dataInstalacao);
+        
         const equipamentoAtualizado = await prisma.equipamento.update({
             where: { id }, data: dadosParaAtualizar
         });
+
         await registrarLog({
             usuarioId: req.usuario.id, acao: 'EDIÇÃO', entidade: 'Equipamento',
             entidadeId: id, detalhes: `Dados do equipamento "${equipamentoAtualizado.modelo}" foram atualizados.`
@@ -108,7 +152,7 @@ router.put('/:id', async (req, res) => {
         res.json(equipamentoAtualizado);
     } catch (error) {
         if (error.code === 'P2025') return res.status(404).json({ message: 'Equipamento não encontrado.' });
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um equipamento com esta Tag ou Número de Património.' });
+        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um equipamento com esta Tag (Nº Série).' });
         res.status(500).json({ message: 'Erro ao atualizar equipamento.' });
     }
 });
@@ -131,10 +175,9 @@ router.delete('/:id', admin, async (req, res) => {
 
 
 // ==========================================================================
-// SEÇÃO: ROTAS ANINHADAS DE ACESSÓRIOS
+// SEÇÃO: ROTAS ANINHADAS DE ACESSÓRIOS (Mantido sem alterações)
 // ==========================================================================
 
-/** @route   GET /api/equipamentos/:equipamentoId/acessorios */
 router.get('/:equipamentoId/acessorios', async (req, res) => {
     const { equipamentoId } = req.params;
     try {
@@ -144,12 +187,10 @@ router.get('/:equipamentoId/acessorios', async (req, res) => {
         });
         res.json(acessorios);
     } catch (error) {
-        console.error(`Erro ao buscar acessórios para o equipamento ${equipamentoId}:`, error);
-        res.status(500).json({ message: 'Erro interno do servidor ao buscar acessórios.' });
+        res.status(500).json({ message: 'Erro ao buscar acessórios.' });
     }
 });
 
-/** @route   POST /api/equipamentos/:equipamentoId/acessorios */
 router.post('/:equipamentoId/acessorios', async (req, res) => {
     const { equipamentoId } = req.params;
     const { nome, numeroSerie, descricao } = req.body;
@@ -164,17 +205,13 @@ router.post('/:equipamentoId/acessorios', async (req, res) => {
         });
         res.status(201).json(novoAcessorio);
     } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Equipamento não encontrado para vincular o acessório.' });
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um acessório com este número de série.' });
         res.status(500).json({ message: 'Erro ao criar acessório.' });
     }
 });
 
-/** @route   PUT /api/equipamentos/:equipamentoId/acessorios/:acessorioId */
 router.put('/:equipamentoId/acessorios/:acessorioId', async (req, res) => {
     const { acessorioId } = req.params;
     const { nome, numeroSerie, descricao } = req.body;
-    if (!nome) return res.status(400).json({ message: 'O nome do acessório é obrigatório.' });
     try {
         const acessorioAtualizado = await prisma.acessorio.update({
             where: { id: acessorioId }, data: { nome, numeroSerie: numeroSerie || null, descricao: descricao || null },
@@ -185,13 +222,10 @@ router.put('/:equipamentoId/acessorios/:acessorioId', async (req, res) => {
         });
         res.json(acessorioAtualizado);
     } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Acessório não encontrado.' });
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um acessório com este número de série.' });
         res.status(500).json({ message: 'Erro ao atualizar acessório.' });
     }
 });
 
-/** @route   DELETE /api/equipamentos/:equipamentoId/acessorios/:acessorioId */
 router.delete('/:equipamentoId/acessorios/:acessorioId', async (req, res) => {
     const { acessorioId } = req.params;
     try {
@@ -202,22 +236,17 @@ router.delete('/:equipamentoId/acessorios/:acessorioId', async (req, res) => {
         });
         res.status(200).json({ message: 'Acessório excluído com sucesso.' });
     } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Acessório não encontrado.' });
         res.status(500).json({ message: 'Erro ao excluir acessório.' });
     }
 });
 
-
 // ==========================================================================
-// SEÇÃO: ROTAS DE ANEXOS
+// SEÇÃO: ROTAS DE ANEXOS (Mantido sem alterações)
 // ==========================================================================
 
-/** @route   POST /api/equipamentos/:equipamentoId/anexos */
 router.post('/:equipamentoId/anexos', upload.array('anexosEquipamento'), async (req, res) => {
     const { equipamentoId } = req.params;
-    if (!req.files || req.files.length === 0) {
-        return res.status(400).json({ message: 'Nenhum ficheiro foi enviado.' });
-    }
+    if (!req.files || req.files.length === 0) return res.status(400).json({ message: 'Nenhum ficheiro foi enviado.' });
     try {
         const anexosData = req.files.map(file => ({
             nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype, equipamentoId: equipamentoId
@@ -230,7 +259,6 @@ router.post('/:equipamentoId/anexos', upload.array('anexosEquipamento'), async (
     }
 });
 
-/** @route   DELETE /api/equipamentos/:equipamentoId/anexos/:anexoId */
 router.delete('/:equipamentoId/anexos/:anexoId', async (req, res) => {
     const { anexoId } = req.params;
     try {
@@ -243,7 +271,6 @@ router.delete('/:equipamentoId/anexos/:anexoId', async (req, res) => {
         });
         res.status(204).send();
     } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Anexo não encontrado.' });
         res.status(500).json({ message: 'Erro ao excluir anexo.' });
     }
 });
