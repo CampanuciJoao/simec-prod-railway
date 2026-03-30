@@ -14,29 +14,6 @@ const adicionarCabecalho = (doc, titulo) => {
     doc.text(titulo, doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
 };
 
-/**
- * RELATÓRIO GERAL (Inventário / Manutenções)
- */
-export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
-    const doc = new jsPDF();
-    let headers = [["Modelo", "Nº de Série", "Fabricante", "Registro ANVISA", "Status", "Unidade"]];
-    let body = resultado.dados.map(item => [
-        item.modelo || 'N/A', item.tag || 'N/A', item.fabricante || 'N/A',
-        item.registroAnvisa || 'N/A', item.status || 'N/A', item.unidade?.nomeSistema || 'N/A'
-    ]);
-
-    adicionarCabecalho(doc, "Relatório de Inventário");
-    autoTable(doc, {
-        head: headers, body: body, startY: 45, theme: 'striped',
-        headStyles: { fillColor: [30, 41, 59], halign: 'center' },
-        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } }
-    });
-    doc.save(`${nomeArquivo}.pdf`);
-};
-
-/**
- * RELATÓRIO DE AUDITORIA DE ATIVO (Histórico Unificado)
- */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     const doc = new jsPDF();
     adicionarCabecalho(doc, "Relatório de Auditoria de Ativo");
@@ -90,4 +67,21 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
 
     const fileName = `auditoria_${(info.tag || 'Equipamento').replace(/\s+/g, '_')}.pdf`;
     doc.save(fileName);
+};
+
+// Mantemos a exportarRelatorioPDF padrão para não quebrar outros módulos
+export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
+    const doc = new jsPDF();
+    let headers = [["Modelo", "Nº de Série", "Fabricante", "Registro ANVISA", "Status", "Unidade"]];
+    let body = resultado.dados.map(item => [
+        item.modelo || 'N/A', item.tag || 'N/A', item.fabricante || 'N/A',
+        item.registroAnvisa || 'N/A', item.status || 'N/A', item.unidade?.nomeSistema || 'N/A'
+    ]);
+    adicionarCabecalho(doc, "Relatório de Inventário");
+    autoTable(doc, {
+        head: headers, body: body, startY: 45, theme: 'striped',
+        headStyles: { fillColor: [30, 41, 59], halign: 'center' },
+        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } }
+    });
+    doc.save(`${nomeArquivo}.pdf`);
 };

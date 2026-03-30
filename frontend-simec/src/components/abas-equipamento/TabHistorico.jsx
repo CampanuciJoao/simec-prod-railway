@@ -46,9 +46,9 @@ function TabHistorico({ equipamento }) {
   const linhaDoTempo = useMemo(() => {
     const m = (historicoBruto.manutencoes || []).map(item => ({
       uniqueId: `os-${item.id}`,
-      data: item.dataConclusao || item.dataHoraAgendamentoInicio, // AUDITORIA: Prioriza execução real
+      data: item.dataConclusao || item.dataHoraAgendamentoInicio, 
       tipo: 'Manutenção',
-      categoria: item.tipo, // Preventiva, Corretiva, etc.
+      categoria: item.tipo, 
       titulo: `OS: ${item.numeroOS}`,
       descricao: item.descricaoProblemaServico,
       responsavel: item.tecnicoResponsavel || 'N/A',
@@ -58,7 +58,7 @@ function TabHistorico({ equipamento }) {
 
     const o = (historicoBruto.ocorrencias || []).map(item => ({
       uniqueId: `oc-${item.id}`,
-      data: item.dataResolucao || item.data, // AUDITORIA: Prioriza solução real
+      data: item.dataResolucao || item.data, 
       tipo: 'Ocorrência',
       categoria: 'Evento / Ocorrência',
       titulo: item.titulo,
@@ -71,7 +71,7 @@ function TabHistorico({ equipamento }) {
 
     let unificado = [...m, ...o];
 
-    // --- FILTRO DE DATA ROBUSTO (Ignora horas para a busca) ---
+    // --- FILTRO DE DATA COM CORREÇÃO DE TIMEZONE ---
     if (dataInicio) {
         const dIni = new Date(dataInicio + 'T00:00:00');
         unificado = unificado.filter(item => new Date(item.data) >= dIni);
@@ -84,10 +84,11 @@ function TabHistorico({ equipamento }) {
     return unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
   }, [historicoBruto, dataInicio, dataFim]);
 
-  const setHoje = () => {
+  // Atalho para setar a data de hoje nos campos
+  const handleSetHoje = (campo) => {
     const hoje = new Date().toISOString().split('T')[0];
-    setDataInicio(hoje);
-    setDataFim(hoje);
+    if (campo === 'inicio') setDataInicio(hoje);
+    if (campo === 'fim') setDataFim(hoje);
   };
 
   const handleExportar = () => {
@@ -106,21 +107,30 @@ function TabHistorico({ equipamento }) {
       <div className="tab-header-action" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '15px'}}>
         <h3 className="tab-inner-title"><FontAwesomeIcon icon={faHistory} /> Auditoria do Ativo</h3>
         
-        <div className="audit-filter-bar" style={{ display: 'flex', gap: '12px', alignItems: 'flex-end', width: '100%', background: '#f8fafc', padding: '18px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+        <div className="audit-filter-bar" style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', width: '100%', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+            
+            {/* CAMPO INÍCIO COM BOTÃO HOJE */}
             <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569' }}>DATA INICIAL</label>
-                <DateInput value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>DATA INICIAL</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <DateInput value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleSetHoje('inicio')} title="Setar hoje">H</button>
+                </div>
             </div>
+
+            {/* CAMPO FIM COM BOTÃO HOJE */}
             <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569' }}>DATA FINAL</label>
-                <DateInput value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>DATA FINAL</label>
+                <div style={{ display: 'flex', gap: '5px' }}>
+                    <DateInput value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleSetHoje('fim')} title="Setar hoje">H</button>
+                </div>
             </div>
-            <button className="btn btn-secondary" onClick={setHoje} style={{ height: '42px', gap: '8px' }}>
-                <FontAwesomeIcon icon={faCalendarDay} /> Hoje
-            </button>
-            <button className="btn btn-danger" onClick={handleExportar} style={{ height: '42px', gap: '8px' }}>
+
+            <button className="btn btn-danger" onClick={handleExportar} style={{ height: '42px', gap: '8px', marginLeft: 'auto' }}>
                 <FontAwesomeIcon icon={faFilePdf} /> Gerar PDF Auditável
             </button>
+
             {(dataInicio || dataFim) && (
                 <button className="btn btn-link btn-sm" onClick={() => { setDataInicio(''); setDataFim(''); }}>Limpar Filtros</button>
             )}
@@ -158,7 +168,7 @@ function TabHistorico({ equipamento }) {
                         <div className="history-card-body-new">
                             <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao}</p>
                             <p><strong><FontAwesomeIcon icon={faUser} /> Responsável:</strong> {item.responsavel}</p>
-                            {item.solucao && <p style={{color: '#10b981'}}><strong>Solução:</strong> {item.solucao}</p>}
+                            {item.solucao && <p style={{color: '#10b981'}}><strong><FontAwesomeIcon icon={faCheckCircle} /> Solução:</strong> {item.solucao}</p>}
                         </div>
                     )}
                 </div>
