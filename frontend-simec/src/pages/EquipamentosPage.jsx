@@ -176,9 +176,8 @@ function EquipamentosPage() {
                         <Link 
                           to={`/equipamentos/ficha-tecnica/${equip.id}`} 
                           className="btn-action view" 
-                          title="Ficha Técnica / Ocorrências"
-                          style={{ backgroundColor: '#8b5cf6', color: 'white' }}
-                        >
+                          title="Ficha Técnica / Ocorrências">
+                                                 
                           <FontAwesomeIcon icon={faFileMedical} />
                         </Link>
 
