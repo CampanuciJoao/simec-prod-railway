@@ -1,28 +1,27 @@
 // Ficheiro: src/components/abas-equipamento/TabHistorico.jsx
-// VERSÃO 11.2 - AJUSTE DE ESPAÇAMENTO E ALINHAMENTO DE TEXTO
+// VERSÃO 12.0 - HISTÓRICO AUDITÁVEL COM FILTRO DE DATA E EXPORTAÇÃO PDF
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
-import { getManutencoes, getOcorrenciasPorEquipamento, addOcorrencia, resolverOcorrencia } from '../../services/api';
+import { getManutencoes, getOcorrenciasPorEquipamento } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { formatarDataHora } from '../../utils/timeUtils';
+import { exportarHistoricoEquipamentoPDF } from '../../utils/pdfUtils'; // Vamos criar esta função
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faHistory, faEye, faSpinner, faPlus, faSave, faTimes, 
-  faTools, faChevronDown, faChevronUp, faUser, faCheckCircle, faExclamationTriangle, faInfoCircle, faWrench
+  faHistory, faSpinner, faFilePdf, faFilter,
+  faWrench, faCheckCircle, faExclamationTriangle, faChevronDown, faChevronUp, faUser, faInfoCircle
 } from '@fortawesome/free-solid-svg-icons';
+import DateInput from '../DateInput';
 
-function TabHistorico({ equipamentoId }) {
+function TabHistorico({ equipamentoId, equipamentoNome }) {
   const { addToast } = useToast();
   const [historicoBruto, setHistoricoBruto] = useState({ manutencoes: [], ocorrencias: [] });
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
-  
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
-  const [resolvendoId, setResolvendoId] = useState(null);
-  const [dadosSolucao, setDadosSolucao] = useState({ solucao: '', tecnicoResolucao: '' });
-  const [novaOcorrencia, setNovaOcorrencia] = useState({ titulo: '', descricao: '', tipo: 'Operacional', tecnico: '' });
+  
+  // Estados para o Filtro de Auditoria
+  const [dataInicio, setDataInicio] = useState('');
+  const [dataFim, setDataFim] = useState('');
 
   const carregarTudo = useCallback(async () => {
     if (!equipamentoId) return;
@@ -48,177 +47,125 @@ function TabHistorico({ equipamentoId }) {
     setItensExpandidos(novosExpandidos);
   };
 
+  // LÓGICA DE FILTRAGEM E MISTURA
   const linhaDoTempo = useMemo(() => {
     const m = historicoBruto.manutencoes.map(item => ({
       uniqueId: `os-${item.id}`,
       data: item.dataHoraAgendamentoInicio,
-      tipoPrincipal: 'Manutenção',
+      tipo: 'Manutenção',
       categoria: item.tipo,
-      titulo: `Ordem de Serviço: ${item.numeroOS}`,
+      titulo: `OS: ${item.numeroOS}`,
       descricao: item.descricaoProblemaServico,
-      responsavel: item.tecnicoResponsavel,
+      responsavel: item.tecnicoResponsavel || 'N/A',
       status: item.status,
-      link: `/manutencoes/detalhes/${item.id}`,
-      isOS: true,
-      resolvido: item.status === 'Concluida'
+      isOS: true
     }));
 
     const o = historicoBruto.ocorrencias.map(item => ({
       uniqueId: `oc-${item.id}`,
-      idReal: item.id,
       data: item.data,
-      tipoPrincipal: 'Ocorrência',
+      tipo: 'Ocorrência',
       categoria: item.tipo,
       titulo: item.titulo,
       descricao: item.descricao,
-      responsavel: item.tecnico,
+      responsavel: item.tecnico || 'N/A',
       status: item.resolvido ? 'Resolvido' : 'Pendente',
-      resolvido: item.resolvido,
-      solucao: item.solucao,
-      dataResolucao: item.dataResolucao,
-      tecnicoResolucao: item.tecnicoResolucao,
-      link: null,
-      isOS: false
+      isOS: false,
+      solucao: item.solucao // Campo extra para o PDF
     }));
 
-    return [...m, ...o].sort((a, b) => new Date(b.data) - new Date(a.data));
-  }, [historicoBruto]);
+    let unificado = [...m, ...o];
 
-  const handleSalvarSolucao = async (id) => {
-    if (!dadosSolucao.solucao.trim()) return addToast('Descreva a solução.', 'error');
-    setSubmitting(true);
-    try {
-      await resolverOcorrencia(id, dadosSolucao);
-      addToast('Ocorrência resolvida!', 'success');
-      setResolvendoId(null);
-      setDadosSolucao({ solucao: '', tecnicoResolucao: '' });
-      carregarTudo();
-    } catch { addToast('Erro ao salvar.', 'error'); } finally { setSubmitting(false); }
+    // Aplicar Filtro de Data
+    if (dataInicio) {
+        unificado = unificado.filter(item => new Date(item.data) >= new Date(dataInicio));
+    }
+    if (dataFim) {
+        const dFim = new Date(dataFim);
+        dFim.setHours(23, 59, 59);
+        unificado = unificado.filter(item => new Date(item.data) <= dFim);
+    }
+
+    return unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
+  }, [historicoBruto, dataInicio, dataFim]);
+
+  const handleExportarPDF = () => {
+    if (linhaDoTempo.length === 0) {
+        return addToast('Não há dados para exportar no período selecionado.', 'info');
+    }
+    exportarHistoricoEquipamentoPDF(linhaDoTempo, { 
+        nome: equipamentoNome, 
+        inicio: dataInicio, 
+        fim: dataFim 
+    });
   };
 
   return (
     <div className="unified-history-wrapper">
-      <div className="tab-header-action">
-        <h3 className="tab-inner-title"><FontAwesomeIcon icon={faHistory} /> Linha do Tempo do Ativo</h3>
-        {!showForm && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>
-            <FontAwesomeIcon icon={faPlus} /> Registrar Ocorrência
-          </button>
-        )}
-      </div>
-
-      {showForm && (
-        <div className="quick-form-card">
-           <form onSubmit={async (e) => {
-             e.preventDefault();
-             setSubmitting(true);
-             try {
-               await addOcorrencia({ ...novaOcorrencia, equipamentoId });
-               addToast('Registrado com sucesso!', 'success');
-               setShowForm(false);
-               setNovaOcorrencia({ titulo: '', descricao: '', tipo: 'Operacional', tecnico: '' });
-               carregarTudo();
-             } catch { addToast('Erro!', 'error'); } finally { setSubmitting(false); }
-           }} className="form-elegante">
-             <div className="form-group">
-                <label>Título do Evento *</label>
-                <input type="text" value={novaOcorrencia.titulo} onChange={e => setNovaOcorrencia({...novaOcorrencia, titulo: e.target.value})} required placeholder="Ex: Queda de energia, Falha de boot..." />
-              </div>
-             <div className="info-grid grid-cols-2">
-               <div className="form-group">
-                 <label>Categoria</label>
-                 <select value={novaOcorrencia.tipo} onChange={e => setNovaOcorrencia({...novaOcorrencia, tipo: e.target.value})}>
-                    <option value="Operacional">Operacional</option>
-                    <option value="Ajuste">Ajuste / Configuração</option>
-                    <option value="Infraestrutura">Infraestrutura</option>
-                 </select>
-               </div>
-               <div className="form-group">
-                 <label>Responsável</label>
-                 <input type="text" value={novaOcorrencia.tecnico} onChange={e => setNovaOcorrencia({...novaOcorrencia, tecnico: e.target.value})} placeholder="Seu nome" />
-               </div>
-             </div>
-             <div className="form-actions-left" style={{ marginTop: '15px' }}>
-                <button type="submit" className="btn btn-primary btn-sm" disabled={submitting}>Salvar no Histórico</button>
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
-             </div>
-           </form>
+      <div className="tab-header-action" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '15px'}}>
+        <h3 className="tab-inner-title"><FontAwesomeIcon icon={faHistory} /> Auditoria do Ativo</h3>
+        
+        {/* BARRA DE FILTRO DE AUDITORIA */}
+        <div className="audit-filter-bar" style={{ display: 'flex', gap: '15px', alignItems: 'flex-end', width: '100%', background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: '0.8rem' }}>Data Inicial</label>
+                <DateInput value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+                <label style={{ fontSize: '0.8rem' }}>Data Final</label>
+                <DateInput value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
+            </div>
+            <button className="btn btn-danger" onClick={handleExportarPDF} style={{ height: '42px' }}>
+                <FontAwesomeIcon icon={faFilePdf} /> Gerar Relatório de Auditoria
+            </button>
+            {(dataInicio || dataFim) && (
+                <button className="btn btn-secondary" onClick={() => { setDataInicio(''); setDataFim(''); }} style={{ height: '42px' }}>Limpar</button>
+            )}
         </div>
-      )}
+      </div>
 
       {loading ? (
         <div className="loader-container" style={{textAlign: 'center', padding: '40px'}}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
       ) : (
-        /* ADICIONADO: Classe timeline-cards-list para garantir o espaçamento vertical */
-        <div className="timeline-cards-list" style={{ marginTop: '20px' }}>
-          {linhaDoTempo.map((item) => {
-            const expandido = itensExpandidos.has(item.uniqueId);
-            const isPendente = !item.isOS && !item.resolvido;
+        <div className="timeline-cards-list">
+          {linhaDoTempo.length === 0 ? (
+              <p className="no-data-message">Nenhum registro encontrado para este período.</p>
+          ) : (
+            linhaDoTempo.map((item) => {
+                const expandido = itensExpandidos.has(item.uniqueId);
+                const isPendente = !item.isOS && item.status === 'Pendente';
 
-            return (
-              /* UNIFICADO: Usei a classe history-card-new para bater com seu global.css */
-              <div key={item.uniqueId} className={`history-card-new ${item.isOS ? 'os-border' : (isPendente ? 'pendente-border' : 'resolvido-border')}`}>
-                <div className="history-card-header-new" onClick={() => toggleExpandir(item.uniqueId)}>
-                  <div className="card-header-left">
-                    <div className={`icon-circle ${item.isOS ? 'os-icon' : (isPendente ? 'pendente-icon' : 'resolvido-icon')}`}>
-                      <FontAwesomeIcon icon={item.isOS ? faWrench : (item.resolvido ? faCheckCircle : faExclamationTriangle)} />
+                return (
+                <div key={item.uniqueId} className={`history-card-new ${item.isOS ? 'os-border' : (isPendente ? 'pendente-border' : 'resolvido-border')}`}>
+                    <div className="history-card-header-new" onClick={() => toggleExpandir(item.uniqueId)}>
+                    <div className="card-header-left">
+                        <div className={`icon-circle ${item.isOS ? 'os-icon' : (isPendente ? 'pendente-icon' : 'resolvido-icon')}`}>
+                        <FontAwesomeIcon icon={item.isOS ? faWrench : (item.status === 'Resolvido' ? faCheckCircle : faExclamationTriangle)} />
+                        </div>
+                        <div className="title-group">
+                        <span className="card-date">{formatarDataHora(item.data)}</span>
+                        <h4 className="card-title">{item.titulo}</h4>
+                        </div>
                     </div>
-                    {/* title-group força a data ficar acima do título via CSS */}
-                    <div className="title-group">
-                      <span className="card-date">{formatarDataHora(item.data)}</span>
-                      <h4 className="card-title">{item.titulo}</h4>
+                    <div className="card-header-right">
+                        <span className={`type-badge ${item.isOS ? 'os-badge' : 'oc-badge'}`}>{item.categoria}</span>
+                        <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} className="chevron-icon" />
                     </div>
-                  </div>
-                  <div className="card-header-right">
-                    <span className={`type-badge ${item.isOS ? 'os-badge' : 'oc-badge'}`}>{item.categoria}</span>
-                    <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} className="chevron-icon" />
-                  </div>
-                </div>
-
-                {expandido && (
-                  <div className="history-card-body-new">
-                    <div className="content-section">
-                      <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Descrição:</strong> {item.descricao || 'Sem detalhes informados.'}</p>
-                      <p><strong><FontAwesomeIcon icon={faUser} /> Registrado por:</strong> {item.responsavel || 'N/A'}</p>
                     </div>
 
-                    {item.isOS ? (
-                      <div className="card-footer-new" style={{ marginTop: '15px' }}>
-                        <Link to={item.link} className="btn-link-os">Visualizar Ordem de Serviço Completa →</Link>
-                      </div>
-                    ) : (
-                      <div className="solution-section-new">
-                        {item.resolvido ? (
-                          <div className="solution-box-active">
-                            <h5>Solução Técnica Aplicada:</h5>
-                            <p>{item.solucao}</p>
-                            <small>Resolvido por <strong>{item.tecnicoResolucao}</strong> em {formatarDataHora(item.dataResolucao)}</small>
-                          </div>
-                        ) : (
-                          <div className="pending-action-box" style={{ marginTop: '15px' }}>
-                            {resolvendoId === item.idReal ? (
-                              <div className="resolver-form">
-                                <textarea placeholder="Como o problema foi resolvido?" value={dadosSolucao.solucao} onChange={e => setDadosSolucao({...dadosSolucao, solucao: e.target.value})} style={{ width: '100%', minHeight: '80px', padding: '10px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                                <input type="text" placeholder="Seu nome" value={dadosSolucao.tecnicoResolucao} onChange={e => setDadosSolucao({...dadosSolucao, tecnicoResolucao: e.target.value})} style={{ width: '100%', marginTop: '10px', padding: '8px', borderRadius: '8px', border: '1px solid #ddd' }} />
-                                <div className="resolver-buttons" style={{ marginTop: '10px', display: 'flex', gap: '10px' }}>
-                                  <button className="btn btn-success btn-sm" onClick={() => handleSalvarSolucao(item.idReal)}>Confirmar</button>
-                                  <button className="btn btn-secondary btn-sm" onClick={() => setResolvendoId(null)}>Cancelar</button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button className="btn btn-outline-success btn-sm" onClick={(e) => { e.stopPropagation(); setResolvendoId(item.idReal); }}>
-                                <FontAwesomeIcon icon={faCheckCircle} /> Marcar como Resolvido
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
+                    {expandido && (
+                    <div className="history-card-body-new">
+                        <div className="content-section">
+                        <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao || 'Sem detalhes informados.'}</p>
+                        <p><strong><FontAwesomeIcon icon={faUser} /> Responsável:</strong> {item.responsavel}</p>
+                        {item.solucao && <p style={{color: '#10b981'}}><strong><FontAwesomeIcon icon={faCheckCircle} /> Solução:</strong> {item.solucao}</p>}
+                        </div>
+                    </div>
                     )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+                );
+            })
+          )}
         </div>
       )}
     </div>
