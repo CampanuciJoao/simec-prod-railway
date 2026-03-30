@@ -1,5 +1,5 @@
 // Ficheiro: src/pages/EquipamentosPage.jsx
-// VERSÃO 6.0 - ORDENAÇÃO COMPLETA EM TODAS AS COLUNAS (CRONOLÓGICA E ALFABÉTICA)
+// VERSÃO 7.0 - COM ACESSO À FICHA TÉCNICA / OCORRÊNCIAS
 
 import React, { useMemo, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -12,7 +12,8 @@ import {
   faEdit, 
   faTrashAlt, 
   faSpinner, 
-  faExclamationTriangle 
+  faExclamationTriangle,
+  faFileMedical // Ícone para a Ficha Técnica
 } from '@fortawesome/free-solid-svg-icons';
 import { useEquipamentos } from '../hooks/useEquipamentos';
 import { useModal } from '../hooks/useModal';
@@ -41,7 +42,6 @@ function EquipamentosPage() {
   const location = useLocation();
   const { user } = useAuth();
 
-  // Consome o Hook com a nova lógica de ordenação
   const {
     equipamentos,
     unidadesDisponiveis,
@@ -60,7 +60,6 @@ function EquipamentosPage() {
     closeModal: fecharModalExclusao
   } = useModal();
   
-  // Captura filtros vindos do Dashboard (ex: clicar no gráfico)
   useEffect(() => {
     if (location.state?.filtroStatusInicial) {
       const statusEnumValue = location.state.filtroStatusInicial;
@@ -76,9 +75,7 @@ function EquipamentosPage() {
     }
   };
 
-  // Configuração dos filtros superiores (Selects)
   const selectFiltersConfig = useMemo(() => {
-    // Gera listas únicas para os filtros baseadas nos equipamentos carregados
     const tipos = [...new Set(equipamentos.map(e => e.tipo).filter(Boolean))].sort();
     const fabricantes = [...new Set(equipamentos.map(e => e.fabricante).filter(Boolean))].sort();
     const statusOptions = ["Operante", "Inoperante", "UsoLimitado", "EmManutencao"];
@@ -91,7 +88,6 @@ function EquipamentosPage() {
     ];
   }, [equipamentos, unidadesDisponiveis, controles]);
 
-  // Função auxiliar para renderizar o ícone de ordenação ativo ou inativo
   const renderSortIcon = (key) => {
     if (controles.sortConfig.key !== key) return <FontAwesomeIcon icon={faSort} className="sort-arrow-inactive" />;
     return controles.sortConfig.direction === 'ascending' ? <FontAwesomeIcon icon={faSortUp} className="sort-arrow-active" /> : <FontAwesomeIcon icon={faSortDown} className="sort-arrow-active" />;
@@ -128,7 +124,6 @@ function EquipamentosPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  {/* CADA CABEÇALHO AGORA POSSUI onClick E ÍCONE DE ORDENAÇÃO */}
                   <th className="sortable-header" onClick={() => controles.requestSort('modelo')}>
                     Modelo {renderSortIcon('modelo')}
                   </th>
@@ -174,8 +169,23 @@ function EquipamentosPage() {
                         />
                       </td>
                       <td data-label="Ações" className="actions-cell col-text-right">
+                        {/* BOTÃO VER DETALHES */}
                         <Link to={`/equipamentos/detalhes/${equip.id}`} className="btn-action view" title="Ver Detalhes"><FontAwesomeIcon icon={faEye} /></Link>
+                        
+                        {/* BOTÃO NOVO: FICHA TÉCNICA (ROXO) */}
+                        <Link 
+                          to={`/equipamentos/ficha-tecnica/${equip.id}`} 
+                          className="btn-action view" 
+                          title="Ficha Técnica / Ocorrências"
+                          style={{ backgroundColor: '#8b5cf6', color: 'white' }}
+                        >
+                          <FontAwesomeIcon icon={faFileMedical} />
+                        </Link>
+
+                        {/* BOTÃO EDITAR */}
                         <button onClick={() => navigate(`/cadastros/equipamentos/editar/${equip.id}`)} className="btn-action edit" title="Editar"><FontAwesomeIcon icon={faEdit} /></button>
+                        
+                        {/* BOTÃO EXCLUIR */}
                         {user?.role === 'admin' && <button onClick={() => abrirModalExclusao(equip)} className="btn-action delete" title="Excluir"><FontAwesomeIcon icon={faTrashAlt} /></button>}
                       </td>
                     </tr>

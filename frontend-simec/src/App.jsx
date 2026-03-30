@@ -22,6 +22,7 @@ const PageLoader = () => (
 
 // --- Componentes de Página (agora com Lazy Loading) ---
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'));
+const FichaTecnicaPage = React.lazy(() => import('@/pages/FichaTecnicaPage'));
 const DashboardPage = React.lazy(() => import('@/pages/DashboardPage'));
 const RelatoriosPage = React.lazy(() => import('@/pages/RelatoriosPage'));
 const AlertasPage = React.lazy(() => import('@/pages/AlertasPage'));
@@ -76,6 +77,7 @@ function App() {
             
             <Route path="equipamentos" element={<EquipamentosPage />} /> 
             <Route path="equipamentos/detalhes/:equipamentoId" element={<DetalhesEquipamentoPage />} />
+            <Route path="equipamentos/ficha-tecnica/:id" element={<FichaTecnicaPage />} />
 
             <Route path="cadastros" element={<CadastrosGeraisPage />}>
               <Route index element={<Navigate to="unidades" replace />} />

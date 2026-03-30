@@ -131,4 +131,8 @@ export const addEmailNotificacao = (dadosEmail) => api.post('/emails-notificacao
 export const updateEmailNotificacao = (id, dadosEmail) => api.put(`/emails-notificacao/${id}`, dadosEmail).then(res => res.data);
 export const deleteEmailNotificacao = (id) => api.delete(`/emails-notificacao/${id}`).then(res => res.data);
 
+// --- Ocorrências (Ficha Técnica) ---
+export const getOcorrenciasPorEquipamento = (id) => api.get(`/ocorrencias/equipamento/${id}`).then(res => res.data);
+export const addOcorrencia = (dados) => api.post('/ocorrencias', dados).then(res => res.data);
+
 export default api;
