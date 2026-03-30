@@ -34,24 +34,10 @@
     --status-pendente-bg-light: #FFEDD5;
     --status-pendente-texto-light: #7C2D12;
     
-    --status-operando-com-limitacoes-bg-light: var(--status-manutencao-bg-light);
-    --status-operando-com-limitacoes-texto-light: var(--status-manutencao-texto-light);
-
-    --status-default-bg-light: #F8FAFC;
-    --status-default-texto-light: var(--cor-texto-secundario-light);
-
     --btn-success-bg-light: #22C55E;
-    --btn-success-hover-bg-light: #1aa04c;
     --btn-warning-bg-light: #FACC15;
-    --btn-warning-hover-bg-light: #e6b800;
-    --btn-warning-texto-light: #713F12; 
     --btn-danger-bg-light: #EF4444;
-    --btn-danger-hover-bg-light: #d93030;
 
-    --status-select-bg-light: rgba(255,255,255,0.7);
-    --status-select-border-light: rgba(0,0,0,0.1);
-
-    --grafico-texto-legenda-light: var(--cor-texto-secundario-light);
     --max-width-page-content: 1200px;
 }
 
@@ -61,23 +47,11 @@ body.dark-mode {
     --cor-primaria-hover-dark: #3B82F6; 
     --cor-sidebar-bg-dark: #0F172A; 
     --cor-sidebar-texto-dark: #94A3B8; 
-    --cor-sidebar-ativo-bg-dark: var(--cor-primaria-dark);
-    --cor-sidebar-ativo-texto-dark: #0F172A;
-
     --cor-fundo-pagina-dark: #0B1120; 
     --cor-fundo-card-dark: #1E293B; 
     --cor-texto-principal-dark: #E2E8F0; 
     --cor-texto-secundario-dark: #94A3B8; 
     --cor-borda-dark: #334155; 
-
-    --status-ativo-bg-dark: #166534; 
-    --status-ativo-texto-dark: #DCFCE7; 
-    --status-default-bg-dark: #374151; 
-    --status-default-texto-dark: var(--cor-texto-secundario-dark);
-
-    --btn-success-bg-dark: #16A34A;
-    --btn-warning-bg-dark: #D97706;
-    --btn-danger-bg-dark: #DC2626;
 }
 
 /* ===== ESTILOS GERAIS ===== */
@@ -99,37 +73,110 @@ body.dark-mode {
 /* ============================================================== */
 
 .unified-history-wrapper {
-    padding: 10px 0;
+    padding: 0;
+    width: 100%;
 }
 
+/* Título e Barra de Filtro empilhados verticalmente */
 .tab-header-action {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column; /* Coloca um embaixo do outro */
+    align-items: flex-start;
+    gap: 15px;
     margin-bottom: 25px;
+    width: 100%;
 }
 
-/* --- CARD DE REGISTRO RÁPIDO (FORMULÁRIO) --- */
-.quick-form-card {
-    background: var(--cor-fundo-card-light);
-    border: 1px solid var(--cor-borda-light);
-    border-radius: 12px;
-    padding: 25px;
-    margin-bottom: 45px !important; /* Espaço extra para não sobrepor a lista */
-    box-shadow: var(--sombra-card-light);
+.tab-inner-title {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--cor-texto-principal-light);
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
-body.dark-mode .quick-form-card {
-    background: var(--cor-fundo-card-dark);
-    border-color: var(--cor-borda-dark);
+/* BARRA DE FILTRO DE AUDITORIA */
+.audit-filter-bar {
+    display: flex;
+    flex-wrap: wrap; /* Permite quebrar linha em telas pequenas */
+    align-items: flex-end;
+    gap: 15px;
+    background: #f8fafc;
+    padding: 20px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    width: 100%;
+    box-sizing: border-box; /* Garante que o padding não estoure a largura */
 }
 
-/* --- LISTA DE CARDS DE HISTÓRICO --- */
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-group label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.input-with-button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Botão "H" (Hoje) */
+.btn-today {
+    background: #64748b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 32px;
+    height: 38px;
+    cursor: pointer;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+.btn-today:hover { background: #475569; }
+
+/* Botão PDF e Limpar */
+.filter-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto; /* Empurra para a direita */
+}
+
+.btn-pdf {
+    height: 40px;
+    padding: 0 20px;
+    font-weight: 600;
+}
+
+.btn-clear {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+/* CARDS DE HISTÓRICO */
 .timeline-cards-list {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    margin-top: 10px;
+    width: 100%;
 }
 
 .history-card-new {
@@ -138,16 +185,6 @@ body.dark-mode .quick-form-card {
     border: 1px solid var(--cor-borda-light);
     box-shadow: var(--sombra-card-light);
     overflow: hidden;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-
-body.dark-mode .history-card-new {
-    background: var(--cor-fundo-card-dark);
-    border-color: var(--cor-borda-dark);
-}
-
-.history-card-new:hover {
-    box-shadow: var(--sombra-card-hover-light);
 }
 
 /* Bordas Laterais por Status */
@@ -171,12 +208,12 @@ body.dark-mode .history-card-new {
     flex: 1;
 }
 
-/* Lógica de Data acima do Título (Correção de sobreposição) */
+/* Lógica de Data acima do Título */
 .title-group {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 2px;
+    gap: 3px;
 }
 
 .card-date {
@@ -184,7 +221,6 @@ body.dark-mode .history-card-new {
     color: var(--cor-texto-secundario-light);
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
 .card-title {
@@ -192,10 +228,7 @@ body.dark-mode .history-card-new {
     font-size: 1.05rem;
     color: var(--cor-texto-principal-light);
     font-weight: 700;
-    line-height: 1.2;
 }
-
-body.dark-mode .card-title { color: var(--cor-texto-principal-dark); }
 
 .icon-circle {
     width: 42px;
@@ -212,24 +245,11 @@ body.dark-mode .card-title { color: var(--cor-texto-principal-dark); }
 .pendente-icon { background: #fef2f2; color: #ef4444; }
 .resolvido-icon { background: #ecfdf5; color: #10b981; }
 
-/* Corpo do Card com recuo para alinhar com o texto */
 .history-card-body-new {
     padding: 20px 20px 20px 82px;
     background: rgba(0,0,0,0.01);
     border-top: 1px solid var(--cor-borda-light);
 }
-
-body.dark-mode .history-card-body-new { border-color: var(--cor-borda-dark); }
-
-.solution-box-active {
-    background: var(--status-ativo-bg-light);
-    border: 1px solid #dcfce7;
-    padding: 15px;
-    border-radius: 8px;
-    margin-top: 15px;
-}
-
-.solution-box-active h5 { color: var(--status-ativo-texto-light); margin: 0 0 5px 0; }
 
 /* ============================================================== */
 /* >> ESTILOS PARA IMPRESSÃO DE RELATÓRIO << */
@@ -238,18 +258,15 @@ body.dark-mode .history-card-body-new { border-color: var(--cor-borda-dark); }
   .sidebar, .header-actions, .no-print {
     display: none !important;
   }
-
   .main-content {
     margin: 0 !important;
     padding: 20px !important;
     width: 100% !important;
   }
-  
   .page-section {
     box-shadow: none !important;
     border: 1px solid #ccc !important;
   }
-  
   .print-header {
     display: flex !important;
     justify-content: space-between;
@@ -258,94 +275,8 @@ body.dark-mode .history-card-body-new { border-color: var(--cor-borda-dark); }
     padding-bottom: 10px;
     margin-bottom: 20px;
   }
-
-  body, p, li, td, th {
-    font-size: 10pt !important;
-    color: #000 !important;
-  }
 }
 
 .print-header {
   display: none;
-}
-
-/* BARRA DE AUDITORIA - CORREÇÃO DE MARGEM */
-.audit-filter-bar {
-    display: flex;
-    flex-wrap: wrap; /* Permite quebrar linha se a tela for pequena */
-    gap: 15px;
-    align-items: flex-end;
-    background: #f8fafc;
-    padding: 15px;
-    border-radius: 8px;
-    border: 1px solid #e2e8f0;
-    width: 100%;
-    box-sizing: border-box; /* IMPEDE QUE O PADDING "EMPURRE" PARA FORA */
-    margin: 0; /* Garante alinhamento com os cards */
-}
-
-.filter-group {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.filter-group label {
-    font-size: 0.7rem;
-    font-weight: 800;
-    color: #64748b;
-    text-transform: uppercase;
-}
-
-.input-with-button {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-/* Botão "H" (Hoje) */
-.btn-today {
-    background: #64748b;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    width: 28px;
-    height: 38px;
-    cursor: pointer;
-    font-weight: bold;
-    font-size: 0.8rem;
-    transition: background 0.2s;
-}
-
-.btn-today:hover { background: #475569; }
-
-/* Grupo de Ações (PDF e Limpar) */
-.filter-actions-group {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-left: auto; /* Empurra para a direita */
-}
-
-.btn-pdf {
-    height: 38px;
-    padding: 0 15px;
-    white-space: nowrap;
-}
-
-.btn-clear {
-    background: transparent;
-    border: none;
-    color: #64748b;
-    font-size: 0.85rem;
-    cursor: pointer;
-    text-decoration: underline;
-}
-
-.btn-clear:hover { color: #1e293b; }
-
-/* Ajuste na Timeline para alinhar com o filtro */
-.timeline-cards-list {
-    margin-top: 20px;
-    width: 100%;
 }

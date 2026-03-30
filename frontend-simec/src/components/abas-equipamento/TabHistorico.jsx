@@ -1,4 +1,6 @@
 // Ficheiro: src/components/abas-equipamento/TabHistorico.jsx
+// VERSÃO 12.5 - FINAL CORRIGIDA (LAYOUT VERTICAL E AUDITORIA COMPLETA)
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getManutencoes, getOcorrenciasPorEquipamento } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -6,7 +8,9 @@ import { formatarDataHora } from '../../utils/timeUtils';
 import { exportarHistoricoEquipamentoPDF } from '../../utils/pdfUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-  faHistory, faSpinner, faFilePdf, faCalendarDay, faChevronDown, faChevronUp, faTools, faCheckCircle, faExclamationTriangle, faInfoCircle, faUser, faWrench
+  faHistory, faSpinner, faFilePdf, faCalendarDay, 
+  faChevronDown, faChevronUp, faTools, faCheckCircle, 
+  faExclamationTriangle, faInfoCircle, faUser, faWrench
 } from '@fortawesome/free-solid-svg-icons';
 import DateInput from '../DateInput';
 
@@ -15,6 +19,8 @@ function TabHistorico({ equipamento }) {
   const [historicoBruto, setHistoricoBruto] = useState({ manutencoes: [], ocorrencias: [] });
   const [loading, setLoading] = useState(true);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
+  
+  // Estados para o Filtro de Auditoria
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
@@ -38,7 +44,11 @@ function TabHistorico({ equipamento }) {
 
   const toggleExpandir = (id) => {
     const novosExpandidos = new Set(itensExpandidos);
-    novosExpandidos.has(id) ? novosExpandidos.delete(id) : novosExpandidos.add(id);
+    if (novosExpandidos.has(id)) {
+      novosExpandidos.delete(id);
+    } else {
+      novosExpandidos.add(id);
+    }
     setItensExpandidos(novosExpandidos);
   };
 
@@ -70,6 +80,7 @@ function TabHistorico({ equipamento }) {
 
     let unificado = [...m, ...o];
 
+    // Filtro de Data com correção de fim de dia (23:59:59)
     if (dataInicio) {
         const dIni = new Date(dataInicio + 'T00:00:00');
         unificado = unificado.filter(item => new Date(item.data) >= dIni);
@@ -89,7 +100,7 @@ function TabHistorico({ equipamento }) {
   };
 
   const handleExportar = () => {
-    if (linhaDoTempo.length === 0) return addToast('Sem dados para exportar.', 'info');
+    if (linhaDoTempo.length === 0) return addToast('Não há dados no período selecionado.', 'info');
     exportarHistoricoEquipamentoPDF(linhaDoTempo, {
         modelo: equipamento.modelo,
         tag: equipamento.tag,
@@ -102,12 +113,15 @@ function TabHistorico({ equipamento }) {
   return (
     <div className="unified-history-wrapper">
       <div className="tab-header-action">
-        <h3 className="tab-inner-title"><FontAwesomeIcon icon={faHistory} /> Auditoria do Ativo</h3>
+        {/* TÍTULO NO TOPO (Agora em linha única e separada) */}
+        <h3 className="tab-inner-title">
+          <FontAwesomeIcon icon={faHistory} /> AUDITORIA DO ATIVO
+        </h3>
         
-        {/* BARRA DE FILTRO CORRIGIDA */}
+        {/* BARRA DE FILTRO (Abaixo do título, ocupa 100% da largura) */}
         <div className="audit-filter-bar">
             <div className="filter-group">
-                <label>DATA INICIAL</label>
+                <label>Data Inicial</label>
                 <div className="input-with-button">
                     <DateInput value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
                     <button type="button" className="btn-today" onClick={() => handleSetHoje('inicio')}>H</button>
@@ -115,7 +129,7 @@ function TabHistorico({ equipamento }) {
             </div>
 
             <div className="filter-group">
-                <label>DATA FINAL</label>
+                <label>Data Final</label>
                 <div className="input-with-button">
                     <DateInput value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
                     <button type="button" className="btn-today" onClick={() => handleSetHoje('fim')}>H</button>
@@ -138,11 +152,12 @@ function TabHistorico({ equipamento }) {
       ) : (
         <div className="timeline-cards-list">
           {linhaDoTempo.length === 0 ? (
-              <p className="no-data-message">Nenhum registro encontrado para este período.</p>
+              <p className="no-data-message">Nenhum registro de execução encontrado para este período.</p>
           ) : (
             linhaDoTempo.map((item) => {
                 const expandido = itensExpandidos.has(item.uniqueId);
                 const isPendente = !item.isOS && item.status === 'Pendente';
+
                 return (
                 <div key={item.uniqueId} className={`history-card-new ${item.isOS ? 'os-border' : (isPendente ? 'pendente-border' : 'resolvido-border')}`}>
                     <div className="history-card-header-new" onClick={() => toggleExpandir(item.uniqueId)}>
@@ -150,6 +165,7 @@ function TabHistorico({ equipamento }) {
                         <div className={`icon-circle ${item.isOS ? 'os-icon' : (isPendente ? 'pendente-icon' : 'resolvido-icon')}`}>
                             <FontAwesomeIcon icon={item.isOS ? faWrench : (item.status === 'Resolvido' ? faCheckCircle : faExclamationTriangle)} />
                         </div>
+                        {/* title-group resolve a sobreposição de texto colocando data sobre o título */}
                         <div className="title-group">
                             <span className="card-date">{formatarDataHora(item.data)}</span>
                             <h4 className="card-title">{item.titulo}</h4>
@@ -157,14 +173,21 @@ function TabHistorico({ equipamento }) {
                     </div>
                     <div className="card-header-right">
                         <span className={`type-badge ${item.isOS ? 'os-badge' : 'oc-badge'}`}>{item.categoria}</span>
-                        <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} />
+                        <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} className="chevron-icon" />
                     </div>
                     </div>
+                    
                     {expandido && (
                         <div className="history-card-body-new">
-                            <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao}</p>
-                            <p><strong><FontAwesomeIcon icon={faUser} /> Responsável:</strong> {item.responsavel}</p>
-                            {item.solucao && <p style={{color: '#10b981'}}><strong><FontAwesomeIcon icon={faCheckCircle} /> Solução:</strong> {item.solucao}</p>}
+                            <div className="content-section">
+                                <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao || 'Sem detalhes informados.'}</p>
+                                <p><strong><FontAwesomeIcon icon={faUser} /> Responsável:</strong> {item.responsavel}</p>
+                                {item.solucao && (
+                                    <p style={{color: '#10b981', marginTop: '10px'}}>
+                                        <strong><FontAwesomeIcon icon={faCheckCircle} /> Solução Técnica:</strong> {item.solucao}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                     )}
                 </div>
