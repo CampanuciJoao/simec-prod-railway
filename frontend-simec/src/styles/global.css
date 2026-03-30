@@ -268,3 +268,84 @@ body.dark-mode .history-card-body-new { border-color: var(--cor-borda-dark); }
 .print-header {
   display: none;
 }
+
+/* BARRA DE AUDITORIA - CORREÇÃO DE MARGEM */
+.audit-filter-bar {
+    display: flex;
+    flex-wrap: wrap; /* Permite quebrar linha se a tela for pequena */
+    gap: 15px;
+    align-items: flex-end;
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    width: 100%;
+    box-sizing: border-box; /* IMPEDE QUE O PADDING "EMPURRE" PARA FORA */
+    margin: 0; /* Garante alinhamento com os cards */
+}
+
+.filter-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.filter-group label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    color: #64748b;
+    text-transform: uppercase;
+}
+
+.input-with-button {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Botão "H" (Hoje) */
+.btn-today {
+    background: #64748b;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 28px;
+    height: 38px;
+    cursor: pointer;
+    font-weight: bold;
+    font-size: 0.8rem;
+    transition: background 0.2s;
+}
+
+.btn-today:hover { background: #475569; }
+
+/* Grupo de Ações (PDF e Limpar) */
+.filter-actions-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-left: auto; /* Empurra para a direita */
+}
+
+.btn-pdf {
+    height: 38px;
+    padding: 0 15px;
+    white-space: nowrap;
+}
+
+.btn-clear {
+    background: transparent;
+    border: none;
+    color: #64748b;
+    font-size: 0.85rem;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.btn-clear:hover { color: #1e293b; }
+
+/* Ajuste na Timeline para alinhar com o filtro */
+.timeline-cards-list {
+    margin-top: 20px;
+    width: 100%;
+}

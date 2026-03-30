@@ -15,7 +15,6 @@ function TabHistorico({ equipamento }) {
   const [historicoBruto, setHistoricoBruto] = useState({ manutencoes: [], ocorrencias: [] });
   const [loading, setLoading] = useState(true);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
-  
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
@@ -71,7 +70,6 @@ function TabHistorico({ equipamento }) {
 
     let unificado = [...m, ...o];
 
-    // --- FILTRO DE DATA COM CORREÇÃO DE TIMEZONE ---
     if (dataInicio) {
         const dIni = new Date(dataInicio + 'T00:00:00');
         unificado = unificado.filter(item => new Date(item.data) >= dIni);
@@ -84,7 +82,6 @@ function TabHistorico({ equipamento }) {
     return unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
   }, [historicoBruto, dataInicio, dataFim]);
 
-  // Atalho para setar a data de hoje nos campos
   const handleSetHoje = (campo) => {
     const hoje = new Date().toISOString().split('T')[0];
     if (campo === 'inicio') setDataInicio(hoje);
@@ -92,7 +89,7 @@ function TabHistorico({ equipamento }) {
   };
 
   const handleExportar = () => {
-    if (linhaDoTempo.length === 0) return addToast('Sem dados para exportar neste período.', 'info');
+    if (linhaDoTempo.length === 0) return addToast('Sem dados para exportar.', 'info');
     exportarHistoricoEquipamentoPDF(linhaDoTempo, {
         modelo: equipamento.modelo,
         tag: equipamento.tag,
@@ -104,45 +101,44 @@ function TabHistorico({ equipamento }) {
 
   return (
     <div className="unified-history-wrapper">
-      <div className="tab-header-action" style={{flexDirection: 'column', alignItems: 'flex-start', gap: '15px'}}>
+      <div className="tab-header-action">
         <h3 className="tab-inner-title"><FontAwesomeIcon icon={faHistory} /> Auditoria do Ativo</h3>
         
-        <div className="audit-filter-bar" style={{ display: 'flex', gap: '20px', alignItems: 'flex-end', width: '100%', background: '#f8fafc', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-            
-            {/* CAMPO INÍCIO COM BOTÃO HOJE */}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>DATA INICIAL</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
+        {/* BARRA DE FILTRO CORRIGIDA */}
+        <div className="audit-filter-bar">
+            <div className="filter-group">
+                <label>DATA INICIAL</label>
+                <div className="input-with-button">
                     <DateInput value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} />
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleSetHoje('inicio')} title="Setar hoje">H</button>
+                    <button type="button" className="btn-today" onClick={() => handleSetHoje('inicio')}>H</button>
                 </div>
             </div>
 
-            {/* CAMPO FIM COM BOTÃO HOJE */}
-            <div className="form-group" style={{ marginBottom: 0 }}>
-                <label style={{ fontSize: '0.75rem', fontWeight: 'bold', color: '#475569', display: 'block', marginBottom: '5px' }}>DATA FINAL</label>
-                <div style={{ display: 'flex', gap: '5px' }}>
+            <div className="filter-group">
+                <label>DATA FINAL</label>
+                <div className="input-with-button">
                     <DateInput value={dataFim} onChange={(e) => setDataFim(e.target.value)} />
-                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => handleSetHoje('fim')} title="Setar hoje">H</button>
+                    <button type="button" className="btn-today" onClick={() => handleSetHoje('fim')}>H</button>
                 </div>
             </div>
 
-            <button className="btn btn-danger" onClick={handleExportar} style={{ height: '42px', gap: '8px', marginLeft: 'auto' }}>
-                <FontAwesomeIcon icon={faFilePdf} /> Gerar PDF Auditável
-            </button>
-
-            {(dataInicio || dataFim) && (
-                <button className="btn btn-link btn-sm" onClick={() => { setDataInicio(''); setDataFim(''); }}>Limpar Filtros</button>
-            )}
+            <div className="filter-actions-group">
+                <button className="btn btn-danger btn-pdf" onClick={handleExportar}>
+                    <FontAwesomeIcon icon={faFilePdf} /> Gerar PDF Auditável
+                </button>
+                {(dataInicio || dataFim) && (
+                    <button className="btn-clear" onClick={() => { setDataInicio(''); setDataFim(''); }}>Limpar</button>
+                )}
+            </div>
         </div>
       </div>
 
       {loading ? (
         <div style={{textAlign: 'center', padding: '40px'}}><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>
       ) : (
-        <div className="timeline-cards-list" style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '15px' }}>
+        <div className="timeline-cards-list">
           {linhaDoTempo.length === 0 ? (
-              <p className="no-data-message">Nenhum registro de execução encontrado para este período.</p>
+              <p className="no-data-message">Nenhum registro encontrado para este período.</p>
           ) : (
             linhaDoTempo.map((item) => {
                 const expandido = itensExpandidos.has(item.uniqueId);
