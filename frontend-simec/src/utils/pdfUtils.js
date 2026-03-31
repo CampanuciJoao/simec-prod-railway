@@ -4,33 +4,39 @@ import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
 import logoSimec from '../assets/images/logo-simec-base64'; 
 
-// Função auxiliar para criar o topo de todos os PDFs
+/**
+ * Função interna para gerar o cabeçalho padrão de todos os relatórios.
+ */
 const adicionarCabecalho = (doc, titulo) => {
-    try { doc.addImage(logoSimec, 'PNG', 14, 12, 25, 25); } catch (e) {}
+    try { doc.addImage(logoSimec, 'PNG', 14, 10, 22, 22); } catch (e) {}
     doc.setFontSize(9);
     doc.setTextColor(100);
     doc.text(`Gerado em: ${formatarDataHora(new Date())}`, 200, 18, { align: 'right' });
-    doc.setFontSize(18);
-    doc.setTextColor(40);
+    doc.setFontSize(16);
+    doc.setTextColor(30, 41, 59); // Cor azul escura padrão do SIMEC
+    doc.setFont(undefined, 'bold');
     doc.text(titulo, doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
 };
 
-// Relatório de Auditoria (Aquele que você gera dentro do card do equipamento)
+/**
+ * PDF de Auditoria do Ativo (Histórico Individual).
+ */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     const doc = new jsPDF();
-    adicionarCabecalho(doc, "Relatório de Auditoria de Ativo");
+    adicionarCabecalho(doc, "RELATÓRIO DE AUDITORIA DE ATIVO");
 
+    // Bloco de Identificação do Ativo
     doc.setFillColor(248, 250, 252);
-    doc.rect(14, 42, 182, 24, 'F'); 
-    doc.setDrawColor(226, 232, 240);
-    doc.rect(14, 42, 182, 24, 'S');
+    doc.rect(14, 42, 182, 22, 'F'); 
+    doc.setDrawColor(203, 213, 225);
+    doc.rect(14, 42, 182, 22, 'S');
 
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setTextColor(30);
     doc.setFont(undefined, 'bold');
-    doc.text(`Modelo:`, 18, 48);
-    doc.text(`Nº Série (Tag):`, 18, 54);
-    doc.text(`Unidade:`, 18, 60);
+    doc.text(`EQUIPAMENTO:`, 18, 48);
+    doc.text(`Nº SÉRIE (TAG):`, 18, 54);
+    doc.text(`UNIDADE:`, 18, 60);
     
     doc.setFont(undefined, 'normal');
     doc.text(`${info.modelo || 'N/A'}`, 45, 48);
@@ -38,11 +44,11 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     doc.text(`${info.unidade || 'N/A'}`, 45, 60);
     
     const periodoTxt = info.inicio || info.fim 
-        ? `Período Auditado: ${info.inicio || 'Início'} até ${info.fim || 'Hoje'}` 
+        ? `Período: ${info.inicio || 'Início'} até ${info.fim || 'Hoje'}` 
         : "Período: Histórico Completo";
-    doc.text(periodoTxt, 110, 48);
+    doc.text(periodoTxt, 120, 48);
 
-    const headers = [["Data Execução", "Categoria", "Evento / OS", "Responsável", "Status"]];
+    const headers = [["DATA EXECUÇÃO", "CATEGORIA", "EVENTO / OS", "RESPONSÁVEL", "STATUS"]];
     const body = dados.map(item => [
         formatarDataHora(item.data),
         item.categoria, 
@@ -54,25 +60,19 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     autoTable(doc, {
         head: headers,
         body: body,
-        startY: 72,
+        startY: 70,
         theme: 'grid',
-        headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 9 },
-        columnStyles: {
-            0: { halign: 'center', cellWidth: 35 },
-            1: { halign: 'center', cellWidth: 30 },
-            3: { halign: 'center' },
-            4: { halign: 'center' },
-        },
-        styles: { fontSize: 8 }
+        headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 8 },
+        styles: { fontSize: 7, cellPadding: 3 },
+        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 4: { halign: 'center' } }
     });
 
-    const fileName = `auditoria_${(info.tag || 'Equipamento').replace(/\s+/g, '_')}.pdf`;
-    doc.save(fileName);
+    doc.save(`auditoria_${(info.tag || 'Equipamento')}.pdf`);
 };
 
-// ============================================================
-// >>> NOVA FUNÇÃO DE RELATÓRIO GERAL (CORRIGIDA) <<<
-// ============================================================
+/**
+ * PDF dos Relatórios Gerais (Inventário e Manutenções).
+ */
 export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     const doc = new jsPDF();
     let headers = [];
@@ -80,10 +80,10 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     let tituloRelatorio = "";
     let configuracaoColunas = {};
 
-    // 1. Lógica para Relatório de INVENTÁRIO
+    // 1. Relatório de INVENTÁRIO
     if (resultado.tipoRelatorio === 'inventarioEquipamentos') {
-        tituloRelatorio = "Relatório de Inventário de Equipamentos";
-        headers = [["Modelo", "Nº de Série", "Fabricante", "Registro ANVISA", "Status", "Unidade"]];
+        tituloRelatorio = "RELATÓRIO DE INVENTÁRIO DE ATIVOS";
+        headers = [["MODELO", "SÉRIE / TAG", "FABRICANTE", "REGISTRO ANVISA", "STATUS", "UNIDADE"]];
         body = resultado.dados.map(item => [
             item.modelo || 'N/A', 
             item.tag || 'N/A', 
@@ -93,43 +93,61 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
             item.unidade?.nomeSistema || 'N/A'
         ]);
         configuracaoColunas = {
-            0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' },
-            3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' }
+            0: { cellWidth: 40 }, 1: { cellWidth: 30, halign: 'center' },
+            2: { cellWidth: 30, halign: 'center' }, 3: { cellWidth: 30, halign: 'center' },
+            4: { cellWidth: 25, halign: 'center' }
         };
     } 
-    // 2. Lógica para Relatório de MANUTENÇÕES REALIZADAS
+    // 2. Relatório de MANUTENÇÕES (Versão Melhorada)
     else if (resultado.tipoRelatorio === 'manutencoesRealizadas') {
-        tituloRelatorio = "Relatório de Manutenções Realizadas";
-        headers = [["OS", "Data Conclusão", "Equipamento", "Responsável", "Descrição do Serviço"]];
+        tituloRelatorio = "RELATÓRIO DE MANUTENÇÕES REALIZADAS";
+        headers = [["Nº OS", "CONCLUSÃO", "EQUIPAMENTO / TAG", "RESPONSÁVEL", "DESCRIÇÃO DO SERVIÇO"]];
         body = resultado.dados.map(item => [
             item.numeroOS,
             formatarDataHora(item.dataConclusao),
-            `${item.equipamento.modelo} (${item.equipamento.tag})`,
+            `${item.equipamento.modelo}\n(Tag: ${item.equipamento.tag})`,
             item.tecnicoResponsavel || 'N/A',
             item.descricaoProblemaServico || '-'
         ]);
-        // Ajuste de largura para a descrição não apertar os outros campos
         configuracaoColunas = {
-            0: { cellWidth: 25 }, // OS
-            1: { cellWidth: 35 }, // Data
-            2: { cellWidth: 40 }, // Equipamento
-            3: { cellWidth: 30 }, // Técnico
-            4: { cellWidth: 'auto' } // Descrição (ocupa o resto)
+            0: { cellWidth: 25, halign: 'center' }, 
+            1: { cellWidth: 32, halign: 'center' }, 
+            2: { cellWidth: 38 }, 
+            3: { cellWidth: 30, halign: 'center' }, 
+            4: { cellWidth: 'auto' } 
         };
     }
 
-    // Chama o cabeçalho com o título correto
     adicionarCabecalho(doc, tituloRelatorio);
 
-    // Gera a tabela com quebra de linha automática (overflow: 'linebreak')
     autoTable(doc, {
         head: headers,
         body: body,
-        startY: 45,
-        theme: 'striped',
-        headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 9 },
+        startY: 48,
+        theme: 'grid', // BORDAS PARA TODOS OS LADOS
+        headStyles: { 
+            fillColor: [30, 41, 59], 
+            fontSize: 9, 
+            halign: 'center', 
+            valign: 'middle',
+            cellPadding: 3 
+        },
+        bodyStyles: { 
+            fontSize: 8, 
+            textColor: [51, 65, 85], 
+            valign: 'top', 
+            cellPadding: 3 
+        },
         columnStyles: configuracaoColunas,
-        styles: { fontSize: 8, overflow: 'linebreak' }
+        styles: { overflow: 'linebreak' },
+        alternateRowStyles: { fillColor: [250, 250, 250] },
+        // Adiciona rodapé com número de página
+        didDrawPage: (data) => {
+            doc.setFontSize(8);
+            doc.setTextColor(150);
+            const str = `Página ${data.pageNumber}`;
+            doc.text(str, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+        }
     });
 
     doc.save(`${nomeArquivo}.pdf`);
