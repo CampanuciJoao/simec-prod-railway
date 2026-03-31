@@ -1,5 +1,5 @@
 // Ficheiro: src/components/abas-equipamento/TabHistorico.jsx
-// VERSÃO 12.5 - FINAL CORRIGIDA (LAYOUT VERTICAL E AUDITORIA COMPLETA)
+// VERSÃO ATUALIZADA - COM SUPORTE A ANEXOS DE OS NO HISTÓRICO
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { getManutencoes, getOcorrenciasPorEquipamento } from '../../services/api';
@@ -10,9 +10,13 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faHistory, faSpinner, faFilePdf, faCalendarDay, 
   faChevronDown, faChevronUp, faTools, faCheckCircle, 
-  faExclamationTriangle, faInfoCircle, faUser, faWrench
+  faExclamationTriangle, faInfoCircle, faUser, faWrench,
+  faPaperclip, faFileDownload 
 } from '@fortawesome/free-solid-svg-icons';
 import DateInput from '../DateInput';
+
+// Define a URL base para buscar os arquivos no servidor
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 function TabHistorico({ equipamento }) {
   const { addToast } = useToast();
@@ -20,7 +24,6 @@ function TabHistorico({ equipamento }) {
   const [loading, setLoading] = useState(true);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
   
-  // Estados para o Filtro de Auditoria
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
 
@@ -53,6 +56,7 @@ function TabHistorico({ equipamento }) {
   };
 
   const linhaDoTempo = useMemo(() => {
+    // Processa Manutenções (OS)
     const m = (historicoBruto.manutencoes || []).map(item => ({
       uniqueId: `os-${item.id}`,
       data: item.dataConclusao || item.dataHoraAgendamentoInicio, 
@@ -62,9 +66,11 @@ function TabHistorico({ equipamento }) {
       descricao: item.descricaoProblemaServico,
       responsavel: item.tecnicoResponsavel || 'N/A',
       status: item.status,
-      isOS: true
+      isOS: true,
+      anexos: item.anexos || [] // Captura os anexos da OS
     }));
 
+    // Processa Ocorrências da Ficha Técnica
     const o = (historicoBruto.ocorrencias || []).map(item => ({
       uniqueId: `oc-${item.id}`,
       data: item.dataResolucao || item.data, 
@@ -80,14 +86,12 @@ function TabHistorico({ equipamento }) {
 
     let unificado = [...m, ...o];
 
-    // Filtro de Data com correção de fim de dia (23:59:59)
+    // Filtros de Data
     if (dataInicio) {
-        const dIni = new Date(dataInicio + 'T00:00:00');
-        unificado = unificado.filter(item => new Date(item.data) >= dIni);
+        unificado = unificado.filter(item => new Date(item.data) >= new Date(dataInicio + 'T00:00:00'));
     }
     if (dataFim) {
-        const dFim = new Date(dataFim + 'T23:59:59');
-        unificado = unificado.filter(item => new Date(item.data) <= dFim);
+        unificado = unificado.filter(item => new Date(item.data) <= new Date(dataFim + 'T23:59:59'));
     }
 
     return unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
@@ -113,12 +117,10 @@ function TabHistorico({ equipamento }) {
   return (
     <div className="unified-history-wrapper">
       <div className="tab-header-action">
-        {/* TÍTULO NO TOPO (Agora em linha única e separada) */}
         <h3 className="tab-inner-title">
           <FontAwesomeIcon icon={faHistory} /> AUDITORIA DO ATIVO
         </h3>
         
-        {/* BARRA DE FILTRO (Abaixo do título, ocupa 100% da largura) */}
         <div className="audit-filter-bar">
             <div className="filter-group">
                 <label>Data Inicial</label>
@@ -165,13 +167,16 @@ function TabHistorico({ equipamento }) {
                         <div className={`icon-circle ${item.isOS ? 'os-icon' : (isPendente ? 'pendente-icon' : 'resolvido-icon')}`}>
                             <FontAwesomeIcon icon={item.isOS ? faWrench : (item.status === 'Resolvido' ? faCheckCircle : faExclamationTriangle)} />
                         </div>
-                        {/* title-group resolve a sobreposição de texto colocando data sobre o título */}
                         <div className="title-group">
                             <span className="card-date">{formatarDataHora(item.data)}</span>
                             <h4 className="card-title">{item.titulo}</h4>
                         </div>
                     </div>
                     <div className="card-header-right">
+                        {/* Ícone de Clipe para sinalizar anexos na OS */}
+                        {item.isOS && item.anexos?.length > 0 && (
+                            <FontAwesomeIcon icon={faPaperclip} style={{ marginRight: '10px', color: '#64748b' }} title="Possui documentos anexados" />
+                        )}
                         <span className={`type-badge ${item.isOS ? 'os-badge' : 'oc-badge'}`}>{item.categoria}</span>
                         <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} className="chevron-icon" />
                     </div>
@@ -182,10 +187,25 @@ function TabHistorico({ equipamento }) {
                             <div className="content-section">
                                 <p><strong><FontAwesomeIcon icon={faInfoCircle} /> Detalhes:</strong> {item.descricao || 'Sem detalhes informados.'}</p>
                                 <p><strong><FontAwesomeIcon icon={faUser} /> Responsável:</strong> {item.responsavel}</p>
+                                
                                 {item.solucao && (
                                     <p style={{color: '#10b981', marginTop: '10px'}}>
                                         <strong><FontAwesomeIcon icon={faCheckCircle} /> Solução Técnica:</strong> {item.solucao}
                                     </p>
+                                )}
+
+                                {/* LISTAGEM DE ANEXOS PARA DOWNLOAD (APENAS PARA MANUTENÇÕES) */}
+                                {item.isOS && item.anexos?.length > 0 && (
+                                    <div style={{marginTop: '15px', background: '#f8fafc', padding: '12px', borderRadius: '8px', border: '1px solid #e2e8f0'}}>
+                                        <h5 style={{fontSize: '0.8rem', fontWeight: 'bold', marginBottom: '10px', color: '#475569', textTransform: 'uppercase'}}>Documentos Anexados:</h5>
+                                        <div style={{display: 'flex', flexDirection: 'column', gap: '8px'}}>
+                                            {item.anexos.map(file => (
+                                                <a key={file.id} href={`${API_BASE_URL}/${file.path}`} target="_blank" rel="noopener noreferrer" style={{fontSize: '0.9rem', color: '#2563eb', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '500'}}>
+                                                    <FontAwesomeIcon icon={faFileDownload} /> {file.nomeOriginal}
+                                                </a>
+                                            ))}
+                                        </div>
+                                    </div>
                                 )}
                             </div>
                         </div>

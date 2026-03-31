@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/manutencoesRoutes.js
-// VERSÃO FINAL CORRIGIDA - STATUS DO EQUIPAMENTO GERENCIADO PELO SERVIÇO AUTOMÁTICO
+// VERSÃO FINAL ATUALIZADA - COM INCLUSÃO DE ANEXOS NA LISTAGEM PARA O HISTÓRICO
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -43,7 +43,10 @@ router.get('/', async (req, res) => {
 
         const manutencoes = await prisma.manutencao.findMany({
             where: whereClause,
-            include: { equipamento: { include: { unidade: true } } },
+            include: { 
+                equipamento: { include: { unidade: true } },
+                anexos: true // <<< ADICIONADO: Garante que os arquivos apareçam no histórico do ativo
+            },
             orderBy: { dataHoraAgendamentoInicio: 'desc' }
         });
         res.json(manutencoes);
@@ -102,9 +105,6 @@ router.post('/', async (req, res) => {
 
         const novaManutencao = await prisma.manutencao.create({ data: dadosParaCriar });
         
-        // A linha que atualizava o status do equipamento foi removida daqui.
-        // A automação agora é feita pelo alertasService.js.
-
         await registrarLog({
             usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Manutenção',
             entidadeId: novaManutencao.id, detalhes: `OS ${novaManutencao.numeroOS} foi criada para o equipamento ${equipamento.modelo}.`
