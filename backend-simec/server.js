@@ -1,22 +1,14 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 3.2 (Sênior - Com log de depuração de ambiente)
-// Descrição: Ponto de entrada principal do servidor da API do SIMEC.
-//            Orquestra a configuração, middlewares, rotas e tarefas agendadas.
+// Versão: 3.3 (Sênior - Estabilizado com Rota BI e Limpeza de Listeners)
 
 // --- 1. Configuração de Ambiente ---
-// Carrega as variáveis de ambiente do ficheiro .env para process.env. Essencial para segurança.
 import dotenv from 'dotenv';
 dotenv.config();
 
-// ==========================================================================
-// >> LOG DE DEPURAÇÃO CRÍTICO <<
-// Imprime a URL do banco de dados que o servidor está efetivamente a usar.
-// Compare esta saída no seu terminal com o conteúdo do seu ficheiro .env.
 console.log("======================================================");
 console.log("INICIANDO SERVIDOR... VARIÁVEL DE AMBIENTE LIDA:");
 console.log("DATABASE_URL:", process.env.DATABASE_URL);
 console.log("======================================================");
-// ==========================================================================
 
 // --- 2. Importações de Módulos ---
 import express from 'express';
@@ -38,7 +30,7 @@ import auditoriaRoutes from './routes/auditoriaRoutes.js';
 import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
-import biRoutes from './routes/biRoutes.js';
+import biRoutes from './routes/biRoutes.js'; // <<< Rota de BI incluída
 
 // --- 4. Importação dos Serviços e Middlewares ---
 import { atualizarStatusManutencoes, processarAlertasEEnviarNotificacoes } from './services/alertasService.js';
@@ -49,14 +41,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor rodando na porta ${PORT}`);});
-  
+
 // --- 6. Configuração de Middlewares Globais ---
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
 
 // --- 7. Servir Arquivos Estáticos (Uploads) ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -68,7 +57,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // --- ROTAS PÚBLICAS ---
 app.use('/api/auth', authRoutes);
 
-// --- ROTAS PROTEGIDAS ---
+// --- ROTAS PROTEGIDAS (Exigem Login) ---
 app.use(proteger);
 app.use('/api/dashboard-data', dashboardRoutes);
 app.use('/api/users', userRoutes);
@@ -82,8 +71,7 @@ app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
-app.use('/api/bi', biRoutes);
-
+app.use('/api/bi', biRoutes); // <<< Ativação da rota de BI
 
 // --- 9. Rota Raiz e Tarefas Agendadas ---
 app.get('/', (req, res) => {
@@ -93,25 +81,28 @@ app.get('/', (req, res) => {
 const executarTarefasDeFundo = async () => {
   console.log(`[${new Date().toLocaleTimeString('pt-BR')}] Executando tarefas de fundo...`);
   try {
-    // 1. PRIMEIRO, verificamos o que está próximo de acontecer e geramos os alertas.
+    // 1. Verifica vencimentos e envia e-mails
     await processarAlertasEEnviarNotificacoes();
     
-    // 2. DEPOIS, atualizamos o status do que já deveria ter acontecido.
+    // 2. Atualiza status de equipamentos em manutenção
     await atualizarStatusManutencoes();
 
   } catch (err) {
-    console.error('[ERRO FATAL NA TAREFA AUTOMÁTICA]:', err);
+    console.error('[ERRO NAS TAREFAS AUTOMÁTICAS]:', err);
   }
 };
 
-const checkIntervalMs = 60 * 1000; // 1 minuto
+// Agenda a execução das tarefas a cada 1 minuto
+const checkIntervalMs = 60 * 1000; 
 setInterval(executarTarefasDeFundo, checkIntervalMs);
 
-// --- 10. Inicialização do Servidor ---
+// --- 10. Inicialização Única do Servidor ---
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Servidor backend a rodar na porta ${PORT}`);
+  console.log(`------------------------------------------------------`);
+  console.log(`✅ Servidor backend rodando na porta ${PORT}`);
+  console.log(`🚀 Executando verificação inicial de tarefas...`);
+  console.log(`------------------------------------------------------`);
   
-  // Executa a verificação inicial na ordem correta também.
-  console.log('Executando verificação inicial de tarefas...');
+  // Executa uma vez no momento em que o servidor liga
   executarTarefasDeFundo();
 });
