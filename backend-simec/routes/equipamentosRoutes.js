@@ -39,7 +39,11 @@ const parseDate = (dateString) => (dateString ? new Date(dateString) : null);
 router.get('/', async (req, res) => {
     try {
         const equipamentos = await prisma.equipamento.findMany({
-            include: { unidade: { select: { id: true, nomeSistema: true } } },
+            include: { 
+                unidade: { select: { id: true, nomeSistema: true } },
+                anexos: true,     // <<< ADICIONADO: Agora os anexos virão na lista
+                acessorios: true  // <<< ADICIONADO: Agora os acessórios também virão na lista
+            },
             orderBy: { modelo: 'asc' }
         });
         res.json(equipamentos);
