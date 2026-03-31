@@ -69,14 +69,14 @@ function RelatorioResultado({ resultado }) {
     
     // Lógica para 'manutencoesRealizadas' corrigida para usar os campos da API
     case 'manutencoesRealizadas':
-      headers = ["Nº OS", "Tipo", "Equipamento", "Técnico", "Data de Conclusão"];
+      headers = ["Nº OS", "Data Conclusão", "Equipamento", "Técnico", "Descrição do Serviço"];
       renderRow = (item, index) => (
         <tr key={index}>
-          <td>{item.numeroOS}</td>
-          <td>{item.tipo}</td>
+          <td style={{ fontWeight: 'bold' }}>{item.numeroOS}</td>
+          <td>{formatarDataHora(item.dataConclusao)}</td>
           <td>{`${item.equipamento.modelo} (${item.equipamento.tag})`}</td>
           <td>{item.tecnicoResponsavel || 'N/A'}</td>
-          <td>{formatarDataHora(item.dataConclusao)}</td>
+          <td style={{ maxWidth: '300px', fontSize: '0.85rem' }}>{item.descricaoProblemaServico || '-'}</td>
         </tr>
       );
       break;

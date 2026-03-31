@@ -24,19 +24,19 @@ router.post('/gerar', async (req, res) => {
             if (fabricante) whereClause.fabricante = fabricante;
             if (status) whereClause.status = status;
 
-            dadosRelatorio = await prisma.equipamento.findMany({
+            dadosRelatorio = await prisma.manutencao.findMany({
                 where: whereClause,
                 select: {
-                    modelo: true,
-                    tag: true,
-                    fabricante: true,
-                    registroAnvisa: true,
-                    status: true,
-                    unidade: {
-                        select: { nomeSistema: true }
+                    numeroOS: true,
+                    tipo: true,
+                    dataConclusao: true,
+                    tecnicoResponsavel: true,
+                    descricaoProblemaServico: true, // <<< ADICIONADO
+                    equipamento: {
+                        select: { modelo: true, tag: true }
                     }
                 },
-                orderBy: { modelo: 'asc' }
+                orderBy: { dataConclusao: 'desc' }
             });
         }
         

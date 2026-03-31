@@ -4,6 +4,7 @@ import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
 import logoSimec from '../assets/images/logo-simec-base64'; 
 
+// Função auxiliar para criar o topo de todos os PDFs
 const adicionarCabecalho = (doc, titulo) => {
     try { doc.addImage(logoSimec, 'PNG', 14, 12, 25, 25); } catch (e) {}
     doc.setFontSize(9);
@@ -14,11 +15,11 @@ const adicionarCabecalho = (doc, titulo) => {
     doc.text(titulo, doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
 };
 
+// Relatório de Auditoria (Aquele que você gera dentro do card do equipamento)
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     const doc = new jsPDF();
     adicionarCabecalho(doc, "Relatório de Auditoria de Ativo");
 
-    // --- BLOCO DE INFORMAÇÕES DO ATIVO ---
     doc.setFillColor(248, 250, 252);
     doc.rect(14, 42, 182, 24, 'F'); 
     doc.setDrawColor(226, 232, 240);
@@ -69,19 +70,67 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     doc.save(fileName);
 };
 
-// Mantemos a exportarRelatorioPDF padrão para não quebrar outros módulos
+// ============================================================
+// >>> NOVA FUNÇÃO DE RELATÓRIO GERAL (CORRIGIDA) <<<
+// ============================================================
 export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     const doc = new jsPDF();
-    let headers = [["Modelo", "Nº de Série", "Fabricante", "Registro ANVISA", "Status", "Unidade"]];
-    let body = resultado.dados.map(item => [
-        item.modelo || 'N/A', item.tag || 'N/A', item.fabricante || 'N/A',
-        item.registroAnvisa || 'N/A', item.status || 'N/A', item.unidade?.nomeSistema || 'N/A'
-    ]);
-    adicionarCabecalho(doc, "Relatório de Inventário");
+    let headers = [];
+    let body = [];
+    let tituloRelatorio = "";
+    let configuracaoColunas = {};
+
+    // 1. Lógica para Relatório de INVENTÁRIO
+    if (resultado.tipoRelatorio === 'inventarioEquipamentos') {
+        tituloRelatorio = "Relatório de Inventário de Equipamentos";
+        headers = [["Modelo", "Nº de Série", "Fabricante", "Registro ANVISA", "Status", "Unidade"]];
+        body = resultado.dados.map(item => [
+            item.modelo || 'N/A', 
+            item.tag || 'N/A', 
+            item.fabricante || 'N/A',
+            item.registroAnvisa || 'N/A', 
+            item.status || 'N/A', 
+            item.unidade?.nomeSistema || 'N/A'
+        ]);
+        configuracaoColunas = {
+            0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' },
+            3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' }
+        };
+    } 
+    // 2. Lógica para Relatório de MANUTENÇÕES REALIZADAS
+    else if (resultado.tipoRelatorio === 'manutencoesRealizadas') {
+        tituloRelatorio = "Relatório de Manutenções Realizadas";
+        headers = [["OS", "Data Conclusão", "Equipamento", "Responsável", "Descrição do Serviço"]];
+        body = resultado.dados.map(item => [
+            item.numeroOS,
+            formatarDataHora(item.dataConclusao),
+            `${item.equipamento.modelo} (${item.equipamento.tag})`,
+            item.tecnicoResponsavel || 'N/A',
+            item.descricaoProblemaServico || '-'
+        ]);
+        // Ajuste de largura para a descrição não apertar os outros campos
+        configuracaoColunas = {
+            0: { cellWidth: 25 }, // OS
+            1: { cellWidth: 35 }, // Data
+            2: { cellWidth: 40 }, // Equipamento
+            3: { cellWidth: 30 }, // Técnico
+            4: { cellWidth: 'auto' } // Descrição (ocupa o resto)
+        };
+    }
+
+    // Chama o cabeçalho com o título correto
+    adicionarCabecalho(doc, tituloRelatorio);
+
+    // Gera a tabela com quebra de linha automática (overflow: 'linebreak')
     autoTable(doc, {
-        head: headers, body: body, startY: 45, theme: 'striped',
-        headStyles: { fillColor: [30, 41, 59], halign: 'center' },
-        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 2: { halign: 'center' }, 3: { halign: 'center' }, 4: { halign: 'center' }, 5: { halign: 'center' } }
+        head: headers,
+        body: body,
+        startY: 45,
+        theme: 'striped',
+        headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 9 },
+        columnStyles: configuracaoColunas,
+        styles: { fontSize: 8, overflow: 'linebreak' }
     });
+
     doc.save(`${nomeArquivo}.pdf`);
 };
