@@ -72,6 +72,7 @@ router.post('/gerar', async (req, res) => {
                     tipo: true,
                     dataConclusao: true,
                     tecnicoResponsavel: true,
+                    descricaoProblemaServico: true,
                     equipamento: {
                         select: { modelo: true, tag: true }
                     }

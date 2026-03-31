@@ -1,10 +1,12 @@
 // src/components/RelatorioResultado.jsx
-// VERSÃO FINAL CORRIGIDA - COM TODOS OS TIPOS DE RELATÓRIO FUNCIONAIS
+// VERSÃO ATUALIZADA - COM ALINHAMENTO CORRIGIDO E DESCRITIVO DE SERVIÇO
 
 import React from 'react';
 import { formatarDataHora } from '../utils/timeUtils';
 
-// Sua função utilitária para formatar o tempo de parada (mantida)
+/**
+ * Formata o tempo de parada para exibição amigável.
+ */
 const formatarHorasParaHumanos = (totalHoras) => {
     if (typeof totalHoras !== 'number' || totalHoras < 0) return 'N/A';
     const horas = Math.floor(totalHoras);
@@ -16,13 +18,8 @@ const formatarHorasParaHumanos = (totalHoras) => {
 };
 
 function RelatorioResultado({ resultado }) {
-  if (!resultado || !resultado.dados) {
-    return null;
-  }
-
-  const { tipoRelatorio, dados } = resultado;
-
-  if (dados.length === 0) {
+  // Verifica se existem dados para exibir
+  if (!resultado || !resultado.dados || resultado.dados.length === 0) {
     return (
       <div className="no-data-message" style={{ marginTop: '30px' }}>
         Nenhum resultado encontrado para os filtros selecionados.
@@ -30,67 +27,74 @@ function RelatorioResultado({ resultado }) {
     );
   }
 
+  const { tipoRelatorio, dados } = resultado;
+
   let headers = [];
   let renderRow = (item, index) => <tr key={index}></tr>;
 
+  // Lógica de montagem da tabela baseada no tipo de relatório
   switch (tipoRelatorio) {
-    // ==============================================================
-    // >> CORREÇÃO APLICADA AQUI <<
-    // O case para 'inventarioEquipamentos' agora mapeia os campos corretos da API.
-    // ==============================================================
+    
     case 'inventarioEquipamentos':
-      headers = ["Modelo", "Nº de Série (Tag)", "Fabricante", "Registro ANVISA", "Status", "Unidade"];
+      headers = ["Modelo", "Nº Série (Tag)", "Fabricante", "Registro ANVISA", "Status", "Unidade"];
       renderRow = (item, index) => (
         <tr key={index}>
-          <td>{item.modelo}</td>
-          <td>{item.tag}</td>
-          <td>{item.fabricante || 'N/A'}</td>
-          <td>{item.registroAnvisa || 'N/A'}</td>
-          <td>{item.status || 'N/A'}</td>
-          <td>{item.unidade?.nomeSistema || 'N/A'}</td>
+          <td className="text-left">{item.modelo}</td>
+          <td className="text-center">{item.tag}</td>
+          <td className="text-center">{item.fabricante || 'N/A'}</td>
+          <td className="text-center">{item.registroAnvisa || 'N/A'}</td>
+          <td className="text-center"><span className={`status-badge status-${item.status?.toLowerCase()}`}>{item.status}</span></td>
+          <td className="text-left">{item.unidade?.nomeSistema || 'N/A'}</td>
         </tr>
       );
       break;
 
-    // Lógica para 'tempoParada' mantida do seu código original
-    case 'tempoParada':
-      headers = ["Equipamento", "Nº OS", "Nº Chamado", "Início da Parada", "Fim da Parada", "Tempo Parado"];
+    case 'manutencoesRealizadas':
+      // AJUSTADO: Cabeçalhos com alinhamento lógico
+      headers = ["Nº OS", "Data Conclusão", "Equipamento", "Responsável", "Descrição do Serviço"];
       renderRow = (item, index) => (
         <tr key={index}>
-          <td>{item.equipamentoNome} ({item.equipamentoId})</td>
-          <td>{item.numeroOS}</td>
-          <td>{item.numeroChamado || 'N/A'}</td>
-          <td>{formatarDataHora(item.dataInicio)}</td>
-          <td>{formatarDataHora(item.dataFim)}</td>
-          <td>{formatarHorasParaHumanos(item.tempoParadaHoras)}</td>
+          <td className="text-center" style={{ fontWeight: 'bold' }}>{item.numeroOS}</td>
+          <td className="text-center">{formatarDataHora(item.dataConclusao)}</td>
+          <td className="text-left">{`${item.equipamento.modelo} (${item.equipamento.tag})`}</td>
+          <td className="text-center">{item.tecnicoResponsavel || 'N/A'}</td>
+          {/* TRAZENDO O CAMPO CORRETO DO BACKEND COM LARGURA MÁXIMA CONTROLADA */}
+          <td className="text-left" style={{ fontSize: '0.85rem', maxWidth: '350px', whiteSpace: 'normal', lineHeight: '1.2' }}>
+            {item.descricaoProblemaServico || '-'}
+          </td>
         </tr>
       );
       break;
-    
-    // Lógica para 'manutencoesRealizadas' corrigida para usar os campos da API
-    case 'manutencoesRealizadas':
-      headers = ["Nº OS", "Data Conclusão", "Equipamento", "Técnico", "Descrição do Serviço"];
+
+    case 'tempoParada':
+      headers = ["Equipamento", "Nº OS", "Início", "Fim", "Total Parado"];
       renderRow = (item, index) => (
         <tr key={index}>
-          <td style={{ fontWeight: 'bold' }}>{item.numeroOS}</td>
-          <td>{formatarDataHora(item.dataConclusao)}</td>
-          <td>{`${item.equipamento.modelo} (${item.equipamento.tag})`}</td>
-          <td>{item.tecnicoResponsavel || 'N/A'}</td>
-          <td style={{ maxWidth: '300px', fontSize: '0.85rem' }}>{item.descricaoProblemaServico || '-'}</td>
+          <td className="text-left">{item.equipamentoNome} ({item.equipamentoId})</td>
+          <td className="text-center">{item.numeroOS}</td>
+          <td className="text-center">{formatarDataHora(item.dataInicio)}</td>
+          <td className="text-center">{formatarDataHora(item.dataFim)}</td>
+          <td className="text-center" style={{ fontWeight: 'bold', color: '#ef4444' }}>{formatarHorasParaHumanos(item.tempoParadaHoras)}</td>
         </tr>
       );
       break;
 
     default:
-      return <p className="form-error" style={{marginTop: '20px'}}>Tipo de relatório desconhecido ou não implementado: {tipoRelatorio}</p>;
+      return <p className="form-error">Tipo de relatório não implementado.</p>;
   }
 
   return (
-    <div className="table-responsive-wrapper" style={{marginTop: '20px'}}>
+    <div className="table-responsive-wrapper" style={{ marginTop: '20px' }}>
       <table className="data-table">
         <thead>
           <tr>
-            {headers.map((header) => <th key={header}>{header}</th>)}
+            {headers.map((h) => {
+                // Define se o título da coluna deve estar à esquerda ou no centro
+                const alignClass = (h === "Equipamento" || h === "Descrição do Serviço" || h === "Modelo" || h === "Unidade") 
+                    ? "text-left" 
+                    : "text-center";
+                return <th key={h} className={alignClass}>{h}</th>;
+            })}
           </tr>
         </thead>
         <tbody>
