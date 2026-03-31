@@ -4,6 +4,7 @@ import { useContratos } from '../hooks/useContratos';
 import { useModal } from '../hooks/useModal';
 import { useToast } from '../contexts/ToastContext';
 import { formatarData } from '../utils/timeUtils';
+import { uploadAnexoContrato, deleteAnexoContrato } from '../services/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faPlus, 
@@ -15,11 +16,16 @@ import {
     faMinusCircle,
     faHospital,
     faMicrochip,
-    faFileContract,
-    faHandshake
+    faPaperclip,
+    faUpload,
+    faFilePdf,
+    faExternalLinkAlt
 } from '@fortawesome/free-solid-svg-icons';
 import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
+
+// Configuração da URL para buscar os arquivos no servidor
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 // --- Funções Auxiliares de Estilo e Status ---
 
@@ -57,7 +63,8 @@ const getRowHighlightClass = (contrato) => {
 function ContratosPage() {
     const navigate = useNavigate();
     const { addToast } = useToast();
-    const [expandidos, setExpandidos] = useState({}); // Controle de qual card está aberto
+    const [expandidos, setExpandidos] = useState({});
+    const [uploadingId, setUploadingId] = useState(null);
 
     const {
         contratos,
@@ -68,7 +75,8 @@ function ContratosPage() {
         setSearchTerm,
         filtros,
         setFiltros,
-        removerContrato
+        removerContrato,
+        refetch // Função para atualizar a lista após upload/delete
     } = useContratos();
 
     const { isOpen: isDeleteModalOpen, modalData: contratoParaDeletar, openModal: openDeleteModal, closeModal: closeDeleteModal } = useModal();
@@ -83,9 +91,41 @@ function ContratosPage() {
             await removerContrato(contratoParaDeletar.id);
             addToast('Contrato excluído com sucesso!', 'success');
         } catch(err) {
-            addToast(err.message || 'Erro ao excluir contrato.', 'error');
+            addToast('Erro ao excluir contrato.', 'error');
         } finally {
             closeDeleteModal();
+        }
+    };
+
+    // Função para realizar o upload do arquivo
+    const handleUploadArquivo = async (contratoId, event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('contratos', file);
+
+        setUploadingId(contratoId);
+        try {
+            await uploadAnexoContrato(contratoId, formData);
+            addToast('Documento anexado com sucesso!', 'success');
+            refetch(); // Atualiza a lista para mostrar o ícone verde
+        } catch (err) {
+            addToast('Erro ao anexar arquivo.', 'error');
+        } finally {
+            setUploadingId(null);
+        }
+    };
+
+    // Função para excluir um anexo
+    const handleDeleteAnexo = async (contratoId, anexoId) => {
+        if (!window.confirm("Tem certeza que deseja remover este documento?")) return;
+        try {
+            await deleteAnexoContrato(contratoId, anexoId);
+            addToast('Documento removido.', 'success');
+            refetch();
+        } catch (err) {
+            addToast('Erro ao remover documento.', 'error');
         }
     };
     
@@ -130,7 +170,7 @@ function ContratosPage() {
                                 return (
                                     <div key={contrato.id} className={`contrato-card-expansivel ${getRowHighlightClass(contrato)}`}>
                                         
-                                        {/* CABEÇALHO DO CARD (Sempre visível) */}
+                                        {/* CABEÇALHO DO CARD */}
                                         <div className="contrato-header" onClick={() => toggleExpandir(contrato.id)}>
                                             <FontAwesomeIcon 
                                                 icon={isAberto ? faMinusCircle : faPlusCircle} 
@@ -156,12 +196,20 @@ function ContratosPage() {
                                                 </div>
                                             </div>
 
-                                            <div className="header-status-badge">
+                                            <div className="header-status-badge" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                                                 <span className={getStatusBadgeClass(statusDinamico)}>{statusDinamico}</span>
+                                                <FontAwesomeIcon 
+                                                    icon={faPaperclip} 
+                                                    style={{ 
+                                                        color: contrato.anexos?.length > 0 ? '#22C55E' : '#CBD5E1',
+                                                        fontSize: '1.1rem'
+                                                    }} 
+                                                    title={contrato.anexos?.length > 0 ? "Documento anexado" : "Sem anexo"}
+                                                />
                                             </div>
                                         </div>
 
-                                        {/* DETALHES EXPANDIDOS (Aparecem ao clicar) */}
+                                        {/* DETALHES EXPANDIDOS */}
                                         {isAberto && (
                                             <div className="contrato-detalhes-expandidos">
                                                 <div className="detalhes-grid-contrato">
@@ -179,7 +227,7 @@ function ContratosPage() {
                                                     {/* Lista de Equipamentos */}
                                                     <div className="lista-cobertura">
                                                         <h5><FontAwesomeIcon icon={faMicrochip} /> Equipamentos Vinculados ({contrato.equipamentosCobertos?.length || 0})</h5>
-                                                        <div className="equipamentos-lista-scroll" style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                                                        <div className="equipamentos-lista-scroll" style={{ maxHeight: '250px', overflowY: 'auto' }}>
                                                             {contrato.equipamentosCobertos?.length > 0 ? (
                                                                 contrato.equipamentosCobertos.map(eq => (
                                                                     <div key={eq.id} className="equip-item-contrato">
@@ -188,10 +236,49 @@ function ContratosPage() {
                                                                     </div>
                                                                 ))
                                                             ) : (
-                                                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Este contrato não possui equipamentos específicos vinculados.</p>
+                                                                <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>Sem equipamentos específicos.</p>
                                                             )}
                                                         </div>
                                                     </div>
+                                                </div>
+
+                                                {/* SEÇÃO DE DOCUMENTOS DO CONTRATO */}
+                                                <div className="anexos-seguro-container" style={{ marginTop: '20px', background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                    <h5 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem' }}>
+                                                        <FontAwesomeIcon icon={faPaperclip} /> DOCUMENTO DIGITAL DO CONTRATO
+                                                    </h5>
+                                                    
+                                                    {contrato.anexos?.length > 0 ? (
+                                                        <div className="lista-anexos-preview" style={{ marginBottom: '15px' }}>
+                                                            {contrato.anexos.map(anexo => (
+                                                                <div key={anexo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '10px 15px', borderRadius: '6px', marginBottom: '8px', border: '1px solid #e2e8f0 shadow-sm' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                        <FontAwesomeIcon icon={faFilePdf} style={{ color: '#ef4444', fontSize: '1.2rem' }} />
+                                                                        <a href={`${API_BASE_URL}/${anexo.path}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.95rem', color: '#1e293b', fontWeight: '600', textDecoration: 'none' }}>
+                                                                            {anexo.nomeOriginal} <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" style={{ marginLeft: '5px', opacity: 0.5 }} />
+                                                                        </a>
+                                                                    </div>
+                                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteAnexo(contrato.id, anexo.id); }} className="btn-action delete" title="Remover Documento">
+                                                                        <FontAwesomeIcon icon={faTrashAlt} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '15px' }}>Nenhum documento anexado.</p>
+                                                    )}
+
+                                                    <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                                                        <FontAwesomeIcon icon={uploadingId === contrato.id ? faSpinner : faUpload} spin={uploadingId === contrato.id} />
+                                                        {uploadingId === contrato.id ? 'Subindo...' : 'Anexar PDF do Contrato'}
+                                                        <input 
+                                                            type="file" 
+                                                            style={{ display: 'none' }} 
+                                                            onChange={(e) => handleUploadArquivo(contrato.id, e)} 
+                                                            accept=".pdf,image/*" 
+                                                            disabled={uploadingId !== null}
+                                                        />
+                                                    </label>
                                                 </div>
 
                                                 <div className="card-actions-expandido" style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
@@ -208,7 +295,7 @@ function ContratosPage() {
                                 );
                             })
                         ) : (
-                            <div className="no-data-message">Nenhum contrato encontrado para os filtros aplicados.</div>
+                            <div className="no-data-message">Nenhum contrato encontrado.</div>
                         )}
                     </div>
                 </section>
