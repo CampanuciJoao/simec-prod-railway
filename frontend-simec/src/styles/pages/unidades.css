@@ -245,3 +245,97 @@ body.dark-mode .search-input-table {
     background: #ffffff;
     min-height: 250px;
 }
+
+/* ============================================================
+   5. CARDS EXPANSÍVEIS DE CONTRATO
+   ============================================================ */
+
+.contrato-card-expansivel {
+    background: #ffffff;
+    border: 1px solid var(--cor-borda-light);
+    border-radius: 12px;
+    margin-bottom: 15px;
+    overflow: hidden;
+    transition: transform 0.2s ease;
+    box-shadow: var(--sombra-card-light);
+}
+
+.contrato-header {
+    display: flex;
+    align-items: center;
+    padding: 18px 20px;
+    cursor: pointer;
+    gap: 20px;
+}
+
+/* Cores de status baseadas na vigência (reutilizando a lógica de seguros) */
+.status-row-vencendo-danger .contrato-header { background-color: #fef2f2; border-left: 10px solid #ef4444; }
+.status-row-vencendo-warning .contrato-header { background-color: #fffbeb; border-left: 10px solid #f59e0b; }
+.status-row-ativo .contrato-header { background-color: #f0fdf4; border-left: 10px solid #22c55e; }
+
+.contrato-header-info {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1.2fr 1fr;
+    gap: 15px;
+}
+
+.contrato-detalhes-expandidos {
+    padding: 25px;
+    background-color: #ffffff;
+    border-top: 1px dashed var(--cor-borda-light);
+}
+
+/* Estilo para as listas de unidades e equipamentos dentro do contrato */
+.detalhes-grid-contrato {
+    display: grid;
+    grid-template-columns: 1fr 2fr; /* Unidades (menor) | Equipamentos (maior) */
+    gap: 30px;
+}
+
+.lista-cobertura {
+    background: #f8fafc;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+}
+
+.lista-cobertura h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #475569;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chip-item {
+    display: inline-block;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    padding: 4px 10px;
+    border-radius: 6px;
+    margin: 4px;
+    font-size: 0.85rem;
+    color: #1e293b;
+    font-weight: 500;
+}
+
+.equip-item-contrato {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e2e8f0;
+    font-size: 0.9rem;
+}
+
+.equip-item-contrato:last-child { border-bottom: none; }
+
+.equip-tag-contrato {
+    font-weight: 700;
+    color: var(--cor-primaria-light);
+    font-family: monospace;
+}
