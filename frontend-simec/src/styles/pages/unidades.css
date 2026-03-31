@@ -1,5 +1,6 @@
-/* frontend-simec/src/styles/pages/unidades.css */
-
+/* ============================================================
+   1. ESTILOS GERAIS DE BUSCA E GRIDS (UNIDADES)
+   ============================================================ */
 .search-input-table {
   padding: 8px 12px;
   border-radius: 6px;
@@ -36,81 +37,9 @@ body.dark-mode .search-input-table {
   box-shadow: var(--sombra-card-hover-light);
 }
 
-body.dark-mode .unidade-card {
-  background-color: var(--cor-fundo-card-dark);
-  border-color: var(--cor-borda-dark);
-  box-shadow: var(--sombra-card-dark);
-}
-
-body.dark-mode .unidade-card:hover {
-  box-shadow: var(--sombra-card-hover-dark);
-}
-
-.unidade-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 15px;
-  border-bottom: 1px solid var(--cor-borda-light);
-}
-
-body.dark-mode .unidade-card-header {
-  border-bottom-color: var(--cor-borda-dark);
-}
-
-.unidade-card-header h4 {
-  margin: 0;
-  font-size: 1.1em;
-  color: var(--cor-texto-principal-light);
-}
-
-body.dark-mode .unidade-card-header h4 {
-  color: var(--cor-texto-principal-dark);
-}
-
-.unidade-card-actions .btn-action {
-  margin-left: 5px;
-}
-
-.unidade-card-body {
-  padding: 15px;
-  flex-grow: 1;
-}
-
-.unidade-info-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  font-size: 0.9em;
-  color: var(--cor-texto-secundario-light);
-  margin-bottom: 12px;
-}
-
-body.dark-mode .unidade-info-item {
-  color: var(--cor-texto-secundario-dark);
-}
-
-.unidade-info-item .svg-inline--fa {
-  margin-top: 4px;
-  color: var(--cor-primaria-light);
-  width: 16px;
-  text-align: center;
-}
-
-body.dark-mode .unidade-info-item .svg-inline--fa {
-  color: var(--cor-primaria-dark);
-}
-
-.unidade-info-item strong {
-  display: block;
-  font-weight: 500;
-  color: var(--cor-texto-principal-light);
-}
-
-body.dark-mode .unidade-info-item strong {
-  color: var(--cor-texto-principal-dark);
-}
-/* Cards Expansíveis de Seguro */
+/* ============================================================
+   2. CARDS EXPANSÍVEIS DE SEGURO
+   ============================================================ */
 .seguro-card-expansivel {
     background: var(--cor-fundo-card-light);
     border: 1px solid var(--cor-borda-light);
@@ -167,86 +96,119 @@ body.dark-mode .unidade-info-item strong {
 .lmi-label { font-size: 0.75rem; color: #64748b; display: block; }
 .lmi-valor { font-weight: 700; color: #1e293b; font-size: 1.1rem; }
 
-/* Cores de Alerta de Vencimento */
+/* Cores de Alerta de Vencimento para Seguros */
 .status-row-vencendo-danger { border-left: 8px solid #ef4444; }
 .status-row-vencendo-warning { border-left: 8px solid #f59e0b; }
 .status-row-ativo { border-left: 8px solid #22c55e; }
 
-/* Cards de Equipamento Expansíveis */
+
+/* ============================================================
+   3. CARDS EXPANSÍVEIS DE EQUIPAMENTO (NOVO LAYOUT)
+   ============================================================ */
+
 .equip-card-expansivel {
-    background: var(--cor-fundo-card-light);
+    background: #ffffff;
     border: 1px solid var(--cor-borda-light);
-    border-radius: 10px;
-    margin-bottom: 15px;
+    border-radius: 12px;
+    margin-bottom: 20px;
     overflow: hidden;
-    transition: box-shadow 0.2s ease;
-    box-shadow: var(--sombra-card-light);
+    transition: transform 0.2s ease;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-.equip-card-expansivel:hover {
-    box-shadow: var(--sombra-card-hover-light);
-}
-
+/* Cabeçalho do Card */
 .equip-header {
     display: flex;
     align-items: center;
-    padding: 18px 22px;
+    padding: 20px;
     cursor: pointer;
     gap: 20px;
-    background-color: #ffffff;
+    border-bottom: 1px solid rgba(0,0,0,0.05);
 }
 
+/* CORES TOTAIS DO CABEÇALHO POR STATUS */
+.status-row-operante .equip-header { background-color: #f0fdf4; border-left: 10px solid #22c55e; }
+.status-row-inoperante .equip-header { background-color: #fef2f2; border-left: 10px solid #ef4444; }
+.status-row-emmanutencao .equip-header { background-color: #fffbeb; border-left: 10px solid #f59e0b; }
+.status-row-usolimitado .equip-header { background-color: #eff6ff; border-left: 10px solid #3b82f6; }
+
+/* Informações dentro do cabeçalho */
 .equip-header-info {
     flex: 1;
     display: grid;
-    grid-template-columns: 1.2fr 1fr 1fr 1.2fr 0.8fr; /* Ajuste das colunas */
-    gap: 20px;
-    align-items: center;
+    grid-template-columns: 1.2fr 1.2fr 1fr 1fr 1.2fr;
+    gap: 15px;
 }
 
-.equip-detalhes-container {
-    padding: 0;
-    border-top: 1px solid var(--cor-borda-light);
-    background-color: #fcfcfc;
+.equip-header-info .header-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: #64748b;
+    letter-spacing: 0.05em;
+    display: block;
 }
 
-/* Navegação de Abas Interna */
+.equip-header-info .header-value {
+    font-size: 1rem;
+    font-weight: 600;
+    color: #1e293b;
+}
+
+/* DESIGN DAS ABAS (NAVEGAÇÃO INTERNA) */
 .equip-tabs-nav {
     display: flex;
-    background: #f1f5f9;
+    padding: 10px 20px 0 20px;
+    background: #f8fafc; /* Cor de fundo das abas não selecionadas */
+    gap: 5px;
     border-bottom: 1px solid var(--cor-borda-light);
 }
 
 .equip-tab-btn {
-    padding: 12px 20px;
-    border: none;
-    background: none;
+    padding: 10px 22px;
+    border: 1px solid transparent;
+    background: transparent;
     cursor: pointer;
-    font-size: 0.85rem;
+    font-size: 0.9rem;
     font-weight: 600;
-    color: var(--cor-texto-secundario-light);
+    color: #64748b;
+    border-radius: 8px 8px 0 0;
     display: flex;
     align-items: center;
     gap: 8px;
     transition: all 0.2s;
+    margin-bottom: -1px; /* Faz a aba conectar com a linha de baixo */
 }
 
 .equip-tab-btn:hover {
+    background: #f1f5f9;
     color: var(--cor-primaria-light);
 }
 
+/* Estilo da Aba Ativa (Efeito de Pasta) */
 .equip-tab-btn.active {
     background: #ffffff;
     color: var(--cor-primaria-light);
-    border-top: 3px solid var(--cor-primaria-light);
+    border: 1px solid var(--cor-borda-light);
+    border-bottom: 1px solid #ffffff; /* Apaga a linha de baixo para fundir com o conteúdo */
+    box-shadow: 0 -2px 4px rgba(0,0,0,0.02);
 }
 
+/* Área onde o conteúdo da aba aparece */
 .equip-tab-content {
-    padding: 25px;
+    padding: 30px;
+    background: #ffffff;
+    min-height: 250px;
 }
 
-/* Ajustes de cores para as bordas de status no card */
-.status-row-operante { border-left: 8px solid #22c55e; }
-.status-row-inoperante { border-left: 8px solid #ef4444; }
-.status-row-emmanutencao { border-left: 8px solid #f59e0b; }
-.status-row-usolimitado { border-left: 8px solid #3b82f6; }
+/* Ajustes de formulários dentro do card expansível */
+.equip-tab-content .info-grid {
+    gap: 25px;
+}
+
+.equip-tab-content h3 {
+    margin-bottom: 20px;
+    border-bottom: 2px solid #f1f5f9;
+    padding-bottom: 10px;
+    font-size: 1.1rem;
+}

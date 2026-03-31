@@ -22,9 +22,8 @@ import { useAuth } from '../contexts/AuthContext';
 import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import StatusSelector from '../components/StatusSelector';
-import { formatarData } from '../utils/timeUtils';
 
-// Importação dos componentes das abas internas
+// Componentes das abas internas
 import TabCadastro from '../components/abas-equipamento/TabCadastro';
 import TabAcessorios from '../components/abas-equipamento/TabAcessorios';
 import TabAnexos from '../components/abas-equipamento/TabAnexos';
@@ -43,7 +42,8 @@ function EquipamentosPage() {
         setFiltros,
         controles,
         removerEquipamento,
-        atualizarStatusLocalmente
+        atualizarStatusLocalmente,
+        refetch // Função para recarregar os dados
     } = useEquipamentos();
 
     const { 
@@ -53,11 +53,10 @@ function EquipamentosPage() {
         closeModal: fecharModalExclusao 
     } = useModal();
 
-    // Estados para controlar quais cards estão abertos e qual aba cada um exibe
-    const [expandidos, setExpandidos] = useState({}); // { id: true/false }
-    const [abasAtivas, setAbasAtivas] = useState({}); // { id: 'cadastro' }
+    // Estados para expansão e controle de qual aba está aberta em cada card
+    const [expandidos, setExpandidos] = useState({});
+    const [abasAtivas, setAbasAtivas] = useState({});
 
-    // Efeito para aplicar filtros vindos do Dashboard (ex: clicar no gráfico)
     useEffect(() => {
         if (location.state?.filtroStatusInicial) {
             setFiltros(prev => ({ ...prev, status: location.state.filtroStatusInicial }));
@@ -65,43 +64,33 @@ function EquipamentosPage() {
         }
     }, [location.state, setFiltros, navigate, location.pathname]);
 
-    // Função para abrir/fechar o card
     const toggleExpandir = (id) => {
         setExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
-        // Se estiver abrindo e não tiver aba ativa, define 'cadastro' como padrão
         if (!expandidos[id] && !abasAtivas[id]) {
             setAbasAtivas(prev => ({ ...prev, [id]: 'cadastro' }));
         }
     };
 
-    // Função para trocar a aba de um card específico
     const trocarAba = (equipId, nomeAba) => {
         setAbasAtivas(prev => ({ ...prev, [equipId]: nomeAba }));
     };
 
-    const getRowHighlightClass = (status) => {
+    const getStatusClass = (status) => {
         const s = status?.toLowerCase().replace(/\s+/g, '') || 'default';
-        const classes = { 
+        const map = { 
             operante: 'status-row-operante', 
             inoperante: 'status-row-inoperante', 
             emmanutencao: 'status-row-emmanutencao', 
             usolimitado: 'status-row-usolimitado' 
         };
-        return classes[s] || '';
-    };
-
-    const confirmarExclusao = () => {
-        if (equipParaExcluir) {
-            removerEquipamento(equipParaExcluir.id);
-            fecharModalExclusao();
-        }
+        return map[s] || '';
     };
 
     const selectFiltersConfig = useMemo(() => {
         const tipos = [...new Set(equipamentos.map(e => e.tipo).filter(Boolean))].sort();
         return [
             { id: 'unidadeId', value: controles.filtros.unidadeId, onChange: (v) => controles.handleFilterChange('unidadeId', v), options: unidadesDisponiveis.map(u => ({ value: u.id, label: u.nomeSistema })), defaultLabel: 'Todas Unidades' },
-            { id: 'tipo', value: controles.filtros.tipo, onChange: (v) => controles.handleFilterChange('tipo', v), options: tipos, defaultLabel: 'Todos Tipos' },
+            { id: 'tipo', value: controles.filtros.tipo, onChange: (v) => controles.handleFilterChange('tipo', v), options: tipos.map(t => ({ value: t, label: t })), defaultLabel: 'Todos Tipos' },
             { id: 'status', value: controles.filtros.status, onChange: (v) => controles.handleFilterChange('status', v), options: ["Operante", "Inoperante", "UsoLimitado", "EmManutencao"].map(s => ({ value: s, label: s.replace(/([A-Z])/g, ' $1').trim() })), defaultLabel: 'Todos Status' }
         ];
     }, [equipamentos, unidadesDisponiveis, controles]);
@@ -113,24 +102,24 @@ function EquipamentosPage() {
             <ModalConfirmacao 
                 isOpen={isDeleteModalOpen} 
                 onClose={fecharModalExclusao} 
-                onConfirm={confirmarExclusao} 
+                onConfirm={() => { removerEquipamento(equipParaExcluir.id); fecharModalExclusao(); }} 
                 title="Confirmar Exclusão" 
-                message={`Deseja excluir o equipamento "${equipParaExcluir?.modelo}" (Tag: ${equipParaExcluir?.tag})?`} 
+                message={`Deseja excluir permanentemente o equipamento "${equipParaExcluir?.modelo}"?`} 
                 isDestructive={true} 
             />
 
             <div className="page-content-wrapper">
                 <div className="page-title-card">
-                    <h1 className="page-title-internal">Gerenciamento de Equipamentos</h1>
+                    <h1 className="page-title-internal">Gerenciamento do Parque Tecnológico</h1>
                     <button className="btn btn-primary" onClick={() => navigate('/cadastros/equipamentos/adicionar')}>
-                        <FontAwesomeIcon icon={faPlus} /> Novo Equipamento
+                        <FontAwesomeIcon icon={faPlus} /> Adicionar Equipamento
                     </button>
                 </div>
 
                 <GlobalFilterBar 
                     searchTerm={controles.searchTerm} 
                     onSearchChange={controles.handleSearchChange} 
-                    searchPlaceholder="Buscar por Modelo, Tag..."
+                    searchPlaceholder="Buscar por modelo ou tag..."
                     selectFilters={selectFiltersConfig} 
                 />
 
@@ -141,50 +130,49 @@ function EquipamentosPage() {
                             const abaAtual = abasAtivas[equip.id] || 'cadastro';
 
                             return (
-                                <div key={equip.id} className={`equip-card-expansivel ${getRowHighlightClass(equip.status)}`}>
+                                <div key={equip.id} className={`equip-card-expansivel ${getStatusClass(equip.status)}`}>
                                     
-                                    {/* CABEÇALHO DO CARD */}
+                                    {/* CABEÇALHO DO CARD (COLORIDO POR STATUS) */}
                                     <div className="equip-header" onClick={() => toggleExpandir(equip.id)}>
                                         <FontAwesomeIcon 
                                             icon={isAberto ? faMinusCircle : faPlusCircle} 
-                                            style={{ color: 'var(--cor-primaria-light)', fontSize: '1.3rem' }} 
+                                            style={{ color: 'var(--cor-primaria-light)', fontSize: '1.4rem' }} 
                                         />
                                         
                                         <div className="equip-header-info">
-                                            <div><span className="header-label">Modelo</span><span className="header-value">{equip.modelo}</span></div>
-                                            <div><span className="header-label">Tag (Série)</span><span className="header-value">{equip.tag}</span></div>
-                                            <div><span className="header-label">Tipo</span><span className="header-value">{equip.tipo}</span></div>
-                                            <div><span className="header-label">Unidade</span><span className="header-value">{equip.unidade?.nomeSistema || 'N/A'}</span></div>
+                                            <div><span className="header-label">Modelo</span><div className="header-value">{equip.modelo}</div></div>
+                                            <div><span className="header-label">Nº Série (Tag)</span><div className="header-value">{equip.tag}</div></div>
+                                            <div><span className="header-label">Tipo</span><div className="header-value">{equip.tipo}</div></div>
+                                            <div><span className="header-label">Unidade</span><div className="header-value">{equip.unidade?.nomeSistema || 'N/A'}</div></div>
                                             <div onClick={(e) => e.stopPropagation()}>
-                                                <span className="header-label">Alterar Status</span>
+                                                <span className="header-label">Status Atual</span>
                                                 <StatusSelector equipamento={equip} onSuccessUpdate={atualizarStatusLocalmente} />
                                             </div>
                                         </div>
 
-                                        <div className="equip-header-badges">
-                                            <button className="btn-action view" onClick={(e) => { e.stopPropagation(); navigate(`/equipamentos/ficha-tecnica/${equip.id}`); }} title="Ficha Técnica">
-                                                <FontAwesomeIcon icon={faFileMedical} />
-                                            </button>
-                                        </div>
+                                        <button className="btn-action view" onClick={(e) => { e.stopPropagation(); navigate(`/equipamentos/ficha-tecnica/${equip.id}`); }} title="Ficha Técnica Rápida">
+                                            <FontAwesomeIcon icon={faFileMedical} />
+                                        </button>
                                     </div>
 
-                                    {/* ÁREA EXPANSÍVEL (CONTEÚDO DAS ABAS) */}
+                                    {/* ÁREA EXPANSÍVEL (ABAS MODERNAS) */}
                                     {isAberto && (
                                         <div className="equip-detalhes-container">
                                             <div className="equip-tabs-nav">
-                                                <button className={`equip-tab-btn ${abaAtual === 'cadastro' ? 'active' : ''}`} onClick={() => trocarAba(equip.id, 'cadastro')}><FontAwesomeIcon icon={faInfoCircle} /> Dados</button>
+                                                <button className={`equip-tab-btn ${abaAtual === 'cadastro' ? 'active' : ''}`} onClick={() => trocarAba(equip.id, 'cadastro')}><FontAwesomeIcon icon={faInfoCircle} /> Dados Técnicos</button>
                                                 <button className={`equip-tab-btn ${abaAtual === 'acessorios' ? 'active' : ''}`} onClick={() => trocarAba(equip.id, 'acessorios')}><FontAwesomeIcon icon={faHdd} /> Acessórios</button>
                                                 <button className={`equip-tab-btn ${abaAtual === 'anexos' ? 'active' : ''}`} onClick={() => trocarAba(equip.id, 'anexos')}><FontAwesomeIcon icon={faPaperclip} /> Anexos</button>
-                                                <button className={`equip-tab-btn ${abaAtual === 'historico' ? 'active' : ''}`} onClick={() => trocarAba(equip.id, 'historico')}><FontAwesomeIcon icon={faHistory} /> Histórico</button>
+                                                <button className={`equip-tab-btn ${abaAtual === 'historico' ? 'active' : ''}`} onClick={() => trocarAba(equip.id, 'historico')}><FontAwesomeIcon icon={faHistory} /> Histórico/Vida</button>
                                             </div>
 
                                             <div className="equip-tab-content">
                                                 {abaAtual === 'cadastro' && <TabCadastro equipamentoInicial={equip} />}
                                                 {abaAtual === 'acessorios' && <TabAcessorios equipamentoId={equip.id} />}
-                                                {abaAtual === 'anexos' && <TabAnexos equipamentoId={equip.id} anexosIniciais={equip.anexos || []} onUpdate={() => {}} />}
+                                                {abaAtual === 'anexos' && <TabAnexos equipamentoId={equip.id} anexosIniciais={equip.anexos || []} onUpdate={refetch} />}
                                                 {abaAtual === 'historico' && <TabHistorico equipamento={equip} />}
                                                 
-                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '20px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+                                                {/* Botões de Ação no final da expansão */}
+                                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '30px', borderTop: '1px solid #eee', paddingTop: '20px' }}>
                                                     <button className="btn btn-secondary btn-sm" onClick={() => navigate(`/cadastros/equipamentos/editar/${equip.id}`)}>
                                                         <FontAwesomeIcon icon={faEdit} /> Editar Equipamento
                                                     </button>
