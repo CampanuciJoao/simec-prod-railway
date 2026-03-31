@@ -110,7 +110,7 @@ function EquipamentosPage() {
 
             <div className="page-content-wrapper">
                 <div className="page-title-card">
-                    <h1 className="page-title-internal">Gerenciamento do Parque Tecnológico</h1>
+                    <h1 className="page-title-internal">Gerenciamento Equipamentos</h1>
                     <button className="btn btn-primary" onClick={() => navigate('/cadastros/equipamentos/adicionar')}>
                         <FontAwesomeIcon icon={faPlus} /> Adicionar Equipamento
                     </button>
