@@ -50,18 +50,20 @@ function RelatorioResultado({ resultado }) {
       break;
 
     case 'manutencoesRealizadas':
-      // AJUSTADO: Cabeçalhos com alinhamento lógico
-      headers = ["Nº OS", "Data Conclusão", "Equipamento", "Responsável", "Descrição do Serviço"];
+      headers = ["Nº OS / Chamado", "Conclusão", "Equipamento / Unidade", "Responsável", "Descrição do Serviço"];
       renderRow = (item, index) => (
         <tr key={index}>
-          <td className="text-center" style={{ fontWeight: 'bold' }}>{item.numeroOS}</td>
-          <td className="text-center">{formatarDataHora(item.dataConclusao)}</td>
-          <td className="text-left">{`${item.equipamento.modelo} (${item.equipamento.tag})`}</td>
-          <td className="text-center">{item.tecnicoResponsavel || 'N/A'}</td>
-          {/* TRAZENDO O CAMPO CORRETO DO BACKEND COM LARGURA MÁXIMA CONTROLADA */}
-          <td className="text-left" style={{ fontSize: '0.85rem', maxWidth: '350px', whiteSpace: 'normal', lineHeight: '1.2' }}>
-            {item.descricaoProblemaServico || '-'}
+          <td className="text-center">
+            <div style={{ fontWeight: 'bold' }}>{item.numeroOS}</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{item.numeroChamado ? `Chamado: ${item.numeroChamado}` : '-'}</div>
           </td>
+          <td className="text-center">{formatarDataHora(item.dataConclusao)}</td>
+          <td className="text-left">
+            <div style={{ fontWeight: 'bold' }}>{item.equipamento.modelo} ({item.equipamento.tag})</div>
+            <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Unidade: {item.equipamento.unidade?.nomeSistema}</div>
+          </td>
+          <td className="text-center">{item.tecnicoResponsavel || 'N/A'}</td>
+          <td className="text-left" style={{ fontSize: '0.85rem', maxWidth: '300px' }}>{item.descricaoProblemaServico || '-'}</td>
         </tr>
       );
       break;

@@ -98,23 +98,35 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
             4: { cellWidth: 25, halign: 'center' }
         };
     } 
-    // 2. Relatório de MANUTENÇÕES (Versão Melhorada)
+    // 2. Relatório de MANUTENÇÕES (Versão com Chamado e Unidade)
     else if (resultado.tipoRelatorio === 'manutencoesRealizadas') {
         tituloRelatorio = "RELATÓRIO DE MANUTENÇÕES REALIZADAS";
-        headers = [["Nº OS", "CONCLUSÃO", "EQUIPAMENTO / TAG", "RESPONSÁVEL", "DESCRIÇÃO DO SERVIÇO"]];
+        // Cabeçalhos atualizados para refletir o empilhamento de informações
+        headers = [["OS / CHAMADO", "CONCLUSÃO", "EQUIPAMENTO / UNIDADE", "RESPONSÁVEL", "DESCRIÇÃO DO SERVIÇO"]];
+        
         body = resultado.dados.map(item => [
-            item.numeroOS,
+            // Coluna 0: OS em negrito e Chamado logo abaixo
+            `${item.numeroOS}${item.numeroChamado ? '\nChamado: ' + item.numeroChamado : ''}`,
+            
+            // Coluna 1: Data de conclusão
             formatarDataHora(item.dataConclusao),
-            `${item.equipamento.modelo}\n(Tag: ${item.equipamento.tag})`,
+            
+            // Coluna 2: Equipamento e Unidade logo abaixo
+            `${item.equipamento.modelo} (${item.equipamento.tag})\nUnidade: ${item.equipamento.unidade?.nomeSistema || 'N/A'}`,
+            
+            // Coluna 3: Técnico Responsável
             item.tecnicoResponsavel || 'N/A',
+            
+            // Coluna 4: Descrição do problema/serviço
             item.descricaoProblemaServico || '-'
         ]);
+
         configuracaoColunas = {
-            0: { cellWidth: 25, halign: 'center' }, 
-            1: { cellWidth: 32, halign: 'center' }, 
-            2: { cellWidth: 38 }, 
-            3: { cellWidth: 30, halign: 'center' }, 
-            4: { cellWidth: 'auto' } 
+            0: { cellWidth: 35, halign: 'center' }, // OS / Chamado
+            1: { cellWidth: 32, halign: 'center' }, // Conclusão
+            2: { cellWidth: 45 },                   // Equipamento / Unidade
+            3: { cellWidth: 30, halign: 'center' }, // Responsável
+            4: { cellWidth: 'auto' }                // Descrição do Serviço
         };
     }
 
@@ -124,24 +136,24 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
         head: headers,
         body: body,
         startY: 48,
-        theme: 'grid', // BORDAS PARA TODOS OS LADOS
+        theme: 'grid',
         headStyles: { 
             fillColor: [30, 41, 59], 
-            fontSize: 9, 
+            fontSize: 8.5, 
             halign: 'center', 
             valign: 'middle',
             cellPadding: 3 
         },
         bodyStyles: { 
-            fontSize: 8, 
-            textColor: [51, 65, 85], 
+            fontSize: 7.5, 
+            textColor: [40, 40, 40], 
             valign: 'top', 
             cellPadding: 3 
         },
         columnStyles: configuracaoColunas,
         styles: { overflow: 'linebreak' },
         alternateRowStyles: { fillColor: [250, 250, 250] },
-        // Adiciona rodapé com número de página
+        // Rodapé com numeração de página
         didDrawPage: (data) => {
             doc.setFontSize(8);
             doc.setTextColor(150);

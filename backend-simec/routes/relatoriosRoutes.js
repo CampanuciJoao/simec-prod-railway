@@ -65,7 +65,7 @@ router.post('/gerar', async (req, res) => {
                 };
             }
 
-            dadosRelatorio = await prisma.manutencao.findMany({
+         dadosRelatorio = await prisma.manutencao.findMany({
                 where: whereClause,
                 select: {
                     numeroOS: true,
@@ -73,8 +73,13 @@ router.post('/gerar', async (req, res) => {
                     dataConclusao: true,
                     tecnicoResponsavel: true,
                     descricaoProblemaServico: true,
+                    numeroChamado: true, // <<< BUSCANDO O NÚMERO DO CHAMADO
                     equipamento: {
-                        select: { modelo: true, tag: true }
+                        select: { 
+                            modelo: true, 
+                            tag: true,
+                            unidade: { select: { nomeSistema: true } } // <<< BUSCANDO A UNIDADE
+                        }
                     }
                 },
                 orderBy: { dataConclusao: 'desc' }
