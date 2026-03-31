@@ -1,7 +1,7 @@
 // Ficheiro: src/App.jsx
-// VERSÃO OTIMIZADA - COM LAZY LOADING E SUSPENSE
+// VERSÃO ATUALIZADA COM COMPONENTE BI DEFINIDO
 
-import React, { Suspense } from 'react'; // Adicionado Suspense
+import React, { Suspense } from 'react'; 
 import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -20,7 +20,7 @@ const PageLoader = () => (
   </div>
 );
 
-// --- Componentes de Página (agora com Lazy Loading) ---
+// --- Componentes de Página (Lazy Loading) ---
 const LoginPage = React.lazy(() => import('@/pages/LoginPage'));
 const FichaTecnicaPage = React.lazy(() => import('@/pages/FichaTecnicaPage'));
 const DashboardPage = React.lazy(() => import('@/pages/DashboardPage'));
@@ -47,6 +47,9 @@ const EmailsNotificacaoPage = React.lazy(() => import('@/pages/EmailsNotificacao
 const DetalhesContratoPage = React.lazy(() => import('@/pages/DetalhesContratoPage'));
 const DetalhesSeguroPage = React.lazy(() => import('@/pages/DetalhesSeguroPage'));
 
+// >>> LINHA CORRIGIDA: DEFINIÇÃO DO COMPONENTE BI <<<
+const BIPage = React.lazy(() => import('@/pages/BIPage'));
+
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
@@ -63,9 +66,6 @@ function App() {
     <>
       <ToastContainer />
       
-      {/* O Suspense envolve TODAS as rotas que usam lazy loading.
-          Ele mostrará o 'fallback' (nosso PageLoader) enquanto o 
-          código da página está sendo baixado. */}
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />} />
@@ -75,6 +75,9 @@ function App() {
             <Route index element={<Navigate to="dashboard" replace />} />
             <Route path="dashboard" element={<DashboardPage />} />
             
+            {/* ROTA DO BI REGISTRADA DENTRO DO LAYOUT PROTEGIDO */}
+            <Route path="bi" element={<BIPage />} />
+
             <Route path="equipamentos" element={<EquipamentosPage />} /> 
             <Route path="equipamentos/detalhes/:equipamentoId" element={<DetalhesEquipamentoPage />} />
             <Route path="equipamentos/ficha-tecnica/:id" element={<FichaTecnicaPage />} />
@@ -121,8 +124,6 @@ function App() {
               <Route path="usuarios" element={<GerenciarUsuariosPage />} />
               <Route path="auditoria" element={<LogAuditoriaPage />} />
             </Route>
-
-          <Route path="bi" element={<BIPage />} />
           
           </Route>
 
