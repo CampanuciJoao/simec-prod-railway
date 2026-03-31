@@ -163,3 +163,39 @@ body.dark-mode .sidebar {
   overflow-y: auto; /* PERMITE A ROLAGEM VERTICAL APENAS SE NECESSÁRIO */
   padding-bottom: 20px; /* Espaço no final da lista */
 }
+
+/* Item da lista de notificação */
+.notification-dropdown-item {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--cor-borda-light);
+    gap: 10px;
+}
+
+.notification-link {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    font-size: 0.85rem;
+}
+
+/* Botão mini de check */
+.btn-mark-seen-mini {
+    background: none;
+    border: none;
+    color: #94a3b8; /* Cinza */
+    cursor: pointer;
+    padding: 5px;
+    border-radius: 4px;
+    transition: all 0.2s;
+}
+
+.btn-mark-seen-mini:hover {
+    background-color: #dcfce7; /* Verde clarinho */
+    color: #166534; /* Verde escuro */
+}

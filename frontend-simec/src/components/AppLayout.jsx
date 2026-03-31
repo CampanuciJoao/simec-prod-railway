@@ -96,11 +96,19 @@ function AppLayout() {
                     <ul>
                       {alertasNaoVistos.length > 0 ? (
                         alertasNaoVistos.slice(0, 5).map(notif => (
-                          <li key={notif.id}>
-                            <Link to={notif.link || "/alertas"} onClick={() => setIsDropdownOpen(false)}>
+                          <li key={notif.id} className="notification-dropdown-item">
+                            <Link to={notif.link || "/alertas"} onClick={() => setIsDropdownOpen(false)} className="notification-link">
                               <FontAwesomeIcon icon={faExclamationCircle} className={`icon-prioridade-${notif.prioridade?.toLowerCase()}`} />
                               <span>{notif.titulo}</span>
                             </Link>
+                            {/* BOTÃO INDIVIDUAL ADICIONADO AQUI */}
+                            <button 
+                              className="btn-mark-seen-mini" 
+                              onClick={() => updateStatus(notif.id, 'Visto')}
+                              title="Marcar como visto"
+                            >
+                              <FontAwesomeIcon icon={faCheck} />
+                            </button>
                           </li>
                         ))
                       ) : <li className="no-notifications">Nenhuma nova notificação.</li>}
