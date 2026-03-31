@@ -7,7 +7,7 @@ import { useAlertas } from '@/contexts/AlertasContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from '@/components/Sidebar';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMoon, faSun, faBell, faExclamationCircle, faSignOutAlt, faBars } from '@fortawesome/free-solid-svg-icons';
+import { faMoon, faSun, faBell, faExclamationCircle, faSignOutAlt, faBars,faCheck } from '@fortawesome/free-solid-svg-icons';
 
 function AppLayout() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
