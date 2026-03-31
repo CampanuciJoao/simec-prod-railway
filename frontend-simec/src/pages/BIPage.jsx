@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import api from '../services/api';
+import { getIndicadoresBI } from '../services/api'; // Importando a função correta
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faChartBar, faPrint, faSpinner, faTools, faExclamationTriangle, faClock } from '@fortawesome/free-solid-svg-icons';
+import { faChartBar, faPrint, faSpinner, faClock } from '@fortawesome/free-solid-svg-icons';
 import { exportarBIPDF } from '../utils/pdfUtils';
 
 function BIPage() {
@@ -9,18 +9,21 @@ function BIPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        api.get('/bi/indicadores').then(res => {
-            setDados(res.data);
-            setLoading(false);
-        });
+        getIndicadoresBI()
+            .then(res => {
+                setDados(res);
+                setLoading(false);
+            })
+            .catch(() => setLoading(false));
     }, []);
 
     if (loading) return <div className="page-content-wrapper centered-loader"><FontAwesomeIcon icon={faSpinner} spin size="3x"/></div>;
+    if (!dados) return <div className="page-content-wrapper"><p>Nenhum dado encontrado para o BI.</p></div>;
 
     return (
         <div className="page-content-wrapper">
             <div className="page-title-card">
-                <h1 className="page-title-internal">Business Intelligence - {dados.ano}</h1>
+                <h1 className="page-title-internal">Indicadores BI - Ano {dados.ano}</h1>
                 <button className="btn btn-primary" onClick={() => exportarBIPDF(dados)}>
                     <FontAwesomeIcon icon={faPrint} /> Imprimir Relatório BI
                 </button>
@@ -55,7 +58,7 @@ function BIPage() {
                         <tbody>
                             {dados.rankingDowntime.map(item => (
                                 <tr key={item.tag}>
-                                    <td>{item.modelo} <br/><small>{item.tag}</small></td>
+                                    <td>{item.modelo} <br/><small style={{color: '#64748b'}}>{item.tag}</small></td>
                                     <td>{item.unidade}</td>
                                     <td className="text-center" style={{fontWeight: 'bold', color: '#ef4444'}}>{item.horasParado}h</td>
                                 </tr>

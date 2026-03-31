@@ -138,4 +138,7 @@ export const getOcorrenciasPorEquipamento = (id) => api.get(`/ocorrencias/equipa
 export const addOcorrencia = (dados) => api.post('/ocorrencias', dados).then(res => res.data);
 export const resolverOcorrencia = (id, dados) => api.put(`/ocorrencias/${id}/resolver`, dados).then(res => res.data);
 
+// --- Indicadores BI ---
+export const getIndicadoresBI = () => api.get('/bi/indicadores').then(res => res.data);
+
 export default api;
