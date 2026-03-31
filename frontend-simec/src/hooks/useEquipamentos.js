@@ -1,5 +1,5 @@
 // Ficheiro: src/hooks/useEquipamentos.js
-// VERSÃO 6.0 - ORDENAÇÃO CRONOLÓGICA E ALFABÉTICA AVANÇADA
+// VERSÃO 6.1 - ADICIONADO EXPORTAÇÃO DE REFETCH PARA ATUALIZAÇÃO DE ANEXOS
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { getEquipamentos, getUnidades, deleteEquipamento } from '../services/api';
@@ -17,7 +17,7 @@ export const useEquipamentos = () => {
   const [filtros, setFiltros] = useState({ unidadeId: '', tipo: '', fabricante: '', status: '' });
   const [sortConfig, setSortConfig] = useState({ key: 'modelo', direction: 'ascending' });
 
-  // 1. BUSCA DE DADOS (API)
+  // 1. BUSCA DE DADOS (API) - Agora memorizada e exportada como refetch
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -42,7 +42,6 @@ export const useEquipamentos = () => {
   const equipamentosFiltrados = useMemo(() => {
     let filtrados = [...equipamentosOriginais];
 
-    // Filtro Global (Barra de busca)
     if (searchTerm) {
       const termo = searchTerm.toLowerCase();
       filtrados = filtrados.filter(e =>
@@ -52,7 +51,6 @@ export const useEquipamentos = () => {
       );
     }
 
-    // Filtros Ativos por Coluna (Selects)
     if (filtros.unidadeId) filtrados = filtrados.filter(e => e.unidadeId === filtros.unidadeId);
     if (filtros.tipo) filtrados = filtrados.filter(e => e.tipo === filtros.tipo);
     if (filtros.fabricante) filtrados = filtrados.filter(e => e.fabricante === filtros.fabricante);
@@ -61,7 +59,7 @@ export const useEquipamentos = () => {
     return filtrados;
   }, [equipamentosOriginais, searchTerm, filtros]);
 
-  // 3. LÓGICA DE ORDENAÇÃO (CRONOLÓGICA E ALFABÉTICA)
+  // 3. LÓGICA DE ORDENAÇÃO
   const equipamentosOrdenados = useMemo(() => {
     let ordenados = [...equipamentosFiltrados];
 
@@ -69,7 +67,6 @@ export const useEquipamentos = () => {
       ordenados.sort((a, b) => {
         let valA, valB;
 
-        // Trata campos aninhados (ex: Unidade)
         if (sortConfig.key === 'unidade') {
           valA = a.unidade?.nomeSistema || '';
           valB = b.unidade?.nomeSistema || '';
@@ -78,21 +75,18 @@ export const useEquipamentos = () => {
           valB = b[sortConfig.key];
         }
 
-        // --- TIPO 1: ORDENAÇÃO CRONOLÓGICA (DATAS) ---
         if (sortConfig.key === 'dataInstalacao' || sortConfig.key === 'createdAt') {
           const dataA = valA ? new Date(valA).getTime() : 0;
           const dataB = valB ? new Date(valB).getTime() : 0;
           return sortConfig.direction === 'ascending' ? dataA - dataB : dataB - dataA;
         }
 
-        // --- TIPO 2: ORDENAÇÃO NUMÉRICA (ANO) ---
         if (sortConfig.key === 'anoFabricacao') {
             const numA = Number(valA) || 0;
             const numB = Number(valB) || 0;
             return sortConfig.direction === 'ascending' ? numA - numB : numB - numA;
         }
 
-        // --- TIPO 3: ORDENAÇÃO ALFABÉTICA (TEXTOS) ---
         const strA = String(valA || '').toLowerCase();
         const strB = String(valB || '').toLowerCase();
 
@@ -123,7 +117,8 @@ export const useEquipamentos = () => {
     unidadesDisponiveis,
     loading,
     error,
-    setFiltros, // Exportado para permitir filtros externos (ex: vindo do dashboard)
+    setFiltros,
+    refetch: fetchData, // <<< ADICIONADO: Agora a página pode chamar esta função
     controles: {
       searchTerm,
       filtros,
