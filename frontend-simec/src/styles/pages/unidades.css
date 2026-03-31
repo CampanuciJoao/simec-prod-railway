@@ -1,47 +1,129 @@
 /* ============================================================
-   1. ESTILOS GERAIS DE BUSCA E GRIDS (UNIDADES)
+   1. ESTILOS GERAIS (BUSCA E GRIDS)
    ============================================================ */
+
+.table-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 25px;
+}
+
 .search-input-table {
-  padding: 8px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--cor-borda-light);
-  min-width: 300px;
-  font-size: 0.9em;
+    flex: 1;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--cor-borda-light);
+    font-size: 0.95rem;
+    background-color: #ffffff;
+    transition: border-color 0.2s;
+}
+
+.search-input-table:focus {
+    outline: none;
+    border-color: var(--cor-primaria-light);
 }
 
 body.dark-mode .search-input-table {
-  background-color: var(--cor-fundo-card-dark);
-  border-color: var(--cor-borda-dark);
-  color: var(--cor-texto-principal-dark);
-}
-
-.unidades-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
-}
-
-.unidade-card {
-  background-color: var(--cor-fundo-card-light);
-  border: 1px solid var(--cor-borda-light);
-  border-radius: 8px;
-  box-shadow: var(--sombra-card-light);
-  display: flex;
-  flex-direction: column;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.unidade-card:hover {
-  transform: translateY(-3px);
-  box-shadow: var(--sombra-card-hover-light);
+    background-color: var(--cor-fundo-card-dark);
+    border-color: var(--cor-borda-dark);
+    color: var(--cor-texto-principal-dark);
 }
 
 /* ============================================================
-   2. CARDS EXPANSÍVEIS DE SEGURO
+   2. LAYOUT DE UNIDADES (CARDS PROFISSIONAIS)
    ============================================================ */
+
+.unidades-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 25px;
+    margin-top: 20px;
+}
+
+.unidade-card {
+    background: #ffffff;
+    border: 1px solid var(--cor-borda-light);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.3s ease;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--sombra-card-light);
+}
+
+.unidade-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--sombra-card-hover-light);
+    border-color: var(--cor-primaria-light);
+}
+
+.unidade-card-header {
+    background: #f8fafc;
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--cor-borda-light);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 5px solid var(--cor-primaria-light); /* Faixa colorida para dar vida */
+}
+
+.unidade-card-header h4 {
+    margin: 0;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #1e293b;
+}
+
+.unidade-card-body {
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 18px; /* Espaço entre os blocos de info */
+}
+
+.unidade-info-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.unidade-info-item svg {
+    color: var(--cor-primaria-light);
+    font-size: 1.1rem;
+    margin-top: 3px;
+    width: 20px;
+    text-align: center;
+}
+
+.info-content {
+    display: flex;
+    flex-direction: column;
+}
+
+.info-label {
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    color: #94a3b8;
+    letter-spacing: 0.05em;
+    margin-bottom: 2px;
+}
+
+.info-value {
+    font-size: 0.95rem;
+    color: #334155;
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+/* ============================================================
+   3. CARDS EXPANSÍVEIS DE SEGURO
+   ============================================================ */
+
 .seguro-card-expansivel {
-    background: var(--cor-fundo-card-light);
+    background: #ffffff;
     border: 1px solid var(--cor-borda-light);
     border-radius: 8px;
     margin-bottom: 12px;
@@ -58,24 +140,12 @@ body.dark-mode .search-input-table {
     background-color: #fcfcfc;
 }
 
-.seguro-header:hover { background-color: #f1f5f9; }
-
 .header-info-principal {
     flex: 1;
     display: grid;
     grid-template-columns: 1fr 1fr 1.5fr 1fr;
     gap: 15px;
 }
-
-.header-label {
-    font-size: 0.7rem;
-    color: var(--cor-texto-secundario-light);
-    text-transform: uppercase;
-    display: block;
-    margin-bottom: 2px;
-}
-
-.header-value { font-weight: 600; font-size: 0.95rem; }
 
 .seguro-detalhes-expandidos {
     padding: 20px;
@@ -96,14 +166,13 @@ body.dark-mode .search-input-table {
 .lmi-label { font-size: 0.75rem; color: #64748b; display: block; }
 .lmi-valor { font-weight: 700; color: #1e293b; font-size: 1.1rem; }
 
-/* Cores de Alerta de Vencimento para Seguros */
+/* Cores de Alerta de Vencimento para Seguros e Equipamentos */
 .status-row-vencendo-danger { border-left: 8px solid #ef4444; }
 .status-row-vencendo-warning { border-left: 8px solid #f59e0b; }
 .status-row-ativo { border-left: 8px solid #22c55e; }
 
-
 /* ============================================================
-   3. CARDS EXPANSÍVEIS DE EQUIPAMENTO (NOVO LAYOUT)
+   4. CARDS EXPANSÍVEIS DE EQUIPAMENTO (LAYOUT COM ABAS)
    ============================================================ */
 
 .equip-card-expansivel {
@@ -116,7 +185,6 @@ body.dark-mode .search-input-table {
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
 }
 
-/* Cabeçalho do Card */
 .equip-header {
     display: flex;
     align-items: center;
@@ -132,7 +200,6 @@ body.dark-mode .search-input-table {
 .status-row-emmanutencao .equip-header { background-color: #fffbeb; border-left: 10px solid #f59e0b; }
 .status-row-usolimitado .equip-header { background-color: #eff6ff; border-left: 10px solid #3b82f6; }
 
-/* Informações dentro do cabeçalho */
 .equip-header-info {
     flex: 1;
     display: grid;
@@ -140,26 +207,11 @@ body.dark-mode .search-input-table {
     gap: 15px;
 }
 
-.equip-header-info .header-label {
-    font-size: 0.65rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    color: #64748b;
-    letter-spacing: 0.05em;
-    display: block;
-}
-
-.equip-header-info .header-value {
-    font-size: 1rem;
-    font-weight: 600;
-    color: #1e293b;
-}
-
-/* DESIGN DAS ABAS (NAVEGAÇÃO INTERNA) */
+/* DESIGN DAS ABAS (SISTEMA DE PASTAS) */
 .equip-tabs-nav {
     display: flex;
     padding: 10px 20px 0 20px;
-    background: #f8fafc; /* Cor de fundo das abas não selecionadas */
+    background: #f1f5f9;
     gap: 5px;
     border-bottom: 1px solid var(--cor-borda-light);
 }
@@ -177,38 +229,19 @@ body.dark-mode .search-input-table {
     align-items: center;
     gap: 8px;
     transition: all 0.2s;
-    margin-bottom: -1px; /* Faz a aba conectar com a linha de baixo */
+    margin-bottom: -1px;
 }
 
-.equip-tab-btn:hover {
-    background: #f1f5f9;
-    color: var(--cor-primaria-light);
-}
-
-/* Estilo da Aba Ativa (Efeito de Pasta) */
 .equip-tab-btn.active {
     background: #ffffff;
     color: var(--cor-primaria-light);
     border: 1px solid var(--cor-borda-light);
-    border-bottom: 1px solid #ffffff; /* Apaga a linha de baixo para fundir com o conteúdo */
+    border-bottom: 1px solid #ffffff;
     box-shadow: 0 -2px 4px rgba(0,0,0,0.02);
 }
 
-/* Área onde o conteúdo da aba aparece */
 .equip-tab-content {
     padding: 30px;
     background: #ffffff;
     min-height: 250px;
-}
-
-/* Ajustes de formulários dentro do card expansível */
-.equip-tab-content .info-grid {
-    gap: 25px;
-}
-
-.equip-tab-content h3 {
-    margin-bottom: 20px;
-    border-bottom: 2px solid #f1f5f9;
-    padding-bottom: 10px;
-    font-size: 1.1rem;
 }
