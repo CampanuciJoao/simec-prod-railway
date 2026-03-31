@@ -75,6 +75,11 @@ function Sidebar({ notificacoesCount = 0 }) {
                 <FontAwesomeIcon icon={faChartLine} /> Relatórios
             </NavLink>
           </li>
+          <li>
+  <NavLink to="/bi">
+    <FontAwesomeIcon icon={faChartBar} /> Indicadores BI
+  </NavLink>
+</li>
           
           {user?.role === 'admin' && (
             <li className="admin-section">

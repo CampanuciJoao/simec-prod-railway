@@ -164,3 +164,32 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
 
     doc.save(`${nomeArquivo}.pdf`);
 };
+
+export const exportarBIPDF = (dados) => {
+    const doc = new jsPDF();
+    adicionarCabecalho(doc, `INDICADORES DE PERFORMANCE - ANO ${dados.ano}`);
+
+    // Quadro de Resumo
+    autoTable(doc, {
+        head: [['INDICADOR', 'TOTAL NO ANO']],
+        body: [
+            ['MANUTENÇÕES PREVENTIVAS REALIZADAS', dados.resumo.totalPreventivas],
+            ['MANUTENÇÕES CORRETIVAS (FALHAS)', dados.resumo.totalCorretivas]
+        ],
+        startY: 45,
+        theme: 'grid',
+        headStyles: { fillColor: [34, 197, 94] }
+    });
+
+    // Tabela de Tempo de Parada
+    doc.text("TOP 10 - EQUIPAMENTOS COM MAIOR TEMPO DE PARADA (HORAS)", 14, doc.lastAutoTable.finalY + 15);
+    autoTable(doc, {
+        head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'HORAS PARADO']],
+        body: dados.rankingDowntime.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.horasParado}h`]),
+        startY: doc.lastAutoTable.finalY + 20,
+        theme: 'striped',
+        headStyles: { fillColor: [239, 68, 68] }
+    });
+
+    doc.save(`BI_SIMEC_${dados.ano}.pdf`);
+};

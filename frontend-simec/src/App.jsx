@@ -121,6 +121,8 @@ function App() {
               <Route path="usuarios" element={<GerenciarUsuariosPage />} />
               <Route path="auditoria" element={<LogAuditoriaPage />} />
             </Route>
+
+          <Route path="bi" element={<BIPage />} />
           
           </Route>
 
