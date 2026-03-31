@@ -1,4 +1,6 @@
 // Ficheiro: src/utils/pdfUtils.js
+// VERSÃO FINAL CONSOLIDADA - SUPORTE A RELATÓRIOS GERAIS E BI
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
@@ -19,13 +21,12 @@ const adicionarCabecalho = (doc, titulo) => {
 };
 
 /**
- * PDF de Auditoria do Ativo (Histórico Individual).
+ * 1. PDF de Auditoria do Ativo (Histórico Individual do Equipamento).
  */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     const doc = new jsPDF();
     adicionarCabecalho(doc, "RELATÓRIO DE AUDITORIA DE ATIVO");
 
-    // Bloco de Identificação do Ativo
     doc.setFillColor(248, 250, 252);
     doc.rect(14, 42, 182, 22, 'F'); 
     doc.setDrawColor(203, 213, 225);
@@ -71,7 +72,7 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
 };
 
 /**
- * PDF dos Relatórios Gerais (Inventário e Manutenções).
+ * 2. PDF dos Relatórios Gerais (Inventário e Manutenções Realizadas).
  */
 export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     const doc = new jsPDF();
@@ -80,7 +81,7 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     let tituloRelatorio = "";
     let configuracaoColunas = {};
 
-    // 1. Relatório de INVENTÁRIO
+    // Caso A: Inventário
     if (resultado.tipoRelatorio === 'inventarioEquipamentos') {
         tituloRelatorio = "RELATÓRIO DE INVENTÁRIO DE ATIVOS";
         headers = [["MODELO", "SÉRIE / TAG", "FABRICANTE", "REGISTRO ANVISA", "STATUS", "UNIDADE"]];
@@ -98,35 +99,25 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
             4: { cellWidth: 25, halign: 'center' }
         };
     } 
-    // 2. Relatório de MANUTENÇÕES (Versão com Chamado e Unidade)
+    // Caso B: Manutenções (Com Chamado e Unidade empilhados)
     else if (resultado.tipoRelatorio === 'manutencoesRealizadas') {
         tituloRelatorio = "RELATÓRIO DE MANUTENÇÕES REALIZADAS";
-        // Cabeçalhos atualizados para refletir o empilhamento de informações
         headers = [["OS / CHAMADO", "CONCLUSÃO", "EQUIPAMENTO / UNIDADE", "RESPONSÁVEL", "DESCRIÇÃO DO SERVIÇO"]];
         
         body = resultado.dados.map(item => [
-            // Coluna 0: OS em negrito e Chamado logo abaixo
             `${item.numeroOS}${item.numeroChamado ? '\nChamado: ' + item.numeroChamado : ''}`,
-            
-            // Coluna 1: Data de conclusão
             formatarDataHora(item.dataConclusao),
-            
-            // Coluna 2: Equipamento e Unidade logo abaixo
             `${item.equipamento.modelo} (${item.equipamento.tag})\nUnidade: ${item.equipamento.unidade?.nomeSistema || 'N/A'}`,
-            
-            // Coluna 3: Técnico Responsável
             item.tecnicoResponsavel || 'N/A',
-            
-            // Coluna 4: Descrição do problema/serviço
             item.descricaoProblemaServico || '-'
         ]);
 
         configuracaoColunas = {
-            0: { cellWidth: 35, halign: 'center' }, // OS / Chamado
-            1: { cellWidth: 32, halign: 'center' }, // Conclusão
-            2: { cellWidth: 45 },                   // Equipamento / Unidade
-            3: { cellWidth: 30, halign: 'center' }, // Responsável
-            4: { cellWidth: 'auto' }                // Descrição do Serviço
+            0: { cellWidth: 35, halign: 'center' }, 
+            1: { cellWidth: 32, halign: 'center' }, 
+            2: { cellWidth: 45 }, 
+            3: { cellWidth: 30, halign: 'center' }, 
+            4: { cellWidth: 'auto' } 
         };
     }
 
@@ -137,59 +128,66 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
         body: body,
         startY: 48,
         theme: 'grid',
-        headStyles: { 
-            fillColor: [30, 41, 59], 
-            fontSize: 8.5, 
-            halign: 'center', 
-            valign: 'middle',
-            cellPadding: 3 
-        },
-        bodyStyles: { 
-            fontSize: 7.5, 
-            textColor: [40, 40, 40], 
-            valign: 'top', 
-            cellPadding: 3 
-        },
+        headStyles: { fillColor: [30, 41, 59], fontSize: 8.5, halign: 'center', valign: 'middle', cellPadding: 3 },
+        bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], valign: 'top', cellPadding: 3 },
         columnStyles: configuracaoColunas,
         styles: { overflow: 'linebreak' },
         alternateRowStyles: { fillColor: [250, 250, 250] },
-        // Rodapé com numeração de página
         didDrawPage: (data) => {
             doc.setFontSize(8);
-            doc.setTextColor(150);
-            const str = `Página ${data.pageNumber}`;
-            doc.text(str, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+            doc.text(`Página ${data.pageNumber}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
         }
     });
 
     doc.save(`${nomeArquivo}.pdf`);
 };
 
+/**
+ * 3. PDF de Indicadores BI (Performance Anual).
+ */
 export const exportarBIPDF = (dados) => {
     const doc = new jsPDF();
     adicionarCabecalho(doc, `INDICADORES DE PERFORMANCE - ANO ${dados.ano}`);
 
-    // Quadro de Resumo
+    // Quadro de Resumo Geral
     autoTable(doc, {
-        head: [['INDICADOR', 'TOTAL NO ANO']],
+        head: [['INDICADOR ESTRATÉGICO', 'QUANTIDADE TOTAL']],
         body: [
             ['MANUTENÇÕES PREVENTIVAS REALIZADAS', dados.resumo.totalPreventivas],
-            ['MANUTENÇÕES CORRETIVAS (FALHAS)', dados.resumo.totalCorretivas]
+            ['MANUTENÇÕES CORRETIVAS (PARADAS)', dados.resumo.totalCorretivas]
         ],
         startY: 45,
         theme: 'grid',
-        headStyles: { fillColor: [34, 197, 94] }
+        headStyles: { fillColor: [34, 197, 94], halign: 'center' }, // Verde
+        bodyStyles: { fontStyle: 'bold', halign: 'center' }
     });
 
-    // Tabela de Tempo de Parada
-    doc.text("TOP 10 - EQUIPAMENTOS COM MAIOR TEMPO DE PARADA (HORAS)", 14, doc.lastAutoTable.finalY + 15);
+    // Tabela de Ranking de Paradas
+    doc.setFontSize(11);
+    doc.setTextColor(30);
+    doc.text("RANKING DE TEMPO DE PARADA (DOWNTIME)", 14, doc.lastAutoTable.finalY + 15);
+
     autoTable(doc, {
-        head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'HORAS PARADO']],
-        body: dados.rankingDowntime.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.horasParado}h`]),
+        head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'TEMPO TOTAL PARADO']],
+        body: dados.rankingDowntime.map(e => [
+            `${e.modelo} (${e.tag})`, 
+            e.unidade, 
+            `${e.horasParado} Horas`
+        ]),
         startY: doc.lastAutoTable.finalY + 20,
-        theme: 'striped',
-        headStyles: { fillColor: [239, 68, 68] }
+        theme: 'grid',
+        headStyles: { fillColor: [239, 68, 68], halign: 'center' }, // Vermelho
+        styles: { fontSize: 8, cellPadding: 3 }
     });
+
+    // Rodapé
+    const totalPaginas = doc.internal.getNumberOfPages();
+    for (let i = 1; i <= totalPaginas; i++) {
+        doc.setPage(i);
+        doc.setFontSize(8);
+        doc.setTextColor(150);
+        doc.text(`Relatório BI SIMEC - Página ${i} de ${totalPaginas}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
+    }
 
     doc.save(`BI_SIMEC_${dados.ano}.pdf`);
 };
