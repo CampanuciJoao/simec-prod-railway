@@ -1,12 +1,21 @@
 // src/components/BarChart.jsx
-// VERSÃO ATUALIZADA - COM LÓGICA DE CLIQUE E BARRAS EMPILHADAS
+// VERSÃO 3.0 - REFINADA PARA DASHBOARD E INDICADORES BI
 
 import React, { useEffect, useRef } from 'react';
 import { Bar, getElementAtEvent } from 'react-chartjs-2';
-import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { 
+    Chart as ChartJS, 
+    CategoryScale, 
+    LinearScale, 
+    BarElement, 
+    Title, 
+    Tooltip, 
+    Legend 
+} from 'chart.js';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+// Função para ler as cores do seu sistema (CSS Variables)
 const getCssVariableValue = (variableName) => {
     if (typeof window !== 'undefined') {
         return getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
@@ -17,115 +26,89 @@ const getCssVariableValue = (variableName) => {
 function BarChart({ chartData, title, darkMode, onBarClick }) {
   const chartRef = useRef(null);
 
-  // Handler para o evento de clique no gráfico
+  // Lógica de clique: Permite que ao clicar na barra, você vá para outra página (Drill-down)
   const handleClick = (event) => {
     if (!chartRef.current || !onBarClick) return;
+    
     const element = getElementAtEvent(chartRef.current, event);
     
     if (element.length > 0) {
       const { datasetIndex, index } = element[0];
-      const mesLabel = chartData.labels[index];
-      const tipoLabel = chartData.datasets[datasetIndex].label;
-      onBarClick({ mes: mesLabel, tipo: tipoLabel });
+      const labelX = chartData.labels[index]; // Ex: Nome do mês ou Nome da Máquina
+      const labelDataset = chartData.datasets[datasetIndex].label; // Ex: Tipo de Manutenção
+      const valor = chartData.datasets[datasetIndex].data[index]; // O valor numérico
+      
+      onBarClick({ label: labelX, tipo: labelDataset, valor: valor });
     }
   };
 
-  useEffect(() => {
-    const chartInstance = chartRef.current;
-    return () => {
-      if (chartInstance) {
-        chartInstance.destroy();
-      }
-    };
-  }, []);
-
+  // Garante que os dados são válidos antes de tentar desenhar o gráfico
   const isValid = chartData &&
                   Array.isArray(chartData.labels) && chartData.labels.length > 0 &&
-                  Array.isArray(chartData.datasets) && chartData.datasets.length > 0 &&
-                  chartData.datasets.every(dataset => 
-                    Array.isArray(dataset.data) && 
-                    dataset.data.length === chartData.labels.length
-                  );
+                  Array.isArray(chartData.datasets) && chartData.datasets.length > 0;
 
   if (!isValid) {
-    console.error("BarChart: Dados insuficientes ou inválidos para o gráfico.", JSON.stringify(chartData, null, 2));
-    return <p>Dados insuficientes para o gráfico.</p>;
+    return <p className="no-data-message" style={{ textAlign: 'center', padding: '20px' }}>Aguardando dados para o gráfico...</p>;
   }
 
-  const textColor = darkMode ? getCssVariableValue('--cor-texto-principal-dark') || '#e0e0e0' : getCssVariableValue('--cor-texto-principal-light') || '#1C2B3A';
-  const gridColor = darkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.08)';
-  
-  const data = {
-    labels: chartData.labels,
-    datasets: chartData.datasets.map(dataset => ({
-        ...dataset,
-    })),
-  };
+  // Definição de cores baseada no tema (Light/Dark)
+  const textColor = darkMode 
+    ? (getCssVariableValue('--cor-texto-principal-dark') || '#e0e0e0') 
+    : (getCssVariableValue('--cor-texto-principal-light') || '#1e293b');
+
+  const gridColor = darkMode ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
 
   const options = {
-    devicePixelRatio: Math.max(window.devicePixelRatio || 1, 1.5), 
-    maintainAspectRatio: false, 
     responsive: true,
-    indexAxis: 'x',
+    maintainAspectRatio: false,
     plugins: {
-      legend: { 
-        display: true, // Sempre mostrar legenda para os tipos
+      legend: {
+        display: chartData.datasets.length > 1, // Só mostra legenda se houver mais de um grupo (ex: Preventiva vs Corretiva)
         position: 'bottom',
-        labels: { 
-            color: textColor, 
-            font: {
-                size: 11,
-                family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            }
-        }
+        labels: { color: textColor, font: { size: 12, weight: '500' }, usePointStyle: true, pointStyle: 'circle' }
       },
-      title: { 
+      title: {
         display: !!title,
-        text: title, 
+        text: title,
         color: textColor,
-        font: {
-            size: 13, 
-            family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        }
+        font: { size: 14, weight: 'bold' }
       },
       tooltip: {
-        titleColor: textColor, bodyColor: textColor,
-        backgroundColor: darkMode ? 'rgba(30, 30, 30, 0.9)' : 'rgba(255, 255, 255, 0.95)',
-        borderColor: darkMode ? getCssVariableValue('--cor-borda-dark') : getCssVariableValue('--cor-borda-light'),
-        borderWidth: 1, padding: 10, cornerRadius: 4,
-        titleFont: { size: 12 },
-        bodyFont: { size: 11 },
+        backgroundColor: darkMode ? '#1e293b' : '#ffffff',
+        titleColor: textColor,
+        bodyColor: textColor,
+        borderColor: getCssVariableValue('--cor-borda-light') || '#e2e8f0',
+        borderWidth: 1,
+        padding: 12,
+        cornerRadius: 8,
+        displayColors: true
       }
     },
     scales: {
       y: {
-        stacked: true, // Habilita o empilhamento no eixo Y
+        stacked: true, // Mantém as barras uma sobre a outra (bom para produtividade)
         beginAtZero: true,
-        ticks: { 
-            color: textColor, 
-            precision: 0,
-            font: { 
-                size: 11,
-                family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            } 
-        },
-        grid: { color: gridColor, borderColor: gridColor, drawBorder: false, }
+        grid: { color: gridColor },
+        ticks: { color: textColor }
       },
       x: {
-        stacked: true, // Habilita o empilhamento no eixo X
-        ticks: { 
-            color: textColor,
-            font: { 
-                size: 11,
-                family: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-            } 
-        },
-        grid: { display: false, }
-      },
-    },
+        stacked: true,
+        grid: { display: false },
+        ticks: { color: textColor }
+      }
+    }
   };
 
-  return <Bar ref={chartRef} data={data} options={options} onClick={handleClick} />;
+  return (
+    <div style={{ width: '100%', height: '100%', minHeight: '250px' }}>
+      <Bar 
+        ref={chartRef} 
+        data={chartData} 
+        options={options} 
+        onClick={handleClick} 
+      />
+    </div>
+  );
 }
 
 export default BarChart;

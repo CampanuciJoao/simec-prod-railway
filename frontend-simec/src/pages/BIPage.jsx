@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getIndicadoresBI } from '../services/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPrint, faSpinner, faClock, faTools, faExclamationTriangle } from '@fortawesome/free-solid-svg-icons';
+import { faChartBar, faPrint, faSpinner, faClock } from '@fortawesome/free-solid-svg-icons'; // <<< IMPORTAÇÕES AQUI
 import { exportarBIPDF } from '../utils/pdfUtils';
 
 function BIPage() {
