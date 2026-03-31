@@ -1,22 +1,13 @@
 // Ficheiro: simec/backend-simec/prisma/schema.prisma
-// Versão: 11.1 (Sênior - Alertas Individuais por Usuário e Limpeza - StatusSeguro Adicionado)
-// Descrição: Define a estrutura completa do banco de dados para a aplicação SIMEC,
-//            agora com gerenciamento de status de alerta por usuário.
 
-// --- Configuração do Cliente Prisma ---
 generator client {
   provider = "prisma-client-js"
 }
 
-// --- Configuração da Fonte de Dados ---
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
-
-// ===============================================
-//         MODELOS PRINCIPAIS
-// ===============================================
 
 model Unidade {
   id                String          @id @default(uuid())
@@ -47,7 +38,7 @@ model Usuario {
   role                Role                 @default(user)
   logsDeAuditoria     LogAuditoria[]
   notasDeAndamento    NotaAndamento[]
-  alertasLidos        AlertaLidoPorUsuario[] // Referência para os alertas que este usuário leu
+  alertasLidos        AlertaLidoPorUsuario[] 
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   @@map("usuarios")
@@ -136,12 +127,23 @@ model Seguro {
   seguradora    String
   dataInicio    DateTime        @map("data_inicio")
   dataFim       DateTime        @map("data_fim")
-  status        StatusSeguro    @default(Ativo) // Mantém o status base para o Seguro
+  status        StatusSeguro    @default(Ativo)
   cobertura     String?         @db.Text
   
+  // NOVOS CAMPOS DE VALORES (LMI)
+  premioTotal           Float?   @default(0) @map("premio_total")
+  lmiIncendio           Float?   @default(0)
+  lmiDanosEletricos     Float?   @default(0)
+  lmiRoubo              Float?   @default(0)
+  lmiVidros             Float?   @default(0)
+  lmiResponsabilidadeCivil Float? @default(0)
+  lmiDanosMateriais     Float?   @default(0)
+  lmiDanosCorporais     Float?   @default(0)
+  lmiDanosMorais        Float?   @default(0)
+  lmiAPP                Float?   @default(0)
+
   equipamento   Equipamento?    @relation(fields: [equipamentoId], references: [id], onDelete: SetNull)
   equipamentoId String?         @map("equipamento_id")
-  
   unidade       Unidade?        @relation("SegurosUnidadesCobertas", fields: [unidadeId], references: [id], onDelete: SetNull)
   unidadeId     String?         @map("unidade_id")
 
@@ -151,38 +153,29 @@ model Seguro {
   @@map("seguros")
 }
 
-// ===============================================
-//         MODELOS DE SUPORTE
-// ===============================================
-
 model Alerta {
-  id            String               @id // ID do alerta deve ser mantido
+  id            String               @id 
   titulo        String
   subtitulo     String?
   data          DateTime
   prioridade    Prioridade
   tipo          String
   link          String?
-  emailEnviado  Boolean              @default(false) // Indica se email JÁ foi enviado
-  
-  lidoPorUsuarios AlertaLidoPorUsuario[] // Relação com a nova tabela pivô
-
+  emailEnviado  Boolean              @default(false)
+  lidoPorUsuarios AlertaLidoPorUsuario[] 
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   @@map("alertas")
 }
 
-// NOVO MODELO: Para rastrear o status de "lido" por cada usuário
 model AlertaLidoPorUsuario {
   alertaId    String
   usuarioId   String
-  visto       Boolean   @default(true) // True se o usuário marcou como visto/dispensado
+  visto       Boolean   @default(true)
   dataVisto   DateTime? @default(now())
-
   alerta      Alerta    @relation(fields: [alertaId], references: [id], onDelete: Cascade)
   usuario     Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
-
-  @@id([alertaId, usuarioId]) // Chave composta: garante unicidade para cada par alerta-usuário
+  @@id([alertaId, usuarioId])
   @@map("alertas_lidos_por_usuario")
 }
 
@@ -198,24 +191,19 @@ model LogAuditoria {
   @@map("log_auditoria")
 }
 
-// Modelo para a Ficha Técnica / Ocorrências Avulsas
 model Ocorrencia {
   id            String   @id @default(uuid())
   data          DateTime @default(now())
-  titulo        String   // Ex: "Ajuste de brilho no monitor", "Queda de energia"
+  titulo        String   
   descricao     String?  @db.Text
-  tipo          String   // Ex: "Operacional", "Software", "Infraestrutura", "Ajuste"
-  tecnico       String?  // Nome de quem realizou/registrou
-
-   // NOVOS CAMPOS PARA SOLUÇÃO
+  tipo          String   
+  tecnico       String?  
   resolvido       Boolean   @default(false)
   solucao         String?   @db.Text
   dataResolucao   DateTime?
   tecnicoResolucao String?
-  
   equipamento   Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
   equipamentoId String
-  
   @@map("ocorrencias")
 }
 
@@ -251,8 +239,6 @@ model NotaAndamento {
   @@map("notas_andamento")
 }
 
-// --- MODELOS DE NOTIFICAÇÃO (ATUALIZADOS) ---
-
 model EmailNotificacao {
   id                        String             @id @default(uuid())
   nome                      String?
@@ -278,10 +264,6 @@ model NotificacaoEnviada {
   @@unique([entidade, entidadeId, emailNotificacaoId])
   @@map("notificacoes_enviadas")
 }
-
-// ===============================================
-//         ENUMS (TIPOS FIXOS)
-// ===============================================
 
 enum Role {
   admin
@@ -317,14 +299,12 @@ enum StatusManutencao {
   AguardandoConfirmacao
 }
 
-// NOVO ENUM: Status do Seguro
 enum StatusSeguro {
   Ativo
   Expirado
   Cancelado
-  Vigente // Mantido para possível uso, embora 'Ativo' já cubra boa parte
+  Vigente
 }
-
 
 enum Prioridade {
   Baixa

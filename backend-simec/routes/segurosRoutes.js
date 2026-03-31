@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/segurosRoutes.js
-// VERSÃO 100% COMPLETA E ATUALIZADA PARA PRISMA E MÚLTIPLOS VÍNCULOS
+// VERSÃO ATUALIZADA COM COBERTURAS DETALHADAS E VÍNCULOS
 
 import express from 'express';
 import multer from 'multer';
@@ -11,7 +11,7 @@ import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
 
-// Configuração do Multer (sem alterações)
+// --- 1. Configuração do Multer para Upload de Apólices ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = 'uploads/seguros';
@@ -24,33 +24,33 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// ROTA: GET /api/seguros
-// FINALIDADE: Listar todos os seguros.
+// --- 2. Listar todos os seguros ---
 router.get('/', async (req, res) => {
     try {
         const seguros = await prisma.seguro.findMany({
             include: {
-                equipamento: { select: { id: true, modelo: true, tag: true } }, // Inclui equipamento
-                unidade: { select: { id: true, nomeSistema: true } } // Inclui unidade
+                equipamento: { select: { id: true, modelo: true, tag: true } },
+                unidade: { select: { id: true, nomeSistema: true } },
+                anexos: true // Inclui anexos para sabermos se a apólice foi enviada
             },
             orderBy: { dataFim: 'asc' }
         });
         res.json(seguros);
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar seguros.', error: error.message });
+        console.error("Erro ao buscar seguros:", error);
+        res.status(500).json({ message: 'Erro ao buscar seguros.' });
     }
 });
 
-// ROTA: GET /api/seguros/:id
-// FINALIDADE: Obter um seguro específico.
+// --- 3. Buscar um seguro específico por ID ---
 router.get('/:id', async (req, res) => {
     try {
         const seguro = await prisma.seguro.findUnique({
             where: { id: req.params.id },
             include: { 
                 anexos: true, 
-                equipamento: true, // Inclui o objeto equipamento
-                unidade: true      // Inclui o objeto unidade
+                equipamento: true,
+                unidade: true      
             }
         });
 
@@ -60,39 +60,46 @@ router.get('/:id', async (req, res) => {
             res.status(404).json({ message: 'Seguro não encontrado.' });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar seguro.', error: error.message });
+        res.status(500).json({ message: 'Erro ao buscar detalhe do seguro.' });
     }
 });
 
-// ROTA: POST /api/seguros
-// FINALIDADE: Criar uma nova apólice de seguro.
+// --- 4. Criar um novo seguro com coberturas (POST) ---
 router.post('/', async (req, res) => {
-    const { apoliceNumero, seguradora, dataInicio, dataFim, equipamentoId, unidadeId, cobertura, ...outrosDados } = req.body;
+    const { 
+        apoliceNumero, seguradora, dataInicio, dataFim, equipamentoId, unidadeId, cobertura,
+        premioTotal, lmiIncendio, lmiDanosEletricos, lmiRoubo, lmiVidros,
+        lmiResponsabilidadeCivil, lmiDanosMateriais, lmiDanosCorporais,
+        lmiDanosMorais, lmiAPP
+    } = req.body;
     
     if (!apoliceNumero || !seguradora || !dataInicio || !dataFim) {
         return res.status(400).json({ message: 'Número da Apólice, Seguradora, Data de Início e Fim são obrigatórios.' });
     }
 
-    // Validação de vínculo: não pode ter os dois ao mesmo tempo
-    if (equipamentoId && unidadeId) {
-        return res.status(400).json({ message: 'Um seguro não pode ser vinculado a um equipamento e uma unidade ao mesmo tempo.' });
-    }
-
     try {
-        const dataPayload = {
-            apoliceNumero,
-            seguradora,
-            dataInicio: new Date(dataInicio),
-            dataFim: new Date(dataFim),
-            cobertura,
-            // 'conect' só será adicionado se o ID existir, caso contrário será undefined e ignorado pelo Prisma
-            ...(equipamentoId && { equipamento: { connect: { id: equipamentoId } } }),
-            ...(unidadeId && { unidade: { connect: { id: unidadeId } } }),
-            ...outrosDados // Para outros campos que podem ser enviados
-        };
-
         const novoSeguro = await prisma.seguro.create({
-            data: dataPayload
+            data: {
+                apoliceNumero,
+                seguradora,
+                dataInicio: new Date(dataInicio),
+                dataFim: new Date(dataFim),
+                cobertura,
+                // Valores financeiros (convertendo para número para garantir)
+                premioTotal: parseFloat(premioTotal) || 0,
+                lmiIncendio: parseFloat(lmiIncendio) || 0,
+                lmiDanosEletricos: parseFloat(lmiDanosEletricos) || 0,
+                lmiRoubo: parseFloat(lmiRoubo) || 0,
+                lmiVidros: parseFloat(lmiVidros) || 0,
+                lmiResponsabilidadeCivil: parseFloat(lmiResponsabilidadeCivil) || 0,
+                lmiDanosMateriais: parseFloat(lmiDanosMateriais) || 0,
+                lmiDanosCorporais: parseFloat(lmiDanosCorporais) || 0,
+                lmiDanosMorais: parseFloat(lmiDanosMorais) || 0,
+                lmiAPP: parseFloat(lmiAPP) || 0,
+                // Vínculos
+                equipamento: equipamentoId ? { connect: { id: equipamentoId } } : undefined,
+                unidade: unidadeId ? { connect: { id: unidadeId } } : undefined,
+            }
         });
 
         await registrarLog({
@@ -100,42 +107,50 @@ router.post('/', async (req, res) => {
             acao: 'CRIAÇÃO',
             entidade: 'Seguro',
             entidadeId: novoSeguro.id,
-            detalhes: `Apólice de seguro nº ${novoSeguro.apoliceNumero} foi criada.`
+            detalhes: `Seguro nº ${novoSeguro.apoliceNumero} criado com coberturas detalhadas.`
         });
 
         res.status(201).json(novoSeguro);
     } catch (error) {
         if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe uma apólice com este número.' });
-        // Captura erros de relação não encontrada para equipamento OU unidade
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Equipamento ou Unidade associado(a) não encontrado(a).' });
-        console.error('Erro ao criar seguro:', error); // Log mais detalhado
-        res.status(500).json({ message: 'Erro ao criar seguro.', error: error.message });
+        console.error('Erro ao criar seguro:', error);
+        res.status(500).json({ message: 'Erro interno ao criar seguro.' });
     }
 });
 
-// ROTA: PUT /api/seguros/:id
-// FINALIDADE: Atualizar uma apólice de seguro.
+// --- 5. Atualizar seguro existente (PUT) ---
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { equipamentoId, unidadeId, ...dataToUpdate } = req.body;
-
-    if (dataToUpdate.dataInicio) dataToUpdate.dataInicio = new Date(dataToUpdate.dataInicio);
-    if (dataToUpdate.dataFim) dataToUpdate.dataFim = new Date(dataToUpdate.dataFim);
-
-    // Validação de vínculo: não pode ter os dois ao mesmo tempo
-    if (equipamentoId && unidadeId) {
-        return res.status(400).json({ message: 'Um seguro não pode ser vinculado a um equipamento e uma unidade ao mesmo tempo.' });
-    }
+    const { 
+        equipamentoId, unidadeId, dataInicio, dataFim,
+        premioTotal, lmiIncendio, lmiDanosEletricos, lmiRoubo, lmiVidros,
+        lmiResponsabilidadeCivil, lmiDanosMateriais, lmiDanosCorporais,
+        lmiDanosMorais, lmiAPP, ...outrosDados 
+    } = req.body;
 
     try {
-        const payloadDeAtualizacao = { ...dataToUpdate };
+        const payloadDeAtualizacao = {
+            ...outrosDados,
+            dataInicio: dataInicio ? new Date(dataInicio) : undefined,
+            dataFim: dataFim ? new Date(dataFim) : undefined,
+            // Valores financeiros
+            premioTotal: premioTotal !== undefined ? parseFloat(premioTotal) : undefined,
+            lmiIncendio: lmiIncendio !== undefined ? parseFloat(lmiIncendio) : undefined,
+            lmiDanosEletricos: lmiDanosEletricos !== undefined ? parseFloat(lmiDanosEletricos) : undefined,
+            lmiRoubo: lmiRoubo !== undefined ? parseFloat(lmiRoubo) : undefined,
+            lmiVidros: lmiVidros !== undefined ? parseFloat(lmiVidros) : undefined,
+            lmiResponsabilidadeCivil: lmiResponsabilidadeCivil !== undefined ? parseFloat(lmiResponsabilidadeCivil) : undefined,
+            lmiDanosMateriais: lmiDanosMateriais !== undefined ? parseFloat(lmiDanosMateriais) : undefined,
+            lmiDanosCorporais: lmiDanosCorporais !== undefined ? parseFloat(lmiDanosCorporais) : undefined,
+            lmiDanosMorais: lmiDanosMorais !== undefined ? parseFloat(lmiDanosMorais) : undefined,
+            lmiAPP: lmiAPP !== undefined ? parseFloat(lmiAPP) : undefined,
+        };
         
-        // Lógica para conectar, desconectar ou manter o vínculo com equipamento/unidade
-        // Se equipamentoId for fornecido, conecta. Se for null/undefined, desconecta.
-        if (equipamentoId !== undefined) { // Verifica explicitamente se a propriedade foi enviada
+        // Gerenciamento de Vínculo
+        if (equipamentoId !== undefined) {
             payloadDeAtualizacao.equipamento = equipamentoId ? { connect: { id: equipamentoId } } : { disconnect: true };
         }
-        if (unidadeId !== undefined) { // Verifica explicitamente se a propriedade foi enviada
+        if (unidadeId !== undefined) {
             payloadDeAtualizacao.unidade = unidadeId ? { connect: { id: unidadeId } } : { disconnect: true };
         }
 
@@ -149,35 +164,29 @@ router.put('/:id', async (req, res) => {
             acao: 'EDIÇÃO',
             entidade: 'Seguro',
             entidadeId: id,
-            detalhes: `Apólice de seguro nº ${seguroAtualizado.apoliceNumero} foi atualizada.`
+            detalhes: `Seguro nº ${seguroAtualizado.apoliceNumero} atualizado.`
         });
 
         res.json(seguroAtualizado);
     } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Seguro, Equipamento ou Unidade associado(a) não encontrado(a).' });
-        console.error('Erro ao atualizar seguro:', error); // Log mais detalhado
-        res.status(500).json({ message: 'Erro ao atualizar seguro.', error: error.message });
+        console.error('Erro ao atualizar seguro:', error);
+        res.status(500).json({ message: 'Erro ao atualizar seguro.' });
     }
 });
 
-// ROTA: DELETE /api/seguros/:id
-// FINALIDADE: Excluir uma apólice de seguro.
+// --- 6. Excluir seguro (DELETE) ---
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
-        const seguroParaExcluir = await prisma.seguro.findUnique({
-            where: { id },
-            include: { anexos: true }
-        });
+        const seguro = await prisma.seguro.findUnique({ where: { id }, include: { anexos: true } });
+        if (!seguro) return res.status(404).json({ message: 'Seguro não encontrado.' });
 
-        if (!seguroParaExcluir) {
-            return res.status(404).json({ message: 'Seguro não encontrado.' });
+        // Apaga arquivos físicos dos anexos
+        if (seguro.anexos) {
+            seguro.anexos.forEach(anexo => {
+                if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
+            });
         }
-
-        // Exclui os arquivos físicos associados
-        (seguroParaExcluir.anexos || []).forEach(anexo => {
-            if (anexo.path && fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
-        });
 
         await prisma.seguro.delete({ where: { id } });
 
@@ -186,20 +195,16 @@ router.delete('/:id', async (req, res) => {
             acao: 'EXCLUSÃO',
             entidade: 'Seguro',
             entidadeId: id,
-            detalhes: `Apólice de seguro nº ${seguroParaExcluir.apoliceNumero} foi excluída.`
+            detalhes: `Seguro nº ${seguro.apoliceNumero} excluído permanentemente.`
         });
 
-        res.status(200).json({ message: 'Seguro e seus anexos foram excluídos com sucesso.' });
+        res.status(204).send();
     } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Seguro não encontrado.' });
-        console.error('Erro ao excluir seguro:', error);
-        res.status(500).json({ message: 'Erro ao excluir seguro.', error: error.message });
+        res.status(500).json({ message: 'Erro ao excluir seguro.' });
     }
 });
 
-// --- ROTAS DE ANEXOS --- (padrão já conhecido)
-
-// ROTA: POST /api/seguros/:id/anexos
+// --- 7. Rota para Upload de Anexos específicos de Seguro ---
 router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
     const { id: seguroId } = req.params;
     if (!req.files || req.files.length === 0) return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
@@ -211,34 +216,18 @@ router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
             path: file.path,
             tipoMime: file.mimetype,
         }));
+        
         await prisma.anexo.createMany({ data: anexosData });
+        
         const seguroAtualizado = await prisma.seguro.findUnique({
             where: { id: seguroId },
             include: { anexos: true }
         });
+        
         res.status(201).json(seguroAtualizado);
     } catch (error) {
-        console.error('Erro ao salvar anexos de seguro:', error);
-        res.status(500).json({ message: 'Erro ao salvar anexos de seguro.', error: error.message });
+        res.status(500).json({ message: 'Erro ao salvar anexo da apólice.' });
     }
 });
 
-// ROTA: DELETE /api/seguros/:id/anexos/:anexoId
-router.delete('/:id/anexos/:anexoId', async (req, res) => {
-    const { anexoId } = req.params;
-    try {
-        const anexo = await prisma.anexo.findUnique({ where: { id: anexoId } });
-        if (anexo && anexo.path && fs.existsSync(anexo.path)) {
-            fs.unlinkSync(anexo.path);
-        }
-        await prisma.anexo.delete({ where: { id: anexoId } });
-        res.status(204).send();
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Anexo de seguro não encontrado.' });
-        console.error('Erro ao excluir anexo de seguro:', error);
-        res.status(500).json({ message: 'Erro ao excluir anexo de seguro.', error: error.message });
-    }
-});
-
-// Exporta o router
 export default router;

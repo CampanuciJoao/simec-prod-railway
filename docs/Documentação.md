@@ -244,3 +244,94 @@ Novas páginas no frontend devem ser adicionadas na pasta pages/ e a sua rota co
     ├── package-lock.json
     ├── package.json                   # Define os scripts e dependências do frontend.
     └── vite.config.js                 # Configurações do Vite.
+
+
+
+    📑 DOCUMENTO DE REFERÊNCIA: SISTEMA SIMEC (v1.0)
+Este documento descreve a arquitetura, regras de negócio e estrutura técnica do sistema SIMEC (Sistema de Monitoramento de Engenharia Clínica).
+🛠️ 1. TECNOLOGIAS (Tech Stack)
+Backend: Node.js com Framework Express.
+Banco de Dados: PostgreSQL.
+ORM: Prisma (Gerenciamento do banco).
+Frontend: React (Vite), JavaScript (ES6+).
+Estilização: CSS3 Puro (Modularizado).
+Segurança: JWT (JSON Web Token) para sessões e Bcrypt para senhas.
+Relatórios: jsPDF e jsPDF-AutoTable.
+🏗️ 2. ARQUITETURA DO BACKEND (Pasta: backend-simec)
+server.js: Ponto de entrada. Gerencia rotas, middlewares e as Tarefas de Fundo (Cron jobs via setInterval) que atualizam status de manutenção e geram alertas automaticamente a cada 1 minuto.
+/prisma/schema.prisma: O "coração" do sistema. Define as tabelas:
+Unidade, Usuario, Equipamento, Contrato, Manutencao, Acessorio, Seguro, Alerta, LogAuditoria, Ocorrencia, EmailNotificacao.
+/routes: Endpoints da API (ex: /api/equipamentos, /api/manutencoes).
+/services:
+alertasService.js: Lógica complexa de vencimentos e proximidade de datas.
+emailService.js: Envio de e-mails via Nodemailer com templates HTML.
+logService.js: Registro automático de auditoria (quem fez o quê).
+/middleware: Proteção de rotas (apenas usuários logados ou apenas admins).
+💻 3. ARQUITETURA DO FRONTEND (Pasta: frontend-simec)
+/contexts: Gerenciamento de estado global.
+AuthContext: Login, logout e permanência do usuário.
+AlertasContext: Busca alertas periodicamente (polling) e gerencia notificações na barra superior.
+ToastContext: Exibe pequenas mensagens de sucesso/erro no canto da tela.
+/hooks: Lógica de tela separada do visual (ex: useEquipamentos.js cuida de buscar e filtrar os dados).
+/components: Componentes reutilizáveis (Gráficos, Formulários, Modais, Inputs com máscara de data/hora/moeda).
+/pages: Telas principais do sistema.
+/utils: Funções de ajuda (Formatação de data/hora, exportação para PDF e CSV).
+📋 4. PRINCIPAIS MÓDULOS E REGRAS DE NEGÓCIO
+🏥 Gestão de Unidades e Equipamentos
+Equipamentos são vinculados a uma Unidade.
+Possuem status: Operante, Inoperante, Em Manutenção, Uso Limitado.
+Cadastro inteligente de Patrimônio: Permite marcar como "Sem Patrimônio" (salva o texto, mas valida duplicidade se for um número real).
+🔧 Manutenções (Ordens de Serviço - OS)
+Fluxo Automático: Uma OS agendada para "agora" muda o status do equipamento para "Em Manutenção" e a OS para "Em Andamento" automaticamente.
+Confirmação de Término: Quando o horário de fim agendado chega, a OS vai para "Aguardando Confirmação". O usuário deve clicar se o equipamento ficou "Operante" ou "Inoperante" para finalizar.
+Histórico: Cada OS permite anexos e "Notas de Andamento".
+⚠️ Sistema de Alertas e Notificações
+Vencimentos: Contratos e Seguros geram alertas internos e e-mails com 30, 15, 7 e 1 dia de antecedência.
+Visualização Individual: O sistema rastreia qual usuário já viu qual alerta (tabela AlertaLidoPorUsuario). Um usuário pode "Dispensar" um alerta sem afetar os outros.
+📝 Ficha Técnica / Ocorrências
+Histórico de "vida" do equipamento para eventos menores (ajustes, quedas de energia) que não são necessariamente manutenções preventivas/corretivas.
+🛡️ Auditoria
+Quase todas as ações (Criar, Editar, Excluir, Concluir) geram um log na tabela LogAuditoria, salvando o autor, a data e o detalhe da alteração.
+🚀 5. COMO EXECUTAR O SISTEMA (Para o desenvolvedor)
+Backend:
+npm install
+Configurar .env com DATABASE_URL e JWT_SECRET.
+npx prisma db push (Sincronizar banco).
+npm run seed (Criar usuário admin inicial: admin / 751953).
+npm start.
+Frontend:
+npm install
+Configurar .env com VITE_API_URL.
+npm run dev.
+
+📑 DOCUMENTO DE REFERÊNCIA: SISTEMA SIMEC (v1.1)
+Este documento descreve a arquitetura, regras de negócio e infraestrutura do sistema SIMEC.
+🌐 1. AMBIENTES E HOSPEDAGEM (Railway)
+O sistema utiliza integração contínua hospedado no Railway, dividido em dois ambientes:
+Produção: Ambiente estável utilizado no dia a dia.
+Testes (Staging): Ambiente para validar novas implementações antes da subida oficial.
+Configuração: O Backend e o Frontend são serviços distintos no Railway. O Frontend (Vite) consome o Backend via variável de ambiente VITE_API_URL.
+🛠️ 2. TECNOLOGIAS (Tech Stack)
+Backend: Node.js + Express + Prisma ORM.
+Banco de Dados: PostgreSQL (Hospedado no Railway).
+Frontend: React (Vite) + JavaScript.
+Segurança: JWT para sessões e Bcrypt para senhas.
+Notificações: Envio de e-mail via SMTP (Nodemailer).
+🏗️ 3. ARQUITETURA TÉCNICA
+Backend (backend-simec):
+server.js: Orquestrador e executor de tarefas automáticas (tarefas de fundo que rodam a cada 1 min).
+schema.prisma: Define as 11 tabelas principais (Unidades, Equipamentos, Manutenções, etc.).
+alertasService.js: Lógica de automação de status (Agendada -> Em Andamento -> Aguardando Confirmação).
+Frontend (frontend-simec):
+AuthContext.jsx & AlertasContext.jsx: Gerenciam o estado global (login e notificações).
+api.js: Centraliza todas as chamadas para o servidor.
+GlobalFilterBar.jsx: Componente padrão de busca e filtros em todas as telas.
+📋 4. REGRAS DE NEGÓCIO CRÍTICAS
+Status de Equipamento: O status muda automaticamente com base nas Ordens de Serviço (OS). Se uma OS inicia agora, o equipamento fica "Em Manutenção".
+Alertas Individuais: O sistema sabe quem leu qual alerta. Se o Admin 1 marcar como lido, o Admin 2 ainda verá o alerta como novo até que ele mesmo marque como visto.
+Patrimônio: Um equipamento pode ser marcado como "Sem Patrimônio". Se tiver número, o sistema impede cadastros duplicados.
+Auditoria: Toda criação, edição ou exclusão de dados importantes gera um registro automático na tabela de Auditoria com o nome do autor e a data/hora.
+🚀 5. INSTRUÇÕES PARA A IA
+Sempre verificar se a alteração exige mudança no schema.prisma (banco de dados).
+Sempre incluir o registro de Log de Auditoria em novas funções de criação/edição no backend.
+Manter o padrão visual do CSS (variáveis de cor e modo escuro).

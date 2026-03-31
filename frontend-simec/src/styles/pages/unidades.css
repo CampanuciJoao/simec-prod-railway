@@ -110,3 +110,64 @@ body.dark-mode .unidade-info-item .svg-inline--fa {
 body.dark-mode .unidade-info-item strong {
   color: var(--cor-texto-principal-dark);
 }
+/* Cards Expansíveis de Seguro */
+.seguro-card-expansivel {
+    background: var(--cor-fundo-card-light);
+    border: 1px solid var(--cor-borda-light);
+    border-radius: 8px;
+    margin-bottom: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.seguro-header {
+    display: flex;
+    align-items: center;
+    padding: 15px 20px;
+    cursor: pointer;
+    gap: 20px;
+    background-color: #fcfcfc;
+}
+
+.seguro-header:hover { background-color: #f1f5f9; }
+
+.header-info-principal {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1.5fr 1fr;
+    gap: 15px;
+}
+
+.header-label {
+    font-size: 0.7rem;
+    color: var(--cor-texto-secundario-light);
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.header-value { font-weight: 600; font-size: 0.95rem; }
+
+.seguro-detalhes-expandidos {
+    padding: 20px;
+    border-top: 1px dashed var(--cor-borda-light);
+    background-color: #ffffff;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 15px;
+}
+
+.lmi-item {
+    background: #f8fafc;
+    padding: 10px;
+    border-radius: 6px;
+    border-left: 4px solid var(--cor-primaria-light);
+}
+
+.lmi-label { font-size: 0.75rem; color: #64748b; display: block; }
+.lmi-valor { font-weight: 700; color: #1e293b; font-size: 1.1rem; }
+
+/* Cores de Alerta de Vencimento */
+.status-row-vencendo-danger { border-left: 8px solid #ef4444; }
+.status-row-vencendo-warning { border-left: 8px solid #f59e0b; }
+.status-row-ativo { border-left: 8px solid #22c55e; }

@@ -1,224 +1,223 @@
-// Ficheiro: frontend-simec/src/pages/SegurosPage.jsx
-// VERSÃO ATUALIZADA - COM LÓGICA DE STATUS DINÂMICO E DESTAQUE DE LINHA REFINADA
-
-import React, { useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSeguros } from '../hooks/useSeguros';
 import { useModal } from '../hooks/useModal';
-import GlobalFilterBar from '../components/GlobalFilterBar';
-import ModalConfirmacao from '../components/ModalConfirmacao';
 import { useToast } from '../contexts/ToastContext';
 import { formatarData } from '../utils/timeUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrashAlt, faSpinner, faExclamationTriangle, faSort, faSortUp, faSortDown, faEdit } from '@fortawesome/free-solid-svg-icons';
+import { 
+    faPlus, 
+    faTrashAlt, 
+    faSpinner, 
+    faExclamationTriangle, 
+    faEdit, 
+    faPlusCircle, 
+    faMinusCircle, 
+    faPaperclip,
+    faShieldAlt,
+    faMoneyBillWave
+} from '@fortawesome/free-solid-svg-icons';
+import GlobalFilterBar from '../components/GlobalFilterBar';
+import ModalConfirmacao from '../components/ModalConfirmacao';
 
-// ==========================================================================
-// --- MÓDULO DE FUNÇÕES AUXILIARES DE UI PARA STATUS ---
-// Ajustadas para a nova lógica de variação por dias.
-// ==========================================================================
+// --- Funções Auxiliares de Estilo e Status ---
 
-/**
- * Determina o TEXTO do status a ser exibido, com base no status e data de vencimento do seguro.
- * @param {object} seguro - O objeto completo do seguro.
- * @returns {string} O texto do status dinâmico ('Ativo', 'Vence em breve', 'Expirado', 'Cancelado').
- */
 const getDynamicStatus = (seguro) => {
-  // Status 'Cancelado' e 'Expirado' têm prioridade, pois são estados finais.
-  if (seguro.status === 'Cancelado') {
-    return 'Cancelado';
-  }
-  
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0); // Zera a hora para uma comparação de data precisa.
-  const dataFim = new Date(seguro.dataFim);
-
-  if (dataFim < hoje) {
-    return 'Expirado';
-  }
-
-  // Se o status do banco for 'Expirado' mas a data ainda não passou (erro de dado?), priorizamos a data.
-  // No seu caso, o backend deve garantir que a dataFim é coerente com o status 'Expirado'.
-  // Esta condição só seria alcançada se seguro.status fosse 'Ativo' no BD.
-  const diffTime = dataFim.getTime() - hoje.getTime();
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 30) { // Inclui 7 e 15 dias também
-    return 'Vence em breve';
-  }
-
-  // Se a data de fim ainda está no futuro e não está 'Vence em breve', é 'Ativo'.
-  return 'Ativo';
-};
-
-/**
- * Retorna a classe CSS correta para a BADGE de status.
- * @param {string} statusText - O texto do status dinâmico retornado por getDynamicStatus.
- * @returns {string} A string de classes CSS para a badge.
- */
-const getStatusBadgeClass = (statusText) => {
-  const statusMap = {
-    'ativo': 'status-ativo', // Sua classe CSS já existente para verde
-    'expirado': 'status-inativo', // Sua classe CSS já existente para vermelho/inativo
-    'cancelado': 'status-cancelado', // Sua classe CSS já existente para cinza
-    'vence em breve': 'status-vence-em-breve' // Sua classe CSS já existente para amarelo
-  };
-  // Fallback para 'default' se não encontrar, embora todos os status dinâmicos devem estar mapeados.
-  const statusClass = statusMap[statusText?.toLowerCase()] || 'default'; 
-  return `status-badge ${statusClass}`;
-};
-
-/**
- * Retorna a classe CSS para o DESTAQUE DA LINHA da tabela (<tr>).
- * Implementa a regra de negócio de cores baseada na proximidade do vencimento e status.
- * @param {object} seguro - O objeto completo do seguro.
- * @returns {string} A classe CSS para destaque da linha.
- */
-const getRowHighlightClass = (seguro) => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0); 
+    if (seguro.status === 'Cancelado') return 'Cancelado';
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
     const dataFim = new Date(seguro.dataFim);
+    if (dataFim < hoje) return 'Expirado';
+    const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 30) return 'Vence em breve';
+    return 'Ativo';
+};
 
-    // Prioridade para status finais definidos no banco ou vencidos.
-    if (seguro.status === 'Cancelado') { // Se o status do banco é 'Cancelado', a linha é cinza.
-        return 'status-row-os-concluida'; // Usando a classe de manutenção concluída que é cinza
-    }
-    
-    if (dataFim < hoje) { // Se a data final já passou, é expirado (vermelho).
-        return 'status-row-vencendo-danger';
-    }
+const getStatusBadgeClass = (statusText) => {
+    const statusMap = {
+        'ativo': 'status-ativo',
+        'expirado': 'status-inativo',
+        'cancelado': 'status-cancelado',
+        'vence em breve': 'status-vence-em-breve'
+    };
+    return `status-badge ${statusMap[statusText?.toLowerCase()] || 'default'}`;
+};
 
-    // Para seguros que ainda não venceram e não estão cancelados, calculamos a proximidade.
-    const diffTime = dataFim.getTime() - hoje.getTime();
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-    if (diffDays <= 7) { // 7 dias ou menos para vencer (vermelho)
-        return 'status-row-vencendo-danger';
-    }
-    if (diffDays <= 30) { // entre 8 e 30 dias para vencer (amarelo)
-        return 'status-row-vencendo-warning';
-    }
-    
-    // Se não se encaixa nas regras acima, e o status é 'Ativo' (do banco), a linha é verde.
+const getRowHighlightClass = (seguro) => {
+    const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    const dataFim = new Date(seguro.dataFim);
+    if (seguro.status === 'Cancelado') return 'status-row-cancelado';
+    if (dataFim < hoje) return 'status-row-vencendo-danger';
+    const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
+    if (diffDays <= 30) return 'status-row-vencendo-warning';
     return 'status-row-ativo';
 };
 
+// Função para formatar dinheiro (R$)
+const formatarMoeda = (valor) => {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+};
 
-/**
- * @component SegurosPage
- * @description Componente "inteligente" que orquestra os hooks e a renderização da página de Seguros.
- */
 function SegurosPage() {
     const navigate = useNavigate();
     const { addToast } = useToast();
+    const [expandidos, setExpandidos] = useState({});
 
     const {
         seguros,
-        unidadesDisponiveis,
-        segurosOriginais, // Adicionado segurosOriginais aqui
+        segurosOriginais,
         loading,
         error,
         searchTerm,
         setSearchTerm,
         filtros,
         setFiltros,
-        sortConfig,
-        setSortConfig,
         removerSeguro
     } = useSeguros();
     
     const { isOpen: isDeleteModalOpen, modalData: seguroParaDeletar, openModal: openDeleteModal, closeModal: closeDeleteModal } = useModal();
 
-    const requestSort = (key) => {
-        setSortConfig(current => ({
-            key,
-            direction: current.key === key && current.direction === 'ascending' ? 'descending' : 'ascending'
-        }));
+    const toggleExpandir = (id) => {
+        setExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
     };
-    
+
     const confirmarExclusao = async () => {
         if (!seguroParaDeletar) return;
         try {
             await removerSeguro(seguroParaDeletar.id);
             addToast('Seguro excluído com sucesso!', 'success');
         } catch (err) {
-            addToast(err.message || 'Erro ao excluir seguro.', 'error');
+            addToast('Erro ao excluir seguro.', 'error');
         } finally {
             closeDeleteModal();
         }
     };
     
-    // Filtros agora usam 'segurosOriginais' para obter todas as opções possíveis.
     const seguradorasUnicas = useMemo(() => [...new Set((segurosOriginais || []).map(s => s.seguradora).filter(Boolean))].sort(), [segurosOriginais]);
-    const unidadesOptions = useMemo(() => (unidadesDisponiveis || []).map(u => ({ value: u.nomeSistema, label: u.nomeSistema })), [unidadesDisponiveis]);
-    // As opções de status do filtro devem incluir todos os status que podem vir do DB.
-    const statusDbOptions = useMemo(() => ["Ativo", "Expirado", "Cancelado"].map(s => ({ value: s, label: s })), []); 
+    const statusDbOptions = ["Ativo", "Expirado", "Cancelado"];
     
     const selectFiltersConfig = [
-        { id: 'seguradora', value: filtros.seguradora, onChange: (v) => setFiltros(f => ({ ...f, seguradora: v })), options: seguradorasUnicas.map(s => ({ value: s, label: s })), defaultLabel: 'Todas as Seguradoras' },
-        { id: 'unidade', value: filtros.unidade, onChange: (v) => setFiltros(f => ({ ...f, unidade: v })), options: unidadesOptions, defaultLabel: 'Todas as Unidades' },
-        { id: 'status', value: filtros.status, onChange: (v) => setFiltros(f => ({ ...f, status: v })), options: statusDbOptions, defaultLabel: 'Todos os Status' },
+        { id: 'seguradora', value: filtros.seguradora, onChange: (v) => setFiltros(f => ({ ...f, seguradora: v })), options: seguradorasUnicas, defaultLabel: 'Todas Seguradoras' },
+        { id: 'status', value: filtros.status, onChange: (v) => setFiltros(f => ({ ...f, status: v })), options: statusDbOptions, defaultLabel: 'Todos Status' },
     ];
+
+    if (loading && seguros.length === 0) return <div className="page-content-wrapper centered-loader"><FontAwesomeIcon icon={faSpinner} spin size="2x"/></div>;
 
     return (
         <>
-            <ModalConfirmacao isOpen={isDeleteModalOpen} onClose={closeDeleteModal} onConfirm={confirmarExclusao} title="Confirmar Exclusão" message={`Tem certeza que deseja excluir a apólice nº ${seguroParaDeletar?.apoliceNumero}?`} isDestructive={true} />
+            <ModalConfirmacao isOpen={isDeleteModalOpen} onClose={closeDeleteModal} onConfirm={confirmarExclusao} title="Confirmar Exclusão" message={`Deseja excluir a apólice nº ${seguroParaDeletar?.apoliceNumero}?`} isDestructive={true} />
+            
             <div className="page-content-wrapper">
-                <div className="page-title-card"><h1 className="page-title-internal">Gerenciamento de Seguros</h1></div>
-                <section className="page-section table-section">
-                    <div className="table-header-actions">
-                        <span>{loading ? <><FontAwesomeIcon icon={faSpinner} spin /> Carregando...</> : `${seguros.length} apólice(s) encontrada(s)`}</span>
-                        <button className="btn btn-primary" onClick={() => navigate('/seguros/adicionar')}><FontAwesomeIcon icon={faPlus} /> Adicionar Seguro</button>
-                    </div>
-                    <GlobalFilterBar searchTerm={searchTerm} onSearchChange={(e) => setSearchTerm(e.target.value)} searchPlaceholder="Buscar por apólice, item segurado..." selectFilters={selectFiltersConfig} />
-                    {error && <p className="form-error"><FontAwesomeIcon icon={faExclamationTriangle} /> {error.message}</p>}
-                    <div className="table-responsive-wrapper">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    {/* Remova espaços e quebras de linha entre as tags <th> */}
-                                    <th className="text-left" onClick={() => requestSort('apoliceNumero')}>Apólice <FontAwesomeIcon icon={sortConfig.key === 'apoliceNumero' ? (sortConfig.direction === 'ascending' ? faSortUp : faSortDown) : faSort}/></th><th className="text-left">Item Segurado</th><th className="text-left" onClick={() => requestSort('unidade.nomeSistema')}>Unidade <FontAwesomeIcon icon={sortConfig.key === 'unidade.nomeSistema' ? (sortConfig.direction === 'ascending' ? faSortUp : faSortDown) : faSort}/></th><th className="text-left" onClick={() => requestSort('seguradora')}>Seguradora <FontAwesomeIcon icon={sortConfig.key === 'seguradora' ? (sortConfig.direction === 'ascending' ? faSortUp : faSortDown) : faSort}/></th><th className="text-center" onClick={() => requestSort('dataFim')}>Fim da Vigência <FontAwesomeIcon icon={sortConfig.key === 'dataFim' ? (sortConfig.direction === 'ascending' ? faSortUp : faSortDown) : faSort}/></th><th className="text-center" onClick={() => requestSort('status')}>Status <FontAwesomeIcon icon={sortConfig.key === 'status' ? (sortConfig.direction === 'ascending' ? faSortUp : faSortDown) : faSort}/></th><th className="text-center">Ações</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {loading && seguros.length === 0 ? (
-                                    <tr><td colSpan="7" className="table-message"><FontAwesomeIcon icon={faSpinner} spin /> Carregando...</td></tr>
-                                ) : seguros.length > 0 ? (
-                                    seguros.map(seguro => {
-                                        // Calcula o status dinâmico e classes de estilo
-                                        const statusDinamico = getDynamicStatus(seguro);
-                                        const classeDaLinha = getRowHighlightClass(seguro); // Passa o objeto completo para avaliar status do DB
-                                        const classeDaBadge = getStatusBadgeClass(statusDinamico);
+                <div className="page-title-card">
+                    <h1 className="page-title-internal">Gestão de Seguros e Coberturas</h1>
+                    <button className="btn btn-primary" onClick={() => navigate('/seguros/adicionar')}>
+                        <FontAwesomeIcon icon={faPlus} /> Novo Seguro
+                    </button>
+                </div>
 
-                                        return (
-                                            <tr key={seguro.id} className={classeDaLinha}>
-                                                <td className="text-left">{seguro.apoliceNumero}</td>
-                                                {/* Exibir nome do Equipamento ou Unidade */}
-                                                <td className="text-left">
-                                                    {seguro.equipamento?.modelo ? 
-                                                        `${seguro.equipamento.modelo} (Tag: ${seguro.equipamento.tag})` : 
-                                                        (seguro.unidade?.nomeSistema || 'N/A')
-                                                    }
-                                                </td>
-                                                {/* Exibir a unidade associada ao seguro, seja ela a unidade do equipamento ou a unidade diretamente vinculada. */}
-                                                <td className="text-left">
-                                                    {seguro.unidade?.nomeSistema || seguro.equipamento?.unidade?.nomeSistema || 'N/A'}
-                                                </td>
-                                                <td className="text-left">{seguro.seguradora}</td>
-                                                <td className="text-center">{formatarData(seguro.dataFim)}</td>
-                                                {/* Usa o status dinâmico para a exibição da badge */}
-                                                <td className="text-center"><span className={classeDaBadge}>{statusDinamico}</span></td>
-                                                <td className="actions-cell text-center">
-                                                    <button className="btn-action edit" title="Editar" onClick={() => navigate(`/seguros/editar/${seguro.id}`)}><FontAwesomeIcon icon={faEdit} /></button>
-                                                    <button className="btn-action delete" title="Excluir" onClick={() => openDeleteModal(seguro)}><FontAwesomeIcon icon={faTrashAlt} /></button>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })
-                                ) : (
-                                    <tr><td colSpan="7" className="table-message">Nenhum seguro encontrado.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
+                <section className="page-section" style={{ background: 'transparent', boxShadow: 'none', padding: 0 }}>
+                    <GlobalFilterBar 
+                        searchTerm={searchTerm} 
+                        onSearchChange={(e) => setSearchTerm(e.target.value)} 
+                        searchPlaceholder="Buscar apólice ou seguradora..." 
+                        selectFilters={selectFiltersConfig} 
+                    />
+
+                    {error && <p className="form-error"><FontAwesomeIcon icon={faExclamationTriangle} /> {error.message}</p>}
+
+                    <div className="lista-seguros-moderna" style={{ marginTop: '20px' }}>
+                        {seguros.length > 0 ? (
+                            seguros.map(seguro => {
+                                const isAberto = expandidos[seguro.id];
+                                const statusDinamico = getDynamicStatus(seguro);
+                                
+                                return (
+                                    <div key={seguro.id} className={`seguro-card-expansivel ${getRowHighlightClass(seguro)}`}>
+                                        
+                                        {/* CABEÇALHO DO CARD (Sempre visível) */}
+                                        <div className="seguro-header" onClick={() => toggleExpandir(seguro.id)}>
+                                            <FontAwesomeIcon 
+                                                icon={isAberto ? faMinusCircle : faPlusCircle} 
+                                                style={{ color: 'var(--cor-primaria-light)', fontSize: '1.3rem' }} 
+                                            />
+                                            
+                                            <div className="header-info-principal">
+                                                <div>
+                                                    <span className="header-label">Nº Apólice</span>
+                                                    <span className="header-value">{seguro.apoliceNumero}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="header-label">Seguradora</span>
+                                                    <span className="header-value">{seguro.seguradora}</span>
+                                                </div>
+                                                <div>
+                                                    <span className="header-label">Objeto Segurado</span>
+                                                    <span className="header-value">
+                                                        {seguro.equipamento?.modelo || seguro.unidade?.nomeSistema || 'Geral (Todos)'}
+                                                    </span>
+                                                </div>
+                                                <div>
+                                                    <span className="header-label">Vencimento</span>
+                                                    <span className="header-value">{formatarData(seguro.dataFim)}</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="header-status-icons" style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                                <span className={getStatusBadgeClass(statusDinamico)}>{statusDinamico}</span>
+                                                <FontAwesomeIcon 
+                                                    icon={faPaperclip} 
+                                                    style={{ 
+                                                        color: seguro.anexos?.length > 0 ? '#22C55E' : '#CBD5E1',
+                                                        fontSize: '1.1rem'
+                                                    }} 
+                                                    title={seguro.anexos?.length > 0 ? "Apólice anexada" : "Sem anexo"}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* DETALHES EXPANDIDOS (Aparecem ao clicar) */}
+                                        {isAberto && (
+                                            <div className="seguro-detalhes-expandidos">
+                                                <div className="lmi-item">
+                                                    <span className="lmi-label">Incêndio / Explosão</span>
+                                                    <div className="lmi-valor">{formatarMoeda(seguro.lmiIncendio)}</div>
+                                                </div>
+                                                <div className="lmi-item">
+                                                    <span className="lmi-label">Danos Elétricos</span>
+                                                    <div className="lmi-valor">{formatarMoeda(seguro.lmiDanosEletricos)}</div>
+                                                </div>
+                                                <div className="lmi-item">
+                                                    <span className="lmi-label">Roubo / Furto</span>
+                                                    <div className="lmi-valor">{formatarMoeda(seguro.lmiRoubo)}</div>
+                                                </div>
+                                                <div className="lmi-item">
+                                                    <span className="lmi-label">Quebra de Vidros</span>
+                                                    <div className="lmi-valor">{formatarMoeda(seguro.lmiVidros)}</div>
+                                                </div>
+                                                <div className="lmi-item">
+                                                    <span className="lmi-label">Resp. Civil (Terceiros)</span>
+                                                    <div className="lmi-valor">{formatarMoeda(seguro.lmiResponsabilidadeCivil)}</div>
+                                                </div>
+                                                <div className="lmi-item" style={{ background: '#eef2ff', borderLeftColor: '#4f46e5' }}>
+                                                    <span className="lmi-label" style={{ color: '#4338ca' }}>Prêmio Total (Custo)</span>
+                                                    <div className="lmi-valor" style={{ color: '#4338ca' }}>{formatarMoeda(seguro.premioTotal)}</div>
+                                                </div>
+
+                                                <div className="card-actions-expandido" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
+                                                    <button className="btn-action edit" onClick={(e) => { e.stopPropagation(); navigate(`/seguros/editar/${seguro.id}`); }}>
+                                                        <FontAwesomeIcon icon={faEdit} /> Editar Apólice
+                                                    </button>
+                                                    <button className="btn-action delete" onClick={(e) => { e.stopPropagation(); openDeleteModal(seguro); }}>
+                                                        <FontAwesomeIcon icon={faTrashAlt} /> Excluir
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="no-data-message">Nenhum seguro encontrado para os filtros aplicados.</div>
+                        )}
                     </div>
                 </section>
             </div>
