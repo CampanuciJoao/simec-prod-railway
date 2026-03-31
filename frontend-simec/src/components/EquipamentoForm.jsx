@@ -1,5 +1,5 @@
 // Ficheiro: src/components/EquipamentoForm.jsx
-// VERSÃO 8.0 - COM CHECKBOX INTELIGENTE PARA "SEM PATRIMÔNIO"
+// VERSÃO 9.0 - COM SELEÇÃO PADRONIZADA DE TIPOS E CHECKBOX DE PATRIMÔNIO
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,11 +11,23 @@ import DateInput from './DateInput';
 import { getUnidades } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 
-const ESTADO_INICIAL_VAZIO = {
-  tag: '', modelo: '', tipo: '', setor: '', unidadeId: '', fabricante: '',
-  anoFabricacao: '', dataInstalacao: '', status: 'Operante',
-  numeroPatrimonio: '', registroAnvisa: '', observacoes: ''
-};
+// --- LISTA DE TIPOS PADRONIZADA (RADIOLOGIA E CLÍNICA) ---
+const LISTA_TIPOS = [
+    "Arco Cirúrgico",
+    "Bomba Injetora",
+    "Cintilografia",
+    "CR (Radiologia Computadorizada)",
+    "Densitometria Óssea",
+    "DR (Radiologia Digital)",
+    "Esteira Ergométrica",
+    "Mamografia",
+    "PET-CT",
+    "Raio-X",
+    "Ressonância Magnética",
+    "Tomografia Computadorizada",
+    "Ultrassom",
+    "Outros"
+].sort();
 
 const OPCOES_STATUS = [
     { valor: 'Operante', rotulo: 'Operante' },
@@ -24,13 +36,17 @@ const OPCOES_STATUS = [
     { valor: 'EmManutencao', rotulo: 'Em Manutenção' },
 ];
 
+const ESTADO_INICIAL_VAZIO = {
+  tag: '', modelo: '', tipo: '', setor: '', unidadeId: '', fabricante: '',
+  anoFabricacao: '', dataInstalacao: '', status: 'Operante',
+  numeroPatrimonio: '', registroAnvisa: '', observacoes: ''
+};
+
 function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = false }) {
   const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [error, setError] = useState('');
-  
-  // NOVO: Estado para o checkbox de Sem Patrimônio
   const [semPatrimonio, setSemPatrimonio] = useState(false);
 
   const { addToast } = useToast();
@@ -46,7 +62,6 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
   // Preenche o formulário se estiver em modo de edição
   useEffect(() => {
     if (isEditing && initialData) {
-      // Verifica se o patrimônio vindo do banco é "Sem Patrimônio" para marcar o checkbox
       const isSemPat = initialData.numeroPatrimonio?.toLowerCase() === "sem patrimônio";
       setSemPatrimonio(isSemPat);
 
@@ -75,16 +90,12 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // NOVO: Handler para o Checkbox de Sem Patrimônio
   const handleCheckboxChange = (e) => {
     const checked = e.target.checked;
     setSemPatrimonio(checked);
-    
     if (checked) {
-      // Se marcou, preenche com o texto padrão
       setFormData(prev => ({ ...prev, numeroPatrimonio: 'Sem Patrimônio' }));
     } else {
-      // Se desmarcou, limpa para o usuário digitar um número real
       setFormData(prev => ({ ...prev, numeroPatrimonio: '' }));
     }
   };
@@ -93,7 +104,7 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
     e.preventDefault();
     setError('');
     if (!formData.tag || !formData.modelo || !formData.tipo || !formData.unidadeId) {
-      setError('Tag (Nº Série), Modelo, Tipo e Unidade são campos obrigatórios.');
+      setError('Tag, Modelo, Tipo e Unidade são campos obrigatórios.');
       return;
     }
     setIsSubmitting(true);
@@ -107,11 +118,8 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
   };
 
   const handleCancelClick = () => {
-    if (onCancel) {
-      onCancel();
-    } else {
-      navigate('/equipamentos');
-    }
+    if (onCancel) onCancel();
+    else navigate('/equipamentos');
   };
 
   return (
@@ -129,10 +137,18 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
             <label htmlFor="modelo">Modelo *</label>
             <input type="text" id="modelo" name="modelo" value={formData.modelo} onChange={handleChange} required />
           </div>
+          
+          {/* CAMPO TIPO ATUALIZADO PARA SELECT */}
           <div className="form-group">
-            <label htmlFor="tipo">Tipo *</label>
-            <input type="text" id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} required />
+            <label htmlFor="tipo">Tipo de Equipamento *</label>
+            <select id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} required>
+                <option value="">Selecione...</option>
+                {LISTA_TIPOS.map(tipo => (
+                    <option key={tipo} value={tipo}>{tipo}</option>
+                ))}
+            </select>
           </div>
+
           <div className="form-group">
             <label htmlFor="unidadeId">Unidade / Hospital *</label>
             <select id="unidadeId" name="unidadeId" value={formData.unidadeId} onChange={handleChange} required>
@@ -147,7 +163,7 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
             <input type="text" id="setor" name="setor" value={formData.setor} onChange={handleChange} />
           </div>
           <div className="form-group">
-            <label htmlFor="status">Status</label>
+            <label htmlFor="status">Status Inicial</label>
             <select id="status" name="status" value={formData.status} onChange={handleChange}>
               {OPCOES_STATUS.map(opt => (
                 <option key={opt.valor} value={opt.valor}>{opt.rotulo}</option>
@@ -173,7 +189,6 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
               <DateInput id="dataInstalacao" name="dataInstalacao" value={formData.dataInstalacao} onChange={handleChange} />
             </div>
 
-            {/* CAMPO DE PATRIMÔNIO ATUALIZADO COM CHECKBOX */}
             <div className="form-group">
               <label htmlFor="numeroPatrimonio">Número de Patrimônio</label>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -187,11 +202,7 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
                   placeholder={semPatrimonio ? "" : "Digite o número"}
                 />
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82em', cursor: 'pointer', fontWeight: 'normal', color: 'var(--cor-texto-secundario-light)' }}>
-                  <input 
-                    type="checkbox" 
-                    checked={semPatrimonio} 
-                    onChange={handleCheckboxChange} 
-                  />
+                  <input type="checkbox" checked={semPatrimonio} onChange={handleCheckboxChange} />
                   Equipamento sem etiqueta de patrimônio
                 </label>
               </div>
