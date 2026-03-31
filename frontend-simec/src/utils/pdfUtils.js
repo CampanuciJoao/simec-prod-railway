@@ -1,5 +1,5 @@
 // Ficheiro: src/utils/pdfUtils.js
-// VERSÃO FINAL CONSOLIDADA - SUPORTE A RELATÓRIOS GERAIS E BI
+// VERSÃO FINAL CONSOLIDADA - SUPORTE COMPLETO A RELATÓRIOS GERAIS E BI AVANÇADO
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -81,7 +81,6 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     let tituloRelatorio = "";
     let configuracaoColunas = {};
 
-    // Caso A: Inventário
     if (resultado.tipoRelatorio === 'inventarioEquipamentos') {
         tituloRelatorio = "RELATÓRIO DE INVENTÁRIO DE ATIVOS";
         headers = [["MODELO", "SÉRIE / TAG", "FABRICANTE", "REGISTRO ANVISA", "STATUS", "UNIDADE"]];
@@ -99,7 +98,6 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
             4: { cellWidth: 25, halign: 'center' }
         };
     } 
-    // Caso B: Manutenções (Com Chamado e Unidade empilhados)
     else if (resultado.tipoRelatorio === 'manutencoesRealizadas') {
         tituloRelatorio = "RELATÓRIO DE MANUTENÇÕES REALIZADAS";
         headers = [["OS / CHAMADO", "CONCLUSÃO", "EQUIPAMENTO / UNIDADE", "RESPONSÁVEL", "DESCRIÇÃO DO SERVIÇO"]];
@@ -143,44 +141,61 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
 };
 
 /**
- * 3. PDF de Indicadores BI (Performance Anual).
+ * 3. PDF de Indicadores BI (Relatório Executivo de Performance).
  */
 export const exportarBIPDF = (dados) => {
     const doc = new jsPDF();
-    adicionarCabecalho(doc, `INDICADORES DE PERFORMANCE - ANO ${dados.ano}`);
+    adicionarCabecalho(doc, `RELATÓRIO EXECUTIVO DE PERFORMANCE - ${dados.ano}`);
 
-    // Quadro de Resumo Geral
+    // Quadro 1: Resumo Geral do Parque
     autoTable(doc, {
-        head: [['INDICADOR ESTRATÉGICO', 'QUANTIDADE TOTAL']],
+        head: [['INDICADOR OPERACIONAL', 'VALOR ACUMULADO']],
         body: [
-            ['MANUTENÇÕES PREVENTIVAS REALIZADAS', dados.resumo.totalPreventivas],
-            ['MANUTENÇÕES CORRETIVAS (PARADAS)', dados.resumo.totalCorretivas]
+            ['TOTAL DE ATIVOS NO SISTEMA', dados.resumoGeral.totalAtivos],
+            ['MANUTENÇÕES PREVENTIVAS REALIZADAS', dados.resumoGeral.preventivas],
+            ['MANUTENÇÕES CORRETIVAS (PARADAS)', dados.resumoGeral.corretivas]
         ],
         startY: 45,
         theme: 'grid',
-        headStyles: { fillColor: [34, 197, 94], halign: 'center' }, // Verde
+        headStyles: { fillColor: [30, 41, 59], halign: 'center' },
         bodyStyles: { fontStyle: 'bold', halign: 'center' }
     });
 
-    // Tabela de Ranking de Paradas
+    // Quadro 2: Downtime por Unidade
     doc.setFontSize(11);
-    doc.setTextColor(30);
-    doc.text("RANKING DE TEMPO DE PARADA (DOWNTIME)", 14, doc.lastAutoTable.finalY + 15);
-
+    doc.text("1. TEMPO DE PARADA (DOWNTIME) POR UNIDADE", 14, doc.lastAutoTable.finalY + 15);
     autoTable(doc, {
-        head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'TEMPO TOTAL PARADO']],
-        body: dados.rankingDowntime.map(e => [
-            `${e.modelo} (${e.tag})`, 
-            e.unidade, 
-            `${e.horasParado} Horas`
-        ]),
+        head: [['UNIDADE / LOCAL', 'HORAS TOTAIS FORA DE OPERAÇÃO']],
+        body: dados.rankingUnidades.map(u => [u.nome, `${u.horasParado} Horas`]),
         startY: doc.lastAutoTable.finalY + 20,
         theme: 'grid',
-        headStyles: { fillColor: [239, 68, 68], halign: 'center' }, // Vermelho
-        styles: { fontSize: 8, cellPadding: 3 }
+        headStyles: { fillColor: [59, 130, 246] }, // Azul
+        styles: { fontSize: 8 }
     });
 
-    // Rodapé
+    // Quadro 3: Reincidência (Frequência)
+    doc.text("2. REINCIDÊNCIA DE FALHAS (FREQUÊNCIA DE CORRETIVAS)", 14, doc.lastAutoTable.finalY + 15);
+    autoTable(doc, {
+        head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'QTD. CORRETIVAS']],
+        body: dados.rankingFrequencia.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.corretivas} vez(es)`]),
+        startY: doc.lastAutoTable.finalY + 20,
+        theme: 'grid',
+        headStyles: { fillColor: [239, 68, 68] }, // Vermelho
+        styles: { fontSize: 8 }
+    });
+
+    // Quadro 4: Ranking de Downtime (Tempo)
+    doc.text("3. TOP 5 EQUIPAMENTOS COM MAIOR TEMPO PARADO", 14, doc.lastAutoTable.finalY + 15);
+    autoTable(doc, {
+        head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'TEMPO PARADO']],
+        body: dados.rankingDowntime.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.horasParado}h`]),
+        startY: doc.lastAutoTable.finalY + 20,
+        theme: 'grid',
+        headStyles: { fillColor: [245, 158, 11] }, // Laranja
+        styles: { fontSize: 8 }
+    });
+
+    // Rodapé com numeração
     const totalPaginas = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPaginas; i++) {
         doc.setPage(i);
@@ -189,5 +204,5 @@ export const exportarBIPDF = (dados) => {
         doc.text(`Relatório BI SIMEC - Página ${i} de ${totalPaginas}`, doc.internal.pageSize.getWidth() / 2, doc.internal.pageSize.getHeight() - 10, { align: 'center' });
     }
 
-    doc.save(`BI_SIMEC_${dados.ano}.pdf`);
+    doc.save(`BI_ESTRATEGICO_SIMEC_${dados.ano}.pdf`);
 };
