@@ -1,9 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSeguros } from '../hooks/useSeguros';
 import { useModal } from '../hooks/useModal';
 import { useToast } from '../contexts/ToastContext';
 import { formatarData } from '../utils/timeUtils';
+import { uploadAnexoSeguro, deleteAnexoSeguro } from '../services/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faPlus, 
@@ -15,10 +16,16 @@ import {
     faMinusCircle, 
     faPaperclip,
     faShieldAlt,
-    faMoneyBillWave
+    faFilePdf,
+    faUpload,
+    faExternalLinkAlt,
+    faEye
 } from '@fortawesome/free-solid-svg-icons';
 import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
+
+// Ajusta a URL base para buscar os arquivos no servidor
+const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 // --- Funções Auxiliares de Estilo e Status ---
 
@@ -52,7 +59,6 @@ const getRowHighlightClass = (seguro) => {
     return 'status-row-ativo';
 };
 
-// Função para formatar dinheiro (R$)
 const formatarMoeda = (valor) => {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
 };
@@ -61,6 +67,7 @@ function SegurosPage() {
     const navigate = useNavigate();
     const { addToast } = useToast();
     const [expandidos, setExpandidos] = useState({});
+    const [uploadingId, setUploadingId] = useState(null);
 
     const {
         seguros,
@@ -71,7 +78,8 @@ function SegurosPage() {
         setSearchTerm,
         filtros,
         setFiltros,
-        removerSeguro
+        removerSeguro,
+        refetch // Função para recarregar a lista após upload/delete de anexo
     } = useSeguros();
     
     const { isOpen: isDeleteModalOpen, modalData: seguroParaDeletar, openModal: openDeleteModal, closeModal: closeDeleteModal } = useModal();
@@ -89,6 +97,38 @@ function SegurosPage() {
             addToast('Erro ao excluir seguro.', 'error');
         } finally {
             closeDeleteModal();
+        }
+    };
+
+    // Função para subir arquivo
+    const handleUploadArquivo = async (seguroId, event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append('apolices', file);
+
+        setUploadingId(seguroId);
+        try {
+            await uploadAnexoSeguro(seguroId, formData);
+            addToast('Documento anexado com sucesso!', 'success');
+            refetch(); // Atualiza a lista para mostrar o clipe verde e o nome do arquivo
+        } catch (err) {
+            addToast('Erro ao anexar arquivo.', 'error');
+        } finally {
+            setUploadingId(null);
+        }
+    };
+
+    // Função para deletar anexo
+    const handleDeleteAnexo = async (seguroId, anexoId) => {
+        if (!window.confirm("Tem certeza que deseja remover este documento?")) return;
+        try {
+            await deleteAnexoSeguro(seguroId, anexoId);
+            addToast('Documento removido.', 'success');
+            refetch();
+        } catch (err) {
+            addToast('Erro ao remover documento.', 'error');
         }
     };
     
@@ -177,6 +217,7 @@ function SegurosPage() {
                                         {/* DETALHES EXPANDIDOS (Aparecem ao clicar) */}
                                         {isAberto && (
                                             <div className="seguro-detalhes-expandidos">
+                                                {/* GRID DE COBERTURAS */}
                                                 <div className="lmi-item">
                                                     <span className="lmi-label">Incêndio / Explosão</span>
                                                     <div className="lmi-valor">{formatarMoeda(seguro.lmiIncendio)}</div>
@@ -202,12 +243,54 @@ function SegurosPage() {
                                                     <div className="lmi-valor" style={{ color: '#4338ca' }}>{formatarMoeda(seguro.premioTotal)}</div>
                                                 </div>
 
+                                                {/* SEÇÃO DE DOCUMENTOS (ANEXOS) */}
+                                                <div className="anexos-seguro-container" style={{ gridColumn: '1 / -1', marginTop: '15px', background: '#f8fafc', padding: '15px', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                                                    <h5 style={{ marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px', color: '#475569', fontSize: '0.9rem' }}>
+                                                        <FontAwesomeIcon icon={faPaperclip} /> DOCUMENTOS DA APÓLICE
+                                                    </h5>
+                                                    
+                                                    {seguro.anexos?.length > 0 ? (
+                                                        <div className="lista-anexos-preview" style={{ marginBottom: '15px' }}>
+                                                            {seguro.anexos.map(anexo => (
+                                                                <div key={anexo.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', padding: '10px 15px', borderRadius: '6px', marginBottom: '8px', border: '1px solid #e2e8f0 shadow-sm' }}>
+                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                                        <FontAwesomeIcon icon={faFilePdf} style={{ color: '#ef4444', fontSize: '1.2rem' }} />
+                                                                        <a href={`${API_BASE_URL}/${anexo.path}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '0.95rem', color: '#1e293b', fontWeight: '600', textDecoration: 'none' }}>
+                                                                            {anexo.nomeOriginal} <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" style={{ marginLeft: '5px', opacity: 0.5 }} />
+                                                                        </a>
+                                                                    </div>
+                                                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteAnexo(seguro.id, anexo.id); }} className="btn-action delete" title="Remover Documento">
+                                                                        <FontAwesomeIcon icon={faTrashAlt} />
+                                                                    </button>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic', marginBottom: '15px' }}>Nenhum documento anexado a esta apólice.</p>
+                                                    )}
+
+                                                    <div className="upload-btn-wrapper">
+                                                        <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', display: 'inline-flex', gap: '8px', alignItems: 'center' }}>
+                                                            <FontAwesomeIcon icon={uploadingId === seguro.id ? faSpinner : faUpload} spin={uploadingId === seguro.id} />
+                                                            {uploadingId === seguro.id ? 'Enviando...' : 'Anexar PDF / Imagem da Apólice'}
+                                                            <input 
+                                                                type="file" 
+                                                                style={{ display: 'none' }} 
+                                                                onChange={(e) => handleUploadArquivo(seguro.id, e)} 
+                                                                accept=".pdf,image/*" 
+                                                                disabled={uploadingId !== null}
+                                                            />
+                                                        </label>
+                                                    </div>
+                                                </div>
+
+                                                {/* BOTÕES DE AÇÃO DO SEGURO */}
                                                 <div className="card-actions-expandido" style={{ gridColumn: '1 / -1', display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px', borderTop: '1px solid #eee', paddingTop: '15px' }}>
                                                     <button className="btn-action edit" onClick={(e) => { e.stopPropagation(); navigate(`/seguros/editar/${seguro.id}`); }}>
-                                                        <FontAwesomeIcon icon={faEdit} /> Editar Apólice
+                                                        <FontAwesomeIcon icon={faEdit} /> Editar Dados
                                                     </button>
                                                     <button className="btn-action delete" onClick={(e) => { e.stopPropagation(); openDeleteModal(seguro); }}>
-                                                        <FontAwesomeIcon icon={faTrashAlt} /> Excluir
+                                                        <FontAwesomeIcon icon={faTrashAlt} /> Excluir Seguro
                                                     </button>
                                                 </div>
                                             </div>
