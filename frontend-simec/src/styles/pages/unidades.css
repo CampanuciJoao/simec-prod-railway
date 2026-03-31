@@ -171,3 +171,82 @@ body.dark-mode .unidade-info-item strong {
 .status-row-vencendo-danger { border-left: 8px solid #ef4444; }
 .status-row-vencendo-warning { border-left: 8px solid #f59e0b; }
 .status-row-ativo { border-left: 8px solid #22c55e; }
+
+/* Cards de Equipamento Expansíveis */
+.equip-card-expansivel {
+    background: var(--cor-fundo-card-light);
+    border: 1px solid var(--cor-borda-light);
+    border-radius: 10px;
+    margin-bottom: 15px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+    box-shadow: var(--sombra-card-light);
+}
+
+.equip-card-expansivel:hover {
+    box-shadow: var(--sombra-card-hover-light);
+}
+
+.equip-header {
+    display: flex;
+    align-items: center;
+    padding: 18px 22px;
+    cursor: pointer;
+    gap: 20px;
+    background-color: #ffffff;
+}
+
+.equip-header-info {
+    flex: 1;
+    display: grid;
+    grid-template-columns: 1.2fr 1fr 1fr 1.2fr 0.8fr; /* Ajuste das colunas */
+    gap: 20px;
+    align-items: center;
+}
+
+.equip-detalhes-container {
+    padding: 0;
+    border-top: 1px solid var(--cor-borda-light);
+    background-color: #fcfcfc;
+}
+
+/* Navegação de Abas Interna */
+.equip-tabs-nav {
+    display: flex;
+    background: #f1f5f9;
+    border-bottom: 1px solid var(--cor-borda-light);
+}
+
+.equip-tab-btn {
+    padding: 12px 20px;
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--cor-texto-secundario-light);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: all 0.2s;
+}
+
+.equip-tab-btn:hover {
+    color: var(--cor-primaria-light);
+}
+
+.equip-tab-btn.active {
+    background: #ffffff;
+    color: var(--cor-primaria-light);
+    border-top: 3px solid var(--cor-primaria-light);
+}
+
+.equip-tab-content {
+    padding: 25px;
+}
+
+/* Ajustes de cores para as bordas de status no card */
+.status-row-operante { border-left: 8px solid #22c55e; }
+.status-row-inoperante { border-left: 8px solid #ef4444; }
+.status-row-emmanutencao { border-left: 8px solid #f59e0b; }
+.status-row-usolimitado { border-left: 8px solid #3b82f6; }
