@@ -1,5 +1,5 @@
 // Ficheiro: src/components/ManutencaoForm.jsx
-// VERSÃO FINAL SÊNIOR - COM CAMPO CONDICIONAL PARA MANUTENÇÃO CORRETIVA
+// VERSÃO ATUALIZADA - DESCRIÇÃO OPCIONAL PARA PREVENTIVAS
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -7,7 +7,6 @@ import PropTypes from 'prop-types';
 import DateInput from './DateInput';
 import TimeInput from './TimeInput';
 
-// Estado inicial padrão para um formulário limpo, já incluindo o novo campo.
 const ESTADO_INICIAL_VAZIO = {
   equipamentoId: '',
   tipo: 'Preventiva',
@@ -16,13 +15,9 @@ const ESTADO_INICIAL_VAZIO = {
   dataLocal: '',
   horaLocalInicio: '',
   horaLocalFim: '',
-  numeroChamado: '', // Novo campo para o tipo 'Corretiva'
+  numeroChamado: '',
 };
 
-/**
- * Componente "burro" para o formulário de agendamento e edição de manutenções.
- * Exibe campos adicionais condicionalmente com base no tipo de manutenção selecionado.
- */
 function ManutencaoForm({ 
   onSubmit, 
   initialData = null, 
@@ -37,7 +32,6 @@ function ManutencaoForm({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  // Efeito para popular o formulário com dados existentes no modo de edição.
   useEffect(() => {
     if (isEditing && initialData && todosEquipamentos.length > 0) {
       const equipamentoDaOs = todosEquipamentos.find(eq => eq.id === initialData.equipamentoId);
@@ -64,7 +58,6 @@ function ManutencaoForm({
     }
   }, [initialData, isEditing, todosEquipamentos]);
   
-  // Lógica para os filtros em cascata
   const modelosFiltrados = useMemo(() => {
     if (!unidadeSelecionada) return [];
     return [...new Set(todosEquipamentos.filter(eq => eq.unidadeId === unidadeSelecionada).map(eq => eq.modelo))].sort();
@@ -95,8 +88,12 @@ function ManutencaoForm({
     e.preventDefault();
     setError('');
     
-    if (!formData.equipamentoId || !formData.dataLocal || !formData.descricaoProblemaServico.trim()) {
-      setError('Seleção de Equipamento, Data e Descrição são campos obrigatórios.');
+    // LÓGICA DE VALIDAÇÃO CONDICIONAL
+    const isPreventiva = formData.tipo === 'Preventiva';
+    const temDescricao = formData.descricaoProblemaServico.trim() !== '';
+
+    if (!formData.equipamentoId || !formData.dataLocal || (!isPreventiva && !temDescricao)) {
+      setError(isPreventiva ? 'Seleção de Equipamento e Data são obrigatórios.' : 'Seleção de Equipamento, Data e Descrição são obrigatórios.');
       return;
     }
     
@@ -109,20 +106,17 @@ function ManutencaoForm({
       const dadosParaApi = {
           equipamentoId: formData.equipamentoId,
           tipo: formData.tipo,
-          descricaoProblemaServico: formData.descricaoProblemaServico,
+          // Se for preventiva e estiver vazio, coloca um texto padrão
+          descricaoProblemaServico: !temDescricao && isPreventiva ? 'Manutenção Preventiva de Rotina' : formData.descricaoProblemaServico,
           tecnicoResponsavel: formData.tecnicoResponsavel,
-          numeroChamado: formData.numeroChamado, // Inclui o novo campo
+          numeroChamado: formData.numeroChamado,
           dataHoraAgendamentoInicio: dataHoraInicioLocal.toISOString(),
           dataHoraAgendamentoFim: dataHoraFimLocal && !isNaN(dataHoraFimLocal) ? dataHoraFimLocal.toISOString() : null,
       };
 
-      if (!dadosParaApi.tecnicoResponsavel) delete dadosParaApi.tecnicoResponsavel;
-      if (!dadosParaApi.numeroChamado) delete dadosParaApi.numeroChamado;
-      if (!dadosParaApi.dataHoraAgendamentoFim) delete dadosParaApi.dataHoraAgendamentoFim;
-      
       await onSubmit(dadosParaApi);
     } catch (apiError) {
-      setError(apiError.response?.data?.message || `Erro ao ${isEditing ? 'salvar' : 'agendar'} manutenção.`);
+      setError(apiError.response?.data?.message || `Erro ao processar manutenção.`);
     } finally {
       setIsSubmitting(false);
     }
@@ -157,7 +151,6 @@ function ManutencaoForm({
             </select>
           </div>
         </div>
-        {isEditing && (<div style={{color: 'var(--cor-texto-secundario-light)', fontSize: '0.85em', marginTop: '10px'}}>Não é possível alterar o equipamento ao editar uma OS.</div>)}
       </div>
 
       <div className="form-section">
@@ -175,7 +168,6 @@ function ManutencaoForm({
             </div>
         </div>
         
-        {/* Renderização condicional do campo "Nº do Chamado" */}
         {formData.tipo === 'Corretiva' && (
             <div className="info-grid grid-cols-1" style={{ marginTop: '15px', border: '1px solid var(--cor-borda-light)', padding: '15px', borderRadius: '8px', background: 'var(--cor-fundo-pagina-light)' }}>
                 <div className="form-group" style={{marginBottom: 0}}>
@@ -195,13 +187,21 @@ function ManutencaoForm({
                 <TimeInput id="horaLocalInicio" name="horaLocalInicio" value={formData.horaLocalInicio} onChange={handleChange} />
             </div>
             <div className="form-group">
-                <label htmlFor="horaLocalFim">Horário de Fim</label>
+                <label htmlFor="horaLocalFim">Previsão de Fim</label>
                 <TimeInput id="horaLocalFim" name="horaLocalFim" value={formData.horaLocalFim} onChange={handleChange} />
             </div>
         </div>
         <div className="form-group" style={{marginTop: '15px'}}>
-            <label htmlFor="descricaoProblemaServico">Descrição do Problema/Serviço *</label>
-            <textarea id="descricaoProblemaServico" name="descricaoProblemaServico" value={formData.descricaoProblemaServico} onChange={handleChange} rows="4" required></textarea>
+            <label htmlFor="descricaoProblemaServico">
+                Descrição do Problema/Serviço {formData.tipo !== 'Preventiva' ? '*' : '(Opcional para Preventiva)'}
+            </label>
+            <textarea 
+                id="descricaoProblemaServico" 
+                name="descricaoProblemaServico" 
+                value={formData.descricaoProblemaServico} 
+                onChange={handleChange} 
+                rows="4"
+            ></textarea>
         </div>
       </div>
       
