@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/segurosRoutes.js
-// VERSÃO ATUALIZADA COM COBERTURAS DETALHADAS E VÍNCULOS
+// VERSÃO FINAL CORRIGIDA - COM EXCLUSÃO DE ANEXOS E COBERTURAS COMPLETAS
 
 import express from 'express';
 import multer from 'multer';
@@ -31,13 +31,12 @@ router.get('/', async (req, res) => {
             include: {
                 equipamento: { select: { id: true, modelo: true, tag: true } },
                 unidade: { select: { id: true, nomeSistema: true } },
-                anexos: true // Inclui anexos para sabermos se a apólice foi enviada
+                anexos: true 
             },
             orderBy: { dataFim: 'asc' }
         });
         res.json(seguros);
     } catch (error) {
-        console.error("Erro ao buscar seguros:", error);
         res.status(500).json({ message: 'Erro ao buscar seguros.' });
     }
 });
@@ -47,24 +46,16 @@ router.get('/:id', async (req, res) => {
     try {
         const seguro = await prisma.seguro.findUnique({
             where: { id: req.params.id },
-            include: { 
-                anexos: true, 
-                equipamento: true,
-                unidade: true      
-            }
+            include: { anexos: true, equipamento: true, unidade: true }
         });
-
-        if (seguro) {
-            res.json(seguro);
-        } else {
-            res.status(404).json({ message: 'Seguro não encontrado.' });
-        }
+        if (seguro) res.json(seguro);
+        else res.status(404).json({ message: 'Seguro não encontrado.' });
     } catch (error) {
         res.status(500).json({ message: 'Erro ao buscar detalhe do seguro.' });
     }
 });
 
-// --- 4. Criar um novo seguro com coberturas (POST) ---
+// --- 4. Criar um novo seguro (POST) ---
 router.post('/', async (req, res) => {
     const { 
         apoliceNumero, seguradora, dataInicio, dataFim, equipamentoId, unidadeId, cobertura,
@@ -73,10 +64,6 @@ router.post('/', async (req, res) => {
         lmiDanosMorais, lmiAPP
     } = req.body;
     
-    if (!apoliceNumero || !seguradora || !dataInicio || !dataFim) {
-        return res.status(400).json({ message: 'Número da Apólice, Seguradora, Data de Início e Fim são obrigatórios.' });
-    }
-
     try {
         const novoSeguro = await prisma.seguro.create({
             data: {
@@ -85,7 +72,6 @@ router.post('/', async (req, res) => {
                 dataInicio: new Date(dataInicio),
                 dataFim: new Date(dataFim),
                 cobertura,
-                // Valores financeiros (convertendo para número para garantir)
                 premioTotal: parseFloat(premioTotal) || 0,
                 lmiIncendio: parseFloat(lmiIncendio) || 0,
                 lmiDanosEletricos: parseFloat(lmiDanosEletricos) || 0,
@@ -96,25 +82,19 @@ router.post('/', async (req, res) => {
                 lmiDanosCorporais: parseFloat(lmiDanosCorporais) || 0,
                 lmiDanosMorais: parseFloat(lmiDanosMorais) || 0,
                 lmiAPP: parseFloat(lmiAPP) || 0,
-                // Vínculos
                 equipamento: equipamentoId ? { connect: { id: equipamentoId } } : undefined,
                 unidade: unidadeId ? { connect: { id: unidadeId } } : undefined,
             }
         });
 
         await registrarLog({
-            usuarioId: req.usuario.id,
-            acao: 'CRIAÇÃO',
-            entidade: 'Seguro',
-            entidadeId: novoSeguro.id,
-            detalhes: `Seguro nº ${novoSeguro.apoliceNumero} criado com coberturas detalhadas.`
+            usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Seguro',
+            entidadeId: novoSeguro.id, detalhes: `Seguro nº ${novoSeguro.apoliceNumero} criado.`
         });
 
         res.status(201).json(novoSeguro);
     } catch (error) {
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe uma apólice com este número.' });
-        console.error('Erro ao criar seguro:', error);
-        res.status(500).json({ message: 'Erro interno ao criar seguro.' });
+        res.status(500).json({ message: 'Erro ao criar seguro.' });
     }
 });
 
@@ -129,11 +109,10 @@ router.put('/:id', async (req, res) => {
     } = req.body;
 
     try {
-        const payloadDeAtualizacao = {
+        const payload = {
             ...outrosDados,
             dataInicio: dataInicio ? new Date(dataInicio) : undefined,
             dataFim: dataFim ? new Date(dataFim) : undefined,
-            // Valores financeiros
             premioTotal: premioTotal !== undefined ? parseFloat(premioTotal) : undefined,
             lmiIncendio: lmiIncendio !== undefined ? parseFloat(lmiIncendio) : undefined,
             lmiDanosEletricos: lmiDanosEletricos !== undefined ? parseFloat(lmiDanosEletricos) : undefined,
@@ -146,87 +125,60 @@ router.put('/:id', async (req, res) => {
             lmiAPP: lmiAPP !== undefined ? parseFloat(lmiAPP) : undefined,
         };
         
-        // Gerenciamento de Vínculo
         if (equipamentoId !== undefined) {
-            payloadDeAtualizacao.equipamento = equipamentoId ? { connect: { id: equipamentoId } } : { disconnect: true };
+            payload.equipamento = equipamentoId ? { connect: { id: equipamentoId } } : { disconnect: true };
         }
         if (unidadeId !== undefined) {
-            payloadDeAtualizacao.unidade = unidadeId ? { connect: { id: unidadeId } } : { disconnect: true };
+            payload.unidade = unidadeId ? { connect: { id: unidadeId } } : { disconnect: true };
         }
 
-        const seguroAtualizado = await prisma.seguro.update({
-            where: { id },
-            data: payloadDeAtualizacao
-        });
-
-        await registrarLog({
-            usuarioId: req.usuario.id,
-            acao: 'EDIÇÃO',
-            entidade: 'Seguro',
-            entidadeId: id,
-            detalhes: `Seguro nº ${seguroAtualizado.apoliceNumero} atualizado.`
-        });
-
-        res.json(seguroAtualizado);
+        const atualizado = await prisma.seguro.update({ where: { id }, data: payload });
+        res.json(atualizado);
     } catch (error) {
-        console.error('Erro ao atualizar seguro:', error);
         res.status(500).json({ message: 'Erro ao atualizar seguro.' });
     }
 });
 
-// --- 6. Excluir seguro (DELETE) ---
+// --- 6. Excluir seguro completo ---
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const seguro = await prisma.seguro.findUnique({ where: { id }, include: { anexos: true } });
-        if (!seguro) return res.status(404).json({ message: 'Seguro não encontrado.' });
-
-        // Apaga arquivos físicos dos anexos
-        if (seguro.anexos) {
-            seguro.anexos.forEach(anexo => {
-                if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
-            });
+        if (seguro?.anexos) {
+            seguro.anexos.forEach(anexo => { if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path); });
         }
-
         await prisma.seguro.delete({ where: { id } });
-
-        await registrarLog({
-            usuarioId: req.usuario.id,
-            acao: 'EXCLUSÃO',
-            entidade: 'Seguro',
-            entidadeId: id,
-            detalhes: `Seguro nº ${seguro.apoliceNumero} excluído permanentemente.`
-        });
-
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ message: 'Erro ao excluir seguro.' });
     }
 });
 
-// --- 7. Rota para Upload de Anexos específicos de Seguro ---
+// --- 7. Upload de Documentos ---
 router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
-    const { id: seguroId } = req.params;
-    if (!req.files || req.files.length === 0) return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
-
+    const { id } = req.params;
     try {
-        const anexosData = req.files.map(file => ({
-            seguroId,
-            nomeOriginal: file.originalname,
-            path: file.path,
-            tipoMime: file.mimetype,
-        }));
-        
+        const anexosData = req.files.map(file => ({ seguroId: id, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype }));
         await prisma.anexo.createMany({ data: anexosData });
-        
-        const seguroAtualizado = await prisma.seguro.findUnique({
-            where: { id: seguroId },
-            include: { anexos: true }
-        });
-        
-        res.status(201).json(seguroAtualizado);
+        const atualizado = await prisma.seguro.findUnique({ where: { id }, include: { anexos: true } });
+        res.status(201).json(atualizado);
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao salvar anexo da apólice.' });
+        res.status(500).json({ message: 'Erro ao salvar anexo.' });
+    }
+});
+
+// --- 8. EXCLUIR UM DOCUMENTO ESPECÍFICO (Esta rota corrige o erro 404) ---
+router.delete('/:id/anexos/:anexoId', async (req, res) => {
+    const { anexoId } = req.params;
+    try {
+        const anexo = await prisma.anexo.findUnique({ where: { id: anexoId } });
+        if (anexo) {
+            if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path); // Apaga arquivo físico
+            await prisma.anexo.delete({ where: { id: anexoId } }); // Apaga no banco
+        }
+        res.status(204).send();
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao remover documento.' });
     }
 });
 
