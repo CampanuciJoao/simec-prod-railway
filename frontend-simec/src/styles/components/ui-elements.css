@@ -176,3 +176,18 @@ body.dark-mode .btn-secondary {
 }
 
 body.dark-mode .status-badge { opacity: 0.9; }
+
+/* Cores leves para os Cards de Manutenção por Tipo */
+.card-manutencao-corretiva {
+    background-color: #fff1f2 !important; /* Vermelho ultra leve */
+    border-left: 5px solid #ef4444 !important; /* Borda lateral forte */
+}
+
+.card-manutencao-preventiva {
+    background-color: #f0fdf4 !important; /* Verde ultra leve */
+    border-left: 5px solid #10b981 !important; /* Borda lateral forte */
+}
+
+/* Ajuste para não conflitar com o hover */
+.card-manutencao-corretiva:hover { background-color: #ffe4e6 !important; }
+.card-manutencao-preventiva:hover { background-color: #dcfce7 !important; }
