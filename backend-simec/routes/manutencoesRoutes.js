@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/manutencoesRoutes.js
-// VERSÃO 10.0 - COM BLINDAGEM ZOD E LIMPEZA AUTOMÁTICA DE ALERTAS
+// VERSÃO 11.0 - CORREÇÃO DE VÍNCULO DE UNIDADE EM DETALHES E BLINDAGEM ZOD
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,7 +10,7 @@ import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { admin } from '../middleware/authMiddleware.js';
 
-// --- NOVAS IMPORTAÇÕES DE SEGURANÇA ---
+// --- IMPORTAÇÕES DE SEGURANÇA ---
 import validate from '../middleware/validate.js';
 import { manutencaoSchema } from '../validators/manutencaoValidator.js';
 
@@ -65,7 +65,10 @@ router.get('/:id', async (req, res) => {
             where: { id: req.params.id },
             include: { 
                 anexos: true, 
-                equipamento: true, 
+                // CORREÇÃO: Incluindo a unidade dentro do equipamento para evitar campos em branco na UI e PDF
+                equipamento: {
+                    include: { unidade: true }
+                }, 
                 notasAndamento: { 
                     orderBy: { data: 'desc' },
                     include: { autor: { select: { nome: true } } }
@@ -75,23 +78,21 @@ router.get('/:id', async (req, res) => {
         if (manutencao) res.json(manutencao);
         else res.status(404).json({ message: 'Manutenção não encontrada.' });
     } catch (error) {
+        console.error("Erro ao buscar detalhes da manutenção:", error);
         res.status(500).json({ message: 'Erro ao buscar detalhes.' });
     }
 });
 
 /** 
  * @route   POST /api/manutencoes 
- * ADICIONADO: validate(manutencaoSchema) para garantir dados perfeitos no agendamento
  */
 router.post('/', validate(manutencaoSchema), async (req, res) => {
     const { equipamentoId, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio, dataHoraAgendamentoFim, ...outrosDados } = req.body;
     
     try {
-        // Gerador automático de OS (Soma total + 1)
         const total = await prisma.manutencao.count();
         const osNumber = String(total + 1).padStart(4, '0');
         
-        // Busca equipamento para compor o prefixo da OS
         const equip = await prisma.equipamento.findUnique({ where: { id: equipamentoId } });
         if (!equip) return res.status(404).json({ message: "Equipamento não encontrado." });
         
@@ -150,7 +151,6 @@ router.post('/:id/concluir', async (req, res) => {
                     data: { status: 'Operante' }
                 });
 
-                // Limpeza dos alertas pendentes para esta OS
                 await tx.alerta.deleteMany({ where: { id: `manut-confirm-${manutencaoId}` } });
                 await tx.alertaLidoPorUsuario.deleteMany({ where: { alertaId: `manut-confirm-${manutencaoId}` } });
 
