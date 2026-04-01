@@ -1,26 +1,27 @@
 // Ficheiro: src/utils/pdfUtils.js
-// VERSÃO CONSOLIDADA - DESIGN EXECUTIVO, CORREÇÃO DE LOGO E ALINHAMENTO DE CHAMADOS
+// VERSÃO INTEGRAL CONSOLIDADA (APROX. 280 LINHAS)
+// SUPORTE COMPLETO: BI, OS PROFISSIONAL, INVENTÁRIO, AUDITORIA E RELATÓRIOS GERAIS
+
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
 import logoSimec from '../assets/images/logo-simec-base64';
 
 /**
- * 1. CABEÇALHO PADRÃO (Corrigido para evitar sobreposição do Logo)
+ * 1. FUNÇÃO INTERNA: ADICIONAR CABEÇALHO PADRÃO
+ * Ajustado para design executivo: Logo à esquerda, Título centralizado abaixo, Linha divisória.
  */
 const adicionarCabecalho = (doc, titulo) => {
-  // Logo no canto superior esquerdo
   try { doc.addImage(logoSimec, 'PNG', 14, 10, 22, 22); } catch (e) {}
   
-  // Data de geração no topo direito
   doc.setFontSize(8);
   doc.setTextColor(150);
   doc.text(`Gerado em: ${formatarDataHora(new Date())}`, 196, 15, { align: 'right' });
 
-  // Título: Posicionado em Y=45 para dar distância segura do logo
   doc.setFontSize(16);
   doc.setTextColor(30, 41, 59);
   doc.setFont(undefined, 'bold');
+  // Título em Y=45 para não bater no logo
   doc.text(titulo.toUpperCase(), doc.internal.pageSize.getWidth() / 2, 45, { align: 'center' });
 
   // Linha divisória elegante
@@ -29,13 +30,13 @@ const adicionarCabecalho = (doc, titulo) => {
 };
 
 /**
- * 2. PDF DE AUDITORIA DO ATIVO
+ * 2. PDF DE AUDITORIA DO ATIVO (Histórico Individual)
  */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
   const doc = new jsPDF();
   adicionarCabecalho(doc, "RELATÓRIO DE AUDITORIA DE ATIVO");
   
-  // Quadro de informações do equipamento
+  // Bloco de informações do equipamento
   doc.setFillColor(248, 250, 252);
   doc.rect(14, 58, 182, 22, 'F');
   doc.setDrawColor(203, 213, 225);
@@ -74,14 +75,18 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     theme: 'grid',
     headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 8 },
     styles: { fontSize: 7, cellPadding: 3 },
-    columnStyles: { 0: { halign: 'center', cellWidth: 30 }, 1: { halign: 'center', cellWidth: 25 }, 4: { halign: 'center', cellWidth: 25 } }
+    columnStyles: {
+      0: { halign: 'center', cellWidth: 30 },
+      1: { halign: 'center', cellWidth: 25 },
+      4: { halign: 'center', cellWidth: 25 }
+    }
   });
   
   doc.save(`auditoria_${(info.tag || 'Equipamento')}.pdf`);
 };
 
 /**
- * 3. PDF DE RELATÓRIOS GERAIS
+ * 3. PDF DE RELATÓRIOS GERAIS (Inventário e Manutenções Realizadas)
  */
 export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
   const doc = new jsPDF();
@@ -94,14 +99,23 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     tituloRelatorio = "RELATÓRIO DE INVENTÁRIO DE ATIVOS";
     headers = [["MODELO", "SÉRIE / TAG", "FABRICANTE", "REGISTRO ANVISA", "STATUS", "UNIDADE"]];
     body = resultado.dados.map(item => [
-      item.modelo || 'N/A', item.tag || 'N/A', item.fabricante || 'N/A',
-      item.registroAnvisa || 'N/A', item.status || 'N/A', item.unidade?.nomeSistema || 'N/A'
+      item.modelo || 'N/A',
+      item.tag || 'N/A',
+      item.fabricante || 'N/A',
+      item.registroAnvisa || 'N/A',
+      item.status || 'N/A',
+      item.unidade?.nomeSistema || 'N/A'
     ]);
-    configuracaoColunas = { 0: { cellWidth: 40 }, 1: { cellWidth: 30, halign: 'center' }, 4: { cellWidth: 25, halign: 'center' } };
+    configuracaoColunas = {
+      0: { cellWidth: 40 }, 1: { cellWidth: 30, halign: 'center' },
+      2: { cellWidth: 30, halign: 'center' }, 3: { cellWidth: 30, halign: 'center' },
+      4: { cellWidth: 25, halign: 'center' }
+    };
   }
   else if (resultado.tipoRelatorio === 'manutencoesRealizadas') {
     tituloRelatorio = "RELATÓRIO DE MANUTENÇÕES REALIZADAS";
     headers = [["OS / CHAMADO", "CONCLUSÃO", "EQUIPAMENTO / UNIDADE", "RESPONSÁVEL", "DESCRIÇÃO DO SERVIÇO"]];
+    
     body = resultado.dados.map(item => [
          `${item.numeroOS}${item.numeroChamado ? '\nChamado: ' + item.numeroChamado : ''}`,
          formatarDataHora(item.dataConclusao),
@@ -109,7 +123,14 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
          item.tecnicoResponsavel || 'N/A',
          item.descricaoProblemaServico || '-'
     ]);
-    configuracaoColunas = { 0: { cellWidth: 35, halign: 'center' }, 1: { cellWidth: 32, halign: 'center' }, 3: { cellWidth: 30, halign: 'center' } };
+    
+    configuracaoColunas = {
+         0: { cellWidth: 35, halign: 'center' }, 
+         1: { cellWidth: 32, halign: 'center' }, 
+         2: { cellWidth: 45 }, 
+         3: { cellWidth: 30, halign: 'center' }, 
+         4: { cellWidth: 'auto' } 
+    };
   }
   
   adicionarCabecalho(doc, tituloRelatorio);
@@ -119,9 +140,10 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
     body: body,
     startY: 60,
     theme: 'grid',
-    headStyles: { fillColor: [30, 41, 59], fontSize: 8.5, halign: 'center', valign: 'middle' },
-    bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], valign: 'top' },
+    headStyles: { fillColor: [30, 41, 59], fontSize: 8.5, halign: 'center', valign: 'middle', cellPadding: 3 },
+    bodyStyles: { fontSize: 7.5, textColor: [40, 40, 40], valign: 'top', cellPadding: 3 },
     columnStyles: configuracaoColunas,
+    styles: { overflow: 'linebreak' },
     alternateRowStyles: { fillColor: [250, 250, 250] },
     didDrawPage: (data) => {
       doc.setFontSize(8);
@@ -133,12 +155,13 @@ export const exportarRelatorioPDF = (resultado, nomeArquivo) => {
 };
 
 /**
- * 4. PDF DE INDICADORES BI (Design Executivo)
+ * 4. PDF DE INDICADORES BI (Relatório Executivo Completo)
  */
 export const exportarBIPDF = (dados) => {
   const doc = new jsPDF();
   adicionarCabecalho(doc, `RELATÓRIO EXECUTIVO DE PERFORMANCE - ${dados.ano}`);
   
+  // Tabela 1: Resumo Geral
   autoTable(doc, {
     head: [['INDICADOR OPERACIONAL', 'VALOR ACUMULADO']],
     body: [
@@ -152,6 +175,7 @@ export const exportarBIPDF = (dados) => {
     bodyStyles: { fontStyle: 'bold', halign: 'center', fontSize: 9, cellPadding: 4 }
   });
   
+  // Tabela 2: Downtime por Unidade
   doc.setFontSize(11);
   doc.setTextColor(30, 41, 59);
   doc.text("1. TEMPO DE PARADA (DOWNTIME) POR UNIDADE", 14, doc.lastAutoTable.finalY + 15);
@@ -165,19 +189,21 @@ export const exportarBIPDF = (dados) => {
     styles: { fontSize: 8.5 }
   });
   
-  doc.text("2. REINCIDÊNCIA DE FALHAS (FREQUÊNCIA DE CORRETIVAS)", 14, doc.lastAutoTable.finalY + 15);
+  // Tabela 3: Reincidência de Falhas (Sem o 'x')
+  doc.text("2. REINCIDÊNCIA DE FALHAS (CONTINGENTE DE CORRETIVAS)", 14, doc.lastAutoTable.finalY + 15);
   
   autoTable(doc, {
-    head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'QTD. CORRETIVAS']],
-    body: dados.rankingFrequencia.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.corretivas} vez(es)`]),
+    head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'QTD. FALHAS']],
+    body: dados.rankingFrequencia.map(e => [`${e.modelo} (${e.tag})`, e.unidade, e.corretivas]),
     startY: doc.lastAutoTable.finalY + 20,
     theme: 'grid',
     headStyles: { fillColor: [239, 68, 68] },
     styles: { fontSize: 8.5 }
   });
-  
-  doc.text("3. TOP 5 EQUIPAMENTOS COM MAIOR TEMPO PARADO", 14, doc.lastAutoTable.finalY + 15);
-  
+
+  // Tabela 4: Ranking de Downtime (NOVO NO PDF)
+  doc.text("3. TOP EQUIPAMENTOS COM MAIOR TEMPO PARADO (DOWNTIME)", 14, doc.lastAutoTable.finalY + 15);
+
   autoTable(doc, {
     head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'TEMPO PARADO']],
     body: dados.rankingDowntime.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.horasParado}h`]),
@@ -199,7 +225,7 @@ export const exportarBIPDF = (dados) => {
 };
 
 /**
- * 5. PDF DE ORDEM DE SERVIÇO DETALHADA
+ * 5. PDF DE ORDEM DE SERVIÇO DETALHADA (Manutenção Individual)
  */
 export const exportarOSManutencaoPDF = (m) => {
     const doc = new jsPDF();
@@ -230,7 +256,10 @@ export const exportarOSManutencaoPDF = (m) => {
             ['Nº CHAMADO:', m.numeroChamado || 'N/A', 'STATUS ATUAL:', m.status.toUpperCase()]
         ],
         styles: { fontSize: 9, cellPadding: 2 },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 35 }, 2: { fontStyle: 'bold', cellWidth: 35 } }
+        columnStyles: { 
+            0: { fontStyle: 'bold', cellWidth: 35 }, 
+            2: { fontStyle: 'bold', cellWidth: 35 } 
+        }
     });
 
     doc.setFillColor(241, 245, 249);
@@ -260,7 +289,11 @@ export const exportarOSManutencaoPDF = (m) => {
     doc.setFont(undefined, 'bold');
     doc.text("HISTÓRICO DO CHAMADO / NOTAS TÉCNICAS", 16, doc.lastAutoTable.finalY + 45);
 
-    const historicoBody = m.notasAndamento?.map(n => [formatarDataHora(n.data), n.autor?.nome || 'Sistema', n.nota]) || [['-', '-', 'Nenhuma nota registrada']];
+    const historicoBody = m.notasAndamento?.map(n => [
+        formatarDataHora(n.data),
+        n.autor?.nome || 'Sistema',
+        n.nota
+    ]) || [['-', '-', 'Nenhuma nota registrada']];
 
     autoTable(doc, {
         startY: doc.lastAutoTable.finalY + 50,
@@ -275,6 +308,7 @@ export const exportarOSManutencaoPDF = (m) => {
     const finalY = doc.lastAutoTable.finalY + 30;
     doc.line(14, finalY, 90, finalY);
     doc.text("Responsável Técnico", 14, finalY + 5);
+    
     doc.line(110, finalY, 196, finalY);
     doc.text("Assinatura Unidade / Cliente", 110, finalY + 5);
 

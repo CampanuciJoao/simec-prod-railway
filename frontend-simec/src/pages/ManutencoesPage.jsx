@@ -1,5 +1,5 @@
 // Ficheiro: src/pages/ManutencoesPage.jsx
-// VERSÃO 11.0 - MODERNIZADA COM TAILWIND CSS, SKELETONS E UI DE ALTA PERFORMANCE
+// VERSÃO 12.0 - COM SUPORTE A DRILL-DOWN (FILTRO POR EQUIPAMENTO VINDO DO BI)
 
 import React, { useMemo, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -26,9 +26,9 @@ import { deleteManutencao } from '../services/api';
 import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import ModalCancelamento from '../components/ModalCancelamento';
-import SkeletonCard from '../components/SkeletonCard'; // <<< IMPORTADO
+import SkeletonCard from '../components/SkeletonCard';
 
-// --- Funções Auxiliares de Estilo Tailwind (Design System) ---
+// --- Funções Auxiliares de Estilo Tailwind ---
 const getStatusStyles = (status) => {
     const s = status?.toLowerCase() || '';
     if (s === 'agendada') return 'bg-blue-100 text-blue-700 border-blue-200';
@@ -72,15 +72,19 @@ function ManutencoesPage() {
         filtros, setFiltros, refetch
     } = useManutencoes();
 
-    // Sincroniza filtros vindos de outras páginas (Dashboard/BI)
+    // LÓGICA DE DRILL-DOWN: Sincroniza filtros vindos do BI (Tipo e Equipamento)
     useEffect(() => {
-        if (location.state?.filtroTipoInicial) {
-            setFiltros(prev => ({ ...prev, tipo: location.state.filtroTipoInicial }));
+        if (location.state?.filtroTipoInicial || location.state?.filtroEquipamentoId) {
+            setFiltros(prev => ({ 
+                ...prev, 
+                tipo: location.state.filtroTipoInicial || prev.tipo,
+                equipamentoId: location.state.filtroEquipamentoId || prev.equipamentoId 
+            }));
+            // Limpa o estado para não re-filtrar se o usuário atualizar a página
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state, setFiltros, navigate, location.pathname]);
     
-    // Atualização automática para manter os status das OS em tempo real
     useEffect(() => {
         const intervalId = setInterval(() => { refetch(); }, 30 * 1000);
         return () => clearInterval(intervalId);
@@ -98,28 +102,22 @@ function ManutencoesPage() {
         } catch (err) { addToast('Erro ao excluir.', 'error'); } finally { closeDeleteModal(); }
     };
 
-    const equipamentosOptions = useMemo(() => equipamentos.map(eq => ({ value: eq.id, label: `${eq.modelo} (${eq.tag})` })), [equipamentos]);
     const unidadesOptions = useMemo(() => (unidadesDisponiveis || []).map(u => ({ value: u.id, label: u.nomeSistema })), [unidadesDisponiveis]);
     const statusOptions = ["Agendada", "EmAndamento", "Concluida", "Cancelada", "AguardandoConfirmacao"].map(s => ({ value: s, label: s.replace(/([A-Z])/g, ' $1').trim() }));
+    const equipamentosOptions = useMemo(() => (equipamentos || []).map(eq => ({ value: eq.id, label: `${eq.modelo} (${eq.tag})` })), [equipamentos]);
 
     const selectFiltersConfig = [
         { id: 'unidadeId', value: filtros.unidadeId, onChange: (v) => setFiltros(f => ({...f, unidadeId: v})), options: unidadesOptions, defaultLabel: 'Todas Unidades' },
+        { id: 'equipamentoId', value: filtros.equipamentoId, onChange: (v) => setFiltros(f => ({...f, equipamentoId: v})), options: equipamentosOptions, defaultLabel: 'Todos Equipamentos' },
         { id: 'tipo', value: filtros.tipo, onChange: (v) => setFiltros(f => ({...f, tipo: v})), options: ["Preventiva", "Corretiva", "Calibracao", "Inspecao"], defaultLabel: 'Todos Tipos' },
         { id: 'status', value: filtros.status, onChange: (v) => setFiltros(f => ({...f, status: v})), options: statusOptions, defaultLabel: 'Todos Status' }
     ];
 
-    // ==========================================================================
-    // >> ESTADO DE CARREGAMENTO COM SKELETONS (VISUAL MODERNO) <<
-    // ==========================================================================
     if (loading && manutencoes.length === 0) {
         return (
             <div className="page-content-wrapper">
                 <div className="page-title-card bg-slate-800 border-none shadow-lg"><h1 className="page-title-internal text-white">Gerenciamento de Manutenções</h1></div>
-                <div className="space-y-4 mt-8 px-4">
-                    <SkeletonCard />
-                    <SkeletonCard />
-                    <SkeletonCard />
-                </div>
+                <div className="space-y-4 mt-8 px-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
             </div>
         );
     }
@@ -130,7 +128,6 @@ function ManutencoesPage() {
             <ModalCancelamento manutencao={manutencaoParaCancelar} isOpen={isCancelModalOpen} onClose={closeCancelModal} onCancelConfirm={refetch} />
 
             <div className="page-content-wrapper pb-20">
-                {/* TÍTULO ESTILIZADO COM TAILWIND */}
                 <div className="page-title-card shadow-xl bg-slate-800 border-none mb-8">
                     <h1 className="page-title-internal flex items-center gap-3 text-white font-bold">
                         <FontAwesomeIcon icon={faWrench} className="text-yellow-400" />
@@ -141,13 +138,11 @@ function ManutencoesPage() {
                     </button>
                 </div>
 
-                {/* FILTROS DENTRO DE CARD LIMPO */}
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8 mx-1">
-                    <GlobalFilterBar searchTerm={searchTerm} onSearchChange={(e) => setSearchTerm(e.target.value)} searchPlaceholder="Buscar por OS, equipamento ou tag..." selectFilters={selectFiltersConfig} />
+                    <GlobalFilterBar searchTerm={searchTerm} onSearchChange={(e) => setSearchTerm(e.target.value)} searchPlaceholder="Buscar por OS ou descrição..." selectFilters={selectFiltersConfig} />
                 </div>
 
                 <div className="px-1 overflow-x-auto">
-                    {/* TABELA ESTILO "CARDS EMPILHADOS" */}
                     <table className="w-full border-separate border-spacing-y-3">
                         <thead>
                             <tr className="text-slate-400 text-[11px] font-black uppercase tracking-widest text-center">
@@ -171,9 +166,7 @@ function ManutencoesPage() {
                                         </td>
                                         <td className="py-4 px-4">
                                             <div className="flex items-center gap-3">
-                                                <div className="bg-slate-100 p-2 rounded-lg text-slate-500">
-                                                    <FontAwesomeIcon icon={faTag} className="text-xs" />
-                                                </div>
+                                                <div className="bg-slate-100 p-2 rounded-lg text-slate-500"><FontAwesomeIcon icon={faTag} className="text-xs" /></div>
                                                 <div>
                                                     <div className="font-bold text-slate-800 text-sm">{m.equipamento?.modelo}</div>
                                                     <div className="text-[11px] text-slate-400 font-mono">{m.equipamento?.tag}</div>
@@ -185,15 +178,11 @@ function ManutencoesPage() {
                                                 <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
                                                     <FontAwesomeIcon icon={faClock} className="text-[10px]" /> {formatarData(m.dataHoraAgendamentoInicio)}
                                                 </span>
-                                                <span className="text-[10px] text-slate-400 font-medium">
-                                                    {formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}
-                                                </span>
+                                                <span className="text-[10px] text-slate-400 font-medium">{formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}</span>
                                             </div>
                                         </td>
                                         <td className="py-4 px-4 text-center">
-                                            <span className="text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                                                {m.tipo}
-                                            </span>
+                                            <span className="text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">{m.tipo}</span>
                                         </td>
                                         <td className="py-4 px-4 text-center">
                                             <div className="text-xs font-medium text-slate-600 flex items-center justify-center gap-1">
