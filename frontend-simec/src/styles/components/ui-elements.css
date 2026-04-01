@@ -1,26 +1,27 @@
 /* src/styles/components/ui-elements.css */
-/* VERSÃO 5.0 - FIX: BOTÕES VISÍVEIS E ALTO CONTRASTE */
+/* VERSÃO 6.0 - FIX: BOTÕES COMPACTOS, ALTO CONTRASTE E GAP DE ÍCONE */
 
 /* ====================================================== */
-/* 1. ESTILO BASE DE TODOS OS BOTÕES                      */
+/* 1. ESTILO BASE DE TODOS OS BOTÕES (REDUZIDOS)          */
 /* ====================================================== */
 .btn { 
-    padding: 10px 20px; 
-    font-size: 0.85em; 
-    border-radius: 8px; 
-    border: none; /* Removida borda padrão para visual mais moderno */
+    padding: 8px 16px; /* Diminuído para um visual mais clean */
+    font-size: 0.82em; /* Fonte levemente menor para equilíbrio */
+    border-radius: 6px; /* Cantos um pouco mais nítidos */
+    border: none;
     cursor: pointer; 
     text-decoration: none; 
     display: inline-flex; 
     align-items: center; 
     justify-content: center; 
-    font-weight: 800; /* Fonte bem pesada para leitura fácil */
+    gap: 8px !important; /* CORREÇÃO: Espaço entre ícone e texto */
+    font-weight: 800; 
     transition: all 0.2s ease-in-out; 
-    margin-left: 5px; 
-    line-height: 1.4; 
-    vertical-align: middle;
-    text-transform: uppercase; /* Caixa alta para visual profissional */
+    margin-left: 8px; 
+    line-height: 1; 
+    text-transform: uppercase; 
     letter-spacing: 0.5px;
+    white-space: nowrap; /* Impede o ícone de cair para a linha de baixo */
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -28,87 +29,87 @@
 
 .btn:hover {
     transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    filter: brightness(1.1); /* Dá um brilho ao passar o mouse */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.12);
+    filter: brightness(1.05);
 }
 
 .btn:active { transform: translateY(0); }
+
+/* Garante que o ícone tenha tamanho fixo */
+.btn svg, .btn i {
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
 
 /* ====================================================== */
 /* 2. CORES DOS BOTÕES (FORÇANDO VISIBILIDADE)            */
 /* ====================================================== */
 
-/* BOTÃO PRIMÁRIO (AZUL) */
 .btn-primary { 
     background-color: #2563eb !important; 
     color: #ffffff !important; 
 }
 
-/* BOTÃO SUCESSO (VERDE) */
 .btn-success { 
     background-color: #10b981 !important; 
     color: #ffffff !important; 
 }
 
-/* BOTÃO AVISO (AMARELO) */
 .btn-warning { 
     background-color: #f59e0b !important; 
     color: #ffffff !important; 
 }
 
-/* BOTÃO PERIGO (VERMELHO) */
 .btn-danger { 
     background-color: #ef4444 !important; 
     color: #ffffff !important; 
 }
 
-/* BOTÃO SECUNDÁRIO / VOLTAR (CINZA CLARO) */
 .btn-secondary { 
     background-color: #f1f5f9 !important; 
     color: #475569 !important;
     border: 1px solid #e2e8f0 !important;
 }
 
-/* --- Botões de Ação (Ícones nas tabelas) --- */
+/* --- Botões de Ação (Ícones menores nas tabelas/cards) --- */
 .btn-action {
-    padding: 8px;
+    padding: 6px;
     background-color: transparent;
     border: none;
     color: #94a3b8;
     cursor: pointer;
-    border-radius: 8px;
+    border-radius: 6px;
     transition: all 0.2s;
     display: inline-flex;
     align-items: center;
     justify-content: center;
 }
 .btn-action:hover {
-    background-color: #f8fafc;
+    background-color: #f1f5f9;
     color: #3b82f6;
 }
 .btn-action.edit:hover { color: #f59e0b; background-color: #fffbeb; }
 .btn-action.delete:hover { color: #ef4444; background-color: #fef2f2; }
 
-
 /* ====================================================== */
-/* 3. MENSAGENS E BADGES (ALTO CONTRASTE)                 */
+/* 3. MENSAGENS E BADGES                                  */
 /* ====================================================== */
 .form-error {
     color: #b91c1c;
     background-color: #fef2f2;
     border: 1px solid #fee2e2;
-    padding: 12px;
-    border-radius: 8px;
+    padding: 10px;
+    border-radius: 6px;
     margin-bottom: 15px;
-    font-size: 0.9em;
+    font-size: 0.85em;
     font-weight: 700;
 }
 
-/* Badges de Status na Tabela */
 .status-badge {
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 0.75em;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72em;
     font-weight: 800;
     text-transform: uppercase;
     display: inline-block;
@@ -120,12 +121,12 @@
 .status-badge.status-cancelada { background-color: #fee2e2; color: #991b1b; }
 
 /* ====================================================== */
-/* 4. SISTEMA DE NOTIFICAÇÃO (SINO)                       */
+/* 4. CABEÇALHO E NOTIFICAÇÕES                            */
 /* ====================================================== */
 .header-action-btn {
-  width: 42px;
-  height: 42px;
-  border-radius: 10px;
+  width: 38px; /* Reduzido */
+  height: 38px; /* Reduzido */
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -144,17 +145,17 @@
 
 .notification-badge {
   position: absolute;
-  top: -5px;
-  right: -5px;
+  top: -4px;
+  right: -4px;
   background-color: #ef4444;
   color: white;
   border-radius: 50%;
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 900;
   border: 2px solid #ffffff;
 }
