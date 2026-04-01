@@ -1,12 +1,17 @@
 // Ficheiro: src/pages/BIPage.jsx
-// VERSÃO 12.0 - COM DRILL-DOWN INTELIGENTE, ALINHAMENTO CORRIGIDO E SEM O "X"
+// VERSÃO RESTAURADA - VISUAL ORIGINAL COM DRILL-DOWN E ALINHAMENTO CORRIGIDO
 import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // IMPORTADO PARA NAVEGAÇÃO
+import { useNavigate } from 'react-router-dom';
 import { getIndicadoresBI } from '../services/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-    faPrint, faSpinner, faClock, faExclamationTriangle, 
-    faHospital, faChartBar, faExternalLinkAlt 
+    faPrint, 
+    faSpinner, 
+    faClock, 
+    faExclamationTriangle, 
+    faHospital, 
+    faChartBar,
+    faExternalLinkAlt 
 } from '@fortawesome/free-solid-svg-icons';
 import { exportarBIPDF } from '../utils/pdfUtils';
 import BarChart from '../components/BarChart';
@@ -14,7 +19,7 @@ import BarChart from '../components/BarChart';
 function BIPage() {
     const [dados, setDados] = useState(null);
     const [loading, setLoading] = useState(true);
-    const navigate = useNavigate(); // HOOK DE NAVEGAÇÃO
+    const navigate = useNavigate();
 
     useEffect(() => {
         getIndicadoresBI()
@@ -28,7 +33,7 @@ function BIPage() {
             });
     }, []);
 
-    // FUNÇÃO DE INTELIGÊNCIA: Clica no equipamento e vai para as corretivas filtradas dele
+    // Função Drill-down: Direciona para as corretivas do equipamento específico
     const handleDrillDown = (equipamentoId) => {
         navigate('/manutencoes', { 
             state: { 
@@ -63,6 +68,7 @@ function BIPage() {
                 </button>
             </div>
 
+            {/* CARDS DE RESUMO ORIGINAIS */}
             <div className="summary-cards">
                 <div className="card" style={{ borderLeft: '6px solid #6366f1' }}>
                     <div className="card-text-content">
@@ -84,9 +90,8 @@ function BIPage() {
                 </div>
             </div>
 
-            <div className="detailed-sections" style={{ display: 'grid', gridTemplateColumns: '1.2fr 0.8fr', gap: '20px' }}>
+            <div className="detailed-sections" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                 
-                {/* GRÁFICO POR UNIDADE */}
                 <section className="page-section">
                     <h3><FontAwesomeIcon icon={faHospital} /> Downtime por Unidade (Horas)</h3>
                     <div style={{ height: '280px', marginTop: '15px' }}>
@@ -94,34 +99,28 @@ function BIPage() {
                     </div>
                 </section>
 
-                {/* TABELA DE FREQUÊNCIA COM DRILL-DOWN E SEM O "X" */}
                 <section className="page-section">
                     <h3><FontAwesomeIcon icon={faExclamationTriangle} /> Reincidência de Falhas</h3>
                     <div className="table-responsive-wrapper" style={{ marginTop: '15px' }}>
                         <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th className="text-left">Equipamento</th>
-                                    <th className="text-center">Falhas</th>
+                                    <th>Equipamento</th>
+                                    <th className="text-center">Qtd. Corretivas</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {dados.rankingFrequencia?.length > 0 ? (
                                     dados.rankingFrequencia.map((e, index) => (
-                                        <tr 
-                                            key={index} 
-                                            onClick={() => handleDrillDown(e.id)} 
-                                            className="hover:bg-slate-50 cursor-pointer" 
-                                            title="Ver manutenções deste equipamento"
-                                        >
-                                            <td className="text-left">
-                                                <div className="font-bold text-blue-600 flex items-center gap-2">
-                                                    {e.modelo} <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" className="opacity-30" />
+                                        <tr key={index} onClick={() => handleDrillDown(e.id)} style={{ cursor: 'pointer' }}>
+                                            <td>
+                                                <div style={{ fontWeight: 'bold', color: 'var(--cor-primaria-light)' }}>
+                                                    {e.modelo} <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" style={{opacity: 0.5, marginLeft: '5px'}}/>
                                                 </div>
-                                                <div className="text-[10px] text-slate-400">Tag: {e.tag}</div>
+                                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Tag: {e.tag}</div>
                                             </td>
                                             <td className="text-center">
-                                                <span className="font-black text-red-600 text-lg">{e.corretivas}</span>
+                                                <span style={{ fontWeight: 'bold', color: '#ef4444', fontSize: '1.1rem' }}>{e.corretivas}</span>
                                             </td>
                                         </tr>
                                     ))
@@ -133,33 +132,33 @@ function BIPage() {
                     </div>
                 </section>
 
-                {/* TABELA DE TEMPO PARADO - ALINHAMENTO CORRIGIDO */}
+                {/* TABELA DE DOWNTIME COM ALINHAMENTO CORRIGIDO */}
                 <section className="page-section" style={{ gridColumn: '1 / -1' }}>
-                    <h3 className="mb-4"><FontAwesomeIcon icon={faClock} /> Ranking de Downtime (Maior Tempo Parado)</h3>
-                    <div className="table-responsive-wrapper">
-                        <table className="data-table w-full">
+                    <h3><FontAwesomeIcon icon={faClock} /> Ranking de Downtime (Maior Tempo Parado)</h3>
+                    <div className="table-responsive-wrapper" style={{ marginTop: '15px' }}>
+                        <table className="data-table">
                             <thead>
                                 <tr>
-                                    <th className="text-left px-4">Equipamento</th>
-                                    <th className="text-left px-4">Nº de Série (Tag)</th>
-                                    <th className="text-left px-4">Unidade</th>
-                                    <th className="text-center px-4">Total Parado</th>
+                                    <th className="text-left">Equipamento</th>
+                                    <th className="text-left">Nº de Série (Tag)</th>
+                                    <th className="text-left">Unidade</th>
+                                    <th className="text-center">Total Parado</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {dados.rankingDowntime?.length > 0 ? (
                                     dados.rankingDowntime.map((e, index) => (
-                                        <tr key={index} className="hover:bg-slate-50">
-                                            <td className="text-left px-4 py-3 font-medium">{e.modelo}</td>
-                                            <td className="text-left px-4 py-3 font-bold text-slate-700">{e.tag}</td>
-                                            <td className="text-left px-4 py-3 text-slate-600">{e.unidade}</td>
-                                            <td className="text-center px-4 py-3">
-                                                <span className="font-black text-amber-600 text-base">{e.horasParado} Horas</span>
+                                        <tr key={index}>
+                                            <td className="text-left">{e.modelo}</td>
+                                            <td className="text-left" style={{ fontWeight: 'bold' }}>{e.tag}</td>
+                                            <td className="text-left">{e.unidade}</td>
+                                            <td className="text-center">
+                                                <span style={{ fontWeight: 'bold', color: '#f59e0b' }}>{e.horasParado} Horas</span>
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
-                                    <tr><td colSpan="4" className="text-center py-8">Nenhum equipamento parado registrado.</td></tr>
+                                    <tr><td colSpan="4" className="text-center">Nenhum equipamento parado registrado.</td></tr>
                                 )}
                             </tbody>
                         </table>
