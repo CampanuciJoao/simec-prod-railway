@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/equipamentosRoutes.js
-// VERSÃO 8.0 - AGORA COM VALIDAÇÃO ZOD E PATRIMÔNIO INTELIGENTE
+// VERSÃO 9.0 - COM VALIDAÇÃO ZOD (COMPLETA E PARCIAL) E PATRIMÔNIO INTELIGENTE
 
 // --- 1. Importações ---
 import express from 'express';
@@ -11,9 +11,9 @@ import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { admin } from '../middleware/authMiddleware.js';
 
-// --- NOVAS IMPORTAÇÕES DE SEGURANÇA ---
+// --- NOVAS IMPORTAÇÕES DE SEGURANÇA (ATUALIZADO) ---
 import validate from '../middleware/validate.js'; 
-import { equipamentoSchema } from '../validators/equipamentoValidator.js';
+import { equipamentoSchema, equipamentoUpdateSchema } from '../validators/equipamentoValidator.js';
 
 const router = express.Router();
 
@@ -79,13 +79,11 @@ router.get('/:id', async (req, res) => {
 
 /** 
  * @route   POST /api/equipamentos 
- * ADICIONADO: validate(equipamentoSchema) para filtrar dados antes de salvar
+ * VALIDAÇÃO COMPLETA: Exige todos os campos obrigatórios para novo cadastro.
  */
 router.post('/', validate(equipamentoSchema), async (req, res) => {
     const { dataInstalacao, ...dados } = req.body;
     
-    // OBS: O Zod já validou se campos obrigatórios existem, não precisamos de IFs manuais aqui.
-
     try {
         // --- REGRA DE PATRIMÔNIO INTELIGENTE ---
         const patrimonioLimpo = dados.numeroPatrimonio?.trim();
@@ -122,7 +120,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 
 /** 
  * @route   PUT /api/equipamentos/:id 
- * ADICIONADO: validate(equipamentoSchema) para garantir edição correta
+ * VALIDAÇÃO PARCIAL: Usa equipamentoUpdateSchema para permitir mudar APENAS o status.
  */
 router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
     const { id } = req.params;
@@ -179,8 +177,7 @@ router.delete('/:id', admin, async (req, res) => {
     }
 });
 
-// [As rotas de Acessórios e Anexos continuam iguais abaixo...]
-// ==========================================================================
+// [As rotas de Acessórios e Anexos permanecem conforme sua versão original...]
 
 router.get('/:equipamentoId/acessorios', async (req, res) => {
     const { equipamentoId } = req.params;
