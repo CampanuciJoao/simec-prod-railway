@@ -1,5 +1,6 @@
 // Ficheiro: src/pages/DetalhesManutencaoPage.jsx
-// VERSÃO FINAL - COM ATUALIZAÇÃO AUTOMÁTICA DO SINO DE NOTIFICAÇÕES E EXPORTAÇÃO DE OS PDF
+// VERSÃO FINAL CONSOLIDADA - CORREÇÃO DE UNIDADE, SUPORTE A CHAMADOS E EXPORTAÇÃO PDF
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useManutencaoDetalhes } from '../hooks/useManutencaoDetalhes';
@@ -11,7 +12,7 @@ import ModalCancelamento from '../components/ModalCancelamento';
 import DateInput from '../components/DateInput';
 import TimeInput from '../components/TimeInput';
 import { formatarDataHora } from '../utils/timeUtils';
-import { exportarOSManutencaoPDF } from '../utils/pdfUtils'; // <<< ADICIONADO
+import { exportarOSManutencaoPDF } from '../utils/pdfUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
 faArrowLeft, faSpinner, faExclamationTriangle, faPaperclip, faUpload,
@@ -130,7 +131,6 @@ function DetalhesManutencaoPage() {
   };
 
   const handlePrint = () => { 
-    // AGORA GERA O PDF OFICIAL EM VEZ DE IMPRIMIR A TELA
     exportarOSManutencaoPDF(manutencao); 
   };
 
@@ -231,7 +231,13 @@ function DetalhesManutencaoPage() {
                 </div>
                 <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Unidade</span>
-                    <span className="font-bold text-slate-700">{manutencao.equipamento?.unidade?.nomeSistema}</span>
+                    <span className="font-bold text-slate-700">
+                        {/* CORREÇÃO ROBUSTA DA UNIDADE */}
+                        {manutencao.equipamento?.unidade?.nomeSistema || 
+                         manutencao.equipamento?.unidade?.nome || 
+                         manutencao.unidade?.nomeSistema || 
+                         '---'}
+                    </span>
                 </div>
             </div>
 

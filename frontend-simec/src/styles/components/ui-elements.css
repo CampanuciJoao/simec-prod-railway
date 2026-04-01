@@ -1,27 +1,27 @@
 /* src/styles/components/ui-elements.css */
-/* VERSÃO 6.0 - FIX: BOTÕES COMPACTOS, ALTO CONTRASTE E GAP DE ÍCONE */
+/* VERSÃO 7.0 - CONSOLIDADA: BOTÕES COMPACTOS + CARDS COLORIDOS POR TIPO */
 
 /* ====================================================== */
-/* 1. ESTILO BASE DE TODOS OS BOTÕES (REDUZIDOS)          */
+/* 1. ESTILO BASE DE TODOS OS BOTÕES (COMPACTOS)          */
 /* ====================================================== */
 .btn { 
-    padding: 8px 16px; /* Diminuído para um visual mais clean */
-    font-size: 0.82em; /* Fonte levemente menor para equilíbrio */
-    border-radius: 6px; /* Cantos um pouco mais nítidos */
+    padding: 8px 16px; 
+    font-size: 0.82em; 
+    border-radius: 6px; 
     border: none;
     cursor: pointer; 
     text-decoration: none; 
     display: inline-flex; 
     align-items: center; 
     justify-content: center; 
-    gap: 8px !important; /* CORREÇÃO: Espaço entre ícone e texto */
+    gap: 8px !important; 
     font-weight: 800; 
     transition: all 0.2s ease-in-out; 
     margin-left: 8px; 
     line-height: 1; 
     text-transform: uppercase; 
     letter-spacing: 0.5px;
-    white-space: nowrap; /* Impede o ícone de cair para a linha de baixo */
+    white-space: nowrap; 
     box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
 }
 
@@ -35,7 +35,7 @@
 
 .btn:active { transform: translateY(0); }
 
-/* Garante que o ícone tenha tamanho fixo */
+/* Tamanho fixo dos ícones nos botões */
 .btn svg, .btn i {
     width: 14px;
     height: 14px;
@@ -43,28 +43,12 @@
 }
 
 /* ====================================================== */
-/* 2. CORES DOS BOTÕES (FORÇANDO VISIBILIDADE)            */
+/* 2. VARIANTES DE CORES DOS BOTÕES                       */
 /* ====================================================== */
-
-.btn-primary { 
-    background-color: #2563eb !important; 
-    color: #ffffff !important; 
-}
-
-.btn-success { 
-    background-color: #10b981 !important; 
-    color: #ffffff !important; 
-}
-
-.btn-warning { 
-    background-color: #f59e0b !important; 
-    color: #ffffff !important; 
-}
-
-.btn-danger { 
-    background-color: #ef4444 !important; 
-    color: #ffffff !important; 
-}
+.btn-primary { background-color: #2563eb !important; color: #ffffff !important; }
+.btn-success { background-color: #10b981 !important; color: #ffffff !important; }
+.btn-warning { background-color: #f59e0b !important; color: #ffffff !important; }
+.btn-danger  { background-color: #ef4444 !important; color: #ffffff !important; }
 
 .btn-secondary { 
     background-color: #f1f5f9 !important; 
@@ -72,7 +56,7 @@
     border: 1px solid #e2e8f0 !important;
 }
 
-/* --- Botões de Ação (Ícones menores nas tabelas/cards) --- */
+/* Botões de Ação (Tabelas/Cards) */
 .btn-action {
     padding: 6px;
     background-color: transparent;
@@ -85,15 +69,12 @@
     align-items: center;
     justify-content: center;
 }
-.btn-action:hover {
-    background-color: #f1f5f9;
-    color: #3b82f6;
-}
+.btn-action:hover { background-color: #f1f5f9; color: #3b82f6; }
 .btn-action.edit:hover { color: #f59e0b; background-color: #fffbeb; }
 .btn-action.delete:hover { color: #ef4444; background-color: #fef2f2; }
 
 /* ====================================================== */
-/* 3. MENSAGENS E BADGES                                  */
+/* 3. MENSAGENS E BADGES DE STATUS                        */
 /* ====================================================== */
 .form-error {
     color: #b91c1c;
@@ -117,15 +98,47 @@
 
 .status-badge.status-agendada { background-color: #dbeafe; color: #1e40af; }
 .status-badge.status-em-andamento { background-color: #fef9c3; color: #854d0e; }
-.status-badge.status-concluída { background-color: #dcfce7; color: #166534; }
+.status-badge.status-concluída, 
+.status-badge.status-concluida { background-color: #dcfce7; color: #166534; }
 .status-badge.status-cancelada { background-color: #fee2e2; color: #991b1b; }
 
 /* ====================================================== */
-/* 4. CABEÇALHO E NOTIFICAÇÕES                            */
+/* 4. CARDS DE MANUTENÇÃO (CORES POR TIPO)                */
+/* ====================================================== */
+
+/* Estilo Base do Card */
+.manutencao-card {
+    background-color: #ffffff;
+    border: 1px solid #e2e8f0;
+    transition: all 0.2s ease;
+}
+
+/* FIX: Reforço para aplicar cores mesmo que existam estilos globais */
+
+/* CORRETIVA: Tom Vermelho Suave */
+.manutencao-card.card-manutencao-corretiva {
+    background-color: #fff1f2 !important; 
+    border-left: 6px solid #ef4444 !important;
+}
+.manutencao-card.card-manutencao-corretiva:hover {
+    background-color: #ffe4e6 !important;
+}
+
+/* PREVENTIVA: Tom Verde Suave */
+.manutencao-card.card-manutencao-preventiva {
+    background-color: #f0fdf4 !important; 
+    border-left: 6px solid #10b981 !important;
+}
+.manutencao-card.card-manutencao-preventiva:hover {
+    background-color: #dcfce7 !important;
+}
+
+/* ====================================================== */
+/* 5. CABEÇALHO E DARK MODE                               */
 /* ====================================================== */
 .header-action-btn {
-  width: 38px; /* Reduzido */
-  height: 38px; /* Reduzido */
+  width: 38px;
+  height: 38px;
   border-radius: 8px;
   display: flex;
   align-items: center;
@@ -135,12 +148,6 @@
   border: 1px solid #e2e8f0;
   cursor: pointer;
   transition: all 0.2s ease;
-}
-
-.header-action-btn:hover {
-  background-color: #f8fafc;
-  color: #3b82f6;
-  border-color: #3b82f6;
 }
 
 .notification-badge {
@@ -160,34 +167,10 @@
   border: 2px solid #ffffff;
 }
 
-/* ====================================================== */
-/* 5. DARK MODE                                           */
-/* ====================================================== */
-body.dark-mode .header-action-btn {
-  background-color: #1e293b;
-  color: #f1f5f9;
-  border-color: #334155;
-}
-
-body.dark-mode .btn-secondary {
-    background-color: #334155 !important;
-    color: #f1f5f9 !important;
-    border-color: #475569 !important;
-}
-
+body.dark-mode .header-action-btn { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
+body.dark-mode .btn-secondary { background-color: #334155 !important; color: #f1f5f9 !important; border-color: #475569 !important; }
 body.dark-mode .status-badge { opacity: 0.9; }
 
-/* Cores leves para os Cards de Manutenção por Tipo */
-.card-manutencao-corretiva {
-    background-color: #fff1f2 !important; /* Vermelho ultra leve */
-    border-left: 5px solid #ef4444 !important; /* Borda lateral forte */
-}
-
-.card-manutencao-preventiva {
-    background-color: #f0fdf4 !important; /* Verde ultra leve */
-    border-left: 5px solid #10b981 !important; /* Borda lateral forte */
-}
-
-/* Ajuste para não conflitar com o hover */
-.card-manutencao-corretiva:hover { background-color: #ffe4e6 !important; }
-.card-manutencao-preventiva:hover { background-color: #dcfce7 !important; }
+/* Manter cores visíveis no Dark Mode para os cards */
+body.dark-mode .manutencao-card.card-manutencao-corretiva { background-color: #44272a !important; color: #fff; }
+body.dark-mode .manutencao-card.card-manutencao-preventiva { background-color: #23372b !important; color: #fff; }

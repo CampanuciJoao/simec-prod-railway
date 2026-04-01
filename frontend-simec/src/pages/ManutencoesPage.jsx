@@ -1,13 +1,13 @@
 // Ficheiro: src/pages/ManutencoesPage.jsx
-// VERSÃO 15.0 - LAYOUT FLAT, Nº CHAMADO INTEGRADO E CORES POR TIPO DE MANUTENÇÃO
+// VERSÃO 16.0 - CORES DE FUNDO NOS CARDS E LAYOUT FLAT INTEGRADO
 
 import React, { useMemo, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { formatarData } from '../utils/timeUtils'; 
+import { formatarData } from '../utils/timeUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-    faPlus, faEye, faPenToSquare, faSpinner, faTrashAlt, 
-    faWrench, faClock, faHospital, faTag, faHashtag 
+import {
+    faPlus, faEye, faPenToSquare, faSpinner, faTrashAlt,
+    faWrench, faClock, faHospital, faTag, faHashtag
 } from '@fortawesome/free-solid-svg-icons';
 import { useManutencoes } from '../hooks/useManutencoes';
 import { useAuth } from '../contexts/AuthContext';
@@ -30,14 +30,13 @@ const getStatusStyles = (status) => {
     return 'bg-slate-100 text-slate-700 border-slate-200';
 };
 
-// NOVA FUNÇÃO: Cores por Tipo de Manutenção
 const getTipoStyles = (tipo) => {
     const t = tipo?.toLowerCase() || '';
-    if (t === 'corretiva') return 'bg-rose-50 text-rose-600 border-rose-200';
-    if (t === 'preventiva') return 'bg-emerald-50 text-emerald-600 border-emerald-200';
-    if (t === 'calibracao') return 'bg-indigo-50 text-indigo-600 border-indigo-200';
-    if (t === 'inspecao') return 'bg-sky-50 text-sky-600 border-sky-200';
-    return 'bg-slate-50 text-slate-500 border-slate-200';
+    if (t === 'corretiva') return 'bg-rose-100 text-rose-700 border-rose-300';
+    if (t === 'preventiva') return 'bg-emerald-100 text-emerald-700 border-emerald-300';
+    if (t === 'calibracao') return 'bg-indigo-100 text-indigo-700 border-indigo-300';
+    if (t === 'inspecao') return 'bg-sky-100 text-sky-700 border-sky-300';
+    return 'bg-slate-100 text-slate-600 border-slate-300';
 };
 
 const getRowBorder = (status) => {
@@ -75,22 +74,22 @@ function ManutencoesPage() {
 
     useEffect(() => {
         if (location.state?.filtroTipoInicial || location.state?.filtroEquipamentoId) {
-            setFiltros(prev => ({ 
-                ...prev, 
+            setFiltros(prev => ({
+                ...prev,
                 tipo: location.state.filtroTipoInicial || prev.tipo,
-                equipamentoId: location.state.filtroEquipamentoId || prev.equipamentoId 
+                equipamentoId: location.state.filtroEquipamentoId || prev.equipamentoId
             }));
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state, setFiltros, navigate, location.pathname]);
-    
+
     useEffect(() => {
         const intervalId = setInterval(() => { refetch(); }, 30 * 1000);
         return () => clearInterval(intervalId);
     }, [refetch]);
 
     const { isOpen: isDeleteModalOpen, modalData: manutencaoParaDeletar, openModal: openDeleteModal, closeModal: closeDeleteModal } = useModal();
-    
+
     const handleConfirmarExclusao = async () => {
         if (!manutencaoParaDeletar) return;
         try {
@@ -105,10 +104,10 @@ function ManutencoesPage() {
     const statusOptions = ["Agendada", "EmAndamento", "Concluida", "Cancelada", "AguardandoConfirmacao"].map(s => ({ value: s, label: s.replace(/([A-Z])/g, ' $1').trim() }));
 
     const selectFiltersConfig = [
-        { id: 'unidadeId', value: filtros.unidadeId, onChange: (v) => setFiltros(f => ({...f, unidadeId: v})), options: unidadesOptions, defaultLabel: 'Todas Unidades' },
-        { id: 'equipamentoId', value: filtros.equipamentoId, onChange: (v) => setFiltros(f => ({...f, equipamentoId: v})), options: equipamentosOptions, defaultLabel: 'Todos Equipamentos' },
-        { id: 'tipo', value: filtros.tipo, onChange: (v) => setFiltros(f => ({...f, tipo: v})), options: ["Preventiva", "Corretiva", "Calibracao", "Inspecao"], defaultLabel: 'Todos Tipos' },
-        { id: 'status', value: filtros.status, onChange: (v) => setFiltros(f => ({...f, status: v})), options: statusOptions, defaultLabel: 'Todos Status' }
+        { id: 'unidadeId', value: filtros.unidadeId, onChange: (v) => setFiltros(f => ({ ...f, unidadeId: v })), options: unidadesOptions, defaultLabel: 'Todas Unidades' },
+        { id: 'equipamentoId', value: filtros.equipamentoId, onChange: (v) => setFiltros(f => ({ ...f, equipamentoId: v })), options: equipamentosOptions, defaultLabel: 'Todos Equipamentos' },
+        { id: 'tipo', value: filtros.tipo, onChange: (v) => setFiltros(f => ({ ...f, tipo: v })), options: ["Preventiva", "Corretiva", "Calibracao", "Inspecao"], defaultLabel: 'Todos Tipos' },
+        { id: 'status', value: filtros.status, onChange: (v) => setFiltros(f => ({ ...f, status: v })), options: statusOptions, defaultLabel: 'Todos Status' }
     ];
 
     if (loading && manutencoes.length === 0) {
@@ -142,12 +141,16 @@ function ManutencoesPage() {
                 <div className="px-1 flex flex-col gap-3">
                     {manutencoes.length > 0 ? (
                         manutencoes.map(m => (
-                            <div key={m.id} className={`bg-white border-y border-r border-slate-200 border-l-[8px] ${getRowBorder(m.status)} shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md`}>
-                                
+                            /* MUDANÇA AQUI: Adicionadas as classes manutencao-card e card-manutencao-tipo */
+                            <div 
+                                key={m.id} 
+                                className={`manutencao-card card-manutencao-${m.tipo?.toLowerCase()} bg-white border-y border-r border-slate-200 border-l-[8px] ${getRowBorder(m.status)} shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md`}
+                            >
+
                                 <div className="p-4 flex items-center justify-between">
                                     <div className="flex items-center gap-6 flex-1">
                                         <div className="grid grid-cols-2 md:grid-cols-6 gap-4 flex-1">
-                                            
+
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">OS / Status</span>
                                                 <span className="font-black text-slate-800 text-sm leading-tight">{m.numeroOS}</span>
@@ -183,7 +186,7 @@ function ManutencoesPage() {
                                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Unidade</span>
                                                 <span className="font-bold text-slate-600 text-xs mt-1 truncate">
                                                     <FontAwesomeIcon icon={faHospital} className="text-slate-300 text-[9px] mr-1" />
-                                                    {m.equipamento?.unidade?.nomeSistema}
+                                                    {m.equipamento?.unidade?.nomeSistema || m.equipamento?.unidade?.nome || '---'}
                                                 </span>
                                             </div>
 
@@ -219,5 +222,4 @@ function ManutencoesPage() {
         </>
     );
 }
-
 export default ManutencoesPage;
