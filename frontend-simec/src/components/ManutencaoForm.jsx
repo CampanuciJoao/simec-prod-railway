@@ -1,11 +1,13 @@
 // Ficheiro: src/components/ManutencaoForm.jsx
-// VERSÃO ATUALIZADA - DESCRIÇÃO OPCIONAL PARA PREVENTIVAS
+// VERSÃO 2.0 - FIX: BOTÕES VISÍVEIS E DESIGN CLEAN
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
 import DateInput from './DateInput';
 import TimeInput from './TimeInput';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSpinner, faSave, faTimes } from '@fortawesome/free-solid-svg-icons';
 
 const ESTADO_INICIAL_VAZIO = {
   equipamentoId: '',
@@ -88,7 +90,6 @@ function ManutencaoForm({
     e.preventDefault();
     setError('');
     
-    // LÓGICA DE VALIDAÇÃO CONDICIONAL
     const isPreventiva = formData.tipo === 'Preventiva';
     const temDescricao = formData.descricaoProblemaServico.trim() !== '';
 
@@ -106,7 +107,6 @@ function ManutencaoForm({
       const dadosParaApi = {
           equipamentoId: formData.equipamentoId,
           tipo: formData.tipo,
-          // Se for preventiva e estiver vazio, coloca um texto padrão
           descricaoProblemaServico: !temDescricao && isPreventiva ? 'Manutenção Preventiva de Rotina' : formData.descricaoProblemaServico,
           tecnicoResponsavel: formData.tecnicoResponsavel,
           numeroChamado: formData.numeroChamado,
@@ -124,28 +124,28 @@ function ManutencaoForm({
 
   return (
     <form onSubmit={handleSubmit} className="form-elegante" noValidate>
-      {error && <div className="form-error">{error}</div>}
+      {error && <div className="form-error bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm font-bold border border-red-100">{error}</div>}
       
       <div className="form-section">
-        <h4>Seleção de Equipamento</h4>
-        <div className="info-grid grid-cols-3">
+        <h4 className="text-slate-800 font-bold uppercase text-xs tracking-widest mb-4">Seleção de Equipamento</h4>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="form-group">
-            <label htmlFor="unidade">Unidade / Local *</label>
-            <select id="unidade" value={unidadeSelecionada} onChange={handleUnidadeChange} required disabled={isEditing}>
+            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Unidade / Local *</label>
+            <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" value={unidadeSelecionada} onChange={handleUnidadeChange} required disabled={isEditing}>
               <option value="">Selecione a Unidade</option>
               {unidadesDisponiveis.map(unidade => ( <option key={unidade.id} value={unidade.id}>{unidade.nomeSistema}</option> ))}
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="modelo">Modelo *</label>
-            <select id="modelo" value={modeloSelecionado} onChange={handleModeloChange} required disabled={!unidadeSelecionada || isEditing}>
+            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Modelo *</label>
+            <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" value={modeloSelecionado} onChange={handleModeloChange} required disabled={!unidadeSelecionada || isEditing}>
               <option value="">Selecione o Modelo</option>
               {modelosFiltrados.map(modelo => ( <option key={modelo} value={modelo}>{modelo}</option> ))}
             </select>
           </div>
           <div className="form-group">
-            <label htmlFor="equipamentoId">Nº de Série (Tag) *</label>
-            <select id="equipamentoId" name="equipamentoId" value={formData.equipamentoId} onChange={handleChange} required disabled={!modeloSelecionado || isEditing}>
+            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Nº de Série (Tag) *</label>
+            <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="equipamentoId" value={formData.equipamentoId} onChange={handleChange} required disabled={!modeloSelecionado || isEditing}>
               <option value="">Selecione a Tag</option>
               {seriesFiltradas.map(eq => ( <option key={eq.id} value={eq.id}>{eq.tag}</option>))}
             </select>
@@ -153,50 +153,50 @@ function ManutencaoForm({
         </div>
       </div>
 
-      <div className="form-section">
-        <h4>Detalhes da Manutenção</h4>
-        <div className="info-grid grid-cols-2">
+      <div className="form-section mt-10">
+        <h4 className="text-slate-800 font-bold uppercase text-xs tracking-widest mb-4">Detalhes da Manutenção</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="form-group">
-                <label htmlFor="tipo">Tipo de Manutenção *</label>
-                <select id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} required>
+                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Tipo de Manutenção *</label>
+                <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="tipo" value={formData.tipo} onChange={handleChange} required>
                     {["Preventiva", "Corretiva", "Calibracao", "Inspecao"].map(tipoOpt => (<option key={tipoOpt} value={tipoOpt}>{tipoOpt}</option>))}
                 </select>
             </div>
              <div className="form-group">
-                <label htmlFor="tecnicoResponsavel">Técnico Responsável</label>
-                <input type="text" id="tecnicoResponsavel" name="tecnicoResponsavel" value={formData.tecnicoResponsavel} onChange={handleChange}/>
+                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Técnico Responsável</label>
+                <input className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" type="text" name="tecnicoResponsavel" value={formData.tecnicoResponsavel} onChange={handleChange}/>
             </div>
         </div>
         
         {formData.tipo === 'Corretiva' && (
-            <div className="info-grid grid-cols-1" style={{ marginTop: '15px', border: '1px solid var(--cor-borda-light)', padding: '15px', borderRadius: '8px', background: 'var(--cor-fundo-pagina-light)' }}>
-                <div className="form-group" style={{marginBottom: 0}}>
-                    <label htmlFor="numeroChamado">Nº do Chamado (Opcional)</label>
-                    <input type="text" id="numeroChamado" name="numeroChamado" value={formData.numeroChamado} onChange={handleChange} />
+            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="form-group">
+                    <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Nº do Chamado (Opcional)</label>
+                    <input className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" type="text" name="numeroChamado" value={formData.numeroChamado} onChange={handleChange} />
                 </div>
             </div>
         )}
         
-        <div className="info-grid grid-cols-3" style={{alignItems: 'flex-end', marginTop: '15px'}}>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
             <div className="form-group">
-                <label htmlFor="dataLocal">Data do Agendamento *</label>
-                <DateInput id="dataLocal" name="dataLocal" value={formData.dataLocal} onChange={handleChange} required />
+                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Data do Agendamento *</label>
+                <DateInput className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="dataLocal" value={formData.dataLocal} onChange={handleChange} required />
             </div>
             <div className="form-group">
-                <label htmlFor="horaLocalInicio">Horário de Início</label>
-                <TimeInput id="horaLocalInicio" name="horaLocalInicio" value={formData.horaLocalInicio} onChange={handleChange} />
+                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Horário de Início</label>
+                <TimeInput className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="horaLocalInicio" value={formData.horaLocalInicio} onChange={handleChange} />
             </div>
             <div className="form-group">
-                <label htmlFor="horaLocalFim">Previsão de Fim</label>
-                <TimeInput id="horaLocalFim" name="horaLocalFim" value={formData.horaLocalFim} onChange={handleChange} />
+                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Previsão de Fim</label>
+                <TimeInput className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="horaLocalFim" value={formData.horaLocalFim} onChange={handleChange} />
             </div>
         </div>
-        <div className="form-group" style={{marginTop: '15px'}}>
-            <label htmlFor="descricaoProblemaServico">
-                Descrição do Problema/Serviço {formData.tipo !== 'Preventiva' ? '*' : '(Opcional para Preventiva)'}
+        <div className="form-group mt-6">
+            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">
+                Descrição {formData.tipo !== 'Preventiva' ? '*' : '(Opcional para Preventiva)'}
             </label>
             <textarea 
-                id="descricaoProblemaServico" 
+                className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[100px]"
                 name="descricaoProblemaServico" 
                 value={formData.descricaoProblemaServico} 
                 onChange={handleChange} 
@@ -205,9 +205,27 @@ function ManutencaoForm({
         </div>
       </div>
       
-      <div className="form-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-        <button type="button" className="btn btn-secondary" onClick={() => navigate('/manutencoes')} disabled={isSubmitting}>Cancelar</button>
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Salvando...' : (isEditing ? 'Atualizar Manutenção' : 'Agendar Manutenção')}</button>
+      {/* BOTÕES CORRIGIDOS: Visibilidade total e Design Clean */}
+      <div className="flex justify-end items-center gap-3 mt-10 pt-6 border-t border-slate-100">
+        <button 
+          type="button" 
+          className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border-none cursor-pointer" 
+          onClick={() => navigate('/manutencoes')} 
+          disabled={isSubmitting}
+        >
+          Cancelar
+        </button>
+        <button 
+          type="submit" 
+          className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-black text-xs uppercase tracking-widest transition-all shadow-md hover:shadow-lg border-none cursor-pointer flex items-center gap-2" 
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <><FontAwesomeIcon icon={faSpinner} spin /> Salvando...</>
+          ) : (
+            <><FontAwesomeIcon icon={faSave} /> {isEditing ? 'Atualizar Manutenção' : 'Agendar Manutenção'}</>
+          )}
+        </button>
       </div>
     </form>
   );
