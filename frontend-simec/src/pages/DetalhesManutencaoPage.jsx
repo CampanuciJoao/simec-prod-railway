@@ -1,10 +1,12 @@
 // Ficheiro: src/pages/DetalhesManutencaoPage.jsx
-// VERSÃO ATUALIZADA - CONFIRMAÇÃO COM REAGENDAMENTO E OBSERVACÃO OBRIGATÓRIA
+// VERSÃO FINAL - COM ATUALIZAÇÃO AUTOMÁTICA DO SINO DE NOTIFICAÇÕES
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useManutencaoDetalhes } from '../hooks/useManutencaoDetalhes';
 import { useModal } from '../hooks/useModal';
+import { useAlertas } from '../contexts/AlertasContext'; // <<< ADICIONADO
+import { useToast } from '../contexts/ToastContext'; // <<< ADICIONADO
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import ModalCancelamento from '../components/ModalCancelamento';
 import DateInput from '../components/DateInput';
@@ -14,7 +16,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faArrowLeft, faSpinner, faExclamationTriangle, faPaperclip, faUpload, 
     faPlus, faTrashAlt, faFilePdf, faFileImage, faFileAlt, faHistory, 
-    faSave, faBan, faCheckCircle, faTimesCircle, faPrint, faScroll, faClock
+    faSave, faBan, faCheckCircle, faTimesCircle, faPrint, faScroll
 } from '@fortawesome/free-solid-svg-icons';
 
 const API_BASE_URL_DOWNLOAD = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -35,6 +37,9 @@ function DetalhesManutencaoPage() {
   const { manutencaoId } = useParams();
   const navigate = useNavigate();
   const anexoInputRef = useRef(null);
+  
+  const { addToast } = useToast();
+  const { refetchAlertas } = useAlertas(); // <<< Função que atualiza o sino
 
   const {
     manutencao, loading, error, submitting,
@@ -42,15 +47,15 @@ function DetalhesManutencaoPage() {
     removerAnexo, concluirOS, refetch: refetchManutencao
   } = useManutencaoDetalhes(manutencaoId);
 
-  // Estados do formulário de edição simples
+  // Estados do formulário de edição
   const [formData, setFormData] = useState({
     descricaoProblemaServico: '', tecnicoResponsavel: '', dataInicioReal: '',
     horaInicioReal: '', dataFimReal: '', horaFimReal: '',
   });
   const [novaNota, setNovaNota] = useState('');
 
-  // ESTADOS PARA O FORMULÁRIO DE CONFIRMAÇÃO (NOVOS)
-  const [confirmMode, setConfirmMode] = useState(null); // 'OK' ou 'ERRO'
+  // Estados para o formulário de decisão (Operante ou Não)
+  const [confirmMode, setConfirmMode] = useState(null); 
   const [dataTerminoReal, setDataTerminoReal] = useState('');
   const [novaPrevisao, setNovaPrevisao] = useState('');
   const [observacaoDecisao, setObservacaoDecisao] = useState('');
@@ -100,24 +105,35 @@ function DetalhesManutencaoPage() {
     await salvarAtualizacoes(payload);
   };
 
-  // FUNÇÃO PARA PROCESSAR A DECISÃO FINAL DA OS
+  // FUNÇÃO FINAL: CONCLUI E ATUALIZA O SINO DE ALERTAS
   const handleConfirmacaoFinal = async () => {
+    let payload = {};
+
     if (confirmMode === 'OK') {
-        if (!dataTerminoReal) return alert("Informe a data e hora de término.");
-        await concluirOS({ 
+        if (!dataTerminoReal) { addToast("Informe a data e hora de término.", "error"); return; }
+        payload = { 
             equipamentoOperante: true, 
             dataTerminoReal: new Date(dataTerminoReal).toISOString() 
-        });
+        };
     } else {
-        if (!novaPrevisao || !observacaoDecisao.trim()) return alert("Observação e Nova Previsão são obrigatórias.");
-        await concluirOS({ 
+        if (!novaPrevisao || !observacaoDecisao.trim()) { addToast("Observação e Nova Previsão são obrigatórias.", "error"); return; }
+        payload = { 
             equipamentoOperante: false, 
             novaPrevisao: new Date(novaPrevisao).toISOString(),
             observacao: observacaoDecisao 
-        });
+        };
     }
-    // Reseta o formulário após salvar
-    setConfirmMode(null);
+
+    try {
+        await concluirOS(payload);
+        
+        // >>> COMANDO PARA LIMPAR O SINO IMEDIATAMENTE <<<
+        if (refetchAlertas) refetchAlertas(); 
+        
+        setConfirmMode(null);
+    } catch (err) {
+        console.error("Erro na confirmação:", err);
+    }
   };
   
   const handlePrint = () => { window.print(); };
@@ -130,23 +146,23 @@ function DetalhesManutencaoPage() {
 
   return (
     <>
-      <ModalConfirmacao isOpen={isDeleteAnexoModalOpen} onClose={closeDeleteAnexoModal} onConfirm={async () => { await removerAnexo(anexoParaDeletar.id); closeDeleteAnexoModal(); }} title="Excluir Anexo" message={`Tem certeza que deseja excluir o anexo "${anexoParaDeletar?.nomeOriginal}"?`} isDestructive={true} />
+      <ModalConfirmacao isOpen={isDeleteAnexoModalOpen} onClose={closeDeleteAnexoModal} onConfirm={async () => { await removerAnexo(anexoParaDeletar.id); closeDeleteAnexoModal(); }} title="Excluir Anexo" message={`Deseja excluir "${anexoParaDeletar?.nomeOriginal}"?`} isDestructive={true} />
       <ModalCancelamento isOpen={isCancelModalOpen} onClose={closeCancelModal} manutencao={manutencao} onCancelConfirm={refetchManutencao} />
 
       <div className="page-content-wrapper">
         <div className="page-title-card no-print">
-            <h1 className="page-title-internal">OS: {manutencao.numeroOS}</h1>
+            <h1 className="page-title-internal">Detalhes da Ordem de Serviço: {manutencao.numeroOS}</h1>
             <div className="page-title-actions">
                 <button className="btn btn-primary" onClick={handlePrint}><FontAwesomeIcon icon={faPrint}/> Imprimir</button>
                 <button className="btn btn-secondary" onClick={() => navigate('/manutencoes')} style={{marginLeft: '10px'}}><FontAwesomeIcon icon={faArrowLeft}/> Voltar</button>
             </div>
         </div>
         
-        {/* SEÇÃO DE CONFIRMAÇÃO OBRIGATÓRIA */}
+        {/* FORMULÁRIO DE DECISÃO FINAL */}
         {manutencao.status === 'AguardandoConfirmacao' && ( 
             <section className="page-section no-print" style={{ borderColor: '#F59E0B', background: '#fefce8', borderWidth: '2px' }}> 
-                <h3 style={{color: '#B45309'}}>Ação Necessária: Confirmar Finalização da Manutenção</h3> 
-                <p>O tempo agendado terminou. Por favor, registre o resultado final para fechar este chamado:</p> 
+                <h3 style={{color: '#B45309'}}>Ação Necessária: Confirmar Finalização</h3> 
+                <p>O tempo agendado para esta manutenção expirou. Registre o resultado para atualizar o sistema:</p> 
                 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
                     <div style={{ display: 'flex', gap: '10px' }}>
@@ -160,7 +176,7 @@ function DetalhesManutencaoPage() {
 
                     {confirmMode === 'OK' && (
                         <div className="form-group" style={{ maxWidth: '400px' }}>
-                            <label>Data e Hora real do término do serviço: *</label>
+                            <label>Data e Hora real da conclusão: *</label>
                             <input type="datetime-local" className="form-control" onChange={(e) => setDataTerminoReal(e.target.value)} />
                         </div>
                     )}
@@ -168,11 +184,11 @@ function DetalhesManutencaoPage() {
                     {confirmMode === 'ERRO' && (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '600px' }}>
                             <div className="form-group">
-                                <label>Por que não ficou pronto? (Auditoria) *</label>
-                                <textarea rows="2" className="form-control" placeholder="Descreva o motivo (ex: aguardando peça)..." onChange={(e) => setObservacaoDecisao(e.target.value)}></textarea>
+                                <label>Motivo da permanência da falha: *</label>
+                                <textarea rows="2" className="form-control" placeholder="Descreva o que houve..." onChange={(e) => setObservacaoDecisao(e.target.value)}></textarea>
                             </div>
                             <div className="form-group">
-                                <label>Nova previsão de término: *</label>
+                                <label>Nova previsão de conclusão: *</label>
                                 <input type="datetime-local" className="form-control" onChange={(e) => setNovaPrevisao(e.target.value)} />
                             </div>
                         </div>
@@ -180,7 +196,7 @@ function DetalhesManutencaoPage() {
 
                     {confirmMode && (
                         <button className="btn btn-primary" style={{ width: 'fit-content' }} onClick={handleConfirmacaoFinal} disabled={submitting}>
-                            {submitting ? 'Processando...' : 'Confirmar e Atualizar Sistema'}
+                            {submitting ? 'Salvando...' : 'Confirmar e Atualizar Sistema'}
                         </button>
                     )}
                 </div>
@@ -188,18 +204,18 @@ function DetalhesManutencaoPage() {
         )}
         
         <section className="page-section">
-          <h3>Informações Gerais</h3>
+          <h3>Informações da Manutenção</h3>
           <div className="info-grid">
-              <p><strong>Equipamento:</strong> <Link to={`/equipamentos/detalhes/${manutencao.equipamento?.id}`}>{manutencao.equipamento?.modelo}</Link></p>
+              <p><strong>Equipamento:</strong> <Link to={`/equipamentos`}>{manutencao.equipamento?.modelo}</Link></p>
               <p><strong>Tipo:</strong> {manutencao.tipo}</p>
               <p><strong>Status OS:</strong> <span className={getStatusBadgeClassManutencao(manutencao.status)}>{manutencao.status}</span></p>
-              <p><strong>Previsão Agendada:</strong> {formatarDataHora(manutencao.dataHoraAgendamentoInicio)}</p>
+              <p><strong>Previsão Original:</strong> {formatarDataHora(manutencao.dataHoraAgendamentoInicio)}</p>
           </div>
           <div className="form-group" style={{ marginTop: '20px' }}><label>Descrição do Problema / Serviço:</label><textarea name="descricaoProblemaServico" value={formData.descricaoProblemaServico} onChange={handleFormChange} rows="3" disabled={camposPrincipaisBloqueados}></textarea></div>
           
           <div className="info-grid" style={{ marginTop: '15px', alignItems: 'flex-end' }}>
               <div className="form-group"><label>Técnico Responsável</label><input type="text" name="tecnicoResponsavel" value={formData.tecnicoResponsavel} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div>
-              <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Início Real</label><DateInput name="dataInicioReal" value={formData.dataInicioReal} onChange={handleFormChange} disabled={true} /></div><div className="form-group" style={{flex: 1}}><label>Hora Início</label><TimeInput name="horaInicioReal" value={formData.horaInicioReal} onChange={handleFormChange} disabled={true} /></div></div>
+              <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Início Real (Auto)</label><DateInput name="dataInicioReal" value={formData.dataInicioReal} onChange={handleFormChange} disabled={true} /></div><div className="form-group" style={{flex: 1}}><label>Hora Início</label><TimeInput name="horaInicioReal" value={formData.horaInicioReal} onChange={handleFormChange} disabled={true} /></div></div>
               <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Fim Real</label><DateInput name="dataFimReal" value={formData.dataFimReal} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div><div className="form-group" style={{flex: 1}}><label>Hora Fim</label><TimeInput name="horaFimReal" value={formData.horaFimReal} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div></div>
           </div>
 
