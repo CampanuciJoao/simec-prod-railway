@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/unidadesRoutes.js
-// VERSÃO FINAL, COMPLETA E CORRIGIDA - COM ENDEREÇO NORMALIZADO
+// VERSÃO 8.0 - COM VALIDAÇÃO ZOD E ENDEREÇO NORMALIZADO
 
 import express from 'express';
 import multer from 'multer';
@@ -8,6 +8,10 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
+
+// --- NOVAS IMPORTAÇÕES DE SEGURANÇA ---
+import validate from '../middleware/validate.js';
+import { unidadeSchema } from '../validators/unidadeValidator.js';
 
 const router = express.Router();
 
@@ -28,9 +32,11 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 
-// --- ROTAS DE UNIDADES ---
+// ==========================================================================
+// SEÇÃO: ROTAS DE UNIDADES (CRUD)
+// ==========================================================================
 
-// ROTA: GET /api/unidades - Listar todas as unidades
+/** @route   GET /api/unidades */
 router.get('/', async (req, res) => {
     try {
         const unidades = await prisma.unidade.findMany({
@@ -38,12 +44,11 @@ router.get('/', async (req, res) => {
         });
         res.json(unidades);
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar unidades.', error: error.message });
+        res.status(500).json({ message: 'Erro ao buscar unidades.' });
     }
 });
 
-
-// ROTA: GET /api/unidades/:id - Obter uma unidade com seus anexos
+/** @route   GET /api/unidades/:id */
 router.get('/:id', async (req, res) => {
     try {
         const unidade = await prisma.unidade.findUnique({
@@ -56,24 +61,19 @@ router.get('/:id', async (req, res) => {
             res.status(404).json({ message: 'Unidade não encontrada.' });
         }
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar unidade.', error: error.message });
+        res.status(500).json({ message: 'Erro ao buscar unidade.' });
     }
 });
 
-
-// ROTA: POST /api/unidades - Criar nova unidade
-router.post('/', async (req, res) => {
-    // Desestrutura todos os campos, incluindo os de endereço, diretamente do corpo da requisição.
+/** 
+ * @route   POST /api/unidades 
+ * ADICIONADO: validate(unidadeSchema) para blindagem de dados
+ */
+router.post('/', validate(unidadeSchema), async (req, res) => {
+    // Agora o req.body já vem limpo e validado pelo Zod
     const { nomeSistema, nomeFantasia, cnpj, logradouro, numero, complemento, bairro, cidade, estado, cep } = req.body;
     
-    if (!nomeSistema) {
-        return res.status(400).json({ message: 'Nome da Unidade é obrigatório.' });
-    }
-
     try {
-        // >> CORREÇÃO PRINCIPAL APLICADA AQUI <<
-        // O objeto `data` agora mapeia diretamente os campos de endereço para as colunas
-        // correspondentes no modelo Unidade, em vez de aninhá-los em um objeto 'endereco'.
         const novaUnidade = await prisma.unidade.create({
             data: {
                 nomeSistema,
@@ -102,20 +102,19 @@ router.post('/', async (req, res) => {
         if (error.code === 'P2002') {
             return res.status(409).json({ message: 'Já existe uma unidade com este Nome ou CNPJ.' });
         }
-        res.status(500).json({ message: 'Erro ao criar unidade.', error: error.message });
+        res.status(500).json({ message: 'Erro ao criar unidade.' });
     }
 });
 
-
-// ROTA: PUT /api/unidades/:id - Atualizar unidade
-router.put('/:id', async (req, res) => {
+/** 
+ * @route   PUT /api/unidades/:id 
+ * ADICIONADO: validate(unidadeSchema) para garantir edição correta
+ */
+router.put('/:id', validate(unidadeSchema), async (req, res) => {
     const { id } = req.params;
     const { nomeSistema, nomeFantasia, cnpj, logradouro, numero, complemento, bairro, cidade, estado, cep } = req.body;
     
     try {
-        // >> CORREÇÃO PRINCIPAL APLICADA AQUI <<
-        // A lógica de atualização segue o mesmo princípio da criação: os campos de endereço
-        // são atualizados individualmente no registro da unidade.
         const unidadeAtualizada = await prisma.unidade.update({
             where: { id },
             data: {
@@ -145,14 +144,12 @@ router.put('/:id', async (req, res) => {
         if (error.code === 'P2025') {
             return res.status(404).json({ message: 'Unidade não encontrada.' });
         }
-        res.status(500).json({ message: 'Erro ao atualizar unidade.', error: error.message });
+        res.status(500).json({ message: 'Erro ao atualizar unidade.' });
     }
 });
 
-
-// ROTA: DELETE /api/unidades/:id - Excluir unidade
+/** @route   DELETE /api/unidades/:id */
 router.delete('/:id', async (req, res) => {
-    // ... (o restante do código de delete e anexos permanece o mesmo e já está correto) ...
     const { id } = req.params;
     try {
         const unidadeParaExcluir = await prisma.unidade.findUnique({
@@ -179,24 +176,24 @@ router.delete('/:id', async (req, res) => {
             acao: 'EXCLUSÃO',
             entidade: 'Unidade',
             entidadeId: id,
-            detalhes: `Unidade "${unidadeParaExcluir.nomeSistema}" e seus anexos foram excluídos.`
+            detalhes: `Unidade "${unidadeParaExcluir.nomeSistema}" e seus anexos excluídos.`
         });
 
         res.status(204).send();
     } catch (error) {
         if (error.code === 'P2003') {
-            return res.status(409).json({ message: 'Não é possível excluir esta unidade pois ela está associada a um ou mais equipamentos.' });
+            return res.status(409).json({ message: 'Não é possível excluir: unidade possui equipamentos vinculados.' });
         }
-        res.status(500).json({ message: 'Erro ao excluir unidade.', error: error.message });
+        res.status(500).json({ message: 'Erro ao excluir unidade.' });
     }
 });
 
 
-// --- ROTAS DE ANEXOS ---
+// ==========================================================================
+// SEÇÃO: ROTAS DE ANEXOS
+// ==========================================================================
 
-// ROTA: POST /api/unidades/:id/anexos - Upload de anexos
 router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
-    // ... (esta rota já estava correta e não precisa de alterações) ...
     const { id: unidadeId } = req.params;
     if (!req.files || req.files.length === 0) {
         return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
@@ -215,14 +212,11 @@ router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
         });
         res.status(201).json(unidadeAtualizada);
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao salvar anexos.', error: error.message });
+        res.status(500).json({ message: 'Erro ao salvar anexos.' });
     }
 });
 
-
-// ROTA: DELETE /api/unidades/:id/anexos/:anexoId - Excluir anexo
 router.delete('/:id/anexos/:anexoId', async (req, res) => {
-    // ... (esta rota já estava correta e não precisa de alterações) ...
     const { anexoId } = req.params;
     try {
         const anexo = await prisma.anexo.findUnique({ where: { id: anexoId } });
@@ -232,13 +226,8 @@ router.delete('/:id/anexos/:anexoId', async (req, res) => {
         await prisma.anexo.delete({ where: { id: anexoId } });
         res.status(204).send();
     } catch (error) {
-        if (error.code === 'P2025') {
-            return res.status(404).json({ message: 'Anexo não encontrado.' });
-        }
-        res.status(500).json({ message: 'Erro ao excluir anexo.', error: error.message });
+        res.status(500).json({ message: 'Erro ao excluir anexo.' });
     }
 });
 
-
-// Exporta o router para ser usado no arquivo principal do servidor.
 export default router;

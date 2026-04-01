@@ -335,3 +335,46 @@ Auditoria: Toda criação, edição ou exclusão de dados importantes gera um re
 Sempre verificar se a alteração exige mudança no schema.prisma (banco de dados).
 Sempre incluir o registro de Log de Auditoria em novas funções de criação/edição no backend.
 Manter o padrão visual do CSS (variáveis de cor e modo escuro).
+
+📑 DOCUMENTO DE REFERÊNCIA: SISTEMA SIMEC (v2.0 - MASTER)
+Este documento descreve o estado atual do sistema SIMEC após a implementação dos módulos de BI, Cards Expansíveis e Automação de Manutenção.
+🌐 1. AMBIENTE E HOSPEDAGEM
+Hospedagem: Railway (Integração com GitHub).
+Ambientes: Produção (Branch main) e Testes (Branch test).
+Banco de Dados: PostgreSQL (Prisma ORM).
+Frontend: React (Vite) consumindo API via VITE_API_URL.
+🛠️ 2. TECNOLOGIAS ATUALIZADAS
+Backend: Node.js + Express + Prisma.
+Frontend: React + JavaScript + FontAwesome + Chart.js.
+Relatórios: jsPDF + jsPDF-AutoTable (Layout em Grade/Grid).
+🏗️ 3. NOVIDADES E REGRAS DE NEGÓCIO IMPLEMENTADAS
+📋 A. Interface de Cards Expansíveis (UI/UX)
+Módulos: Seguros, Equipamentos e Contratos.
+Funcionamento: A lista não é mais uma tabela rígida. Cada item é um Card. Ao clicar no ícone (+), o card expande para mostrar detalhes sem mudar de página.
+Equipamentos: Dentro do card expandido, existe um sistema de abas internas (Cadastro, Acessórios, Anexos e Histórico).
+Cores Semânticas: O cabeçalho do card muda de cor automaticamente baseando-se no status (Verde: Operante/Ativo, Vermelho: Inoperante/Vencido, Amarelo: Atenção/Vencendo em breve).
+📈 B. Business Intelligence (BI) e Indicadores
+Página de BI: Nova tela com indicadores anuais de performance.
+Métricas:
+Downtime (Tempo de Parada): Soma das horas reais de indisponibilidade (Preventiva + Corretiva).
+Frequência de Falhas: Ranking de equipamentos que mais geram corretivas.
+Performance por Unidade: Gráfico comparando quais hospitais têm mais tempo de máquina parada.
+Impressão: Relatório Executivo em PDF formatado em grade profissional.
+🔧 C. Ciclo de Vida da Manutenção (Automação)
+Início Automático: Quando uma OS agendada atinge o horário, o sistema muda o status para "Em Andamento" e carimba o Horário de Início Real automaticamente (campo travado para edição).
+Preenchimento Ágil: Descrição do serviço é opcional para Preventivas (salva texto padrão se vazio).
+Fechamento Auditado: Para concluir uma OS, o sistema obriga a informar a Data/Hora Real de Término. Se continuar inoperante, o sistema exige um motivo e uma nova data de previsão, registrando tudo no histórico.
+🔔 D. Sistema de Alertas Blindado
+Controle Individual: O sistema sabe qual usuário já viu qual alerta.
+Alertas Obrigatórios: Alertas de "Confirmação Pendente" (manutenção que terminou o prazo) ficam travados no sino. O usuário não consegue dar baixa manual neles; o alerta só some quando a OS é devidamente finalizada na tela de detalhes.
+Ordem de Urgência: A lógica de vencimento de contratos/seguros prioriza os prazos menores (1 dia, 7 dias) antes dos maiores (30 dias).
+📂 E. Gestão de Documentos Digitais
+Anexos: Implementado upload e download de arquivos PDF/Imagens diretamente nos cards de Seguros e Contratos.
+Sinalização Visual: Ícone de clipe no cabeçalho do card (Verde: Com anexo, Cinza: Sem anexo).
+Higiene do Servidor: Ao excluir um registro ou anexo, o arquivo físico é apagado da pasta uploads no Railway.
+💾 4. ESTRUTURA DE ARQUIVOS CRÍTICA
+backend-simec/prisma/schema.prisma: Modelo Seguro com campos de valores LMI.
+backend-simec/routes/biRoutes.js: Cálculos matemáticos dos indicadores.
+backend-simec/services/alertasService.js: Motor de automação de status e alertas.
+frontend-simec/src/App.jsx: Importação estática do BIPage para evitar erros de definição.
+frontend-simec/src/utils/pdfUtils.js: Central de geração de PDFs (Auditoria, Relatórios e BI).

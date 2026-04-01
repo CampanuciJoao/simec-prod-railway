@@ -1,17 +1,11 @@
 /* Ficheiro: src/index.css */
-/*
-  ==============================================================
-  |                     ARQUIVO MESTRE DE CSS                    |
-  ==============================================================
+
+/* 
+   1. IMPORTAÇÕES PRIMEIRO (Regra obrigatória do CSS)
+   Mantemos todos os seus estilos atuais para nada "quebrar" agora.
 */
-
-/* ===== ESTILOS GLOBAIS PRIMEIRO ===== */
 @import './styles/global.css';
-
-/* ===== ESTRUTURA E LAYOUT ===== */
 @import './styles/layout.css';
-
-/* ===== COMPONENTES DE UI REUTILIZÁVEIS ===== */
 @import './styles/components/sidebar.css';
 @import './styles/components/ui-elements.css';
 @import './styles/components/forms.css';
@@ -20,9 +14,23 @@
 @import './styles/components/tabs.css';
 @import './styles/components/GlobalFilterBar.css';
 @import './styles/components/toast.css';
-
-/* ===== ESTILOS ESPECÍFICOS DE PÁGINAS ===== */
 @import './styles/pages/dashboard.css';
 @import './styles/pages/alertas.css';
 @import './styles/pages/login.css';
 @import './styles/pages/unidades.css';
+
+/* 
+   2. ATIVAÇÃO DO TAILWIND (Abaixo dos imports)
+   Isso permite que você use as classes do Tailwind junto com seus estilos antigos.
+*/
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 
+   ==============================================================
+   |  DICA: A partir de agora, você pode criar novos estilos    |
+   |  diretamente no HTML (JSX) usando as classes do Tailwind,  |
+   |  sem precisar criar novos arquivos .css na pasta styles.   |
+   ==============================================================
+*/

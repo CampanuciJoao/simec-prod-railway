@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/manutencoesRoutes.js
-// VERSÃO FINAL - CONCLUSÃO COM LIMPEZA AUTOMÁTICA DE ALERTAS E SUPORTE A ANEXOS
+// VERSÃO 10.0 - COM BLINDAGEM ZOD E LIMPEZA AUTOMÁTICA DE ALERTAS
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,7 +9,10 @@ import fs from 'fs';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { admin } from '../middleware/authMiddleware.js';
-import { format } from 'date-fns';
+
+// --- NOVAS IMPORTAÇÕES DE SEGURANÇA ---
+import validate from '../middleware/validate.js';
+import { manutencaoSchema } from '../validators/manutencaoValidator.js';
 
 const router = express.Router();
 
@@ -28,7 +31,7 @@ const upload = multer({ storage: storage });
 
 
 // ==========================================================================
-// ROTAS DE CONSULTA E CRIAÇÃO (CRUD)
+// SEÇÃO: ROTAS DE CONSULTA E CRIAÇÃO (CRUD)
 // ==========================================================================
 
 /** @route   GET /api/manutencoes */
@@ -45,7 +48,7 @@ router.get('/', async (req, res) => {
             where: whereClause,
             include: { 
                 equipamento: { include: { unidade: true } }, 
-                anexos: true // Garante anexos para o histórico do ativo
+                anexos: true 
             },
             orderBy: { dataHoraAgendamentoInicio: 'desc' }
         });
@@ -76,30 +79,46 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-/** @route   POST /api/manutencoes (Agendamento) */
-router.post('/', async (req, res) => {
+/** 
+ * @route   POST /api/manutencoes 
+ * ADICIONADO: validate(manutencaoSchema) para garantir dados perfeitos no agendamento
+ */
+router.post('/', validate(manutencaoSchema), async (req, res) => {
     const { equipamentoId, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio, dataHoraAgendamentoFim, ...outrosDados } = req.body;
+    
     try {
+        // Gerador automático de OS (Soma total + 1)
         const total = await prisma.manutencao.count();
         const osNumber = String(total + 1).padStart(4, '0');
+        
+        // Busca equipamento para compor o prefixo da OS
         const equip = await prisma.equipamento.findUnique({ where: { id: equipamentoId } });
+        if (!equip) return res.status(404).json({ message: "Equipamento não encontrado." });
+        
         const tagPrefix = equip.tag.substring(0, 3).toUpperCase();
         const numeroOS = `${tipo.substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
 
         const nova = await prisma.manutencao.create({
             data: { 
-                numeroOS, tipo, 
-                descricaoProblemaServico: descricaoProblemaServico || 'Manutenção Preventiva de Rotina', 
+                numeroOS, 
+                tipo, 
+                descricaoProblemaServico, 
                 dataHoraAgendamentoInicio: new Date(dataHoraAgendamentoInicio),
                 dataHoraAgendamentoFim: dataHoraAgendamentoFim ? new Date(dataHoraAgendamentoFim) : null,
                 equipamento: { connect: { id: equipamentoId } },
                 ...outrosDados 
             }
         });
-        await registrarLog({ usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Manutenção', entidadeId: nova.id, detalhes: `OS ${numeroOS} agendada.` });
+
+        await registrarLog({ 
+            usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Manutenção', 
+            entidadeId: nova.id, detalhes: `OS ${numeroOS} agendada para ${equip.modelo}.` 
+        });
+
         res.status(201).json(nova);
     } catch (error) {
-        res.status(500).json({ message: 'Erro ao agendar.' });
+        console.error("Erro no POST manutenção:", error);
+        res.status(500).json({ message: 'Erro ao agendar manutenção.' });
     }
 });
 
@@ -119,16 +138,11 @@ router.post('/:id/concluir', async (req, res) => {
             let notaHistorico = "";
 
             if (equipamentoOperante) {
-                // CENÁRIO A: EQUIPAMENTO OK -> FECHA OS E LIMPA ALERTA
                 notaHistorico = `MANUTENÇÃO CONCLUÍDA: Equipamento Operante. Término: ${new Date(dataTerminoReal).toLocaleString('pt-BR')}.`;
                 
                 await tx.manutencao.update({
                     where: { id: manutencaoId },
-                    data: { 
-                        status: 'Concluida', 
-                        dataFimReal: new Date(dataTerminoReal), 
-                        dataConclusao: new Date() 
-                    }
+                    data: { status: 'Concluida', dataFimReal: new Date(dataTerminoReal), dataConclusao: new Date() }
                 });
 
                 await tx.equipamento.update({
@@ -136,22 +150,16 @@ router.post('/:id/concluir', async (req, res) => {
                     data: { status: 'Operante' }
                 });
 
-                // >>> LIMPEZA AUTOMÁTICA DO ALERTA <<<
-                // Remove o alerta do sistema
+                // Limpeza dos alertas pendentes para esta OS
                 await tx.alerta.deleteMany({ where: { id: `manut-confirm-${manutencaoId}` } });
-                // Remove os registros de quem leu esse alerta para não deixar lixo no banco
                 await tx.alertaLidoPorUsuario.deleteMany({ where: { alertaId: `manut-confirm-${manutencaoId}` } });
 
             } else {
-                // CENÁRIO B: EQUIPAMENTO FALHOU -> REAGENDA E MANTÉM ALERTA (ou ele renovará depois)
                 notaHistorico = `EQUIPAMENTO CONTINUA INOPERANTE: ${observacao}. Nova previsão: ${new Date(novaPrevisao).toLocaleString('pt-BR')}.`;
                 
                 await tx.manutencao.update({
                     where: { id: manutencaoId },
-                    data: { 
-                        status: 'EmAndamento', 
-                        dataHoraAgendamentoFim: new Date(novaPrevisao) 
-                    }
+                    data: { status: 'EmAndamento', dataHoraAgendamentoFim: new Date(novaPrevisao) }
                 });
 
                 await tx.equipamento.update({
@@ -160,7 +168,6 @@ router.post('/:id/concluir', async (req, res) => {
                 });
             }
 
-            // Registra a decisão no histórico da Ordem de Serviço
             await tx.notaAndamento.create({
                 data: { nota: notaHistorico, manutencaoId, origem: 'automatico' }
             });
@@ -186,10 +193,9 @@ router.post('/:id/concluir', async (req, res) => {
 // ==========================================================================
 
 router.post('/:id/notas', async (req, res) => {
-    const { id } = req.params;
     try {
         const nova = await prisma.notaAndamento.create({ 
-            data: { nota: req.body.nota, manutencaoId: id, autorId: req.usuario.id } 
+            data: { nota: req.body.nota, manutencaoId: req.params.id, autorId: req.usuario.id } 
         });
         res.status(201).json(nova);
     } catch (error) {
@@ -198,10 +204,9 @@ router.post('/:id/notas', async (req, res) => {
 });
 
 router.post('/:id/upload', upload.array('arquivosManutencao'), async (req, res) => {
-    const { id: manutencaoId } = req.params;
     try {
         const anexosData = req.files.map(file => ({
-            manutencaoId, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype,
+            manutencaoId: req.params.id, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype,
         }));
         await prisma.anexo.createMany({ data: anexosData });
         res.status(201).json({ message: "Arquivos salvos com sucesso." });

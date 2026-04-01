@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/segurosRoutes.js
-// VERSÃO FINAL CORRIGIDA - COM EXCLUSÃO DE ANEXOS E COBERTURAS COMPLETAS
+// VERSÃO 10.0 - COM BLINDAGEM ZOD E AUDITORIA FINANCEIRA
 
 import express from 'express';
 import multer from 'multer';
@@ -8,6 +8,10 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
+
+// --- NOVAS IMPORTAÇÕES DE SEGURANÇA ---
+import validate from '../middleware/validate.js';
+import { seguroSchema } from '../validators/seguroValidator.js';
 
 const router = express.Router();
 
@@ -24,7 +28,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-// --- 2. Listar todos os seguros ---
+// ==========================================================================
+// SEÇÃO: ROTAS DE SEGUROS (CRUD)
+// ==========================================================================
+
+/** @route   GET /api/seguros */
 router.get('/', async (req, res) => {
     try {
         const seguros = await prisma.seguro.findMany({
@@ -41,7 +49,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// --- 3. Buscar um seguro específico por ID ---
+/** @route   GET /api/seguros/:id */
 router.get('/:id', async (req, res) => {
     try {
         const seguro = await prisma.seguro.findUnique({
@@ -55,13 +63,16 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-// --- 4. Criar um novo seguro (POST) ---
-router.post('/', async (req, res) => {
+/** 
+ * @route   POST /api/seguros 
+ * ADICIONADO: validate(seguroSchema) para blindagem de dados financeiros
+ */
+router.post('/', validate(seguroSchema), async (req, res) => {
     const { 
         apoliceNumero, seguradora, dataInicio, dataFim, equipamentoId, unidadeId, cobertura,
         premioTotal, lmiIncendio, lmiDanosEletricos, lmiRoubo, lmiVidros,
         lmiResponsabilidadeCivil, lmiDanosMateriais, lmiDanosCorporais,
-        lmiDanosMorais, lmiAPP
+        lmiDanosMorais, lmiAPP, status
     } = req.body;
     
     try {
@@ -72,16 +83,17 @@ router.post('/', async (req, res) => {
                 dataInicio: new Date(dataInicio),
                 dataFim: new Date(dataFim),
                 cobertura,
-                premioTotal: parseFloat(premioTotal) || 0,
-                lmiIncendio: parseFloat(lmiIncendio) || 0,
-                lmiDanosEletricos: parseFloat(lmiDanosEletricos) || 0,
-                lmiRoubo: parseFloat(lmiRoubo) || 0,
-                lmiVidros: parseFloat(lmiVidros) || 0,
-                lmiResponsabilidadeCivil: parseFloat(lmiResponsabilidadeCivil) || 0,
-                lmiDanosMateriais: parseFloat(lmiDanosMateriais) || 0,
-                lmiDanosCorporais: parseFloat(lmiDanosCorporais) || 0,
-                lmiDanosMorais: parseFloat(lmiDanosMorais) || 0,
-                lmiAPP: parseFloat(lmiAPP) || 0,
+                status: status || 'Ativo',
+                premioTotal,
+                lmiIncendio,
+                lmiDanosEletricos,
+                lmiRoubo,
+                lmiVidros,
+                lmiResponsabilidadeCivil,
+                lmiDanosMateriais,
+                lmiDanosCorporais,
+                lmiDanosMorais,
+                lmiAPP,
                 equipamento: equipamentoId ? { connect: { id: equipamentoId } } : undefined,
                 unidade: unidadeId ? { connect: { id: unidadeId } } : undefined,
             }
@@ -89,42 +101,34 @@ router.post('/', async (req, res) => {
 
         await registrarLog({
             usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Seguro',
-            entidadeId: novoSeguro.id, detalhes: `Seguro nº ${novoSeguro.apoliceNumero} criado.`
+            entidadeId: novoSeguro.id, detalhes: `Seguro nº ${novoSeguro.apoliceNumero} (${seguradora}) cadastrado.`
         });
 
         res.status(201).json(novoSeguro);
     } catch (error) {
+        if (error.code === 'P2002') return res.status(409).json({ message: 'Este número de apólice já está cadastrado.' });
         res.status(500).json({ message: 'Erro ao criar seguro.' });
     }
 });
 
-// --- 5. Atualizar seguro existente (PUT) ---
-router.put('/:id', async (req, res) => {
+/** 
+ * @route   PUT /api/seguros/:id 
+ * ADICIONADO: validate(seguroSchema) para garantir edição correta
+ */
+router.put('/:id', validate(seguroSchema), async (req, res) => {
     const { id } = req.params;
     const { 
-        equipamentoId, unidadeId, dataInicio, dataFim,
-        premioTotal, lmiIncendio, lmiDanosEletricos, lmiRoubo, lmiVidros,
-        lmiResponsabilidadeCivil, lmiDanosMateriais, lmiDanosCorporais,
-        lmiDanosMorais, lmiAPP, ...outrosDados 
+        equipamentoId, unidadeId, dataInicio, dataFim, ...outrosDados 
     } = req.body;
 
     try {
         const payload = {
             ...outrosDados,
-            dataInicio: dataInicio ? new Date(dataInicio) : undefined,
-            dataFim: dataFim ? new Date(dataFim) : undefined,
-            premioTotal: premioTotal !== undefined ? parseFloat(premioTotal) : undefined,
-            lmiIncendio: lmiIncendio !== undefined ? parseFloat(lmiIncendio) : undefined,
-            lmiDanosEletricos: lmiDanosEletricos !== undefined ? parseFloat(lmiDanosEletricos) : undefined,
-            lmiRoubo: lmiRoubo !== undefined ? parseFloat(lmiRoubo) : undefined,
-            lmiVidros: lmiVidros !== undefined ? parseFloat(lmiVidros) : undefined,
-            lmiResponsabilidadeCivil: lmiResponsabilidadeCivil !== undefined ? parseFloat(lmiResponsabilidadeCivil) : undefined,
-            lmiDanosMateriais: lmiDanosMateriais !== undefined ? parseFloat(lmiDanosMateriais) : undefined,
-            lmiDanosCorporais: lmiDanosCorporais !== undefined ? parseFloat(lmiDanosCorporais) : undefined,
-            lmiDanosMorais: lmiDanosMorais !== undefined ? parseFloat(lmiDanosMorais) : undefined,
-            lmiAPP: lmiAPP !== undefined ? parseFloat(lmiAPP) : undefined,
+            dataInicio: new Date(dataInicio),
+            dataFim: new Date(dataFim),
         };
         
+        // Gerencia os vínculos de forma dinâmica
         if (equipamentoId !== undefined) {
             payload.equipamento = equipamentoId ? { connect: { id: equipamentoId } } : { disconnect: true };
         }
@@ -133,32 +137,56 @@ router.put('/:id', async (req, res) => {
         }
 
         const atualizado = await prisma.seguro.update({ where: { id }, data: payload });
+
+        await registrarLog({
+            usuarioId: req.usuario.id, acao: 'EDIÇÃO', entidade: 'Seguro',
+            entidadeId: id, detalhes: `Dados do seguro nº ${atualizado.apoliceNumero} foram atualizados.`
+        });
+
         res.json(atualizado);
     } catch (error) {
         res.status(500).json({ message: 'Erro ao atualizar seguro.' });
     }
 });
 
-// --- 6. Excluir seguro completo ---
+/** @route   DELETE /api/seguros/:id */
 router.delete('/:id', async (req, res) => {
     const { id } = req.params;
     try {
         const seguro = await prisma.seguro.findUnique({ where: { id }, include: { anexos: true } });
-        if (seguro?.anexos) {
+        if (!seguro) return res.status(404).json({ message: 'Seguro não encontrado.' });
+
+        // Apaga os arquivos físicos antes de deletar o registro no banco
+        if (seguro.anexos) {
             seguro.anexos.forEach(anexo => { if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path); });
         }
+
         await prisma.seguro.delete({ where: { id } });
+
+        await registrarLog({
+            usuarioId: req.usuario.id, acao: 'EXCLUSÃO', entidade: 'Seguro',
+            entidadeId: id, detalhes: `Seguro nº ${seguro.apoliceNumero} e seus documentos excluídos.`
+        });
+
         res.status(204).send();
     } catch (error) {
         res.status(500).json({ message: 'Erro ao excluir seguro.' });
     }
 });
 
-// --- 7. Upload de Documentos ---
+// ============================================================
+// SEÇÃO DE ANEXOS
+// ============================================================
+
 router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
     const { id } = req.params;
     try {
-        const anexosData = req.files.map(file => ({ seguroId: id, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype }));
+        const anexosData = req.files.map(file => ({ 
+            seguroId: id, 
+            nomeOriginal: file.originalname, 
+            path: file.path, 
+            tipoMime: file.mimetype 
+        }));
         await prisma.anexo.createMany({ data: anexosData });
         const atualizado = await prisma.seguro.findUnique({ where: { id }, include: { anexos: true } });
         res.status(201).json(atualizado);
@@ -167,14 +195,13 @@ router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
     }
 });
 
-// --- 8. EXCLUIR UM DOCUMENTO ESPECÍFICO (Esta rota corrige o erro 404) ---
 router.delete('/:id/anexos/:anexoId', async (req, res) => {
     const { anexoId } = req.params;
     try {
         const anexo = await prisma.anexo.findUnique({ where: { id: anexoId } });
         if (anexo) {
-            if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path); // Apaga arquivo físico
-            await prisma.anexo.delete({ where: { id: anexoId } }); // Apaga no banco
+            if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
+            await prisma.anexo.delete({ where: { id: anexoId } });
         }
         res.status(204).send();
     } catch (error) {

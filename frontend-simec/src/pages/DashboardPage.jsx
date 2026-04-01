@@ -1,12 +1,20 @@
 // Ficheiro: src/pages/DashboardPage.jsx
-// VERSÃO 6.2 - LÓGICA DE FILTRO CORRIGIDA E SIMPLIFICADA
+// VERSÃO 7.0 - MODERNIZADA COM TAILWIND CSS E SKELETON LOADING
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faHeartbeat, faTools, faFileInvoiceDollar, faExclamationCircle, faChartPie, faChartBar } from '@fortawesome/free-solid-svg-icons';
+import { 
+    faHeartbeat, 
+    faTools, 
+    faFileInvoiceDollar, 
+    faExclamationCircle, 
+    faChartPie, 
+    faChartBar 
+} from '@fortawesome/free-solid-svg-icons';
 import DonutChart from '../components/DonutChart';
 import BarChart from '../components/BarChart';
+import SkeletonCard from '../components/SkeletonCard'; // <<< NOVO: Importando o componente de carregamento
 import { getDashboardData } from '../services/api';
 
 // Mapeamento dos valores do ENUM para Labels amigáveis
@@ -51,7 +59,6 @@ function DashboardPage({ darkMode }) {
   useEffect(() => { carregarDados(); }, [carregarDados]);
 
   const handleChartClick = (clickedLabel) => {
-    // Traduz o label clicado (ex: "Em Manutenção") para o valor do enum (ex: "EmManutencao")
     const statusEnumValue = labelToEnumMap[clickedLabel];
     if (statusEnumValue) {
       navigate('/equipamentos', { state: { filtroStatusInicial: statusEnumValue } });
@@ -91,29 +98,108 @@ function DashboardPage({ darkMode }) {
   const temDadosValidosParaDonut = statusEquipamentosChartData.labels.length > 0 && statusEquipamentosChartData.datasets[0].data.some(d => d > 0);
   const temDadosValidosParaBar = manutencoesPorTipoMesChartData.labels.length > 0 && manutencoesPorTipoMesChartData.datasets.some(ds => ds.data.some(d => d > 0));
 
-  if (loading) return <div className="page-content-wrapper"><div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div><p>Carregando...</p></div>;
+  // ==========================================================================
+  // >> NOVO: ESTADO DE CARREGAMENTO COM SKELETONS (VISUAL APP SÊNIOR) <<
+  // ==========================================================================
+  if (loading) {
+    return (
+        <div className="page-content-wrapper">
+          <div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white h-64 rounded-2xl animate-pulse"></div>
+            <div className="bg-white h-64 rounded-2xl animate-pulse"></div>
+          </div>
+        </div>
+    );
+  }
+
   if (error) return <div className="page-content-wrapper"><div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div><p style={{ color: 'red' }}>Erro: {error}</p></div>;
 
   return (
     <div className="page-content-wrapper">
-      <div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div>
-      <section className="summary-cards">
-        <Link to="/equipamentos" className="card-link"><div className="card"><div className="card-icon"><FontAwesomeIcon icon={faHeartbeat} /></div><div className="card-text-content"><div className="card-title">EQUIPAMENTOS</div><div className="card-value">{dashboardData.equipamentosCount}</div></div></div></Link>
-        <Link to="/manutencoes" className="card-link"><div className="card"><div className="card-icon"><FontAwesomeIcon icon={faTools} /></div><div className="card-text-content"><div className="card-title">MANUTENÇÕES PENDENTES</div><div className="card-value">{dashboardData.manutencoesCount}</div></div></div></Link>
-        <Link to="/contratos" className="card-link"><div className="card"><div className="card-icon"><FontAwesomeIcon icon={faFileInvoiceDollar} /></div><div className="card-text-content"><div className="card-title">CONTRATOS VENCENDO</div><div className="card-value">{dashboardData.contratosVencendoCount}</div></div></div></Link>
+      <div className="page-title-card">
+        <h1 className="page-title-internal">Dashboard</h1>
+      </div>
+
+      {/* ==========================================================================
+          >> SEÇÃO DE CARDS DE RESUMO (AGORA COM TAILWIND CSS) <<
+          ========================================================================== */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+        {/* Card: Equipamentos */}
+        <Link to="/equipamentos" className="group no-underline">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[10px] border-blue-500 hover:shadow-md transition-all flex items-center gap-5 transform group-hover:-translate-y-1">
+                <div className="bg-blue-50 p-4 rounded-xl text-blue-600 text-2xl">
+                    <FontAwesomeIcon icon={faHeartbeat} />
+                </div>
+                <div>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Ativos Totais</p>
+                    <p className="text-3xl font-black text-gray-800 leading-none">{dashboardData.equipamentosCount}</p>
+                </div>
+            </div>
+        </Link>
+
+        {/* Card: Manutenções */}
+        <Link to="/manutencoes" className="group no-underline">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[10px] border-yellow-500 hover:shadow-md transition-all flex items-center gap-5 transform group-hover:-translate-y-1">
+                <div className="bg-yellow-50 p-4 rounded-xl text-yellow-600 text-2xl">
+                    <FontAwesomeIcon icon={faTools} />
+                </div>
+                <div>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Manutenções Pendentes</p>
+                    <p className="text-3xl font-black text-gray-800 leading-none">{dashboardData.manutencoesCount}</p>
+                </div>
+            </div>
+        </Link>
+
+        {/* Card: Contratos */}
+        <Link to="/contratos" className="group no-underline">
+            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[10px] border-purple-500 hover:shadow-md transition-all flex items-center gap-5 transform group-hover:-translate-y-1">
+                <div className="bg-purple-50 p-4 rounded-xl text-purple-600 text-2xl">
+                    <FontAwesomeIcon icon={faFileInvoiceDollar} />
+                </div>
+                <div>
+                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Contratos Vencendo</p>
+                    <p className="text-3xl font-black text-gray-800 leading-none">{dashboardData.contratosVencendoCount}</p>
+                </div>
+            </div>
+        </Link>
       </section>
+
+      {/* SEÇÃO DETALHADA (ALERTAS E GRÁFICOS) */}
       <section className="detailed-sections">
         <div className="alerts-section page-section">
           <h2>ALERTAS RECENTES/CRÍTICOS</h2>
           <div className="alerts-list">
             {(dashboardData.alertasRecentes?.length > 0) ? (
-              <ul>{dashboardData.alertasRecentes.map(alerta => (<li key={alerta.id}><Link to={alerta.link || '/alertas'}><FontAwesomeIcon icon={faExclamationCircle} className="alert-icon" style={{ color: alerta.prioridade === 'Alta' ? 'var(--btn-danger-bg-light)' : (alerta.prioridade === 'Media' ? '#FACC15' : 'var(--cor-texto-secundario-light)')}} />{alerta.titulo}</Link></li>))}</ul>
+              <ul>
+                {dashboardData.alertasRecentes.map(alerta => (
+                  <li key={alerta.id}>
+                    <Link to={alerta.link || '/alertas'}>
+                      <FontAwesomeIcon 
+                        icon={faExclamationCircle} 
+                        className="alert-icon" 
+                        style={{ color: alerta.prioridade === 'Alta' ? '#ef4444' : (alerta.prioridade === 'Media' ? '#FACC15' : '#64748b')}} 
+                      />
+                      {alerta.titulo}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
             ) : <p style={{textAlign: 'center', color: 'var(--cor-texto-secundario-light)'}}>Nenhum alerta crítico no momento.</p>}
           </div>
         </div>
+
         <div className="charts-section page-section">
           <div className="chart-container-dashboard"> 
-            <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}><FontAwesomeIcon icon={faChartPie} style={{ marginRight: '8px', fontSize: '0.9em', color: 'var(--cor-texto-secundario-light)' }} /><h2 style={{margin: 0, borderBottom: 'none', textTransform: 'none', letterSpacing: 'normal', fontSize:'1em', color: 'var(--cor-texto-principal-light)'}}>Status dos Equipamentos</h2></div>
+            <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
+              <FontAwesomeIcon icon={faChartPie} style={{ marginRight: '8px', fontSize: '0.9em', color: 'var(--cor-texto-secundario-light)' }} />
+              <h2 style={{margin: 0, borderBottom: 'none', textTransform: 'none', letterSpacing: 'normal', fontSize:'1em', color: 'var(--cor-texto-principal-light)'}}>Status dos Equipamentos</h2>
+            </div>
             <div className="chart-wrapper" style={{ height: '220px', maxHeight: '220px' }}>
               {temDadosValidosParaDonut ? (
                 <DonutChart key={`donut-${darkMode}`} chartData={statusEquipamentosChartData} darkMode={darkMode} onSliceClick={handleChartClick} />
@@ -122,7 +208,10 @@ function DashboardPage({ darkMode }) {
           </div>
           <hr className="chart-separator" />
           <div className="chart-container-dashboard"> 
-             <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}><FontAwesomeIcon icon={faChartBar} style={{ marginRight: '8px', fontSize: '0.9em', color: 'var(--cor-texto-secundario-light)' }} /><h2 style={{margin: 0, borderBottom: 'none', textTransform: 'none', letterSpacing: 'normal', fontSize:'1em', color: 'var(--cor-texto-principal-light)'}}>Manutenções nos Últimos 6 Meses</h2></div>
+             <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
+               <FontAwesomeIcon icon={faChartBar} style={{ marginRight: '8px', fontSize: '0.9em', color: 'var(--cor-texto-secundario-light)' }} />
+               <h2 style={{margin: 0, borderBottom: 'none', textTransform: 'none', letterSpacing: 'normal', fontSize:'1em', color: 'var(--cor-texto-principal-light)'}}>Manutenções nos Últimos 6 Meses</h2>
+             </div>
             <div className="chart-wrapper" style={{ height: '220px', maxHeight: '220px' }}>
               {temDadosValidosParaBar ? (
                 <BarChart key={`bar-${darkMode}`} chartData={manutencoesPorTipoMesChartData} darkMode={darkMode} onBarClick={handleBarChartClick} />
