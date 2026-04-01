@@ -230,22 +230,31 @@ export const exportarOSManutencaoPDF = (m) => {
     doc.setFont(undefined, 'normal');
     doc.text(`Gerado em: ${formatarDataHora(new Date())}`, 196, 15, { align: 'right' });
 
-    // --- BLOCO 1: INFORMAÇÕES DO ATIVO ---
+   // --- BLOCO 1: INFORMAÇÕES DO ATIVO ---
     doc.setFillColor(241, 245, 249);
     doc.rect(14, 35, 182, 8, 'F');
     doc.setFont(undefined, 'bold');
     doc.text("INFORMAÇÕES DO EQUIPAMENTO", 16, 40);
+
+    // Variável de segurança para a Unidade não sair em branco
+    const nomeUnidade = m.equipamento?.unidade?.nomeSistema || 
+                        m.equipamento?.unidade?.nome || 
+                        'N/A';
 
     autoTable(doc, {
         startY: 45,
         theme: 'plain',
         body: [
             ['MODELO:', m.equipamento?.modelo, 'Nº SÉRIE / TAG:', m.equipamento?.tag],
-            ['UNIDADE:', m.equipamento?.unidade?.nomeSistema, 'TIPO:', m.tipo],
+            ['UNIDADE:', nomeUnidade, 'TIPO:', m.tipo],
             ['Nº CHAMADO:', m.numeroChamado || 'N/A', 'STATUS ATUAL:', m.status.toUpperCase()]
         ],
         styles: { fontSize: 9, cellPadding: 2 },
-        columnStyles: { 0: { fontStyle: 'bold', cellWidth: 25 }, 2: { fontStyle: 'bold', cellWidth: 35 } }
+        columnStyles: { 
+            // AUMENTADO DE 25 PARA 35 PARA CABER O TEXTO NA MESMA LINHA
+            0: { fontStyle: 'bold', cellWidth: 35 }, 
+            2: { fontStyle: 'bold', cellWidth: 35 } 
+        }
     });
 
     // --- BLOCO 2: TEMPOS E EXECUÇÃO ---
