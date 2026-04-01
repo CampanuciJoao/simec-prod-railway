@@ -1,23 +1,21 @@
-const { z } = require('zod');
+// Ficheiro: backend-simec/middleware/validador.js
+import { z } from 'zod';
 
-// Schema para proteger a criação de Manutenções (Exemplo)
-const manutencaoSchema = z.object({
-  equipamentoId: z.number().int(),
-  tipo: z.enum(['PREVENTIVA', 'CORRETIVA']),
-  dataAgendada: z.string().datetime(), // Garante formato de data ISO
-  prioridade: z.enum(['BAIXA', 'MEDIA', 'ALTA']),
+export const manutencaoSchema = z.object({
+  equipamentoId: z.string(), // IDs no seu banco são UUID (strings)
+  tipo: z.enum(['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao']),
+  dataAgendada: z.string(), 
+  prioridade: z.enum(['Baixa', 'Media', 'Alta']),
 });
 
-const validar = (schema) => (req, res, next) => {
+export const validarRequest = (schema) => (req, res, next) => {
   try {
     schema.parse(req.body);
     next();
-  } catch (error) {
+  } catch (e) {
     return res.status(400).json({ 
-      error: "Dados inválidos", 
-      mensagens: error.errors.map(e => `${e.path[0]}: ${e.message}`) 
+      error: "Erro de validação", 
+      detalhes: e.errors.map(err => ({ campo: err.path[0], mensagem: err.message })) 
     });
   }
 };
-
-module.exports = { validar, manutencaoSchema };
