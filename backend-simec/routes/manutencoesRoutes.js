@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/manutencoesRoutes.js
-// VERSÃO FINAL ATUALIZADA - COM INCLUSÃO DE ANEXOS NA LISTAGEM PARA O HISTÓRICO
+// VERSÃO ATUALIZADA - CONCLUSÃO COM AUDITORIA, DATAS REAIS E REAGENDAMENTO
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -13,11 +13,10 @@ import { format } from 'date-fns';
 
 const router = express.Router();
 
-// --- Configuração do Multer ---
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
         const dir = path.join('uploads', 'manutencoes');
-        fs.mkdirSync(dir, { recursive: true });
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
         cb(null, dir);
     },
     filename: (req, file, cb) => {
@@ -26,12 +25,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage: storage });
 
-
-// ==========================================================================
-// ROTAS PRINCIPAIS (CRUD)
-// ==========================================================================
-
-/** @route   GET /api/manutencoes */
+// --- Listar manutenções ---
 router.get('/', async (req, res) => {
     const { equipamentoId, unidadeId, tipo, status } = req.query;
     try {
@@ -43,286 +37,155 @@ router.get('/', async (req, res) => {
 
         const manutencoes = await prisma.manutencao.findMany({
             where: whereClause,
-            include: { 
-                equipamento: { include: { unidade: true } },
-                anexos: true // <<< ADICIONADO: Garante que os arquivos apareçam no histórico do ativo
-            },
+            include: { equipamento: { include: { unidade: true } }, anexos: true },
             orderBy: { dataHoraAgendamentoInicio: 'desc' }
         });
         res.json(manutencoes);
     } catch (error) {
-        console.error("Erro ao buscar manutenções:", error);
-        res.status(500).json({ message: 'Erro ao buscar manutenções.', error: error.message });
+        res.status(500).json({ message: 'Erro ao buscar manutenções.' });
     }
 });
 
-/** @route   GET /api/manutencoes/:id */
+// --- Buscar por ID ---
 router.get('/:id', async (req, res) => {
     try {
         const manutencao = await prisma.manutencao.findUnique({
             where: { id: req.params.id },
             include: { 
-                anexos: true, 
-                equipamento: true, 
-                notasAndamento: { 
-                    orderBy: { data: 'desc' },
-                    include: { autor: { select: { nome: true } } }
-                } 
+                anexos: true, equipamento: true, 
+                notasAndamento: { orderBy: { data: 'desc' }, include: { autor: { select: { nome: true } } } } 
             }
         });
-        if (manutencao) {
-            res.json(manutencao);
-        } else {
-            res.status(404).json({ message: 'Manutenção não encontrada.' });
-        }
+        if (manutencao) res.json(manutencao);
+        else res.status(404).json({ message: 'Manutenção não encontrada.' });
     } catch (error) {
-        console.error("Erro ao buscar detalhes da manutenção:", error);
-        res.status(500).json({ message: 'Erro ao buscar manutenção.', error: error.message });
+        res.status(500).json({ message: 'Erro ao buscar manutenção.' });
     }
 });
 
-/** @route   POST /api/manutencoes */
+// --- Criar Manutenção (Agendar) ---
 router.post('/', async (req, res) => {
-    const { equipamentoId, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio, ...outrosDados } = req.body;
-    if (!equipamentoId || !tipo || !descricaoProblemaServico || !dataHoraAgendamentoInicio) {
-        return res.status(400).json({ message: 'Equipamento, Tipo, Descrição e Data de Início são obrigatórios.' });
-    }
+    const { equipamentoId, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio, dataHoraAgendamentoFim, ...outrosDados } = req.body;
     try {
-        const totalManutencoes = await prisma.manutencao.count();
-        const osNumberPart = String(totalManutencoes + 1).padStart(4, '0');
-        const tipoPrefix = tipo.substring(0, 1).toUpperCase();
-        
-        const equipamento = await prisma.equipamento.findUnique({ where: { id: equipamentoId } });
-        if (!equipamento) return res.status(404).json({ message: 'Equipamento para a OS não encontrado.' });
-        const tagPrefix = equipamento.tag.substring(0, 3).toUpperCase();
-        
-        const numeroOS = `${tipoPrefix}${tagPrefix}-${osNumberPart}`;
-        const dadosParaCriar = { numeroOS, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio: new Date(dataHoraAgendamentoInicio), equipamento: { connect: { id: equipamentoId } }, ...outrosDados };
+        const total = await prisma.manutencao.count();
+        const osNumber = String(total + 1).padStart(4, '0');
+        const equip = await prisma.equipamento.findUnique({ where: { id: equipamentoId } });
+        const tagPrefix = equip.tag.substring(0, 3).toUpperCase();
+        const numeroOS = `${tipo.substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
 
-        if (req.body.dataHoraAgendamentoFim) {
-            dadosParaCriar.dataHoraAgendamentoFim = new Date(req.body.dataHoraAgendamentoFim);
-        }
-
-        const novaManutencao = await prisma.manutencao.create({ data: dadosParaCriar });
-        
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Manutenção',
-            entidadeId: novaManutencao.id, detalhes: `OS ${novaManutencao.numeroOS} foi criada para o equipamento ${equipamento.modelo}.`
+        const nova = await prisma.manutencao.create({
+            data: { 
+                numeroOS, tipo, 
+                descricaoProblemaServico: descricaoProblemaServico || 'Manutenção Preventiva de Rotina', 
+                dataHoraAgendamentoInicio: new Date(dataHoraAgendamentoInicio),
+                dataHoraAgendamentoFim: dataHoraAgendamentoFim ? new Date(dataHoraAgendamentoFim) : null,
+                equipamento: { connect: { id: equipamentoId } },
+                ...outrosDados 
+            }
         });
-        res.status(201).json(novaManutencao);
+        await registrarLog({ usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Manutenção', entidadeId: nova.id, detalhes: `OS ${numeroOS} agendada.` });
+        res.status(201).json(nova);
     } catch (error) {
-        console.error("Erro ao criar manutenção:", error);
-        res.status(500).json({ message: 'Erro interno ao criar manutenção.', error: error.message });
+        res.status(500).json({ message: 'Erro ao agendar manutenção.' });
     }
 });
 
-/** @route   PUT /api/manutencoes/:id */
-router.put('/:id', async (req, res) => {
+// --- ROTA DE CONCLUSÃO / CONFIRMAÇÃO (REESCRITA) ---
+router.post('/:id/concluir', async (req, res) => {
     const { id: manutencaoId } = req.params;
-    const novosDados = req.body;
-    const autorDaAcao = req.usuario;
+    const { equipamentoOperante, dataTerminoReal, novaPrevisao, observacao } = req.body;
 
     try {
-        const estadoAntigo = await prisma.manutencao.findUnique({ where: { id: manutencaoId } });
-        if (!estadoAntigo) return res.status(404).json({ message: 'Manutenção não encontrada.' });
+        const resultado = await prisma.$transaction(async (tx) => {
+            const manutAtual = await tx.manutencao.findUnique({ where: { id: manutencaoId } });
+            let notaHistorico = "";
 
-        const dadosParaSalvar = {
-            descricaoProblemaServico: novosDados.descricaoProblemaServico,
-            tecnicoResponsavel: novosDados.tecnicoResponsavel,
-            dataInicioReal: novosDados.dataInicioReal ? new Date(novosDados.dataInicioReal) : null,
-            dataFimReal: novosDados.dataFimReal ? new Date(novosDados.dataFimReal) : null,
-        };
+            if (equipamentoOperante) {
+                // CAMINHO A: Equipamento ficou pronto
+                notaHistorico = `MANUTENÇÃO CONCLUÍDA: Equipamento testado e operante. Finalizado em: ${new Date(dataTerminoReal).toLocaleString('pt-BR')}.`;
+                
+                await tx.manutencao.update({
+                    where: { id: manutencaoId },
+                    data: { 
+                        status: 'Concluida', 
+                        dataFimReal: new Date(dataTerminoReal), 
+                        dataConclusao: new Date() 
+                    }
+                });
 
-        const manutencaoAtualizada = await prisma.manutencao.update({
-            where: { id: manutencaoId }, data: dadosParaSalvar
-        });
+                await tx.equipamento.update({
+                    where: { id: manutAtual.equipamentoId },
+                    data: { status: 'Operante' }
+                });
 
-        const formatarValorParaLog = (valor) => {
-            if (valor instanceof Date && !isNaN(valor)) return format(valor, 'dd/MM/yyyy HH:mm');
-            return valor || 'vazio';
-        };
-        
-        const camposParaComparar = {
-            descricaoProblemaServico: 'Descrição',
-            tecnicoResponsavel: 'Técnico Responsável',
-            dataInicioReal: 'Data de Início Real',
-            dataFimReal: 'Data de Fim Real'
-        };
+                // Apaga o alerta de confirmação, pois o ciclo fechou
+                await tx.alerta.deleteMany({ where: { id: `manut-confirm-${manutencaoId}` } });
 
-        for (const campo in camposParaComparar) {
-            const valorAntigo = estadoAntigo[campo];
-            const valorNovo = manutencaoAtualizada[campo];
-            if (String(valorAntigo) !== String(valorNovo)) {
-                await registrarLog({
-                    usuarioId: autorDaAcao.id, acao: 'EDIÇÃO_CAMPO', entidade: 'Manutenção', entidadeId: manutencaoId,
-                    detalhes: `O campo "${camposParaComparar[campo]}" foi alterado de "${formatarValorParaLog(valorAntigo)}" para "${formatarValorParaLog(valorNovo)}".`
+            } else {
+                // CAMINHO B: Equipamento continua inoperante (Reagendamento)
+                notaHistorico = `EQUIPAMENTO CONTINUA INOPERANTE: ${observacao}. Nova previsão: ${new Date(novaPrevisao).toLocaleString('pt-BR')}.`;
+                
+                await tx.manutencao.update({
+                    where: { id: manutencaoId },
+                    data: { 
+                        status: 'EmAndamento', // Volta para Em Andamento
+                        dataHoraAgendamentoFim: new Date(novaPrevisao) 
+                    }
+                });
+
+                await tx.equipamento.update({
+                    where: { id: manutAtual.equipamentoId },
+                    data: { status: 'Inoperante' }
                 });
             }
-        }
 
-        res.json(manutencaoAtualizada);
+            // Registra a nota no histórico da OS
+            await tx.notaAndamento.create({
+                data: { nota: notaHistorico, manutencaoId, origem: 'automatico' }
+            });
+
+            return { status: equipamentoOperante ? 'Concluida' : 'EmAndamento' };
+        });
+
+        await registrarLog({
+            usuarioId: req.usuario.id, acao: 'CONCLUSÃO', entidade: 'Manutenção',
+            entidadeId: manutencaoId, detalhes: `Decisão de conclusão registrada: Equipamento ${equipamentoOperante ? 'Operante' : 'Inoperante'}.`
+        });
+
+        res.json(resultado);
     } catch (error) {
-        console.error("Erro ao atualizar manutenção:", error);
-        res.status(500).json({ message: 'Erro ao atualizar manutenção.' });
+        console.error(error);
+        res.status(500).json({ message: 'Erro ao processar a finalização da manutenção.' });
     }
 });
 
-/** @route   DELETE /api/manutencoes/:id */
+// --- Demais Rotas de Ação (Notas e Uploads) ---
+
+router.post('/:id/notas', async (req, res) => {
+    const { id } = req.params;
+    try {
+        const nova = await prisma.notaAndamento.create({ data: { nota: req.body.nota, manutencaoId: id, autorId: req.usuario.id } });
+        res.status(201).json(nova);
+    } catch (error) { res.status(500).json({ message: 'Erro ao adicionar nota.' }); }
+});
+
+router.post('/:id/upload', upload.array('arquivosManutencao'), async (req, res) => {
+    const { id } = req.params;
+    try {
+        const anexosData = req.files.map(file => ({ manutencaoId: id, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype }));
+        await prisma.anexo.createMany({ data: anexosData });
+        res.status(201).json({ message: "Upload concluído" });
+    } catch (error) { res.status(500).json({ message: 'Erro no upload.' }); }
+});
+
 router.delete('/:id', admin, async (req, res) => {
     const { id } = req.params;
     try {
-        const manutencaoParaExcluir = await prisma.manutencao.findUnique({
-            where: { id }, include: { anexos: true, notasAndamento: true }
-        });
-        if (!manutencaoParaExcluir) return res.status(404).json({ message: 'Manutenção não encontrada.' });
-
-        (manutencaoParaExcluir.anexos || []).forEach(anexo => {
-            if (anexo.path && fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
-        });
+        const manut = await prisma.manutencao.findUnique({ where: { id }, include: { anexos: true } });
+        if (manut?.anexos) manut.anexos.forEach(a => { if (fs.existsSync(a.path)) fs.unlinkSync(a.path); });
         await prisma.manutencao.delete({ where: { id } });
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'EXCLUSÃO', entidade: 'Manutenção', entidadeId: id,
-            detalhes: `A OS ${manutencaoParaExcluir.numeroOS} e todos os seus dados foram apagados.`
-        });
-        res.status(200).json({ message: 'Manutenção e seus dados associados foram excluídos com sucesso.' });
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Manutenção não encontrada.' });
-        res.status(500).json({ message: 'Erro ao excluir manutenção.' });
-    }
-});
-
-
-// ==========================================================================
-// ROTAS DE AÇÃO
-// ==========================================================================
-
-/** @route   POST /api/manutencoes/:id/upload */
-router.post('/:id/upload', upload.array('arquivosManutencao'), async (req, res) => {
-    const { id: manutencaoId } = req.params;
-    if (!req.files || req.files.length === 0) return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
-    try {
-        const anexosData = req.files.map(file => ({
-            manutencaoId, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype,
-        }));
-        await prisma.anexo.createMany({ data: anexosData });
-        
-        for (const file of req.files) {
-            await registrarLog({
-                usuarioId: req.usuario.id, acao: 'UPLOAD_ANEXO', entidade: 'Manutenção', entidadeId: manutencaoId,
-                detalhes: `Anexo "${file.originalname}" foi adicionado.`
-            });
-        }
-        const manutencaoAtualizada = await prisma.manutencao.findUnique({
-            where: { id: manutencaoId }, include: { anexos: true }
-        });
-        res.status(201).json(manutencaoAtualizada);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao salvar anexos.', error: error.message });
-    }
-});
-
-/** @route   DELETE /api/manutencoes/:id/anexos/:anexoId */
-router.delete('/:id/anexos/:anexoId', async (req, res) => {
-    const { id: manutencaoId, anexoId } = req.params;
-    try {
-        const anexo = await prisma.anexo.findUnique({ where: { id: anexoId } });
-        if (!anexo) return res.status(404).json({ message: 'Anexo não encontrado.' });
-
-        if (anexo.path && fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
-        await prisma.anexo.delete({ where: { id: anexoId } });
-        
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'EXCLUSAO_ANEXO', entidade: 'Manutenção', entidadeId: manutencaoId,
-            detalhes: `Anexo "${anexo.nomeOriginal}" foi removido.`
-        });
         res.status(204).send();
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Anexo não encontrado.' });
-        res.status(500).json({ message: 'Erro ao excluir anexo.' });
-    }
-});
-
-/** @route   POST /api/manutencoes/:id/notas */
-router.post('/:id/notas', async (req, res) => {
-    const { id: manutencaoId } = req.params;
-    const { nota } = req.body;
-    if (!nota || typeof nota !== 'string' || nota.trim() === '') {
-        return res.status(400).json({ message: 'O conteúdo da nota é obrigatório.' });
-    }
-    try {
-        const novaNota = await prisma.notaAndamento.create({
-            data: {
-                nota: nota.trim(),
-                manutencaoId: manutencaoId,
-                autorId: req.usuario.id
-            }
-        });
-        res.status(201).json(novaNota);
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Manutenção não encontrada.' });
-        res.status(500).json({ message: 'Erro ao adicionar nota.' });
-    }
-});
-
-/** @route   POST /api/manutencoes/:id/concluir */
-router.post('/:id/concluir', async (req, res) => {
-    const { id: manutencaoId } = req.params;
-    const { equipamentoOperante } = req.body;
-    if (typeof equipamentoOperante !== 'boolean') {
-        return res.status(400).json({ message: 'Confirmação de status do equipamento é obrigatória.' });
-    }
-    try {
-        const manutencaoConcluida = await prisma.$transaction(async (tx) => {
-            const manutencao = await tx.manutencao.update({
-                where: { id: manutencaoId }, data: { status: 'Concluida', dataConclusao: new Date() }
-            });
-            await tx.equipamento.update({
-                where: { id: manutencao.equipamentoId },
-                data: { status: equipamentoOperante ? 'Operante' : 'Inoperante' }
-            });
-            await tx.notaAndamento.create({
-                data: {
-                    nota: `Manutenção concluída. Status final do equipamento: ${equipamentoOperante ? 'Operante' : 'Inoperante'}.`,
-                    manutencaoId, origem: 'automatico'
-                }
-            });
-            return manutencao;
-        });
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'CONCLUSAO', entidade: 'Manutenção', entidadeId: manutencaoId,
-            detalhes: `OS ${manutencaoConcluida.numeroOS} foi concluída.`
-        });
-        res.json(manutencaoConcluida);
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Manutenção ou Equipamento não encontrado.' });
-        res.status(500).json({ message: 'Erro ao concluir manutenção.' });
-    }
-});
-
-/** @route   POST /api/manutencoes/:id/cancelar */
-router.post('/:id/cancelar', async (req, res) => {
-    const { id: manutencaoId } = req.params;
-    const { motivo } = req.body;
-    if (!motivo) return res.status(400).json({ message: "O motivo do cancelamento é obrigatório." });
-    try {
-        const manutencaoCancelada = await prisma.$transaction(async (tx) => {
-            const man = await tx.manutencao.update({
-                where: { id: manutencaoId }, data: { status: 'Cancelada' }
-            });
-            await tx.notaAndamento.create({
-                data: { nota: `Manutenção cancelada. Motivo: ${motivo}`, manutencaoId, origem: 'automatico' }
-            });
-            return man;
-        });
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'CANCELAMENTO', entidade: 'Manutenção', entidadeId: manutencaoId,
-            detalhes: `OS ${manutencaoCancelada.numeroOS} foi cancelada. Motivo: ${motivo}`
-        });
-        res.json(manutencaoCancelada);
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Manutenção não encontrada.' });
-        res.status(500).json({ message: 'Erro ao cancelar manutenção.' });
-    }
+    } catch (error) { res.status(500).json({ message: 'Erro ao excluir.' }); }
 });
 
 export default router;
