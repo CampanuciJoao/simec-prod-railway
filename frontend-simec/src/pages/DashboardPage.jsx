@@ -1,5 +1,5 @@
 // Ficheiro: src/pages/DashboardPage.jsx
-// VERSÃO 8.0 - ALTO CONTRASTE, CORES SÓLIDAS E LEITURA FACILITADA
+// VERSÃO 10.0 - DESIGN PREMIUM CLEAN (ALTO CONTRASTE E LEITURA LEVE)
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -38,7 +38,7 @@ function DashboardPage({ darkMode }) {
       const data = await getDashboardData();
       setDashboardData(prevData => ({ ...prevData, ...data }));
     } catch (err) {
-      setError(err.message || "Erro de conexão com o servidor.");
+      setError(err.message || "Erro de conexão.");
     } finally {
       setLoading(false);
     }
@@ -60,7 +60,7 @@ function DashboardPage({ darkMode }) {
     return {
       labels: (statusData?.labels || []).map(val => enumToLabelMap[val] || val),
       datasets: [{ data: statusData?.data || [] }],
-      colorsLight: statusData?.colorsLight || [],
+      colorsLight: ['#10b981', '#ef4444', '#f59e0b', '#3b82f6'], 
       colorsDark: statusData?.colorsDark || [],
       textColorsLight: statusData?.textColorsLight || [],
       textColorsDark: statusData?.textColorsDark || []
@@ -85,115 +85,110 @@ function DashboardPage({ darkMode }) {
   if (loading) {
     return (
         <div className="page-content-wrapper">
-          <div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 px-2">
-            <div className="h-32 bg-blue-600/20 rounded-2xl animate-pulse"></div>
-            <div className="h-32 bg-amber-400/20 rounded-2xl animate-pulse"></div>
-            <div className="h-32 bg-indigo-600/20 rounded-2xl animate-pulse"></div>
+          <div className="page-title-card bg-[#1e293b] border-none shadow-md"><h1 className="page-title-internal">Dashboard</h1></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 px-1">
+            <SkeletonCard /><SkeletonCard /><SkeletonCard />
           </div>
         </div>
     );
   }
 
-  if (error) return <div className="page-content-wrapper"><div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div><p className="p-4 bg-red-100 text-red-700 rounded-lg shadow">Erro: {error}</p></div>;
+  if (error) return <div className="page-content-wrapper"><div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div><p className="p-4 bg-red-50 text-red-700 rounded-lg">Erro: {error}</p></div>;
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card shadow-lg border-none bg-slate-800">
-        <h1 className="page-title-internal">Dashboard Estratégico</h1>
+    <div className="page-content-wrapper pb-12">
+      <div className="page-title-card shadow-md border-none bg-[#1e293b] mb-8">
+        <h1 className="page-title-internal font-semibold">Dashboard</h1>
       </div>
 
-      {/* SEÇÃO DE CARDS COM CORES SÓLIDAS E ALTO CONTRASTE */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 px-2">
+      {/* SEÇÃO DE CARDS PREMIUM CLEAN */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 px-1">
         
-        {/* CARD AZUL - ATIVOS */}
-        <Link to="/equipamentos" className="group no-underline">
-            <div className="bg-blue-600 p-6 rounded-2xl shadow-xl hover:bg-blue-700 transition-all flex items-center gap-5 transform group-hover:-translate-y-2">
-                <div className="bg-white/20 p-4 rounded-xl text-white text-3xl shrink-0">
+        {/* CARD EQUIPAMENTOS */}
+        <Link to="/equipamentos" className="no-underline group">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center gap-6">
+                <div className="w-14 h-14 rounded-full bg-blue-50 flex items-center justify-center text-blue-500 text-xl border border-blue-100 shrink-0">
                     <FontAwesomeIcon icon={faHeartbeat} />
                 </div>
-                <div>
-                    <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Ativos Totais</p>
-                    <p className="text-5xl font-black text-white leading-none">{dashboardData.equipamentosCount}</p>
+                <div className="flex flex-col">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Equipamentos</span>
+                    <span className="text-3xl font-bold text-slate-800 leading-none">{dashboardData.equipamentosCount}</span>
                 </div>
             </div>
         </Link>
 
-        {/* CARD AMARELO - MANUTENÇÕES (Texto escuro para contraste) */}
-        <Link to="/manutencoes" className="group no-underline">
-            <div className="bg-amber-400 p-6 rounded-2xl shadow-xl hover:bg-amber-500 transition-all flex items-center gap-5 transform group-hover:-translate-y-2">
-                <div className="bg-black/10 p-4 rounded-xl text-slate-900 text-3xl shrink-0">
+        {/* CARD MANUTENÇÕES */}
+        <Link to="/manutencoes" className="no-underline group">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center gap-6">
+                <div className="w-14 h-14 rounded-full bg-amber-50 flex items-center justify-center text-amber-500 text-xl border border-amber-100 shrink-0">
                     <FontAwesomeIcon icon={faTools} />
                 </div>
-                <div>
-                    <p className="text-amber-900/70 text-[10px] font-black uppercase tracking-widest mb-1">Em Aberto</p>
-                    <p className="text-5xl font-black text-slate-900 leading-none">{dashboardData.manutencoesCount}</p>
+                <div className="flex flex-col">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Em Aberto</span>
+                    <span className="text-3xl font-bold text-slate-800 leading-none">{dashboardData.manutencoesCount}</span>
                 </div>
             </div>
         </Link>
 
-        {/* CARD INDIGO - CONTRATOS */}
-        <Link to="/contratos" className="group no-underline">
-            <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all flex items-center gap-5 transform group-hover:-translate-y-2">
-                <div className="bg-white/20 p-4 rounded-xl text-white text-3xl shrink-0">
+        {/* CARD CONTRATOS */}
+        <Link to="/contratos" className="no-underline group">
+            <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all flex items-center gap-6">
+                <div className="w-14 h-14 rounded-full bg-indigo-50 flex items-center justify-center text-indigo-500 text-xl border border-indigo-100 shrink-0">
                     <FontAwesomeIcon icon={faFileInvoiceDollar} />
                 </div>
-                <div>
-                    <p className="text-indigo-100 text-[10px] font-black uppercase tracking-widest mb-1">Vencendo (30d)</p>
-                    <p className="text-5xl font-black text-white leading-none">{dashboardData.contratosVencendoCount}</p>
+                <div className="flex flex-col">
+                    <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1">Contratos Vencendo</span>
+                    <span className="text-3xl font-bold text-slate-800 leading-none">{dashboardData.contratosVencendoCount}</span>
                 </div>
             </div>
         </Link>
       </section>
 
-      <section className="detailed-sections">
-        <div className="alerts-section page-section border-t-4 border-red-500">
-          <h2 className="font-black text-slate-800 text-sm tracking-tighter mb-4 border-none uppercase">Alertas Críticos</h2>
-          <div className="alerts-list">
+      {/* SEÇÃO INFERIOR CLEAN */}
+      <section className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-1">
+        
+        {/* ALERTAS RECENTES */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6">
+          <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest mb-6 flex items-center gap-2 border-b border-slate-100 pb-4">
+              <FontAwesomeIcon icon={faExclamationCircle} className="text-slate-300" />
+              Alertas Críticos
+          </h3>
+          <div className="space-y-1">
             {(dashboardData.alertasRecentes?.length > 0) ? (
-              <ul className="space-y-2">
-                {dashboardData.alertasRecentes.map(alerta => (
-                  <li key={alerta.id}>
-                    <Link to={alerta.link || '/alertas'} className="hover:bg-slate-100 p-2 rounded-lg transition-colors flex items-center gap-3 no-underline">
-                      <FontAwesomeIcon 
+              dashboardData.alertasRecentes.map(alerta => (
+                <Link key={alerta.id} to={alerta.link || '/alertas'} className="flex items-center gap-4 p-3 hover:bg-slate-50 rounded-lg transition-colors no-underline">
+                    <FontAwesomeIcon 
                         icon={faExclamationCircle} 
-                        className="text-xl" 
-                        style={{ color: alerta.prioridade === 'Alta' ? '#ef4444' : (alerta.prioridade === 'Media' ? '#f59e0b' : '#64748b')}} 
-                      />
-                      <span className="font-black text-slate-700 text-[11px] uppercase tracking-tight leading-none">{alerta.titulo}</span>
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : <p className="text-center text-slate-400 py-10 font-bold italic">Nenhum alerta pendente.</p>}
+                        className={alerta.prioridade === 'Alta' ? 'text-red-500' : 'text-amber-500'} 
+                    />
+                    <span className="text-xs font-bold text-slate-600 uppercase tracking-tight">{alerta.titulo}</span>
+                </Link>
+              ))
+            ) : <p className="text-center text-slate-300 py-10 text-sm italic">Nenhum alerta no momento.</p>}
           </div>
         </div>
 
-        <div className="charts-section page-section">
-          <div className="chart-container-dashboard"> 
-            <div className="flex items-center gap-2 mb-4">
-              <FontAwesomeIcon icon={faChartPie} className="text-slate-400" />
-              <h2 className="m-0 border-none text-slate-800 text-sm font-black uppercase tracking-tighter">Status Geral</h2>
-            </div>
-            <div className="chart-wrapper h-[220px]">
+        {/* GRÁFICOS */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col gap-10">
+          <div>
+            <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest mb-6">Status dos Ativos</h3>
+            <div className="h-[200px]">
               {temDadosValidosParaDonut ? (
                 <DonutChart key={`donut-${darkMode}`} chartData={statusEquipamentosChartData} darkMode={darkMode} onSliceClick={handleChartClick} />
-              ) : (<p className="no-data-message italic text-slate-400">Sem dados.</p>)}
+              ) : <p className="text-center text-slate-300 py-10 text-sm">Sem dados disponíveis.</p>}
             </div>
           </div>
-          <hr className="my-6 border-slate-100" />
-          <div className="chart-container-dashboard"> 
-             <div className="flex items-center gap-2 mb-4">
-               <FontAwesomeIcon icon={faChartBar} className="text-slate-400" />
-               <h2 className="m-0 border-none text-slate-800 text-sm font-black uppercase tracking-tighter">Manutenções Semestrais</h2>
-             </div>
-            <div className="chart-wrapper h-[220px]">
+
+          <div className="border-t border-slate-50 pt-8">
+            <h3 className="text-slate-800 font-bold text-xs uppercase tracking-widest mb-6">Manutenções Semestrais</h3>
+            <div className="h-[200px]">
               {temDadosValidosParaBar ? (
                 <BarChart key={`bar-${darkMode}`} chartData={manutencoesPorTipoMesChartData} darkMode={darkMode} onBarClick={handleBarChartClick} />
-              ) : (<p className="no-data-message italic text-slate-400">Sem dados.</p>)}
+              ) : <p className="text-center text-slate-300 py-10 text-sm">Sem dados disponíveis.</p>}
             </div>
           </div>
         </div>
+
       </section>
     </div>
   );

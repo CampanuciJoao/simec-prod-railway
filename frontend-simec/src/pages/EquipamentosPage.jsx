@@ -1,5 +1,5 @@
 // Ficheiro: src/pages/EquipamentosPage.jsx
-// VERSÃO 12.0 - ALTO CONTRASTE, CORES SÓLIDAS POR STATUS E UI IMPACTANTE
+// VERSÃO 13.0 - DESIGN CLEAN (INSPIRADO NA REFERÊNCIA)
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -16,8 +16,7 @@ import {
     faExclamationTriangle, 
     faFileMedical, 
     faEdit, 
-    faTrashAlt,
-    faCubes
+    faTrashAlt
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useEquipamentos } from '../hooks/useEquipamentos';
@@ -50,12 +49,7 @@ function EquipamentosPage() {
         refetch 
     } = useEquipamentos();
 
-    const { 
-        isOpen: isDeleteModalOpen, 
-        modalData: equipParaExcluir, 
-        openModal: abrirModalExclusao, 
-        closeModal: fecharModalExclusao 
-    } = useModal();
+    const { isOpen: isDeleteModalOpen, modalData: equipParaExcluir, openModal: abrirModalExclusao, closeModal: fecharModalExclusao } = useModal();
 
     const [expandidos, setExpandidos] = useState({});
     const [abasAtivas, setAbasAtivas] = useState({});
@@ -78,15 +72,14 @@ function EquipamentosPage() {
         setAbasAtivas(prev => ({ ...prev, [equipId]: nomeAba }));
     };
 
-    // >> LÓGICA DE CORES DE ALTO IMPACTO <<
+    // --- LÓGICA DE CORES CLEAN (Barra lateral + Fundo sutil) ---
     const getStatusStyles = (status) => {
         const s = status?.toLowerCase() || '';
-        // Retorna: Cor do Fundo | Cor do Texto | Cor da Borda
-        if (s === 'operante') return 'bg-emerald-600 text-white border-emerald-700';
-        if (s === 'inoperante') return 'bg-red-600 text-white border-red-700';
-        if (s === 'emmanutencao') return 'bg-amber-400 text-slate-900 border-amber-500';
-        if (s === 'usolimitado') return 'bg-blue-600 text-white border-blue-700';
-        return 'bg-slate-200 text-slate-800 border-slate-300';
+        if (s === 'operante') return 'border-emerald-500 bg-emerald-50/40';
+        if (s === 'inoperante') return 'border-red-500 bg-red-50/40';
+        if (s === 'emmanutencao') return 'border-amber-500 bg-amber-50/40';
+        if (s === 'usolimitado') return 'border-blue-500 bg-blue-50/40';
+        return 'border-slate-300 bg-slate-50';
     };
 
     const selectFiltersConfig = useMemo(() => {
@@ -109,109 +102,106 @@ function EquipamentosPage() {
 
     return (
         <>
-            <ModalConfirmacao 
-                isOpen={isDeleteModalOpen} 
-                onClose={fecharModalExclusao} 
-                onConfirm={() => { removerEquipamento(equipParaExcluir.id); fecharModalExclusao(); }} 
-                title="Excluir Equipamento" 
-                message={`Deseja excluir permanentemente o equipamento "${equipParaExcluir?.modelo}"?`} 
-                isDestructive={true} 
-            />
+            <ModalConfirmacao isOpen={isDeleteModalOpen} onClose={fecharModalExclusao} onConfirm={() => { removerEquipamento(equipParaExcluir.id); fecharModalExclusao(); }} title="Excluir Equipamento" message={`Deseja excluir permanentemente o equipamento "${equipParaExcluir?.modelo}"?`} isDestructive={true} />
 
             <div className="page-content-wrapper pb-20">
-                <div className="page-title-card shadow-xl bg-slate-800 border-none mb-8">
-                    <h1 className="page-title-internal flex items-center gap-3">
-                        <FontAwesomeIcon icon={faCubes} className="text-blue-400" />
+                {/* Cabeçalho de Página Clean */}
+                <div className="page-title-card shadow-md bg-[#1e293b] border-none mb-6">
+                    <h1 className="page-title-internal flex items-center gap-3 text-white">
+                        <FontAwesomeIcon icon={faHdd} className="text-blue-400" />
                         Parque Tecnológico
                     </h1>
-                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 border-none cursor-pointer" onClick={() => navigate('/cadastros/equipamentos/adicionar')}>
+                    <button className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-full font-bold shadow transition-all flex items-center gap-2 border-none cursor-pointer" onClick={() => navigate('/cadastros/equipamentos/adicionar')}>
                         <FontAwesomeIcon icon={faPlus} /> Novo Ativo
                     </button>
                 </div>
 
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8 mx-1">
+                {/* Filtros em Container Branco */}
+                <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 mx-1">
                     <GlobalFilterBar 
                         searchTerm={controles.searchTerm} 
                         onSearchChange={controles.handleSearchChange} 
-                        searchPlaceholder="Pesquisar modelo, patrimônio ou série..."
+                        searchPlaceholder="Pesquisar por modelo, série ou hospital..."
                         selectFilters={selectFiltersConfig} 
                     />
                 </div>
 
-                <div className="flex flex-col gap-4">
+                {/* Lista de Cards Estilo Referência */}
+                <div className="flex flex-col gap-3">
                     {equipamentos.length > 0 ? (
                         equipamentos.map(equip => {
                             const isAberto = expandidos[equip.id];
                             const abaAtual = abasAtivas[equip.id] || 'cadastro';
-                            const colorStyle = getStatusStyles(equip.status);
-                            const isLightBg = equip.status?.toLowerCase() === 'emmanutencao';
+                            const cardStyle = getStatusStyles(equip.status);
 
                             return (
-                                <div key={equip.id} className={`rounded-2xl shadow-lg transition-all overflow-hidden mb-2 border-b-4 ${colorStyle}`}>
+                                <div key={equip.id} className={`bg-white rounded-xl border-l-[6px] ${cardStyle} shadow-sm transition-all overflow-hidden border-t border-r border-b border-slate-200`}>
                                     
-                                    {/* CABEÇALHO DO CARD (COR SÓLIDA) */}
-                                    <div className={`p-5 flex items-center justify-between cursor-pointer ${isAberto ? 'brightness-95' : ''}`} onClick={() => toggleExpandir(equip.id)}>
+                                    {/* Cabeçalho do Item */}
+                                    <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => toggleExpandir(equip.id)}>
                                         
-                                        <div className="flex items-center gap-6 flex-1">
-                                            <FontAwesomeIcon 
-                                                icon={isAberto ? faMinusCircle : faPlusCircle} 
-                                                className={`text-2xl ${isLightBg ? 'text-black/30' : 'text-white/40'}`} 
-                                            />
+                                        <div className="flex items-center gap-4 flex-1">
+                                            {/* Botão de Expansão Azul à Esquerda */}
+                                            <button className="text-blue-500 bg-transparent border-none p-0 cursor-pointer text-xl leading-none">
+                                                <FontAwesomeIcon icon={isAberto ? faMinusCircle : faPlusCircle} />
+                                            </button>
                                             
-                                            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-x-8 gap-y-2 flex-1">
+                                            {/* Grid de Informações com Rótulos Pequenos */}
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 flex-1">
                                                 <div className="flex flex-col">
-                                                    <span className={`text-[10px] font-black uppercase tracking-tighter opacity-70`}>Modelo</span>
-                                                    <span className="font-black text-lg leading-tight uppercase truncate">{equip.modelo}</span>
+                                                    <span className="text-[10px] uppercase text-slate-500 font-bold tracking-tight">Modelo</span>
+                                                    <span className="text-sm font-semibold text-slate-800 uppercase leading-none mt-1">{equip.modelo}</span>
                                                 </div>
                                                 <div className="flex flex-col">
-                                                    <span className={`text-[10px] font-black uppercase tracking-tighter opacity-70`}>Série / Tag</span>
-                                                    <span className="font-mono font-bold">{equip.tag}</span>
+                                                    <span className="text-[10px] uppercase text-slate-500 font-bold tracking-tight">Nº Série / Tag</span>
+                                                    <span className="text-sm text-slate-600 font-medium italic leading-none mt-1">{equip.tag}</span>
                                                 </div>
                                                 <div className="hidden md:flex flex-col">
-                                                    <span className={`text-[10px] font-black uppercase tracking-tighter opacity-70`}>Tipo</span>
-                                                    <span className="font-bold truncate">{equip.tipo}</span>
+                                                    <span className="text-[10px] uppercase text-slate-500 font-bold tracking-tight">Tipo</span>
+                                                    <span className="text-sm text-slate-600 leading-none mt-1">{equip.tipo}</span>
                                                 </div>
-                                                <div className="hidden lg:flex flex-col">
-                                                    <span className={`text-[10px] font-black uppercase tracking-tighter opacity-70`}>Unidade</span>
-                                                    <span className="font-bold truncate">{equip.unidade?.nomeSistema || 'N/A'}</span>
+                                                <div className="hidden md:flex flex-col">
+                                                    <span className="text-[10px] uppercase text-slate-500 font-bold tracking-tight">Unidade</span>
+                                                    <span className="text-sm text-slate-600 truncate leading-none mt-1">{equip.unidade?.nomeSistema || 'N/A'}</span>
                                                 </div>
                                                 <div className="flex flex-col" onClick={(e) => e.stopPropagation()}>
-                                                    <span className={`text-[10px] font-black uppercase tracking-tighter opacity-70 mb-1`}>Status Atual</span>
+                                                    <span className="text-[10px] uppercase text-slate-500 font-bold tracking-tight mb-1">Status Atual</span>
                                                     <StatusSelector equipamento={equip} onSuccessUpdate={atualizarStatusLocalmente} />
                                                 </div>
                                             </div>
                                         </div>
 
-                                        <div className="flex items-center gap-3 ml-4">
-                                            <button className={`w-12 h-12 rounded-full transition-all flex items-center justify-center border-none shadow-inner ${isLightBg ? 'bg-black/10 text-slate-900 hover:bg-black/20' : 'bg-white/20 text-white hover:bg-white/30'}`} onClick={(e) => { e.stopPropagation(); navigate(`/equipamentos/ficha-tecnica/${equip.id}`); }} title="Abrir Ficha Técnica">
-                                                <FontAwesomeIcon icon={faFileMedical} size="lg" />
+                                        <div className="flex items-center gap-2 ml-4">
+                                            <button className="text-slate-400 hover:text-blue-600 bg-transparent border-none p-2 transition-colors cursor-pointer" onClick={(e) => { e.stopPropagation(); navigate(`/equipamentos/ficha-tecnica/${equip.id}`); }}>
+                                                <FontAwesomeIcon icon={faFileMedical} />
                                             </button>
                                         </div>
                                     </div>
 
-                                    {/* CONTEÚDO EXPANSÍVEL (MANTIDO EM FUNDO NEUTRO PARA LEITURA) */}
+                                    {/* Conteúdo Expandido (Branco Puro para Contraste) */}
                                     {isAberto && (
-                                        <div className="bg-white text-slate-800">
-                                            <div className="flex bg-slate-100 px-5 pt-3 gap-2 border-b border-slate-200">
-                                                <button className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-t-xl transition-all ${abaAtual === 'cadastro' ? 'bg-white text-blue-600 mb-[-1px]' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => trocarAba(equip.id, 'cadastro')}>Dados</button>
-                                                <button className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-t-xl transition-all ${abaAtual === 'acessorios' ? 'bg-white text-blue-600 mb-[-1px]' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => trocarAba(equip.id, 'acessorios')}>Acessórios</button>
-                                                <button className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-t-xl transition-all ${abaAtual === 'anexos' ? 'bg-white text-blue-600 mb-[-1px]' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => trocarAba(equip.id, 'anexos')}>Anexos</button>
-                                                <button className={`px-4 py-2 text-[11px] font-black uppercase tracking-widest rounded-t-xl transition-all ${abaAtual === 'historico' ? 'bg-white text-blue-600 mb-[-1px]' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => trocarAba(equip.id, 'historico')}>Histórico</button>
+                                        <div className="bg-white border-t border-slate-100">
+                                            <div className="flex bg-slate-50/50 px-4 pt-2 gap-1 border-b border-slate-200">
+                                                {['cadastro', 'acessorios', 'anexos', 'historico'].map(aba => (
+                                                    <button key={aba} className={`px-4 py-2 text-[10px] font-black uppercase tracking-widest transition-all border-none cursor-pointer ${abaAtual === aba ? 'bg-white text-blue-600 border-x border-t border-slate-200 rounded-t-lg mb-[-1px] shadow-[0_-2px_4px_rgba(0,0,0,0.02)]' : 'bg-transparent text-slate-400 hover:text-slate-600'}`} onClick={() => trocarAba(equip.id, aba)}>
+                                                        {aba === 'cadastro' ? 'Dados' : aba === 'acessorios' ? 'Acessórios' : aba === 'anexos' ? 'Anexos' : 'Histórico'}
+                                                    </button>
+                                                ))}
                                             </div>
 
-                                            <div className="p-8 min-h-[300px] animate-fadeIn">
+                                            <div className="p-6 min-h-[200px] animate-fadeIn">
                                                 {abaAtual === 'cadastro' && <TabCadastro equipamentoInicial={equip} />}
                                                 {abaAtual === 'acessorios' && <TabAcessorios equipamentoId={equip.id} />}
                                                 {abaAtual === 'anexos' && <TabAnexos equipamentoId={equip.id} anexosIniciais={equip.anexos || []} onUpdate={refetch} />}
                                                 {abaAtual === 'historico' && <TabHistorico equipamento={equip} />}
                                                 
-                                                <div className="flex justify-end gap-3 mt-10 pt-6 border-t border-slate-100">
-                                                    <button className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-bold text-xs transition-colors border-none cursor-pointer" onClick={() => navigate(`/cadastros/equipamentos/editar/${equip.id}`)}>
-                                                        <FontAwesomeIcon icon={faEdit} /> Editar Equipamento
+                                                <div className="flex justify-end gap-3 mt-8 pt-4 border-t border-slate-100">
+                                                    <button className="flex items-center gap-2 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-xs font-bold transition-all border-none cursor-pointer" onClick={() => navigate(`/cadastros/equipamentos/editar/${equip.id}`)}>
+                                                        <FontAwesomeIcon icon={faEdit} /> Editar Registro
                                                     </button>
                                                     {user?.role === 'admin' && (
-                                                        <button className="flex items-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg font-bold text-xs transition-colors border-none cursor-pointer" onClick={() => abrirModalExclusao(equip)}>
-                                                            <FontAwesomeIcon icon={faTrashAlt} /> Excluir Registro
+                                                        <button className="flex items-center gap-2 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded text-xs font-bold transition-all border-none cursor-pointer" onClick={() => abrirModalExclusao(equip)}>
+                                                            <FontAwesomeIcon icon={faTrashAlt} /> Excluir Ativo
                                                         </button>
                                                     )}
                                                 </div>
@@ -224,7 +214,7 @@ function EquipamentosPage() {
                     ) : (
                         <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
                             <FontAwesomeIcon icon={faExclamationTriangle} className="text-slate-300 text-4xl mb-4" />
-                            <p className="text-slate-400 font-medium text-lg">Nenhum equipamento encontrado.</p>
+                            <p className="text-slate-400 font-medium text-lg">Nenhum ativo encontrado para os filtros selecionados.</p>
                         </div>
                     )}
                 </div>
