@@ -66,10 +66,10 @@ function EquipamentosPage() {
     // --- LÓGICA DE CORES FIEL À IMAGEM (Barra grossa + Fundo sutil) ---
     const getStatusTheme = (status) => {
         const s = status?.toLowerCase() || '';
-        if (s === 'operante') return { border: 'border-emerald-500', bg: 'bg-emerald-100/50' };
-        if (s === 'inoperante') return { border: 'border-red-500', bg: 'bg-red-100/50' };
-        if (s === 'emmanutencao') return { border: 'border-amber-400', bg: 'bg-amber-100/50' };
-        if (s === 'usolimitado') return { border: 'border-blue-500', bg: 'bg-blue-100/50' };
+        if (s === 'operante') return { border: 'border-emerald-500', bg: 'bg-emerald-200/70' };
+        if (s === 'inoperante') return { border: 'border-red-500', bg: 'bg-red-200/70' };
+        if (s === 'emmanutencao') return { border: 'border-amber-400', bg: 'bg-amber-200/70' };
+        if (s === 'usolimitado') return { border: 'border-blue-500', bg: 'bg-blue-200/70' };
         return { border: 'border-slate-200', bg: 'bg-white' };
     };
 
