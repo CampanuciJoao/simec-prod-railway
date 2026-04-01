@@ -1,22 +1,14 @@
 // Ficheiro: src/pages/ManutencoesPage.jsx
-// VERSÃO 12.0 - COM SUPORTE A DRILL-DOWN (FILTRO POR EQUIPAMENTO VINDO DO BI)
+// VERSÃO 13.0 - CARDS EXPANSÍVEIS, DRILL-DOWN E UI DE ALTA PERFORMANCE
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { formatarData } from '../utils/timeUtils'; 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-    faPlus, 
-    faEye, 
-    faPenToSquare, 
-    faSpinner, 
-    faExclamationTriangle, 
-    faTrashAlt, 
-    faBan,
-    faWrench,
-    faClock,
-    faHospital,
-    faTag
+    faPlus, faEye, faPenToSquare, faSpinner, faTrashAlt, 
+    faWrench, faClock, faHospital, faTag, faPlusCircle, 
+    faMinusCircle, faUser, faFileAlt, faHashtag 
 } from '@fortawesome/free-solid-svg-icons';
 import { useManutencoes } from '../hooks/useManutencoes';
 import { useAuth } from '../contexts/AuthContext';
@@ -72,7 +64,10 @@ function ManutencoesPage() {
         filtros, setFiltros, refetch
     } = useManutencoes();
 
-    // LÓGICA DE DRILL-DOWN: Sincroniza filtros vindos do BI (Tipo e Equipamento)
+    // ESTADO PARA CONTROLE DE QUAIS CARDS ESTÃO ABERTOS
+    const [expandidos, setExpandidos] = useState({});
+
+    // Sincroniza filtros vindos do BI (Tipo e Equipamento)
     useEffect(() => {
         if (location.state?.filtroTipoInicial || location.state?.filtroEquipamentoId) {
             setFiltros(prev => ({ 
@@ -80,7 +75,6 @@ function ManutencoesPage() {
                 tipo: location.state.filtroTipoInicial || prev.tipo,
                 equipamentoId: location.state.filtroEquipamentoId || prev.equipamentoId 
             }));
-            // Limpa o estado para não re-filtrar se o usuário atualizar a página
             navigate(location.pathname, { replace: true, state: {} });
         }
     }, [location.state, setFiltros, navigate, location.pathname]);
@@ -93,6 +87,11 @@ function ManutencoesPage() {
     const { isOpen: isDeleteModalOpen, modalData: manutencaoParaDeletar, openModal: openDeleteModal, closeModal: closeDeleteModal } = useModal();
     const { isOpen: isCancelModalOpen, modalData: manutencaoParaCancelar, openModal: openCancelModal, closeModal: closeCancelModal } = useModal();
     
+    // Alterna o estado de expansão de um card
+    const toggleExpandir = (id) => {
+        setExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
+    };
+
     const handleConfirmarExclusao = async () => {
         if (!manutencaoParaDeletar) return;
         try {
@@ -103,8 +102,8 @@ function ManutencoesPage() {
     };
 
     const unidadesOptions = useMemo(() => (unidadesDisponiveis || []).map(u => ({ value: u.id, label: u.nomeSistema })), [unidadesDisponiveis]);
-    const statusOptions = ["Agendada", "EmAndamento", "Concluida", "Cancelada", "AguardandoConfirmacao"].map(s => ({ value: s, label: s.replace(/([A-Z])/g, ' $1').trim() }));
     const equipamentosOptions = useMemo(() => (equipamentos || []).map(eq => ({ value: eq.id, label: `${eq.modelo} (${eq.tag})` })), [equipamentos]);
+    const statusOptions = ["Agendada", "EmAndamento", "Concluida", "Cancelada", "AguardandoConfirmacao"].map(s => ({ value: s, label: s.replace(/([A-Z])/g, ' $1').trim() }));
 
     const selectFiltersConfig = [
         { id: 'unidadeId', value: filtros.unidadeId, onChange: (v) => setFiltros(f => ({...f, unidadeId: v})), options: unidadesOptions, defaultLabel: 'Todas Unidades' },
@@ -116,7 +115,7 @@ function ManutencoesPage() {
     if (loading && manutencoes.length === 0) {
         return (
             <div className="page-content-wrapper">
-                <div className="page-title-card bg-slate-800 border-none shadow-lg"><h1 className="page-title-internal text-white">Gerenciamento de Manutenções</h1></div>
+                <div className="page-title-card bg-slate-800 border-none shadow-lg"><h1 className="page-title-internal text-white">Ordens de Serviço</h1></div>
                 <div className="space-y-4 mt-8 px-4"><SkeletonCard /><SkeletonCard /><SkeletonCard /></div>
             </div>
         );
@@ -124,14 +123,14 @@ function ManutencoesPage() {
 
     return (
         <>
-            <ModalConfirmacao isOpen={isDeleteModalOpen} onClose={closeDeleteModal} onConfirm={handleConfirmarExclusao} title="Excluir OS" message={`Tem certeza que deseja apagar a OS nº ${manutencaoParaDeletar?.numeroOS}?`} isDestructive={true} />
+            <ModalConfirmacao isOpen={isDeleteModalOpen} onClose={closeDeleteModal} onConfirm={handleConfirmarExclusao} title="Excluir OS" message={`Deseja apagar a OS nº ${manutencaoParaDeletar?.numeroOS}?`} isDestructive={true} />
             <ModalCancelamento manutencao={manutencaoParaCancelar} isOpen={isCancelModalOpen} onClose={closeCancelModal} onCancelConfirm={refetch} />
 
             <div className="page-content-wrapper pb-20">
                 <div className="page-title-card shadow-xl bg-slate-800 border-none mb-8">
                     <h1 className="page-title-internal flex items-center gap-3 text-white font-bold">
                         <FontAwesomeIcon icon={faWrench} className="text-yellow-400" />
-                        Ordens de Serviço
+                        Gerenciamento de Manutenções
                     </h1>
                     <button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 border-none cursor-pointer" onClick={() => navigate('/manutencoes/agendar')}>
                         <FontAwesomeIcon icon={faPlus} /> Agendar Nova
@@ -142,78 +141,129 @@ function ManutencoesPage() {
                     <GlobalFilterBar searchTerm={searchTerm} onSearchChange={(e) => setSearchTerm(e.target.value)} searchPlaceholder="Buscar por OS ou descrição..." selectFilters={selectFiltersConfig} />
                 </div>
 
-                <div className="px-1 overflow-x-auto">
-                    <table className="w-full border-separate border-spacing-y-3">
-                        <thead>
-                            <tr className="text-slate-400 text-[11px] font-black uppercase tracking-widest text-center">
-                                <th className="pb-2 px-4 text-left">OS / Status</th>
-                                <th className="pb-2 px-4 text-left">Equipamento</th>
-                                <th className="pb-2 px-4">Agendamento</th>
-                                <th className="pb-2 px-4">Tipo</th>
-                                <th className="pb-2 px-4">Unidade</th>
-                                <th className="pb-2 px-4">Ações</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {manutencoes.length > 0 ? (
-                                manutencoes.map(m => (
-                                    <tr key={m.id} className={`group bg-white hover:shadow-md transition-all border-l-[8px] ${getRowBorder(m.status)} shadow-sm rounded-xl`}>
-                                        <td className="py-4 px-4 rounded-l-xl">
-                                            <div className="font-black text-slate-800 text-sm">{m.numeroOS}</div>
-                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${getStatusStyles(m.status)}`}>
-                                                {m.status.replace(/([A-Z])/g, ' $1').trim()}
-                                            </span>
-                                        </td>
-                                        <td className="py-4 px-4">
-                                            <div className="flex items-center gap-3">
-                                                <div className="bg-slate-100 p-2 rounded-lg text-slate-500"><FontAwesomeIcon icon={faTag} className="text-xs" /></div>
-                                                <div>
-                                                    <div className="font-bold text-slate-800 text-sm">{m.equipamento?.modelo}</div>
-                                                    <div className="text-[11px] text-slate-400 font-mono">{m.equipamento?.tag}</div>
+                <div className="px-1 flex flex-col gap-3">
+                    {manutencoes.length > 0 ? (
+                        manutencoes.map(m => {
+                            const isAberto = !!expandidos[m.id];
+                            return (
+                                <div key={m.id} className={`bg-white border-y border-r border-slate-200 border-l-[8px] ${getRowBorder(m.status)} shadow-sm rounded-xl overflow-hidden transition-all`}>
+                                    
+                                    {/* CABEÇALHO DO CARD (CLICÁVEL) */}
+                                    <div className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition-colors" onClick={() => toggleExpandir(m.id)}>
+                                        <div className="flex items-center gap-6 flex-1">
+                                            <div className="text-blue-500 w-6 flex items-center justify-center">
+                                                <FontAwesomeIcon icon={isAberto ? faMinusCircle : faPlusCircle} size="lg" />
+                                            </div>
+                                            
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-4 flex-1">
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">OS / Status</span>
+                                                    <span className="font-black text-slate-800 text-sm leading-tight">{m.numeroOS}</span>
+                                                    <span className={`w-fit mt-1 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getStatusStyles(m.status)}`}>
+                                                        {m.status.replace(/([A-Z])/g, ' $1').trim()}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Equipamento</span>
+                                                    <span className="font-bold text-slate-800 text-sm truncate">{m.equipamento?.modelo}</span>
+                                                    <span className="text-[10px] text-slate-400 font-mono italic">{m.equipamento?.tag}</span>
+                                                </div>
+
+                                                <div className="hidden md:flex flex-col">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Agendamento</span>
+                                                    <span className="font-bold text-slate-700 text-xs flex items-center gap-1">
+                                                        <FontAwesomeIcon icon={faClock} className="text-[9px] text-slate-300" /> {formatarData(m.dataHoraAgendamentoInicio)}
+                                                    </span>
+                                                    <span className="text-[10px] text-slate-500">{formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}</span>
+                                                </div>
+
+                                                <div className="hidden md:flex flex-col">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Unidade</span>
+                                                    <span className="font-bold text-slate-600 text-xs mt-1 flex items-center gap-1">
+                                                        <FontAwesomeIcon icon={faHospital} className="text-slate-300 text-[9px]" /> {m.equipamento?.unidade?.nomeSistema}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-col">
+                                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Tipo</span>
+                                                    <span className="font-bold text-slate-500 text-xs bg-slate-50 border border-slate-100 rounded-full px-2 py-0.5 w-fit mt-1">{m.tipo}</span>
                                                 </div>
                                             </div>
-                                        </td>
-                                        <td className="py-4 px-4 text-center">
-                                            <div className="flex flex-col items-center">
-                                                <span className="text-xs font-bold text-slate-600 flex items-center gap-1">
-                                                    <FontAwesomeIcon icon={faClock} className="text-[10px]" /> {formatarData(m.dataHoraAgendamentoInicio)}
-                                                </span>
-                                                <span className="text-[10px] text-slate-400 font-medium">{formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}</span>
+                                        </div>
+
+                                        {/* AÇÕES RÁPIDAS NA DIREITA */}
+                                        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                                            <Link to={`/manutencoes/detalhes/${m.id}`} className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm">
+                                                <FontAwesomeIcon icon={faEye} />
+                                            </Link>
+                                            {user?.role === 'admin' && (
+                                                <button onClick={() => openDeleteModal(m)} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm border-none cursor-pointer">
+                                                    <FontAwesomeIcon icon={faTrashAlt} />
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {/* ÁREA EXPANSÍVEL (DETALHES ADICIONAIS) */}
+                                    {isAberto && (
+                                        <div className="bg-slate-50/50 border-t border-slate-100 p-6 animate-fadeIn">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                                            <FontAwesomeIcon icon={faFileAlt} /> Descrição do Problema / Serviço
+                                                        </span>
+                                                        <p className="text-sm text-slate-700 bg-white p-4 rounded-lg border border-slate-200 leading-relaxed shadow-xs min-h-[80px]">
+                                                            {m.descricaoProblemaServico || "Nenhuma descrição informada."}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex flex-col gap-4">
+                                                    <div className="grid grid-cols-2 gap-4">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                                                <FontAwesomeIcon icon={faUser} /> Técnico Responsável
+                                                            </span>
+                                                            <span className="font-bold text-slate-700">{m.tecnicoResponsavel || "Não designado"}</span>
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-2">
+                                                                <FontAwesomeIcon icon={faHashtag} /> Número do Chamado
+                                                            </span>
+                                                            <span className="font-black text-slate-900 text-base">{m.numeroChamado || "N/A"}</span>
+                                                        </div>
+                                                    </div>
+                                                    
+                                                    <div className="mt-4 flex justify-end gap-3">
+                                                        {m.status === 'Agendada' && (
+                                                            <button 
+                                                                className="px-4 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-100 transition-all shadow-sm cursor-pointer"
+                                                                onClick={() => navigate(`/manutencoes/editar/${m.id}`)}
+                                                            >
+                                                                <FontAwesomeIcon icon={faPenToSquare} /> Editar Agendamento
+                                                            </button>
+                                                        )}
+                                                        <button 
+                                                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700 transition-all shadow-md cursor-pointer"
+                                                            onClick={() => navigate(`/manutencoes/detalhes/${m.id}`)}
+                                                        >
+                                                            Gerenciar O.S. Completa
+                                                        </button>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </td>
-                                        <td className="py-4 px-4 text-center">
-                                            <span className="text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">{m.tipo}</span>
-                                        </td>
-                                        <td className="py-4 px-4 text-center">
-                                            <div className="text-xs font-medium text-slate-600 flex items-center justify-center gap-1">
-                                                <FontAwesomeIcon icon={faHospital} className="text-slate-300 text-[10px]" />
-                                                {m.equipamento?.unidade?.nomeSistema}
-                                            </div>
-                                        </td>
-                                        <td className="py-4 px-4 text-center rounded-r-xl">
-                                            <div className="flex items-center justify-center gap-2">
-                                                <Link to={`/manutencoes/detalhes/${m.id}`} className="w-8 h-8 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm">
-                                                    <FontAwesomeIcon icon={faEye} />
-                                                </Link>
-                                                {m.status === 'Agendada' && (
-                                                    <Link to={`/manutencoes/editar/${m.id}`} className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-500 rounded-lg hover:bg-yellow-500 hover:text-white transition-all shadow-sm">
-                                                        <FontAwesomeIcon icon={faPenToSquare} />
-                                                    </Link>
-                                                )}
-                                                {user?.role === 'admin' && (
-                                                    <button onClick={() => openDeleteModal(m)} className="w-8 h-8 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm border-none cursor-pointer">
-                                                        <FontAwesomeIcon icon={faTrashAlt} />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr><td colSpan="6" className="py-20 text-center text-slate-400 font-medium italic">Nenhuma manutenção encontrada.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
+                                        </div>
+                                    )}
+                                </div>
+                            );
+                        })
+                    ) : (
+                        <div className="py-20 text-center text-slate-400 font-medium italic bg-white rounded-2xl border border-dashed border-slate-200">
+                            Nenhuma manutenção encontrada para os filtros aplicados.
+                        </div>
+                    )}
                 </div>
             </div>
         </>
