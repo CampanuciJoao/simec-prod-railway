@@ -1,46 +1,44 @@
 // Ficheiro: src/pages/DetalhesManutencaoPage.jsx
-// VERSÃO FINAL - COM ATUALIZAÇÃO AUTOMÁTICA DO SINO DE NOTIFICAÇÕES
-
+// VERSÃO FINAL - COM ATUALIZAÇÃO AUTOMÁTICA DO SINO DE NOTIFICAÇÕES E EXPORTAÇÃO DE OS PDF
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useManutencaoDetalhes } from '../hooks/useManutencaoDetalhes';
 import { useModal } from '../hooks/useModal';
-import { useAlertas } from '../contexts/AlertasContext'; // <<< ADICIONADO
-import { useToast } from '../contexts/ToastContext'; // <<< ADICIONADO
+import { useAlertas } from '../contexts/AlertasContext'; 
+import { useToast } from '../contexts/ToastContext'; 
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import ModalCancelamento from '../components/ModalCancelamento';
 import DateInput from '../components/DateInput';
 import TimeInput from '../components/TimeInput';
 import { formatarDataHora } from '../utils/timeUtils';
+import { exportarOSManutencaoPDF } from '../utils/pdfUtils'; // <<< ADICIONADO
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-    faArrowLeft, faSpinner, faExclamationTriangle, faPaperclip, faUpload, 
-    faPlus, faTrashAlt, faFilePdf, faFileImage, faFileAlt, faHistory, 
-    faSave, faBan, faCheckCircle, faTimesCircle, faPrint, faScroll
+import {
+faArrowLeft, faSpinner, faExclamationTriangle, faPaperclip, faUpload,
+faPlus, faTrashAlt, faFilePdf, faFileImage, faFileAlt, faHistory,
+faSave, faBan, faCheckCircle, faTimesCircle, faPrint, faScroll
 } from '@fortawesome/free-solid-svg-icons';
 
 const API_BASE_URL_DOWNLOAD = import.meta.env.VITE_API_URL || 'http://localhost:5000';
 
-const getIconePorTipoArquivo = (mimeType = '') => { 
-    if (mimeType.startsWith('image/')) return <FontAwesomeIcon icon={faFileImage} style={{ marginRight: '8px' }} />;
-    if (mimeType === 'application/pdf') return <FontAwesomeIcon icon={faFilePdf} style={{ marginRight: '8px' }} />;
-    return <FontAwesomeIcon icon={faFileAlt} style={{ marginRight: '8px' }} />;
+const getIconePorTipoArquivo = (mimeType = '') => {
+  if (mimeType.startsWith('image/')) return <FontAwesomeIcon icon={faFileImage} style={{ marginRight: '8px' }} />;
+  if (mimeType === 'application/pdf') return <FontAwesomeIcon icon={faFilePdf} style={{ marginRight: '8px' }} />;
+  return <FontAwesomeIcon icon={faFileAlt} style={{ marginRight: '8px' }} />;
 };
 
 const getStatusBadgeClassManutencao = (status) => {
-    const statusClass = status?.toLowerCase().replace(/ /g, '-') || 'default';
-    if (status === 'AguardandoConfirmacao') return 'status-badge status-os-emandamento';
-    return `status-badge status-os-${statusClass}`;
+  const statusClass = status?.toLowerCase().replace(/ /g, '-') || 'default';
+  if (status === 'AguardandoConfirmacao') return 'status-badge status-os-emandamento';
+  return `status-badge status-os-${statusClass}`;
 };
 
 function DetalhesManutencaoPage() {
   const { manutencaoId } = useParams();
   const navigate = useNavigate();
   const anexoInputRef = useRef(null);
-  
   const { addToast } = useToast();
-  const { refetchAlertas } = useAlertas(); // <<< Função que atualiza o sino
-
+  const { refetchAlertas } = useAlertas(); 
   const {
     manutencao, loading, error, submitting,
     salvarAtualizacoes, adicionarNota, fazerUploadAnexo,
@@ -55,11 +53,11 @@ function DetalhesManutencaoPage() {
   const [novaNota, setNovaNota] = useState('');
 
   // Estados para o formulário de decisão (Operante ou Não)
-  const [confirmMode, setConfirmMode] = useState(null); 
+  const [confirmMode, setConfirmMode] = useState(null);
   const [dataTerminoReal, setDataTerminoReal] = useState('');
   const [novaPrevisao, setNovaPrevisao] = useState('');
   const [observacaoDecisao, setObservacaoDecisao] = useState('');
-  
+
   const { isOpen: isDeleteAnexoModalOpen, modalData: anexoParaDeletar, openModal: openDeleteAnexoModal, closeModal: closeDeleteAnexoModal } = useModal();
   const { isOpen: isCancelModalOpen, openModal: openCancelModal, closeModal: closeCancelModal } = useModal();
 
@@ -77,13 +75,13 @@ function DetalhesManutencaoPage() {
       });
     }
   }, [manutencao]);
-  
+
   const handleFormChange = (e) => { const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value })); };
   
   const handleAddNota = async () => {
     if (novaNota.trim()) { await adicionarNota(novaNota); setNovaNota(''); }
   };
-  
+
   const handleAnexoUpload = (event) => {
     const files = event.target.files;
     if (!files || files.length === 0) return;
@@ -105,10 +103,8 @@ function DetalhesManutencaoPage() {
     await salvarAtualizacoes(payload);
   };
 
-  // FUNÇÃO FINAL: CONCLUI E ATUALIZA O SINO DE ALERTAS
   const handleConfirmacaoFinal = async () => {
     let payload = {};
-
     if (confirmMode === 'OK') {
         if (!dataTerminoReal) { addToast("Informe a data e hora de término.", "error"); return; }
         payload = { 
@@ -126,17 +122,17 @@ function DetalhesManutencaoPage() {
 
     try {
         await concluirOS(payload);
-        
-        // >>> COMANDO PARA LIMPAR O SINO IMEDIATAMENTE <<<
         if (refetchAlertas) refetchAlertas(); 
-        
         setConfirmMode(null);
     } catch (err) {
         console.error("Erro na confirmação:", err);
     }
   };
-  
-  const handlePrint = () => { window.print(); };
+
+  const handlePrint = () => { 
+    // AGORA GERA O PDF OFICIAL EM VEZ DE IMPRIMIR A TELA
+    exportarOSManutencaoPDF(manutencao); 
+  };
 
   if (loading) return <div className="page-content-wrapper centered-loader"><FontAwesomeIcon icon={faSpinner} spin size="2x"/></div>;
   if (error) return <div className="page-content-wrapper"><p className="form-error"><FontAwesomeIcon icon={faExclamationTriangle} /> {error.message}</p></div>;
@@ -150,102 +146,133 @@ function DetalhesManutencaoPage() {
       <ModalCancelamento isOpen={isCancelModalOpen} onClose={closeCancelModal} manutencao={manutencao} onCancelConfirm={refetchManutencao} />
 
       <div className="page-content-wrapper">
-        <div className="page-title-card no-print">
-            <h1 className="page-title-internal">Detalhes da Ordem de Serviço: {manutencao.numeroOS}</h1>
-            <div className="page-title-actions">
-                <button className="btn btn-primary" onClick={handlePrint}><FontAwesomeIcon icon={faPrint}/> Imprimir</button>
-                <button className="btn btn-secondary" onClick={() => navigate('/manutencoes')} style={{marginLeft: '10px'}}><FontAwesomeIcon icon={faArrowLeft}/> Voltar</button>
-            </div>
-        </div>
-        
-        {/* FORMULÁRIO DE DECISÃO FINAL */}
-        {manutencao.status === 'AguardandoConfirmacao' && ( 
-            <section className="page-section no-print" style={{ borderColor: '#F59E0B', background: '#fefce8', borderWidth: '2px' }}> 
-                <h3 style={{color: '#B45309'}}>Ação Necessária: Confirmar Finalização</h3> 
-                <p>O tempo agendado para esta manutenção expirou. Registre o resultado para atualizar o sistema:</p> 
-                
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
-                    <div style={{ display: 'flex', gap: '10px' }}>
-                        <button className={`btn ${confirmMode === 'OK' ? 'btn-success' : 'btn-secondary'}`} onClick={() => setConfirmMode('OK')}>
-                            <FontAwesomeIcon icon={faCheckCircle} /> Equipamento Operante
-                        </button>
-                        <button className={`btn ${confirmMode === 'ERRO' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setConfirmMode('ERRO')}>
-                            <FontAwesomeIcon icon={faTimesCircle} /> Continua Inoperante
-                        </button>
-                    </div>
+          <div className="page-title-card no-print">
+              <h1 className="page-title-internal">Detalhes da Ordem de Serviço: {manutencao.numeroOS}</h1>
+              <div className="page-title-actions">
+                  <button className="btn btn-primary" onClick={handlePrint}><FontAwesomeIcon icon={faPrint}/> Imprimir PDF</button>
+                  <button className="btn btn-secondary" onClick={() => navigate('/manutencoes')} style={{marginLeft: '10px'}}><FontAwesomeIcon icon={faArrowLeft}/> Voltar</button>
+              </div>
+          </div>
+          
+          {/* FORMULÁRIO DE DECISÃO FINAL */}
+          {manutencao.status === 'AguardandoConfirmacao' && ( 
+              <section className="page-section no-print" style={{ borderColor: '#F59E0B', background: '#fefce8', borderWidth: '2px' }}> 
+                  <h3 style={{color: '#B45309'}}>Ação Necessária: Confirmar Finalização</h3> 
+                  <p>O tempo agendado para esta manutenção expirou. Registre o resultado para atualizar o sistema:</p> 
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', marginTop: '20px' }}>
+                      <div style={{ display: 'flex', gap: '10px' }}>
+                          <button className={`btn ${confirmMode === 'OK' ? 'btn-success' : 'btn-secondary'}`} onClick={() => setConfirmMode('OK')}>
+                              <FontAwesomeIcon icon={faCheckCircle} /> Equipamento Operante
+                          </button>
+                          <button className={`btn ${confirmMode === 'ERRO' ? 'btn-danger' : 'btn-secondary'}`} onClick={() => setConfirmMode('ERRO')}>
+                              <FontAwesomeIcon icon={faTimesCircle} /> Continua Inoperante
+                          </button>
+                      </div>
 
-                    {confirmMode === 'OK' && (
-                        <div className="form-group" style={{ maxWidth: '400px' }}>
-                            <label>Data e Hora real da conclusão: *</label>
-                            <input type="datetime-local" className="form-control" onChange={(e) => setDataTerminoReal(e.target.value)} />
-                        </div>
-                    )}
+                      {confirmMode === 'OK' && (
+                          <div className="form-group" style={{ maxWidth: '400px' }}>
+                              <label>Data e Hora real da conclusão: *</label>
+                              <input type="datetime-local" className="form-control" onChange={(e) => setDataTerminoReal(e.target.value)} />
+                          </div>
+                      )}
 
-                    {confirmMode === 'ERRO' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '600px' }}>
-                            <div className="form-group">
-                                <label>Motivo da permanência da falha: *</label>
-                                <textarea rows="2" className="form-control" placeholder="Descreva o que houve..." onChange={(e) => setObservacaoDecisao(e.target.value)}></textarea>
-                            </div>
-                            <div className="form-group">
-                                <label>Nova previsão de conclusão: *</label>
-                                <input type="datetime-local" className="form-control" onChange={(e) => setNovaPrevisao(e.target.value)} />
-                            </div>
-                        </div>
-                    )}
+                      {confirmMode === 'ERRO' && (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px', maxWidth: '600px' }}>
+                              <div className="form-group">
+                                  <label>Motivo da permanência da falha: *</label>
+                                  <textarea rows="2" className="form-control" placeholder="Descreva o que houve..." onChange={(e) => setObservacaoDecisao(e.target.value)}></textarea>
+                              </div>
+                              <div className="form-group">
+                                  <label>Nova previsão de conclusão: *</label>
+                                  <input type="datetime-local" className="form-control" onChange={(e) => setNovaPrevisao(e.target.value)} />
+                              </div>
+                          </div>
+                      )}
 
-                    {confirmMode && (
-                        <button className="btn btn-primary" style={{ width: 'fit-content' }} onClick={handleConfirmacaoFinal} disabled={submitting}>
-                            {submitting ? 'Salvando...' : 'Confirmar e Atualizar Sistema'}
-                        </button>
-                    )}
+                      {confirmMode && (
+                          <button className="btn btn-primary" style={{ width: 'fit-content' }} onClick={handleConfirmacaoFinal} disabled={submitting}>
+                              {submitting ? 'Salvando...' : 'Confirmar e Atualizar Sistema'}
+                          </button>
+                      )}
+                  </div>
+              </section> 
+          )}
+          
+          <section className="page-section">
+            <h3 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-6 border-b border-slate-100 pb-4">
+              Informações da Manutenção
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Equipamento</span>
+                    <Link to={`/equipamentos`} className="font-bold text-blue-600 no-underline hover:underline">
+                        {manutencao.equipamento?.modelo} ({manutencao.equipamento?.tag})
+                    </Link>
                 </div>
-            </section> 
-        )}
-        
-        <section className="page-section">
-          <h3>Informações da Manutenção</h3>
-          <div className="info-grid">
-              <p><strong>Equipamento:</strong> <Link to={`/equipamentos`}>{manutencao.equipamento?.modelo}</Link></p>
-              <p><strong>Tipo:</strong> {manutencao.tipo}</p>
-              <p><strong>Status OS:</strong> <span className={getStatusBadgeClassManutencao(manutencao.status)}>{manutencao.status}</span></p>
-              <p><strong>Previsão Original:</strong> {formatarDataHora(manutencao.dataHoraAgendamentoInicio)}</p>
-          </div>
-          <div className="form-group" style={{ marginTop: '20px' }}><label>Descrição do Problema / Serviço:</label><textarea name="descricaoProblemaServico" value={formData.descricaoProblemaServico} onChange={handleFormChange} rows="3" disabled={camposPrincipaisBloqueados}></textarea></div>
-          
-          <div className="info-grid" style={{ marginTop: '15px', alignItems: 'flex-end' }}>
-              <div className="form-group"><label>Técnico Responsável</label><input type="text" name="tecnicoResponsavel" value={formData.tecnicoResponsavel} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div>
-              <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Início Real (Auto)</label><DateInput name="dataInicioReal" value={formData.dataInicioReal} onChange={handleFormChange} disabled={true} /></div><div className="form-group" style={{flex: 1}}><label>Hora Início</label><TimeInput name="horaInicioReal" value={formData.horaInicioReal} onChange={handleFormChange} disabled={true} /></div></div>
-              <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Fim Real</label><DateInput name="dataFimReal" value={formData.dataFimReal} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div><div className="form-group" style={{flex: 1}}><label>Hora Fim</label><TimeInput name="horaFimReal" value={formData.horaFimReal} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div></div>
-          </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Tipo / Categoria</span>
+                    <span className="font-bold text-slate-700">{manutencao.tipo}</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Status da OS</span>
+                    <span className={getStatusBadgeClassManutencao(manutencao.status)}>{manutencao.status}</span>
+                </div>
+                
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Nº do Chamado</span>
+                    <span className="font-black text-slate-900 text-lg">
+                        {manutencao.numeroChamado || '---'}
+                    </span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Previsão Original</span>
+                    <span className="font-bold text-slate-700">{formatarDataHora(manutencao.dataHoraAgendamentoInicio)}</span>
+                </div>
+                <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Unidade</span>
+                    <span className="font-bold text-slate-700">{manutencao.equipamento?.unidade?.nomeSistema}</span>
+                </div>
+            </div>
 
-          <div className="form-actions no-print" style={{ justifyContent: 'flex-start', marginTop: '20px', gap: '10px' }}>
-            <button className="btn btn-primary" onClick={handleSalvarAlteracoes} disabled={submitting || camposPrincipaisBloqueados}><FontAwesomeIcon icon={faSave} /> Salvar Alterações</button>
-            {isCancelavel && <button className="btn btn-danger" onClick={() => openCancelModal(manutencao)} disabled={submitting}><FontAwesomeIcon icon={faBan} /> Cancelar</button>}
-          </div>
-        </section>
+            <div className="form-group" style={{ marginTop: '20px' }}>
+              <label>Descrição do Problema / Serviço:</label>
+              <textarea name="descricaoProblemaServico" value={formData.descricaoProblemaServico} onChange={handleFormChange} rows="3" disabled={camposPrincipaisBloqueados}></textarea>
+            </div>
+            
+            <div className="info-grid" style={{ marginTop: '15px', alignItems: 'flex-end' }}>
+                <div className="form-group"><label>Técnico Responsável</label><input type="text" name="tecnicoResponsavel" value={formData.tecnicoResponsavel} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div>
+                <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Início Real (Auto)</label><DateInput name="dataInicioReal" value={formData.dataInicioReal} onChange={handleFormChange} disabled={true} /></div><div className="form-group" style={{flex: 1}}><label>Hora Início</label><TimeInput name="horaInicioReal" value={formData.horaInicioReal} onChange={handleFormChange} disabled={true} /></div></div>
+                <div style={{display: 'flex', gap: '15px'}}><div className="form-group" style={{flex: 1}}><label>Fim Real</label><DateInput name="dataFimReal" value={formData.dataFimReal} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div><div className="form-group" style={{flex: 1}}><label>Hora Fim</label><TimeInput name="horaFimReal" value={formData.horaFimReal} onChange={handleFormChange} disabled={camposPrincipaisBloqueados} /></div></div>
+            </div>
 
-        <section className="page-section">
-          <div className="section-header">
-              <h3><FontAwesomeIcon icon={faHistory} /> Histórico do Chamado</h3>
-              <Link to="/gerenciamento/auditoria" state={{ filtroEntidade: 'Manutenção', filtroEntidadeId: manutencao.id }} className="btn btn-secondary btn-sm no-print">
-                  <FontAwesomeIcon icon={faScroll} /> Auditoria Completa
-              </Link>
-          </div>
-          {(manutencao.notasAndamento?.length > 0) ? ( <ul className="list-group" style={{marginBottom: '20px'}}>{manutencao.notasAndamento.map((nota) => ( <li key={nota.id} className="list-group-item" style={{display: 'block'}}><strong style={{color: '#1e293b'}}>{formatarDataHora(nota.data)} - {nota.autor?.nome || 'Sistema'}:</strong><span style={{marginLeft: '8px'}}>{nota.nota}</span></li> ))}</ul> ) : <p className="no-data-message" style={{marginBottom: '20px'}}>Nenhuma nota registrada.</p> } 
+            <div className="form-actions no-print" style={{ justifyContent: 'flex-start', marginTop: '20px', gap: '10px' }}>
+              <button className="btn btn-primary" onClick={handleSalvarAlteracoes} disabled={submitting || camposPrincipaisBloqueados}><FontAwesomeIcon icon={faSave} /> Salvar Alterações</button>
+              {isCancelavel && <button className="btn btn-danger" onClick={() => openCancelModal(manutencao)} disabled={submitting}><FontAwesomeIcon icon={faBan} /> Cancelar</button>}
+            </div>
+          </section>
+
+          <section className="page-section">
+            <div className="section-header">
+                <h3><FontAwesomeIcon icon={faHistory} /> Histórico do Chamado</h3>
+                <Link to="/gerenciamento/auditoria" state={{ filtroEntidade: 'Manutenção', filtroEntidadeId: manutencao.id }} className="btn btn-secondary btn-sm no-print">
+                    <FontAwesomeIcon icon={faScroll} /> Auditoria Completa
+                </Link>
+            </div>
+            {(manutencao.notasAndamento?.length > 0) ? ( <ul className="list-group" style={{marginBottom: '20px'}}>{manutencao.notasAndamento.map((nota) => ( <li key={nota.id} className="list-group-item" style={{display: 'block'}}><strong style={{color: '#1e293b'}}>{formatarDataHora(nota.data)} - {nota.autor?.nome || 'Sistema'}:</strong><span style={{marginLeft: '8px'}}>{nota.nota}</span></li> ))}</ul> ) : <p className="no-data-message" style={{marginBottom: '20px'}}>Nenhuma nota registrada.</p> } 
+            
+            <div className="form-group no-print"><label htmlFor="nova-nota">Adicionar Nota Manual</label><textarea id="nova-nota" rows="2" value={novaNota} onChange={(e) => setNovaNota(e.target.value)} disabled={submitting}></textarea></div>
+            <button className="btn btn-primary btn-sm no-print" onClick={handleAddNota} disabled={submitting || !novaNota.trim()} style={{marginTop: '10px'}}><FontAwesomeIcon icon={faPlus} /> Adicionar Nota</button>
+          </section>
           
-          <div className="form-group no-print"><label htmlFor="nova-nota">Adicionar Nota Manual</label><textarea id="nova-nota" rows="2" value={novaNota} onChange={(e) => setNovaNota(e.target.value)} disabled={submitting}></textarea></div>
-          <button className="btn btn-primary btn-sm no-print" onClick={handleAddNota} disabled={submitting || !novaNota.trim()} style={{marginTop: '10px'}}><FontAwesomeIcon icon={faPlus} /> Adicionar Nota</button>
-        </section>
-        
-        <section className="page-section no-print">
-          <div className="section-header">
-            <h3><FontAwesomeIcon icon={faPaperclip} /> Anexos ({manutencao.anexos?.length || 0})</h3>
-            <button onClick={() => anexoInputRef.current.click()} className="btn btn-sm btn-success" disabled={submitting}><FontAwesomeIcon icon={faUpload} /> Enviar Arquivo</button>
-          </div>
-          <input type="file" multiple ref={anexoInputRef} onChange={handleAnexoUpload} style={{ display: 'none' }} disabled={submitting} />
-          {(manutencao.anexos?.length > 0) ? ( <ul className="list-group" style={{marginTop: '15px'}}>{manutencao.anexos.map(anexo => ( <li key={anexo.id} className="list-group-item"><a href={`${API_BASE_URL_DOWNLOAD}/${anexo.path}`} target="_blank" rel="noopener noreferrer">{getIconePorTipoArquivo(anexo.tipoMime)} {anexo.nomeOriginal}</a><button onClick={() => openDeleteAnexoModal(anexo)} className="btn-action delete"><FontAwesomeIcon icon={faTrashAlt} /></button></li> ))}</ul> ) : <p className="no-data-message">Nenhum anexo.</p> }
-        </section>
+          <section className="page-section no-print">
+            <div className="section-header">
+              <h3><FontAwesomeIcon icon={faPaperclip} /> Anexos ({manutencao.anexos?.length || 0})</h3>
+              <button onClick={() => anexoInputRef.current.click()} className="btn btn-sm btn-success" disabled={submitting}><FontAwesomeIcon icon={faUpload} /> Enviar Arquivo</button>
+            </div>
+            <input type="file" multiple ref={anexoInputRef} onChange={handleAnexoUpload} style={{ display: 'none' }} disabled={submitting} />
+            {(manutencao.anexos?.length > 0) ? ( <ul className="list-group" style={{marginTop: '15px'}}>{manutencao.anexos.map(anexo => ( <li key={anexo.id} className="list-group-item"><a href={`${API_BASE_URL_DOWNLOAD}/${anexo.path}`} target="_blank" rel="noopener noreferrer">{getIconePorTipoArquivo(anexo.tipoMime)} {anexo.nomeOriginal}</a><button onClick={() => openDeleteAnexoModal(anexo)} className="btn-action delete"><FontAwesomeIcon icon={faTrashAlt} /></button></li> ))}</ul> ) : <p className="no-data-message">Nenhum anexo.</p> }
+          </section>
       </div>
     </>
   );
