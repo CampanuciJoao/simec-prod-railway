@@ -1,5 +1,5 @@
 // Ficheiro: src/pages/EquipamentosPage.jsx
-// VERSÃO 18.0 - DESIGN PREMIUM (CORES DO USUÁRIO + BORDAS NÍTIDAS)
+// VERSÃO 19.0 - CORREÇÃO DE ERROS, CORES VIVAS E BORDAS NÍTIDAS
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -38,22 +38,24 @@ function EquipamentosPage() {
         }
     }, [location.state, setFiltros, navigate, location.pathname]);
 
-    const toggleExpandir = (id) => {
+    const toggleExpandir = (e, id) => {
+        e.stopPropagation(); // << IMPEDE QUE O BOTÃO REDIRECIONE A PÁGINA
         setExpandidos(prev => ({ ...prev, [id]: !prev[id] }));
-        if (!expandidos[id] && !abasAtivas[id]) setAbasAtivas(prev => ({ ...prev, [id]: 'cadastro' }));
+        if (!abasAtivas[id]) setAbasAtivas(prev => ({ ...prev, [id]: 'cadastro' }));
     };
 
     const trocarAba = (equipId, nomeAba) => setAbasAtivas(prev => ({ ...prev, [equipId]: nomeAba }));
 
     // ==========================================================================
-    // >>> CORES DOS CARDS (MANTIDAS CONFORME SOLICITADO) <<<
+    // >>> CONFIGURAÇÃO DE CORES VIVAS <<<
     // ==========================================================================
     const getStatusTheme = (status) => {
         const s = status?.toLowerCase() || '';
-        if (s === 'operante') return { border: 'border-emerald-500', bg: 'bg-emerald-200/60' };
-        if (s === 'inoperante') return { border: 'border-red-500', bg: 'bg-red-200/60' };
-        if (s === 'emmanutencao') return { border: 'border-amber-400', bg: 'bg-amber-200/60' };
-        if (s === 'usolimitado') return { border: 'border-blue-500', bg: 'bg-blue-200/60' };
+        // bg-color-100 ou 200 deixa a cor bem presente
+        if (s === 'operante') return { border: 'border-emerald-500', bg: 'bg-emerald-100/80' };
+        if (s === 'inoperante') return { border: 'border-red-500', bg: 'bg-red-100/80' };
+        if (s === 'emmanutencao') return { border: 'border-amber-500', bg: 'bg-amber-100/90' };
+        if (s === 'usolimitado') return { border: 'border-blue-500', bg: 'bg-blue-100/80' };
         return { border: 'border-slate-300', bg: 'bg-white' };
     };
 
@@ -61,23 +63,23 @@ function EquipamentosPage() {
 
     return (
         <div className="page-content-wrapper p-6 bg-slate-50 min-h-screen">
-            <ModalConfirmacao isOpen={isOpen} onClose={closeModal} onConfirm={() => { removerEquipamento(modalData.id); closeModal(); }} title="Excluir" message="Excluir este ativo?" isDestructive={true} />
+            <ModalConfirmacao isOpen={isOpen} onClose={closeModal} onConfirm={() => { removerEquipamento(modalData.id); closeModal(); }} title="Excluir" message="Deseja excluir este registro?" isDestructive={true} />
 
             {/* HEADER DARK */}
             <div className="flex justify-between items-center bg-[#1e293b] p-5 rounded-xl shadow-lg mb-8">
-                <h1 className="text-xl font-bold text-white m-0 tracking-tight">Gerenciamento de Ativos</h1>
+                <h1 className="text-xl font-bold text-white m-0 tracking-tight uppercase">Gerenciamento de Ativos</h1>
                 <button className="bg-[#3b82f6] hover:bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-black transition-all border-none cursor-pointer flex items-center gap-2 shadow-md uppercase" onClick={() => navigate('/cadastros/equipamentos/adicionar')}>
                     <FontAwesomeIcon icon={faPlus} /> Adicionar Equipamento
                 </button>
             </div>
 
-            {/* BARRA DE FILTROS */}
-            <div className="mb-8">
+            {/* FILTROS COM BORDA NÍTIDA */}
+            <div className="mb-8 px-1">
                 <div className="bg-white p-2 rounded-xl shadow-sm border border-slate-300">
                     <GlobalFilterBar 
                         searchTerm={controles.searchTerm} 
                         onSearchChange={controles.handleSearchChange} 
-                        searchPlaceholder="Pesquisar modelo ou tag..."
+                        searchPlaceholder="Pesquisar..."
                         selectFilters={[
                             { id: 'unidadeId', value: controles.filtros.unidadeId, onChange: (v) => controles.handleFilterChange('unidadeId', v), options: unidadesDisponiveis.map(u => ({ value: u.id, label: u.nomeSistema })), defaultLabel: 'Todas Unidades' },
                             { id: 'status', value: controles.filtros.status, onChange: (v) => controles.handleFilterChange('status', v), options: ["Operante", "Inoperante", "UsoLimitado", "EmManutencao"].map(s => ({ value: s, label: s })), defaultLabel: 'Todos Status' }
@@ -86,51 +88,50 @@ function EquipamentosPage() {
                 </div>
             </div>
 
-            {/* LISTAGEM DE CARDS */}
+            {/* LISTAGEM */}
             <div className="flex flex-col gap-4">
                 {equipamentos.map(equip => {
                     const theme = getStatusTheme(equip.status);
-                    const isAberto = expandidos[equip.id];
-                    const abaAtual = abasAtivas[equip.id] || 'cadastro';
+                    const isAberto = !!expandidos[equip.id]; // Garante valor booleano
+                    const abaAtivaDesteCard = abasAtivas[equip.id] || 'cadastro'; // CORREÇÃO AQUI
 
                     return (
-                        /* CONTAINER DO CARD - Bordas Nítidas (border-slate-300) */
-                        <div key={equip.id} className={`bg-white border border-slate-300 border-l-[12px] ${theme.border} ${theme.bg} rounded-2xl shadow-sm overflow-hidden transition-all hover:shadow-md mb-1`}>
+                        /* CARD CONTAINER - Bordas reforçadas para aparecerem bem */
+                        <div key={equip.id} className={`bg-white border-y border-r border-slate-300 border-l-[12px] ${theme.border} ${theme.bg} rounded-2xl shadow-md overflow-hidden transition-all hover:shadow-lg mb-2`}>
                             
-                            <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => toggleExpandir(equip.id)}>
+                            <div className="p-4 flex items-center justify-between cursor-pointer" onClick={(e) => toggleExpandir(e, equip.id)}>
                                 <div className="flex items-center gap-6 flex-1">
                                     
-                                    {/* BOTÃO (+) IGUAL À FOTO: Círculo Azul, Símbolo Branco */}
+                                    {/* BOTÃO (+) REDONDO AZUL */}
                                     <div className="bg-[#3b82f6] text-white rounded-full w-8 h-8 flex items-center justify-center shadow-md shrink-0">
                                         <FontAwesomeIcon icon={isAberto ? faMinusCircle : faPlusCircle} size="lg" />
                                     </div>
                                     
-                                    {/* GRID DE COLUNAS */}
                                     <div className="grid grid-cols-2 md:grid-cols-5 gap-4 flex-1">
                                         <div className="flex flex-col">
                                             {/* COR DO RÓTULO: Mude 'text-slate-500' */}
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase mb-1">Modelo</span>
+                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Modelo</span>
                                             {/* COR DO VALOR: Mude 'text-slate-900' */}
-                                            <span className="font-black text-slate-900 text-sm uppercase leading-none">{equip.modelo}</span>
+                                            <span className="font-black text-slate-900 text-[15px] uppercase leading-none">{equip.modelo}</span>
                                         </div>
 
                                         <div className="flex flex-col">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase mb-1">Nº Série / Tag</span>
-                                            <span className="font-bold text-slate-800 text-sm italic leading-none">{equip.tag}</span>
+                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Nº Série</span>
+                                            <span className="font-bold text-slate-800 text-[14px] italic leading-none">{equip.tag}</span>
                                         </div>
 
                                         <div className="hidden md:flex flex-col">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase mb-1">Tipo</span>
-                                            <span className="font-bold text-slate-800 text-sm leading-none">{equip.tipo}</span>
+                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Tipo</span>
+                                            <span className="font-bold text-slate-800 text-[14px] leading-none">{equip.tipo}</span>
                                         </div>
 
                                         <div className="hidden md:flex flex-col">
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase mb-1">Unidade</span>
-                                            <span className="font-bold text-slate-800 text-sm leading-none truncate">{equip.unidade?.nomeSistema}</span>
+                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Unidade</span>
+                                            <span className="font-bold text-slate-800 text-[14px] leading-none truncate">{equip.unidade?.nomeSistema}</span>
                                         </div>
 
                                         <div className="flex flex-col" onClick={e => e.stopPropagation()}>
-                                            <span className="text-[11px] font-bold text-slate-500 uppercase mb-1">Status Atual</span>
+                                            <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-1">Status</span>
                                             <StatusSelector equipamento={equip} onSuccessUpdate={atualizarStatusLocalmente} />
                                         </div>
                                     </div>
@@ -141,27 +142,31 @@ function EquipamentosPage() {
                                 </button>
                             </div>
 
-                            {/* CONTEÚDO EXPANSÍVEL (BRANCO PURO) */}
+                            {/* CONTEÚDO EXPANSÍVEL (BRANCO PURO PARA LEITURA) */}
                             {isAberto && (
                                 <div className="bg-white border-t border-slate-200 p-8 shadow-inner">
                                     <div className="flex gap-8 mb-6 border-b border-slate-100 pb-2">
                                         {['cadastro', 'acessorios', 'anexos', 'historico'].map(aba => (
-                                            <button key={aba} className={`bg-transparent border-none cursor-pointer font-black text-xs uppercase tracking-widest pb-2 transition-all ${abaAtual === aba ? 'text-blue-600 border-b-4 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`} onClick={() => setAbasAtivas({...abasAtivas, [equip.id]: aba})}>
+                                            <button 
+                                                key={aba} 
+                                                className={`bg-transparent border-none cursor-pointer font-black text-xs uppercase tracking-widest pb-2 transition-all ${abaAtivaDesteCard === aba ? 'text-blue-600 border-b-4 border-blue-600' : 'text-slate-400 hover:text-slate-600'}`} 
+                                                onClick={() => trocarAba(equip.id, aba)}
+                                            >
                                                 {aba === 'cadastro' ? 'Cadastro' : aba}
                                             </button>
                                         ))}
                                     </div>
                                     
                                     <div className="min-h-[250px] text-slate-900">
-                                        {abaAtiva === 'cadastro' && <TabCadastro equipamentoInicial={equip} />}
-                                        {abaAtiva === 'acessorios' && <TabAcessorios equipamentoId={equip.id} />}
-                                        {abaAtiva === 'anexos' && <TabAnexos equipamentoId={equip.id} anexosIniciais={equip.anexos} onUpdate={refetch} />}
-                                        {abaAtiva === 'historico' && <TabHistorico equipamento={equip} />}
+                                        {abaAtivaDesteCard === 'cadastro' && <TabCadastro equipamentoInicial={equip} />}
+                                        {abaAtivaDesteCard === 'acessorios' && <TabAcessorios equipamentoId={equip.id} />}
+                                        {abaAtivaDesteCard === 'anexos' && <TabAnexos equipamentoId={equip.id} anexosIniciais={equip.anexos} onUpdate={refetch} />}
+                                        {abaAtivaDesteCard === 'historico' && <TabHistorico equipamento={equip} />}
                                     </div>
 
-                                    <div className="flex justify-end gap-3 mt-10 pt-4 border-t border-slate-50">
-                                        <button className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2 rounded font-bold text-xs border-none cursor-pointer" onClick={() => navigate(`/cadastros/equipamentos/editar/${equip.id}`)}><FontAwesomeIcon icon={faEdit}/> Editar</button>
-                                        {user?.role === 'admin' && <button className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-2 rounded font-bold text-xs border-none cursor-pointer" onClick={() => openModal(equip)}><FontAwesomeIcon icon={faTrashAlt}/> Excluir</button>}
+                                    <div className="flex justify-end gap-3 mt-10 pt-4 border-t border-slate-100">
+                                        <button className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-1.5 rounded font-black text-xs border-none cursor-pointer uppercase transition-colors" onClick={() => navigate(`/cadastros/equipamentos/editar/${equip.id}`)}><FontAwesomeIcon icon={faEdit}/> Editar</button>
+                                        {user?.role === 'admin' && <button className="bg-red-50 hover:bg-red-100 text-red-600 px-4 py-1.5 rounded font-black text-xs border-none cursor-pointer uppercase transition-colors" onClick={() => openModal(equip)}><FontAwesomeIcon icon={faTrashAlt}/> Excluir</button>}
                                     </div>
                                 </div>
                             )}
