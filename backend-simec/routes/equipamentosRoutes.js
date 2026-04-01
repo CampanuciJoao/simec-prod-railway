@@ -124,7 +124,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
  * @route   PUT /api/equipamentos/:id 
  * ADICIONADO: validate(equipamentoSchema) para garantir edição correta
  */
-router.put('/:id', validate(equipamentoSchema), async (req, res) => {
+router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
     const { id } = req.params;
     const { dataInstalacao, ...dados } = req.body;
     
