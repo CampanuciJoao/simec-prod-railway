@@ -1,12 +1,12 @@
 // Ficheiro: src/pages/ManutencoesPage.jsx
-// VERSÃO 16.0 - CORES DE FUNDO NOS CARDS E LAYOUT FLAT INTEGRADO
+// VERSÃO 17.0 - ALINHAMENTO EXECUTIVO, RÓTULOS ESCUROS E LEGENDA DE SÉRIE
 
 import React, { useMemo, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { formatarData } from '../utils/timeUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-    faPlus, faEye, faPenToSquare, faSpinner, faTrashAlt,
+    faPlus, faEye, faSpinner, faTrashAlt,
     faWrench, faClock, faHospital, faTag, faHashtag
 } from '@fortawesome/free-solid-svg-icons';
 import { useManutencoes } from '../hooks/useManutencoes';
@@ -18,15 +18,13 @@ import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import SkeletonCard from '../components/SkeletonCard';
 
-// --- Funções de Estilo Tailwind ---
-
 const getStatusStyles = (status) => {
     const s = status?.toLowerCase() || '';
-    if (s === 'agendada') return 'bg-blue-100 text-blue-700 border-blue-200';
-    if (s === 'emandamento') return 'bg-yellow-100 text-yellow-700 border-yellow-200';
-    if (s === 'aguardandoconfirmacao') return 'bg-orange-100 text-orange-700 border-orange-200 animate-pulse';
-    if (s === 'concluida') return 'bg-emerald-100 text-emerald-700 border-emerald-200';
-    if (s === 'cancelada') return 'bg-red-100 text-red-700 border-red-200';
+    if (s === 'agendada') return 'bg-blue-100 text-blue-800 border-blue-200';
+    if (s === 'emandamento') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    if (s === 'aguardandoconfirmacao') return 'bg-orange-100 text-orange-800 border-orange-200 animate-pulse';
+    if (s === 'concluida') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (s === 'cancelada') return 'bg-red-100 text-red-800 border-red-200';
     return 'bg-slate-100 text-slate-700 border-slate-200';
 };
 
@@ -141,70 +139,72 @@ function ManutencoesPage() {
                 <div className="px-1 flex flex-col gap-3">
                     {manutencoes.length > 0 ? (
                         manutencoes.map(m => (
-                            /* MUDANÇA AQUI: Adicionadas as classes manutencao-card e card-manutencao-tipo */
                             <div 
                                 key={m.id} 
                                 className={`manutencao-card card-manutencao-${m.tipo?.toLowerCase()} bg-white border-y border-r border-slate-200 border-l-[8px] ${getRowBorder(m.status)} shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md`}
                             >
-
                                 <div className="p-4 flex items-center justify-between">
                                     <div className="flex items-center gap-6 flex-1">
-                                        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 flex-1">
+                                        {/* GRADE DE 6 COLUNAS COM ALINHAMENTO RIGOROSO */}
+                                        <div className="grid grid-cols-2 md:grid-cols-6 gap-6 flex-1 items-start">
 
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">OS / Status</span>
-                                                <span className="font-black text-slate-800 text-sm leading-tight">{m.numeroOS}</span>
-                                                <span className={`w-fit mt-1 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getStatusStyles(m.status)}`}>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">OS / Status</span>
+                                                <span className="font-black text-slate-900 text-sm leading-none">{m.numeroOS}</span>
+                                                <span className={`w-fit mt-2 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getStatusStyles(m.status)}`}>
                                                     {m.status.replace(/([A-Z])/g, ' $1').trim()}
                                                 </span>
                                             </div>
 
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Equipamento</span>
-                                                <span className="font-bold text-slate-800 text-sm truncate">{m.equipamento?.modelo}</span>
-                                                <span className="text-[10px] text-slate-400 font-mono italic">{m.equipamento?.tag}</span>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">Equipamento</span>
+                                                <span className="font-black text-slate-900 text-sm leading-tight truncate">{m.equipamento?.modelo}</span>
+                                                <span className="text-[10px] text-slate-500 font-medium mt-1">
+                                                    Nº de Série: <span className="font-bold text-slate-600">{m.equipamento?.tag}</span>
+                                                </span>
                                             </div>
 
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Nº Chamado</span>
-                                                <span className="font-black text-slate-900 text-sm mt-1">
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">Nº Chamado</span>
+                                                <span className="font-black text-slate-900 text-sm mt-0.5">
                                                     {m.numeroChamado ? (
-                                                        <><FontAwesomeIcon icon={faHashtag} className="text-slate-300 mr-1" /> {m.numeroChamado}</>
+                                                        <><FontAwesomeIcon icon={faHashtag} className="text-slate-400 mr-1" /> {m.numeroChamado}</>
                                                     ) : '---'}
                                                 </span>
                                             </div>
 
-                                            <div className="hidden md:flex flex-col">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Agendamento</span>
-                                                <span className="font-bold text-slate-700 text-xs flex items-center gap-1">
-                                                    <FontAwesomeIcon icon={faClock} className="text-[9px] text-slate-300" /> {formatarData(m.dataHoraAgendamentoInicio)}
+                                            <div className="hidden md:flex flex-col min-w-0">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">Agendamento</span>
+                                                <span className="font-black text-slate-900 text-xs flex items-center gap-1">
+                                                    <FontAwesomeIcon icon={faClock} className="text-slate-400 text-[9px]" /> {formatarData(m.dataHoraAgendamentoInicio)}
                                                 </span>
-                                                <span className="text-[10px] text-slate-500">{formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}</span>
+                                                <span className="text-[10px] text-slate-500 font-medium mt-0.5">{formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}</span>
                                             </div>
 
-                                            <div className="hidden md:flex flex-col">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Unidade</span>
-                                                <span className="font-bold text-slate-600 text-xs mt-1 truncate">
-                                                    <FontAwesomeIcon icon={faHospital} className="text-slate-300 text-[9px] mr-1" />
+                                            <div className="hidden md:flex flex-col min-w-0">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">Unidade</span>
+                                                <span className="font-bold text-slate-700 text-xs mt-0.5 truncate">
+                                                    <FontAwesomeIcon icon={faHospital} className="text-slate-400 text-[9px] mr-1" />
                                                     {m.equipamento?.unidade?.nomeSistema || m.equipamento?.unidade?.nome || '---'}
                                                 </span>
                                             </div>
 
-                                            <div className="flex flex-col">
-                                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Tipo</span>
-                                                <span className={`font-black text-[9px] px-2 py-0.5 rounded-full border uppercase w-fit mt-1 shadow-xs ${getTipoStyles(m.tipo)}`}>
+                                            <div className="flex flex-col min-w-0">
+                                                <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">Tipo</span>
+                                                <span className={`font-black text-[9px] px-2.5 py-1 rounded-full border uppercase w-fit mt-0.5 shadow-sm ${getTipoStyles(m.tipo)}`}>
                                                     {m.tipo}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
 
-                                    <div className="flex items-center gap-2 ml-4">
-                                        <Link to={`/manutencoes/detalhes/${m.id}`} className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm" title="Ver Detalhes">
+                                    {/* AÇÕES */}
+                                    <div className="flex items-center gap-2 ml-4 shrink-0">
+                                        <Link to={`/manutencoes/detalhes/${m.id}`} className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100" title="Ver Detalhes">
                                             <FontAwesomeIcon icon={faEye} />
                                         </Link>
                                         {user?.role === 'admin' && (
-                                            <button onClick={() => openDeleteModal(m)} className="w-9 h-9 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm border-none cursor-pointer" title="Excluir">
+                                            <button onClick={() => openDeleteModal(m)} className="w-9 h-9 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100 cursor-pointer" title="Excluir">
                                                 <FontAwesomeIcon icon={faTrashAlt} />
                                             </button>
                                         )}
