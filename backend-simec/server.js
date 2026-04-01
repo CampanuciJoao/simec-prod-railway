@@ -1,13 +1,12 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 3.3 (Sênior - Estabilizado com Rota BI e Limpeza de Listeners)
+// Versão: 3.4 (Sênior - Ajuste de CORS e Estabilidade de Deploy)
 
 // --- 1. Configuração de Ambiente ---
 import dotenv from 'dotenv';
 dotenv.config();
 
 console.log("======================================================");
-console.log("INICIANDO SERVIDOR... VARIÁVEL DE AMBIENTE LIDA:");
-console.log("DATABASE_URL:", process.env.DATABASE_URL);
+console.log("        INICIANDO SERVIDOR BACKEND SIMEC             ");
 console.log("======================================================");
 
 // --- 2. Importações de Módulos ---
@@ -30,7 +29,7 @@ import auditoriaRoutes from './routes/auditoriaRoutes.js';
 import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
-import biRoutes from './routes/biRoutes.js'; // <<< Rota de BI incluída
+import biRoutes from './routes/biRoutes.js'; 
 
 // --- 4. Importação dos Serviços e Middlewares ---
 import { atualizarStatusManutencoes, processarAlertasEEnviarNotificacoes } from './services/alertasService.js';
@@ -43,7 +42,13 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- 6. Configuração de Middlewares Globais ---
-app.use(cors());
+// >> CORREÇÃO DE CORS APLICADA AQUI <<
+app.use(cors({
+  origin: '*', // Permite que qualquer frontend acesse a API (essencial para ambiente de teste)
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -71,38 +76,38 @@ app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
-app.use('/api/bi', biRoutes); // <<< Ativação da rota de BI
+app.use('/api/bi', biRoutes); 
 
 // --- 9. Rota Raiz e Tarefas Agendadas ---
 app.get('/', (req, res) => {
-  res.send('API do SIMEC está a funcionar!');
+  res.send('API do SIMEC está ativa e operante!');
 });
 
 const executarTarefasDeFundo = async () => {
-  console.log(`[${new Date().toLocaleTimeString('pt-BR')}] Executando tarefas de fundo...`);
+  const agora = new Date().toLocaleTimeString('pt-BR');
+  console.log(`[${agora}] Executando automações de fundo...`);
   try {
-    // 1. Verifica vencimentos e envia e-mails
+    // 1. Verifica vencimentos de contratos/seguros e envia e-mails
     await processarAlertasEEnviarNotificacoes();
     
-    // 2. Atualiza status de equipamentos em manutenção
+    // 2. Atualiza status de manutenções e equipamentos
     await atualizarStatusManutencoes();
 
   } catch (err) {
-    console.error('[ERRO NAS TAREFAS AUTOMÁTICAS]:', err);
+    console.error('[ERRO NAS TAREFAS AUTOMÁTICAS]:', err.message);
   }
 };
 
-// Agenda a execução das tarefas a cada 1 minuto
-const checkIntervalMs = 60 * 1000; 
-setInterval(executarTarefasDeFundo, checkIntervalMs);
+// Agenda a execução das tarefas a cada 1 minuto (60000ms)
+setInterval(executarTarefasDeFundo, 60 * 1000);
 
-// --- 10. Inicialização Única do Servidor ---
+// --- 10. Inicialização do Servidor ---
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`------------------------------------------------------`);
-  console.log(`✅ Servidor backend rodando na porta ${PORT}`);
-  console.log(`🚀 Executando verificação inicial de tarefas...`);
+  console.log(`✅ Servidor rodando na porta: ${PORT}`);
+  console.log(`🔗 Banco de Dados Conectado com Sucesso`);
   console.log(`------------------------------------------------------`);
   
-  // Executa uma vez no momento em que o servidor liga
+  // Executa uma vez no momento do boot para garantir alertas frescos
   executarTarefasDeFundo();
 });
