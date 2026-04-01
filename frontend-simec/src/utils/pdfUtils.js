@@ -1,5 +1,5 @@
 // Ficheiro: src/utils/pdfUtils.js
-// VERSÃO FINAL CONSOLIDADA - SUPORTE COMPLETO A RELATÓRIOS GERAIS E BI AVANÇADO
+// VERSÃO FINAL CONSOLIDADA - SUPORTE A CHAMADOS NO HISTÓRICO E BI AVANÇADO
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -15,13 +15,14 @@ const adicionarCabecalho = (doc, titulo) => {
     doc.setTextColor(100);
     doc.text(`Gerado em: ${formatarDataHora(new Date())}`, 200, 18, { align: 'right' });
     doc.setFontSize(16);
-    doc.setTextColor(30, 41, 59); // Cor azul escura padrão do SIMEC
+    doc.setTextColor(30, 41, 59); 
     doc.setFont(undefined, 'bold');
     doc.text(titulo, doc.internal.pageSize.getWidth() / 2, 35, { align: 'center' });
 };
 
 /**
  * 1. PDF de Auditoria do Ativo (Histórico Individual do Equipamento).
+ * ATUALIZADO: Agora inclui o número do chamado na coluna de eventos.
  */
 export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     const doc = new jsPDF();
@@ -50,10 +51,15 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
     doc.text(periodoTxt, 120, 48);
 
     const headers = [["DATA EXECUÇÃO", "CATEGORIA", "EVENTO / OS", "RESPONSÁVEL", "STATUS"]];
+    
+    // >>> LÓGICA DE CHAMADO APLICADA AQUI <<<
     const body = dados.map(item => [
         formatarDataHora(item.data),
         item.categoria, 
-        item.titulo,
+        // Se for uma OS e tiver chamado, imprime: "OS: XXX (Chamado: YYY)"
+        item.isOS && item.chamado 
+            ? `${item.titulo} (Chamado: ${item.chamado})` 
+            : item.titulo,
         item.responsavel || 'N/A',
         item.status
     ]);
@@ -65,7 +71,12 @@ export const exportarHistoricoEquipamentoPDF = (dados, info) => {
         theme: 'grid',
         headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 8 },
         styles: { fontSize: 7, cellPadding: 3 },
-        columnStyles: { 0: { halign: 'center' }, 1: { halign: 'center' }, 4: { halign: 'center' } }
+        columnStyles: { 
+            0: { halign: 'center', cellWidth: 30 }, 
+            1: { halign: 'center', cellWidth: 25 }, 
+            2: { cellWidth: 'auto' }, 
+            4: { halign: 'center', cellWidth: 25 } 
+        }
     });
 
     doc.save(`auditoria_${(info.tag || 'Equipamento')}.pdf`);
@@ -147,7 +158,6 @@ export const exportarBIPDF = (dados) => {
     const doc = new jsPDF();
     adicionarCabecalho(doc, `RELATÓRIO EXECUTIVO DE PERFORMANCE - ${dados.ano}`);
 
-    // Quadro 1: Resumo Geral do Parque
     autoTable(doc, {
         head: [['INDICADOR OPERACIONAL', 'VALOR ACUMULADO']],
         body: [
@@ -161,7 +171,6 @@ export const exportarBIPDF = (dados) => {
         bodyStyles: { fontStyle: 'bold', halign: 'center' }
     });
 
-    // Quadro 2: Downtime por Unidade
     doc.setFontSize(11);
     doc.text("1. TEMPO DE PARADA (DOWNTIME) POR UNIDADE", 14, doc.lastAutoTable.finalY + 15);
     autoTable(doc, {
@@ -169,33 +178,30 @@ export const exportarBIPDF = (dados) => {
         body: dados.rankingUnidades.map(u => [u.nome, `${u.horasParado} Horas`]),
         startY: doc.lastAutoTable.finalY + 20,
         theme: 'grid',
-        headStyles: { fillColor: [59, 130, 246] }, // Azul
+        headStyles: { fillColor: [59, 130, 246] }, 
         styles: { fontSize: 8 }
     });
 
-    // Quadro 3: Reincidência (Frequência)
     doc.text("2. REINCIDÊNCIA DE FALHAS (FREQUÊNCIA DE CORRETIVAS)", 14, doc.lastAutoTable.finalY + 15);
     autoTable(doc, {
         head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'QTD. CORRETIVAS']],
         body: dados.rankingFrequencia.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.corretivas} vez(es)`]),
         startY: doc.lastAutoTable.finalY + 20,
         theme: 'grid',
-        headStyles: { fillColor: [239, 68, 68] }, // Vermelho
+        headStyles: { fillColor: [239, 68, 68] }, 
         styles: { fontSize: 8 }
     });
 
-    // Quadro 4: Ranking de Downtime (Tempo)
     doc.text("3. TOP 5 EQUIPAMENTOS COM MAIOR TEMPO PARADO", 14, doc.lastAutoTable.finalY + 15);
     autoTable(doc, {
         head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'TEMPO PARADO']],
         body: dados.rankingDowntime.map(e => [`${e.modelo} (${e.tag})`, e.unidade, `${e.horasParado}h`]),
         startY: doc.lastAutoTable.finalY + 20,
         theme: 'grid',
-        headStyles: { fillColor: [245, 158, 11] }, // Laranja
+        headStyles: { fillColor: [245, 158, 11] }, 
         styles: { fontSize: 8 }
     });
 
-    // Rodapé com numeração
     const totalPaginas = doc.internal.getNumberOfPages();
     for (let i = 1; i <= totalPaginas; i++) {
         doc.setPage(i);
