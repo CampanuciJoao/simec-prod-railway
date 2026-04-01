@@ -1,5 +1,5 @@
 // Ficheiro: src/pages/DashboardPage.jsx
-// VERSÃO 7.0 - MODERNIZADA COM TAILWIND CSS E SKELETON LOADING
+// VERSÃO 8.0 - ALTO CONTRASTE, CORES SÓLIDAS E LEITURA FACILITADA
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -14,24 +14,12 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import DonutChart from '../components/DonutChart';
 import BarChart from '../components/BarChart';
-import SkeletonCard from '../components/SkeletonCard'; // <<< NOVO: Importando o componente de carregamento
+import SkeletonCard from '../components/SkeletonCard';
 import { getDashboardData } from '../services/api';
 
-// Mapeamento dos valores do ENUM para Labels amigáveis
-const enumToLabelMap = {
-  'Operante': 'Operante',
-  'Inoperante': 'Inoperante',
-  'UsoLimitado': 'Uso Limitado',
-  'EmManutencao': 'Em Manutenção',
-};
-
-// Mapeamento dos Labels amigáveis de volta para os valores do ENUM
-const labelToEnumMap = {
-  'Operante': 'Operante',
-  'Inoperante': 'Inoperante',
-  'Uso Limitado': 'UsoLimitado',
-  'Em Manutenção': 'EmManutencao',
-};
+// Mapeamento para labels amigáveis
+const enumToLabelMap = { 'Operante': 'Operante', 'Inoperante': 'Inoperante', 'UsoLimitado': 'Uso Limitado', 'EmManutencao': 'Em Manutenção' };
+const labelToEnumMap = { 'Operante': 'Operante', 'Inoperante': 'Inoperante', 'Uso Limitado': 'UsoLimitado', 'Em Manutenção': 'EmManutencao' };
 
 function DashboardPage({ darkMode }) {
   const [dashboardData, setDashboardData] = useState({
@@ -50,7 +38,7 @@ function DashboardPage({ darkMode }) {
       const data = await getDashboardData();
       setDashboardData(prevData => ({ ...prevData, ...data }));
     } catch (err) {
-      setError(err.message || "Ocorreu um erro ao buscar os dados do dashboard.");
+      setError(err.message || "Erro de conexão com o servidor.");
     } finally {
       setLoading(false);
     }
@@ -60,21 +48,17 @@ function DashboardPage({ darkMode }) {
 
   const handleChartClick = (clickedLabel) => {
     const statusEnumValue = labelToEnumMap[clickedLabel];
-    if (statusEnumValue) {
-      navigate('/equipamentos', { state: { filtroStatusInicial: statusEnumValue } });
-    }
+    if (statusEnumValue) navigate('/equipamentos', { state: { filtroStatusInicial: statusEnumValue } });
   };
 
   const handleBarChartClick = (dados) => {
-    if (dados && dados.tipo) {
-      navigate('/manutencoes', { state: { filtroTipoInicial: dados.tipo } });
-    }
+    if (dados && dados.tipo) navigate('/manutencoes', { state: { filtroTipoInicial: dados.tipo } });
   };
 
   const statusEquipamentosChartData = useMemo(() => {
     const statusData = dashboardData.statusEquipamentos;
     return {
-      labels: (statusData?.labels || []).map(enumValue => enumToLabelMap[enumValue] || enumValue),
+      labels: (statusData?.labels || []).map(val => enumToLabelMap[val] || val),
       datasets: [{ data: statusData?.data || [] }],
       colorsLight: statusData?.colorsLight || [],
       colorsDark: statusData?.colorsDark || [],
@@ -85,12 +69,12 @@ function DashboardPage({ darkMode }) {
 
   const manutencoesPorTipoMesChartData = useMemo(() => {
     const manutencoesData = dashboardData.manutencoesPorTipoMes;
-    const colors = ['rgba(59, 130, 246, 0.8)', 'rgba(245, 159, 11, 0.8)', 'rgba(16, 185, 129, 0.8)', 'rgba(139, 92, 246, 0.8)'];
+    const colors = ['#3b82f6', '#f59e0b', '#10b981', '#8b5cf6'];
     return {
       labels: manutencoesData?.labels || [],
-      datasets: (manutencoesData?.datasets || []).map((dataset, index) => ({
-        ...dataset,
-        backgroundColor: colors[index % colors.length]
+      datasets: (manutencoesData?.datasets || []).map((ds, idx) => ({
+        ...ds,
+        backgroundColor: colors[idx % colors.length]
       })),
     }
   }, [dashboardData.manutencoesPorTipoMes]);
@@ -98,124 +82,115 @@ function DashboardPage({ darkMode }) {
   const temDadosValidosParaDonut = statusEquipamentosChartData.labels.length > 0 && statusEquipamentosChartData.datasets[0].data.some(d => d > 0);
   const temDadosValidosParaBar = manutencoesPorTipoMesChartData.labels.length > 0 && manutencoesPorTipoMesChartData.datasets.some(ds => ds.data.some(d => d > 0));
 
-  // ==========================================================================
-  // >> NOVO: ESTADO DE CARREGAMENTO COM SKELETONS (VISUAL APP SÊNIOR) <<
-  // ==========================================================================
   if (loading) {
     return (
         <div className="page-content-wrapper">
           <div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <SkeletonCard />
-            <SkeletonCard />
-            <SkeletonCard />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white h-64 rounded-2xl animate-pulse"></div>
-            <div className="bg-white h-64 rounded-2xl animate-pulse"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10 px-2">
+            <div className="h-32 bg-blue-600/20 rounded-2xl animate-pulse"></div>
+            <div className="h-32 bg-amber-400/20 rounded-2xl animate-pulse"></div>
+            <div className="h-32 bg-indigo-600/20 rounded-2xl animate-pulse"></div>
           </div>
         </div>
     );
   }
 
-  if (error) return <div className="page-content-wrapper"><div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div><p style={{ color: 'red' }}>Erro: {error}</p></div>;
+  if (error) return <div className="page-content-wrapper"><div className="page-title-card"><h1 className="page-title-internal">Dashboard</h1></div><p className="p-4 bg-red-100 text-red-700 rounded-lg shadow">Erro: {error}</p></div>;
 
   return (
     <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">Dashboard</h1>
+      <div className="page-title-card shadow-lg border-none bg-slate-800">
+        <h1 className="page-title-internal">Dashboard Estratégico</h1>
       </div>
 
-      {/* ==========================================================================
-          >> SEÇÃO DE CARDS DE RESUMO (AGORA COM TAILWIND CSS) <<
-          ========================================================================== */}
-      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        {/* Card: Equipamentos */}
+      {/* SEÇÃO DE CARDS COM CORES SÓLIDAS E ALTO CONTRASTE */}
+      <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12 px-2">
+        
+        {/* CARD AZUL - ATIVOS */}
         <Link to="/equipamentos" className="group no-underline">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[10px] border-blue-500 hover:shadow-md transition-all flex items-center gap-5 transform group-hover:-translate-y-1">
-                <div className="bg-blue-50 p-4 rounded-xl text-blue-600 text-2xl">
+            <div className="bg-blue-600 p-6 rounded-2xl shadow-xl hover:bg-blue-700 transition-all flex items-center gap-5 transform group-hover:-translate-y-2">
+                <div className="bg-white/20 p-4 rounded-xl text-white text-3xl shrink-0">
                     <FontAwesomeIcon icon={faHeartbeat} />
                 </div>
                 <div>
-                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Ativos Totais</p>
-                    <p className="text-3xl font-black text-gray-800 leading-none">{dashboardData.equipamentosCount}</p>
+                    <p className="text-blue-100 text-[10px] font-black uppercase tracking-widest mb-1">Ativos Totais</p>
+                    <p className="text-5xl font-black text-white leading-none">{dashboardData.equipamentosCount}</p>
                 </div>
             </div>
         </Link>
 
-        {/* Card: Manutenções */}
+        {/* CARD AMARELO - MANUTENÇÕES (Texto escuro para contraste) */}
         <Link to="/manutencoes" className="group no-underline">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[10px] border-yellow-500 hover:shadow-md transition-all flex items-center gap-5 transform group-hover:-translate-y-1">
-                <div className="bg-yellow-50 p-4 rounded-xl text-yellow-600 text-2xl">
+            <div className="bg-amber-400 p-6 rounded-2xl shadow-xl hover:bg-amber-500 transition-all flex items-center gap-5 transform group-hover:-translate-y-2">
+                <div className="bg-black/10 p-4 rounded-xl text-slate-900 text-3xl shrink-0">
                     <FontAwesomeIcon icon={faTools} />
                 </div>
                 <div>
-                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Manutenções Pendentes</p>
-                    <p className="text-3xl font-black text-gray-800 leading-none">{dashboardData.manutencoesCount}</p>
+                    <p className="text-amber-900/70 text-[10px] font-black uppercase tracking-widest mb-1">Em Aberto</p>
+                    <p className="text-5xl font-black text-slate-900 leading-none">{dashboardData.manutencoesCount}</p>
                 </div>
             </div>
         </Link>
 
-        {/* Card: Contratos */}
+        {/* CARD INDIGO - CONTRATOS */}
         <Link to="/contratos" className="group no-underline">
-            <div className="bg-white p-6 rounded-2xl shadow-sm border-l-[10px] border-purple-500 hover:shadow-md transition-all flex items-center gap-5 transform group-hover:-translate-y-1">
-                <div className="bg-purple-50 p-4 rounded-xl text-purple-600 text-2xl">
+            <div className="bg-indigo-600 p-6 rounded-2xl shadow-xl hover:bg-indigo-700 transition-all flex items-center gap-5 transform group-hover:-translate-y-2">
+                <div className="bg-white/20 p-4 rounded-xl text-white text-3xl shrink-0">
                     <FontAwesomeIcon icon={faFileInvoiceDollar} />
                 </div>
                 <div>
-                    <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mb-1">Contratos Vencendo</p>
-                    <p className="text-3xl font-black text-gray-800 leading-none">{dashboardData.contratosVencendoCount}</p>
+                    <p className="text-indigo-100 text-[10px] font-black uppercase tracking-widest mb-1">Vencendo (30d)</p>
+                    <p className="text-5xl font-black text-white leading-none">{dashboardData.contratosVencendoCount}</p>
                 </div>
             </div>
         </Link>
       </section>
 
-      {/* SEÇÃO DETALHADA (ALERTAS E GRÁFICOS) */}
       <section className="detailed-sections">
-        <div className="alerts-section page-section">
-          <h2>ALERTAS RECENTES/CRÍTICOS</h2>
+        <div className="alerts-section page-section border-t-4 border-red-500">
+          <h2 className="font-black text-slate-800 text-sm tracking-tighter mb-4 border-none uppercase">Alertas Críticos</h2>
           <div className="alerts-list">
             {(dashboardData.alertasRecentes?.length > 0) ? (
-              <ul>
+              <ul className="space-y-2">
                 {dashboardData.alertasRecentes.map(alerta => (
                   <li key={alerta.id}>
-                    <Link to={alerta.link || '/alertas'}>
+                    <Link to={alerta.link || '/alertas'} className="hover:bg-slate-100 p-2 rounded-lg transition-colors flex items-center gap-3 no-underline">
                       <FontAwesomeIcon 
                         icon={faExclamationCircle} 
-                        className="alert-icon" 
-                        style={{ color: alerta.prioridade === 'Alta' ? '#ef4444' : (alerta.prioridade === 'Media' ? '#FACC15' : '#64748b')}} 
+                        className="text-xl" 
+                        style={{ color: alerta.prioridade === 'Alta' ? '#ef4444' : (alerta.prioridade === 'Media' ? '#f59e0b' : '#64748b')}} 
                       />
-                      {alerta.titulo}
+                      <span className="font-black text-slate-700 text-[11px] uppercase tracking-tight leading-none">{alerta.titulo}</span>
                     </Link>
                   </li>
                 ))}
               </ul>
-            ) : <p style={{textAlign: 'center', color: 'var(--cor-texto-secundario-light)'}}>Nenhum alerta crítico no momento.</p>}
+            ) : <p className="text-center text-slate-400 py-10 font-bold italic">Nenhum alerta pendente.</p>}
           </div>
         </div>
 
         <div className="charts-section page-section">
           <div className="chart-container-dashboard"> 
-            <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
-              <FontAwesomeIcon icon={faChartPie} style={{ marginRight: '8px', fontSize: '0.9em', color: 'var(--cor-texto-secundario-light)' }} />
-              <h2 style={{margin: 0, borderBottom: 'none', textTransform: 'none', letterSpacing: 'normal', fontSize:'1em', color: 'var(--cor-texto-principal-light)'}}>Status dos Equipamentos</h2>
+            <div className="flex items-center gap-2 mb-4">
+              <FontAwesomeIcon icon={faChartPie} className="text-slate-400" />
+              <h2 className="m-0 border-none text-slate-800 text-sm font-black uppercase tracking-tighter">Status Geral</h2>
             </div>
-            <div className="chart-wrapper" style={{ height: '220px', maxHeight: '220px' }}>
+            <div className="chart-wrapper h-[220px]">
               {temDadosValidosParaDonut ? (
                 <DonutChart key={`donut-${darkMode}`} chartData={statusEquipamentosChartData} darkMode={darkMode} onSliceClick={handleChartClick} />
-              ) : (<p className="no-data-message">Dados insuficientes para o gráfico.</p>)}
+              ) : (<p className="no-data-message italic text-slate-400">Sem dados.</p>)}
             </div>
           </div>
-          <hr className="chart-separator" />
+          <hr className="my-6 border-slate-100" />
           <div className="chart-container-dashboard"> 
-             <div style={{display: 'flex', alignItems: 'center', marginBottom: '10px'}}>
-               <FontAwesomeIcon icon={faChartBar} style={{ marginRight: '8px', fontSize: '0.9em', color: 'var(--cor-texto-secundario-light)' }} />
-               <h2 style={{margin: 0, borderBottom: 'none', textTransform: 'none', letterSpacing: 'normal', fontSize:'1em', color: 'var(--cor-texto-principal-light)'}}>Manutenções nos Últimos 6 Meses</h2>
+             <div className="flex items-center gap-2 mb-4">
+               <FontAwesomeIcon icon={faChartBar} className="text-slate-400" />
+               <h2 className="m-0 border-none text-slate-800 text-sm font-black uppercase tracking-tighter">Manutenções Semestrais</h2>
              </div>
-            <div className="chart-wrapper" style={{ height: '220px', maxHeight: '220px' }}>
+            <div className="chart-wrapper h-[220px]">
               {temDadosValidosParaBar ? (
                 <BarChart key={`bar-${darkMode}`} chartData={manutencoesPorTipoMesChartData} darkMode={darkMode} onBarClick={handleBarChartClick} />
-              ) : (<p className="no-data-message">Dados insuficientes para o gráfico.</p>)}
+              ) : (<p className="no-data-message italic text-slate-400">Sem dados.</p>)}
             </div>
           </div>
         </div>
