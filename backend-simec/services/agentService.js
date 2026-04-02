@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 8.0 - ATIVADA APÓS LIBERAÇÃO DE CRÉDITO
+// VERSÃO 10.0 - ESTÁVEL PARA CONTA PAGA E OTIMIZADA PARA BAIXO CUSTO
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
@@ -10,23 +10,33 @@ const genAI = new GoogleGenerativeAI(API_KEY || "");
 
 /**
  * FERRAMENTA: Busca dados reais no banco para a IA analisar.
+ * Otimizada para buscar apenas o necessário e economizar tokens (dinheiro).
  */
 async function obterContextoDoBanco(tag) {
     try {
-        console.log(`[AGENTE] Buscando dados do equipamento: ${tag}`);
+        console.log(`[AGENTE] Verificando histórico do equipamento: ${tag}`);
         const equipamento = await prisma.equipamento.findUnique({
             where: { tag },
-            include: {
-                unidade: true,
+            select: {
+                modelo: true,
+                tag: true,
+                status: true,
+                setor: true,
+                unidade: { select: { nomeSistema: true } },
                 manutencoes: {
-                    take: 5,
+                    take: 3, // Apenas as 3 últimas para economizar
                     orderBy: { dataHoraAgendamentoInicio: 'desc' },
-                    include: { notasAndamento: true }
+                    select: {
+                        tipo: true,
+                        status: true,
+                        descricaoProblemaServico: true,
+                        dataConclusao: true
+                    }
                 }
             }
         });
         
-        if (!equipamento) return "Equipamento não encontrado no SIMEC.";
+        if (!equipamento) return null;
         
         return JSON.stringify(equipamento);
     } catch (e) {
@@ -39,54 +49,52 @@ async function obterContextoDoBanco(tag) {
  * PROCESSADOR: Envia a pergunta ao Gemini e retorna a resposta técnica.
  */
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
-    if (!API_KEY) throw new Error("GEMINI_API_KEY não configurada.");
+    if (!API_KEY) throw new Error("Chave GEMINI_API_KEY não configurada no servidor.");
 
     try {
-        // Agora usamos o 1.5 Flash (O melhor custo-benefício e velocidade)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
+        // MODELO: 'gemini-1.5-flash' é o ideal. Se der 404, o Google ainda não liberou o faturamento.
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-        // Tenta capturar uma TAG no formato AAA-000 ou Texto-000
+        // Tenta capturar uma TAG (Ex: CTES-0004)
         let dadosAdicionais = "";
         const extrairTag = perguntaUsuario.match(/[A-Za-z0-9]+-[A-Za-z0-9]+/);
         
         if (extrairTag) {
-            const tagEncontrada = extrairTag[0].toUpperCase();
-            dadosAdicionais = await obterContextoDoBanco(tagEncontrada);
+            const contexto = await obterContextoDoBanco(extrairTag[0].toUpperCase());
+            if (contexto) {
+                dadosAdicionais = `\n[DADOS TÉCNICOS DO SISTEMA]:\n${contexto}\n`;
+            }
         }
 
-        const promptSistema = `
-        Você é o Guardião SIMEC, assistente sênior de Engenharia Clínica.
-        Usuário atual: ${usuarioNome || 'Administrador'}.
-        
-        CONTEXTO TÉCNICO DO BANCO DE DADOS:
+        const promptSistema = `Você é o Guardião SIMEC, assistente de Engenharia Clínica.
+        Usuário: ${usuarioNome || 'Administrador'}.
         ${dadosAdicionais}
+        INSTRUÇÕES:
+        1. Responda em Português-BR.
+        2. Seja técnico, útil e muito direto (evite textos longos para economizar tokens).
+        3. Se houver dados do equipamento acima, analise se ele está apresentando falhas repetitivas.
+        4. Se não houver dados, responda com base no seu conhecimento geral de engenharia clínica.`;
 
-        INSTRUÇÕES DE RESPOSTA:
-        1. Responda em Português (Brasil).
-        2. Seja técnico, direto e profissional.
-        3. Se houver dados de manutenção acima, analise se há falhas repetitivas (Ex: muitas corretivas no mesmo mês).
-        4. Se o usuário perguntar algo que não está nos dados, use seu conhecimento de engenharia clínica para ajudar.
-        `;
+        console.log(`[AGENTE] Enviando pergunta para a IA...`);
 
-        console.log(`[AGENTE] Consultando Gemini 1.5 Flash...`);
-
+        // Executa a geração de conteúdo
         const result = await model.generateContent([promptSistema, perguntaUsuario]);
         const response = await result.response;
         const text = response.text();
 
-        if (!text) throw new Error("IA retornou resposta vazia.");
+        if (!text) throw new Error("A IA não gerou uma resposta válida.");
 
         return text;
 
     } catch (error) {
         console.error("--- ERRO NA IA (DIAGNÓSTICO) ---");
-        console.error("Causa:", error.message);
+        console.error("Causa real:", error.message);
         
-        // Mensagem amigável para o usuário no chat
-        if (error.message.includes("404")) {
-            throw new Error("O Google ainda está processando seu pagamento. Aguarde 10 minutos e tente novamente.");
+        // Tratamento especial para o erro 404 de faturamento
+        if (error.message.includes("404") || error.message.includes("not found")) {
+            throw new Error("O projeto ainda consta como 'Gratuito' no Google. Certifique-se de que criou uma NOVA CHAVE de API após ativar o faturamento.");
         }
 
-        throw new Error(`Erro na IA: ${error.message}`);
+        throw new Error(`Instabilidade na IA: ${error.message}`);
     }
 };
