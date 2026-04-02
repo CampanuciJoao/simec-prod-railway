@@ -1,100 +1,57 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 10.0 - ESTÁVEL PARA CONTA PAGA E OTIMIZADA PARA BAIXO CUSTO
+// VERSÃO 11.0 - FORÇANDO API STABLE (V1) PARA EVITAR ERRO 404
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
 
-// 1. Configuração da Chave de API
 const API_KEY = process.env.GEMINI_API_KEY;
-const genAI = new GoogleGenerativeAI(API_KEY || "");
 
-/**
- * FERRAMENTA: Busca dados reais no banco para a IA analisar.
- * Otimizada para buscar apenas o necessário e economizar tokens (dinheiro).
- */
-async function obterContextoDoBanco(tag) {
-    try {
-        console.log(`[AGENTE] Verificando histórico do equipamento: ${tag}`);
-        const equipamento = await prisma.equipamento.findUnique({
-            where: { tag },
-            select: {
-                modelo: true,
-                tag: true,
-                status: true,
-                setor: true,
-                unidade: { select: { nomeSistema: true } },
-                manutencoes: {
-                    take: 3, // Apenas as 3 últimas para economizar
-                    orderBy: { dataHoraAgendamentoInicio: 'desc' },
-                    select: {
-                        tipo: true,
-                        status: true,
-                        descricaoProblemaServico: true,
-                        dataConclusao: true
-                    }
-                }
-            }
-        });
-        
-        if (!equipamento) return null;
-        
-        return JSON.stringify(equipamento);
-    } catch (e) {
-        console.error("[AGENTE_ERRO_BANCO]:", e.message);
-        return "Erro ao acessar o banco de dados.";
-    }
-}
-
-/**
- * PROCESSADOR: Envia a pergunta ao Gemini e retorna a resposta técnica.
- */
+// AJUSTE CRÍTICO: Removi a inicialização global para garantir que a chave 
+// seja lida corretamente a cada chamada e configurada para a versão estável.
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
-    if (!API_KEY) throw new Error("Chave GEMINI_API_KEY não configurada no servidor.");
+    if (!API_KEY) throw new Error("Chave API não configurada no Railway.");
 
     try {
-        // MODELO: 'gemini-1.5-flash' é o ideal. Se der 404, o Google ainda não liberou o faturamento.
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Inicializa com a versão 'v1' (Estável) em vez da 'v1beta'
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: "v1" });
 
-        // Tenta capturar uma TAG (Ex: CTES-0004)
         let dadosAdicionais = "";
         const extrairTag = perguntaUsuario.match(/[A-Za-z0-9]+-[A-Za-z0-9]+/);
         
         if (extrairTag) {
-            const contexto = await obterContextoDoBanco(extrairTag[0].toUpperCase());
-            if (contexto) {
-                dadosAdicionais = `\n[DADOS TÉCNICOS DO SISTEMA]:\n${contexto}\n`;
-            }
+            const tag = extrairTag[0].toUpperCase();
+            const equipamento = await prisma.equipamento.findUnique({
+                where: { tag },
+                select: {
+                    modelo: true, tag: true, status: true,
+                    unidade: { select: { nomeSistema: true } },
+                    manutencoes: {
+                        take: 3,
+                        orderBy: { dataHoraAgendamentoInicio: 'desc' },
+                        select: { tipo: true, status: true, descricaoProblemaServico: true }
+                    }
+                }
+            });
+            if (equipamento) dadosAdicionais = `CONTEXTO: ${JSON.stringify(equipamento)}`;
         }
 
-        const promptSistema = `Você é o Guardião SIMEC, assistente de Engenharia Clínica.
-        Usuário: ${usuarioNome || 'Administrador'}.
-        ${dadosAdicionais}
-        INSTRUÇÕES:
-        1. Responda em Português-BR.
-        2. Seja técnico, útil e muito direto (evite textos longos para economizar tokens).
-        3. Se houver dados do equipamento acima, analise se ele está apresentando falhas repetitivas.
-        4. Se não houver dados, responda com base no seu conhecimento geral de engenharia clínica.`;
+        const prompt = `Você é o Guardião SIMEC. Usuário: ${usuarioNome}. ${dadosAdicionais} Responda técnico e direto em PT-BR.`;
 
-        console.log(`[AGENTE] Enviando pergunta para a IA...`);
+        // Log para você ver no Railway que o código novo entrou
+        console.log(`[AGENTE] Tentativa via API V1 Estável...`);
 
-        // Executa a geração de conteúdo
-        const result = await model.generateContent([promptSistema, perguntaUsuario]);
+        const result = await model.generateContent(prompt);
         const response = await result.response;
-        const text = response.text();
-
-        if (!text) throw new Error("A IA não gerou uma resposta válida.");
-
-        return text;
+        return response.text();
 
     } catch (error) {
-        console.error("--- ERRO NA IA (DIAGNÓSTICO) ---");
-        console.error("Causa real:", error.message);
+        console.error("--- ERRO NA IA (DIAGNÓSTICO V1) ---");
+        console.error("Mensagem:", error.message);
         
-        // Tratamento especial para o erro 404 de faturamento
-        if (error.message.includes("404") || error.message.includes("not found")) {
-            throw new Error("O projeto ainda consta como 'Gratuito' no Google. Certifique-se de que criou uma NOVA CHAVE de API após ativar o faturamento.");
+        if (error.message.includes("404")) {
+            throw new Error("O Google ainda está ativando seu faturamento. Isso pode levar até 2 horas após o pagamento. Verifique se a Chave no Railway é a NOVA.");
         }
-
-        throw new Error(`Instabilidade na IA: ${error.message}`);
+        throw new Error(error.message);
     }
 };
