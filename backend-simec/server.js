@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 3.4 (Sênior - Ajuste de CORS e Estabilidade de Deploy)
+// Versão: 3.5 (Sênior - Integração de Agente IA e Estabilidade de Conexão)
 
 // --- 1. Configuração de Ambiente ---
 import dotenv from 'dotenv';
@@ -30,7 +30,7 @@ import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js'; 
-import agentRoutes from './routes/agentRoutes.js';
+import agentRoutes from './routes/agentRoutes.js'; // Rota do Agente Guardião
 
 // --- 4. Importação dos Serviços e Middlewares ---
 import { atualizarStatusManutencoes, processarAlertasEEnviarNotificacoes } from './services/alertasService.js';
@@ -43,7 +43,6 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 
 // --- 6. Configuração de Middlewares Globais ---
-// >> CORREÇÃO DE CORS APLICADA AQUI <<
 app.use(cors({
   origin: '*', // Permite que qualquer frontend acesse a API (essencial para ambiente de teste)
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -78,7 +77,7 @@ app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
-app.use('/api/agent', agentRoutes);
+app.use('/api/agent', agentRoutes); // Ativação da inteligência artificial
 
 // --- 9. Rota Raiz e Tarefas Agendadas ---
 app.get('/', (req, res) => {
@@ -104,7 +103,7 @@ const executarTarefasDeFundo = async () => {
 setInterval(executarTarefasDeFundo, 60 * 1000);
 
 // --- 10. Inicialização do Servidor ---
-app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`------------------------------------------------------`);
   console.log(`✅ Servidor rodando na porta: ${PORT}`);
   console.log(`🔗 Banco de Dados Conectado com Sucesso`);
@@ -113,3 +112,8 @@ app.listen(PORT, '0.0.0.0', () => {
   // Executa uma vez no momento do boot para garantir alertas frescos
   executarTarefasDeFundo();
 });
+
+// >> CONFIGURAÇÃO DE ESTABILIDADE IA <<
+// Aumentamos o tempo de espera da requisição para 2 minutos. 
+// Isso garante que a IA tenha tempo de processar históricos grandes sem cair a conexão.
+server.timeout = 120000;

@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/agentRoutes.js
-// VERSÃO 3.0 - DIAGNÓSTICO INTEGRADO E TRATAMENTO DE ERROS DA IA
+// VERSÃO 4.0 - SINCRONIZADA COM SERVICE v6.0 (SOLUÇÃO DE LOOP DE ERROS)
 
 import express from 'express';
 import { processarComandoAgente } from '../services/agentService.js';
@@ -9,36 +9,36 @@ const router = express.Router();
 
 /**
  * ROTA: POST /api/agent/chat
- * FINALIDADE: Endpoint principal para interação com o Agente Guardião SIMEC.
- * REQUISITO: Usuário autenticado.
+ * FINALIDADE: Receber comandos do usuário e processar via Agente SIMEC (IA).
+ * SEGURANÇA: Requer Token JWT.
  */
 router.post('/chat', proteger, async (req, res) => {
     const { mensagem } = req.body;
 
-    // 1. Validação de segurança básica: impede requisições sem conteúdo.
+    // 1. Validação: Impede que o sistema processe mensagens vazias.
     if (!mensagem || mensagem.trim() === "") {
-        return res.status(400).json({ message: "Por favor, digite uma mensagem para o Agente." });
+        return res.status(400).json({ message: "Por favor, digite uma mensagem." });
     }
 
     try {
-        // 2. Extração segura dos dados do usuário logado vindo do middleware 'proteger'.
-        const nomeUsuario = req.usuario?.nome || "Administrador";
+        // 2. Extrai o nome do usuário populado pelo middleware de proteção.
+        const nomeDoUsuario = req.usuario?.nome || "Administrador";
 
-        // 3. Chamada ao motor de IA no Service.
-        const resposta = await processarComandoAgente(mensagem, nomeUsuario);
+        // 3. Envia para o processador de IA no Service.
+        const respostaDaIA = await processarComandoAgente(mensagem, nomeDoUsuario);
         
-        // 4. Sucesso: Retorna o texto gerado pelo Gemini.
-        res.json({ resposta });
+        // 4. Sucesso: Retorna a resposta da IA no formato JSON esperado pelo Frontend.
+        return res.json({ resposta: respostaDaIA });
 
     } catch (error) {
-        // 5. Tratamento de Erros Críticos (Visíveis no Log do Railway).
-        console.error(`[AGENT_ERROR] Usuário: ${req.usuario?.nome || 'Desconhecido'} | Falha:`, error.message);
+        // 5. Erro: Registra o problema detalhado no console do Railway para análise técnica.
+        console.error(`[ROTA_AGENTE_ERRO] Falha na comunicação:`, error.message);
 
-        // Retorna a falha de forma amigável no chat para que o usuário saiba o que houve.
-        // O status continua 500 para o frontend exibir a notificação de erro caso necessário.
-        res.status(500).json({ 
-            message: "O Agente SIMEC encontrou uma dificuldade técnica.",
-            resposta: `[AVISO DO SISTEMA]: Não consegui processar seu pedido agora. Motivo: ${error.message}`,
+        // Retorna Status 500 mas com a chave 'resposta' preenchida com o erro.
+        // Isso permite que o componente ChatBot.jsx mostre a causa da falha no balão de chat.
+        return res.status(500).json({ 
+            message: "O Agente Guardião encontrou uma instabilidade.",
+            resposta: `[AVISO TÉCNICO]: ${error.message}`,
             error: true
         });
     }
