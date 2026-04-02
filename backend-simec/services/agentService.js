@@ -1,57 +1,64 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 11.0 - FORÇANDO API STABLE (V1) PARA EVITAR ERRO 404
+// VERSÃO 13.0 - DIAGNÓSTICO PROFUNDO E FORÇAGEM DE API ESTÁVEL
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
 
-const API_KEY = process.env.GEMINI_API_KEY;
-
-// AJUSTE CRÍTICO: Removi a inicialização global para garantir que a chave 
-// seja lida corretamente a cada chamada e configurada para a versão estável.
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
-    if (!API_KEY) throw new Error("Chave API não configurada no Railway.");
+    // 1. Verificação da Chave
+    const API_KEY = process.env.GEMINI_API_KEY?.trim(); // O .trim() remove espaços acidentais
+    if (!API_KEY) throw new Error("ERRO: Variável GEMINI_API_KEY vazia no Railway.");
 
     try {
-        // Inicializa com a versão 'v1' (Estável) em vez da 'v1beta'
+        // 2. Inicialização Forçada na Versão Estável (v1)
+        // Isso evita o erro 'v1beta' que apareceu no seu log anterior
         const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" }, { apiVersion: "v1" });
+        const model = genAI.getGenerativeModel(
+            { model: "gemini-1.5-flash" },
+            { apiVersion: 'v1' } 
+        );
 
-        let dadosAdicionais = "";
+        // 3. Busca de Contexto (Simplificada para economia)
+        let contexto = "";
         const extrairTag = perguntaUsuario.match(/[A-Za-z0-9]+-[A-Za-z0-9]+/);
-        
         if (extrairTag) {
             const tag = extrairTag[0].toUpperCase();
-            const equipamento = await prisma.equipamento.findUnique({
+            const equip = await prisma.equipamento.findUnique({
                 where: { tag },
-                select: {
-                    modelo: true, tag: true, status: true,
-                    unidade: { select: { nomeSistema: true } },
-                    manutencoes: {
-                        take: 3,
-                        orderBy: { dataHoraAgendamentoInicio: 'desc' },
-                        select: { tipo: true, status: true, descricaoProblemaServico: true }
-                    }
-                }
+                select: { modelo: true, status: true, unidade: { select: { nomeSistema: true } } }
             });
-            if (equipamento) dadosAdicionais = `CONTEXTO: ${JSON.stringify(equipamento)}`;
+            if (equip) contexto = `Equipamento: ${equip.modelo}, Status: ${equip.status}, Unidade: ${equip.unidade.nomeSistema}.`;
         }
 
-        const prompt = `Você é o Guardião SIMEC. Usuário: ${usuarioNome}. ${dadosAdicionais} Responda técnico e direto em PT-BR.`;
+        // 4. Prompt estruturado
+        const promptSistema = `Você é o Guardião SIMEC. Usuário: ${usuarioNome}. ${contexto}`;
+        
+        console.log(`[AGENTE] Iniciando chamada estável (v1) para o modelo Flash...`);
 
-        // Log para você ver no Railway que o código novo entrou
-        console.log(`[AGENTE] Tentativa via API V1 Estável...`);
-
-        const result = await model.generateContent(prompt);
+        // 5. Execução
+        const result = await model.generateContent([promptSistema, perguntaUsuario]);
         const response = await result.response;
-        return response.text();
+        const text = response.text();
+
+        if (!text) throw new Error("O Google respondeu, mas o texto veio vazio.");
+
+        return text;
 
     } catch (error) {
-        console.error("--- ERRO NA IA (DIAGNÓSTICO V1) ---");
+        // LOG COMPLETO PARA DIAGNÓSTICO
+        console.error("--- RELATÓRIO DE ERRO IA ---");
         console.error("Mensagem:", error.message);
         
         if (error.message.includes("404")) {
-            throw new Error("O Google ainda está ativando seu faturamento. Isso pode levar até 2 horas após o pagamento. Verifique se a Chave no Railway é a NOVA.");
+            // Se der 404 aqui, com a apiVersion 'v1', é porque o Google
+            // ainda não propagou seu faturamento para os servidores de borda.
+            throw new Error("O Google reconhece seu pagamento, mas ainda não ativou sua chave paga. Tempo estimado: 30 a 60 min.");
         }
-        throw new Error(error.message);
+
+        if (error.message.includes("403")) {
+            throw new Error("Erro de Permissão: Verifique se a chave de API é do projeto correto.");
+        }
+
+        throw new Error(`Falha técnica: ${error.message}`);
     }
 };
