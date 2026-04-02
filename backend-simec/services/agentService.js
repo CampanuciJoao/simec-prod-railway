@@ -1,119 +1,90 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 2.0 - COM TRATAMENTO DE ERROS E LOGS PARA DEBUG NO RAILWAY
+// VERSÃO 3.0 - DIAGNÓSTICO AVANÇADO E INTELIGÊNCIA PREDITIVA
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
 
-// Verificação de segurança: Se a chave não existir, o sistema avisa nos logs
+// 1. Validação de Segurança da Chave de API
 const API_KEY = process.env.GEMINI_API_KEY;
 if (!API_KEY) {
-    console.error("ERRO CRÍTICO: Variável GEMINI_API_KEY não encontrada nas variáveis de ambiente!");
+    console.error("[ERRO CRÍTICO] Variável GEMINI_API_KEY não configurada no Railway!");
 }
 
-const genAI = new GoogleGenerativeAI(API_KEY);
+const genAI = new GoogleGenerativeAI(API_KEY || "");
 
-// --- FERRAMENTAS DISPONÍVEIS PARA CONSULTA ---
+// --- FERRAMENTAS TÉCNICAS (INTELIGÊNCIA DE DADOS) ---
 
 /**
- * Busca o histórico completo de manutenções e notas técnicas de um equipamento.
- * Útil para a IA identificar padrões de quebra.
+ * Busca dados reais do banco para fundamentar a resposta da IA.
  */
-async function buscarHistoricoEquipamento(tag) {
+async function obterDadosTecnicos(tag) {
     try {
-        const equipamento = await prisma.equipamento.findUnique({
+        const dados = await prisma.equipamento.findUnique({
             where: { tag },
             include: {
                 manutencoes: {
                     include: { notasAndamento: true },
                     orderBy: { dataHoraAgendamentoInicio: 'desc' },
-                    take: 10 // Pega as 10 últimas para não sobrecarregar a IA
+                    take: 5
                 },
                 unidade: true
             }
         });
-        return equipamento ? JSON.stringify(equipamento) : "Equipamento não encontrado no banco.";
+        return dados ? JSON.stringify(dados) : "Equipamento não localizado no inventário.";
     } catch (err) {
-        console.error("Erro ao buscar histórico para a IA:", err.message);
-        return "Erro ao acessar o banco de dados.";
+        return "Erro ao acessar base de dados.";
     }
 }
 
-/**
- * Permite ao agente registrar uma nova Ordem de Serviço preventivamente.
- */
-async function agendarManutencaoAgente(tag, tipo, descricao) {
-    try {
-        const equip = await prisma.equipamento.findUnique({ where: { tag } });
-        if (!equip) return "Erro: Equipamento não localizado.";
+// --- PROCESSAMENTO PRINCIPAL ---
 
-        const total = await prisma.manutencao.count();
-        const numeroOS = `IA-${tag}-${String(total + 1).padStart(4, '0')}`;
-
-        const novaOS = await prisma.manutencao.create({
-            data: {
-                numeroOS,
-                tipo: tipo || 'Preventiva',
-                descricaoProblemaServico: `[SOLICITAÇÃO IA]: ${descricao}`,
-                dataHoraAgendamentoInicio: new Date(),
-                equipamentoId: equip.id,
-                status: 'Agendada'
-            }
-        });
-        return `OS ${novaOS.numeroOS} gerada com sucesso para ${tag}.`;
-    } catch (err) {
-        console.error("Erro ao agendar via IA:", err.message);
-        return "Falha ao criar agendamento no banco.";
-    }
-}
-
-// --- MOTOR DE PROCESSAMENTO DO AGENTE ---
-
-/**
- * Processa a conversa do usuário, enviando para o Gemini e retornando a resposta técnica.
- */
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
-    try {
-        // Usamos o modelo Flash para velocidade ou Pro para maior inteligência
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    // Verificação de pré-vôo
+    if (!API_KEY) throw new Error("Chave de API não configurada no servidor.");
 
-        const chat = model.startChat({
-            history: [
-                {
-                    role: "user",
-                    parts: [{ text: `Você é o Guardião SIMEC, um engenheiro clínico virtual sênior. 
-                    Seu objetivo é auxiliar o usuário ${usuarioNome || 'Administrador'} na gestão do hospital.
-                    Você tem capacidade de ler históricos e identificar riscos de quebra.
-                    Sempre que detectar quebras repetitivas ou 'sinais fracos' (como ruído ou calor), recomende uma manutenção preditiva.
-                    Seja direto, técnico e use termos da engenharia biomédica.` }],
-                },
-                {
-                    role: "model",
-                    parts: [{ text: "Entendido. Estou pronto para monitorar o parque tecnológico do SIMEC. Como posso ajudar hoje?" }],
-                },
-            ],
+    try {
+        // Usamos o modelo 1.5-flash para maior estabilidade e velocidade
+        const model = genAI.getGenerativeModel({ 
+            model: "gemini-1.5-flash",
+            systemInstruction: `Você é o Guardião SIMEC, um Engenheiro Clínico Sênior com 20 anos de experiência.
+            Seu tom é profissional, técnico e extremamente prestativo.
+            O usuário atual é ${usuarioNome || 'Administrador'}.
+            
+            DIRETRIZES DE INTELIGÊNCIA:
+            1. Se o usuário perguntar sobre um equipamento, analise sinais de falha como 'ruído', 'calor' ou 'travamentos'.
+            2. Sempre que detectar recorrência de problemas, sugira abrir uma Manutenção Preditiva.
+            3. Você tem permissão para analisar prazos e sugerir inspeções.
+            4. Se não tiver certeza de um dado, peça a TAG do equipamento.`
         });
 
-        console.log(`[Agente SIMEC] Processando comando: "${perguntaUsuario}"`);
+        console.log(`[AGENTE] Iniciando análise para o usuário: ${usuarioNome}`);
 
-        // Envia a mensagem e aguarda a resposta da IA
-        const result = await chat.sendMessage(perguntaUsuario);
+        // Chamada direta para evitar erros de histórico de chat corrompido
+        const result = await model.generateContent(perguntaUsuario);
         const response = await result.response;
-        const textoResposta = response.text();
+        const texto = response.text();
 
-        // Se a IA não retornar nada (por bloqueio de segurança ou erro)
-        if (!textoResposta) {
-            throw new Error("A IA retornou uma resposta vazia.");
-        }
+        if (!texto) throw new Error("A IA não conseguiu gerar uma resposta válida.");
 
-        return textoResposta;
+        return texto;
 
     } catch (error) {
-        // LOG CRÍTICO: Isso aparecerá no painel do Railway
-        console.error("--- ERRO NO SERVIÇO DO AGENTE ---");
-        console.error("Mensagem:", error.message);
-        console.error("Stack:", error.stack);
+        // --- BLOCO DE DIAGNÓSTICO PARA RAILWAY ---
+        console.error("========== ERRO NO AGENTE GEMINI ==========");
+        console.error("Causa:", error.message);
         
-        // Retorna uma mensagem amigável para o frontend não quebrar
-        throw new Error("Falha na inteligência artificial. Verifique os logs do servidor.");
+        // Identifica erros comuns de localização do Railway
+        if (error.message.includes("location") || error.message.includes("supported")) {
+            console.error("DICA: O Google não suporta o Gemini na região atual do seu servidor Railway.");
+            throw new Error("O Google bloqueou a conexão por conta da região do servidor (Railway). Tente mudar a região do serviço para 'us-east1' nas configurações do Railway.");
+        }
+
+        // Identifica erros de chave
+        if (error.message.includes("API key")) {
+            console.error("DICA: Sua GEMINI_API_KEY parece ser inválida ou expirou.");
+            throw new Error("Chave da Inteligência Artificial inválida. Verifique a configuração.");
+        }
+
+        throw new Error(`Falha técnica na IA: ${error.message}`);
     }
 };

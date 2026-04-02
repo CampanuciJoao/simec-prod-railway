@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/agentRoutes.js
-// VERSÃO 2.0 - COM VALIDAÇÃO DE ENTRADA E LOGS DE ERRO DETALHADOS
+// VERSÃO 3.0 - DIAGNÓSTICO INTEGRADO E TRATAMENTO DE ERROS DA IA
 
 import express from 'express';
 import { processarComandoAgente } from '../services/agentService.js';
@@ -9,33 +9,37 @@ const router = express.Router();
 
 /**
  * ROTA: POST /api/agent/chat
- * FINALIDADE: Receber comandos e dúvidas do usuário e processar via Gemini IA.
- * ACESSO: Protegido (Requer Token JWT válido).
+ * FINALIDADE: Endpoint principal para interação com o Agente Guardião SIMEC.
+ * REQUISITO: Usuário autenticado.
  */
 router.post('/chat', proteger, async (req, res) => {
     const { mensagem } = req.body;
 
-    // 1. Validação: Impede que o servidor gaste recursos com mensagens vazias
+    // 1. Validação de segurança básica: impede requisições sem conteúdo.
     if (!mensagem || mensagem.trim() === "") {
-        return res.status(400).json({ message: "A mensagem não pode estar vazia." });
+        return res.status(400).json({ message: "Por favor, digite uma mensagem para o Agente." });
     }
 
     try {
-        // 2. Processamento: Envia para o serviço do agente passando o nome do usuário logado
-        // O nome vem do middleware 'proteger' que populou req.usuario
-        const resposta = await processarComandoAgente(mensagem, req.usuario.nome);
+        // 2. Extração segura dos dados do usuário logado vindo do middleware 'proteger'.
+        const nomeUsuario = req.usuario?.nome || "Administrador";
+
+        // 3. Chamada ao motor de IA no Service.
+        const resposta = await processarComandoAgente(mensagem, nomeUsuario);
         
-        // 3. Sucesso: Retorna a resposta gerada pela IA
+        // 4. Sucesso: Retorna o texto gerado pelo Gemini.
         res.json({ resposta });
 
     } catch (error) {
-        // 4. Tratamento de Erro: Registra o erro no log do servidor (Railway)
-        console.error(`[AGENT_ROUTE_ERROR] Erro ao processar chat para o usuário ${req.usuario?.nome}:`, error.message);
+        // 5. Tratamento de Erros Críticos (Visíveis no Log do Railway).
+        console.error(`[AGENT_ERROR] Usuário: ${req.usuario?.nome || 'Desconhecido'} | Falha:`, error.message);
 
-        // Retorna status 500 mas com uma mensagem que o frontend pode tratar
+        // Retorna a falha de forma amigável no chat para que o usuário saiba o que houve.
+        // O status continua 500 para o frontend exibir a notificação de erro caso necessário.
         res.status(500).json({ 
-            message: "O Agente SIMEC está indisponível no momento.",
-            details: error.message 
+            message: "O Agente SIMEC encontrou uma dificuldade técnica.",
+            resposta: `[AVISO DO SISTEMA]: Não consegui processar seu pedido agora. Motivo: ${error.message}`,
+            error: true
         });
     }
 });
