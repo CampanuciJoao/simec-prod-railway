@@ -1,52 +1,48 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 21.0 - CHAMADA DIRETA VIA FETCH (SEM DEPENDÊNCIA DE SDK)
+// VERSÃO 22.0 - VARREDURA AUTOMÁTICA DE VERSÃO E MODELO
 
 import prisma from './prismaService.js';
 
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     
-    // Usaremos a URL oficial de produção (v1), ignorando a v1beta que deu erro no log
-    const URL = `https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+    // Lista de tentativas (A ordem foi escolhida para achar o que está liberado na sua conta)
+    const tentativas = [
+        { url: 'v1beta', model: 'gemini-1.5-flash' },
+        { url: 'v1beta', model: 'gemini-pro' },
+        { url: 'v1', model: 'gemini-pro' }
+    ];
 
-    const payload = {
-        contents: [{
-            parts: [{
-                text: `Você é o Guardião SIMEC, assistente de engenharia clínica. Usuário: ${usuarioNome}. Pergunta: ${perguntaUsuario}`
-            }]
-        }],
-        generationConfig: {
-            maxOutputTokens: 500,
-            temperature: 0.7
-        }
-    };
+    let ultimoErro = "";
 
-    try {
-        console.log(`[AGENTE] Enviando chamada direta via API Estável (v1)...`);
-
-        const response = await fetch(URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            console.error("--- ERRO NA RESPOSTA DO GOOGLE ---");
-            console.error(JSON.stringify(data, null, 2));
+    for (const tentativa of tentativas) {
+        try {
+            console.log(`[AGENTE] Tentando: ${tentativa.model} na API ${tentativa.url}...`);
             
-            if (response.status === 404) {
-                throw new Error("O Google ainda não sincronizou seu faturamento para acesso externo. No Playground funciona porque é interno, mas para APIs externas como o Railway, o delay de propagação é de algumas horas.");
+            const endpoint = `https://generativelanguage.googleapis.com/${tentativa.url}/models/${tentativa.model}:generateContent?key=${API_KEY}`;
+            
+            const response = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: `Você é o Guardião SIMEC. Responda curto em PT-BR: ${perguntaUsuario}` }] }]
+                })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                console.log(`[AGENTE] Sucesso com ${tentativa.model}!`);
+                return data.candidates[0].content.parts[0].text;
+            } else {
+                console.warn(`[AGENTE] ${tentativa.model} falhou: ${data.error?.message}`);
+                ultimoErro = data.error?.message;
             }
-            throw new Error(data.error?.message || "Erro na API do Google");
+        } catch (err) {
+            console.error(`[AGENTE] Erro de rede na tentativa: ${err.message}`);
         }
-
-        return data.candidates[0].content.parts[0].text;
-
-    } catch (error) {
-        console.error("--- FALHA NA CONEXÃO DIRETA ---");
-        console.error("Mensagem:", error.message);
-        throw new Error(error.message);
     }
+
+    // Se chegou aqui, todas falharam
+    throw new Error(`O Google ainda não liberou sua chave para uso externo. No Playground funciona por ser interno, mas para o sistema, o delay de ativação é maior. Erro: ${ultimoErro}`);
 };
