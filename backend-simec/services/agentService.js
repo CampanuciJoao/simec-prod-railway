@@ -43,7 +43,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
 
     try {
         // Agora usamos o 1.5 Flash (O melhor custo-benefício e velocidade)
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash-latest" });
 
         // Tenta capturar uma TAG no formato AAA-000 ou Texto-000
         let dadosAdicionais = "";
