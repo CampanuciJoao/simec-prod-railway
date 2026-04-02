@@ -1,21 +1,23 @@
 // Ficheiro: src/components/ChatBot.jsx
 import React, { useState, useRef, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faRobot, faPaperPlane, faTimes, faMinus, faCommentDots } from '@fortawesome/free-solid-svg-icons';
+import { faRobot, faPaperPlane, faMinus } from '@fortawesome/free-solid-svg-icons';
 import { enviarMensagemAoAgente } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
+
+// Importação com o caminho correto para a pasta styles
+import '../styles/components/ChatBot.css'; 
 
 function ChatBot() {
     const [isOpen, setIsOpen] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [historico, setHistorico] = useState([
-        { role: 'assistant', text: 'Olá! Sou o Guardião SIMEC. Como posso ajudar na engenharia clínica hoje?' }
+        { role: 'assistant', text: 'Olá! Sou a SIMEC-IA. Como posso ajudar na engenharia clínica hoje?' }
     ]);
     const [loading, setLoading] = useState(false);
     const scrollRef = useRef(null);
     const { addToast } = useToast();
 
-    // Scroll automático para a última mensagem
     useEffect(() => {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -35,7 +37,7 @@ function ChatBot() {
             const data = await enviarMensagemAoAgente(mensagem);
             setHistorico(prev => [...prev, { role: 'assistant', text: data.resposta }]);
         } catch (error) {
-            addToast("O Agente está offline no momento.", "error");
+            addToast("A IA está processando seu crédito Google. Tente em breve.", "info");
         } finally {
             setLoading(false);
         }
@@ -43,25 +45,25 @@ function ChatBot() {
 
     return (
         <div className="chatbot-wrapper no-print">
-            {/* Botão Flutuante */}
             {!isOpen && (
                 <button className="chatbot-trigger" onClick={() => setIsOpen(true)}>
-                    <FontAwesomeIcon icon={faCommentDots} size="lg" />
-                    <span className="chatbot-tooltip">Fale com o Agente</span>
+                    <FontAwesomeIcon icon={faRobot} />
+                    <span className="chatbot-tooltip">Falar com SIMEC-IA</span>
                 </button>
             )}
 
-            {/* Janela de Chat */}
             {isOpen && (
                 <div className="chatbot-window">
                     <div className="chatbot-header">
                         <div className="chatbot-info">
-                            <FontAwesomeIcon icon={faRobot} />
-                            <span>Guardião SIMEC</span>
+                            <div className="bot-icon-circle">
+                                <FontAwesomeIcon icon={faRobot} />
+                            </div>
+                            <span className="bot-name">SIMEC-IA</span>
                         </div>
-                        <div className="chatbot-actions">
-                            <button onClick={() => setIsOpen(false)}><FontAwesomeIcon icon={faMinus} /></button>
-                        </div>
+                        <button className="close-btn" onClick={() => setIsOpen(false)}>
+                            <FontAwesomeIcon icon={faMinus} />
+                        </button>
                     </div>
 
                     <div className="chatbot-messages" ref={scrollRef}>
@@ -80,12 +82,12 @@ function ChatBot() {
                     <form className="chatbot-input" onSubmit={handleEnviar}>
                         <input 
                             type="text" 
-                            placeholder="Digite sua dúvida ou comando..." 
+                            placeholder="Digite aqui..." 
                             value={mensagem}
                             onChange={(e) => setMensagem(e.target.value)}
                             disabled={loading}
                         />
-                        <button type="submit" disabled={loading}>
+                        <button type="submit" disabled={loading || !mensagem.trim()}>
                             <FontAwesomeIcon icon={faPaperPlane} />
                         </button>
                     </form>
