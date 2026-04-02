@@ -1,51 +1,44 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 17.0 - A PROVA DE FALHAS COM LOG DE CONFERÊNCIA
+// VERSÃO 18.0 - ESTRATÉGIA DE CONTORNO (FALLBACK) AUTOMÁTICO
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
 
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
+    if (!API_KEY) throw new Error("Chave API não encontrada.");
+
+    console.log(`[AGENTE] Chave ativa: ${API_KEY.substring(0, 6)}...`);
+
+    const genAI = new GoogleGenerativeAI(API_KEY);
     
-    if (!API_KEY) {
-        throw new Error("ERRO: Variável GEMINI_API_KEY não encontrada no Railway.");
-    }
-
-    // LOG DE SEGURANÇA: Isso vai aparecer no seu log preto do Railway
-    // Verifique se esses 4 primeiros dígitos batem com a chave que você criou por último.
-    console.log(`[AGENTE] Iniciando com a chave: ${API_KEY.substring(0, 4)}...`);
-
+    // TENTATIVA 1: O modelo que você quer (1.5 Flash)
     try {
-        // Inicializamos usando a versão 'v1' (Estável/Produção)
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        
-        // Usamos exatamente o ID do modelo que apareceu com cota no seu print
-        const model = genAI.getGenerativeModel(
-            { model: "gemini-1.5-flash" },
-            { apiVersion: "v1" }
-        );
-
-        console.log(`[AGENTE] Consultando modelo gemini-1.5-flash (v1)...`);
-
-        const promptBase = `Você é o Guardião SIMEC, assistente de engenharia clínica. Usuário: ${usuarioNome}. Responda em PT-BR de forma curta.`;
-        
-        // Chamada de conteúdo
-        const result = await model.generateContent(`${promptBase}\n\nPergunta: ${perguntaUsuario}`);
+        console.log("[AGENTE] Tentativa 1: gemini-1.5-flash");
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        const result = await model.generateContent(`Você é o Guardião SIMEC. Usuário: ${usuarioNome}. Responda: ${perguntaUsuario}`);
         const response = await result.response;
-        const text = response.text();
-
-        if (!text) throw new Error("Resposta da IA veio vazia.");
-
-        return text;
+        return response.text();
 
     } catch (error) {
-        console.error("--- ERRO CRÍTICO NO AGENTE ---");
-        console.error("MENSAGEM:", error.message);
-
-        if (error.message.includes("404")) {
-            throw new Error("O Google retornou 404 (Não Encontrado). Verifique se a chave no Railway é a que você criou DEPOIS de pagar os R$ 50,00.");
+        // Se o erro for 404 (Modelo não encontrado/faturamento pendente)
+        if (error.message.includes("404") || error.message.includes("not found")) {
+            console.warn("[AGENTE] Modelo 1.5 Flash ainda não liberado pelo Google. Tentando Fallback...");
+            
+            // TENTATIVA 2: O modelo de segurança (gemini-pro)
+            try {
+                console.log("[AGENTE] Tentativa 2: gemini-pro (Modelo de Segurança)");
+                const fallbackModel = genAI.getGenerativeModel({ model: "gemini-pro" });
+                const result = await fallbackModel.generateContent(`Você é o Guardião SIMEC. Usuário: ${usuarioNome}. Responda: ${perguntaUsuario}`);
+                const response = await result.response;
+                return response.text();
+                
+            } catch (fallbackError) {
+                console.error("[AGENTE] Falha total em todos os modelos.");
+                throw new Error("O Google ainda está ativando sua conta paga. Tente novamente em instantes.");
+            }
         }
-
-        throw new Error(`Erro na IA: ${error.message}`);
+        
+        throw error;
     }
 };
