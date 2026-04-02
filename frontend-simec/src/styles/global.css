@@ -280,3 +280,104 @@ body.dark-mode {
 .print-header {
   display: none;
 }
+
+/* Estilos para o ChatBot SIMEC */
+.chatbot-wrapper {
+    position: fixed;
+    bottom: 25px;
+    right: 25px;
+    z-index: 9999;
+}
+
+.chatbot-trigger {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background-color: #2563eb;
+    color: white;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    transition: transform 0.3s;
+}
+
+.chatbot-trigger:hover { transform: scale(1.1); }
+
+.chatbot-window {
+    width: 350px;
+    height: 450px;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+}
+
+.chatbot-header {
+    background: #1e293b;
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    font-size: 0.9rem;
+}
+
+.chatbot-messages {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    background: #f8fafc;
+}
+
+.chat-bubble {
+    padding: 10px 14px;
+    border-radius: 18px;
+    max-width: 85%;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.chat-bubble.user {
+    background: #2563eb;
+    color: white;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.chat-bubble.assistant {
+    background: #e2e8f0;
+    color: #1e293b;
+    align-self: flex-start;
+    border-bottom-left-radius: 4px;
+}
+
+.chatbot-input {
+    padding: 15px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    gap: 10px;
+}
+
+.chatbot-input input {
+    flex: 1;
+    border: 1px solid #cbd5e1;
+    border-radius: 20px;
+    padding: 8px 15px;
+    font-size: 0.85rem;
+}
+
+.chatbot-input button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    width: 35px;
+    height: 35px;
+    border-radius: 50%;
+    cursor: pointer;
+}

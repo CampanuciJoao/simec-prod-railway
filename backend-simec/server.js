@@ -30,6 +30,7 @@ import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js'; 
+import agentRoutes from './routes/agentRoutes.js';
 
 // --- 4. Importação dos Serviços e Middlewares ---
 import { atualizarStatusManutencoes, processarAlertasEEnviarNotificacoes } from './services/alertasService.js';
@@ -77,6 +78,7 @@ app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
+app.use('/api/agent', agentRoutes);
 
 // --- 9. Rota Raiz e Tarefas Agendadas ---
 app.get('/', (req, res) => {

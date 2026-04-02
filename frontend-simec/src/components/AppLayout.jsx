@@ -1,11 +1,12 @@
 // Ficheiro: frontend-simec/src/components/AppLayout.jsx
-// VERSÃO ATUALIZADA - NOTIFICAÇÕES OBRIGATÓRIAS BLINDADAS
+// VERSÃO ATUALIZADA - COM INTEGRAÇÃO DO AGENTE INTELIGENTE (CHATBOT)
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAlertas } from '@/contexts/AlertasContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from '@/components/Sidebar';
+import ChatBot from './ChatBot'; // <<< IMPORTADO O NOVO COMPONENTE
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faMoon, 
@@ -52,7 +53,6 @@ function AppLayout() {
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
   const handleMarcarTodasComoVistas = () => {
-    // Só marca como visto os alertas que NÃO são confirmações obrigatórias de manutenção
     const alertasPassíveisDeLimpeza = alertas.filter(a => 
         a.status === 'NaoVisto' && !a.id.startsWith('manut-confirm')
     );
@@ -96,7 +96,6 @@ function AppLayout() {
                     <ul>
                       {alertasNaoVistos.length > 0 ? (
                         alertasNaoVistos.slice(0, 8).map(notif => {
-                          // REGRA: Confirmação de manutenção é obrigatória e não pode ser "limpa" por aqui
                           const isObrigatorio = notif.id.startsWith('manut-confirm');
 
                           return (
@@ -106,7 +105,6 @@ function AppLayout() {
                                 <span>{notif.titulo}</span>
                               </Link>
                               
-                              {/* Só mostra o botão de check se NÃO for obrigatório */}
                               {!isObrigatorio && (
                                 <button 
                                   className="btn-mark-seen-mini" 
@@ -135,6 +133,9 @@ function AppLayout() {
         <main className="main-content">
           <Outlet />
         </main>
+        
+        {/* AGENTE INTELIGENTE (CHATBOT) INTEGRADO */}
+        <ChatBot /> 
       </div>
     </div>
   );

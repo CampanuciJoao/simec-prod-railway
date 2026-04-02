@@ -141,4 +141,8 @@ export const resolverOcorrencia = (id, dados) => api.put(`/ocorrencias/${id}/res
 // --- Indicadores BI ---
 export const getIndicadoresBI = () => api.get('/bi/indicadores').then(res => res.data);
 
+// chat bot
+export const enviarMensagemAoAgente = (mensagem) => 
+    api.post('/agent/chat', { mensagem }).then(res => res.data);
+
 export default api;
