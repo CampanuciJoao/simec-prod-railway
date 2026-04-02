@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 6.0 - CORREÇÃO DEFINITIVA DO ERRO 404 E INTEGRAÇÃO DE DADOS
+// VERSÃO 7.0 - TESTE EM PLANO GRATUITO (GEMINI-PRO)
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
@@ -9,8 +9,7 @@ const API_KEY = process.env.GEMINI_API_KEY;
 const genAI = new GoogleGenerativeAI(API_KEY || "");
 
 /**
- * FERRAMENTA: Busca dados reais para a IA basear sua análise técnica.
- * Isso evita que o robô "invente" informações.
+ * FERRAMENTA: Busca dados reais no banco para a IA analisar.
  */
 async function obterContextoDoBanco(tag) {
     try {
@@ -19,63 +18,73 @@ async function obterContextoDoBanco(tag) {
             include: {
                 unidade: true,
                 manutencoes: {
-                    take: 3,
+                    take: 5, // Aumentei para 5 para dar mais inteligência à IA
                     orderBy: { dataHoraAgendamentoInicio: 'desc' },
                     include: { notasAndamento: true }
                 }
             }
         });
-        if (!equipamento) return "Equipamento não encontrado.";
+        if (!equipamento) return "Equipamento com esta TAG não foi encontrado no sistema.";
         return JSON.stringify(equipamento);
     } catch (e) {
-        return "Erro ao consultar o banco de dados.";
+        return "Erro técnico ao consultar o banco de dados.";
     }
 }
 
 /**
- * PROCESSADOR: Envia a pergunta ao Gemini e retorna a resposta técnica.
+ * PROCESSADOR: Envia a pergunta ao Gemini e retorna a resposta.
  */
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
-    if (!API_KEY) throw new Error("GEMINI_API_KEY não configurada no Railway.");
+    if (!API_KEY) throw new Error("Chave GEMINI_API_KEY não encontrada nas variáveis do Railway.");
 
     try {
-        // CORREÇÃO DO 404: Usando o nome de modelo mais estável para a versão 1.5
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        // Usando 'gemini-pro' que é mais permissivo no plano gratuito sem pré-pagamento
+        const model = genAI.getGenerativeModel({ model: "gemini-pro" });
 
-        // Tenta identificar se o usuário mencionou uma TAG (Ex: CT-01 ou RAIOX-04)
+        // Identifica se o usuário digitou algo como 'CT-01' ou 'RAIOX-10'
         let dadosAdicionais = "";
         const extrairTag = perguntaUsuario.match(/[A-Za-z0-9]+-[A-Za-z0-9]+/);
         if (extrairTag) {
-            dadosAdicionais = await obterContextoDoBanco(extrairTag[0]);
+            dadosAdicionais = await obterContextoDoBanco(extrairTag[0].toUpperCase());
         }
 
-        const promptSistema = `Você é o Guardião SIMEC, assistente de engenharia clínica.
-        Usuário: ${usuarioNome || 'Administrador'}.
-        Dados do Banco: ${dadosAdicionais}
-        Instruções: Responda em Português-BR de forma técnica e direta. 
-        Se houver falhas repetitivas nos dados, sugira uma manutenção preditiva.`;
+        // Criamos um bloco de texto único para a IA não se perder
+        const promptFinal = `
+        Você é o Guardião SIMEC, assistente virtual de Engenharia Clínica.
+        Quem está falando com você: ${usuarioNome || 'Administrador'}.
+        
+        CONTEXTO DO BANCO DE DADOS (Se vazio, ignore):
+        ${dadosAdicionais}
 
-        console.log(`[AGENTE] Iniciando consulta para: ${perguntaUsuario}`);
+        PERGUNTA DO USUÁRIO:
+        "${perguntaUsuario}"
 
-        // Chamada de geração de conteúdo estruturada
-        const result = await model.generateContent([promptSistema, perguntaUsuario]);
+        INSTRUÇÕES:
+        1. Responda em Português do Brasil.
+        2. Seja técnico, porém direto.
+        3. Se houver dados de manutenção acima, analise se o defeito é recorrente.
+        4. Se não encontrar dados do equipamento, responda apenas à pergunta do usuário de forma genérica.
+        `;
+
+        console.log(`[AGENTE] Processando via Gemini-Pro: ${perguntaUsuario}`);
+
+        const result = await model.generateContent(promptFinal);
         const response = await result.response;
         const text = response.text();
 
-        if (!text) throw new Error("A IA não gerou uma resposta.");
+        if (!text) throw new Error("O Google Gemini não devolveu texto.");
 
         return text;
 
     } catch (error) {
-        // LOG DE DIAGNÓSTICO NO RAILWAY
         console.error("--- ERRO NA IA (DIAGNÓSTICO) ---");
-        console.error("Causa:", error.message);
+        console.error("Mensagem:", error.message);
 
-        // Se o erro for de modelo não encontrado (404), tentamos uma última explicação amigável
-        if (error.message.includes("404") || error.message.includes("not found")) {
-            throw new Error("O modelo gemini-1.5-flash não foi localizado. Verifique se o seu faturamento no Google AI Studio está ativo ou se a API Key tem permissões.");
+        // Se mesmo o gemini-pro der 404, o Google bloqueou sua chave até você validar o cartão/pagar os R$ 50
+        if (error.message.includes("404")) {
+            throw new Error("O Google bloqueou o acesso gratuito para esta chave de API. Isso acontece quando a conta precisa de verificação de faturamento (Billing) no Google AI Studio.");
         }
 
-        throw new Error(error.message);
+        throw new Error(`Falha na IA: ${error.message}`);
     }
 };
