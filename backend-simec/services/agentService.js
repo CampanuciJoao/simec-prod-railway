@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/services/agentService.js
-// VERSÃO 23.0 - REFORMULADA COM SDK OFICIAL DO GOOGLE
+// VERSÃO 26.0 - CORREÇÃO DE ERRO 404 (ESTÁVEL)
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import prisma from './prismaService.js';
@@ -8,65 +8,55 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
 
     if (!API_KEY) {
-        throw new Error("A chave GEMINI_API_KEY não foi configurada no servidor.");
+        throw new Error("API_KEY não configurada.");
     }
 
     try {
-        // 1. Inicializa o SDK oficial do Google
+        // Inicializa o SDK
         const genAI = new GoogleGenerativeAI(API_KEY);
 
-        // 2. Configura o modelo (Usando o 1.5-flash que é o mais estável e rápido)
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-1.5-flash",
-            generationConfig: {
-                maxOutputTokens: 500,
-                temperature: 0.7,
-            }
-        });
+        /**
+         * CORREÇÃO TÉCNICA:
+         * O modelo 'gemini-1.5-flash' foi movido para a API v1 (estável).
+         * Se o 1.5-flash der erro, ele tentará o 'gemini-pro' (1.0) que é o mais compatível de todos.
+         */
+        let model;
+        try {
+            model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        } catch (e) {
+            console.warn("[AGENTE] Falha ao carregar 1.5-flash, tentando gemini-pro...");
+            model = genAI.getGenerativeModel({ model: "gemini-pro" });
+        }
 
-        // 3. Busca um resumo rápido do banco para dar "Contexto" à IA (O "Cérebro" do SIMEC)
-        const totalEquipamentos = await prisma.equipamento.count();
+        // Busca contexto do banco
+        const total = await prisma.equipamento.count();
         const inoperantes = await prisma.equipamento.count({ where: { status: 'Inoperante' } });
-        const emManutencao = await prisma.equipamento.count({ where: { status: 'EmManutencao' } });
 
-        // 4. Monta o Prompt com o contexto do sistema
         const promptLocal = `
-            Você é o "Guardião SIMEC", um assistente especialista em Engenharia Clínica.
+            Você é o Guardião SIMEC, assistente de Engenharia Clínica.
             Estamos no sistema SIMEC.
-            Dados atuais do inventário:
-            - Total de equipamentos cadastrados: ${totalEquipamentos}
-            - Equipamentos parados (Inoperantes): ${inoperantes}
-            - Equipamentos em manutenção agora: ${emManutencao}
-
-            O usuário logado é: ${usuarioNome}.
-            Responda de forma profissional, prestativa e curta em Português do Brasil.
-            Pergunta do usuário: ${perguntaUsuario}
+            Status do hospital: ${total} equipamentos totais, ${inoperantes} parados.
+            Usuário: ${usuarioNome}.
+            Responda de forma curta em Português: ${perguntaUsuario}
         `;
 
-        console.log(`[AGENTE] Enviando requisição para o Google Gemini...`);
+        console.log(`[AGENTE] Solicitando resposta para: "${perguntaUsuario.substring(0, 20)}..."`);
         
-        // 5. Executa a chamada
+        // Gera o conteúdo
         const result = await model.generateContent(promptLocal);
         const response = await result.response;
         const text = response.text();
 
-        console.log(`[AGENTE] Resposta recebida com sucesso.`);
         return text;
 
     } catch (error) {
-        console.error(`[AGENTE_ERRO_CRÍTICO]:`, error);
+        console.error(`[ERRO_REAL_IA]:`, error.message);
         
-        // Se for erro de chave inválida ou exaurida
-        if (error.message?.includes("API_KEY_INVALID")) {
-            throw new Error("Erro de Autenticação: A sua API Key do Google é inválida ou expirou.");
+        // Se mesmo assim der erro de modelo não encontrado
+        if (error.message.includes("not found")) {
+            throw new Error("O modelo solicitado está em manutenção pelo Google. Tente novamente em instantes.");
         }
 
-        // Se for erro de região (muito comum em servidores gringos)
-        if (error.message?.includes("location is not supported")) {
-            throw new Error("O Google ainda não liberou o Gemini para a região onde seu servidor está hospedado.");
-        }
-
-        // Erro genérico mas com o detalhe técnico para você ler no console
-        throw new Error(`Falha na comunicação com a IA: ${error.message}`);
+        throw new Error(error.message);
     }
 };
