@@ -61,6 +61,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // --- ROTAS PÚBLICAS ---
 app.use('/api/auth', authRoutes);
+app.use('/api/agent', agentRoutes); // Ativação da inteligência artificial
 
 // --- ROTAS PROTEGIDAS (Exigem Login) ---
 app.use(proteger);
@@ -77,7 +78,7 @@ app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
-app.use('/api/agent', agentRoutes); // Ativação da inteligência artificial
+
 
 // --- 9. Rota Raiz e Tarefas Agendadas ---
 app.get('/', (req, res) => {
