@@ -1,37 +1,50 @@
+// Ficheiro: simec/backend-simec/services/agentService.js
+// VERSÃO 30.0 - CORRIGIDA COM BASE NO TESTE DE MODELOS DO USUÁRIO
+
 import axios from 'axios';
 import prisma from './prismaService.js';
 
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome) => {
-    const API_KEY = process.env.GEMINI_API_KEY?.trim();
+    // Limpeza da chave
+    const API_KEY = process.env.GEMINI_API_KEY?.replace(/['" ]/g, '').trim();
 
-    if (!API_KEY) throw new Error("API_KEY não configurada.");
+    if (!API_KEY) throw new Error("Chave não encontrada no ambiente.");
 
     try {
-        // Busca contexto do banco
+        // Contexto do banco (Prisma)
         const total = await prisma.equipamento.count();
         const inoperantes = await prisma.equipamento.count({ where: { status: 'Inoperante' } });
 
-        const systemPrompt = `Você é o Guardião SIMEC, assistente de Engenharia Clínica. O hospital possui ${total} equipamentos cadastrados, sendo que ${inoperantes} estão parados. O usuário solicitando é ${usuarioNome}. Responda de forma curta, técnica e prestativa em Português do Brasil: ${perguntaUsuario}`;
+        const prompt = `Você é o Guardião SIMEC. Hospital com ${total} aparelhos, ${inoperantes} parados. Usuário: ${usuarioNome}. Responda curto: ${perguntaUsuario}`;
 
-        // MUDANÇA CRUCIAL: Usando 'gemini-pro' (versão 1.0 estável) na rota v1
-        // Este modelo é o mais aceito universalmente pelo Google.
-        const url = `https://generativelanguage.googleapis.com/v1/models/gemini-pro:generateContent?key=${API_KEY}`;
+        /**
+         * AJUSTE DE ROTA:
+         * Usaremos o sufixo '-latest' no modelo Flash. 
+         * É o nome oficial para evitar o erro 404 que você está recebendo.
+         */
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${API_KEY}`;
 
-        console.log("[AGENTE] Chamando gemini-pro na rota v1...");
+        console.log("[IA] Chamando modelo 1.5-flash-latest...");
 
         const response = await axios.post(url, {
-            contents: [{ parts: [{ text: systemPrompt }] }],
-            generationConfig: {
-                temperature: 0.7,
-                maxOutputTokens: 500
-            }
+            contents: [{ parts: [{ text: prompt }] }]
         });
 
         return response.data.candidates[0].content.parts[0].text;
 
     } catch (error) {
-        const errorMessage = error.response?.data?.error?.message || error.message;
-        console.error("AXIOS AGENTE ERROR:", errorMessage);
-        throw new Error(errorMessage);
+        // FALLBACK: Se o Flash der 404, tentamos o 'gemini-pro' que é o modelo raiz
+        try {
+            console.warn("[IA] Flash falhou, tentando gemini-pro...");
+            const urlPro = `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${API_KEY}`;
+            const resPro = await axios.post(urlPro, {
+                contents: [{ parts: [{ text: perguntaUsuario }] }]
+            });
+            return resPro.data.candidates[0].content.parts[0].text;
+        } catch (errFinal) {
+            const msg = errFinal.response?.data?.error?.message || errFinal.message;
+            console.error("ERRO CRÍTICO IA:", msg);
+            throw new Error(`O Google retornou: ${msg}`);
+        }
     }
 };
