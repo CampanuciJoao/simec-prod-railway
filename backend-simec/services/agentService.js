@@ -6,7 +6,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    // Modelos estáveis e suportados pela API v1beta
+    // Modelos estáveis e suportados pela API
     const modelosBackup = ["gemini-1.5-flash-latest", "gemini-1.5-pro-latest", "gemini-1.0-pro"];
     let erroUltimaTentativa = null;
 
@@ -39,7 +39,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
 
             const listaEquipamentosStr = JSON.stringify(equipamentosAtivos);
 
-            // 2. A INSTRUÇÃO MESTRA (Adicionado reforço para não adicionar texto extra)
+            // 2. A INSTRUÇÃO MESTRA
             const systemInstruction = `
                 Você é o Guardião SIMEC, assistente de Engenharia Clínica.
                 DATA ATUAL DO SERVIDOR: ${agora.toISOString()}
@@ -68,44 +68,50 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             let textoDaIA = result.response.text();
             let respostaFinalTexto = textoDaIA;
 
-            // 5. INTERCEPTANDO AÇÕES
-            if (textoDaIA.includes('"acao_sistema":')) {
-                let jsonLimpo = textoDaIA.replace(/```json/g, '').replace(/```/g, '').trim();
-                const comando = JSON.parse(jsonLimpo);
+            // 5. INTERCEPTANDO AÇÕES (Extração resiliente de JSON)
+            if (textoDaIA.includes('{') && textoDaIA.includes('}')) {
+                try {
+                    const inicio = textoDaIA.indexOf('{');
+                    const fim = textoDaIA.lastIndexOf('}');
+                    const jsonLimpo = textoDaIA.substring(inicio, fim + 1);
+                    const comando = JSON.parse(jsonLimpo);
 
-                if (comando.acao_sistema === "CRIAR_MANUTENCAO") {
-                    if (comando.confirmado === true) {
-                        const numeroOSGerado = `OS-${Date.now()}`;
-                        await prisma.manutencao.create({
-                            data: {
-                                numeroOS: numeroOSGerado,
-                                tipo: comando.tipo,
-                                status: "Agendada",
-                                descricaoProblemaServico: comando.descricao,
-                                dataHoraAgendamentoInicio: new Date(comando.dataInicio),
-                                equipamentoId: comando.equipamentoId
-                            }
+                    if (comando.acao_sistema === "CRIAR_MANUTENCAO") {
+                        if (comando.confirmado === true) {
+                            const numeroOSGerado = `OS-${Date.now()}`;
+                            await prisma.manutencao.create({
+                                data: {
+                                    numeroOS: numeroOSGerado,
+                                    tipo: comando.tipo,
+                                    status: "Agendada",
+                                    descricaoProblemaServico: comando.descricao,
+                                    dataHoraAgendamentoInicio: new Date(comando.dataInicio),
+                                    equipamentoId: comando.equipamentoId
+                                }
+                            });
+                            respostaFinalTexto = `✅ Agendamento concluído! OS gerada: ${numeroOSGerado}.`;
+                        } else {
+                            respostaFinalTexto = `Entendido. Você deseja agendar uma ${comando.tipo} para ${comando.descricao}. Posso confirmar este agendamento? (Responda: "Sim, confirme")`;
+                        }
+                    } 
+                    else if (comando.acao_sistema === "GERAR_RELATORIO") {
+                        const umAnoAtras = new Date(agora);
+                        umAnoAtras.setFullYear(agora.getFullYear() - 1);
+                        const contagem = await prisma.manutencao.count({
+                            where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
                         });
-                        respostaFinalTexto = `✅ Agendamento concluído! OS gerada: ${numeroOSGerado}.`;
-                    } else {
-                        respostaFinalTexto = `Entendido. Você deseja agendar uma ${comando.tipo} para ${comando.descricao}. Posso confirmar este agendamento? (Responda: "Sim, confirme")`;
+                        respostaFinalTexto = `📊 Relatório: Encontrei ${contagem} manutenções do tipo ${comando.filtros.tipo} no último ano.`;
                     }
-                } 
-                else if (comando.acao_sistema === "GERAR_RELATORIO") {
-                    const umAnoAtras = new Date(agora);
-                    umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
-                    const contagem = await prisma.manutencao.count({
-                        where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
-                    });
-                    respostaFinalTexto = `📊 Relatório: Encontrei ${contagem} manutenções do tipo ${comando.filtros.tipo} no último ano.`;
-                }
-                else if (comando.acao_sistema === "ANALISAR_SAUDE") {
-                    const ocorrencias = await prisma.ocorrencia.findMany({
-                        where: { equipamentoId: comando.equipamentoId, data: { gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } }
-                    });
-                    const promptSaude = `Analise este histórico de falhas e explique a saúde do ativo: ${JSON.stringify(ocorrencias)}. Responda de forma técnica e oriente o técnico.`;
-                    const analise = await chat.sendMessage(promptSaude);
-                    respostaFinalTexto = analise.response.text();
+                    else if (comando.acao_sistema === "ANALISAR_SAUDE") {
+                        const ocorrencias = await prisma.ocorrencia.findMany({
+                            where: { equipamentoId: comando.equipamentoId, data: { gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } }
+                        });
+                        const promptSaude = `Analise este histórico de falhas e explique a saúde do ativo: ${JSON.stringify(ocorrencias)}. Responda de forma técnica e oriente o técnico.`;
+                        const analise = await chat.sendMessage(promptSaude);
+                        respostaFinalTexto = analise.response.text();
+                    }
+                } catch (jsonErr) {
+                    console.warn("IA retornou algo que não é JSON puro:", textoDaIA);
                 }
             }
 
