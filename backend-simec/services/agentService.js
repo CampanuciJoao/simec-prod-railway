@@ -6,7 +6,8 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    const modelosBackup = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    // Modelos estáveis e suportados pela API v1beta
+    const modelosBackup = ["gemini-1.5-flash", "gemini-1.5-flash-8b", "gemini-1.5-pro"];
     let erroUltimaTentativa = null;
 
     for (const nomeModelo of modelosBackup) {
@@ -33,22 +34,23 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             );
 
             if (candidatos.length > 1) {
-                return `Encontrei ${candidatos.length} equipamentos: ${candidatos.map(e => `${e.modelo} (Tag: ${e.tag})`).join(', ')}. Por favor, especifique citando a Tag ou Patrimônio.`;
+                return `Encontrei ${candidatos.length} equipamentos: ${candidatos.map(e => `${e.modelo} (Tag: ${e.tag})`).join(', ')}. Por favor, seja mais específico citando a Tag ou Patrimônio.`;
             }
 
             const listaEquipamentosStr = JSON.stringify(equipamentosAtivos);
 
-            // 2. A INSTRUÇÃO MESTRA (Atualizada com a regra de Saúde)
+            // 2. A INSTRUÇÃO MESTRA (Adicionado reforço para não adicionar texto extra)
             const systemInstruction = `
                 Você é o Guardião SIMEC, assistente de Engenharia Clínica.
                 DATA ATUAL DO SERVIDOR: ${agora.toISOString()}
                 Lista de equipamentos: ${listaEquipamentosStr}
 
                 REGRAS:
-                1. AGENDAMENTO: Responda JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva/Corretiva", "descricao": "...", "dataInicio": "ISO_DATE", "confirmado": false}
-                2. RELATÓRIOS: Responda JSON: {"acao_sistema": "GERAR_RELATORIO", "tipo": "manutencoesRealizadas", "filtros": {"tipo": "...", "periodo": "1_ano"}}
-                3. ANÁLISE DE SAÚDE: Se perguntarem sobre a saúde/estado de um equipamento, responda JSON: {"acao_sistema": "ANALISAR_SAUDE", "equipamentoId": "ID"}
-                4. Se for agendamento, após gerar o JSON, peça confirmação.
+                1. AGENDAMENTO: Responda APENAS JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva/Corretiva", "descricao": "...", "dataInicio": "ISO_DATE", "confirmado": false}
+                2. RELATÓRIOS: Responda APENAS JSON: {"acao_sistema": "GERAR_RELATORIO", "tipo": "manutencoesRealizadas", "filtros": {"tipo": "...", "periodo": "1_ano"}}
+                3. ANÁLISE DE SAÚDE: Responda APENAS JSON: {"acao_sistema": "ANALISAR_SAUDE", "equipamentoId": "ID"}
+                
+                IMPORTANTE: Não escreva explicações, nem saudações, nem texto fora do bloco JSON. Apenas o JSON puro.
             `;
 
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
@@ -91,7 +93,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                 } 
                 else if (comando.acao_sistema === "GERAR_RELATORIO") {
                     const umAnoAtras = new Date(agora);
-                    umAnoAtras.setFullYear(agora.getFullYear() - 1);
+                    umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
                     const contagem = await prisma.manutencao.count({
                         where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
                     });

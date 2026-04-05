@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/services/alertasService.js
-// VERSÃO 9.0 - ADICIONADO MOTOR DE SAÚDE PREDITIVA (SCORE DE RISCO)
+// VERSÃO 9.1 - CORRIGIDA (REFERÊNCIAS RESOLVIDAS)
 
 import prisma from './prismaService.js';
 import { enviarEmail } from './emailService.js';
@@ -7,13 +7,11 @@ import { addDays, isBefore, isAfter, differenceInDays, format, startOfDay } from
 import { ptBR } from 'date-fns/locale';
 
 // ==========================================================================
-// SEÇÃO DE MANUTENÇÕES
+// SEÇÃO DE MANUTENÇÕES E SAÚDE PREDITIVA
 // ==========================================================================
 
 export async function atualizarStatusManutencoes() {
   const agora = new Date();
-
-  // 1. Inicia manutenções 'Agendada' -> 'EmAndamento'
   const manutsParaIniciar = await prisma.manutencao.findMany({
     where: { status: 'Agendada', dataHoraAgendamentoInicio: { lte: agora } },
     select: { id: true, equipamentoId: true, numeroOS: true, dataHoraAgendamentoInicio: true },
@@ -23,12 +21,7 @@ export async function atualizarStatusManutencoes() {
     await prisma.$transaction(async (tx) => {
       for (const manut of manutsParaIniciar) {
         await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
-        
-        await tx.manutencao.update({
-          where: { id: manut.id },
-          data: { status: 'EmAndamento', dataInicioReal: manut.dataHoraAgendamentoInicio }
-        });
-        
+        await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'EmAndamento', dataInicioReal: manut.dataHoraAgendamentoInicio } });
         await tx.alerta.create({
           data: {
             id: `manut-iniciada-${manut.id}`,
@@ -42,10 +35,8 @@ export async function atualizarStatusManutencoes() {
         });
       }
     });
-    console.log(`[STATUS AUTO] ${manutsParaIniciar.length} manutenção(ões) iniciada(s).`);
   }
 
-  // 2. Move 'EmAndamento' -> 'AguardandoConfirmacao'
   const manutsParaConfirmar = await prisma.manutencao.findMany({
     where: { status: 'EmAndamento', dataHoraAgendamentoFim: { lte: agora } }
   });
@@ -70,19 +61,51 @@ export async function atualizarStatusManutencoes() {
   }
 }
 
-// ==========================================================================
-// SEÇÃO DE SAÚDE PREDITIVA (NOVO)
-// ==========================================================================
+async function gerarAlertasDeProximidadeManutencao() {
+  const agora = new Date();
+  const PONTOS_INICIO = [
+    { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' },
+    { limiar: 60, prioridade: 'Media', label: '1h', texto: 'em 1 hora' },
+    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: 'em 24 horas' },
+  ];
+
+  const manutencoesProximas = await prisma.manutencao.findMany({
+    where: { status: 'Agendada', dataHoraAgendamentoInicio: { gt: agora } },
+    include: { equipamento: { select: { modelo: true } } }
+  });
+
+  for (const manut of manutencoesProximas) {
+    const minRestantes = Math.round((manut.dataHoraAgendamentoInicio.getTime() - agora.getTime()) / 60000);
+    for (const ponto of PONTOS_INICIO) {
+      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
+        const idAlerta = `manut-prox-início-${manut.id}-${ponto.label}`;
+        const jaExiste = await prisma.alerta.findUnique({ where: { id: idAlerta } });
+        if (!jaExiste) {
+          await prisma.alerta.create({
+            data: {
+              id: idAlerta,
+              titulo: `Manutenção inicia ${ponto.texto}`,
+              subtitulo: `OS ${manut.numeroOS} - ${manut.equipamento.modelo}`,
+              data: manut.dataHoraAgendamentoInicio,
+              prioridade: ponto.prioridade,
+              tipo: 'Manutenção',
+              link: `/manutencoes/detalhes/${manut.id}`
+            }
+          });
+        }
+        break;
+      }
+    }
+  }
+}
 
 export async function processarSaudeEquipamentos() {
-  console.log('[SAÚDE] Analisando histórico de falhas para alertas preditivos...');
+  console.log('[SAÚDE] Analisando histórico de falhas...');
   const umAnoAtras = new Date();
   umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
 
   const equipamentos = await prisma.equipamento.findMany({
-    include: { 
-      ocorrencias: { where: { data: { gte: umAnoAtras } } } 
-    }
+    include: { ocorrencias: { where: { data: { gte: umAnoAtras } } } }
   });
 
   for (const eq of equipamentos) {
@@ -94,7 +117,6 @@ export async function processarSaudeEquipamentos() {
     if (score >= 10) {
       const idAlerta = `alerta-saude-${eq.id}-${new Date().getMonth()}`;
       const jaExiste = await prisma.alerta.findUnique({ where: { id: idAlerta } });
-
       if (!jaExiste) {
         await prisma.alerta.create({
           data: {
@@ -107,7 +129,6 @@ export async function processarSaudeEquipamentos() {
             link: `/equipamentos/ficha-tecnica/${eq.id}`
           }
         });
-        console.log(`[ALERTA PREDITIVO] Risco detectado para ${eq.tag}. Score: ${score}`);
       }
     }
   }
@@ -134,7 +155,6 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
       if (diasRestantes > 0 && diasRestantes <= ponto.limiar) {
         const idAlerta = `${tipoEntidade.toLowerCase()}-vence-${item.id}-${ponto.label}`;
         const jaExiste = await prisma.alerta.findUnique({ where: { id: idAlerta } });
-        
         if (!jaExiste) {
           await prisma.alerta.create({
             data: {
@@ -175,31 +195,20 @@ async function verificarVencimentoContratos() {
 
   for (const contrato of contratosAtivos) {
     await gerarAlertasVencimento(contrato, 'Contrato');
-    
     const emails = await prisma.emailNotificacao.findMany({ where: { ativo: true, recebeAlertasContrato: true } });
     for (const email of emails) {
       const dataInicioNotif = addDays(startOfDay(contrato.dataFim), -email.diasAntecedencia);
       if (isBefore(hoje, contrato.dataFim) && (hoje.getTime() >= dataInicioNotif.getTime())) {
-        const jaEnviado = await prisma.notificacaoEnviada.findFirst({
-          where: { entidade: 'Contrato', entidadeId: contrato.id, emailNotificacaoId: email.id },
-        });
-
+        const jaEnviado = await prisma.notificacaoEnviada.findFirst({ where: { entidade: 'Contrato', entidadeId: contrato.id, emailNotificacaoId: email.id } });
         if (!jaEnviado) {
           const dias = differenceInDays(contrato.dataFim, hoje);
           await enviarEmail({
             para: email.email,
             assunto: `[SIMEC] Alerta: Contrato ${contrato.numeroContrato} vence em ${dias} dia(s)`,
             dadosTemplate: {
-              nomeDestinatario: email.nome || 'Usuário',
-              tituloAlerta: 'Vencimento de Contrato',
-              mensagemPrincipal: `O contrato abaixo vencerá em breve.`,
-              detalhes: { 
-                'Nº Contrato': contrato.numeroContrato, 
-                'Fornecedor': contrato.fornecedor, 
-                'Vence em': format(contrato.dataFim, 'dd/MM/yyyy', { locale: ptBR }) 
-              },
-              textoBotao: 'Ver Contrato', 
-              linkBotao: `${process.env.FRONTEND_URL}/contratos`
+              nomeDestinatario: email.nome || 'Usuário', tituloAlerta: 'Vencimento de Contrato', mensagemPrincipal: `O contrato abaixo vencerá em breve.`,
+              detalhes: { 'Nº Contrato': contrato.numeroContrato, 'Fornecedor': contrato.fornecedor, 'Vence em': format(contrato.dataFim, 'dd/MM/yyyy', { locale: ptBR }) },
+              textoBotao: 'Ver Contrato', linkBotao: `${process.env.FRONTEND_URL}/contratos`
             }
           });
           await prisma.notificacaoEnviada.create({ data: { entidade: 'Contrato', entidadeId: contrato.id, emailNotificacaoId: email.id } });
@@ -215,31 +224,20 @@ async function verificarVencimentoSeguros() {
 
   for (const seguro of segurosAtivos) {
     await gerarAlertasVencimento(seguro, 'Seguro');
-    
     const emails = await prisma.emailNotificacao.findMany({ where: { ativo: true, recebeAlertasSeguro: true } });
     for (const email of emails) {
       const dataInicioNotif = addDays(startOfDay(seguro.dataFim), -email.diasAntecedencia);
       if (isBefore(hoje, seguro.dataFim) && (hoje.getTime() >= dataInicioNotif.getTime())) {
-        const jaEnviado = await prisma.notificacaoEnviada.findFirst({
-          where: { entidade: 'Seguro', entidadeId: seguro.id, emailNotificacaoId: email.id },
-        });
-
+        const jaEnviado = await prisma.notificacaoEnviada.findFirst({ where: { entidade: 'Seguro', entidadeId: seguro.id, emailNotificacaoId: email.id } });
         if (!jaEnviado) {
           const dias = differenceInDays(seguro.dataFim, hoje);
           await enviarEmail({
             para: email.email,
             assunto: `[SIMEC] Alerta: Seguro ${seguro.apoliceNumero} vence em ${dias} dia(s)`,
             dadosTemplate: {
-              nomeDestinatario: email.nome || 'Usuário',
-              tituloAlerta: 'Vencimento de Seguro',
-              mensagemPrincipal: `A apólice abaixo vencerá em breve.`,
-              detalhes: { 
-                'Nº Apólice': seguro.apoliceNumero, 
-                'Seguradora': seguro.seguradora, 
-                'Vence em': format(seguro.dataFim, 'dd/MM/yyyy', { locale: ptBR }) 
-              },
-              textoBotao: 'Ver Seguro', 
-              linkBotao: `${process.env.FRONTEND_URL}/seguros`
+              nomeDestinatario: email.nome || 'Usuário', tituloAlerta: 'Vencimento de Seguro', mensagemPrincipal: `A apólice abaixo vencerá em breve.`,
+              detalhes: { 'Nº Apólice': seguro.apoliceNumero, 'Seguradora': seguro.seguradora, 'Vence em': format(seguro.dataFim, 'dd/MM/yyyy', { locale: ptBR }) },
+              textoBotao: 'Ver Seguro', linkBotao: `${process.env.FRONTEND_URL}/seguros`
             }
           });
           await prisma.notificacaoEnviada.create({ data: { entidade: 'Seguro', entidadeId: seguro.id, emailNotificacaoId: email.id } });
@@ -252,7 +250,7 @@ async function verificarVencimentoSeguros() {
 export async function processarAlertasEEnviarNotificacoes() {
   try {
     await gerarAlertasDeProximidadeManutencao();
-    await processarSaudeEquipamentos(); // Executa a análise preditiva
+    await processarSaudeEquipamentos();
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
   } catch (error) {
