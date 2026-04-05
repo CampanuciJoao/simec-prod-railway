@@ -1,21 +1,22 @@
-// services/timeService.js
-
-// Altere para 'false' quando o sistema estiver em produção
-const IS_PRODUCTION_MODE = true;
-
-// A data mockada para testes DEVE estar no formato ISO 8601 UTC (com 'Z' no final).
-// Usando seu exemplo de UTC-4: 09:36 da manhã no seu fuso é 13:36 em UTC.
-const MOCK_DATE_UTC = '2025-06-06T13:36:00.000Z';
+// Ficheiro: services/timeService.js
+// VERSÃO FINAL - COM DETECÇÃO AUTOMÁTICA DE AMBIENTE
 
 /**
- * Retorna um objeto Date que representa o "agora" do sistema.
- * Em modo de produção, retorna a data/hora atual do servidor (que deve estar em UTC).
- * Em modo de desenvolvimento, retorna uma data mockada para consistência nos testes.
- * O valor retornado é sempre um objeto Date, para ser formatado depois.
+ * Retorna o "agora" do sistema.
+ * Em produção (NODE_ENV=production), usa o relógio do servidor.
+ * Em desenvolvimento/testes, usa uma data fixa para consistência.
  */
 export function getAgora() {
-  if (IS_PRODUCTION_MODE) {
+  // Verifica a variável de ambiente definida no .env ou no servidor
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // A data mockada para testes (Junho de 2025)
+  const MOCK_DATE_UTC = '2025-06-06T13:36:00.000Z';
+
+  if (isProduction) {
     return new Date();
   }
+  
+  console.log('[TimeService] Modo de desenvolvimento: Usando data mockada.');
   return new Date(MOCK_DATE_UTC);
 }

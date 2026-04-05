@@ -1,143 +1,117 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from './prismaService.js';
+import { getAgora } from './timeService.js';
 
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Admin") => {
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    try {
-        const genAI = new GoogleGenerativeAI(API_KEY);
+    const modelosBackup = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"];
+    let erroUltimaTentativa = null;
 
-        // =========================================================================
-        // 1. DANDO "SUPER OLHOS" PARA A IA (Visão detalhada do banco)
-        // =========================================================================
-        const equipamentosAtivos = await prisma.equipamento.findMany({
-            select: { 
-                id: true, 
-                tag: true, 
-                modelo: true,
-                fabricante: true,         // Para buscas por marca
-                numeroPatrimonio: true,   // Para buscas por série/patrimônio
-                tipo: true,               // Ex: Ventilador Pulmonar
-                setor: true,              // Ex: UTI
-                unidade: {                // Ex: Casa do Nilton
-                    select: { nomeFantasia: true, nomeSistema: true }
-                }
-            },
-            take: 200 // Limite aumentado para ver mais equipamentos de uma vez
-        });
-        const listaEquipamentosStr = JSON.stringify(equipamentosAtivos);
+    for (const nomeModelo of modelosBackup) {
+        try {
+            const genAI = new GoogleGenerativeAI(API_KEY);
+            const agora = getAgora();
 
-        // =========================================================================
-        // 2. A INSTRUÇÃO MESTRA (O "Cérebro" do Agente)
-        // =========================================================================
-        const systemInstruction = `
-            Você é o Guardião SIMEC, assistente de Engenharia Clínica.
-            
-            Lista de equipamentos no banco de dados (incluindo unidades, setores, patrimônio e fabricante):
-            ${listaEquipamentosStr}
+            // 1. DANDO "SUPER OLHOS" PARA A IA
+            const equipamentosAtivos = await prisma.equipamento.findMany({
+                select: { 
+                    id: true, tag: true, modelo: true, fabricante: true, 
+                    numeroPatrimonio: true, tipo: true, setor: true,
+                    unidade: { select: { nomeFantasia: true, nomeSistema: true } }
+                },
+                take: 200
+            });
 
-            REGRAS DE AÇÃO:
-            1. O usuário pode pedir agendamento citando Fabricante, Unidade, Setor ou Patrimônio.
-            2. Se o usuário pedir para agendar, mas faltar data, hora, ou não ficar claro o equipamento, PERGUNTE NORMALMENTE em texto.
-            3. SÓ SE VOCÊ TIVER CERTEZA do equipamento e da data, responda APENAS com um bloco JSON no seguinte formato (sem texto extra):
-            
-            {
-              "acao_sistema": "CRIAR_MANUTENCAO",
-              "equipamentoId": "coloque_o_id_aqui",
-              "tipo": "Preventiva ou Corretiva",
-              "descricao": "Resumo do que o usuario pediu",
-              "dataInicio": "2024-05-20T10:00:00Z",
-              "dataFim": "2024-05-20T17:00:00Z"
+            // Lógica de Desambiguação
+            const termoBusca = perguntaUsuario.toLowerCase();
+            const candidatos = equipamentosAtivos.filter(e => 
+                e.modelo.toLowerCase().includes(termoBusca) || 
+                e.tag.toLowerCase().includes(termoBusca) ||
+                e.unidade.nomeSistema.toLowerCase().includes(termoBusca)
+            );
+
+            if (candidatos.length > 1) {
+                return `Encontrei ${candidatos.length} equipamentos: ${candidatos.map(e => `${e.modelo} (Tag: ${e.tag})`).join(', ')}. Por favor, seja mais específico citando a Tag ou Patrimônio.`;
             }
 
-            Atenção: A "dataFim" é opcional, envie null se ele não falar o horário que finaliza.
-        `;
+            const listaEquipamentosStr = JSON.stringify(equipamentosAtivos);
 
-        const model = genAI.getGenerativeModel({ 
-            model: "gemini-2.5-flash",
-            systemInstruction: systemInstruction
-        });
+            // 2. A INSTRUÇÃO MESTRA
+            const systemInstruction = `
+                Você é o Guardião SIMEC, assistente de Engenharia Clínica.
+                DATA ATUAL DO SERVIDOR: ${agora.toISOString()}
+                Lista de equipamentos: ${listaEquipamentosStr}
 
-        // =========================================================================
-        // 3. RECUPERANDO A MEMÓRIA DO USUÁRIO
-        // =========================================================================
-        const historicoBanco = await prisma.chatHistorico.findMany({
-            where: { usuario: usuarioNome },
-            orderBy: { createdAt: 'asc' },
-            take: 10 // Lembra das últimas 10 mensagens
-        });
+                REGRAS:
+                1. AGENDAMENTO: Responda JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva/Corretiva", "descricao": "...", "dataInicio": "ISO_DATE", "confirmado": false}
+                2. RELATÓRIOS: Responda JSON: {"acao_sistema": "GERAR_RELATORIO", "tipo": "manutencoesRealizadas", "filtros": {"tipo": "...", "periodo": "1_ano"}}
+                3. Se for agendamento, após gerar o JSON, peça confirmação ao usuário. Se o usuário confirmar, retorne o JSON com "confirmado": true.
+            `;
 
-        const history = historicoBanco.map(msg => ({
-            role: msg.role,
-            parts: [{ text: msg.mensagem }]
-        }));
+            const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
 
-        console.log(`[AGENTE] Memória: ${history.length} msgs. Processando: "${perguntaUsuario}"...`);
+            const historicoBanco = await prisma.chatHistorico.findMany({
+                where: { usuario: usuarioNome },
+                orderBy: { createdAt: 'asc' },
+                take: 10
+            });
 
-        // INICIA O CHAT COM A MEMÓRIA
-        const chat = model.startChat({ history: history });
+            const history = historicoBanco.map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
+            const chat = model.startChat({ history });
 
-        // =========================================================================
-        // 4. ENVIANDO PARA O GOOGLE E RECEBENDO RESPOSTA
-        // =========================================================================
-        const result = await chat.sendMessage(perguntaUsuario);
-        let textoDaIA = result.response.text();
-        let respostaFinalTexto = textoDaIA;
+            const result = await chat.sendMessage(perguntaUsuario);
+            let textoDaIA = result.response.text();
+            let respostaFinalTexto = textoDaIA;
 
-        // =========================================================================
-        // 5. A MÁGICA DA AUTOMAÇÃO: INTERCEPTANDO A AÇÃO!
-        // =========================================================================
-        if (textoDaIA.includes('"acao_sistema":') || textoDaIA.includes('CRIAR_MANUTENCAO')) {
-            console.log("[AGENTE] A IA decidiu executar uma ação no banco!");
-            
-            try {
-                // Limpa formatações Markdown
+            // 5. INTERCEPTANDO AÇÕES
+            if (textoDaIA.includes('"acao_sistema":')) {
                 let jsonLimpo = textoDaIA.replace(/```json/g, '').replace(/```/g, '').trim();
                 const comando = JSON.parse(jsonLimpo);
 
                 if (comando.acao_sistema === "CRIAR_MANUTENCAO") {
-                    
-                    const numeroOSGerado = `OS-${Date.now()}`;
-
-                    // EXECUTA NO BANCO DE DADOS
-                    await prisma.manutencao.create({
-                        data: {
-                            numeroOS: numeroOSGerado,
-                            tipo: comando.tipo || "Preventiva",
-                            status: "Agendada",
-                            descricaoProblemaServico: comando.descricao,
-                            dataHoraAgendamentoInicio: new Date(comando.dataInicio),
-                            dataHoraAgendamentoFim: comando.dataFim ? new Date(comando.dataFim) : null,
-                            equipamentoId: comando.equipamentoId
-                        }
+                    if (comando.confirmado === true) {
+                        const numeroOSGerado = `OS-${Date.now()}`;
+                        await prisma.manutencao.create({
+                            data: {
+                                numeroOS: numeroOSGerado,
+                                tipo: comando.tipo,
+                                status: "Agendada",
+                                descricaoProblemaServico: comando.descricao,
+                                dataHoraAgendamentoInicio: new Date(comando.dataInicio),
+                                equipamentoId: comando.equipamentoId
+                            }
+                        });
+                        respostaFinalTexto = `✅ Agendamento concluído! OS gerada: ${numeroOSGerado}.`;
+                    } else {
+                        respostaFinalTexto = `Entendido. Você deseja agendar uma ${comando.tipo} para ${comando.descricao}. Posso confirmar este agendamento? (Responda: "Sim, confirme")`;
+                    }
+                } else if (comando.acao_sistema === "GERAR_RELATORIO") {
+                    const umAnoAtras = new Date(agora);
+                    umAnoAtras.setFullYear(agora.getFullYear() - 1);
+                    const contagem = await prisma.manutencao.count({
+                        where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
                     });
-
-                    // Modifica o texto que o usuário vai ler
-                    respostaFinalTexto = `✅ Comando executado! Agendei uma manutenção ${comando.tipo} com sucesso.\nO número da OS gerada é: **${numeroOSGerado}**.`;
+                    respostaFinalTexto = `📊 Relatório: Encontrei ${contagem} manutenções do tipo ${comando.filtros.tipo} no último ano.`;
                 }
-
-            } catch (errExecucao) {
-                console.error("Erro ao tentar executar a ação no banco:", errExecucao);
-                respostaFinalTexto = "Entendi que você quer agendar, mas faltou algum dado importante ou não achei o equipamento exato. Pode repetir com mais detalhes?";
             }
+
+            // 6. SALVANDO MEMÓRIA
+            await prisma.chatHistorico.createMany({
+                data: [
+                    { usuario: usuarioNome, role: "user", mensagem: perguntaUsuario },
+                    { usuario: usuarioNome, role: "model", mensagem: respostaFinalTexto }
+                ]
+            });
+
+            return respostaFinalTexto;
+
+        } catch (error) {
+            console.error(`Falha no modelo ${nomeModelo}:`, error.message);
+            erroUltimaTentativa = error.message;
         }
-
-        // =========================================================================
-        // 6. SALVANDO A CONVERSA NO BANCO DE DADOS (MEMÓRIA)
-        // =========================================================================
-        await prisma.chatHistorico.createMany({
-            data: [
-                { usuario: usuarioNome, role: "user", mensagem: perguntaUsuario },
-                { usuario: usuarioNome, role: "model", mensagem: respostaFinalTexto }
-            ]
-        });
-
-        // 7. Retorna a resposta (seja texto normal ou o aviso de sucesso da OS)
-        return respostaFinalTexto;
-
-    } catch (error) {
-        console.error("ERRO NO SDK DO GOOGLE:", error.message);
-        throw new Error(`Falha ao conectar com o Google AI: ${error.message}`);
     }
+
+    throw new Error(`Falha ao processar com IA. Último erro: ${erroUltimaTentativa}`);
 };
