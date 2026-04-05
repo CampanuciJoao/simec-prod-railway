@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/services/alertasService.js
-// VERSÃO 8.0 - LÓGICA DE VENCIMENTO CORRIGIDA (URGÊNCIA PRIORITÁRIA)
+// VERSÃO 9.0 - ADICIONADO MOTOR DE SAÚDE PREDITIVA (SCORE DE RISCO)
 
 import prisma from './prismaService.js';
 import { enviarEmail } from './emailService.js';
@@ -8,7 +8,6 @@ import { ptBR } from 'date-fns/locale';
 
 // ==========================================================================
 // SEÇÃO DE MANUTENÇÕES
-// (Lógica de alertas internos e automação de status)
 // ==========================================================================
 
 export async function atualizarStatusManutencoes() {
@@ -27,10 +26,7 @@ export async function atualizarStatusManutencoes() {
         
         await tx.manutencao.update({
           where: { id: manut.id },
-          data: { 
-            status: 'EmAndamento',
-            dataInicioReal: manut.dataHoraAgendamentoInicio 
-          }
+          data: { status: 'EmAndamento', dataInicioReal: manut.dataHoraAgendamentoInicio }
         });
         
         await tx.alerta.create({
@@ -74,46 +70,51 @@ export async function atualizarStatusManutencoes() {
   }
 }
 
-async function gerarAlertasDeProximidadeManutencao() {
-  const agora = new Date();
-  const PONTOS_INICIO = [
-    { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' },
-    { limiar: 60, prioridade: 'Media', label: '1h', texto: 'em 1 hora' },
-    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: 'em 24 horas' },
-  ];
+// ==========================================================================
+// SEÇÃO DE SAÚDE PREDITIVA (NOVO)
+// ==========================================================================
 
-  const manutencoesProximas = await prisma.manutencao.findMany({
-    where: { status: 'Agendada', dataHoraAgendamentoInicio: { gt: agora } },
-    include: { equipamento: { select: { modelo: true } } }
+export async function processarSaudeEquipamentos() {
+  console.log('[SAÚDE] Analisando histórico de falhas para alertas preditivos...');
+  const umAnoAtras = new Date();
+  umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
+
+  const equipamentos = await prisma.equipamento.findMany({
+    include: { 
+      ocorrencias: { where: { data: { gte: umAnoAtras } } } 
+    }
   });
 
-  for (const manut of manutencoesProximas) {
-    const minRestantes = Math.round((manut.dataHoraAgendamentoInicio.getTime() - agora.getTime()) / 60000);
-    for (const ponto of PONTOS_INICIO) {
-      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
-        const idAlerta = `manut-prox-início-${manut.id}-${ponto.label}`;
-        const jaExiste = await prisma.alerta.findUnique({ where: { id: idAlerta } });
-        if (!jaExiste) {
-          await prisma.alerta.create({
-            data: {
-              id: idAlerta,
-              titulo: `Manutenção inicia ${ponto.texto}`,
-              subtitulo: `OS ${manut.numeroOS} - ${manut.equipamento.modelo}`,
-              data: manut.dataHoraAgendamentoInicio,
-              prioridade: ponto.prioridade,
-              tipo: 'Manutenção',
-              link: `/manutencoes/detalhes/${manut.id}`
-            }
-          });
-        }
-        break;
+  for (const eq of equipamentos) {
+    const score = eq.ocorrencias.reduce((acc, occ) => {
+      let peso = occ.tipo === 'Infraestrutura' ? 3 : (occ.tipo === 'Ajuste' ? 2 : 1);
+      return acc + (occ.resolvido ? peso : 0);
+    }, 0);
+
+    if (score >= 10) {
+      const idAlerta = `alerta-saude-${eq.id}-${new Date().getMonth()}`;
+      const jaExiste = await prisma.alerta.findUnique({ where: { id: idAlerta } });
+
+      if (!jaExiste) {
+        await prisma.alerta.create({
+          data: {
+            id: idAlerta,
+            titulo: `Atenção: Equipamento com Alto Risco de Falha`,
+            subtitulo: `${eq.modelo} (${eq.tag}) apresentou múltiplas falhas recentes. Requer inspeção técnica.`,
+            data: new Date(),
+            prioridade: 'Alta',
+            tipo: 'Manutenção',
+            link: `/equipamentos/ficha-tecnica/${eq.id}`
+          }
+        });
+        console.log(`[ALERTA PREDITIVO] Risco detectado para ${eq.tag}. Score: ${score}`);
       }
     }
   }
 }
 
 // ==========================================================================
-// SEÇÃO DE CONTRATOS E SEGUROS (Lógica de Vencimento Corrigida)
+// SEÇÃO DE VENCIMENTOS (CONTRATOS E SEGUROS)
 // ==========================================================================
 
 async function gerarAlertasVencimento(item, tipoEntidade) {
@@ -122,8 +123,6 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
 
   if (isAfter(dataDeVencimento, hoje)) {
     const diasRestantes = differenceInDays(dataDeVencimento, hoje);
-    
-    // >>> CORREÇÃO AQUI: Ordem do menor para o maior limiar <<<
     const PONTOS = [
       { limiar: 1, prioridade: 'Alta', label: '1d', texto: 'amanhã' },
       { limiar: 7, prioridade: 'Alta', label: '7d', texto: 'em 7 dias' },
@@ -140,7 +139,7 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
           await prisma.alerta.create({
             data: {
               id: idAlerta,
-              titulo: `${tipoEntidade} vence ${ponto.texto}`, // Agora usa o texto correto (ex: amanhã)
+              titulo: `${tipoEntidade} vence ${ponto.texto}`,
               subtitulo: tipoEntidade === 'Contrato' ? `Nº ${item.numeroContrato}` : `Apólice Nº ${item.apoliceNumero}`,
               data: item.dataFim,
               prioridade: ponto.prioridade,
@@ -148,14 +147,11 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
               link: `/${tipoEntidade.toLowerCase()}s`
             }
           });
-          console.log(`[ALERTA VENCIMENTO] Alerta '${ponto.label}' gerado para ${tipoEntidade} ${item.id}.`);
         }
-        // Ao encontrar o ponto mais urgente, para de procurar os outros
         break; 
       }
     }
   } else {
-    // Lógica para itens já vencidos
     const idAlerta = `${tipoEntidade.toLowerCase()}-vencido-${item.id}`;
     if (!(await prisma.alerta.findUnique({ where: { id: idAlerta } }))) {
       await prisma.alerta.create({
@@ -256,6 +252,7 @@ async function verificarVencimentoSeguros() {
 export async function processarAlertasEEnviarNotificacoes() {
   try {
     await gerarAlertasDeProximidadeManutencao();
+    await processarSaudeEquipamentos(); // Executa a análise preditiva
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
   } catch (error) {

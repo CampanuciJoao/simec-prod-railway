@@ -33,12 +33,12 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             );
 
             if (candidatos.length > 1) {
-                return `Encontrei ${candidatos.length} equipamentos: ${candidatos.map(e => `${e.modelo} (Tag: ${e.tag})`).join(', ')}. Por favor, seja mais específico citando a Tag ou Patrimônio.`;
+                return `Encontrei ${candidatos.length} equipamentos: ${candidatos.map(e => `${e.modelo} (Tag: ${e.tag})`).join(', ')}. Por favor, especifique citando a Tag ou Patrimônio.`;
             }
 
             const listaEquipamentosStr = JSON.stringify(equipamentosAtivos);
 
-            // 2. A INSTRUÇÃO MESTRA
+            // 2. A INSTRUÇÃO MESTRA (Atualizada com a regra de Saúde)
             const systemInstruction = `
                 Você é o Guardião SIMEC, assistente de Engenharia Clínica.
                 DATA ATUAL DO SERVIDOR: ${agora.toISOString()}
@@ -47,7 +47,8 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                 REGRAS:
                 1. AGENDAMENTO: Responda JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva/Corretiva", "descricao": "...", "dataInicio": "ISO_DATE", "confirmado": false}
                 2. RELATÓRIOS: Responda JSON: {"acao_sistema": "GERAR_RELATORIO", "tipo": "manutencoesRealizadas", "filtros": {"tipo": "...", "periodo": "1_ano"}}
-                3. Se for agendamento, após gerar o JSON, peça confirmação ao usuário. Se o usuário confirmar, retorne o JSON com "confirmado": true.
+                3. ANÁLISE DE SAÚDE: Se perguntarem sobre a saúde/estado de um equipamento, responda JSON: {"acao_sistema": "ANALISAR_SAUDE", "equipamentoId": "ID"}
+                4. Se for agendamento, após gerar o JSON, peça confirmação.
             `;
 
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
@@ -87,13 +88,22 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                     } else {
                         respostaFinalTexto = `Entendido. Você deseja agendar uma ${comando.tipo} para ${comando.descricao}. Posso confirmar este agendamento? (Responda: "Sim, confirme")`;
                     }
-                } else if (comando.acao_sistema === "GERAR_RELATORIO") {
+                } 
+                else if (comando.acao_sistema === "GERAR_RELATORIO") {
                     const umAnoAtras = new Date(agora);
                     umAnoAtras.setFullYear(agora.getFullYear() - 1);
                     const contagem = await prisma.manutencao.count({
                         where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
                     });
                     respostaFinalTexto = `📊 Relatório: Encontrei ${contagem} manutenções do tipo ${comando.filtros.tipo} no último ano.`;
+                }
+                else if (comando.acao_sistema === "ANALISAR_SAUDE") {
+                    const ocorrencias = await prisma.ocorrencia.findMany({
+                        where: { equipamentoId: comando.equipamentoId, data: { gte: new Date(new Date().setFullYear(new Date().getFullYear() - 1)) } }
+                    });
+                    const promptSaude = `Analise este histórico de falhas e explique a saúde do ativo: ${JSON.stringify(ocorrencias)}. Responda de forma técnica e oriente o técnico.`;
+                    const analise = await chat.sendMessage(promptSaude);
+                    respostaFinalTexto = analise.response.text();
                 }
             }
 

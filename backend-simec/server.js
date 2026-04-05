@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 3.5 (Sênior - Integração de Agente IA e Estabilidade de Conexão)
+// Versão: 3.6 (Sênior - Integração de Saúde Preditiva)
 
 // --- 1. Configuração de Ambiente ---
 import dotenv from 'dotenv';
@@ -30,10 +30,14 @@ import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js'; 
-import agentRoutes from './routes/agentRoutes.js'; // Rota do Agente Guardião
+import agentRoutes from './routes/agentRoutes.js'; 
 
 // --- 4. Importação dos Serviços e Middlewares ---
-import { atualizarStatusManutencoes, processarAlertasEEnviarNotificacoes } from './services/alertasService.js';
+import { 
+    atualizarStatusManutencoes, 
+    processarAlertasEEnviarNotificacoes, 
+    processarSaudeEquipamentos // Importação do novo serviço preditivo
+} from './services/alertasService.js';
 import { proteger } from './middleware/authMiddleware.js';
 
 // --- 5. Configuração de Caminhos e Variáveis ---
@@ -44,7 +48,7 @@ const PORT = process.env.PORT || 5000;
 
 // --- 6. Configuração de Middlewares Globais ---
 app.use(cors({
-  origin: '*', // Permite que qualquer frontend acesse a API (essencial para ambiente de teste)
+  origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -59,11 +63,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // --- 8. Montagem das Rotas da API ---
 // ==========================================================================
 
-// --- ROTAS PÚBLICAS ---
 app.use('/api/auth', authRoutes);
-app.use('/api/agent', agentRoutes); // Ativação da inteligência artificial
+app.use('/api/agent', agentRoutes);
 
-// --- ROTAS PROTEGIDAS (Exigem Login) ---
 app.use(proteger);
 app.use('/api/dashboard-data', dashboardRoutes);
 app.use('/api/users', userRoutes);
@@ -95,6 +97,9 @@ const executarTarefasDeFundo = async () => {
     // 2. Atualiza status de manutenções e equipamentos
     await atualizarStatusManutencoes();
 
+    // 3. Executa a análise de saúde preditiva dos ativos
+    await processarSaudeEquipamentos();
+
   } catch (err) {
     console.error('[ERRO NAS TAREFAS AUTOMÁTICAS]:', err.message);
   }
@@ -110,11 +115,7 @@ const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 Banco de Dados Conectado com Sucesso`);
   console.log(`------------------------------------------------------`);
   
-  // Executa uma vez no momento do boot para garantir alertas frescos
   executarTarefasDeFundo();
 });
 
-// >> CONFIGURAÇÃO DE ESTABILIDADE IA <<
-// Aumentamos o tempo de espera da requisição para 2 minutos. 
-// Isso garante que a IA tenha tempo de processar históricos grandes sem cair a conexão.
 server.timeout = 120000;
