@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 3.6 (Sênior - Integração de Saúde Preditiva)
+// Versão: 3.7 (Sênior - Integração com Fila BullMQ para Processamento em Background)
 
 // --- 1. Configuração de Ambiente ---
 import dotenv from 'dotenv';
@@ -32,13 +32,14 @@ import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js'; 
 import agentRoutes from './routes/agentRoutes.js'; 
 
-// --- 4. Importação dos Serviços e Middlewares ---
+// --- 4. Importação dos Serviços, Middlewares e Fila ---
 import { 
     atualizarStatusManutencoes, 
     processarAlertasEEnviarNotificacoes, 
-    processarSaudeEquipamentos // Importação do novo serviço preditivo
+    processarSaudeEquipamentos 
 } from './services/alertasService.js';
 import { proteger } from './middleware/authMiddleware.js';
+import { alertasQueue } from './services/queueService.js'; // Nova importação da fila
 
 // --- 5. Configuração de Caminhos e Variáveis ---
 const __filename = fileURLToPath(import.meta.url);
@@ -81,41 +82,27 @@ app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
 
-
-// --- 9. Rota Raiz e Tarefas Agendadas ---
+// --- 9. Rota Raiz ---
 app.get('/', (req, res) => {
   res.send('API do SIMEC está ativa e operante!');
 });
 
-const executarTarefasDeFundo = async () => {
-  const agora = new Date().toLocaleTimeString('pt-BR');
-  console.log(`[${agora}] Executando automações de fundo...`);
-  try {
-    // 1. Verifica vencimentos de contratos/seguros e envia e-mails
-    await processarAlertasEEnviarNotificacoes();
-    
-    // 2. Atualiza status de manutenções e equipamentos
-    await atualizarStatusManutencoes();
-
-    // 3. Executa a análise de saúde preditiva dos ativos
-    await processarSaudeEquipamentos();
-
-  } catch (err) {
-    console.error('[ERRO NAS TAREFAS AUTOMÁTICAS]:', err.message);
-  }
-};
-
-// Agenda a execução das tarefas a cada 1 minuto (60000ms)
-setInterval(executarTarefasDeFundo, 60 * 1000);
+// A função de automação agora é disparada pelo Worker via BullMQ (configurado no queueService.js)
+// Por isso, removemos o 'setInterval' daqui para evitar duplicação de processamento.
 
 // --- 10. Inicialização do Servidor ---
-const server = app.listen(PORT, '0.0.0.0', () => {
+const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`------------------------------------------------------`);
   console.log(`✅ Servidor rodando na porta: ${PORT}`);
   console.log(`🔗 Banco de Dados Conectado com Sucesso`);
+  console.log(`🚀 Sistema de Filas (BullMQ) Inicializado`);
   console.log(`------------------------------------------------------`);
   
-  executarTarefasDeFundo();
+  // Limpa filas pendentes de execuções anteriores e agenda a tarefa recorrente
+  await alertasQueue.obliterate({ force: true });
+  await alertasQueue.add('verificar-tarefas-diarias', {}, { 
+      repeat: { every: 60000 } // Executa as tarefas a cada 1 minuto
+  });
 });
 
 server.timeout = 120000;
