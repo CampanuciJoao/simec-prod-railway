@@ -12,7 +12,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    // 1. RECUPERAR ESTADO ATUAL (O JSON que a IA gerou por último)
+    // 1. RECUPERAR O ESTADO DO ÚLTIMO JSON (Memória da conversa)
     const ultimaInteracao = await prisma.chatHistorico.findFirst({
         where: { usuario: usuarioNome, role: 'model' },
         orderBy: { createdAt: 'desc' }
@@ -22,11 +22,10 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         equipamentoId: null, tipo: null, numeroChamado: null, descricao: null, dataInicio: null, dataFim: null
     };
 
-    // Tenta recuperar o que já foi preenchido anteriormente
     if (ultimaInteracao) {
         const match = ultimaInteracao.mensagem.match(/\{[\s\S]*\}/);
         if (match) {
-            try { estadoAtual = JSON.parse(match[0]); } catch (e) {}
+            try { estadoAtual = JSON.parse(match[0]); } catch (e) { console.error("Erro ao ler estado:", e); }
         }
     }
 
@@ -36,21 +35,19 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         take: 200 
     });
 
-    const systemInstruction = `
-    Você é o Guardião SIMEC. Seu objetivo é completar este objeto JSON: ${JSON.stringify(estadoAtual)}.
+    const systemInstruction = `Você é um formulário de manutenção SIMEC. 
+    ESTADO ATUAL: ${JSON.stringify(estadoAtual)}.
     EQUIPAMENTOS: ${JSON.stringify(equipamentosAtivos)}.
     
-    REGRAS:
-    1. Analise o que já está preenchido no JSON acima. NÃO PERGUNTE O QUE JÁ ESTÁ PREENCHIDO.
-    2. Se faltar algo, pergunte apenas o que falta.
-    3. Quando TODOS os campos estiverem preenchidos, retorne APENAS o JSON final com "acao_sistema": "CRIAR_MANUTENCAO".
-    4. Se for CORRETIVA, o numeroChamado é obrigatório.
-    `;
+    REGRA: Preencha os campos vazios do JSON acima. Se o usuário fornecer um dado, atualize o campo correspondente.
+    Se faltar informação, responda APENAS: "Falta: [campo]". Não repita o que já está preenchido.
+    Quando tudo estiver preenchido, retorne o JSON completo com "acao_sistema": "CRIAR_MANUTENCAO".`;
 
-    const model = new GoogleGenerativeAI(API_KEY).getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction });
+    const genAI = new GoogleGenerativeAI(API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
     
-    // 3. ENVIAR COM O ESTADO EMBUTIDO NO PROMPT
-    const promptFinal = `Estado atual dos dados: ${JSON.stringify(estadoAtual)}. Usuário disse: "${perguntaUsuario}". Atualize o JSON e responda.`;
+    // 3. ENVIAR COM O ESTADO EMBUTIDO
+    const promptFinal = `Usuário disse: "${perguntaUsuario}". Atualize o JSON: ${JSON.stringify(estadoAtual)} e me diga o que falta ou confirme o agendamento.`;
     const result = await model.generateContent(promptFinal);
     let textoDaIA = result.response.text();
 
