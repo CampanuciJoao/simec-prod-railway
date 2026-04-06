@@ -48,7 +48,6 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     for (const nomeModelo of modelosBackup) {
         try {
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const agora = getAgora();
             const equipamentosAtivos = await prisma.equipamento.findMany({ select: { id: true, tag: true, modelo: true, unidade: { select: { nomeSistema: true } } }, take: 200 });
             
             const systemInstruction = `Você é o Guardião SIMEC. Regras:
@@ -57,8 +56,17 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             3. Não escreva explicações, apenas JSON puro ou a pergunta solicitada.`;
 
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
-            const historicoBanco = await prisma.chatHistorico.findMany({ where: { usuario: usuarioNome }, orderBy: { createdAt: 'desc' }, take: 2 });
-            let history = historicoBanco.reverse().filter(msg => !msg.mensagem.includes("⚠️")).map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
+            
+            // BUSCA E LIMPEZA DE HISTÓRICO
+            const historicoBanco = await prisma.chatHistorico.findMany({ where: { usuario: usuarioNome }, orderBy: { createdAt: 'asc' }, take: 8 });
+            let history = historicoBanco
+                .filter(msg => !msg.mensagem.includes("⚠️"))
+                .map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
+            
+            // GARANTIA: O primeiro elemento DEVE ser 'user'. Removemos qualquer 'model' inicial.
+            while (history.length > 0 && history[0].role !== 'user') {
+                history.shift();
+            }
             
             const chat = model.startChat({ history });
             const result = await chat.sendMessage(perguntaUsuario);
@@ -80,6 +88,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             return textoDaIA;
         } catch (error) {
             if (error.message.includes("429")) { await new Promise(r => setTimeout(r, 12000)); continue; }
+            console.error("[AGENTE] Erro:", error);
             throw error;
         }
     }
