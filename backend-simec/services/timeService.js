@@ -1,17 +1,14 @@
 // Ficheiro: backend-simec/services/timeService.js
-// VERSÃO FINAL - FORÇANDO O FUSO HORÁRIO DE MATO GROSSO DO SUL (UTC-4)
+// VERSÃO DEFINITIVA - CORREÇÃO DE CONSTRUÇÃO DE DATA
 
 /**
- * Retorna um objeto Date que representa o "agora" exato do sistema,
- * ancorado no fuso horário de Mato Grosso do Sul (America/Campo_Grande),
- * independentemente de onde o servidor físico (Railway, AWS) esteja hospedado.
+ * Retorna um objeto Date que representa o "agora" exato para o fuso de Mato Grosso do Sul (UTC-4).
+ * Esta versão corrige a construção da data para garantir que o Javascript não 
+ * "re-interprete" o fuso horário após a criação do objeto.
  */
 export function getAgora() {
-  // Pega a data/hora bruta do servidor (geralmente UTC)
-  const dataServidor = new Date();
-
-  // Converte a data do servidor para uma string baseada no fuso de MS
-  const dataHoraMS_String = dataServidor.toLocaleString('en-US', { 
+  // 1. Pega o tempo atual em MS (Campo Grande) usando toLocaleString
+  const options = {
     timeZone: 'America/Campo_Grande',
     year: 'numeric',
     month: '2-digit',
@@ -19,16 +16,24 @@ export function getAgora() {
     hour: '2-digit',
     minute: '2-digit',
     second: '2-digit',
-    hour12: false // Força o formato 24h
-  });
+    hour12: false
+  };
 
-  // A string retornada será algo como "04/12/2024, 15:30:00"
-  // Precisamos reagrupar isso para o formato que o "new Date()" entende (YYYY-MM-DDTHH:mm:ss)
+  const formatter = new Intl.DateTimeFormat('en-US', options);
+  const partes = formatter.formatToParts(new Date());
   
-  const [dataPart, horaPart] = dataHoraMS_String.split(', ');
-  const [mes, dia, ano] = dataPart.split('/'); // No padrão 'en-US' vem MM/DD/YYYY
-  
-  const dataLocalReal = new Date(`${ano}-${mes}-${dia}T${horaPart}`);
+  // Extrai as partes para montar a data manualmente sem conversão de fuso do JS
+  const p = {};
+  partes.forEach(({ type, value }) => { p[type] = value; });
 
-  return dataLocalReal;
+  // Retorna um novo objeto Date montado manualmente. 
+  // Nota: O mês no construtor do Date é base 0 (janeiro = 0), por isso o -1.
+  return new Date(
+    p.year,
+    p.month - 1,
+    p.day,
+    p.hour === '24' ? 0 : p.hour,
+    p.minute,
+    p.second
+  );
 }

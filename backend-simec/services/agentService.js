@@ -1,8 +1,13 @@
-// Ficheiro: backend-simec/services/agentService.js
-
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from './prismaService.js';
 import { getAgora } from './timeService.js';
+
+// Função para garantir que a data vinda da IA seja interpretada como fuso local (MS)
+function forcarFusoMS(dataIsoDaIA) {
+    if (!dataIsoDaIA || dataIsoDaIA === "null") return null;
+    const cleanIso = dataIsoDaIA.replace('Z', '');
+    return new Date(cleanIso);
+}
 
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Admin") => {
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
@@ -29,19 +34,18 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             const listaEquipamentosStr = JSON.stringify(equipamentosAtivos);
 
             // Formatação do tempo real para injetar na mente da IA
-            const dataHoje = agora.toISOString().split('T')[0]; // YYYY-MM-DD local
+            const dataHoje = agora.toISOString().split('T')[0]; 
             const horaHoje = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
             // 2. O CÉREBRO (INSTRUÇÃO MESTRA)
             const systemInstruction = `
                 Você é o Guardião SIMEC, assistente de Engenharia Clínica.
-                
                 REFERÊNCIA TEMPORAL OBRIGATÓRIA: Hoje é dia ${dataHoje} e a hora atual é ${horaHoje}.
                 Lista de equipamentos: ${listaEquipamentosStr}
 
                 REGRAS ABSOLUTAS (NÃO QUEBRE):
                 1. AGENDAMENTO NOVO: Se o usuário pedir manutenção, retorne APENAS este JSON puro:
-                   {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva/Corretiva", "descricao": "...", "dataInicio": "YYYY-MM-DDTHH:mm:00", "dataFim": "YYYY-MM-DDTHH:mm:00", "confirmado": false}
+                   {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva ou Corretiva", "descricao": "...", "dataInicio": "YYYY-MM-DDTHH:mm:00", "dataFim": "YYYY-MM-DDTHH:mm:00", "confirmado": false}
                 
                 2. REGRAS DE HORA: Se o usuário der hora de início e hora de fim, preencha OBRIGATORIAMENTE os dois campos com a data e hora informadas, formato ISO SEM "Z" (Ex: ${dataHoje}T10:30:00). Se não der fim, dataFim é null.
                 
@@ -58,23 +62,17 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
 
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
 
-            // 3. RECUPERANDO A MEMÓRIA DA CONVERSA
             const historicoBanco = await prisma.chatHistorico.findMany({
                 where: { usuario: usuarioNome },
                 orderBy: { createdAt: 'asc' },
                 take: 10
             });
 
-            // Converte para o formato do Google e resolve o bug do "First content should be with role 'user'"
             let history = historicoBanco.map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
-            
-            while (history.length > 0 && history[0].role !== 'user') {
-                history.shift(); 
-            }
+            while (history.length > 0 && history[0].role !== 'user') { history.shift(); }
 
             const chat = model.startChat({ history });
 
-            // 4. ENVIANDO A PERGUNTA
             const result = await chat.sendMessage(perguntaUsuario);
             let textoDaIA = result.response.text();
             let respostaFinalTexto = textoDaIA;
@@ -88,33 +86,21 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                     const comando = JSON.parse(jsonLimpo);
 
                     if (comando.acao_sistema === "CRIAR_MANUTENCAO") {
-                        
                         const equipTarget = equipamentosAtivos.find(e => e.id === comando.equipamentoId);
                         const nomeEquipamento = equipTarget ? `${equipTarget.modelo} (Tag: ${equipTarget.tag}) - ${equipTarget.unidade?.nomeSistema}` : "Equipamento Desconhecido";
 
-                        // Garante que o Node interprete a string como hora LOCAL, e não UTC.
-                        const dataInicioStr = comando.dataInicio.includes('T') ? comando.dataInicio : `${comando.dataInicio}T00:00:00`;
-                        const dataInicioObj = new Date(dataInicioStr);
-                        
-                        let dataFimObj = null;
-                        if (comando.dataFim && comando.dataFim !== "null") {
-                            const dataFimStr = comando.dataFim.includes('T') ? comando.dataFim : `${comando.dataFim}T00:00:00`;
-                            dataFimObj = new Date(dataFimStr);
-                        }
+                        const dataInicioObj = forcarFusoMS(comando.dataInicio);
+                        const dataFimObj = forcarFusoMS(comando.dataFim);
 
-                        // =================================================================
-                        // >> TRAVA DE SEGURANÇA: BLOQUEIO DE AGENDAMENTO NO PASSADO <<
-                        // =================================================================
-                        const limiteMinimo = new Date(agora.getTime() - 5 * 60000); // 5 minutos de tolerância
+                        // TRAVA DE SEGURANÇA: BLOQUEIO DE AGENDAMENTO NO PASSADO
+                        const limiteMinimo = new Date(agora.getTime() - 5 * 60000);
 
                         if (dataInicioObj < limiteMinimo) {
-                            respostaFinalTexto = `⚠️ **Agendamento Recusado:** A data/hora solicitada (${dataInicioObj.toLocaleString('pt-BR')}) já passou. Por favor, solicite um horário futuro.`;
-                            comando.confirmado = false; // Cancela a intenção de gravar no banco
+                            respostaFinalTexto = `⚠️ **Agendamento Recusado:** A data/hora solicitada (${dataInicioObj.toLocaleString('pt-BR')}) já passou.`;
+                            comando.confirmado = false;
                         } 
-                        // =================================================================
                         else if (comando.confirmado === true) {
                             const numeroOSGerado = `OS-${Date.now()}`;
-                            
                             await prisma.manutencao.create({
                                 data: {
                                     numeroOS: numeroOSGerado,
@@ -126,31 +112,21 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                                     equipamentoId: comando.equipamentoId
                                 }
                             });
-                            
                             const horaInicioFormatada = dataInicioObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
                             let horaFimFormatada = "";
-                            if (dataFimObj) {
-                                horaFimFormatada = ` até ${dataFimObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-                            }
-
+                            if (dataFimObj) horaFimFormatada = ` até ${dataFimObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
                             respostaFinalTexto = `✅ Agendamento concluído com sucesso!\n**OS:** ${numeroOSGerado}\n**Ativo:** ${nomeEquipamento}\n**Horário:** ${horaInicioFormatada}${horaFimFormatada}`;
-                        
                         } else {
                             const dataFormatada = dataInicioObj.toLocaleDateString('pt-BR');
                             const horaInicio = dataInicioObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                            
                             let textoFim = "";
-                            if (dataFimObj) {
-                                const horaFim = dataFimObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                                textoFim = ` com término previsto para as ${horaFim}`;
-                            }
-
+                            if (dataFimObj) textoFim = ` com término previsto para as ${dataFimObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
                             respostaFinalTexto = `📋 **Resumo do Agendamento:**\n\n**Equipamento:** ${nomeEquipamento}\n**Tipo:** ${comando.tipo}\n**Data:** ${dataFormatada}\n**Horário:** Início às ${horaInicio}${textoFim}\n\nPosso confirmar e gerar a Ordem de Serviço?`;
                         }
                     } 
                     else if (comando.acao_sistema === "GERAR_RELATORIO") {
                         const umAnoAtras = new Date(agora);
-                        umAnoAtras.setFullYear(agora.getFullYear() - 1);
+                        umAnoAtras.setFullYear(umAnoAtras.getFullYear() - 1);
                         const contagem = await prisma.manutencao.count({
                             where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
                         });
@@ -171,21 +147,17 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                 }
             }
 
-            // 6. SALVANDO A CONVERSA NA MEMÓRIA
             await prisma.chatHistorico.createMany({
                 data: [
                     { usuario: usuarioNome, role: "user", mensagem: perguntaUsuario },
                     { usuario: usuarioNome, role: "model", mensagem: respostaFinalTexto }
                 ]
             });
-
             return respostaFinalTexto;
-
         } catch (error) {
             console.error(`[AGENTE] Falha no modelo ${nomeModelo}:`, error.message);
             erroUltimaTentativa = error.message;
         }
     }
-
-    throw new Error(`Falha ao processar com IA. O servidor do Google pode estar instável. Detalhe: ${erroUltimaTentativa}`);
+    throw new Error(`Falha ao processar com IA: ${erroUltimaTentativa}`);
 };
