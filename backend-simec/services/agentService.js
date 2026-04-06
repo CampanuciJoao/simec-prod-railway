@@ -1,92 +1,66 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from './prismaService.js';
-import { getAgora } from './timeService.js';
-
-function forcarFusoMS(dataIsoDaIA) {
-    if (!dataIsoDaIA || dataIsoDaIA === "null") return null;
-    const cleanIso = dataIsoDaIA.replace('Z', '');
-    return new Date(cleanIso);
-}
 
 export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Admin") => {
-    const API_KEY = process.env.GEMINI_API_KEY?.trim();
-    if (!API_KEY) throw new Error("Chave não configurada no .env.");
-
-    // 1. RECUPERAR ESTADO ATUAL DO BANCO (O JSON que a IA gerou por último)
+    // 1. RECUPERAR ESTADO DO BANCO
     const ultimaInteracao = await prisma.chatHistorico.findFirst({
         where: { usuario: usuarioNome, role: 'model' },
         orderBy: { createdAt: 'desc' }
     });
 
     let estadoAtual = {
-        equipamentoId: null, tipo: null, numeroChamado: null, descricao: null, dataInicio: null, dataFim: null
+        equipamentoId: null, tag: null, tipo: null, numeroChamado: null, 
+        descricao: null, dataInicio: null, dataFim: null
     };
 
     if (ultimaInteracao) {
-        const match = ultimaInteracao.mensagem.match(/\{[\s\S]*\}/);
-        if (match) {
-            try { 
-                const obj = JSON.parse(match[0]);
-                estadoAtual = obj.estado || estadoAtual; // Recupera apenas o estado
-            } catch (e) { console.error("Erro ao ler estado:", e); }
-        }
+        try { estadoAtual = JSON.parse(ultimaInteracao.mensagem); } catch (e) {}
     }
 
-    // 2. CONFIGURAR IA
-    const equipamentosAtivos = await prisma.equipamento.findMany({ 
-        select: { id: true, tag: true, modelo: true, unidade: { select: { nomeSistema: true } } }, 
-        take: 200 
-    });
+    // 2. PROMPT OBJETIVO (O segredo: sem explicações, sem listas longas)
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-    const systemInstruction = `Você é um preenchedor de formulário do SIMEC.
-    EQUIPAMENTOS DISPONÍVEIS: ${JSON.stringify(equipamentosAtivos)}.
-    REGRA: Você deve preencher o JSON abaixo.
-    Se o usuário citar um equipamento, busque o ID na lista acima. NÃO PEÇA O ID se puder identificar pelo nome/tag.
+    const prompt = `
+    Você é um extrator de dados. Seu objetivo é preencher este JSON: ${JSON.stringify(estadoAtual)}.
+    Usuário disse: "${perguntaUsuario}".
     
-    ESTRUTURA DE RESPOSTA OBRIGATÓRIA:
-    {
-      "estado": { "equipamentoId": "...", "tipo": "...", "numeroChamado": "...", "descricao": "...", "dataInicio": "...", "dataFim": "..." },
-      "mensagem": "Sua pergunta ou resumo para o usuário",
-      "acao_sistema": null 
-    }
-    Se tudo estiver preenchido, defina "acao_sistema": "CRIAR_MANUTENCAO".`;
+    REGRAS:
+    1. Preencha apenas os campos que o usuário forneceu.
+    2. Se o usuário fornecer um nome de equipamento, apenas coloque o NOME no campo "tag" ou "modelo", não tente adivinhar o ID.
+    3. Retorne APENAS um JSON válido. Não diga nada.
+    4. Se for Corretiva, "numeroChamado" é obrigatório.
+    `;
 
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction });
-    
-    // 3. ENVIAR COM ESTADO ATUAL FORÇADO
-    const promptFinal = `Estado atual dos dados: ${JSON.stringify(estadoAtual)}. Usuário disse: "${perguntaUsuario}". Atualize os dados e responda.`;
-    const result = await model.generateContent(promptFinal);
-    let textoDaIA = result.response.text();
-    const match = textoDaIA.match(/\{[\s\S]*\}/);
-    
-    if (match) {
-        const jsonResposta = JSON.parse(match[0]);
+    const result = await model.generateContent(prompt);
+    const jsonIA = JSON.parse(result.response.text().match(/\{[\s\S]*\}/)[0]);
 
-        // 4. INTERCEPTAR AÇÃO FINAL
-        if (jsonResposta.acao_sistema === "CRIAR_MANUTENCAO") {
-            const numeroOSGerado = `OS-${Date.now()}`;
-            await prisma.manutencao.create({
-                data: {
-                    numeroOS: numeroOSGerado,
-                    tipo: jsonResposta.estado.tipo,
-                    status: "Agendada",
-                    numeroChamado: jsonResposta.estado.numeroChamado,
-                    descricaoProblemaServico: jsonResposta.estado.descricao,
-                    dataHoraAgendamentoInicio: forcarFusoMS(jsonResposta.estado.dataInicio),
-                    dataHoraAgendamentoFim: forcarFusoMS(jsonResposta.estado.dataFim),
-                    equipamentoId: jsonResposta.estado.equipamentoId
-                }
-            });
-            textoDaIA = `✅ Agendamento concluído! OS: ${numeroOSGerado}`;
-        } else {
-            textoDaIA = jsonResposta.mensagem;
-        }
+    // 3. RESOLUÇÃO NO BACKEND (Aqui é onde a mágica acontece)
+    // Se a IA extraiu um nome de equipamento, o seu backend busca o ID real
+    if (jsonIA.tag || jsonIA.modelo) {
+        const equip = await prisma.equipamento.findFirst({
+            where: { OR: [{ tag: { contains: jsonIA.tag || '' } }, { modelo: { contains: jsonIA.modelo || '' } }] }
+        });
+        if (equip) jsonIA.equipamentoId = equip.id;
     }
 
-    await prisma.chatHistorico.createMany({
-        data: [{ usuario: usuarioNome, role: "user", mensagem: perguntaUsuario }, { usuario: usuarioNome, role: "model", mensagem: textoDaIA }]
-    });
+    // 4. VALIDAÇÃO DE CAMPOS (Backend decide o que falta)
+    const faltantes = [];
+    if (!jsonIA.equipamentoId) faltantes.push("Equipamento");
+    if (jsonIA.tipo === 'Corretiva' && !jsonIA.numeroChamado) faltantes.push("Número do Chamado");
+    if (!jsonIA.descricao) faltantes.push("Descrição do problema");
 
-    return textoDaIA;
+    // 5. RESPOSTA AO USUÁRIO
+    let resposta = "";
+    if (faltantes.length > 0) {
+        resposta = `Falta preencher: ${faltantes.join(', ')}.`;
+    } else {
+        // TUDO PRONTO
+        await prisma.manutencao.create({ /* ... criar OS ... */ });
+        resposta = "✅ Agendamento concluído!";
+        jsonIA = { /* resetar estado */ };
+    }
+
+    await prisma.chatHistorico.create({ data: { usuario: usuarioNome, role: "model", mensagem: JSON.stringify(jsonIA) } });
+    return resposta;
 };
