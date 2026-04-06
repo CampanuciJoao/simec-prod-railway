@@ -102,7 +102,17 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                             dataFimObj = new Date(dataFimStr);
                         }
 
-                        if (comando.confirmado === true) {
+                        // =================================================================
+                        // >> TRAVA DE SEGURANÇA: BLOQUEIO DE AGENDAMENTO NO PASSADO <<
+                        // =================================================================
+                        const limiteMinimo = new Date(agora.getTime() - 5 * 60000); // 5 minutos de tolerância
+
+                        if (dataInicioObj < limiteMinimo) {
+                            respostaFinalTexto = `⚠️ **Agendamento Recusado:** A data/hora solicitada (${dataInicioObj.toLocaleString('pt-BR')}) já passou. Por favor, solicite um horário futuro.`;
+                            comando.confirmado = false; // Cancela a intenção de gravar no banco
+                        } 
+                        // =================================================================
+                        else if (comando.confirmado === true) {
                             const numeroOSGerado = `OS-${Date.now()}`;
                             
                             await prisma.manutencao.create({
