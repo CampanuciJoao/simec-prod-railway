@@ -12,6 +12,12 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
+    // AUTO-LIMPEZA: Se o chat ficar muito grande, reseta para evitar contextos corrompidos
+    const totalMensagens = await prisma.chatHistorico.count({ where: { usuario: usuarioNome } });
+    if (totalMensagens > 20) {
+        await prisma.chatHistorico.deleteMany({ where: { usuario: usuarioNome } });
+    }
+
     const modelosBackup = ["gemini-2.5-flash", "gemini-1.5-flash"];
     let erroUltimaTentativa = null;
 
@@ -40,7 +46,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
 
                 REGRAS:
                 1. Se o usuário pedir manutenção, retorne APENAS: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva", "descricao": "...", "dataInicio": "YYYY-MM-DDTHH:mm:00", "dataFim": "YYYY-MM-DDTHH:mm:00", "confirmado": false}
-                2. SE RECEBER UM ERRO (ex: "data passou"), ESQUEÇA o JSON anterior. Não repita comandos recusados. Peça uma nova data válida ao usuário.
+                2. SE RECEBER UM ERRO (como data passada), ESQUEÇA o JSON anterior. Não repita comandos recusados. Peça uma nova data válida ao usuário.
                 3. NÃO escreva explicações, markdown ou saudações. Apenas o JSON puro se for um comando.
             `;
 
@@ -48,12 +54,13 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
 
             const historicoBanco = await prisma.chatHistorico.findMany({
                 where: { usuario: usuarioNome },
-                orderBy: { createdAt: 'asc' },
-                take: 10
+                orderBy: { createdAt: 'desc' }, // Pega os mais recentes primeiro
+                take: 8
             });
 
-            let history = historicoBanco
-                .filter(msg => !msg.mensagem.includes("Agendamento Recusado"))
+            // FILTRO DE SEGURANÇA: Remove mensagens de erro do histórico para a IA nunca lê-las
+            let history = historicoBanco.reverse()
+                .filter(msg => !msg.mensagem.includes("⚠️")) 
                 .map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
             
             while (history.length > 0 && history[0].role !== 'user') { history.shift(); }
@@ -62,8 +69,8 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             const result = await chat.sendMessage(perguntaUsuario);
             let textoDaIA = result.response.text();
             let respostaFinalTexto = textoDaIA;
+            let mensagemParaSalvar = textoDaIA;
 
-            // Lógica de processamento
             if (textoDaIA.includes('"acao_sistema"')) {
                 try {
                     const inicio = textoDaIA.indexOf('{');
@@ -80,6 +87,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
 
                         if (dataInicioObj < limiteMinimo && comando.confirmado === false) {
                             respostaFinalTexto = `⚠️ **Agendamento Recusado:** A data solicitada (${dataInicioObj.toLocaleString('pt-BR')}) já passou. Por favor, sugira uma data futura.`;
+                            mensagemParaSalvar = respostaFinalTexto; // Salva o aviso com o ícone para o filtro deletar depois
                         } 
                         else if (comando.confirmado === true) {
                             const numeroOSGerado = `OS-${Date.now()}`;
@@ -92,8 +100,10 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                                 }
                             });
                             respostaFinalTexto = `✅ Agendamento concluído! OS: ${numeroOSGerado}`;
+                            mensagemParaSalvar = respostaFinalTexto;
                         } else {
                             respostaFinalTexto = `📋 Confirmar agendamento para ${nomeEquipamento} em ${dataInicioObj.toLocaleString('pt-BR')}? (Responda "Sim")`;
+                            mensagemParaSalvar = respostaFinalTexto;
                         }
                     }
                 } catch (jsonErr) {
@@ -101,12 +111,10 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                 }
             }
 
-            // A MUDANÇA MAIS IMPORTANTE: Salvamos sempre, mas como o histórico foi filtrado, 
-            // a IA nunca "lerá" o erro passado, apenas a resposta amigável.
             await prisma.chatHistorico.createMany({
                 data: [
                     { usuario: usuarioNome, role: "user", mensagem: perguntaUsuario },
-                    { usuario: usuarioNome, role: "model", mensagem: respostaFinalTexto }
+                    { usuario: usuarioNome, role: "model", mensagem: mensagemParaSalvar }
                 ]
             });
             return respostaFinalTexto;
