@@ -12,9 +12,6 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    const totalMensagens = await prisma.chatHistorico.count({ where: { usuario: usuarioNome } });
-    if (totalMensagens > 20) await prisma.chatHistorico.deleteMany({ where: { usuario: usuarioNome } });
-
     // --- INTERCEPTAÇÃO DE CONFIRMAÇÃO ---
     if (perguntaUsuario.toLowerCase().trim() === "sim") {
         const ultimaInteracao = await prisma.chatHistorico.findFirst({
@@ -44,16 +41,23 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         }
     }
 
-    const modelosBackup = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
+    // Busca equipamentos PARA INJETAR NO CONTEXTO
+    const equipamentosAtivos = await prisma.equipamento.findMany({ 
+        select: { id: true, tag: true, modelo: true, unidade: { select: { nomeSistema: true } } }, 
+        take: 200 
+    });
+    const listaEquipStr = JSON.stringify(equipamentosAtivos);
+
+    const modelosBackup = ["gemini-2.5-flash", "gemini-1.5-flash"];
     for (const nomeModelo of modelosBackup) {
         try {
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const systemInstruction = `Você é o Guardião SIMEC, assistente de engenharia. 
-            Regras: 
-            1. SE O USUÁRIO RESPONDER A UMA PERGUNTA SUA (ex: número do chamado), USE ESSA INFORMAÇÃO PARA CONCLUIR O JSON DE AGENDAMENTO.
-            2. PREVENTIVA: JSON {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}
-            3. CORRETIVA: Se precisar do chamado, peça. Se já tiver, inclua "numeroChamado": "XXXX" no JSON.
-            4. Responda apenas JSON ou a pergunta necessária.`;
+            // INJEÇÃO FORÇADA DE CONTEXTO: Toda chamada reenvia a lista de equipamentos
+            const systemInstruction = `Você é o Guardião SIMEC. 
+            LISTA DE EQUIPAMENTOS ATUAIS (Use estes IDs): ${listaEquipStr}.
+            1. PREVENTIVA: Retorne JSON {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}
+            2. CORRETIVA: Se o usuário pedir corretiva, inclua o numeroChamado e a descrição no JSON.
+            3. Se faltar informação (ID ou Chamado), pergunte ao usuário. Não invente IDs.`;
 
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
             
@@ -64,28 +68,17 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             
             while (history.length > 0 && history[0].role !== 'user') history.shift();
             
-            // --- ENRIQUECIMENTO DE CONTEXTO ---
-            let promptEnriquecido = perguntaUsuario;
-            if (history.length > 0) {
-                const ultimaIA = history[history.length - 1];
-                if (ultimaIA.role === 'model' && ultimaIA.parts[0].text.includes("número do chamado")) {
-                    promptEnriquecido = `O número do chamado é "${perguntaUsuario}". Agora continue o agendamento: ${perguntaUsuario}`;
-                }
-            }
-            
             const chat = model.startChat({ history });
-            const result = await chat.sendMessage(promptEnriquecido);
+            const result = await chat.sendMessage(perguntaUsuario);
             let textoDaIA = result.response.text();
 
-            if (!textoDaIA || textoDaIA.trim() === "") textoDaIA = "Pode confirmar o dado ou repetir?";
-
+            // LÓGICA DE EXTRAÇÃO DE COMANDO
             if (textoDaIA.includes('"acao_sistema"')) {
                 const match = textoDaIA.match(/\{[\s\S]*\}/);
                 if (match) {
                     const comando = JSON.parse(match[0]);
-                    if (comando.tipo === 'Corretiva' && !comando.numeroChamado) {
-                        textoDaIA = "⚠️ Para manutenções corretivas, é obrigatório informar o número do chamado.";
-                    }
+                    // Validação de segurança: Se a IA não pegou o ID, peça novamente
+                    if (!comando.equipamentoId) textoDaIA = "⚠️ Não encontrei o ID do equipamento. Por favor, especifique qual a tomografia.";
                 }
             }
 
@@ -94,10 +87,9 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             });
             return textoDaIA;
         } catch (error) {
-            console.error(`[AGENTE] Falha no ${nomeModelo}:`, error.message);
             if (error.message.includes("429")) { await new Promise(r => setTimeout(r, 15000)); continue; }
             continue;
         }
     }
-    return "Desculpe, o sistema de IA está temporariamente indisponível.";
+    return "Desculpe, tente novamente.";
 };
