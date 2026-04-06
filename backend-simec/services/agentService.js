@@ -12,7 +12,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    const modelosBackup = ["gemini-1.5-flash"];
+    const modelosBackup = ["gemini-2.5-flash", "gemini-1.5-flash"];
     let erroUltimaTentativa = null;
 
     for (const nomeModelo of modelosBackup) {
