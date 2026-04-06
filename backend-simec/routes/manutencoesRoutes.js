@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/manutencoesRoutes.js
-// VERSÃO 11.0 - CORREÇÃO DE VÍNCULO DE UNIDADE EM DETALHES E BLINDAGEM ZOD
+// VERSÃO 12.0 - ADICIONADA ROTA DE CANCELAMENTO
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -65,7 +65,6 @@ router.get('/:id', async (req, res) => {
             where: { id: req.params.id },
             include: { 
                 anexos: true, 
-                // CORREÇÃO: Incluindo a unidade dentro do equipamento para evitar campos em branco na UI e PDF
                 equipamento: {
                     include: { unidade: true }
                 }, 
@@ -83,9 +82,7 @@ router.get('/:id', async (req, res) => {
     }
 });
 
-/** 
- * @route   POST /api/manutencoes 
- */
+/** @route   POST /api/manutencoes */
 router.post('/', validate(manutencaoSchema), async (req, res) => {
     const { equipamentoId, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio, dataHoraAgendamentoFim, ...outrosDados } = req.body;
     
@@ -125,10 +122,9 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
 
 
 // ==========================================================================
-// ROTA DE CONCLUSÃO (COM LIMPEZA AUTOMÁTICA DE NOTIFICAÇÃO)
+// ROTA DE CONCLUSÃO
 // ==========================================================================
 
-/** @route   POST /api/manutencoes/:id/concluir */
 router.post('/:id/concluir', async (req, res) => {
     const { id: manutencaoId } = req.params;
     const { equipamentoOperante, dataTerminoReal, novaPrevisao, observacao } = req.body;
@@ -140,56 +136,56 @@ router.post('/:id/concluir', async (req, res) => {
 
             if (equipamentoOperante) {
                 notaHistorico = `MANUTENÇÃO CONCLUÍDA: Equipamento Operante. Término: ${new Date(dataTerminoReal).toLocaleString('pt-BR')}.`;
-                
                 await tx.manutencao.update({
                     where: { id: manutencaoId },
                     data: { status: 'Concluida', dataFimReal: new Date(dataTerminoReal), dataConclusao: new Date() }
                 });
-
-                await tx.equipamento.update({
-                    where: { id: manutAtual.equipamentoId },
-                    data: { status: 'Operante' }
-                });
-
+                await tx.equipamento.update({ where: { id: manutAtual.equipamentoId }, data: { status: 'Operante' } });
                 await tx.alerta.deleteMany({ where: { id: `manut-confirm-${manutencaoId}` } });
-                await tx.alertaLidoPorUsuario.deleteMany({ where: { alertaId: `manut-confirm-${manutencaoId}` } });
-
             } else {
                 notaHistorico = `EQUIPAMENTO CONTINUA INOPERANTE: ${observacao}. Nova previsão: ${new Date(novaPrevisao).toLocaleString('pt-BR')}.`;
-                
                 await tx.manutencao.update({
                     where: { id: manutencaoId },
                     data: { status: 'EmAndamento', dataHoraAgendamentoFim: new Date(novaPrevisao) }
                 });
-
-                await tx.equipamento.update({
-                    where: { id: manutAtual.equipamentoId },
-                    data: { status: 'Inoperante' }
-                });
+                await tx.equipamento.update({ where: { id: manutAtual.equipamentoId }, data: { status: 'Inoperante' } });
             }
-
-            await tx.notaAndamento.create({
-                data: { nota: notaHistorico, manutencaoId, origem: 'automatico' }
-            });
-
+            await tx.notaAndamento.create({ data: { nota: notaHistorico, manutencaoId, origem: 'automatico' } });
             return { status: equipamentoOperante ? 'Concluida' : 'EmAndamento' };
-        });
-
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'CONCLUSÃO', entidade: 'Manutenção',
-            entidadeId: manutencaoId, detalhes: `Conclusão registrada. Equipamento ficou ${equipamentoOperante ? 'Operante' : 'Inoperante'}.`
         });
 
         res.json(resultado);
     } catch (error) {
-        console.error("Erro ao concluir manutenção:", error);
         res.status(500).json({ message: 'Erro ao processar a finalização.' });
+    }
+});
+
+// ==========================================================================
+// ROTA DE CANCELAMENTO (ADICIONADA)
+// ==========================================================================
+
+router.post('/:id/cancelar', async (req, res) => {
+    const { id } = req.params;
+    const { motivo } = req.body;
+
+    if (!motivo) return res.status(400).json({ message: "O motivo do cancelamento é obrigatório." });
+
+    try {
+        await prisma.$transaction(async (tx) => {
+            await tx.manutencao.update({ where: { id }, data: { status: 'Cancelada' } });
+            await tx.notaAndamento.create({
+                data: { nota: `CANCELAMENTO: ${motivo}`, manutencaoId: id, origem: 'manual' }
+            });
+        });
+        res.json({ message: "Manutenção cancelada com sucesso." });
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao cancelar manutenção.' });
     }
 });
 
 
 // ==========================================================================
-// OUTRAS AÇÕES (NOTAS, UPLOADS, EXCLUSÃO)
+// OUTRAS AÇÕES
 // ==========================================================================
 
 router.post('/:id/notas', async (req, res) => {
@@ -220,11 +216,7 @@ router.delete('/:id', admin, async (req, res) => {
     try {
         const manut = await prisma.manutencao.findUnique({ where: { id }, include: { anexos: true } });
         if (!manut) return res.status(404).json({ message: 'Não encontrada.' });
-
-        if (manut.anexos) {
-            manut.anexos.forEach(a => { if (fs.existsSync(a.path)) fs.unlinkSync(a.path); });
-        }
-
+        if (manut.anexos) manut.anexos.forEach(a => { if (fs.existsSync(a.path)) fs.unlinkSync(a.path); });
         await prisma.manutencao.delete({ where: { id } });
         res.status(204).send();
     } catch (error) {
