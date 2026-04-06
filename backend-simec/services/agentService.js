@@ -46,7 +46,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     }
 
     // USANDO O MODELO COM MAIOR COTA (Gemini 2.0 Flash)
-    const modelosBackup = [gemini-2.5-flash, gemini-2.5-flash-lite];
+    const modelosBackup = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     
     for (const nomeModelo of modelosBackup) {
         try {
