@@ -46,14 +46,12 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         take: 200 
     });
     
-    // System Instruction fortalecida para não perder dados parciais
-    const systemInstruction = `Você é o Guardião SIMEC.
+    // System Instruction focada em persistência
+    const systemInstruction = `Você é o Guardião SIMEC. 
+    REGRA DE OURO: Sempre leia o histórico de conversa. Se o usuário fornecer informações (Chamado, Equipamento, Problema), JAMAIS peça novamente.
     EQUIPAMENTOS: ${JSON.stringify(equipamentosAtivos)}.
-    REGRAS DE FORMULÁRIO:
-    1. Se o usuário fornecer um dado (Ex: Chamado, Equipamento, Descrição), memorize-o.
-    2. SE FOR CORRETIVA e faltar o número do chamado, PEÇA APENAS o chamado.
-    3. SE TIVER TUDO (equipamento, tipo, chamado, descrição, data), retorne JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "...", "numeroChamado": "...", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}
-    4. NÃO responda apenas "Ok", sempre mostre o resumo do que você já entendeu ou o que falta.`;
+    Quando tiver todos os dados, retorne APENAS o JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "...", "tipo": "...", "numeroChamado": "...", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}.
+    Se faltar algo, responda: "Tenho [dado X, dado Y]. Falta: [dado Z]".`;
 
     const modelosBackup = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     for (const nomeModelo of modelosBackup) {
@@ -70,16 +68,8 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             
             const chat = model.startChat({ history });
             
-            // Lógica de Enriquecimento: Se a IA perguntou algo antes, reforçamos a pergunta
-            let promptEnriquecido = perguntaUsuario;
-            if (history.length > 0) {
-                const ultimaIA = history[history.length - 1];
-                if (ultimaIA.role === 'model' && (ultimaIA.parts[0].text.includes("número do chamado") || ultimaIA.parts[0].text.includes("ID do equipamento"))) {
-                    promptEnriquecido = `Usuário respondeu: "${perguntaUsuario}". Complete o formulário com esta informação.`;
-                }
-            }
-
-            const result = await chat.sendMessage(promptEnriquecido);
+            // O segredo para não esquecer: injetar o resumo do que já foi coletado no prompt
+            const result = await chat.sendMessage(`Analise o histórico e complete o agendamento com: ${perguntaUsuario}`);
             let textoDaIA = result.response.text();
 
             await prisma.chatHistorico.createMany({
@@ -92,5 +82,5 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             continue;
         }
     }
-    return "Desculpe, tente novamente.";
+    return "Desculpe, o sistema está indisponível. Tente novamente.";
 };
