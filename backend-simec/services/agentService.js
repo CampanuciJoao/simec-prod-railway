@@ -12,7 +12,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    // --- INTERCEPTAÇÃO DE CONFIRMAÇÃO (MANTIDA) ---
+    // --- INTERCEPTAÇÃO DE CONFIRMAÇÃO ---
     if (perguntaUsuario.toLowerCase().trim() === "sim") {
         const ultimaInteracao = await prisma.chatHistorico.findFirst({
             where: { usuario: usuarioNome, role: 'model' },
@@ -46,22 +46,21 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         take: 200 
     });
     
-    // Injeção de contexto detalhada para não perder o foco
-    const systemInstruction = `Você é o Guardião SIMEC, assistente de engenharia.
-    LISTA DE EQUIPAMENTOS DISPONÍVEIS: ${JSON.stringify(equipamentosAtivos)}.
-    REGRAS DE CONTEXTO:
-    1. SE O USUÁRIO FORNECER DADOS PARCIAIS, ARMAZENE-OS MENTALMENTE.
-    2. SE O USUÁRIO PEDIR CORRETIVA E VOCÊ NÃO TIVER O CHAMADO, PEÇA APENAS O CHAMADO.
-    3. SE TIVER TUDO, retorne JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "...", "numeroChamado": "...", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}
-    4. Mantenha o tom profissional e direto. Use a lista de equipamentos para identificar o ID corretamente.`;
+    // System Instruction fortalecida para não perder dados parciais
+    const systemInstruction = `Você é o Guardião SIMEC.
+    EQUIPAMENTOS: ${JSON.stringify(equipamentosAtivos)}.
+    REGRAS DE FORMULÁRIO:
+    1. Se o usuário fornecer um dado (Ex: Chamado, Equipamento, Descrição), memorize-o.
+    2. SE FOR CORRETIVA e faltar o número do chamado, PEÇA APENAS o chamado.
+    3. SE TIVER TUDO (equipamento, tipo, chamado, descrição, data), retorne JSON: {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "...", "numeroChamado": "...", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}
+    4. NÃO responda apenas "Ok", sempre mostre o resumo do que você já entendeu ou o que falta.`;
 
-    const modelosBackup = ["gemini-2.5-flash", "gemini-1.5-flash"];
+    const modelosBackup = ["gemini-2.5-flash", "gemini-2.5-flash-lite"];
     for (const nomeModelo of modelosBackup) {
         try {
             const genAI = new GoogleGenerativeAI(API_KEY);
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
             
-            // Histórico estendido para a IA lembrar das respostas anteriores
             const historicoBanco = await prisma.chatHistorico.findMany({ where: { usuario: usuarioNome }, orderBy: { createdAt: 'asc' }, take: 10 });
             let history = historicoBanco
                 .filter(msg => !msg.mensagem.includes("⚠️"))
@@ -71,8 +70,16 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             
             const chat = model.startChat({ history });
             
-            // Enriquecimento: se o histórico mostrar que ela perguntou algo, a IA já leva o contexto
-            const result = await chat.sendMessage(perguntaUsuario);
+            // Lógica de Enriquecimento: Se a IA perguntou algo antes, reforçamos a pergunta
+            let promptEnriquecido = perguntaUsuario;
+            if (history.length > 0) {
+                const ultimaIA = history[history.length - 1];
+                if (ultimaIA.role === 'model' && (ultimaIA.parts[0].text.includes("número do chamado") || ultimaIA.parts[0].text.includes("ID do equipamento"))) {
+                    promptEnriquecido = `Usuário respondeu: "${perguntaUsuario}". Complete o formulário com esta informação.`;
+                }
+            }
+
+            const result = await chat.sendMessage(promptEnriquecido);
             let textoDaIA = result.response.text();
 
             await prisma.chatHistorico.createMany({
@@ -80,10 +87,10 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             });
             return textoDaIA;
         } catch (error) {
-            if (error.message.includes("429")) { await new Promise(r => setTimeout(r, 15000)); continue; }
             console.error(`Falha no ${nomeModelo}:`, error.message);
+            if (error.message.includes("429")) { await new Promise(r => setTimeout(r, 15000)); continue; }
             continue;
         }
     }
-    return "Desculpe, estou com instabilidade. Tente novamente em instantes.";
+    return "Desculpe, tente novamente.";
 };
