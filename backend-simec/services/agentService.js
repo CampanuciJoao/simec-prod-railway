@@ -15,7 +15,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const totalMensagens = await prisma.chatHistorico.count({ where: { usuario: usuarioNome } });
     if (totalMensagens > 20) await prisma.chatHistorico.deleteMany({ where: { usuario: usuarioNome } });
 
-    // --- INTERCEPTAÇÃO DE CONFIRMAÇÃO (ECONOMIZA COTA) ---
+    // --- INTERCEPTAÇÃO DE CONFIRMAÇÃO ---
     if (perguntaUsuario.toLowerCase().trim() === "sim") {
         const ultimaInteracao = await prisma.chatHistorico.findFirst({
             where: { usuario: usuarioNome, role: 'model' },
@@ -44,34 +44,34 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         }
     }
 
-    const modelosBackup = ["gemini-3.1-flash-lite", "gemini-1.5-flash"];
+    // LISTA GARANTIDA DE MODELOS V1BETA
+    const modelosBackup = ["gemini-1.5-flash", "gemini-1.5-pro"];
+    
     for (const nomeModelo of modelosBackup) {
         try {
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const equipamentosAtivos = await prisma.equipamento.findMany({ select: { id: true, tag: true, modelo: true, unidade: { select: { nomeSistema: true } } }, take: 200 });
+            const model = genAI.getGenerativeModel({ model: nomeModelo });
             
-            const systemInstruction = `Você é o Guardião SIMEC. Regras:
+            const systemInstruction = `Você é o Guardião SIMEC. 
+            Regras: 
             1. PREVENTIVA: Retorne JSON {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva", "descricao": "...", "dataInicio": "...", "dataFim": "...", "confirmado": false}
             2. CORRETIVA: Se não houver numeroChamado, responda APENAS: "Para corretivas, preciso do número do chamado." Se tiver, inclua "numeroChamado": "XXXX" no JSON.
             3. Não escreva explicações, apenas JSON puro ou a pergunta solicitada.`;
 
-            const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
-            
-            // BUSCA E LIMPEZA DE HISTÓRICO
+            // Construção do histórico
             const historicoBanco = await prisma.chatHistorico.findMany({ where: { usuario: usuarioNome }, orderBy: { createdAt: 'asc' }, take: 8 });
             let history = historicoBanco
                 .filter(msg => !msg.mensagem.includes("⚠️"))
-                .map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
+                .map(msg => ({ role: msg.role === 'model' ? 'model' : 'user', parts: [{ text: msg.mensagem }] }));
             
-            // GARANTIA: O primeiro elemento DEVE ser 'user'. Removemos qualquer 'model' inicial.
-            while (history.length > 0 && history[0].role !== 'user') {
-                history.shift();
-            }
-            
-            const chat = model.startChat({ history });
+            // Garantia: O primeiro deve ser user
+            while (history.length > 0 && history[0].role !== 'user') history.shift();
+
+            const chat = model.startChat({ history, systemInstruction });
             const result = await chat.sendMessage(perguntaUsuario);
             let textoDaIA = result.response.text();
 
+            // Validação de segurança para corretiva
             if (textoDaIA.includes('"acao_sistema"')) {
                 const match = textoDaIA.match(/\{[\s\S]*\}/);
                 if (match) {
@@ -87,9 +87,10 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             });
             return textoDaIA;
         } catch (error) {
+            console.error(`[AGENTE] Falha no modelo ${nomeModelo}:`, error.message);
             if (error.message.includes("429")) { await new Promise(r => setTimeout(r, 12000)); continue; }
-            console.error("[AGENTE] Erro:", error);
-            throw error;
+            continue; // Tenta o próximo modelo se este falhar (404)
         }
     }
+    throw new Error("Falha ao processar com IA: Todos os modelos falharam.");
 };
