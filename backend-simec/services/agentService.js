@@ -65,7 +65,13 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                 take: 10
             });
 
-            const history = historicoBanco.map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
+            // Converte para o formato do Google e resolve o bug do "First content should be with role 'user'"
+            let history = historicoBanco.map(msg => ({ role: msg.role, parts: [{ text: msg.mensagem }] }));
+            
+            while (history.length > 0 && history[0].role !== 'user') {
+                history.shift(); 
+            }
+
             const chat = model.startChat({ history });
 
             // 4. ENVIANDO A PERGUNTA
