@@ -1,39 +1,17 @@
 // Ficheiro: backend-simec/services/timeService.js
-// VERSÃO DEFINITIVA - CORREÇÃO DE CONSTRUÇÃO DE DATA
+// VERSÃO DEFINITIVA E OTIMIZADA
 
 /**
- * Retorna um objeto Date que representa o "agora" exato para o fuso de Mato Grosso do Sul (UTC-4).
- * Esta versão corrige a construção da data para garantir que o Javascript não 
- * "re-interprete" o fuso horário após a criação do objeto.
+ * Retorna um objeto Date que representa o "agora" exato.
+ * Como definimos a variável de ambiente TZ=America/Campo_Grande no Railway,
+ * o próprio ambiente do Node.js já tratará o 'new Date()' no fuso correto.
  */
 export function getAgora() {
-  // 1. Pega o tempo atual em MS (Campo Grande) usando toLocaleString
-  const options = {
-    timeZone: 'America/Campo_Grande',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false
-  };
-
-  const formatter = new Intl.DateTimeFormat('en-US', options);
-  const partes = formatter.formatToParts(new Date());
+  // Apenas retornando new Date(), o Node.js respeitará a variável TZ definida no Railway.
+  // Isso é o padrão ouro para aplicações servidoras modernas.
+  const agora = new Date();
   
-  // Extrai as partes para montar a data manualmente sem conversão de fuso do JS
-  const p = {};
-  partes.forEach(({ type, value }) => { p[type] = value; });
-
-  // Retorna um novo objeto Date montado manualmente. 
-  // Nota: O mês no construtor do Date é base 0 (janeiro = 0), por isso o -1.
-  return new Date(
-    p.year,
-    p.month - 1,
-    p.day,
-    p.hour === '24' ? 0 : p.hour,
-    p.minute,
-    p.second
-  );
+  // Apenas uma trava de segurança: garante que o fuso seja respeitado se 
+  // o servidor por algum motivo não ler a variável de ambiente (fallback).
+  return new Date(agora.toLocaleString("en-US", { timeZone: "America/Campo_Grande" }));
 }

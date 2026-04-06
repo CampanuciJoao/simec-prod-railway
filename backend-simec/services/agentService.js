@@ -1,10 +1,14 @@
+// Ficheiro: backend-simec/services/agentService.js
+
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import prisma from './prismaService.js';
 import { getAgora } from './timeService.js';
 
-// Função para garantir que a data vinda da IA seja interpretada como fuso local (MS)
+// Função utilitária corrigida para evitar fuso horário automático
 function forcarFusoMS(dataIsoDaIA) {
     if (!dataIsoDaIA || dataIsoDaIA === "null") return null;
+    // O pulo do gato: removemos o 'Z' e garantimos que o JS leia como data local do servidor
+    // Como o servidor agora tem TZ=America/Campo_Grande, isso é o suficiente.
     const cleanIso = dataIsoDaIA.replace('Z', '');
     return new Date(cleanIso);
 }
@@ -19,7 +23,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     for (const nomeModelo of modelosBackup) {
         try {
             const genAI = new GoogleGenerativeAI(API_KEY);
-            const agora = getAgora();
+            const agora = getAgora(); // getAgora já respeita o TZ configurado no Railway
 
             // 1. BUSCANDO OS EQUIPAMENTOS NO BANCO PARA DAR "VISÃO" À IA
             const equipamentosAtivos = await prisma.equipamento.findMany({
@@ -40,28 +44,29 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             // 2. O CÉREBRO (INSTRUÇÃO MESTRA)
             const systemInstruction = `
                 Você é o Guardião SIMEC, assistente de Engenharia Clínica.
-                REFERÊNCIA TEMPORAL OBRIGATÓRIA: Hoje é dia ${dataHoje} e a hora atual é ${horaHoje}.
+                DATA E HORA ATUAL DO SISTEMA: ${dataHoje} ${horaHoje}.
                 Lista de equipamentos: ${listaEquipamentosStr}
 
                 REGRAS ABSOLUTAS (NÃO QUEBRE):
                 1. AGENDAMENTO NOVO: Se o usuário pedir manutenção, retorne APENAS este JSON puro:
                    {"acao_sistema": "CRIAR_MANUTENCAO", "equipamentoId": "ID", "tipo": "Preventiva ou Corretiva", "descricao": "...", "dataInicio": "YYYY-MM-DDTHH:mm:00", "dataFim": "YYYY-MM-DDTHH:mm:00", "confirmado": false}
                 
-                2. REGRAS DE HORA: Se o usuário der hora de início e hora de fim, preencha OBRIGATORIAMENTE os dois campos com a data e hora informadas, formato ISO SEM "Z" (Ex: ${dataHoje}T10:30:00). Se não der fim, dataFim é null.
+                2. REGRAS DE HORA: Se o usuário der hora de início e hora de fim, use o ano atual. Retorne o formato ISO SEM "Z" (Ex: ${dataHoje}T10:30:00).
                 
-                3. CONFIRMAÇÃO (MUITO IMPORTANTE): Se o usuário confirmar um agendamento anterior (ex: "sim", "pode"), você DEVE ler a sua última resposta JSON, COPIAR EXATAMENTE OS MESMOS VALORES de "dataInicio", "dataFim", "equipamentoId" e "tipo", e retornar o JSON alterando APENAS "confirmado": true. Nunca altere o ano para frente ou invente novas datas ao confirmar.
+                3. CONFIRMAÇÃO: Se o usuário confirmar (ex: "sim", "pode"), leia a última mensagem JSON, copie os valores exatos de dataInicio e dataFim, e altere APENAS "confirmado": true.
                 
-                4. DESAMBIGUAÇÃO: Se o usuário não citar o equipamento de forma clara (ex: "tomografia" mas há duas), NÃO gere JSON. Pergunte em texto normal a Tag.
+                4. DESAMBIGUAÇÃO: Se o equipamento não for claro, NÃO gere JSON. Pergunte em texto.
                 
                 5. RELATÓRIOS: Responda JSON: {"acao_sistema": "GERAR_RELATORIO", "tipo": "manutencoesRealizadas", "filtros": {"tipo": "Preventiva ou Corretiva"}}
                 
                 6. ANÁLISE DE SAÚDE: Responda JSON: {"acao_sistema": "ANALISAR_SAUDE", "equipamentoId": "ID"}
                 
-                NÃO escreva explicações, código markdown (\`\`\`) ou saudações antes ou depois do JSON. Apenas o JSON cru.
+                NÃO escreva explicações, código markdown ou saudações antes ou depois do JSON. Apenas o JSON cru.
             `;
 
             const model = genAI.getGenerativeModel({ model: nomeModelo, systemInstruction });
 
+            // 3. RECUPERANDO A MEMÓRIA DA CONVERSA
             const historicoBanco = await prisma.chatHistorico.findMany({
                 where: { usuario: usuarioNome },
                 orderBy: { createdAt: 'asc' },
@@ -73,11 +78,12 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
 
             const chat = model.startChat({ history });
 
+            // 4. ENVIANDO A PERGUNTA
             const result = await chat.sendMessage(perguntaUsuario);
             let textoDaIA = result.response.text();
             let respostaFinalTexto = textoDaIA;
 
-            // 5. INTERCEPTANDO AÇÕES (EXTRAÇÃO SEGURA DE JSON)
+            // 5. INTERCEPTANDO AÇÕES
             if (textoDaIA.includes('"acao_sistema"')) {
                 try {
                     const inicio = textoDaIA.indexOf('{');
@@ -92,11 +98,11 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                         const dataInicioObj = forcarFusoMS(comando.dataInicio);
                         const dataFimObj = forcarFusoMS(comando.dataFim);
 
-                        // TRAVA DE SEGURANÇA: BLOQUEIO DE AGENDAMENTO NO PASSADO
-                        const limiteMinimo = new Date(agora.getTime() - 5 * 60000);
+                        // TRAVA: Tolerância de 5 minutos
+                        const limiteMinimo = new Date(getAgora().getTime() - 5 * 60000);
 
-                        if (dataInicioObj < limiteMinimo) {
-                            respostaFinalTexto = `⚠️ **Agendamento Recusado:** A data/hora solicitada (${dataInicioObj.toLocaleString('pt-BR')}) já passou.`;
+                        if (dataInicioObj < limiteMinimo && comando.confirmado === false) {
+                            respostaFinalTexto = `⚠️ **Agendamento Recusado:** A data solicitada (${dataInicioObj.toLocaleString('pt-BR')}) já passou.`;
                             comando.confirmado = false;
                         } 
                         else if (comando.confirmado === true) {
@@ -112,16 +118,9 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                                     equipamentoId: comando.equipamentoId
                                 }
                             });
-                            const horaInicioFormatada = dataInicioObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                            let horaFimFormatada = "";
-                            if (dataFimObj) horaFimFormatada = ` até ${dataFimObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-                            respostaFinalTexto = `✅ Agendamento concluído com sucesso!\n**OS:** ${numeroOSGerado}\n**Ativo:** ${nomeEquipamento}\n**Horário:** ${horaInicioFormatada}${horaFimFormatada}`;
+                            respostaFinalTexto = `✅ Agendamento concluído!\n**OS:** ${numeroOSGerado}\n**Ativo:** ${nomeEquipamento}\n**Início:** ${dataInicioObj.toLocaleString('pt-BR')}`;
                         } else {
-                            const dataFormatada = dataInicioObj.toLocaleDateString('pt-BR');
-                            const horaInicio = dataInicioObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-                            let textoFim = "";
-                            if (dataFimObj) textoFim = ` com término previsto para as ${dataFimObj.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
-                            respostaFinalTexto = `📋 **Resumo do Agendamento:**\n\n**Equipamento:** ${nomeEquipamento}\n**Tipo:** ${comando.tipo}\n**Data:** ${dataFormatada}\n**Horário:** Início às ${horaInicio}${textoFim}\n\nPosso confirmar e gerar a Ordem de Serviço?`;
+                            respostaFinalTexto = `📋 **Confirmar agendamento:**\nEquipamento: ${nomeEquipamento}\nInício: ${dataInicioObj.toLocaleString('pt-BR')}\nPosso confirmar? (Responda: "Sim")`;
                         }
                     } 
                     else if (comando.acao_sistema === "GERAR_RELATORIO") {
@@ -130,7 +129,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                         const contagem = await prisma.manutencao.count({
                             where: { tipo: comando.filtros.tipo, dataConclusao: { gte: umAnoAtras, lte: agora } }
                         });
-                        respostaFinalTexto = `📊 Levantamento concluído: O sistema registra **${contagem}** manutenções do tipo ${comando.filtros.tipo} realizadas nos últimos 12 meses.`;
+                        respostaFinalTexto = `📊 Levantamento concluído: ${contagem} manutenções do tipo ${comando.filtros.tipo} no último ano.`;
                     }
                     else if (comando.acao_sistema === "ANALISAR_SAUDE") {
                         const ocorrencias = await prisma.ocorrencia.findMany({
@@ -143,7 +142,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
                         respostaFinalTexto = analise.response.text();
                     }
                 } catch (jsonErr) {
-                    console.warn("[AGENTE] Falha ao ler JSON da IA:", textoDaIA);
+                    console.warn("[AGENTE] Falha ao ler JSON da IA.");
                 }
             }
 
