@@ -12,7 +12,7 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     const API_KEY = process.env.GEMINI_API_KEY?.trim();
     if (!API_KEY) throw new Error("Chave não configurada no .env.");
 
-    // 1. RECUPERAR ESTADO ATUAL
+    // 1. RECUPERAR ESTADO ATUAL DO BANCO (O JSON que a IA gerou por último)
     const ultimaInteracao = await prisma.chatHistorico.findFirst({
         where: { usuario: usuarioNome, role: 'model' },
         orderBy: { createdAt: 'desc' }
@@ -25,7 +25,10 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
     if (ultimaInteracao) {
         const match = ultimaInteracao.mensagem.match(/\{[\s\S]*\}/);
         if (match) {
-            try { estadoAtual = JSON.parse(match[0]); } catch (e) { console.error("Erro ao ler estado:", e); }
+            try { 
+                const obj = JSON.parse(match[0]);
+                estadoAtual = obj.estado || estadoAtual; // Recupera apenas o estado
+            } catch (e) { console.error("Erro ao ler estado:", e); }
         }
     }
 
@@ -35,20 +38,24 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
         take: 200 
     });
 
-    const systemInstruction = `Você é um formulário de manutenção SIMEC. 
-    ESTADO ATUAL: ${JSON.stringify(estadoAtual)}.
-    EQUIPAMENTOS: ${JSON.stringify(equipamentosAtivos)}.
+    const systemInstruction = `Você é um preenchedor de formulário do SIMEC.
+    EQUIPAMENTOS DISPONÍVEIS: ${JSON.stringify(equipamentosAtivos)}.
+    REGRA: Você deve preencher o JSON abaixo.
+    Se o usuário citar um equipamento, busque o ID na lista acima. NÃO PEÇA O ID se puder identificar pelo nome/tag.
     
-    REGRA DE OURO: 
-    - Retorne SEMPRE um JSON.
-    - Se faltar dado: Retorne JSON com os campos preenchidos e o campo "mensagem" indicando o que falta.
-    - Se TUDO estiver preenchido: Retorne JSON com "acao_sistema": "CRIAR_MANUTENCAO" e todos os dados preenchidos.
-    - Estrutura obrigatória: {"estado": {...dados}, "mensagem": "...", "acao_sistema": "..." ou null}`;
+    ESTRUTURA DE RESPOSTA OBRIGATÓRIA:
+    {
+      "estado": { "equipamentoId": "...", "tipo": "...", "numeroChamado": "...", "descricao": "...", "dataInicio": "...", "dataFim": "..." },
+      "mensagem": "Sua pergunta ou resumo para o usuário",
+      "acao_sistema": null 
+    }
+    Se tudo estiver preenchido, defina "acao_sistema": "CRIAR_MANUTENCAO".`;
 
     const genAI = new GoogleGenerativeAI(API_KEY);
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash", systemInstruction });
     
-    const promptFinal = `Usuário disse: "${perguntaUsuario}". Responda APENAS em formato JSON seguindo a estrutura definida.`;
+    // 3. ENVIAR COM ESTADO ATUAL FORÇADO
+    const promptFinal = `Estado atual dos dados: ${JSON.stringify(estadoAtual)}. Usuário disse: "${perguntaUsuario}". Atualize os dados e responda.`;
     const result = await model.generateContent(promptFinal);
     let textoDaIA = result.response.text();
     const match = textoDaIA.match(/\{[\s\S]*\}/);
@@ -62,13 +69,13 @@ export const processarComandoAgente = async (perguntaUsuario, usuarioNome = "Adm
             await prisma.manutencao.create({
                 data: {
                     numeroOS: numeroOSGerado,
-                    tipo: jsonResposta.tipo,
+                    tipo: jsonResposta.estado.tipo,
                     status: "Agendada",
-                    numeroChamado: jsonResposta.numeroChamado,
-                    descricaoProblemaServico: jsonResposta.descricao,
-                    dataHoraAgendamentoInicio: forcarFusoMS(jsonResposta.dataInicio),
-                    dataHoraAgendamentoFim: forcarFusoMS(jsonResposta.dataFim),
-                    equipamentoId: jsonResposta.equipamentoId
+                    numeroChamado: jsonResposta.estado.numeroChamado,
+                    descricaoProblemaServico: jsonResposta.estado.descricao,
+                    dataHoraAgendamentoInicio: forcarFusoMS(jsonResposta.estado.dataInicio),
+                    dataHoraAgendamentoFim: forcarFusoMS(jsonResposta.estado.dataFim),
+                    equipamentoId: jsonResposta.estado.equipamentoId
                 }
             });
             textoDaIA = `✅ Agendamento concluído! OS: ${numeroOSGerado}`;
