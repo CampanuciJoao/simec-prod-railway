@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 4.0 (Sênior - Arquitetura Modular do Agente + BullMQ)
+// Versão: 4.1 (Sênior - Reforço no Agendador BullMQ)
 
 // --- 1. Configuração de Ambiente ---
 import dotenv from 'dotenv';
@@ -17,7 +17,7 @@ import { fileURLToPath } from 'url';
 
 // --- 3. Importação das Rotas da Aplicação ---
 import authRoutes from './routes/authRoutes.js';
-import agentRoutes from './routes/agentRoutes.js'; // Rota do Agente (Inteligência)
+import agentRoutes from './routes/agentRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import dashboardRoutes from './routes/dashboardRoutes.js';
 import equipamentosRoutes from './routes/equipamentosRoutes.js';
@@ -59,11 +59,9 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // --- 8. Montagem das Rotas da API ---
 // ==========================================================================
 
-// Rotas Públicas ou com Proteção Interna Específica
 app.use('/api/auth', authRoutes);
-app.use('/api/agent', agentRoutes); // Nova estrutura modular do Agente Guardião
+app.use('/api/agent', agentRoutes);
 
-// Barreira de Segurança Global: Todas as rotas abaixo exigem Token JWT
 app.use(proteger);
 
 app.use('/api/dashboard-data', dashboardRoutes);
@@ -82,7 +80,7 @@ app.use('/api/bi', biRoutes);
 
 // --- 9. Rota Raiz ---
 app.get('/', (req, res) => {
-  res.send('API do SIMEC (v4.0) está ativa e operante!');
+  res.send('API do SIMEC (v4.1) está ativa e operante!');
 });
 
 // --- 10. Inicialização do Servidor ---
@@ -91,17 +89,25 @@ const server = app.listen(PORT, '0.0.0.0', async () => {
   console.log(`✅ Servidor rodando na porta: ${PORT}`);
   console.log(`🔗 Banco de Dados Conectado`);
   console.log(`🚀 Arquitetura IA (Agent System) Pronta`);
-  console.log(`📦 Sistema de Filas (BullMQ) Ativo`);
+  console.log(`📦 Sistema de Filas (BullMQ) Conectado ao Redis`);
   console.log(`------------------------------------------------------`);
   
-  // Reinicializa a fila de tarefas recorrentes
+  // --- CONFIGURAÇÃO DA TAREFA RECORRENTE ---
   try {
+    // 1. Limpa agendamentos antigos para evitar duplicidade no reinício
     await alertasQueue.obliterate({ force: true });
+    
+    // 2. Adiciona a tarefa de verificação a cada 1 minuto (60000ms)
     await alertasQueue.add('verificar-tarefas-diarias', {}, { 
-        repeat: { every: 60000 } // Executa a cada 1 minuto
+        repeat: { 
+          every: 60000,
+          immediately: true // Começa a rodar assim que o servidor liga
+        } 
     });
+
+    console.log(`⏰ Agendador: Ciclo de 1 minuto configurado e iniciado.`);
   } catch (error) {
-    console.error("Erro ao inicializar filas BullMQ:", error.message);
+    console.error("❌ Erro ao configurar o agendador BullMQ:", error.message);
   }
 });
 

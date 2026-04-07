@@ -227,12 +227,16 @@ function DetalhesManutencaoPage() {
                 </div>
                 <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Previsão Original</span>
-                    <span className="font-bold text-slate-700">{formatarDataHora(manutencao.dataHoraAgendamentoInicio)}</span>
+                    <span className="font-bold text-slate-700">
+                        {formatarDataHora(manutencao.dataHoraAgendamentoInicio)}
+                        {manutencao.dataHoraAgendamentoFim && (
+                            <> às {new Date(manutencao.dataHoraAgendamentoFim).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</>
+                        )}
+                    </span>
                 </div>
                 <div className="flex flex-col">
                     <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Unidade</span>
                     <span className="font-bold text-slate-700">
-                        {/* CORREÇÃO ROBUSTA DA UNIDADE */}
                         {manutencao.equipamento?.unidade?.nomeSistema || 
                          manutencao.equipamento?.unidade?.nome || 
                          manutencao.unidade?.nomeSistema || 

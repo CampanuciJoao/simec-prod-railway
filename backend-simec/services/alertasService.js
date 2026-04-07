@@ -12,12 +12,15 @@ const getAgora = () => new Date();
 
 export async function atualizarStatusManutencoes() {
   const agora = getAgora();
+  console.log(`[MANUTENÇÃO] Verificando trocas de status às: ${agora.toLocaleString('pt-BR')}`);
+
   const manutsParaIniciar = await prisma.manutencao.findMany({
     where: { status: 'Agendada', dataHoraAgendamentoInicio: { lte: agora } },
     select: { id: true, equipamentoId: true, numeroOS: true, dataHoraAgendamentoInicio: true },
   });
 
   if (manutsParaIniciar.length > 0) {
+    console.log(`[MANUTENÇÃO] Iniciando ${manutsParaIniciar.length} manutenções.`);
     await prisma.$transaction(async (tx) => {
       for (const manut of manutsParaIniciar) {
         await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
@@ -43,23 +46,26 @@ export async function atualizarStatusManutencoes() {
     where: { status: 'EmAndamento', dataHoraAgendamentoFim: { lte: agora } }
   });
 
-  for (const manut of manutsParaConfirmar) {
-    await prisma.$transaction(async (tx) => {
-      await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'AguardandoConfirmacao' } });
-      await tx.alerta.upsert({
-        where: { id: `manut-confirm-${manut.id}` },
-        update: { titulo: 'Confirmação de Manutenção Pendente' },
-        create: {
-          id: `manut-confirm-${manut.id}`,
-          titulo: 'Confirmação de Manutenção Pendente',
-          subtitulo: `OS ${manut.numeroOS} finalizou. Confirme o status do equipamento.`,
-          data: agora,
-          prioridade: 'Alta',
-          tipo: 'Manutenção',
-          link: `/manutencoes/detalhes/${manut.id}`
-        }
+  if (manutsParaConfirmar.length > 0) {
+    console.log(`[MANUTENÇÃO] Movendo ${manutsParaConfirmar.length} manutenções para Aguardando Confirmação.`);
+    for (const manut of manutsParaConfirmar) {
+      await prisma.$transaction(async (tx) => {
+        await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'AguardandoConfirmacao' } });
+        await tx.alerta.upsert({
+          where: { id: `manut-confirm-${manut.id}` },
+          update: { titulo: 'Confirmação de Manutenção Pendente' },
+          create: {
+            id: `manut-confirm-${manut.id}`,
+            titulo: 'Confirmação de Manutenção Pendente',
+            subtitulo: `OS ${manut.numeroOS} finalizou. Confirme o status do equipamento.`,
+            data: agora,
+            prioridade: 'Alta',
+            tipo: 'Manutenção',
+            link: `/manutencoes/detalhes/${manut.id}`
+          }
+        });
       });
-    });
+    }
   }
 }
 
@@ -239,12 +245,21 @@ async function verificarVencimentoSeguros() {
   }
 }
 
+// ESTA FUNÇÃO É A QUE O WORKER CHAMA
 export async function processarAlertasEEnviarNotificacoes() {
   try {
+    console.log("[TAREFA PROGRAMADA] Iniciando processamento de manutenções e alertas...");
+
+    // >>> CORREÇÃO APLICADA AQUI <<<
+    // Chamamos a função de atualização de status de manutenção no início do ciclo
+    await atualizarStatusManutencoes(); 
+
     await gerarAlertasDeProximidadeManutencao();
     await processarSaudeEquipamentos();
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
+
+    console.log("[TAREFA PROGRAMADA] Processamento finalizado.");
   } catch (error) {
     console.error('[ERRO GERAL Alertas]:', error);
   }
