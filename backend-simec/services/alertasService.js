@@ -34,17 +34,16 @@ export async function atualizarStatusManutencoes() {
         const modelo = manut.equipamento.modelo;
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
-        
-        // FRASE DETALHADA DE CONFIRMAÇÃO (Ativa negrito no Frontend)
         const novoTitulo = `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
+          update: { titulo: novoTitulo },
           create: {
             id: `manut-confirm-${manut.id}`,
             titulo: novoTitulo,
-            subtitulo: `O prazo da OS ${manut.numeroOS} expirou. Confirme o status real.`,
+            // AQUI: Formato exato para o Frontend recortar o número da OS
+            subtitulo: `OS ${manut.numeroOS} - O prazo expirou. Confirme o status.`,
             data: agora,
             prioridade: 'Alta',
             tipo: 'Manutenção',
@@ -55,11 +54,12 @@ export async function atualizarStatusManutencoes() {
     }
   }
 
-  // --- 2. INÍCIO AUTOMÁTICO ---
+  // --- 2. INÍCIO AUTOMÁTICO (Agressivo: 1 minuto de margem para evitar atrasos) ---
+  const margemInicio = new Date(agora.getTime() + 60000); // Olha 1 minuto no futuro
   const manutsParaIniciar = await prisma.manutencao.findMany({
     where: { 
         status: 'Agendada', 
-        dataHoraAgendamentoInicio: { lte: agora },
+        dataHoraAgendamentoInicio: { lte: margemInicio },
         dataHoraAgendamentoFim: { gt: agora } 
     },
     include: { equipamento: { include: { unidade: true } } }
@@ -74,17 +74,16 @@ export async function atualizarStatusManutencoes() {
         const modelo = manut.equipamento.modelo;
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
-        
-        // FRASE DETALHADA DE INÍCIO (Ativa negrito no Frontend)
         const novoTitulo = `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await tx.alerta.upsert({
           where: { id: `manut-iniciada-${manut.id}` },
-          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
+          update: { titulo: novoTitulo },
           create: {
             id: `manut-iniciada-${manut.id}`,
             titulo: novoTitulo,
-            subtitulo: `Ordem de Serviço ${manut.numeroOS} iniciada automaticamente.`,
+            // AQUI: Formato exato para o Frontend recortar o número da OS
+            subtitulo: `OS ${manut.numeroOS} - Iniciada automaticamente.`,
             data: agora,
             prioridade: 'Media',
             tipo: 'Manutenção',
@@ -110,32 +109,33 @@ async function gerarAlertasDeProximidadeManutencao() {
   });
 
   for (const manut of manutencoesProximas) {
-    const minRestantes = Math.round((manut.dataHoraAgendamentoInicio.getTime() - agora.getTime()) / 60000);
+    // Math.floor para precisão nos minutos exatos
+    const minRestantes = Math.floor((manut.dataHoraAgendamentoInicio.getTime() - agora.getTime()) / 60000);
+    
     for (const ponto of PONTOS_INICIO) {
-      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
+      // Cria uma margem de 1 minuto para não perder nenhum alerta entre os "tiques" do relógio
+      if (minRestantes <= ponto.limiar && minRestantes >= (ponto.limiar - 1)) {
         const idAlerta = `manut-prox-início-${manut.id}-${ponto.label}`;
-        
         const modelo = manut.equipamento.modelo;
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
-        
-        // FRASE DETALHADA DE PROXIMIDADE (Ativa negrito no Frontend)
-        const novoTitulo = `Manutenção inicia ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        const novoTitulo = `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await prisma.alerta.upsert({
           where: { id: idAlerta },
-          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
+          update: { titulo: novoTitulo }, 
           create: {
             id: idAlerta,
             titulo: novoTitulo,
-            subtitulo: `Agendado: ${format(manut.dataHoraAgendamentoInicio, 'HH:mm')} | OS: ${manut.numeroOS}`,
+            // AQUI: Formato exato para o Frontend recortar o número da OS
+            subtitulo: `OS ${manut.numeroOS} - Agendado para ${format(manut.dataHoraAgendamentoInicio, 'HH:mm')}`,
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
             tipo: 'Manutenção',
             link: `/manutencoes/detalhes/${manut.id}`
           }
         });
-        break;
+        break; // Impede gerar múltiplos alertas de tempos diferentes para a mesma OS
       }
     }
   }
@@ -155,8 +155,6 @@ export async function processarSaudeEquipamentos() {
     if (score >= 10) {
       const idAlerta = `alerta-saude-${eq.id}-${getAgora().getMonth()}`;
       const unidade = eq.unidade?.nomeSistema || "N/A";
-      
-      // FRASE DETALHADA DE RISCO (Ativa negrito no Frontend)
       const novoTitulo = `Risco de falha crítico na unidade de ${unidade}, no equipamento ${eq.modelo} (${eq.tag})`;
 
       await prisma.alerta.upsert({
@@ -165,7 +163,7 @@ export async function processarSaudeEquipamentos() {
         create: {
           id: idAlerta,
           titulo: novoTitulo,
-          subtitulo: `Este ativo atingiu um nível elevado de reincidência de problemas técnicos.`,
+          subtitulo: `Este ativo atingiu um nível elevado de reincidência de falhas.`,
           data: getAgora(),
           prioridade: 'Alta',
           tipo: 'Manutenção',
