@@ -1,50 +1,60 @@
 // simec/backend-simec/services/agent/router.js
 import { AgendamentoService } from './agendamentoService.js';
 import { classificarIntencao } from './intentClassifier.js';
-import { ChatRepository } from './chatRepository.js'; // Importação essencial para verificar o estado
+import { ChatRepository } from './chatRepository.js';
 
 /**
- * Mapa de Estratégias (Intenções)
+ * Mapa de Estratégias (Habilidades do Agente)
  */
 const STRATEGIES = {
     AGENDAR_MANUTENCAO: AgendamentoService,
 };
 
 /**
- * Maestro do Agente: Inteligente o suficiente para manter o contexto da conversa.
+ * Maestro do Agente: Orquestra a conversa, mantendo o contexto e tratando falhas da IA.
  */
 export const RoteadorAgente = async (mensagem, usuarioNome) => {
     try {
-        // 1. RECUPERAÇÃO DE CONTEXTO (O segredo da conversa natural)
-        // Verificamos se o usuário já tem um processo (como agendamento) em aberto no banco.
+        // 1. RECUPERAÇÃO DE CONTEXTO
+        // Verificamos se o usuário já deixou um agendamento incompleto no banco.
         const estadoAtual = await ChatRepository.buscarEstado(usuarioNome);
         const temProcessoAtivo = Object.keys(estadoAtual).length > 0;
 
-        // 2. Classificação da intenção da nova mensagem
-        const intencao = await classificarIntencao(mensagem);
+        // 2. CLASSIFICAÇÃO DA INTENÇÃO (VIA IA)
+        let intencao = await classificarIntencao(mensagem);
+
+        // 3. REDE DE SEGURANÇA (Heurística Sênior)
+        // Se a IA falhou (OUTRO) mas o usuário usou palavras claras de agendamento,
+        // nós "corrigimos" a intenção manualmente no backend.
+        const termosChaveAgendamento = ['agendar', 'marcar', 'manutenção', 'corretiva', 'preventiva', 'conserto', 'os', 'abrir'];
+        const msgMinuscula = mensagem.toLowerCase();
+        
+        if (intencao === 'OUTRO' && termosChaveAgendamento.some(t => msgMinuscula.includes(t))) {
+            console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para AGENDAR_MANUTENCAO`);
+            intencao = 'AGENDAR_MANUTENCAO';
+        }
 
         console.log(`[AGENT_ROUTER] Usuário: ${usuarioNome} | Ativo: ${temProcessoAtivo} | Intenção: ${intencao}`);
 
-        // 3. LÓGICA DE CONTINUIDADE SÊNIOR
-        // Se já existe um agendamento em curso, ignoramos o 'OUTRO' e mandamos para o especialista.
-        // Isso permite que o usuário diga "Oi", "Sim", "Muda o horário" sem cair no loop da saudação.
-        if (temProcessoAtivo && (intencao === 'AGENDAR_MANUTENCAO' || intencao === 'OUTRO')) {
+        // 4. LÓGICA DE ROTEAMENTO (PRIORIDADES)
+
+        // Prioridade 1: Se já existe um agendamento em curso, manda direto para o especialista.
+        // Ignoramos a intenção 'OUTRO' se ele estiver no meio de um processo.
+        if (temProcessoAtivo) {
             return await AgendamentoService.processar(mensagem, usuarioNome);
         }
 
-        // 4. LÓGICA DE NOVA INTENÇÃO (Início de conversa)
-        const executor = STRATEGIES[intencao];
-
-        // Só exibe a saudação inicial se NÃO houver processo ativo e a intenção for vaga.
-        if (!executor || intencao === 'OUTRO') {
-            return "Olá! Sou o Agente Guardião do SIMEC. No momento, sou especialista em **agendar manutenções** para seus equipamentos. Como posso ser útil agora?";
+        // Prioridade 2: Se é um novo pedido de agendamento detectado.
+        if (intencao === 'AGENDAR_MANUTENCAO') {
+            return await AgendamentoService.processar(mensagem, usuarioNome);
         }
 
-        // 5. Execução de nova estratégia
-        return await executor.processar(mensagem, usuarioNome);
+        // Prioridade 3: Fallback para Saudações ou Conversas Casuais.
+        // Só cai aqui se NÃO houver processo ativo e a intenção for REALMENTE 'OUTRO'.
+        return "Olá! Sou o Agente Guardião do SIMEC. No momento, sou especialista em **agendar manutenções** para seus equipamentos. Como posso ser útil agora?";
 
     } catch (error) {
-        console.error(`[AGENT_ROUTER_ERROR] Erro ao rotear pedido de ${usuarioNome}:`, error.message);
-        return "Tive um pequeno contratempo técnico. Poderia repetir sua solicitação de outra forma?";
+        console.error(`[AGENT_ROUTER_ERROR] Erro crítico no roteamento:`, error.message);
+        return "Tive um problema técnico ao processar sua mensagem. Poderia repetir de forma mais direta?";
     }
 };

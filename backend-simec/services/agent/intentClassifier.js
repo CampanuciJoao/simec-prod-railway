@@ -1,45 +1,52 @@
 // simec/backend-simec/services/agent/intentClassifier.js
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
+// Inicialização com a chave de API limpa
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// FIXO: Versão 2.5 mantida conforme exigência do ambiente
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 /**
- * Classifica a intenção real do usuário, ignorando saudações e focando em palavras-chave de ação.
+ * Classifica a intenção real do usuário, ignorando saudações e focando no objetivo da mensagem.
  */
 export async function classificarIntencao(mensagem) {
     const prompt = `
-    Você é um triador inteligente de um sistema hospitalar. 
-    Sua tarefa é identificar a TAREFA que o usuário quer realizar, ignorando saudações ou conversas irrelevantes.
+    Você é um triador especializado para um sistema de engenharia clínica hospitalar. 
+    Identifique o OBJETIVO FINAL da mensagem, ignorando cortesias e saudações iniciais.
 
-    Categorias e Palavras-Chave:
-    1. AGENDAR_MANUTENCAO: agendar, marcar, consertar, quebrou, parou de funcionar, preventiva, corretiva, abrir OS, manutenção.
-    2. RELATORIO: ver lista, gerar PDF, exportar, histórico de gastos, relatório de equipamentos.
-    3. BUSCAR_APOLICE: seguro, apólice, vigência, vencimento do seguro, renovação.
-    4. OUTRO: apenas oi, bom dia, como você está, ou assuntos não relacionados ao sistema.
+    CATEGORIAS VÁLIDAS:
+    - AGENDAR_MANUTENCAO: Para pedidos de agendamento, conserto, reparo, preventivas ou corretivas. 
+      Exemplo: "Olá, vamos marcar uma corretiva...", "Agende um reparo...", "Quebrou o raio-x".
+    - RELATORIO: Para pedidos de listas, visualização de histórico ou geração de documentos PDF.
+    - BUSCAR_APOLICE: Para dúvidas ou consultas sobre seguros e apólices.
+    - OUTRO: Saudações puras (Oi, Olá), agradecimentos ou assuntos sem pedido de ação.
 
     MENSAGEM DO USUÁRIO: "${mensagem}"
 
-    Regra: Se a frase contiver uma saudação E um pedido (ex: "Oi, quero agendar..."), ignore o "Oi" e responda a categoria do pedido.
-    Responda APENAS o nome da categoria em MAIÚSCULAS.
+    REGRA: Responda APENAS o nome da categoria em MAIÚSCULAS. Sem explicações ou pontuação extra.
     `;
 
     try {
         const result = await model.generateContent(prompt);
-        let texto = result.response.text().trim().toUpperCase();
+        let respostaIA = result.response.text().trim().toUpperCase();
         
-        // Mapeamento de segurança para garantir o retorno de uma das chaves do objeto STRATEGIES
-        const categorias = ['AGENDAR_MANUTENCAO', 'RELATORIO', 'BUSCAR_APOLICE', 'OUTRO'];
+        // Limpeza de Markdown caso a IA retorne o texto dentro de blocos de código
+        respostaIA = respostaIA.replace(/```|JSON/g, "").trim();
+
+        // Mapeamento de segurança para garantir compatibilidade com as chaves do router.js
+        const categoriasValidas = ['AGENDAR_MANUTENCAO', 'RELATORIO', 'BUSCAR_APOLICE', 'OUTRO'];
         
-        // Busca se alguma das categorias válidas está presente na resposta da IA
-        const encontrada = categorias.find(cat => texto.includes(cat));
+        // Busca se a resposta da IA contém alguma das categorias permitidas
+        const detectada = categoriasValidas.find(cat => respostaIA.includes(cat));
 
-        // Log para monitorar a inteligência no terminal do servidor
-        console.log(`[INTENT_CLASSIFIER] Entrada: "${mensagem}" -> Detectado: ${encontrada || 'OUTRO'}`);
+        // LOG DE MONITORAMENTO: Essencial para depurar o comportamento no Railway
+        console.log(`[IA_INTENT] Input: "${mensagem}" | Detectada: ${detectada || 'OUTRO'}`);
 
-        return encontrada || 'OUTRO'; 
+        return detectada || 'OUTRO'; 
+
     } catch (error) {
-        console.error("[INTENT_CLASSIFIER_ERROR]:", error);
-        return "OUTRO"; 
+        // Captura falhas de conexão ou erros da API do Google
+        console.error("[IA_INTENT_ERROR]:", error.message);
+        return "OUTRO"; // Fallback seguro para o fluxo continuar na saudação
     }
 }

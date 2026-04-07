@@ -3,97 +3,100 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// MANTER VERSÃO 2.5 CONFORME REGRA DE AMBIENTE
+const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 // --- CONTRATO DE DADOS (SCHEMA ZOD) ---
-// Define as regras rígidas de formato para os dados que entram no banco.
 const AgendamentoSchema = z.object({
     tipo: z.enum(['Corretiva', 'Preventiva']).nullable(),
     unidadeTexto: z.string().nullable(),
     equipamentoTexto: z.string().nullable(),
-    data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), // YYYY-MM-DD
-    horaInicio: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),  // HH:mm
-    horaFim: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),     // HH:mm
+    data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(), // Valida YYYY-MM-DD
+    horaInicio: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),  // Valida HH:mm
+    horaFim: z.string().regex(/^\d{2}:\d{2}$/).nullable().optional(),     // Valida HH:mm
     numeroChamado: z.string().nullable(),
     descricao: z.string().nullable(),
     confirmacao: z.boolean().nullable()
 });
 
 /**
- * Usa a IA para extrair informações estruturadas de uma mensagem de texto.
+ * Usa a IA para extrair informações estruturadas da conversa.
  */
 export const extrairCamposComIA = async (mensagem, estado) => {
-    // Referência temporal para a IA conseguir calcular "amanhã", "hoje" ou "sexta"
+    // Fornece o contexto de hoje para a IA calcular datas relativas corretamente
     const dataHoje = new Date().toISOString().split('T')[0];
 
     const prompt = `
-    DATA_REFERENCIA_HOJE: ${dataHoje}
-    ESTADO_ATUAL_JSON: ${JSON.stringify(estado)}
+    DATA_HOJE: ${dataHoje}
+    ESTADO_ATUAL: ${JSON.stringify(estado)}
     MENSAGEM_USUARIO: "${mensagem}"
     
-    Tarefa: Extraia dados para agendamento de manutenção hospitalar.
-    Retorne APENAS o JSON no formato abaixo, sem markdown, sem explicações.
+    TAREFA: Extraia os dados para agendamento de manutenção hospitalar.
+    Retorne APENAS o JSON puro. Sem textos extras, sem markdown.
     
+    ESTRUTURA:
     { "tipo": null, "unidadeTexto": null, "equipamentoTexto": null, "data": null, "horaInicio": null, "horaFim": null, "numeroChamado": null, "descricao": null, "confirmacao": null }
     
-    Regras Críticas:
-    1. "data": Se o usuário disser datas relativas, converta para YYYY-MM-DD usando a DATA_REFERENCIA_HOJE.
-    2. "confirmacao": true para sim/confirmo, false para não/cancela.
-    3. Não invente informações. Se não houver certeza, retorne null.
+    REGRAS:
+    1. "data": Se o usuário disser "amanhã", retorne a data de amanhã em YYYY-MM-DD.
+    2. "confirmacao": true para sim/ok/pode/confirmo. false para não/cancela/mudar.
+    3. Mantenha null se a informação não estiver clara na mensagem.
     `;
     
     try {
         const result = await model.generateContent(prompt);
         const textoBruto = result.response.text();
         
-        // Limpeza Sênior: Extrai apenas o conteúdo entre as primeiras e últimas chaves
+        // Limpeza Sênior: Extrai o que está entre { } ignorando ruído da IA
         const jsonMatch = textoBruto.match(/{[\s\S]*}/);
         if (!jsonMatch) return {};
 
         const jsonObjeto = JSON.parse(jsonMatch[0]);
         
-        // Validação parcial: Pegamos os dados validados pelo Zod
-        const resultadoZod = AgendamentoSchema.safeParse(jsonObjeto);
+        // Validação defensiva com Zod
+        const validacao = AgendamentoSchema.safeParse(jsonObjeto);
         
-        if (!resultadoZod.success) {
-            // Se falhar o formato (ex: data errada), logamos o erro e retornamos o que for possível
-            console.warn("[AGENT_VALIDATION_WARNING] Campos mal formatados ignorados.");
-            return jsonObjeto; 
+        if (!validacao.success) {
+            // Se o Zod falhar (ex: data no formato errado), 
+            // limpamos os campos inválidos mas mantemos o resto.
+            console.warn("[AGENT_VALIDATION] IA enviou dados fora do padrão. Limpando campos...");
+            const dadosLimpos = { ...jsonObjeto };
+            validacao.error.issues.forEach(issue => {
+                dadosLimpos[issue.path[0]] = null; // Reseta apenas o campo que falhou
+            });
+            return dadosLimpos;
         }
 
-        return resultadoZod.data;
+        return validacao.data;
 
     } catch (e) {
-        console.error("[AGENT_EXTRACT_ERROR] Falha crítica na extração:", e.message);
+        console.error("[AGENT_EXTRACT_ERROR]:", e.message);
         return {};
     }
 };
 
 /**
- * Mescla o estado antigo com os novos dados, impedindo que campos vazios apaguem dados já salvos.
+ * Une os dados novos com os antigos sem sobrescrever com valores nulos.
  */
 export const mergeEstadoSeguro = (estado, extraido) => {
     const novo = { ...estado };
-    const camposPermitidos = ['tipo', 'unidadeTexto', 'equipamentoTexto', 'data', 'horaInicio', 'horaFim', 'numeroChamado', 'descricao', 'confirmacao'];
+    const CAMPOS = ['tipo', 'unidadeTexto', 'equipamentoTexto', 'data', 'horaInicio', 'horaFim', 'numeroChamado', 'descricao', 'confirmacao'];
     
-    camposPermitidos.forEach(campo => {
-        const valorNovo = extraido[campo];
-        // Só atualiza se o valor novo não for nulo, indefinido ou string vazia.
-        if (valorNovo !== null && valorNovo !== undefined && valorNovo !== '') {
-            novo[campo] = valorNovo;
+    CAMPOS.forEach(campo => {
+        if (extraido[campo] !== null && extraido[campo] !== undefined && extraido[campo] !== '') {
+            novo[campo] = extraido[campo];
         }
     });
     return novo;
 };
 
 /**
- * Define quais campos ainda faltam para o agendamento ser considerado completo.
+ * Define o que falta baseado no tipo de manutenção.
  */
 export const getFaltantes = (estado) => {
-    // Requisitos mínimos (IDs reais do banco)
+    // Requisitos básicos (precisam de IDs reais do banco)
     const base = ['unidadeId', 'equipamentoId', 'tipo', 'data', 'horaInicio', 'horaFim'];
     
-    // Se for Corretiva, exigimos campos adicionais
     const obrigatorios = estado.tipo === 'Corretiva' 
         ? [...base, 'numeroChamado', 'descricao'] 
         : base;
@@ -102,35 +105,33 @@ export const getFaltantes = (estado) => {
 };
 
 /**
- * Tradutor de nomes técnicos para linguagem humana para as perguntas do chat.
+ * Traduz campos técnicos para perguntas amigáveis no chat.
  */
 export const proximaPergunta = (estado, faltantes) => {
     const mapa = { 
-        unidadeId: 'unidade (hospital)', 
-        equipamentoId: 'nome ou modelo do equipamento', 
-        tipo: 'tipo de manutenção (Preventiva ou Corretiva)', 
-        data: 'data do agendamento', 
-        horaInicio: 'horário de início', 
-        horaFim: 'horário de término', 
-        numeroChamado: 'número do chamado (ticket)', 
-        descricao: 'descrição do defeito' 
+        unidadeId: 'a unidade (hospital)', 
+        equipamentoId: 'o nome ou modelo do equipamento', 
+        tipo: 'o tipo de manutenção (Preventiva ou Corretiva)', 
+        data: 'a data (dia/mês/ano)', 
+        horaInicio: 'o horário de início', 
+        horaFim: 'o horário de término', 
+        numeroChamado: 'o número do chamado/ticket', 
+        descricao: 'uma breve descrição do problema' 
     };
-    return `Entendi. Para continuar, por favor me informe o: **${mapa[faltantes[0]]}**.`;
+    return `Para agendar, por favor me informe **${mapa[faltantes[0]]}**.`;
 };
 
 /**
- * Constrói o resumo visual para a confirmação final do usuário.
+ * Gera o resumo visual para a confirmação final.
  */
 export const buildResumoConfirmacao = (estado) => {
-    // Converte YYYY-MM-DD para DD/MM/YYYY para o usuário ler melhor
-    const dataBR = estado.data ? estado.data.split('-').reverse().join('/') : '';
-    
-    return `📋 **Resumo do Agendamento**
-- **Equipamento:** ${estado.equipamentoNome} (Tag: ${estado.tag})
+    const dataFmt = estado.data ? estado.data.split('-').reverse().join('/') : '';
+    return `📋 **Resumo para Agendamento**
+- **Ativo:** ${estado.equipamentoNome} (Tag: ${estado.tag})
 - **Unidade:** ${estado.unidadeNome}
 - **Tipo:** ${estado.tipo}
-- **Data/Hora:** ${dataBR} das ${estado.horaInicio} às ${estado.horaFim}
+- **Data/Hora:** ${dataFmt} | das ${estado.horaInicio} às ${estado.horaFim}
 ${estado.tipo === 'Corretiva' ? `- **Chamado:** ${estado.numeroChamado}` : ''}
 
-**Posso confirmar o agendamento?** (Responda **Sim** ou **Não**)`;
+**Confirma a criação desta manutenção?** (Responda **Sim** ou **Não**)`;
 };
