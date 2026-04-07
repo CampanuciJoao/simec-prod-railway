@@ -321,16 +321,6 @@ enum Prioridade {
   Alta
 }
 
-model ChatHistorico {
-  id        String   @id @default(uuid())
-  usuario   String
-  role      String
-  mensagem  String   @db.Text
-  createdAt DateTime @default(now())
-
-  @@map("chat_historico")
-}
-
 enum AgentSessionStatus {
   Ativa
   Finalizada

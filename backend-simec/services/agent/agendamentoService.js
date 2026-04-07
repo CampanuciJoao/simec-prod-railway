@@ -43,6 +43,17 @@ export const AgendamentoService = {
         // 4. Extrai dados da mensagem
         const extraido = await extrairCamposComIA(mensagem, estado);
 
+        // 4.1 NORMALIZAÇÃO MANUAL DE CONFIRMAÇÃO (ANTI-LOOP)
+        const msgNormalizada = mensagem.toLowerCase().trim();
+
+        if (['sim', 'confirmar', 'ok', 'pode', 'pode sim'].includes(msgNormalizada)) {
+            extraido.confirmacao = true;
+        }
+
+        if (['não', 'nao', 'cancelar', 'cancela', 'parar', 'negativo'].includes(msgNormalizada)) {
+            extraido.confirmacao = false;
+        }
+
         // 5. Merge seguro
         estado = mergeEstadoSeguro(estado, extraido);
 

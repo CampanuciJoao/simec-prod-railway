@@ -1,4 +1,4 @@
-// simec/backend-simec/services/alertasService.js
+// Ficheiro: simec/backend-simec/services/alertasService.js
 
 import prisma from './prismaService.js';
 import { enviarEmail } from './emailService.js';
@@ -16,13 +16,13 @@ export async function atualizarStatusManutencoes() {
   const agora = getAgora();
   console.log(`[MANUTENÇÃO] Verificando trocas de status às: ${agora.toLocaleString('pt-BR')}`);
 
-  // --- 1. FINALIZAÇÃO AUTOMÁTICA (O caso do Bteste) ---
-  // Busca tudo que está 'Agendada' ou 'EmAndamento' mas que o horário de FIM já passou.
+  // --- 1. FINALIZAÇÃO AUTOMÁTICA (Ex: Bteste de ontem) ---
   const manutsParaConfirmar = await prisma.manutencao.findMany({
     where: { 
       status: { in: ['Agendada', 'EmAndamento'] }, 
       dataHoraAgendamentoFim: { lte: agora } 
-    }
+    },
+    include: { equipamento: { include: { unidade: true } } }
   });
 
   if (manutsParaConfirmar.length > 0) {
@@ -30,16 +30,19 @@ export async function atualizarStatusManutencoes() {
     for (const manut of manutsParaConfirmar) {
       await prisma.$transaction(async (tx) => {
         await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'AguardandoConfirmacao' } });
-        // Se estava 'Agendada', marcamos o equipamento como 'EmManutencao' apenas para manter a lógica de histórico
         await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
+
+        const modelo = manut.equipamento.modelo;
+        const tag = manut.equipamento.tag;
+        const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: 'Confirmação de Manutenção Pendente' },
+          update: { titulo: `Confirmar Ativo: ${modelo}` },
           create: {
             id: `manut-confirm-${manut.id}`,
-            titulo: 'Confirmação de Manutenção Pendente',
-            subtitulo: `OS ${manut.numeroOS} finalizou o prazo. Confirme o status do equipamento.`,
+            titulo: `Confirmar Ativo: ${modelo}`,
+            subtitulo: `Prazo da OS ${manut.numeroOS} (SN: ${tag}) expirou em ${unidade}. Confirme o status real.`,
             data: agora,
             prioridade: 'Alta',
             tipo: 'Manutenção',
@@ -51,14 +54,13 @@ export async function atualizarStatusManutencoes() {
   }
 
   // --- 2. INÍCIO AUTOMÁTICO ---
-  // Busca apenas quem deve estar 'EmAndamento' agora (Início <= agora E Fim > agora)
   const manutsParaIniciar = await prisma.manutencao.findMany({
     where: { 
         status: 'Agendada', 
         dataHoraAgendamentoInicio: { lte: agora },
         dataHoraAgendamentoFim: { gt: agora } 
     },
-    select: { id: true, equipamentoId: true, numeroOS: true, dataHoraAgendamentoInicio: true },
+    include: { equipamento: { include: { unidade: true } } }
   });
 
   if (manutsParaIniciar.length > 0) {
@@ -67,13 +69,18 @@ export async function atualizarStatusManutencoes() {
       for (const manut of manutsParaIniciar) {
         await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
         await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'EmAndamento', dataInicioReal: manut.dataHoraAgendamentoInicio } });
+        
+        const modelo = manut.equipamento.modelo;
+        const tag = manut.equipamento.tag;
+        const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
+
         await tx.alerta.upsert({
           where: { id: `manut-iniciada-${manut.id}` },
           update: {},
           create: {
             id: `manut-iniciada-${manut.id}`,
-            titulo: `Manutenção Iniciada: OS ${manut.numeroOS}`,
-            subtitulo: `A manutenção foi iniciada automaticamente.`,
+            titulo: `Iniciada: ${modelo}`,
+            subtitulo: `OS ${manut.numeroOS} (SN: ${tag}) iniciou agora na unidade ${unidade}.`,
             data: agora,
             prioridade: 'Media',
             tipo: 'Manutenção',
@@ -95,7 +102,7 @@ async function gerarAlertasDeProximidadeManutencao() {
 
   const manutencoesProximas = await prisma.manutencao.findMany({
     where: { status: 'Agendada', dataHoraAgendamentoInicio: { gt: agora } },
-    include: { equipamento: { select: { modelo: true } } }
+    include: { equipamento: { include: { unidade: true } } }
   });
 
   for (const manut of manutencoesProximas) {
@@ -103,13 +110,18 @@ async function gerarAlertasDeProximidadeManutencao() {
     for (const ponto of PONTOS_INICIO) {
       if (minRestantes > 0 && minRestantes <= ponto.limiar) {
         const idAlerta = `manut-prox-início-${manut.id}-${ponto.label}`;
+        
+        const modelo = manut.equipamento.modelo;
+        const tag = manut.equipamento.tag;
+        const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
+
         await prisma.alerta.upsert({
           where: { id: idAlerta },
           update: {},
           create: {
             id: idAlerta,
-            titulo: `Manutenção inicia ${ponto.texto}`,
-            subtitulo: `OS ${manut.numeroOS} - ${manut.equipamento.modelo}`,
+            titulo: `${modelo} inicia ${ponto.texto}`,
+            subtitulo: `SN: ${tag} | Unidade: ${unidade} | OS: ${manut.numeroOS}`,
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
             tipo: 'Manutenção',
@@ -137,8 +149,8 @@ export async function processarSaudeEquipamentos() {
         update: {},
         create: {
           id: idAlerta,
-          titulo: `Atenção: Equipamento com Alto Risco`,
-          subtitulo: `${eq.modelo} (${eq.tag}) requer inspeção técnica.`,
+          titulo: `Risco de Falha: ${eq.modelo}`,
+          subtitulo: `O ativo (Tag: ${eq.tag}) atingiu nível crítico de reincidência de problemas.`,
           data: getAgora(),
           prioridade: 'Alta',
           tipo: 'Manutenção',
@@ -264,15 +276,11 @@ async function verificarVencimentoSeguros() {
 export async function processarAlertasEEnviarNotificacoes() {
   try {
     console.log("[TAREFA PROGRAMADA] Iniciando ciclo de verificações...");
-
-    // ESTA CHAMADA ABAIXO É O MOTOR QUE MUDA OS STATUS NO BANCO
     await atualizarStatusManutencoes(); 
-
     await gerarAlertasDeProximidadeManutencao();
     await processarSaudeEquipamentos();
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
-
     console.log("[TAREFA PROGRAMADA] Ciclo finalizado com sucesso.");
   } catch (error) {
     console.error('[ERRO GERAL Alertas]:', error);
