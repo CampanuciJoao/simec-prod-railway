@@ -1,49 +1,50 @@
 // simec/backend-simec/services/agent/router.js
 import { AgendamentoService } from './agendamentoService.js';
 import { classificarIntencao } from './intentClassifier.js';
+import { ChatRepository } from './chatRepository.js'; // Importação essencial para verificar o estado
 
 /**
  * Mapa de Estratégias (Intenções)
- * Centraliza os serviços especializados do Agente.
  */
 const STRATEGIES = {
     AGENDAR_MANUTENCAO: AgendamentoService,
-    
-    // Espaço reservado para expansão futura (Escalabilidade):
-    // RELATORIO: RelatorioService,
-    // BUSCAR_APOLICE: SeguroService
 };
 
 /**
- * Maestro do Agente: Identifica a intenção e delega a mensagem para o serviço correto.
- * @param {string} mensagem - Texto enviado pelo usuário.
- * @param {string} usuarioNome - Identificador do usuário para gestão de sessão.
+ * Maestro do Agente: Inteligente o suficiente para manter o contexto da conversa.
  */
 export const RoteadorAgente = async (mensagem, usuarioNome) => {
     try {
-        // 1. Classificação via IA (Descobre o que o usuário quer fazer)
+        // 1. RECUPERAÇÃO DE CONTEXTO (O segredo da conversa natural)
+        // Verificamos se o usuário já tem um processo (como agendamento) em aberto no banco.
+        const estadoAtual = await ChatRepository.buscarEstado(usuarioNome);
+        const temProcessoAtivo = Object.keys(estadoAtual).length > 0;
+
+        // 2. Classificação da intenção da nova mensagem
         const intencao = await classificarIntencao(mensagem);
 
-        // 2. Log de monitoramento (Essencial para debug no Railway)
-        console.log(`[AGENT_ROUTER] Usuário: ${usuarioNome} | Intenção detectada: ${intencao}`);
+        console.log(`[AGENT_ROUTER] Usuário: ${usuarioNome} | Ativo: ${temProcessoAtivo} | Intenção: ${intencao}`);
 
-        // 3. Busca o executor correspondente no mapa de estratégias
-        const executor = STRATEGIES[intencao];
-
-        // 4. Tratamento para comandos não reconhecidos ou categoria 'OUTRO'
-        if (!executor || intencao === 'OUTRO') {
-            return "Olá! No momento, sou especialista em **agendar manutenções** para seus equipamentos. Como posso ajudar você com isso hoje?";
+        // 3. LÓGICA DE CONTINUIDADE SÊNIOR
+        // Se já existe um agendamento em curso, ignoramos o 'OUTRO' e mandamos para o especialista.
+        // Isso permite que o usuário diga "Oi", "Sim", "Muda o horário" sem cair no loop da saudação.
+        if (temProcessoAtivo && (intencao === 'AGENDAR_MANUTENCAO' || intencao === 'OUTRO')) {
+            return await AgendamentoService.processar(mensagem, usuarioNome);
         }
 
-        // 5. Execução: Passa a responsabilidade para o Especialista (Service)
-        // O router não precisa saber "como" agendar, apenas "quem" agenda.
+        // 4. LÓGICA DE NOVA INTENÇÃO (Início de conversa)
+        const executor = STRATEGIES[intencao];
+
+        // Só exibe a saudação inicial se NÃO houver processo ativo e a intenção for vaga.
+        if (!executor || intencao === 'OUTRO') {
+            return "Olá! Sou o Agente Guardião do SIMEC. No momento, sou especialista em **agendar manutenções** para seus equipamentos. Como posso ser útil agora?";
+        }
+
+        // 5. Execução de nova estratégia
         return await executor.processar(mensagem, usuarioNome);
 
     } catch (error) {
-        // Log crítico para o desenvolvedor analisar falhas de processamento
         console.error(`[AGENT_ROUTER_ERROR] Erro ao rotear pedido de ${usuarioNome}:`, error.message);
-
-        // Resposta de fallback para o usuário não ficar sem retorno
-        return "Tive um pequeno contratempo técnico ao processar sua mensagem. Poderia repetir de forma mais direta?";
+        return "Tive um pequeno contratempo técnico. Poderia repetir sua solicitação de outra forma?";
     }
 };

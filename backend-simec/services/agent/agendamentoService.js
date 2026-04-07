@@ -12,80 +12,86 @@ import { criarManutencaoNoBanco } from './dbManager.js';
 
 export const AgendamentoService = {
     async processar(mensagem, usuarioNome) {
-        // 1. Recupera o estado atual e cria uma cópia para comparação
+        // 1. Recupera a memória da conversa
         let estado = await ChatRepository.buscarEstado(usuarioNome);
-        const snapshotAnterior = JSON.stringify(estado);
+        const estadoAnterior = { ...estado };
 
-        // 2. Extração via IA (Parser) e Merge Seguro (Filtro de campos)
+        // 2. Extração via IA: O 'Parser' tenta encontrar dados técnicos na frase natural
         const extraido = await extrairCamposComIA(mensagem, estado);
+        
+        // Verificamos se a IA conseguiu extrair ALGO novo ou se foi apenas conversa casual
+        const houveNovosDados = Object.values(extraido).some(v => v !== null && v !== undefined);
+        
+        // 3. Merge Inteligente: Une o que já sabíamos com o que o usuário acabou de falar
         estado = mergeEstadoSeguro(estado, extraido);
 
-        // 3. Gerenciamento de Estado: Se o usuário alterou algum dado crítico,
-        // invalidamos qualquer confirmação pendente para evitar erros de gravação.
-        if (houveAlteracaoRelevante(snapshotAnterior, JSON.stringify(estado))) {
+        // 4. Detecção de Mudança de Rota: 
+        // Se o usuário corrigiu algo (ex: mudou a unidade), precisamos re-confirmar tudo.
+        if (houveAlteracaoRelevante(estadoAnterior, estado)) {
             estado.aguardandoConfirmacao = false;
             estado.confirmacao = null;
         }
 
-        // 4. Resolução de Entidades: Traduz "Nomes" em "IDs" reais do Prisma
+        // 5. Resolução de IDs: Transforma nomes de texto em registros do banco (Prisma)
         estado = await resolverEntidades(estado);
 
-        // 5. Tratamento de Ambiguidade: Se a busca no banco retornou + de 1 item
+        // 6. Tratamento de Ambiguidade: Caso o banco ache dois equipamentos parecidos
         if (estado.ambiguidadeEquipamento?.length > 0) {
             await ChatRepository.salvarEstado(usuarioNome, estado);
-            const tags = estado.ambiguidadeEquipamento.map(e => e.tag).join(', ');
-            return `Encontrei mais de um equipamento com esse nome. Qual a TAG correta? (${tags})`;
+            const opcoes = estado.ambiguidadeEquipamento.map(e => `**${e.tag}**`).join(', ');
+            return `Encontrei mais de um equipamento com esse nome. Qual a TAG (Nº de Série) correta? (${opcoes})`;
         }
 
-        // 6. Fluxo de Cancelamento: Se o usuário negar a confirmação explicitamente
+        // 7. Fluxo de Cancelamento: Se o usuário disser "Não", "Cancela" ou "Para tudo"
         if (extraido.confirmacao === false) {
             await ChatRepository.limparEstado(usuarioNome);
-            return "❌ Agendamento cancelado. Como posso te ajudar agora?";
+            return "Entendido. Cancelei o agendamento. Como posso te ajudar com outra coisa?";
         }
 
-        // 7. Verificação de Pendências: Se faltam dados, gera a próxima pergunta
+        // 8. Verificação de Dados Faltantes
         const faltantes = getFaltantes(estado);
         if (faltantes.length > 0) {
             await ChatRepository.salvarEstado(usuarioNome, estado);
-            return proximaPergunta(estado, faltantes);
+            
+            // Se o usuário falou algo mas não era o que precisávamos, damos um feedback natural
+            const prefixo = (houveNovosDados) ? "Legal, anotei." : "Entendi.";
+            return `${prefixo} ${proximaPergunta(estado, faltantes)}`;
         }
 
-        // 8. Etapa de Resumo (Pre-Confirm): Prepara os dados para o "Sim/Não" do usuário
+        // 9. Etapa de Confirmação (Resumo antes de salvar no banco)
         if (!estado.aguardandoConfirmacao) {
             estado.aguardandoConfirmacao = true;
             await ChatRepository.salvarEstado(usuarioNome, estado);
             return buildResumoConfirmacao(estado);
         }
 
-        // 9. Finalização: Se tudo estiver preenchido e o usuário confirmou com "Sim"
+        // 10. Persistência Final: Só grava no banco se o usuário confirmou com "Sim"
         if (estado.aguardandoConfirmacao && extraido.confirmacao === true) {
             try {
                 await criarManutencaoNoBanco(estado);
                 await ChatRepository.limparEstado(usuarioNome);
-                return "✅ **Ordem de Serviço gerada com sucesso!** Já atualizei o status do equipamento no sistema.";
+                return "✅ **Perfeito! Agendamento realizado.** A Ordem de Serviço foi criada e o equipamento já está marcado como 'Em Manutenção' no sistema.";
             } catch (error) {
-                console.error("[AGENT_DB_ERROR]:", error);
-                return "Houve um erro técnico ao salvar no banco de dados. Por favor, tente novamente em instantes.";
+                console.error("[AGENT_SAVE_ERROR]:", error);
+                return "Tive um erro ao salvar no banco. Pode tentar confirmar novamente?";
             }
         }
 
-        // 10. Fallback: Se o usuário responder algo aleatório durante a confirmação
-        return "Por favor, responda apenas **Sim** para confirmar o agendamento acima ou **Não** para cancelar.";
+        // 11. Feedback para conversa "solta" durante a confirmação
+        return "Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** para agendar ou **Não** para cancelar.";
     }
 };
 
 /**
- * Compara o estado antes e depois da interação. 
- * Se houver mudança nos dados técnicos, o fluxo de confirmação deve ser reiniciado.
+ * Função Sênior de comparação de objetos:
+ * Detecta se dados fundamentais do agendamento foram trocados pelo usuário.
  */
-function houveAlteracaoRelevante(antesStr, depoisStr) {
-    // Se as strings de estado são diferentes, houve mudança.
-    // Ignoramos o campo 'confirmacao' na comparação para não entrar em loop.
-    const antes = JSON.parse(antesStr);
-    const depois = JSON.parse(depoisStr);
-    
-    return antes.equipamentoId !== depois.equipamentoId || 
-           antes.data !== depois.data || 
-           antes.horaInicio !== depois.horaInicio ||
-           antes.tipo !== depois.tipo;
+function houveAlteracaoRelevante(antes, depois) {
+    const camposCriticos = ['equipamentoId', 'data', 'horaInicio', 'tipo', 'unidadeId'];
+    return camposCriticos.some(campo => 
+        antes[campo] !== undefined && 
+        depois[campo] !== undefined && 
+        antes[campo] !== depois[campo] &&
+        depois[campo] !== null
+    );
 }
