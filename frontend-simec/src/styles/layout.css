@@ -1,5 +1,5 @@
 /* Ficheiro: src/styles/layout.css */
-/* Versão: Final Sênior - Revisada com Fix de Notificações */
+/* Versão: Final Sênior - Revisada com Layout de Notificações Detalhadas */
 
 /* ==========================================================================
    1. ESTRUTURA PRINCIPAL DA APLICAÇÃO
@@ -63,7 +63,7 @@
   position: absolute;
   top: 45px;            /* Distância abaixo do botão */
   right: 0;             /* Alinha à direita com o botão */
-  width: 320px;
+  width: 340px;         /* Aumentado levemente para caber o texto detalhado */
   background-color: var(--cor-fundo-card-light, #ffffff);
   border: 1px solid var(--cor-borda-light, #e2e8f0);
   border-radius: 12px;
@@ -88,26 +88,41 @@
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 350px;
+  max-height: 400px;    /* Aumentado para acomodar notificações maiores */
   overflow-y: auto;
   background-color: var(--cor-fundo-card-light);
 }
 
 .notification-dropdown-item {
-  padding: 12px 16px;
+  padding: 14px 16px;   /* Aumentado o padding vertical */
   border-bottom: 1px solid #f1f5f9;
   display: flex;
-  align-items: center;
+  align-items: flex-start; /* Alinha o ícone e o botão de fechar ao topo do texto */
   justify-content: space-between;
   transition: background 0.2s;
+  gap: 10px;
 }
 
 .notification-dropdown-item:hover {
   background-color: #f1f7ff;
 }
 
+/* Estilo para garantir que o link ocupe o espaço e alinhe ao topo */
+.notification-link {
+  display: flex;
+  align-items: flex-start;
+  text-decoration: none;
+  gap: 12px;
+  flex: 1;
+}
+
+/* Cores utilitárias caso o Tailwind não carregue */
+.text-blue-600 { color: #2563eb !important; }
+.text-slate-800 { color: #1e293b !important; }
+.text-slate-600 { color: #475569 !important; }
+
 .dropdown-footer {
-  padding: 10px;
+  padding: 12px;
   text-align: center;
   background-color: #f8fafc;
   border-top: 1px solid var(--cor-borda-light);
