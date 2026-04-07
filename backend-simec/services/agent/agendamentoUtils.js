@@ -56,6 +56,11 @@ const normalizarData = (valor) => {
     return valor.trim();
 };
 
+const mensagemEhConfirmacaoCurta = (mensagem) => {
+    const lower = mensagem.trim().toLowerCase();
+    return /^(sim|s|ok|confirmo|pode confirmar|certo|não|nao|n|cancela|cancelar)$/i.test(lower);
+};
+
 const extrairCamposHeuristico = (mensagem, estado = {}) => {
     const msg = mensagem.trim();
     const lower = msg.toLowerCase();
@@ -122,6 +127,22 @@ const extrairCamposHeuristico = (mensagem, estado = {}) => {
         extraido.numeroChamado = matchChamado[0];
     }
 
+    // descrição simples quando já estamos numa corretiva e nada mais encaixou
+    if (
+        !extraido.tipo &&
+        !extraido.unidadeTexto &&
+        !extraido.equipamentoTexto &&
+        !extraido.data &&
+        !extraido.horaInicio &&
+        !extraido.horaFim &&
+        !extraido.numeroChamado &&
+        extraido.confirmacao === null &&
+        msg.length > 3 &&
+        estado.tipo === 'Corretiva'
+    ) {
+        extraido.descricao = msg;
+    }
+
     return extraido;
 };
 
@@ -139,13 +160,45 @@ const normalizarObjetoIA = (obj) => {
     };
 };
 
+const mesclarPreferindoIAComFallback = (normalizadoIA, fallback) => {
+    return {
+        tipo: normalizadoIA.tipo ?? fallback.tipo,
+        unidadeTexto: normalizadoIA.unidadeTexto ?? fallback.unidadeTexto,
+        equipamentoTexto: normalizadoIA.equipamentoTexto ?? fallback.equipamentoTexto,
+        data: normalizadoIA.data ?? fallback.data,
+        horaInicio: normalizadoIA.horaInicio ?? fallback.horaInicio,
+        horaFim: normalizadoIA.horaFim ?? fallback.horaFim,
+        numeroChamado: normalizadoIA.numeroChamado ?? fallback.numeroChamado,
+        descricao: normalizadoIA.descricao ?? fallback.descricao,
+        confirmacao: normalizadoIA.confirmacao ?? fallback.confirmacao
+    };
+};
+
 /**
- * Extrai dados estruturados e normaliza formatos de hora/data.
- * Possui retry curto para 503 e fallback heurístico.
+ * Extrai dados estruturados e normaliza formatos.
+ * Regras:
+ * 1. confirmação curta é tratada localmente sem depender da IA
+ * 2. IA + fallback heurístico são mesclados
+ * 3. retry curto para 503
  */
 export const extrairCamposComIA = async (mensagem, estado) => {
     const dataHoje = new Date().toISOString().split('T')[0];
     const fallback = extrairCamposHeuristico(mensagem, estado);
+
+    // atalha confirmações curtas
+    if (mensagemEhConfirmacaoCurta(mensagem)) {
+        return AgendamentoSchema.parse({
+            tipo: null,
+            unidadeTexto: null,
+            equipamentoTexto: null,
+            data: null,
+            horaInicio: null,
+            horaFim: null,
+            numeroChamado: null,
+            descricao: null,
+            confirmacao: fallback.confirmacao
+        });
+    }
 
     const prompt = `
     DATA_HOJE: ${dataHoje}
@@ -184,9 +237,10 @@ export const extrairCamposComIA = async (mensagem, estado) => {
             if (!match) throw new Error('JSON não encontrado na resposta da IA');
 
             const bruto = JSON.parse(match[0]);
-            const normalizado = normalizarObjetoIA(bruto);
+            const normalizadoIA = normalizarObjetoIA(bruto);
+            const finalObj = mesclarPreferindoIAComFallback(normalizadoIA, fallback);
 
-            return AgendamentoSchema.parse(normalizado);
+            return AgendamentoSchema.parse(finalObj);
         } catch (e) {
             console.error(`[AGENT_EXTRACT_ERROR][tentativa ${tentativa}]:`, e.message);
 
@@ -201,7 +255,7 @@ export const extrairCamposComIA = async (mensagem, estado) => {
     }
 
     try {
-        return AgendamentoSchema.parse(normalizarObjetoIA(fallback));
+        return AgendamentoSchema.parse(fallback);
     } catch {
         return {};
     }
