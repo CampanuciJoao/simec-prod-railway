@@ -1,10 +1,11 @@
 // Ficheiro: src/contexts/AlertasContext.jsx
-// VERSÃO PROFISSIONAL - REAL-TIME COM WEBSOCKETS (SOCKET.IO)
+// VERSÃO PROFISSIONAL - REAL-TIME ESPONTÂNEO COM NOTIFICAÇÃO TOAST
 
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { getAlertas, updateAlertaStatus } from '../services/api';
 import { useAuth } from './AuthContext';
-import { io } from 'socket.io-client'; // Importação do cliente de WebSockets
+import { useToast } from './ToastContext'; // Importação do sistema de avisos flutuantes
+import { io } from 'socket.io-client';
 
 // 1. Criação do Contexto
 const AlertasContext = createContext(null);
@@ -14,12 +15,13 @@ export const AlertasProvider = ({ children }) => {
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { addToast } = useToast(); // Função para disparar o aviso visual na tela
 
   /**
    * @function carregarAlertas
-   * @description Busca os alertas via API (Chamado inicialmente e via WebSocket)
+   * @param {boolean} vindaDoSocket - Se verdadeiro, dispara o aviso visual (Toast)
    */
-  const carregarAlertas = useCallback(async () => {
+  const carregarAlertas = useCallback(async (vindaDoSocket = false) => {
     if (!isAuthenticated || authLoading || !user?.id) {
       setAlertas([]);
       if (!authLoading) setLoading(false);
@@ -29,37 +31,41 @@ export const AlertasProvider = ({ children }) => {
     try {
       const data = await getAlertas(); 
       setAlertas(data || []);
+
+      // SE FOR UMA ATUALIZAÇÃO EM TEMPO REAL, MOSTRA O AVISO NA TELA
+      if (vindaDoSocket) {
+          addToast("🔔 Novo alerta de manutenção gerado pelo sistema!", "info");
+      }
+
     } catch (error) {
       console.error("AlertasContext: Falha ao buscar dados de alertas.", error);
       setAlertas([]);
     } finally {
         setLoading(false);
     }
-  }, [isAuthenticated, authLoading, user?.id]);
+  }, [isAuthenticated, authLoading, user?.id, addToast]);
 
   /**
    * @effect [SISTEMA REAL-TIME]
-   * @description Conecta ao servidor via WebSocket e aguarda o "empurrão" de dados.
-   * Substitui o antigo setInterval (Polling).
+   * @description Mantém o túnel aberto com o servidor para atualizações espontâneas.
    */
   useEffect(() => {
     if (isAuthenticated && !authLoading && user?.id) {
-      // 1. Carrega os alertas assim que o usuário loga
+      // 1. Carrega os dados assim que o usuário entra
       carregarAlertas();
 
-      // 2. Define a URL do servidor (remove o /api da string para conectar na raiz do socket)
+      // 2. Configura o endereço do servidor
       const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
       
-      // 3. Abre o túnel de comunicação real-time
+      // 3. Conecta ao túnel de comunicação
       const socket = io(socketUrl);
 
-      // 4. "Escuta" o servidor. Quando o backend gritar 'atualizar-alertas', o frontend obedece na hora.
+      // 4. ESCUTA ATIVA: Quando o servidor terminar de processar, ele "empurra" a notícia.
       socket.on('atualizar-alertas', () => {
-          console.log("📢 WebSocket: O servidor avisou que há novidades! Atualizando...");
-          carregarAlertas();
+          console.log("📢 WebSocket: Chegou notificação espontânea!");
+          carregarAlertas(true); // 'true' faz o balão aparecer na tela na hora
       });
 
-      // 5. Limpeza: Fecha o túnel quando o usuário sai do sistema
       return () => {
         socket.disconnect();
         setAlertas([]);
