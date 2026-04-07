@@ -63,48 +63,48 @@
   position: absolute;
   top: 45px;            /* Distância abaixo do botão */
   right: 0;             /* Alinha à direita com o botão */
-  width: 340px;         /* Aumentado levemente para caber o texto detalhado */
+  width: 360px;         /* Aumentado para melhor leitura dos detalhes */
   background-color: var(--cor-fundo-card-light, #ffffff);
   border: 1px solid var(--cor-borda-light, #e2e8f0);
   border-radius: 12px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.18);
   z-index: 1000;        /* Acima de tudo */
   overflow: hidden;
-  animation: slideInDown 0.2s ease-out;
+  animation: slideInDown 0.25s ease-out;
 }
 
 .dropdown-header {
-  padding: 12px 16px;
+  padding: 14px 18px;
   background-color: #f8fafc;
   border-bottom: 1px solid var(--cor-borda-light);
   display: flex;
   justify-content: space-between;
   align-items: center;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: 0.95rem;
 }
 
 .notification-list {
   list-style: none;
   margin: 0;
   padding: 0;
-  max-height: 400px;    /* Aumentado para acomodar notificações maiores */
+  max-height: 450px;    /* Acomoda mais itens detalhados antes de scrollar */
   overflow-y: auto;
   background-color: var(--cor-fundo-card-light);
 }
 
 .notification-dropdown-item {
-  padding: 14px 16px;   /* Aumentado o padding vertical */
+  padding: 16px;
   border-bottom: 1px solid #f1f5f9;
   display: flex;
-  align-items: flex-start; /* Alinha o ícone e o botão de fechar ao topo do texto */
+  align-items: flex-start; /* Alinhamento ao topo essencial para frases longas */
   justify-content: space-between;
   transition: background 0.2s;
-  gap: 10px;
+  gap: 12px;
 }
 
 .notification-dropdown-item:hover {
-  background-color: #f1f7ff;
+  background-color: #f8fafc;
 }
 
 /* Estilo para garantir que o link ocupe o espaço e alinhe ao topo */
@@ -112,24 +112,32 @@
   display: flex;
   align-items: flex-start;
   text-decoration: none;
-  gap: 12px;
+  gap: 14px;
   flex: 1;
 }
 
-/* Cores utilitárias caso o Tailwind não carregue */
-.text-blue-600 { color: #2563eb !important; }
-.text-slate-800 { color: #1e293b !important; }
-.text-slate-600 { color: #475569 !important; }
+.notification-text {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+}
+
+/* Força uma quebra de linha suave e espaçamento entre parágrafos de notificação */
+.notification-title {
+    display: block;
+    line-height: 1.5;
+    color: #475569;
+}
 
 .dropdown-footer {
-  padding: 12px;
+  padding: 14px;
   text-align: center;
   background-color: #f8fafc;
   border-top: 1px solid var(--cor-borda-light);
 }
 
 @keyframes slideInDown {
-  from { opacity: 0; transform: translateY(-10px); }
+  from { opacity: 0; transform: translateY(-12px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
@@ -240,5 +248,11 @@ body.dark-mode .dropdown-footer {
 
   .main-content {
     padding-top: 70px; 
+  }
+  
+  /* Ajuste de largura do sino no mobile */
+  .notification-dropdown {
+      width: 300px;
+      right: -50px;
   }
 }
