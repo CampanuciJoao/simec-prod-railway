@@ -1,9 +1,10 @@
 // Ficheiro: src/contexts/AlertasContext.jsx
-// VERSÃO FINAL SÊNIOR - COM LÓGICA DE DISPENSAR (REMOÇÃO OTIMISTA)
+// VERSÃO PROFISSIONAL - REAL-TIME COM WEBSOCKETS (SOCKET.IO)
 
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { getAlertas, updateAlertaStatus } from '../services/api';
 import { useAuth } from './AuthContext';
+import { io } from 'socket.io-client'; // Importação do cliente de WebSockets
 
 // 1. Criação do Contexto
 const AlertasContext = createContext(null);
@@ -16,8 +17,7 @@ export const AlertasProvider = ({ children }) => {
 
   /**
    * @function carregarAlertas
-   * @description Função central para buscar os alertas da API.
-   * Agora busca alertas específicos para o usuário logado.
+   * @description Busca os alertas via API (Chamado inicialmente e via WebSocket)
    */
   const carregarAlertas = useCallback(async () => {
     if (!isAuthenticated || authLoading || !user?.id) {
@@ -29,7 +29,6 @@ export const AlertasProvider = ({ children }) => {
     try {
       const data = await getAlertas(); 
       setAlertas(data || []);
-      
     } catch (error) {
       console.error("AlertasContext: Falha ao buscar dados de alertas.", error);
       setAlertas([]);
@@ -39,17 +38,30 @@ export const AlertasProvider = ({ children }) => {
   }, [isAuthenticated, authLoading, user?.id]);
 
   /**
-   * @effect [Inicialização e Polling]
-   * @description Efeito que gerencia a busca inicial e a atualização periódica (polling).
+   * @effect [SISTEMA REAL-TIME]
+   * @description Conecta ao servidor via WebSocket e aguarda o "empurrão" de dados.
+   * Substitui o antigo setInterval (Polling).
    */
   useEffect(() => {
     if (isAuthenticated && !authLoading && user?.id) {
+      // 1. Carrega os alertas assim que o usuário loga
       carregarAlertas();
 
-      const intervalId = setInterval(carregarAlertas, 60 * 1000);
+      // 2. Define a URL do servidor (remove o /api da string para conectar na raiz do socket)
+      const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+      
+      // 3. Abre o túnel de comunicação real-time
+      const socket = io(socketUrl);
 
+      // 4. "Escuta" o servidor. Quando o backend gritar 'atualizar-alertas', o frontend obedece na hora.
+      socket.on('atualizar-alertas', () => {
+          console.log("📢 WebSocket: O servidor avisou que há novidades! Atualizando...");
+          carregarAlertas();
+      });
+
+      // 5. Limpeza: Fecha o túnel quando o usuário sai do sistema
       return () => {
-        clearInterval(intervalId);
+        socket.disconnect();
         setAlertas([]);
         setLoading(true);
       };
@@ -62,8 +74,7 @@ export const AlertasProvider = ({ children }) => {
 
   /**
    * @function updateStatus
-   * @description Atualiza o status de visualização de um alerta específico (ex: marcar como visto/não visto).
-   * Faz uma atualização otimista na UI antes de confirmar com a API.
+   * @description Atualiza o status de visualização (Visto/NaoVisto)
    */
   const updateStatus = useCallback(async (alertaId, newStatus) => {
     const originalAlertas = alertas;
@@ -76,7 +87,6 @@ export const AlertasProvider = ({ children }) => {
 
     try {
       await updateAlertaStatus(alertaId, newStatus); 
-      
     } catch (error) {
       console.error(`Erro ao atualizar status do alerta ${alertaId}. Revertendo...`, error);
       setAlertas(originalAlertas);
@@ -85,21 +95,17 @@ export const AlertasProvider = ({ children }) => {
 
   /**
    * @function dismissAlerta
-   * @description Remove um alerta da visualização do usuário (otimista) e marca como 'Visto' na API.
-   * Ideal para a ação "Dispensar".
+   * @description Remove o alerta da vista (Ação de Dispensar)
    */
   const dismissAlerta = useCallback(async (alertaId) => {
     const originalAlertas = [...alertas];
-    
-    // Atualização otimista: remove o alerta da UI imediatamente.
     setAlertas(prevAlertas => prevAlertas.filter(alerta => alerta.id !== alertaId));
 
     try {
-      // A ação no backend continua a mesma: marcar como 'Visto'.
       await updateAlertaStatus(alertaId, 'Visto');
     } catch (error) {
       console.error(`Erro ao dispensar o alerta ${alertaId}. Revertendo...`, error);
-      setAlertas(originalAlertas); // Reverte a UI em caso de falha na API.
+      setAlertas(originalAlertas);
     }
   }, [alertas]);
 
@@ -121,7 +127,7 @@ export const AlertasProvider = ({ children }) => {
   );
 };
 
-// 5. Hook customizado para facilitar o consumo do contexto.
+// 5. Hook customizado
 export const useAlertas = () => {
     const context = useContext(AlertasContext);
     if (context === undefined) {
