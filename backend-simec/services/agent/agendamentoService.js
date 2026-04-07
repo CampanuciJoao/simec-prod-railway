@@ -12,86 +12,86 @@ import { criarManutencaoNoBanco } from './dbManager.js';
 
 export const AgendamentoService = {
     async processar(mensagem, usuarioNome) {
-        // 1. Recupera a memória da conversa
+        // 1. Carrega a memória e faz snapshot para detectar mudanças
         let estado = await ChatRepository.buscarEstado(usuarioNome);
-        const estadoAnterior = { ...estado };
+        const estadoAnterior = JSON.stringify(estado);
 
-        // 2. Extração via IA: O 'Parser' tenta encontrar dados técnicos na frase natural
+        // 2. Extração via IA (NLP)
         const extraido = await extrairCamposComIA(mensagem, estado);
         
-        // Verificamos se a IA conseguiu extrair ALGO novo ou se foi apenas conversa casual
-        const houveNovosDados = Object.values(extraido).some(v => v !== null && v !== undefined);
-        
-        // 3. Merge Inteligente: Une o que já sabíamos com o que o usuário acabou de falar
+        // 3. Merge de Dados: Une o que a IA acabou de ler com o que já tínhamos
         estado = mergeEstadoSeguro(estado, extraido);
 
-        // 4. Detecção de Mudança de Rota: 
-        // Se o usuário corrigiu algo (ex: mudou a unidade), precisamos re-confirmar tudo.
-        if (houveAlteracaoRelevante(estadoAnterior, estado)) {
+        // --- 4. VALIDAÇÃO DE REGRA DE NEGÓCIO: BLOQUEIO DE PASSADO ---
+        if (estado.data && estado.horaInicio) {
+            const agora = new Date();
+            // Criamos o objeto de data combinando o dia e a hora extraídos
+            const dataAgendada = new Date(`${estado.data}T${estado.horaInicio}:00`);
+
+            if (dataAgendada < agora) {
+                // Se o horário já passou, limpamos a hora no estado para forçar correção
+                estado.horaInicio = null;
+                estado.horaFim = null;
+                estado.aguardandoConfirmacao = false; // Reseta fluxo de resumo
+                await ChatRepository.salvarEstado(usuarioNome, estado);
+                
+                const horaAtual = `${agora.getHours()}:${agora.getMinutes().toString().padStart(2, '0')}`;
+                return `O horário das **${extraido.horaInicio || 'solicitado'}** não é válido pois já passou. Agora são **${horaAtual}**. Por favor, informe um horário futuro para hoje ou outra data.`;
+            }
+        }
+
+        // 5. Detecção de Alteração: Se o usuário corrigiu algo, cancelamos confirmações antigas
+        if (estadoAnterior !== JSON.stringify(estado)) {
             estado.aguardandoConfirmacao = false;
             estado.confirmacao = null;
         }
 
-        // 5. Resolução de IDs: Transforma nomes de texto em registros do banco (Prisma)
+        // 6. Resolução de IDs: Traduz texto para registros reais do Prisma
         estado = await resolverEntidades(estado);
 
-        // 6. Tratamento de Ambiguidade: Caso o banco ache dois equipamentos parecidos
+        // 7. Tratamento de Ambiguidade (Ex: 2 tomógrafos na mesma unidade)
         if (estado.ambiguidadeEquipamento?.length > 0) {
             await ChatRepository.salvarEstado(usuarioNome, estado);
-            const opcoes = estado.ambiguidadeEquipamento.map(e => `**${e.tag}**`).join(', ');
-            return `Encontrei mais de um equipamento com esse nome. Qual a TAG (Nº de Série) correta? (${opcoes})`;
+            const listaTags = estado.ambiguidadeEquipamento.map(e => `**${e.tag}**`).join(', ');
+            return `Encontrei mais de um equipamento com esse nome. Qual a TAG correta? (${listaTags})`;
         }
 
-        // 7. Fluxo de Cancelamento: Se o usuário disser "Não", "Cancela" ou "Para tudo"
+        // 8. Fluxo de Cancelamento
         if (extraido.confirmacao === false) {
             await ChatRepository.limparEstado(usuarioNome);
-            return "Entendido. Cancelei o agendamento. Como posso te ajudar com outra coisa?";
+            return "Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?";
         }
 
-        // 8. Verificação de Dados Faltantes
+        // 9. Verificação de Dados Faltantes
         const faltantes = getFaltantes(estado);
         if (faltantes.length > 0) {
             await ChatRepository.salvarEstado(usuarioNome, estado);
-            
-            // Se o usuário falou algo mas não era o que precisávamos, damos um feedback natural
-            const prefixo = (houveNovosDados) ? "Legal, anotei." : "Entendi.";
+            // Se a IA não extraiu nada novo (ex: o usuário só disse "Oi"), usamos um tom neutro
+            const houveNovosDados = Object.values(extraido).some(v => v !== null && v !== undefined);
+            const prefixo = houveNovosDados ? "Legal, anotei." : "Entendi.";
             return `${prefixo} ${proximaPergunta(estado, faltantes)}`;
         }
 
-        // 9. Etapa de Confirmação (Resumo antes de salvar no banco)
+        // 10. Etapa de Resumo (Pre-Confirmação)
         if (!estado.aguardandoConfirmacao) {
             estado.aguardandoConfirmacao = true;
             await ChatRepository.salvarEstado(usuarioNome, estado);
             return buildResumoConfirmacao(estado);
         }
 
-        // 10. Persistência Final: Só grava no banco se o usuário confirmou com "Sim"
+        // 11. Finalização: Gravação atômica no Banco de Dados
         if (estado.aguardandoConfirmacao && extraido.confirmacao === true) {
             try {
                 await criarManutencaoNoBanco(estado);
                 await ChatRepository.limparEstado(usuarioNome);
-                return "✅ **Perfeito! Agendamento realizado.** A Ordem de Serviço foi criada e o equipamento já está marcado como 'Em Manutenção' no sistema.";
+                return "✅ **Perfeito! Agendamento realizado com sucesso.** A Ordem de Serviço foi gerada e o ativo atualizado no sistema.";
             } catch (error) {
-                console.error("[AGENT_SAVE_ERROR]:", error);
-                return "Tive um erro ao salvar no banco. Pode tentar confirmar novamente?";
+                console.error("[AGENT_DB_ERROR]:", error);
+                return "Tive um erro técnico ao salvar no banco. Por favor, tente confirmar novamente ou contate o suporte.";
             }
         }
 
-        // 11. Feedback para conversa "solta" durante a confirmação
-        return "Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** para agendar ou **Não** para cancelar.";
+        // 12. Fallback de Diálogo: Mantém o usuário no trilho do agendamento
+        return "Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.";
     }
 };
-
-/**
- * Função Sênior de comparação de objetos:
- * Detecta se dados fundamentais do agendamento foram trocados pelo usuário.
- */
-function houveAlteracaoRelevante(antes, depois) {
-    const camposCriticos = ['equipamentoId', 'data', 'horaInicio', 'tipo', 'unidadeId'];
-    return camposCriticos.some(campo => 
-        antes[campo] !== undefined && 
-        depois[campo] !== undefined && 
-        antes[campo] !== depois[campo] &&
-        depois[campo] !== null
-    );
-}

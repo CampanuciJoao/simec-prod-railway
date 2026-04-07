@@ -1,52 +1,64 @@
 // simec/backend-simec/services/agent/intentClassifier.js
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Inicialização com a chave de API limpa
+// Inicialização com tratamento de espaços na chave
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
 // FIXO: Versão 2.5 mantida conforme exigência do ambiente
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" }); 
 
 /**
- * Classifica a intenção real do usuário, ignorando saudações e focando no objetivo da mensagem.
+ * Classifica a intenção do usuário. 
+ * Possui uma rede de segurança manual para casos de falha da API (Erro 503).
  */
 export async function classificarIntencao(mensagem) {
+    const msgLimpa = mensagem.toLowerCase();
+
+    // 1. REDE DE SEGURANÇA MANUAL (Heurística Sênior)
+    // Se a frase contiver palavras óbvias, classificamos antes mesmo de chamar a IA.
+    // Isso economiza tokens e resolve o problema se o Google estiver fora do ar.
+    const termosAgendamento = ['agendar', 'marcar', 'manutenção', 'corretiva', 'preventiva', 'conserto', 'reparo', 'abrir os'];
+    if (termosAgendamento.some(t => msgLimpa.includes(t))) {
+        console.log(`[INTENT_MANUAL] Detectado Agendamento por palavra-chave.`);
+        return 'AGENDAR_MANUTENCAO';
+    }
+
     const prompt = `
-    Você é um triador especializado para um sistema de engenharia clínica hospitalar. 
-    Identifique o OBJETIVO FINAL da mensagem, ignorando cortesias e saudações iniciais.
+    Você é um triador de tarefas hospitalares. 
+    Analise a frase e responda APENAS o nome da categoria que melhor descreve o DESEJO do usuário.
 
-    CATEGORIAS VÁLIDAS:
-    - AGENDAR_MANUTENCAO: Para pedidos de agendamento, conserto, reparo, preventivas ou corretivas. 
-      Exemplo: "Olá, vamos marcar uma corretiva...", "Agende um reparo...", "Quebrou o raio-x".
-    - RELATORIO: Para pedidos de listas, visualização de histórico ou geração de documentos PDF.
-    - BUSCAR_APOLICE: Para dúvidas ou consultas sobre seguros e apólices.
-    - OUTRO: Saudações puras (Oi, Olá), agradecimentos ou assuntos sem pedido de ação.
+    CATEGORIAS:
+    - AGENDAR_MANUTENCAO: Pedidos de conserto, preventiva, corretiva ou novos agendamentos.
+    - RELATORIO: Pedidos de listas, PDFs ou histórico.
+    - BUSCAR_APOLICE: Consultas sobre seguros e apólices.
+    - OUTRO: Apenas "Oi", "Tudo bem" ou conversas sem pedido de ação clara.
 
-    MENSAGEM DO USUÁRIO: "${mensagem}"
+    FRASE DO USUÁRIO: "${mensagem}"
 
-    REGRA: Responda APENAS o nome da categoria em MAIÚSCULAS. Sem explicações ou pontuação extra.
+    REGRA: Ignore saudações iniciais. Responda apenas o nome da categoria em MAIÚSCULAS.
     `;
 
     try {
         const result = await model.generateContent(prompt);
         let respostaIA = result.response.text().trim().toUpperCase();
         
-        // Limpeza de Markdown caso a IA retorne o texto dentro de blocos de código
+        // Limpeza de Markdown
         respostaIA = respostaIA.replace(/```|JSON/g, "").trim();
 
-        // Mapeamento de segurança para garantir compatibilidade com as chaves do router.js
         const categoriasValidas = ['AGENDAR_MANUTENCAO', 'RELATORIO', 'BUSCAR_APOLICE', 'OUTRO'];
-        
-        // Busca se a resposta da IA contém alguma das categorias permitidas
         const detectada = categoriasValidas.find(cat => respostaIA.includes(cat));
 
-        // LOG DE MONITORAMENTO: Essencial para depurar o comportamento no Railway
         console.log(`[IA_INTENT] Input: "${mensagem}" | Detectada: ${detectada || 'OUTRO'}`);
 
         return detectada || 'OUTRO'; 
 
     } catch (error) {
-        // Captura falhas de conexão ou erros da API do Google
-        console.error("[IA_INTENT_ERROR]:", error.message);
-        return "OUTRO"; // Fallback seguro para o fluxo continuar na saudação
+        console.error("[IA_INTENT_ERROR] Falha na API do Google:", error.message);
+        
+        // FALLBACK FINAL: Se a API deu erro (503), tentamos uma última checagem por palavras-chave
+        if (msgLimpa.includes('manutenção') || msgLimpa.includes('quebrou')) {
+            return 'AGENDAR_MANUTENCAO';
+        }
+        
+        return "OUTRO"; 
     }
 }
