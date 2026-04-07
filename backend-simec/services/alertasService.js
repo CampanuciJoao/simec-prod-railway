@@ -16,7 +16,7 @@ export async function atualizarStatusManutencoes() {
   const agora = getAgora();
   console.log(`[MANUTENÇÃO] Verificando trocas de status às: ${agora.toLocaleString('pt-BR')}`);
 
-  // --- 1. FINALIZAÇÃO AUTOMÁTICA (Ex: OS que venceu e precisa confirmar) ---
+  // --- 1. FINALIZAÇÃO AUTOMÁTICA (OS que venceram e precisam de confirmação) ---
   const manutsParaConfirmar = await prisma.manutencao.findMany({
     where: { 
       status: { in: ['Agendada', 'EmAndamento'] }, 
@@ -35,13 +35,14 @@ export async function atualizarStatusManutencoes() {
         const modelo = manut.equipamento.modelo;
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
+        const novoTitulo = `Confirmar conclusão: ${modelo} (${tag}) em ${unidade}`;
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: `Confirmar conclusão: ${modelo} (${tag}) em ${unidade}` },
+          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
           create: {
             id: `manut-confirm-${manut.id}`,
-            titulo: `Confirmar conclusão: ${modelo} (${tag}) em ${unidade}`,
+            titulo: novoTitulo,
             subtitulo: `O prazo da OS ${manut.numeroOS} expirou. Por favor, confirme se o equipamento já está operante.`,
             data: agora,
             prioridade: 'Alta',
@@ -73,13 +74,14 @@ export async function atualizarStatusManutencoes() {
         const modelo = manut.equipamento.modelo;
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
+        const novoTitulo = `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await tx.alerta.upsert({
           where: { id: `manut-iniciada-${manut.id}` },
-          update: {},
+          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
           create: {
             id: `manut-iniciada-${manut.id}`,
-            titulo: `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`,
+            titulo: novoTitulo,
             subtitulo: `Ordem de Serviço ${manut.numeroOS} foi movida para "Em Andamento" automaticamente.`,
             data: agora,
             prioridade: 'Media',
@@ -114,13 +116,14 @@ async function gerarAlertasDeProximidadeManutencao() {
         const modelo = manut.equipamento.modelo;
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
+        const novoTitulo = `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await prisma.alerta.upsert({
           where: { id: idAlerta },
-          update: {},
+          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
           create: {
             id: idAlerta,
-            titulo: `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`,
+            titulo: novoTitulo,
             subtitulo: `A OS ${manut.numeroOS} está agendada para iniciar em breve.`,
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
@@ -144,12 +147,14 @@ export async function processarSaudeEquipamentos() {
     const score = eq.ocorrencias.reduce((acc, occ) => acc + (occ.resolvido ? (occ.tipo === 'Infraestrutura' ? 3 : 1) : 0), 0);
     if (score >= 10) {
       const idAlerta = `alerta-saude-${eq.id}-${getAgora().getMonth()}`;
+      const novoTitulo = `Risco de Falha Crítico: ${eq.modelo} (${eq.tag})`;
+
       await prisma.alerta.upsert({
         where: { id: idAlerta },
-        update: {},
+        update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
         create: {
           id: idAlerta,
-          titulo: `Risco de Falha Crítico: ${eq.modelo} (${eq.tag})`,
+          titulo: novoTitulo,
           subtitulo: `Este ativo atingiu um nível elevado de reincidência de problemas técnicos no último ano.`,
           data: getAgora(),
           prioridade: 'Alta',
@@ -181,12 +186,14 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
     for (const ponto of PONTOS) {
       if (diasRestantes > 0 && diasRestantes <= ponto.limiar) {
         const idAlerta = `${tipoEntidade.toLowerCase()}-vence-${item.id}-${ponto.label}`;
+        const novoTitulo = `${tipoEntidade} vence ${ponto.texto}`;
+
         await prisma.alerta.upsert({
           where: { id: idAlerta },
-          update: {},
+          update: { titulo: novoTitulo },
           create: {
             id: idAlerta,
-            titulo: `${tipoEntidade} vence ${ponto.texto}`,
+            titulo: novoTitulo,
             subtitulo: tipoEntidade === 'Contrato' ? `Nº ${item.numeroContrato}` : `Apólice Nº ${item.apoliceNumero}`,
             data: item.dataFim,
             prioridade: ponto.prioridade,
@@ -199,12 +206,14 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
     }
   } else {
     const idAlerta = `${tipoEntidade.toLowerCase()}-vencido-${item.id}`;
+    const novoTitulo = `${tipoEntidade} Vencido`;
+
     await prisma.alerta.upsert({
       where: { id: idAlerta },
-      update: {},
+      update: { titulo: novoTitulo },
       create: {
         id: idAlerta,
-        titulo: `${tipoEntidade} Vencido`,
+        titulo: novoTitulo,
         subtitulo: tipoEntidade === 'Contrato' ? `Nº ${item.numeroContrato}` : `Apólice Nº ${item.apoliceNumero}`,
         data: item.dataFim,
         prioridade: 'Alta',
