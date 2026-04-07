@@ -11,19 +11,11 @@ import {
 import { resolverEntidades } from './entityResolver.js';
 import { criarManutencaoNoBanco } from './dbManager.js';
 import { validarConflitoAgenda } from './agendaValidator.js';
-import {
-    STEPS,
-    inicializarStep,
-    determinarProximoStep,
-    resetarConfirmacaoSeHouverMudanca
-} from './stateMachine.js';
 
 export const AgendamentoService = {
     async processar(mensagem, usuarioNome) {
-        // 1. Carrega estado e garante step inicial
+        // 1. Carrega o estado atual
         let estado = await ChatRepository.buscarEstado(usuarioNome);
-        estado = inicializarStep(estado);
-
         const estadoAnterior = JSON.stringify(estado);
 
         // 2. Extrai dados da mensagem
@@ -32,7 +24,7 @@ export const AgendamentoService = {
         // 3. Merge seguro
         estado = mergeEstadoSeguro(estado, extraido);
 
-        // 4. Detecta correção
+        // 4. Detecta se houve correção de dados
         const houveCorrecao =
             extraido.tipo ||
             extraido.unidadeTexto ||
@@ -43,16 +35,23 @@ export const AgendamentoService = {
             extraido.numeroChamado ||
             extraido.descricao;
 
-        // 5. Se algo mudou, reseta confirmação e volta para coleta
-        const houveMudanca = estadoAnterior !== JSON.stringify(estado);
-        estado = resetarConfirmacaoSeHouverMudanca(estado, houveMudanca);
+        // 5. Se houve alteração, reseta confirmação anterior
+        if (estadoAnterior !== JSON.stringify(estado)) {
+            estado.aguardandoConfirmacao = false;
+            estado.confirmacao = null;
+        }
 
-        // 6. Resolve entidades
+        // 6. Se o usuário disse "não" sem corrigir nada, cancela
+        if (extraido.confirmacao === false && !houveCorrecao) {
+            await ChatRepository.limparEstado(usuarioNome);
+            return "Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?";
+        }
+
+        // 7. Resolve unidade e equipamento no banco
         estado = await resolverEntidades(estado);
 
-        // 7. Ambiguidade de equipamento
+        // 8. Trata ambiguidade de equipamento
         if (estado.ambiguidadeEquipamento?.length > 0) {
-            estado.step = STEPS.COLETANDO_DADOS;
             await ChatRepository.salvarEstado(usuarioNome, estado);
 
             const lista = estado.ambiguidadeEquipamento
@@ -62,55 +61,21 @@ export const AgendamentoService = {
             return `Encontrei mais de um equipamento compatível. Qual deles você deseja? ${lista}`;
         }
 
-        // 8. Horário no passado
+        // 9. Valida se o horário é futuro
         const validacaoHorario = validarHorarioFuturo(estado.data, estado.horaInicio);
         if (!validacaoHorario.valido) {
             estado.horaInicio = null;
             estado.horaFim = null;
             estado.aguardandoConfirmacao = false;
             estado.confirmacao = null;
-            estado.step = STEPS.COLETANDO_DADOS;
 
             await ChatRepository.salvarEstado(usuarioNome, estado);
             return validacaoHorario.msg;
         }
 
-        // 9. Campos faltantes
+        // 10. Verifica campos obrigatórios faltantes
         const faltantes = getFaltantes(estado);
-
-        // 10. Conflito de agenda só quando já temos tudo preenchido
-        let conflitoAgenda = null;
-        if (faltantes.length === 0) {
-            conflitoAgenda = await validarConflitoAgenda(estado);
-        }
-
-        // 11. Define próximo step
-        const proximoStep = determinarProximoStep({
-            estado,
-            faltantes,
-            conflitoAgenda,
-            confirmacao: extraido.confirmacao,
-            houveCorrecao
-        });
-
-        estado.step = proximoStep;
-
-        // 12. Se cancelou
-        if (proximoStep === STEPS.CANCELADO) {
-            await ChatRepository.limparEstado(usuarioNome);
-            return "Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?";
-        }
-
-        // 13. Se ainda está coletando
-        if (proximoStep === STEPS.COLETANDO_DADOS) {
-            if (conflitoAgenda && !conflitoAgenda.valido) {
-                estado.aguardandoConfirmacao = false;
-                estado.confirmacao = null;
-
-                await ChatRepository.salvarEstado(usuarioNome, estado);
-                return `${conflitoAgenda.mensagem} Por favor, informe outro horário.`;
-            }
-
+        if (faltantes.length > 0) {
             await ChatRepository.salvarEstado(usuarioNome, estado);
 
             const houveNovosDados = Object.values(extraido).some(v => v !== null && v !== undefined);
@@ -119,25 +84,29 @@ export const AgendamentoService = {
             return `${prefixo} ${proximaPergunta(estado, faltantes)}`;
         }
 
-        // 14. Se chegou na fase de confirmação
-        if (proximoStep === STEPS.AGUARDANDO_CONFIRMACAO) {
-            if (!estado.aguardandoConfirmacao) {
-                estado.aguardandoConfirmacao = true;
-                await ChatRepository.salvarEstado(usuarioNome, estado);
-                return buildResumoConfirmacao(estado);
-            }
+        // 11. NOVO: valida conflito de agenda antes de mostrar o resumo
+        const conflitoAgenda = await validarConflitoAgenda(estado);
+        if (!conflitoAgenda.valido) {
+            estado.aguardandoConfirmacao = false;
+            estado.confirmacao = null;
 
             await ChatRepository.salvarEstado(usuarioNome, estado);
-            return "Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.";
+            return `${conflitoAgenda.mensagem} Por favor, informe outro horário.`;
         }
 
-        // 15. Se finalizou, grava no banco
-        if (proximoStep === STEPS.FINALIZADO) {
+        // 12. Se já temos tudo, mostra resumo e pede confirmação
+        if (!estado.aguardandoConfirmacao) {
+            estado.aguardandoConfirmacao = true;
+            await ChatRepository.salvarEstado(usuarioNome, estado);
+            return buildResumoConfirmacao(estado);
+        }
+
+        // 13. Se confirmou, revalida conflito e grava
+        if (estado.aguardandoConfirmacao && extraido.confirmacao === true) {
             try {
-                // revalida conflito antes de gravar
+                // Revalidação para evitar corrida entre resumo e confirmação
                 const revalidacao = await validarConflitoAgenda(estado);
                 if (!revalidacao.valido) {
-                    estado.step = STEPS.COLETANDO_DADOS;
                     estado.aguardandoConfirmacao = false;
                     estado.confirmacao = null;
 
@@ -155,8 +124,7 @@ export const AgendamentoService = {
             }
         }
 
-        // 16. Fallback absoluto
-        await ChatRepository.salvarEstado(usuarioNome, estado);
-        return "Tive dificuldade para continuar o fluxo do agendamento. Pode repetir a última informação?";
+        // 14. Fallback de confirmação
+        return "Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.";
     }
 };
