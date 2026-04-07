@@ -1,3 +1,5 @@
+// simec/backend-simec/services/alertasService.js
+
 import prisma from './prismaService.js';
 import { enviarEmail } from './emailService.js';
 import { addDays, isBefore, isAfter, differenceInDays, format, startOfDay } from 'date-fns';
@@ -14,8 +16,48 @@ export async function atualizarStatusManutencoes() {
   const agora = getAgora();
   console.log(`[MANUTENÇÃO] Verificando trocas de status às: ${agora.toLocaleString('pt-BR')}`);
 
+  // --- 1. FINALIZAÇÃO AUTOMÁTICA (O caso do Bteste) ---
+  // Busca tudo que está 'Agendada' ou 'EmAndamento' mas que o horário de FIM já passou.
+  const manutsParaConfirmar = await prisma.manutencao.findMany({
+    where: { 
+      status: { in: ['Agendada', 'EmAndamento'] }, 
+      dataHoraAgendamentoFim: { lte: agora } 
+    }
+  });
+
+  if (manutsParaConfirmar.length > 0) {
+    console.log(`[MANUTENÇÃO] Movendo ${manutsParaConfirmar.length} manutenções para Aguardando Confirmação.`);
+    for (const manut of manutsParaConfirmar) {
+      await prisma.$transaction(async (tx) => {
+        await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'AguardandoConfirmacao' } });
+        // Se estava 'Agendada', marcamos o equipamento como 'EmManutencao' apenas para manter a lógica de histórico
+        await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
+
+        await tx.alerta.upsert({
+          where: { id: `manut-confirm-${manut.id}` },
+          update: { titulo: 'Confirmação de Manutenção Pendente' },
+          create: {
+            id: `manut-confirm-${manut.id}`,
+            titulo: 'Confirmação de Manutenção Pendente',
+            subtitulo: `OS ${manut.numeroOS} finalizou o prazo. Confirme o status do equipamento.`,
+            data: agora,
+            prioridade: 'Alta',
+            tipo: 'Manutenção',
+            link: `/manutencoes/detalhes/${manut.id}`
+          }
+        });
+      });
+    }
+  }
+
+  // --- 2. INÍCIO AUTOMÁTICO ---
+  // Busca apenas quem deve estar 'EmAndamento' agora (Início <= agora E Fim > agora)
   const manutsParaIniciar = await prisma.manutencao.findMany({
-    where: { status: 'Agendada', dataHoraAgendamentoInicio: { lte: agora } },
+    where: { 
+        status: 'Agendada', 
+        dataHoraAgendamentoInicio: { lte: agora },
+        dataHoraAgendamentoFim: { gt: agora } 
+    },
     select: { id: true, equipamentoId: true, numeroOS: true, dataHoraAgendamentoInicio: true },
   });
 
@@ -40,32 +82,6 @@ export async function atualizarStatusManutencoes() {
         });
       }
     });
-  }
-
-  const manutsParaConfirmar = await prisma.manutencao.findMany({
-    where: { status: 'EmAndamento', dataHoraAgendamentoFim: { lte: agora } }
-  });
-
-  if (manutsParaConfirmar.length > 0) {
-    console.log(`[MANUTENÇÃO] Movendo ${manutsParaConfirmar.length} manutenções para Aguardando Confirmação.`);
-    for (const manut of manutsParaConfirmar) {
-      await prisma.$transaction(async (tx) => {
-        await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'AguardandoConfirmacao' } });
-        await tx.alerta.upsert({
-          where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: 'Confirmação de Manutenção Pendente' },
-          create: {
-            id: `manut-confirm-${manut.id}`,
-            titulo: 'Confirmação de Manutenção Pendente',
-            subtitulo: `OS ${manut.numeroOS} finalizou. Confirme o status do equipamento.`,
-            data: agora,
-            prioridade: 'Alta',
-            tipo: 'Manutenção',
-            link: `/manutencoes/detalhes/${manut.id}`
-          }
-        });
-      });
-    }
   }
 }
 
@@ -245,13 +261,11 @@ async function verificarVencimentoSeguros() {
   }
 }
 
-// ESTA FUNÇÃO É A QUE O WORKER CHAMA
 export async function processarAlertasEEnviarNotificacoes() {
   try {
-    console.log("[TAREFA PROGRAMADA] Iniciando processamento de manutenções e alertas...");
+    console.log("[TAREFA PROGRAMADA] Iniciando ciclo de verificações...");
 
-    // >>> CORREÇÃO APLICADA AQUI <<<
-    // Chamamos a função de atualização de status de manutenção no início do ciclo
+    // ESTA CHAMADA ABAIXO É O MOTOR QUE MUDA OS STATUS NO BANCO
     await atualizarStatusManutencoes(); 
 
     await gerarAlertasDeProximidadeManutencao();
@@ -259,7 +273,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
 
-    console.log("[TAREFA PROGRAMADA] Processamento finalizado.");
+    console.log("[TAREFA PROGRAMADA] Ciclo finalizado com sucesso.");
   } catch (error) {
     console.error('[ERRO GERAL Alertas]:', error);
   }
