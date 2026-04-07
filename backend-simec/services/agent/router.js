@@ -1,7 +1,7 @@
 // simec/backend-simec/services/agent/router.js
 import { AgendamentoService } from './agendamentoService.js';
 import { classificarIntencao } from './intentClassifier.js';
-import { ChatRepository } from './chatRepository.js';
+import { AgentSessionRepository } from './agentSessionRepository.js';
 
 /**
  * Mapa de Estratégias (Habilidades do Agente)
@@ -11,46 +11,86 @@ const STRATEGIES = {
 };
 
 /**
- * Maestro do Agente: Orquestra a conversa, mantendo o contexto e tratando falhas da IA.
+ * Frases que forçam reset manual do fluxo
+ */
+const RESET_COMMANDS = [
+    'vamos recomeçar',
+    'recomeçar',
+    'começar de novo',
+    'reiniciar',
+    'novo agendamento',
+    'cancelar isso',
+    'resetar'
+];
+
+/**
+ * Maestro do Agente: Orquestra a conversa, mantendo contexto via AgentSession.
  */
 export const RoteadorAgente = async (mensagem, usuarioNome) => {
     try {
-        // 1. RECUPERAÇÃO DE CONTEXTO
-        // Verificamos se o usuário já deixou um agendamento incompleto no banco.
-        const estadoAtual = await ChatRepository.buscarEstado(usuarioNome);
-        const temProcessoAtivo = Object.keys(estadoAtual).length > 0;
+        const msgMinuscula = mensagem.toLowerCase().trim();
 
-        // 2. CLASSIFICAÇÃO DA INTENÇÃO (VIA IA)
+        // 1. Expira sessões antigas do usuário
+        await AgentSessionRepository.expirarSessoesAntigas(usuarioNome);
+
+        // 2. Busca sessão ativa de agendamento
+        const sessaoAtiva = await AgentSessionRepository.buscarSessaoAtiva(
+            usuarioNome,
+            'AGENDAR_MANUTENCAO'
+        );
+
+        const temProcessoAtivo = !!sessaoAtiva;
+
+        // 3. Reset manual explícito
+        if (RESET_COMMANDS.some(cmd => msgMinuscula.includes(cmd))) {
+            if (sessaoAtiva) {
+                await AgentSessionRepository.cancelarSessao(sessaoAtiva.id);
+                await AgentSessionRepository.registrarMensagem(
+                    sessaoAtiva.id,
+                    'user',
+                    mensagem,
+                    { acao: 'RESET_MANUAL' }
+                );
+            }
+
+            return "Certo, vamos começar de novo. Qual manutenção você deseja agendar?";
+        }
+
+        // 4. Classificação de intenção
         let intencao = await classificarIntencao(mensagem);
 
-        // 3. REDE DE SEGURANÇA (Heurística Sênior)
-        // Se a IA falhou (OUTRO) mas o usuário usou palavras claras de agendamento,
-        // nós "corrigimos" a intenção manualmente no backend.
-        const termosChaveAgendamento = ['agendar', 'marcar', 'manutenção', 'corretiva', 'preventiva', 'conserto', 'os', 'abrir'];
-        const msgMinuscula = mensagem.toLowerCase();
-        
+        // 5. Heurística de segurança para agendamento
+        const termosChaveAgendamento = [
+            'agendar',
+            'marcar',
+            'manutenção',
+            'corretiva',
+            'preventiva',
+            'conserto',
+            'os',
+            'abrir'
+        ];
+
         if (intencao === 'OUTRO' && termosChaveAgendamento.some(t => msgMinuscula.includes(t))) {
             console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para AGENDAR_MANUTENCAO`);
             intencao = 'AGENDAR_MANUTENCAO';
         }
 
-        console.log(`[AGENT_ROUTER] Usuário: ${usuarioNome} | Ativo: ${temProcessoAtivo} | Intenção: ${intencao}`);
+        console.log(
+            `[AGENT_ROUTER] Usuário: ${usuarioNome} | Ativo: ${temProcessoAtivo} | Intenção: ${intencao}`
+        );
 
-        // 4. LÓGICA DE ROTEAMENTO (PRIORIDADES)
-
-        // Prioridade 1: Se já existe um agendamento em curso, manda direto para o especialista.
-        // Ignoramos a intenção 'OUTRO' se ele estiver no meio de um processo.
+        // 6. Se já existe sessão ativa, prioriza continuidade do fluxo
         if (temProcessoAtivo) {
-            return await AgendamentoService.processar(mensagem, usuarioNome);
+            return await AgendamentoService.processar(mensagem, usuarioNome, sessaoAtiva);
         }
 
-        // Prioridade 2: Se é um novo pedido de agendamento detectado.
+        // 7. Se é novo pedido de agendamento
         if (intencao === 'AGENDAR_MANUTENCAO') {
-            return await AgendamentoService.processar(mensagem, usuarioNome);
+            return await AgendamentoService.processar(mensagem, usuarioNome, null);
         }
 
-        // Prioridade 3: Fallback para Saudações ou Conversas Casuais.
-        // Só cai aqui se NÃO houver processo ativo e a intenção for REALMENTE 'OUTRO'.
+        // 8. Fallback amigável
         return "Olá! Sou o Agente Guardião do SIMEC. No momento, sou especialista em **agendar manutenções** para seus equipamentos. Como posso ser útil agora?";
 
     } catch (error) {
