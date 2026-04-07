@@ -1,5 +1,5 @@
 /* Ficheiro: src/styles/layout.css */
-/* Versão: Final Sênior - Com Header Alinhado à Direita */
+/* Versão: Final Sênior - Revisada com Fix de Notificações */
 
 /* ==========================================================================
    1. ESTRUTURA PRINCIPAL DA APLICAÇÃO
@@ -22,26 +22,24 @@
 }
 
 /* ==========================================================================
-   2. CABEÇALHO (HEADER)
+   2. CABEÇALHO (HEADER) E NOTIFICAÇÕES
    ========================================================================== */
 
 .header-actions {
-  /* CORREÇÃO: Posicionamento absoluto para flutuar sobre o conteúdo */
   position: absolute;
   top: 20px;
   right: 24px;
-  left: 24px; /* Garante que ocupe a largura para o space-between funcionar em mobile */
+  left: 24px; 
   z-index: 100;
   display: flex;
   align-items: center;
-  justify-content: flex-end; /* Alinha o grupo de botões à direita */
-  height: auto; /* A altura agora é definida pelo conteúdo */
-  padding: 0; /* Remove padding extra */
-  background: none; /* Remove qualquer fundo */
-  border: none; /* Remove qualquer borda */
+  justify-content: flex-end; 
+  height: auto;
+  padding: 0;
+  background: none;
+  border: none;
 }
 
-/* O container para os botões e saudação da direita */
 .header-right-actions {
   display: flex;
   align-items: center;
@@ -52,6 +50,72 @@
   font-weight: 500;
   font-size: 1.0rem;
   color: #000000fa;
+}
+
+/* --- FIX: SINO E DROPDOWN DE NOTIFICAÇÕES --- */
+
+.notification-bell {
+  position: relative; /* FUNDAMENTAL: Ancoragem para o menu */
+  display: inline-flex;
+}
+
+.notification-dropdown {
+  position: absolute;
+  top: 45px;            /* Distância abaixo do botão */
+  right: 0;             /* Alinha à direita com o botão */
+  width: 320px;
+  background-color: var(--cor-fundo-card-light, #ffffff);
+  border: 1px solid var(--cor-borda-light, #e2e8f0);
+  border-radius: 12px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  z-index: 1000;        /* Acima de tudo */
+  overflow: hidden;
+  animation: slideInDown 0.2s ease-out;
+}
+
+.dropdown-header {
+  padding: 12px 16px;
+  background-color: #f8fafc;
+  border-bottom: 1px solid var(--cor-borda-light);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.notification-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 350px;
+  overflow-y: auto;
+  background-color: var(--cor-fundo-card-light);
+}
+
+.notification-dropdown-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.2s;
+}
+
+.notification-dropdown-item:hover {
+  background-color: #f1f7ff;
+}
+
+.dropdown-footer {
+  padding: 10px;
+  text-align: center;
+  background-color: #f8fafc;
+  border-top: 1px solid var(--cor-borda-light);
+}
+
+@keyframes slideInDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 /* ==========================================================================
@@ -123,39 +187,43 @@
 
 body.dark-mode .app-container { background-color: var(--cor-fundo-pagina-dark); }
 body.dark-mode .user-greeting { color: var(--cor-texto-secundario-dark); }
-/* ... (outras regras de dark mode) */
+
+body.dark-mode .notification-dropdown {
+    background-color: var(--cor-fundo-card-dark);
+    border-color: var(--cor-borda-dark);
+}
+
+body.dark-mode .dropdown-header,
+body.dark-mode .dropdown-footer {
+    background-color: #0f172a;
+}
+
 /* Botão de Menu para Mobile (escondido por padrão) */
 .mobile-menu-btn-wrapper {
   display: none;
 }
 
-/* Responsividade do Header e Conteúdo Principal */
 @media (max-width: 992px) {
   .main-content-wrapper {
-    /* Remove a margem esquerda para ocupar toda a tela */
     margin-left: 0;
   }
   
   .header-actions {
-    /* No mobile, o header volta a usar space-between */
     justify-content: space-between;
     left: 15px;
     right: 15px;
     top: 10px;
   }
 
-  /* Mostra o wrapper do botão de menu */
   .mobile-menu-btn-wrapper {
     display: block;
   }
   
-  /* Esconde a saudação para economizar espaço */
   .header-right-actions .user-greeting {
     display: none;
   }
 
   .main-content {
-    /* Aumenta o padding superior para não ficar embaixo do header */
     padding-top: 70px; 
   }
 }

@@ -1,21 +1,15 @@
 // Ficheiro: frontend-simec/src/components/AppLayout.jsx
-// VERSÃO ATUALIZADA - COM INTEGRAÇÃO DO AGENTE INTELIGENTE (CHATBOT)
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAlertas } from '@/contexts/AlertasContext';
 import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from '@/components/Sidebar';
-import ChatBot from './ChatBot'; // <<< IMPORTADO O NOVO COMPONENTE
+import ChatBot from './ChatBot';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
-    faMoon, 
-    faSun, 
-    faBell, 
-    faExclamationCircle, 
-    faSignOutAlt, 
-    faBars, 
-    faCheck 
+    faMoon, faSun, faBell, faExclamationCircle, 
+    faSignOutAlt, faBars, faCheck 
 } from '@fortawesome/free-solid-svg-icons';
 
 function AppLayout() {
@@ -52,12 +46,12 @@ function AppLayout() {
 
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
-  const handleMarcarTodasComoVistas = () => {
+  const handleMarcarTodasComoVistas = (e) => {
+    e.stopPropagation(); // Impede o fechamento precoce
     const alertasPassíveisDeLimpeza = alertas.filter(a => 
         a.status === 'NaoVisto' && !a.id.startsWith('manut-confirm')
     );
     alertasPassíveisDeLimpeza.forEach(notif => updateStatus(notif.id, 'Visto'));
-    setIsDropdownOpen(false);
   };
 
   const alertasNaoVistos = alertas.filter(a => a.status === 'NaoVisto');
@@ -77,23 +71,30 @@ function AppLayout() {
 
           <div className="header-right-actions">
             <span className="user-greeting">Olá, {user?.nome}</span>
-            <button onClick={logout} className="header-action-btn" title="Sair">
-              <FontAwesomeIcon icon={faSignOutAlt} />
+
+            {/* BOTÃO DE TEMA */}
+            <button onClick={toggleTheme} className="header-action-btn" title="Alternar Tema">
+              <FontAwesomeIcon icon={theme === 'light' ? faMoon : faSun} />
             </button>
 
+            {/* SINO DE NOTIFICAÇÕES (ESTRUTURA CORRIGIDA) */}
             <div className="notification-bell" ref={notificationRef}>
-              <button className="header-action-btn" onClick={() => setIsDropdownOpen(prev => !prev)}>
+              <button className="header-action-btn" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                 <FontAwesomeIcon icon={faBell} />
-                {alertasNaoVistos.length > 0 && <span className="notification-badge">{alertasNaoVistos.length > 9 ? '9+' : alertasNaoVistos.length}</span>}
+                {alertasNaoVistos.length > 0 && (
+                  <span className="notification-badge">
+                    {alertasNaoVistos.length > 9 ? '9+' : alertasNaoVistos.length}
+                  </span>
+                )}
               </button>
 
               {isDropdownOpen && (
                 <div className="notification-dropdown">
                     <div className="dropdown-header">
-                      <span>Notificações</span>
+                      <span className="font-bold">Notificações</span>
                       <button className="limpar-btn" onClick={handleMarcarTodasComoVistas}>Limpar avisos</button>
                     </div>
-                    <ul>
+                    <ul className="notification-list">
                       {alertasNaoVistos.length > 0 ? (
                         alertasNaoVistos.slice(0, 8).map(notif => {
                           const isObrigatorio = notif.id.startsWith('manut-confirm');
@@ -102,7 +103,9 @@ function AppLayout() {
                             <li key={notif.id} className="notification-dropdown-item">
                               <Link to={notif.link || "/alertas"} onClick={() => setIsDropdownOpen(false)} className="notification-link">
                                 <FontAwesomeIcon icon={faExclamationCircle} className={`icon-prioridade-${notif.prioridade?.toLowerCase()}`} />
-                                <span>{notif.titulo}</span>
+                                <div className="notification-text">
+                                    <span className="notification-title">{notif.titulo}</span>
+                                </div>
                               </Link>
                               
                               {!isObrigatorio && (
@@ -119,13 +122,15 @@ function AppLayout() {
                         })
                       ) : <li className="no-notifications">Tudo em dia!</li>}
                     </ul>
-                    <div className="dropdown-footer"><Link to="/alertas" onClick={() => setIsDropdownOpen(false)}>Ver todos os alertas</Link></div>
+                    <div className="dropdown-footer">
+                        <Link to="/alertas" onClick={() => setIsDropdownOpen(false)}>Ver todos os alertas</Link>
+                    </div>
                 </div>
               )}
             </div>
 
-            <button onClick={toggleTheme} className="header-action-btn">
-              <FontAwesomeIcon icon={theme === 'light' ? faMoon : faSun} />
+            <button onClick={logout} className="header-action-btn" title="Sair">
+              <FontAwesomeIcon icon={faSignOutAlt} />
             </button>
           </div>
         </header>
@@ -134,7 +139,6 @@ function AppLayout() {
           <Outlet />
         </main>
         
-        {/* AGENTE INTELIGENTE (CHATBOT) INTEGRADO */}
         <ChatBot /> 
       </div>
     </div>
