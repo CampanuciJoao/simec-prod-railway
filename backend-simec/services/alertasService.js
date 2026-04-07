@@ -16,7 +16,7 @@ export async function atualizarStatusManutencoes() {
   const agora = getAgora();
   console.log(`[MANUTENÇÃO] Verificando trocas de status às: ${agora.toLocaleString('pt-BR')}`);
 
-  // --- 1. FINALIZAÇÃO AUTOMÁTICA (Ex: Bteste de ontem) ---
+  // --- 1. FINALIZAÇÃO AUTOMÁTICA (Ex: OS que venceu e precisa confirmar) ---
   const manutsParaConfirmar = await prisma.manutencao.findMany({
     where: { 
       status: { in: ['Agendada', 'EmAndamento'] }, 
@@ -38,11 +38,11 @@ export async function atualizarStatusManutencoes() {
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: `Confirmar Ativo: ${modelo}` },
+          update: { titulo: `Confirmar conclusão: ${modelo} (${tag}) em ${unidade}` },
           create: {
             id: `manut-confirm-${manut.id}`,
-            titulo: `Confirmar Ativo: ${modelo}`,
-            subtitulo: `Prazo da OS ${manut.numeroOS} (SN: ${tag}) expirou em ${unidade}. Confirme o status real.`,
+            titulo: `Confirmar conclusão: ${modelo} (${tag}) em ${unidade}`,
+            subtitulo: `O prazo da OS ${manut.numeroOS} expirou. Por favor, confirme se o equipamento já está operante.`,
             data: agora,
             prioridade: 'Alta',
             tipo: 'Manutenção',
@@ -79,8 +79,8 @@ export async function atualizarStatusManutencoes() {
           update: {},
           create: {
             id: `manut-iniciada-${manut.id}`,
-            titulo: `Iniciada: ${modelo}`,
-            subtitulo: `OS ${manut.numeroOS} (SN: ${tag}) iniciou agora na unidade ${unidade}.`,
+            titulo: `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`,
+            subtitulo: `Ordem de Serviço ${manut.numeroOS} foi movida para "Em Andamento" automaticamente.`,
             data: agora,
             prioridade: 'Media',
             tipo: 'Manutenção',
@@ -120,8 +120,8 @@ async function gerarAlertasDeProximidadeManutencao() {
           update: {},
           create: {
             id: idAlerta,
-            titulo: `${modelo} inicia ${ponto.texto}`,
-            subtitulo: `SN: ${tag} | Unidade: ${unidade} | OS: ${manut.numeroOS}`,
+            titulo: `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`,
+            subtitulo: `A OS ${manut.numeroOS} está agendada para iniciar em breve.`,
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
             tipo: 'Manutenção',
@@ -149,8 +149,8 @@ export async function processarSaudeEquipamentos() {
         update: {},
         create: {
           id: idAlerta,
-          titulo: `Risco de Falha: ${eq.modelo}`,
-          subtitulo: `O ativo (Tag: ${eq.tag}) atingiu nível crítico de reincidência de problemas.`,
+          titulo: `Risco de Falha Crítico: ${eq.modelo} (${eq.tag})`,
+          subtitulo: `Este ativo atingiu um nível elevado de reincidência de problemas técnicos no último ano.`,
           data: getAgora(),
           prioridade: 'Alta',
           tipo: 'Manutenção',
