@@ -5,7 +5,7 @@ import { enviarEmail } from './emailService.js';
 import { addDays, isBefore, isAfter, differenceInDays, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// Função auxiliar para garantir o horário local do servidor (que já está em Campo Grande)
+// Função auxiliar para obter o horário atual
 const getAgora = () => new Date();
 
 // ==========================================================================
@@ -16,7 +16,7 @@ export async function atualizarStatusManutencoes() {
   const agora = getAgora();
   console.log(`[MANUTENÇÃO] Verificando trocas de status às: ${agora.toLocaleString('pt-BR')}`);
 
-  // --- 1. FINALIZAÇÃO AUTOMÁTICA ---
+  // --- 1. FINALIZAÇÃO AUTOMÁTICA (OS que venceram e precisam de confirmação) ---
   const manutsParaConfirmar = await prisma.manutencao.findMany({
     where: { 
       status: { in: ['Agendada', 'EmAndamento'] }, 
@@ -35,16 +35,16 @@ export async function atualizarStatusManutencoes() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // PADRÃO DE CONFIRMAÇÃO
+        // FRASE DETALHADA DE CONFIRMAÇÃO
         const novoTitulo = `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: novoTitulo }, 
+          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
           create: {
             id: `manut-confirm-${manut.id}`,
             titulo: novoTitulo,
-            subtitulo: `O prazo da OS ${manut.numeroOS} expirou.`,
+            subtitulo: `O prazo da OS ${manut.numeroOS} expirou. Confirme o status real.`,
             data: agora,
             prioridade: 'Alta',
             tipo: 'Manutenção',
@@ -75,16 +75,16 @@ export async function atualizarStatusManutencoes() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // PADRÃO DE INÍCIO
-        const novoTitulo = `Manutenção Iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        // FRASE DETALHADA DE INÍCIO
+        const novoTitulo = `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await tx.alerta.upsert({
           where: { id: `manut-iniciada-${manut.id}` },
-          update: { titulo: novoTitulo },
+          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
           create: {
             id: `manut-iniciada-${manut.id}`,
             titulo: novoTitulo,
-            subtitulo: `Ordem de Serviço ${manut.numeroOS} em andamento automático.`,
+            subtitulo: `Ordem de Serviço ${manut.numeroOS} iniciada automaticamente.`,
             data: agora,
             prioridade: 'Media',
             tipo: 'Manutenção',
@@ -101,7 +101,7 @@ async function gerarAlertasDeProximidadeManutencao() {
   const PONTOS_INICIO = [
     { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' },
     { limiar: 60, prioridade: 'Media', label: '1h', texto: 'em 1 hora' },
-    { limiar: 1440, prioridade: 'Baixa', label: ' Baixa', texto: 'em 24 horas' },
+    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: 'em 24 horas' },
   ];
 
   const manutencoesProximas = await prisma.manutencao.findMany({
@@ -119,16 +119,16 @@ async function gerarAlertasDeProximidadeManutencao() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // PADRÃO DE PROXIMIDADE
-        const novoTitulo = `Manutenção inicia ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        // FRASE DETALHADA DE PROXIMIDADE (RECONHECIDA PELO FRONTEND PARA NEGRITO)
+        const novoTitulo = `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await prisma.alerta.upsert({
           where: { id: idAlerta },
-          update: { titulo: novoTitulo }, 
+          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
           create: {
             id: idAlerta,
             titulo: novoTitulo,
-            subtitulo: `OS: ${manut.numeroOS}`,
+            subtitulo: `Agendado: ${format(manut.dataHoraAgendamentoInicio, 'HH:mm')} | OS: ${manut.numeroOS}`,
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
             tipo: 'Manutenção',
@@ -156,12 +156,12 @@ export async function processarSaudeEquipamentos() {
       const idAlerta = `alerta-saude-${eq.id}-${getAgora().getMonth()}`;
       const unidade = eq.unidade?.nomeSistema || "N/A";
       
-      // PADRÃO DE RISCO
-      const novoTitulo = `Risco de Falha Crítico na unidade de ${unidade}, no equipamento ${eq.modelo} (${eq.tag})`;
+      // FRASE DETALHADA DE RISCO
+      const novoTitulo = `Risco de falha crítico na unidade de ${unidade}, no equipamento ${eq.modelo} (${eq.tag})`;
 
       await prisma.alerta.upsert({
         where: { id: idAlerta },
-        update: { titulo: novoTitulo },
+        update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
         create: {
           id: idAlerta,
           titulo: novoTitulo,
@@ -299,7 +299,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
 
-    // --- LINHA PROFISSIONAL: EMPURRA A ATUALIZAÇÃO PARA O FRONTEND ---
+    // --- LINHA PROFISSIONAL: EMPURRA A ATUALIZAÇÃO PARA O FRONTEND (WEBSOCKETS) ---
     if (global.io) {
         global.io.emit('atualizar-alertas');
         console.log("📢 WebSockets: Notificando navegadores em tempo real!");

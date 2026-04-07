@@ -1,21 +1,16 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 4.1 (Sênior - Reforço no Agendador BullMQ)
+// Versão: 5.1 (Sênior - Integração Socket.io + Ativação do Worker BullMQ)
 
-// --- 1. Configuração de Ambiente ---
 import dotenv from 'dotenv';
 dotenv.config();
 
-console.log("======================================================");
-console.log("        INICIANDO SERVIDOR BACKEND SIMEC             ");
-console.log("======================================================");
-
-// --- 2. Importações de Módulos ---
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createServer } from 'http'; // Adicionado para WebSocket
+import { Server } from 'socket.io';  // Adicionado para WebSocket
 
-// --- 3. Importação das Rotas da Aplicação ---
 import authRoutes from './routes/authRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -32,17 +27,33 @@ import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js'; 
 
-// --- 4. Importação de Middlewares e Filas ---
 import { proteger } from './middleware/authMiddleware.js';
 import { alertasQueue } from './services/queueService.js';
 
-// --- 5. Configuração de Caminhos e Variáveis ---
+// --- IMPORTANTE: ATIVAÇÃO DO COZINHEIRO (WORKER) ---
+import './worker.js'; // Esta linha faz o sistema processar a fila de alertas
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const app = express();
+const httpServer = createServer(app); 
 const PORT = process.env.PORT || 5000;
 
-// --- 6. Configuração de Middlewares Globais ---
+// --- CONFIGURAÇÃO DO SOCKET.IO (REAL-TIME) ---
+const io = new Server(httpServer, {
+  cors: {
+    origin: "*", 
+    methods: ["GET", "POST"]
+  }
+});
+
+// Torna o 'io' global para que possamos usar dentro do alertasService.js
+global.io = io;
+
+io.on('connection', (socket) => {
+  console.log(`🔌 Novo navegador conectado ao SIMEC: ${socket.id}`);
+});
+
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -51,19 +62,11 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-// --- 7. Servir Arquivos Estáticos (Uploads) ---
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
-
-// ==========================================================================
-// --- 8. Montagem das Rotas da API ---
-// ==========================================================================
 
 app.use('/api/auth', authRoutes);
 app.use('/api/agent', agentRoutes);
-
 app.use(proteger);
-
 app.use('/api/dashboard-data', dashboardRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/alertas', alertasRoutes);
@@ -78,37 +81,32 @@ app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
 
-// --- 9. Rota Raiz ---
 app.get('/', (req, res) => {
-  res.send('API do SIMEC (v4.1) está ativa e operante!');
+  res.send('API do SIMEC (v5.1) ativa e com Worker processando!');
 });
 
-// --- 10. Inicialização do Servidor ---
-const server = app.listen(PORT, '0.0.0.0', async () => {
-  console.log(`------------------------------------------------------`);
-  console.log(`✅ Servidor rodando na porta: ${PORT}`);
-  console.log(`🔗 Banco de Dados Conectado`);
-  console.log(`🚀 Arquitetura IA (Agent System) Pronta`);
-  console.log(`📦 Sistema de Filas (BullMQ) Conectado ao Redis`);
-  console.log(`------------------------------------------------------`);
+httpServer.listen(PORT, '0.0.0.0', async () => {
+  console.log("======================================================");
+  console.log(`✅ SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
+  console.log(`📡 WebSocket: Pronto para empurrar notificações`);
+  console.log("======================================================");
   
-  // --- CONFIGURAÇÃO DA TAREFA RECORRENTE ---
   try {
-    // 1. Limpa agendamentos antigos para evitar duplicidade no reinício
+    // Limpa tarefas duplicadas ao reiniciar
     await alertasQueue.obliterate({ force: true });
     
-    // 2. Adiciona a tarefa de verificação a cada 1 minuto (60000ms)
+    // Configura o ciclo de 30 segundos
     await alertasQueue.add('verificar-tarefas-diarias', {}, { 
         repeat: { 
-          every: 60000,
-          immediately: true // Começa a rodar assim que o servidor liga
+          every: 30000, 
+          immediately: true 
         } 
     });
 
-    console.log(`⏰ Agendador: Ciclo de 1 minuto configurado e iniciado.`);
+    console.log(`⏰ Agendador BullMQ: Ciclo de 30 segundos iniciado.`);
   } catch (error) {
-    console.error("❌ Erro ao configurar o agendador BullMQ:", error.message);
+    console.error("❌ Erro no Agendador:", error.message);
   }
 });
 
-server.timeout = 120000;
+httpServer.timeout = 120000;
