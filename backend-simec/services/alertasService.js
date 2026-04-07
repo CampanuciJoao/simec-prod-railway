@@ -35,7 +35,7 @@ export async function atualizarStatusManutencoes() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // PADRÃO DE CONFIRMAÇÃO (Negrito ativado no Frontend)
+        // PADRÃO DE CONFIRMAÇÃO
         const novoTitulo = `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
 
         await tx.alerta.upsert({
@@ -75,7 +75,7 @@ export async function atualizarStatusManutencoes() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // PADRÃO DE INÍCIO (Negrito ativado no Frontend)
+        // PADRÃO DE INÍCIO
         const novoTitulo = `Manutenção Iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await tx.alerta.upsert({
@@ -101,7 +101,7 @@ async function gerarAlertasDeProximidadeManutencao() {
   const PONTOS_INICIO = [
     { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' },
     { limiar: 60, prioridade: 'Media', label: '1h', texto: 'em 1 hora' },
-    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: 'em 24 horas' },
+    { limiar: 1440, prioridade: 'Baixa', label: ' Baixa', texto: 'em 24 horas' },
   ];
 
   const manutencoesProximas = await prisma.manutencao.findMany({
@@ -119,7 +119,7 @@ async function gerarAlertasDeProximidadeManutencao() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // PADRÃO DE PROXIMIDADE (Negrito ativado no Frontend)
+        // PADRÃO DE PROXIMIDADE
         const novoTitulo = `Manutenção inicia ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await prisma.alerta.upsert({
@@ -156,7 +156,7 @@ export async function processarSaudeEquipamentos() {
       const idAlerta = `alerta-saude-${eq.id}-${getAgora().getMonth()}`;
       const unidade = eq.unidade?.nomeSistema || "N/A";
       
-      // PADRÃO DE RISCO (Negrito ativado no Frontend)
+      // PADRÃO DE RISCO
       const novoTitulo = `Risco de Falha Crítico na unidade de ${unidade}, no equipamento ${eq.modelo} (${eq.tag})`;
 
       await prisma.alerta.upsert({
@@ -298,6 +298,13 @@ export async function processarAlertasEEnviarNotificacoes() {
     await processarSaudeEquipamentos();
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
+
+    // --- LINHA PROFISSIONAL: EMPURRA A ATUALIZAÇÃO PARA O FRONTEND ---
+    if (global.io) {
+        global.io.emit('atualizar-alertas');
+        console.log("📢 WebSockets: Notificando navegadores em tempo real!");
+    }
+
     console.log("[TAREFA PROGRAMADA] Ciclo finalizado com sucesso.");
   } catch (error) {
     console.error('[ERRO GERAL Alertas]:', error);
