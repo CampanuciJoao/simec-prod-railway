@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 5.2 (Sênior - Ciclo de 20s + Socket.io + Worker BullMQ)
+// Versão: 5.3 (Sênior - CORREÇÃO DE CAMINHO + Ciclo 20s + Socket.io)
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -19,7 +19,8 @@ import equipamentosRoutes from './routes/equipamentosRoutes.js';
 import manutencoesRoutes from './routes/manutencoesRoutes.js';
 import alertasRoutes from './routes/alertasRoutes.js';
 import contratosRoutes from './routes/contratosRoutes.js';
-import relatoriosRoutes from './reports/relatoriosRoutes.js'; // Verifique se o caminho está correto conforme seu projeto
+// --- LINHA CORRIGIDA ABAIXO ---
+import relatoriosRoutes from './routes/relatoriosRoutes.js'; 
 import segurosRoutes from './routes/segurosRoutes.js';
 import auditoriaRoutes from './routes/auditoriaRoutes.js';
 import unidadesRoutes from './routes/unidadesRoutes.js';
@@ -82,7 +83,7 @@ app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
 
 app.get('/', (req, res) => {
-  res.send('API do SIMEC (v5.2) em Tempo Real (20s) ativa!');
+  res.send('API do SIMEC ativa e operante em tempo real!');
 });
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
