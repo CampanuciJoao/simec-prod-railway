@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão: 5.1 (Sênior - Integração Socket.io + Ativação do Worker BullMQ)
+// Versão: 5.2 (Sênior - Ciclo de 20s + Socket.io + Worker BullMQ)
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -19,7 +19,7 @@ import equipamentosRoutes from './routes/equipamentosRoutes.js';
 import manutencoesRoutes from './routes/manutencoesRoutes.js';
 import alertasRoutes from './routes/alertasRoutes.js';
 import contratosRoutes from './routes/contratosRoutes.js';
-import relatoriosRoutes from './routes/relatoriosRoutes.js';
+import relatoriosRoutes from './reports/relatoriosRoutes.js'; // Verifique se o caminho está correto conforme seu projeto
 import segurosRoutes from './routes/segurosRoutes.js';
 import auditoriaRoutes from './routes/auditoriaRoutes.js';
 import unidadesRoutes from './routes/unidadesRoutes.js';
@@ -30,8 +30,8 @@ import biRoutes from './routes/biRoutes.js';
 import { proteger } from './middleware/authMiddleware.js';
 import { alertasQueue } from './services/queueService.js';
 
-// --- IMPORTANTE: ATIVAÇÃO DO COZINHEIRO (WORKER) ---
-import './worker.js'; // Esta linha faz o sistema processar a fila de alertas
+// --- ATIVAÇÃO DO COZINHEIRO (WORKER) ---
+import './worker.js'; 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -47,7 +47,7 @@ const io = new Server(httpServer, {
   }
 });
 
-// Torna o 'io' global para que possamos usar dentro do alertasService.js
+// Torna o 'io' global para o alertasService.js enviar as notificações espontâneas
 global.io = io;
 
 io.on('connection', (socket) => {
@@ -82,28 +82,27 @@ app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
 
 app.get('/', (req, res) => {
-  res.send('API do SIMEC (v5.1) ativa e com Worker processando!');
+  res.send('API do SIMEC (v5.2) em Tempo Real (20s) ativa!');
 });
 
 httpServer.listen(PORT, '0.0.0.0', async () => {
   console.log("======================================================");
   console.log(`✅ SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
-  console.log(`📡 WebSocket: Pronto para empurrar notificações`);
+  console.log(`📡 Ciclo de Verificação: 20 segundos`);
   console.log("======================================================");
   
   try {
-    // Limpa tarefas duplicadas ao reiniciar
     await alertasQueue.obliterate({ force: true });
     
-    // Configura o ciclo de 30 segundos
+    // CONFIGURADO PARA 20 SEGUNDOS (20000ms)
     await alertasQueue.add('verificar-tarefas-diarias', {}, { 
         repeat: { 
-          every: 30000, 
+          every: 20000, 
           immediately: true 
         } 
     });
 
-    console.log(`⏰ Agendador BullMQ: Ciclo de 30 segundos iniciado.`);
+    console.log(`⏰ Agendador BullMQ: Ciclo de 20 segundos iniciado.`);
   } catch (error) {
     console.error("❌ Erro no Agendador:", error.message);
   }

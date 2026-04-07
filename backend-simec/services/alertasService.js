@@ -5,7 +5,7 @@ import { enviarEmail } from './emailService.js';
 import { addDays, isBefore, isAfter, differenceInDays, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-// Função auxiliar para obter o horário atual
+// Função auxiliar para obter o horário atual (Servidor em Campo Grande)
 const getAgora = () => new Date();
 
 // ==========================================================================
@@ -35,12 +35,12 @@ export async function atualizarStatusManutencoes() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // FRASE DETALHADA DE CONFIRMAÇÃO
+        // FRASE DETALHADA DE CONFIRMAÇÃO (Ativa negrito no Frontend)
         const novoTitulo = `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
-          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
+          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
           create: {
             id: `manut-confirm-${manut.id}`,
             titulo: novoTitulo,
@@ -75,12 +75,12 @@ export async function atualizarStatusManutencoes() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // FRASE DETALHADA DE INÍCIO
+        // FRASE DETALHADA DE INÍCIO (Ativa negrito no Frontend)
         const novoTitulo = `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await tx.alerta.upsert({
           where: { id: `manut-iniciada-${manut.id}` },
-          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
+          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
           create: {
             id: `manut-iniciada-${manut.id}`,
             titulo: novoTitulo,
@@ -119,12 +119,12 @@ async function gerarAlertasDeProximidadeManutencao() {
         const tag = manut.equipamento.tag;
         const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
         
-        // FRASE DETALHADA DE PROXIMIDADE (RECONHECIDA PELO FRONTEND PARA NEGRITO)
-        const novoTitulo = `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        // FRASE DETALHADA DE PROXIMIDADE (Ativa negrito no Frontend)
+        const novoTitulo = `Manutenção inicia ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
 
         await prisma.alerta.upsert({
           where: { id: idAlerta },
-          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
+          update: { titulo: novoTitulo }, // ATUALIZA O TÍTULO SE JÁ EXISTIR
           create: {
             id: idAlerta,
             titulo: novoTitulo,
@@ -156,12 +156,12 @@ export async function processarSaudeEquipamentos() {
       const idAlerta = `alerta-saude-${eq.id}-${getAgora().getMonth()}`;
       const unidade = eq.unidade?.nomeSistema || "N/A";
       
-      // FRASE DETALHADA DE RISCO
+      // FRASE DETALHADA DE RISCO (Ativa negrito no Frontend)
       const novoTitulo = `Risco de falha crítico na unidade de ${unidade}, no equipamento ${eq.modelo} (${eq.tag})`;
 
       await prisma.alerta.upsert({
         where: { id: idAlerta },
-        update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
+        update: { titulo: novoTitulo },
         create: {
           id: idAlerta,
           titulo: novoTitulo,

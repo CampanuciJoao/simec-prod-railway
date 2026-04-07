@@ -15,11 +15,11 @@ export const AlertasProvider = ({ children }) => {
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const { addToast } = useToast(); // Função para disparar o aviso visual na tela
+  const { addToast } = useToast(); // Hook para disparar o aviso visual na tela
 
   /**
    * @function carregarAlertas
-   * @param {boolean} vindaDoSocket - Se verdadeiro, dispara o aviso visual (Toast)
+   * @description Busca os alertas no banco e opcionalmente mostra um balão de aviso
    */
   const carregarAlertas = useCallback(async (vindaDoSocket = false) => {
     if (!isAuthenticated || authLoading || !user?.id) {
@@ -32,9 +32,9 @@ export const AlertasProvider = ({ children }) => {
       const data = await getAlertas(); 
       setAlertas(data || []);
 
-      // SE FOR UMA ATUALIZAÇÃO EM TEMPO REAL, MOSTRA O AVISO NA TELA
+      // SE A ATUALIZAÇÃO FOR ESPONTÂNEA (VIA SOCKET), DISPARA O TOAST NO CANTO DA TELA
       if (vindaDoSocket) {
-          addToast("🔔 Novo alerta de manutenção gerado pelo sistema!", "info");
+          addToast("🔔 Sistema: Nova atualização de manutenção detectada!", "info");
       }
 
     } catch (error) {
@@ -47,23 +47,23 @@ export const AlertasProvider = ({ children }) => {
 
   /**
    * @effect [SISTEMA REAL-TIME]
-   * @description Mantém o túnel aberto com o servidor para atualizações espontâneas.
+   * @description Mantém o canal de comunicação aberto com o servidor Railway/Redis.
    */
   useEffect(() => {
     if (isAuthenticated && !authLoading && user?.id) {
-      // 1. Carrega os dados assim que o usuário entra
+      // 1. Carrega os dados na entrada
       carregarAlertas();
 
-      // 2. Configura o endereço do servidor
-      const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+      // 2. Define a URL do servidor (remove o /api para conectar no canal de rádio principal)
+      const socketUrl = import.meta.env.VITE_API_URL?.split('/api')[0] || 'http://localhost:5000';
       
-      // 3. Conecta ao túnel de comunicação
+      // 3. Conecta ao túnel Socket.io
       const socket = io(socketUrl);
 
-      // 4. ESCUTA ATIVA: Quando o servidor terminar de processar, ele "empurra" a notícia.
+      // 4. OUVIDO ATIVO: No milésimo de segundo que o servidor emitir, o frontend obedece
       socket.on('atualizar-alertas', () => {
-          console.log("📢 WebSocket: Chegou notificação espontânea!");
-          carregarAlertas(true); // 'true' faz o balão aparecer na tela na hora
+          console.log("📢 WebSocket: Sinal recebido do servidor! Atualizando interface...");
+          carregarAlertas(true); // 'true' ativa o balão de aviso flutuante
       });
 
       return () => {
@@ -80,7 +80,7 @@ export const AlertasProvider = ({ children }) => {
 
   /**
    * @function updateStatus
-   * @description Atualiza o status de visualização (Visto/NaoVisto)
+   * @description Marca como Visto ou Não Visto
    */
   const updateStatus = useCallback(async (alertaId, newStatus) => {
     const originalAlertas = alertas;
@@ -94,14 +94,14 @@ export const AlertasProvider = ({ children }) => {
     try {
       await updateAlertaStatus(alertaId, newStatus); 
     } catch (error) {
-      console.error(`Erro ao atualizar status do alerta ${alertaId}. Revertendo...`, error);
+      console.error(`Erro ao atualizar status. Revertendo...`, error);
       setAlertas(originalAlertas);
     }
   }, [alertas]);
 
   /**
    * @function dismissAlerta
-   * @description Remove o alerta da vista (Ação de Dispensar)
+   * @description Ação de "Dispensar" o alerta da vista atual
    */
   const dismissAlerta = useCallback(async (alertaId) => {
     const originalAlertas = [...alertas];
@@ -110,13 +110,13 @@ export const AlertasProvider = ({ children }) => {
     try {
       await updateAlertaStatus(alertaId, 'Visto');
     } catch (error) {
-      console.error(`Erro ao dispensar o alerta ${alertaId}. Revertendo...`, error);
+      console.error(`Erro ao dispensar alerta. Revertendo...`, error);
       setAlertas(originalAlertas);
     }
   }, [alertas]);
 
 
-  // 3. Monta o valor a ser fornecido pelo contexto.
+  // 3. Monta o valor a ser fornecido pelo contexto global
   const value = useMemo(() => ({
     alertas,
     loading,
@@ -125,7 +125,7 @@ export const AlertasProvider = ({ children }) => {
     refetchAlertas: carregarAlertas,
   }), [alertas, loading, updateStatus, dismissAlerta, carregarAlertas]);
 
-  // 4. Retorna o Provider
+  // 4. Retorna o Provider que envolve toda a aplicação
   return (
     <AlertasContext.Provider value={value}>
       {children}
@@ -133,7 +133,7 @@ export const AlertasProvider = ({ children }) => {
   );
 };
 
-// 5. Hook customizado
+// 5. Hook customizado para facilitar o uso nos componentes (Ex: AlertasPage)
 export const useAlertas = () => {
     const context = useContext(AlertasContext);
     if (context === undefined) {

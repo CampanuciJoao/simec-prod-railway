@@ -12,6 +12,38 @@ import {
     faSignOutAlt, faBars, faCheck 
 } from '@fortawesome/free-solid-svg-icons';
 
+// ==========================================================================
+// FUNÇÃO DE FORMATAÇÃO PREMIUM PARA AS NOTIFICAÇÕES
+// ==========================================================================
+const formatarNotificacao = (titulo) => {
+    // 1. Padrão para Início de Manutenção / Proximidade / Risco de Falha
+    const matchGeral = titulo.match(/(.*?) na unidade de (.*?), no equipamento (.*)/);
+    if (matchGeral) {
+        return (
+            <span className="block" style={{ lineHeight: '1.5' }}>
+                <span className="text-slate-400" style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase' }}>{matchGeral[1]}</span> <br/>
+                <span className="text-slate-500">Unidade:</span> <strong className="text-blue-600">{matchGeral[2]}</strong> <br/>
+                <span className="text-slate-500">Equip:</span> <strong className="text-slate-900">{matchGeral[3]}</strong>
+            </span>
+        );
+    }
+
+    // 2. Padrão para Confirmação de Conclusão (OS Expirada)
+    const matchConfirmacao = titulo.match(/Confirmar conclusão: (.*?) na unidade de (.*)/);
+    if (matchConfirmacao) {
+        return (
+            <span className="block" style={{ lineHeight: '1.5' }}>
+                <strong className="text-amber-600" style={{ fontSize: '0.75rem' }}>⚠️ AÇÃO REQUERIDA</strong> <br/>
+                <span className="text-slate-500">Concluir:</span> <strong className="text-slate-900">{matchConfirmacao[1]}</strong> <br/>
+                <span className="text-slate-500">Local:</span> <strong className="text-blue-600">{matchConfirmacao[2]}</strong>
+            </span>
+        );
+    }
+
+    // 3. Caso não caia nos padrões acima, retorna o texto comum com estilo melhorado
+    return <span className="block font-medium text-slate-700">{titulo}</span>;
+};
+
 function AppLayout() {
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -47,7 +79,7 @@ function AppLayout() {
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
 
   const handleMarcarTodasComoVistas = (e) => {
-    e.stopPropagation(); // Impede o fechamento precoce
+    e.stopPropagation(); 
     const alertasPassíveisDeLimpeza = alertas.filter(a => 
         a.status === 'NaoVisto' && !a.id.startsWith('manut-confirm')
     );
@@ -72,12 +104,10 @@ function AppLayout() {
           <div className="header-right-actions">
             <span className="user-greeting">Olá, {user?.nome}</span>
 
-            {/* BOTÃO DE TEMA */}
             <button onClick={toggleTheme} className="header-action-btn" title="Alternar Tema">
               <FontAwesomeIcon icon={theme === 'light' ? faMoon : faSun} />
             </button>
 
-            {/* SINO DE NOTIFICAÇÕES (ESTRUTURA CORRIGIDA) */}
             <div className="notification-bell" ref={notificationRef}>
               <button className="header-action-btn" onClick={() => setIsDropdownOpen(!isDropdownOpen)}>
                 <FontAwesomeIcon icon={faBell} />
@@ -91,8 +121,8 @@ function AppLayout() {
               {isDropdownOpen && (
                 <div className="notification-dropdown">
                     <div className="dropdown-header">
-                      <span className="font-bold">Notificações</span>
-                      <button className="limpar-btn" onClick={handleMarcarTodasComoVistas}>Limpar avisos</button>
+                      <span className="font-bold">Centro de Notificações</span>
+                      <button className="limpar-btn bg-transparent border-none text-blue-600 font-bold text-xs cursor-pointer hover:underline" onClick={handleMarcarTodasComoVistas}>Limpar avisos</button>
                     </div>
                     <ul className="notification-list">
                       {alertasNaoVistos.length > 0 ? (
@@ -100,11 +130,15 @@ function AppLayout() {
                           const isObrigatorio = notif.id.startsWith('manut-confirm');
 
                           return (
-                            <li key={notif.id} className="notification-dropdown-item">
-                              <Link to={notif.link || "/alertas"} onClick={() => setIsDropdownOpen(false)} className="notification-link">
-                                <FontAwesomeIcon icon={faExclamationCircle} className={`icon-prioridade-${notif.prioridade?.toLowerCase()}`} />
+                            <li key={notif.id} className="notification-dropdown-item" style={{ alignItems: 'flex-start' }}>
+                              <Link to={notif.link || "/alertas"} onClick={() => setIsDropdownOpen(false)} className="notification-link" style={{ alignItems: 'flex-start' }}>
+                                <FontAwesomeIcon icon={faExclamationCircle} className={`icon-prioridade-${notif.prioridade?.toLowerCase()}`} style={{ marginTop: '4px' }} />
                                 <div className="notification-text">
-                                    <span className="notification-title">{notif.titulo}</span>
+                                    <div className="notification-title">
+                                        {/* CHAMADA PARA A FORMATAÇÃO EM NEGRITO/CORES */}
+                                        {formatarNotificacao(notif.titulo)}
+                                    </div>
+                                    <div className="text-[10px] text-slate-400 mt-1">OS: {notif.subtitulo?.match(/OS (.*?) /)?.[1] || '---'}</div>
                                 </div>
                               </Link>
                               
@@ -113,6 +147,7 @@ function AppLayout() {
                                   className="btn-mark-seen-mini" 
                                   onClick={(e) => { e.stopPropagation(); updateStatus(notif.id, 'Visto'); }}
                                   title="Marcar como visto"
+                                  style={{ marginTop: '2px' }}
                                 >
                                   <FontAwesomeIcon icon={faCheck} />
                                 </button>
@@ -120,10 +155,10 @@ function AppLayout() {
                             </li>
                           );
                         })
-                      ) : <li className="no-notifications">Tudo em dia!</li>}
+                      ) : <li className="no-notifications p-4 text-center text-slate-400">Tudo em dia por aqui!</li>}
                     </ul>
                     <div className="dropdown-footer">
-                        <Link to="/alertas" onClick={() => setIsDropdownOpen(false)}>Ver todos os alertas</Link>
+                        <Link to="/alertas" className="text-blue-600 font-black text-xs no-underline hover:underline" onClick={() => setIsDropdownOpen(false)}>VER TODOS OS ALERTAS</Link>
                     </div>
                 </div>
               )}
