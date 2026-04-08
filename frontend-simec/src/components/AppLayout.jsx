@@ -17,25 +17,29 @@ import {
 // ==========================================================================
 const formatarNotificacao = (titulo) => {
     // 1. Padrão para Início de Manutenção / Proximidade / Risco de Falha
-    const matchGeral = titulo.match(/(.*?) na unidade de (.*?), no equipamento (.*)/);
+    // O /i no final ignora maiúsculas/minúsculas. O \s+ garante que espaços extras não quebrem a regra.
+    const matchGeral = titulo.match(/(.*?)\s+na unidade de\s+(.*?),\s+no equipamento\s+(.*)/i);
+    
     if (matchGeral) {
         return (
             <span className="block" style={{ lineHeight: '1.5' }}>
-                <span className="text-slate-400" style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase' }}>{matchGeral[1]}</span> <br/>
-                <span className="text-slate-500">Unidade:</span> <strong className="text-blue-600">{matchGeral[2]}</strong> <br/>
-                <span className="text-slate-500">Equip:</span> <strong className="text-slate-900">{matchGeral[3]}</strong>
+                <span className="text-slate-400" style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase' }}>
+                    {matchGeral[1].trim()}
+                </span> <br/>
+                <span className="text-slate-500">Unidade:</span> <strong className="text-blue-600">{matchGeral[2].trim()}</strong> <br/>
+                <span className="text-slate-500">Equip:</span> <strong className="text-slate-900">{matchGeral[3].trim()}</strong>
             </span>
         );
     }
 
     // 2. Padrão para Confirmação de Conclusão (OS Expirada)
-    const matchConfirmacao = titulo.match(/Confirmar conclusão: (.*?) na unidade de (.*)/);
+    const matchConfirmacao = titulo.match(/Confirmar conclusão:\s+(.*?)\s+na unidade de\s+(.*)/i);
     if (matchConfirmacao) {
         return (
             <span className="block" style={{ lineHeight: '1.5' }}>
                 <strong className="text-amber-600" style={{ fontSize: '0.75rem' }}>⚠️ AÇÃO REQUERIDA</strong> <br/>
-                <span className="text-slate-500">Concluir:</span> <strong className="text-slate-900">{matchConfirmacao[1]}</strong> <br/>
-                <span className="text-slate-500">Local:</span> <strong className="text-blue-600">{matchConfirmacao[2]}</strong>
+                <span className="text-slate-500">Concluir:</span> <strong className="text-slate-900">{matchConfirmacao[1].trim()}</strong> <br/>
+                <span className="text-slate-500">Local:</span> <strong className="text-blue-600">{matchConfirmacao[2].trim()}</strong>
             </span>
         );
     }
@@ -128,6 +132,9 @@ function AppLayout() {
                       {alertasNaoVistos.length > 0 ? (
                         alertasNaoVistos.slice(0, 8).map(notif => {
                           const isObrigatorio = notif.id.startsWith('manut-confirm');
+                          
+                          // Captura segura do número da OS no subtítulo (aceita "OS: XXX" ou "OS XXX")
+                          const numeroOS = notif.subtitulo?.match(/OS\s*:?\s*([a-zA-Z0-9-]+)/i)?.[1] || '---';
 
                           return (
                             <li key={notif.id} className="notification-dropdown-item" style={{ alignItems: 'flex-start' }}>
@@ -138,7 +145,7 @@ function AppLayout() {
                                         {/* CHAMADA PARA A FORMATAÇÃO EM NEGRITO/CORES */}
                                         {formatarNotificacao(notif.titulo)}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 mt-1">OS: {notif.subtitulo?.match(/OS (.*?) /)?.[1] || '---'}</div>
+                                    <div className="text-[10px] text-slate-400 mt-1">OS: {numeroOS}</div>
                                 </div>
                               </Link>
                               
