@@ -1,161 +1,161 @@
 // simec/backend-simec/services/agent/relatorioUtils.js
 
-export function formatarDataBR(data) {
+function formatarDataBR(data) {
+    if (!data) return 'N/A';
+    return new Date(data).toLocaleDateString('pt-BR');
+}
+
+function formatarDataHoraBR(data) {
     if (!data) return 'N/A';
     return new Date(data).toLocaleString('pt-BR');
 }
 
-export function inicioDoDia(date) {
-    const d = new Date(date);
-    d.setHours(0, 0, 0, 0);
-    return d;
+function limparTexto(texto = '') {
+    return texto
+        .replace(/[?.!,;:]+$/g, '')
+        .trim();
 }
 
-export function fimDoDia(date) {
-    const d = new Date(date);
-    d.setHours(23, 59, 59, 999);
-    return d;
+function normalizarTipoManutencao(lower) {
+    if (lower.includes('preventiva')) return 'Preventiva';
+    if (lower.includes('corretiva')) return 'Corretiva';
+    if (lower.includes('calibração') || lower.includes('calibracao')) return 'Calibracao';
+    if (lower.includes('inspeção') || lower.includes('inspecao')) return 'Inspecao';
+    return null;
+}
+
+function extrairPeriodo(lower) {
+    const hoje = new Date();
+
+    if (lower.includes('último ano') || lower.includes('ultimo ano')) {
+        const inicio = new Date(hoje);
+        inicio.setFullYear(inicio.getFullYear() - 1);
+
+        return {
+            periodoInicio: inicio.toISOString(),
+            periodoFim: hoje.toISOString()
+        };
+    }
+
+    return {
+        periodoInicio: null,
+        periodoFim: null
+    };
 }
 
 export function extrairFiltrosRelatorio(mensagem) {
     const lower = mensagem.toLowerCase().trim();
-    const hoje = new Date();
 
     const filtros = {
-        tipoManutencao: null,
+        tipoManutencao: normalizarTipoManutencao(lower),
         unidadeTexto: null,
         equipamentoTexto: null,
+        somenteUltima: false,
         periodoInicio: null,
-        periodoFim: null,
-        somenteUltima: false
+        periodoFim: null
     };
 
-    // Tipo de manutenção
-    if (lower.includes('preventiva')) filtros.tipoManutencao = 'Preventiva';
-    if (lower.includes('corretiva')) filtros.tipoManutencao = 'Corretiva';
-
     // Última / mais recente
-    if (lower.includes('última') || lower.includes('ultima') || lower.includes('mais recente')) {
+    if (
+        lower.includes('última') ||
+        lower.includes('ultima') ||
+        lower.includes('mais recente') ||
+        lower.includes('quando foi')
+    ) {
         filtros.somenteUltima = true;
     }
 
-    // Unidade
-    const matchUnidade = mensagem.match(/(?:unidade|hospital)\s+(?:de\s+)?([a-zà-ú0-9\s-]+)/i);
-    if (matchUnidade) {
-        filtros.unidadeTexto = matchUnidade[1].trim();
-    }
+    // Período
+    const periodo = extrairPeriodo(lower);
+    filtros.periodoInicio = periodo.periodoInicio;
+    filtros.periodoFim = periodo.periodoFim;
 
-    // Equipamento por pistas comuns
-    const matchEquip = mensagem.match(
-        /(?:equipamento|tomografia|raio[- ]?x|mam[oó]grafo|ultrassom|resson[âa]ncia|act revolution|aquilion ct)(?:\s+de\s+[a-zà-ú0-9\s-]+)?/i
+    // 1. Padrão mais importante:
+    // "tomografia de coxim", "ultrassom de dourados", etc.
+    const matchEquipDeUnidade = mensagem.match(
+        /\b(tomografia|raio[- ]?x|mam[oó]grafo|ultrassom|resson[âa]ncia|act revolution|aquilion ct)\s+de\s+([a-zà-ú0-9\s-]+)\b/i
     );
 
-    if (matchEquip) {
-        let eq = matchEquip[0].trim();
-        eq = eq.replace(/^(equipamento)\s+/i, '').trim();
-        eq = eq.replace(/\s+da?\s+unidade\s+de\s+[a-zà-ú0-9\s-]+$/i, '').trim();
-        eq = eq.replace(/\s+de\s+[a-zà-ú0-9\s-]+$/i, '').trim();
-
-        if (!/^unidade$/i.test(eq)) {
-            filtros.equipamentoTexto = eq;
-        }
+    if (matchEquipDeUnidade) {
+        filtros.equipamentoTexto = limparTexto(matchEquipDeUnidade[1]);
+        filtros.unidadeTexto = limparTexto(matchEquipDeUnidade[2]);
+        return filtros;
     }
 
-    // Período: último ano
-    if (
-        lower.includes('último ano') ||
-        lower.includes('ultimo ano') ||
-        lower.includes('1 ano') ||
-        lower.includes('um ano')
-    ) {
-        const fim = fimDoDia(hoje);
-        const inicio = inicioDoDia(
-            new Date(hoje.getFullYear() - 1, hoje.getMonth(), hoje.getDate())
-        );
+    // 2. "na tomografia de coxim"
+    const matchNaEquipDeUnidade = mensagem.match(
+        /\bna?\s+(tomografia|raio[- ]?x|mam[oó]grafo|ultrassom|resson[âa]ncia|act revolution|aquilion ct)\s+de\s+([a-zà-ú0-9\s-]+)\b/i
+    );
 
-        filtros.periodoInicio = inicio.toISOString();
-        filtros.periodoFim = fim.toISOString();
+    if (matchNaEquipDeUnidade) {
+        filtros.equipamentoTexto = limparTexto(matchNaEquipDeUnidade[1]);
+        filtros.unidadeTexto = limparTexto(matchNaEquipDeUnidade[2]);
+        return filtros;
     }
 
-    // Período: últimos 30 dias
-    if (lower.includes('últimos 30 dias') || lower.includes('ultimos 30 dias')) {
-        const fim = fimDoDia(hoje);
-        const inicio = inicioDoDia(new Date(hoje.getTime() - 30 * 24 * 60 * 60 * 1000));
+    // 3. Unidade explícita: "unidade de coxim"
+    const matchUnidade = mensagem.match(
+        /\b(?:unidade|hospital)\s+de\s+([a-zà-ú0-9\s-]+)\b/i
+    );
 
-        filtros.periodoInicio = inicio.toISOString();
-        filtros.periodoFim = fim.toISOString();
+    if (matchUnidade) {
+        filtros.unidadeTexto = limparTexto(matchUnidade[1]);
     }
 
-    // Período: últimos 6 meses
-    if (lower.includes('últimos 6 meses') || lower.includes('ultimos 6 meses')) {
-        const fim = fimDoDia(hoje);
-        const inicio = inicioDoDia(
-            new Date(hoje.getFullYear(), hoje.getMonth() - 6, hoje.getDate())
-        );
+    // 4. Equipamento explícito
+    const matchEquipamento = mensagem.match(
+        /\b(tomografia|raio[- ]?x|mam[oó]grafo|ultrassom|resson[âa]ncia|act revolution|aquilion ct)\b/i
+    );
 
-        filtros.periodoInicio = inicio.toISOString();
-        filtros.periodoFim = fim.toISOString();
+    if (matchEquipamento) {
+        filtros.equipamentoTexto = limparTexto(matchEquipamento[1]);
     }
 
     return filtros;
 }
 
-export function montarResumoUltima(item, filtros, contexto) {
-    const unidadeNome = contexto.unidadeNome || filtros.unidadeTexto || 'unidade informada';
-    const equipamentoNome = contexto.equipamentoNome || filtros.equipamentoTexto || null;
-    const tipo = filtros.tipoManutencao || 'manutenção';
-
-    if (!item) {
-        if (equipamentoNome) {
-            return `Não encontrei ${tipo.toLowerCase()} para o equipamento ${equipamentoNome}.`;
-        }
-
-        return `Não encontrei ${tipo.toLowerCase()} na unidade ${unidadeNome}.`;
+export function montarResumoUltima(manutencao, filtros, contexto = {}) {
+    if (!manutencao) {
+        return 'Não encontrei manutenção correspondente com os filtros informados.';
     }
 
-    const alvo = equipamentoNome
-        ? `no equipamento ${equipamentoNome}`
-        : `na unidade ${unidadeNome}`;
+    const unidadeNome =
+        manutencao?.equipamento?.unidade?.nomeSistema ||
+        contexto.unidadeNome ||
+        'N/A';
 
-    return `A última ${tipo.toLowerCase()} ${alvo} foi a OS ${item.numeroOS}, em ${formatarDataBR(item.dataHoraAgendamentoInicio)}, no equipamento ${item.equipamento?.modelo || 'N/A'} (TAG ${item.equipamento?.tag || 'N/A'}), com status ${item.status}.`;
+    const equipamentoNome =
+        manutencao?.equipamento?.modelo ||
+        contexto.equipamentoNome ||
+        'N/A';
+
+    const tag = manutencao?.equipamento?.tag || 'N/A';
+
+    return `A última ${manutencao.tipo?.toLowerCase()} na unidade ${unidadeNome} foi a OS ${manutencao.numeroOS}, em ${formatarDataHoraBR(manutencao.dataHoraAgendamentoInicio || manutencao.dataConclusao)}, no equipamento ${equipamentoNome} (TAG ${tag}), com status ${manutencao.status}.`;
 }
 
-export function montarResumoLista(dados, filtros, contexto) {
-    const total = dados.length;
-    const unidadeNome = contexto.unidadeNome || filtros.unidadeTexto || 'unidade informada';
-    const equipamentoNome = contexto.equipamentoNome || filtros.equipamentoTexto || null;
-    const tipo = filtros.tipoManutencao || 'manutenções';
-
-    const periodoTxt =
-        filtros.periodoInicio && filtros.periodoFim
-            ? ` entre ${new Date(filtros.periodoInicio).toLocaleDateString('pt-BR')} e ${new Date(filtros.periodoFim).toLocaleDateString('pt-BR')}`
-            : '';
-
-    if (total === 0) {
-        if (equipamentoNome) {
-            return `Não encontrei ${tipo.toLowerCase()}${periodoTxt} para o equipamento ${equipamentoNome}.`;
-        }
-
-        return `Não encontrei ${tipo.toLowerCase()}${periodoTxt} na unidade ${unidadeNome}.`;
+export function montarResumoLista(manutencoes, filtros, contexto = {}) {
+    if (!manutencoes || manutencoes.length === 0) {
+        return 'Não encontrei manutenções correspondentes com os filtros informados.';
     }
 
-    const maisRecente = dados[0];
-    const alvo = equipamentoNome
-        ? `no equipamento ${equipamentoNome}`
-        : `na unidade ${unidadeNome}`;
+    const unidadeNome =
+        contexto.unidadeNome ||
+        manutencoes[0]?.equipamento?.unidade?.nomeSistema ||
+        'N/A';
 
-    return `Encontrei ${total} ${tipo.toLowerCase()}${periodoTxt} ${alvo}. A mais recente foi a OS ${maisRecente.numeroOS}, em ${formatarDataBR(maisRecente.dataHoraAgendamentoInicio)}, no equipamento ${maisRecente.equipamento?.modelo || 'N/A'} (TAG ${maisRecente.equipamento?.tag || 'N/A'}).`;
+    const tipo = (filtros.tipoManutencao || 'manutenção').toLowerCase();
+
+    return `Encontrei ${manutencoes.length} registros de ${tipo} para a unidade ${unidadeNome}.`;
 }
 
 export function construirPayloadConsultaUnica(manutencao, respostaTexto) {
     return {
         tipoResposta: 'MANUTENCAO_UNICA',
-        total: manutencao ? 1 : 0,
         respostaTexto,
-        podeGerarPDF: !!manutencao,
-        podeGerarOSIndividual: !!manutencao,
         manutencaoId: manutencao?.id || null,
         numeroOS: manutencao?.numeroOS || null,
+        total: manutencao ? 1 : 0,
         contextoPDF: manutencao
             ? {
                   tipo: 'OS_MANUTENCAO',
@@ -168,26 +168,14 @@ export function construirPayloadConsultaUnica(manutencao, respostaTexto) {
 export function construirPayloadLista(manutencoes, filtros, respostaTexto) {
     return {
         tipoResposta: 'LISTA_MANUTENCOES',
-        total: manutencoes.length,
         respostaTexto,
-        podeGerarPDF: manutencoes.length > 0,
-        podeGerarOSIndividual: manutencoes.length === 1,
-        manutencaoId: manutencoes.length === 1 ? manutencoes[0].id : null,
-        numeroOS: manutencoes.length === 1 ? manutencoes[0].numeroOS : null,
-        filtrosAplicados: filtros,
-        ids: manutencoes.map(m => m.id),
-        contextoPDF:
-            manutencoes.length === 1
-                ? {
-                      tipo: 'OS_MANUTENCAO',
-                      manutencaoId: manutencoes[0].id
-                  }
-                : manutencoes.length > 0
-                  ? {
-                        tipo: 'RELATORIO_MANUTENCOES',
-                        ids: manutencoes.map(m => m.id),
-                        filtros
-                    }
-                  : null
+        total: manutencoes?.length || 0,
+        ids: manutencoes?.map(m => m.id) || [],
+        contextoPDF: manutencoes?.length
+            ? {
+                  tipo: 'RELATORIO_MANUTENCOES',
+                  ids: manutencoes.map(m => m.id)
+              }
+            : null
     };
 }

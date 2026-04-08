@@ -2,6 +2,80 @@
 import prisma from '../prismaService.js';
 
 /**
+ * Normaliza texto removendo excesso de espaços e padronizando minúsculas.
+ */
+function normalizarTexto(texto = '') {
+    return texto
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/**
+ * Expande sinônimos comuns usados pelos usuários para equipamentos médicos.
+ */
+function expandirSinonimosEquipamento(texto = '') {
+    const t = normalizarTexto(texto);
+
+    const sinonimos = new Set([t]);
+
+    if (/\b(rm|rnm|ressonancia magnetica|ressonancia)\b/.test(t)) {
+        sinonimos.add('ressonancia');
+        sinonimos.add('ressonancia magnetica');
+        sinonimos.add('rm');
+        sinonimos.add('rnm');
+    }
+
+    if (/\b(tc|ct|tomografia|tomografo)\b/.test(t)) {
+        sinonimos.add('tomografia');
+        sinonimos.add('tomografo');
+        sinonimos.add('tc');
+        sinonimos.add('ct');
+    }
+
+    if (/\b(rx|raio x|raio-x|radiografia)\b/.test(t)) {
+        sinonimos.add('raio x');
+        sinonimos.add('raio-x');
+        sinonimos.add('radiografia');
+        sinonimos.add('rx');
+    }
+
+    if (/\b(us|uss|ultrassom|ultra-sonografia|ultrasonografia|ultra)\b/.test(t)) {
+        sinonimos.add('ultrassom');
+        sinonimos.add('ultrasonografia');
+        sinonimos.add('us');
+        sinonimos.add('uss');
+        sinonimos.add('ultra');
+    }
+
+    if (/\b(dr|radiografia digital)\b/.test(t)) {
+        sinonimos.add('dr');
+        sinonimos.add('radiografia digital');
+    }
+
+    if (/\b(mammo|mamografia|mamografo|mamografo)\b/.test(t)) {
+        sinonimos.add('mamografia');
+        sinonimos.add('mamografo');
+        sinonimos.add('mammo');
+    }
+
+    if (/\b(act revolution)\b/.test(t)) {
+        sinonimos.add('act revolution');
+        sinonimos.add('tomografia');
+    }
+
+    if (/\b(aquilion ct)\b/.test(t)) {
+        sinonimos.add('aquilion ct');
+        sinonimos.add('ct');
+        sinonimos.add('tomografia');
+    }
+
+    return Array.from(sinonimos);
+}
+
+/**
  * Resolve os nomes de texto da IA para registros reais do banco.
  * Estratégia:
  * 1. Resolver unidade
@@ -16,12 +90,14 @@ export async function resolverEntidades(estado) {
 
     // 1) Resolver unidade
     if (novo.unidadeTexto && !novo.unidadeId) {
+        const unidadeTextoNormalizado = normalizarTexto(novo.unidadeTexto);
+
         const unidade = await prisma.unidade.findFirst({
             where: {
                 OR: [
-                    { nomeSistema: { contains: novo.unidadeTexto, mode: 'insensitive' } },
-                    { nomeFantasia: { contains: novo.unidadeTexto, mode: 'insensitive' } },
-                    { cidade: { contains: novo.unidadeTexto, mode: 'insensitive' } }
+                    { nomeSistema: { contains: unidadeTextoNormalizado, mode: 'insensitive' } },
+                    { nomeFantasia: { contains: unidadeTextoNormalizado, mode: 'insensitive' } },
+                    { cidade: { contains: unidadeTextoNormalizado, mode: 'insensitive' } }
                 ]
             }
         });
@@ -34,17 +110,25 @@ export async function resolverEntidades(estado) {
 
     // 2) Resolver equipamento
     if (novo.equipamentoTexto && !novo.equipamentoId) {
-        const termoBusca = novo.equipamentoTexto.trim();
+        const termosBusca = expandirSinonimosEquipamento(novo.equipamentoTexto);
+
+        const montarOR = () => {
+            const condicoes = [];
+
+            for (const termo of termosBusca) {
+                condicoes.push({ modelo: { contains: termo, mode: 'insensitive' } });
+                condicoes.push({ tipo: { contains: termo, mode: 'insensitive' } });
+                condicoes.push({ tag: { contains: termo, mode: 'insensitive' } });
+                condicoes.push({ fabricante: { contains: termo, mode: 'insensitive' } });
+                condicoes.push({ setor: { contains: termo, mode: 'insensitive' } });
+            }
+
+            return condicoes;
+        };
 
         const montarWhere = (comUnidade = true) => ({
             ...(comUnidade && novo.unidadeId ? { unidadeId: novo.unidadeId } : {}),
-            OR: [
-                { modelo: { contains: termoBusca, mode: 'insensitive' } },
-                { tipo: { contains: termoBusca, mode: 'insensitive' } },
-                { tag: { contains: termoBusca, mode: 'insensitive' } },
-                { fabricante: { contains: termoBusca, mode: 'insensitive' } },
-                { setor: { contains: termoBusca, mode: 'insensitive' } }
-            ]
+            OR: montarOR()
         });
 
         let equipamentos = await prisma.equipamento.findMany({
@@ -53,13 +137,22 @@ export async function resolverEntidades(estado) {
             take: 10
         });
 
-        // busca global se nada encontrado dentro da unidade
+        // 3) Busca global se nada encontrado dentro da unidade
         if (equipamentos.length === 0 && novo.unidadeId) {
             equipamentos = await prisma.equipamento.findMany({
                 where: montarWhere(false),
                 include: { unidade: true },
                 take: 10
             });
+        }
+
+        // 4) Refinamento extra:
+        // se houver unidade resolvida, prioriza equipamentos dessa unidade
+        if (equipamentos.length > 1 && novo.unidadeId) {
+            const daMesmaUnidade = equipamentos.filter(e => e.unidadeId === novo.unidadeId);
+            if (daMesmaUnidade.length > 0) {
+                equipamentos = daMesmaUnidade;
+            }
         }
 
         if (equipamentos.length === 1) {
@@ -73,7 +166,7 @@ export async function resolverEntidades(estado) {
             novo.fabricante = eq.fabricante || null;
             novo.setor = eq.setor || null;
 
-            // sincronia da unidade real do equipamento
+            // Sincronia da unidade real do equipamento
             novo.unidadeId = eq.unidadeId;
             novo.unidadeNome = eq.unidade.nomeSistema;
         } else if (equipamentos.length > 1) {
