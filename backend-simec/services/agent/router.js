@@ -28,9 +28,6 @@ const RESET_COMMANDS = [
     'resetar'
 ];
 
-/**
- * Detecta se a frase parece uma consulta / relatório.
- */
 function pareceConsultaRelatorio(msg) {
     const termosConsulta = [
         'quando foi',
@@ -62,9 +59,6 @@ function pareceConsultaRelatorio(msg) {
     return termosConsulta.some(t => msg.includes(t));
 }
 
-/**
- * Detecta se a frase parece um pedido explícito de agendamento.
- */
 function pareceAgendamento(msg) {
     const termosAgendamento = [
         'agendar',
@@ -75,15 +69,13 @@ function pareceAgendamento(msg) {
         'nova manutenção',
         'novo agendamento',
         'quero agendar',
-        'preciso agendar'
+        'preciso agendar',
+        'gostaria de agendar'
     ];
 
     return termosAgendamento.some(t => msg.includes(t));
 }
 
-/**
- * Detecta se a frase parece uma consulta de seguro.
- */
 function pareceSeguro(msg) {
     const termosSeguro = [
         'seguro',
@@ -101,22 +93,29 @@ function pareceSeguro(msg) {
     return termosSeguro.some(t => msg.includes(t));
 }
 
+async function cancelarSessaoSeExistir(sessao, mensagem) {
+    if (!sessao) return;
+
+    await AgentSessionRepository.cancelarSessao(sessao.id);
+    await AgentSessionRepository.registrarMensagem(
+        sessao.id,
+        'user',
+        mensagem,
+        { acao: 'TROCA_DE_INTENCAO' }
+    );
+}
+
 /**
- * Maestro do Agente:
- * 1. expira sessões antigas
- * 2. trata reset manual
- * 3. tenta resolver ação contextual
- * 4. continua fluxo ativo
- * 5. classifica nova intenção
+ * Maestro do Agente
  */
 export const RoteadorAgente = async (mensagem, usuarioNome) => {
     try {
         const msgMinuscula = mensagem.toLowerCase().trim();
 
-        // 1. Expira sessões antigas do usuário
+        // 1. Expira sessões antigas
         await AgentSessionRepository.expirarSessoesAntigas(usuarioNome);
 
-        // 2. Busca sessões ativas por domínio
+        // 2. Busca sessões ativas
         const sessaoAgendamento = await AgentSessionRepository.buscarSessaoAtiva(
             usuarioNome,
             'AGENDAR_MANUTENCAO'
@@ -138,42 +137,16 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
 
         // 3. Reset manual explícito
         if (RESET_COMMANDS.some(cmd => msgMinuscula.includes(cmd))) {
-            if (sessaoAgendamento) {
-                await AgentSessionRepository.cancelarSessao(sessaoAgendamento.id);
-                await AgentSessionRepository.registrarMensagem(
-                    sessaoAgendamento.id,
-                    'user',
-                    mensagem,
-                    { acao: 'RESET_MANUAL' }
-                );
-            }
-
-            if (sessaoRelatorio) {
-                await AgentSessionRepository.cancelarSessao(sessaoRelatorio.id);
-                await AgentSessionRepository.registrarMensagem(
-                    sessaoRelatorio.id,
-                    'user',
-                    mensagem,
-                    { acao: 'RESET_MANUAL' }
-                );
-            }
-
-            if (sessaoSeguro) {
-                await AgentSessionRepository.cancelarSessao(sessaoSeguro.id);
-                await AgentSessionRepository.registrarMensagem(
-                    sessaoSeguro.id,
-                    'user',
-                    mensagem,
-                    { acao: 'RESET_MANUAL' }
-                );
-            }
+            await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
+            await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
+            await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
 
             return {
                 mensagem: 'Certo, vamos começar de novo. Como posso ajudar?'
             };
         }
 
-        // 4. Tenta resolver ação contextual antes de qualquer classificação
+        // 4. Ação contextual primeiro
         const acaoRelatorio = sessaoRelatorio
             ? resolverAcaoPorContexto(sessaoRelatorio, mensagem)
             : null;
@@ -208,67 +181,26 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
             );
         }
 
-        // 5. Se já existe fluxo ativo de agendamento, continua nele
-        if (temAgendamentoAtivo) {
-            console.log(
-                `[AGENT_ROUTER] Usuário: ${usuarioNome} | Continuando fluxo ativo de AGENDAMENTO`
-            );
-            return await AgendamentoService.processar(
-                mensagem,
-                usuarioNome,
-                sessaoAgendamento
-            );
-        }
-
-        // 6. Se já existe fluxo ativo de relatório, continua nele
-        if (temRelatorioAtivo) {
-            console.log(
-                `[AGENT_ROUTER] Usuário: ${usuarioNome} | Continuando fluxo ativo de RELATORIO`
-            );
-            return await RelatorioService.processar(
-                mensagem,
-                usuarioNome,
-                sessaoRelatorio,
-                null
-            );
-        }
-
-        // 7. Se já existe fluxo ativo de seguro, continua nele
-        if (temSeguroAtivo) {
-            console.log(
-                `[AGENT_ROUTER] Usuário: ${usuarioNome} | Continuando fluxo ativo de SEGURO`
-            );
-            return await SeguroService.processar(
-                mensagem,
-                usuarioNome,
-                sessaoSeguro,
-                null
-            );
-        }
-
-        // 8. Sem fluxo ativo: classifica nova intenção
+        // 5. Classifica intenção cedo, para detectar mudança de assunto
         let intencao = await classificarIntencao(mensagem);
 
-        // 9. Heurísticas de segurança
         if (intencao === 'OUTRO' && pareceSeguro(msgMinuscula)) {
-            console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para SEGURO`);
             intencao = 'SEGURO';
         }
 
         if (intencao === 'OUTRO' && pareceConsultaRelatorio(msgMinuscula)) {
-            console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para RELATORIO`);
             intencao = 'RELATORIO';
         }
 
         if (intencao === 'OUTRO' && pareceAgendamento(msgMinuscula)) {
-            console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para AGENDAR_MANUTENCAO`);
             intencao = 'AGENDAR_MANUTENCAO';
         }
 
-        // Regra de desempate:
-        // seguro > relatório > agendamento, quando houver termos claros
+        // Desempate
         if (pareceSeguro(msgMinuscula)) {
             intencao = 'SEGURO';
+        } else if (pareceAgendamento(msgMinuscula)) {
+            intencao = 'AGENDAR_MANUTENCAO';
         } else if (pareceConsultaRelatorio(msgMinuscula)) {
             intencao = 'RELATORIO';
         }
@@ -277,18 +209,87 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
             `[AGENT_ROUTER] Usuário: ${usuarioNome} | AgendamentoAtivo: ${temAgendamentoAtivo} | RelatorioAtivo: ${temRelatorioAtivo} | SeguroAtivo: ${temSeguroAtivo} | Intenção: ${intencao}`
         );
 
-        // 10. Estratégia padrão
-        const executor = STRATEGIES[intencao];
-        if (executor) {
-            return await executor.processar(mensagem, usuarioNome, null, null);
+        // 6. Troca explícita de intenção
+        if (intencao === 'AGENDAR_MANUTENCAO') {
+            if (sessaoRelatorio) {
+                await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
+            }
+            if (sessaoSeguro) {
+                await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
+            }
+
+            return await AgendamentoService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoAgendamento || null
+            );
         }
 
-        // 11. Fallback
+        if (intencao === 'RELATORIO') {
+            if (sessaoAgendamento) {
+                await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
+            }
+            if (sessaoSeguro) {
+                await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
+            }
+
+            return await RelatorioService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoRelatorio || null,
+                null
+            );
+        }
+
+        if (intencao === 'SEGURO') {
+            if (sessaoAgendamento) {
+                await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
+            }
+            if (sessaoRelatorio) {
+                await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
+            }
+
+            return await SeguroService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoSeguro || null,
+                null
+            );
+        }
+
+        // 7. Se não houve intenção nova clara, continua fluxo ativo
+        if (temAgendamentoAtivo) {
+            return await AgendamentoService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoAgendamento
+            );
+        }
+
+        if (temRelatorioAtivo) {
+            return await RelatorioService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoRelatorio,
+                null
+            );
+        }
+
+        if (temSeguroAtivo) {
+            return await SeguroService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoSeguro,
+                null
+            );
+        }
+
+        // 8. Fallback
         return {
             mensagem: 'Olá! Sou a SIMEC-IA. Posso ajudar com agendamentos, relatórios e consultas de seguros. Como posso ajudar?'
         };
     } catch (error) {
-        console.error(`[AGENT_ROUTER_ERROR] Erro crítico no roteamento:`, error);
+        console.error('[AGENT_ROUTER_ERROR] Erro crítico no roteamento:', error);
 
         return {
             mensagem: 'Tive um problema técnico ao processar sua mensagem. Poderia repetir de forma mais direta?'
