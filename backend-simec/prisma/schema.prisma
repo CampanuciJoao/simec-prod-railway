@@ -332,6 +332,8 @@ enum AgentSessionStatus {
 enum AgentIntent {
   AGENDAR_MANUTENCAO
   RELATORIO
+  SEGURO
+  CONTRATO
   BUSCAR_APOLICE
   OUTRO
 }
@@ -345,22 +347,22 @@ enum AgentStep {
 }
 
 model AgentSession {
-  id             String             @id @default(uuid())
-  usuario        String
-  intent         AgentIntent
-  status         AgentSessionStatus @default(Ativa)
-  step           AgentStep          @default(START)
-  stateJson      String             @db.Text
-  resumo         String?
-  startedAt      DateTime           @default(now())
-  lastInteractionAt DateTime        @default(now())
-  expiresAt      DateTime
-  finalizadaAt   DateTime?
-  canceladaAt    DateTime?
-  expiradaAt     DateTime?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  mensagens      AgentMessage[]
+  id                String             @id @default(uuid())
+  usuario           String
+  intent            AgentIntent
+  status            AgentSessionStatus @default(Ativa)
+  step              AgentStep          @default(START)
+  stateJson         String             @db.Text
+  resumo            String?
+  startedAt         DateTime           @default(now())
+  lastInteractionAt DateTime           @default(now())
+  expiresAt         DateTime
+  finalizadaAt      DateTime?
+  canceladaAt       DateTime?
+  expiradaAt        DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  mensagens         AgentMessage[]
 
   @@index([usuario, status])
   @@index([usuario, intent, status])
@@ -369,29 +371,29 @@ model AgentSession {
 }
 
 model AgentMessage {
-  id          String       @id @default(uuid())
-  sessionId   String       @map("session_id")
-  role        String
-  mensagem    String       @db.Text
-  metadataJson String?     @db.Text
-  createdAt   DateTime     @default(now())
-  session     AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid())
+  sessionId    String       @map("session_id")
+  role         String
+  mensagem     String       @db.Text
+  metadataJson String?      @db.Text
+  createdAt    DateTime     @default(now())
+  session      AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
 
   @@index([sessionId, createdAt])
   @@map("agent_messages")
 }
 
 model UserAgentMemory {
-  id                    String   @id @default(uuid())
-  usuario               String   @unique
-  ultimaUnidadeId       String?  @map("ultima_unidade_id")
-  ultimaUnidadeNome     String?  @map("ultima_unidade_nome")
-  ultimoEquipamentoId   String?  @map("ultimo_equipamento_id")
-  ultimoEquipamentoTag  String?  @map("ultimo_equipamento_tag")
+  id                     String   @id @default(uuid())
+  usuario                String   @unique
+  ultimaUnidadeId        String?  @map("ultima_unidade_id")
+  ultimaUnidadeNome      String?  @map("ultima_unidade_nome")
+  ultimoEquipamentoId    String?  @map("ultimo_equipamento_id")
+  ultimoEquipamentoTag   String?  @map("ultimo_equipamento_tag")
   ultimoEquipamentoModelo String? @map("ultimo_equipamento_modelo")
-  preferenciasJson      String?  @db.Text
-  updatedAt             DateTime @updatedAt
-  createdAt             DateTime @default(now())
+  preferenciasJson       String?  @db.Text
+  updatedAt              DateTime @updatedAt
+  createdAt              DateTime @default(now())
 
   @@map("user_agent_memory")
 }
