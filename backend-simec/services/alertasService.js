@@ -31,10 +31,11 @@ export async function atualizarStatusManutencoes() {
         await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'AguardandoConfirmacao' } });
         await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
 
-        const modelo = manut.equipamento.modelo;
-        const tag = manut.equipamento.tag;
-        const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
-        const novoTitulo = `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
+        const eq = manut.equipamento.modelo;
+        const u = manut.equipamento.unidade?.nomeSistema || "N/A";
+        
+        // FRASE NATURAL EXATA (Ativa negrito no Frontend)
+        const novoTitulo = `Confirmar manutenção da ${eq} em ${u}`;
 
         await tx.alerta.upsert({
           where: { id: `manut-confirm-${manut.id}` },
@@ -71,10 +72,11 @@ export async function atualizarStatusManutencoes() {
         await tx.equipamento.update({ where: { id: manut.equipamentoId }, data: { status: 'EmManutencao' } });
         await tx.manutencao.update({ where: { id: manut.id }, data: { status: 'EmAndamento', dataInicioReal: manut.dataHoraAgendamentoInicio } });
         
-        const modelo = manut.equipamento.modelo;
-        const tag = manut.equipamento.tag;
-        const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
-        const novoTitulo = `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        const eq = manut.equipamento.modelo;
+        const u = manut.equipamento.unidade?.nomeSistema || "N/A";
+        
+        // FRASE NATURAL EXATA (Ativa negrito no Frontend)
+        const novoTitulo = `Manutenção iniciada na ${eq} de ${u}`;
 
         await tx.alerta.upsert({
           where: { id: `manut-iniciada-${manut.id}` },
@@ -97,10 +99,11 @@ export async function atualizarStatusManutencoes() {
 
 async function gerarAlertasDeProximidadeManutencao() {
   const agora = getAgora();
+  // Retirado a palavra "em" do texto para não ficar redundante com o "inicia em" do título
   const PONTOS_INICIO = [
-    { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' },
-    { limiar: 60, prioridade: 'Media', label: '1h', texto: 'em 1 hora' },
-    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: 'em 24 horas' },
+    { limiar: 10, prioridade: 'Alta', label: '10min', texto: '10 minutos' },
+    { limiar: 60, prioridade: 'Media', label: '1h', texto: '1 hora' },
+    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: '24 horas' },
   ];
 
   const manutencoesProximas = await prisma.manutencao.findMany({
@@ -116,18 +119,19 @@ async function gerarAlertasDeProximidadeManutencao() {
       // Cria uma margem de 1 minuto para não perder nenhum alerta entre os "tiques" do relógio
       if (minRestantes <= ponto.limiar && minRestantes >= (ponto.limiar - 1)) {
         const idAlerta = `manut-prox-início-${manut.id}-${ponto.label}`;
-        const modelo = manut.equipamento.modelo;
-        const tag = manut.equipamento.tag;
-        const unidade = manut.equipamento.unidade?.nomeSistema || "N/A";
-        const novoTitulo = `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        
+        const eq = manut.equipamento.modelo;
+        const u = manut.equipamento.unidade?.nomeSistema || "N/A";
+        
+        // FRASE NATURAL EXATA (Reconhecida pelo Frontend para aplicar negrito e cores)
+        const novoTitulo = `Manutenção na ${eq} de ${u}, inicia em ${ponto.texto}`;
 
         await prisma.alerta.upsert({
           where: { id: idAlerta },
-          update: { titulo: novoTitulo }, 
+          update: { titulo: novoTitulo }, // FORÇA A ATUALIZAÇÃO DO TÍTULO
           create: {
             id: idAlerta,
             titulo: novoTitulo,
-            // AQUI: Formato exato para o Frontend recortar o número da OS
             subtitulo: `OS ${manut.numeroOS} - Agendado para ${format(manut.dataHoraAgendamentoInicio, 'HH:mm')}`,
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
