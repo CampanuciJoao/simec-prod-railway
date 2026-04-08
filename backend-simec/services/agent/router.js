@@ -1,5 +1,6 @@
 // simec/backend-simec/services/agent/router.js
 import { AgendamentoService } from './agendamentoService.js';
+import { RelatorioService } from './relatorioService.js';
 import { classificarIntencao } from './intentClassifier.js';
 import { AgentSessionRepository } from './agentSessionRepository.js';
 
@@ -8,6 +9,7 @@ import { AgentSessionRepository } from './agentSessionRepository.js';
  */
 const STRATEGIES = {
     AGENDAR_MANUTENCAO: AgendamentoService,
+    RELATORIO: RelatorioService,
 };
 
 /**
@@ -34,22 +36,30 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
         await AgentSessionRepository.expirarSessoesAntigas(usuarioNome);
 
         // 2. Busca sessão ativa de agendamento
-        const sessaoAtiva = await AgentSessionRepository.buscarSessaoAtiva(
+        const sessaoAgendamento = await AgentSessionRepository.buscarSessaoAtiva(
             usuarioNome,
             'AGENDAR_MANUTENCAO'
         );
 
-        const temProcessoAtivo = !!sessaoAtiva;
+        const temProcessoAtivo = !!sessaoAgendamento;
 
         // 3. Reset manual explícito
         if (RESET_COMMANDS.some(cmd => msgMinuscula.includes(cmd))) {
-            if (sessaoAtiva) {
-                await AgentSessionRepository.cancelarSessao(sessaoAtiva.id);
+            if (sessaoAgendamento) {
+                await AgentSessionRepository.cancelarSessao(sessaoAgendamento.id);
+
                 await AgentSessionRepository.registrarMensagem(
-                    sessaoAtiva.id,
+                    sessaoAgendamento.id,
                     'user',
                     mensagem,
                     { acao: 'RESET_MANUAL' }
+                );
+
+                await AgentSessionRepository.registrarMensagem(
+                    sessaoAgendamento.id,
+                    'agent',
+                    "Certo, vamos começar de novo. Qual manutenção você deseja agendar?",
+                    { acao: 'RESET_MANUAL_CONFIRMACAO' }
                 );
             }
 
@@ -80,18 +90,19 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
             `[AGENT_ROUTER] Usuário: ${usuarioNome} | Ativo: ${temProcessoAtivo} | Intenção: ${intencao}`
         );
 
-        // 6. Se já existe sessão ativa, prioriza continuidade do fluxo
+        // 6. Se já existe sessão ativa de agendamento, prioriza continuidade do fluxo
         if (temProcessoAtivo) {
-            return await AgendamentoService.processar(mensagem, usuarioNome, sessaoAtiva);
+            return await AgendamentoService.processar(mensagem, usuarioNome, sessaoAgendamento);
         }
 
-        // 7. Se é novo pedido de agendamento
-        if (intencao === 'AGENDAR_MANUTENCAO') {
-            return await AgendamentoService.processar(mensagem, usuarioNome, null);
+        // 7. Se houver estratégia correspondente, delega para ela
+        const executor = STRATEGIES[intencao];
+        if (executor) {
+            return await executor.processar(mensagem, usuarioNome, null);
         }
 
         // 8. Fallback amigável
-        return "Olá! Sou o Agente Guardião do SIMEC. No momento, sou especialista em **agendar manutenções** para seus equipamentos. Como posso ser útil agora?";
+        return "Olá! Sou o Agente Guardião do SIMEC. Posso ajudar com **agendamentos**, **consultas de histórico** e **relatórios de manutenção**. Como posso ser útil agora?";
 
     } catch (error) {
         console.error(`[AGENT_ROUTER_ERROR] Erro crítico no roteamento:`, error.message);
