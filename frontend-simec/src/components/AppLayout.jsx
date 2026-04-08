@@ -16,35 +16,50 @@ import {
 // FUNÇÃO DE FORMATAÇÃO PREMIUM PARA AS NOTIFICAÇÕES
 // ==========================================================================
 const formatarNotificacao = (titulo) => {
-    // 1. Padrão para Início de Manutenção / Proximidade / Risco de Falha
-    // O /i no final ignora maiúsculas/minúsculas. O \s+ garante que espaços extras não quebrem a regra.
-    const matchGeral = titulo.match(/(.*?)\s+na unidade de\s+(.*?),\s+no equipamento\s+(.*)/i);
-    
-    if (matchGeral) {
+    // 1. Padrão: "Manutenção na [Equipamento] de [Unidade], inicia em [Tempo]"
+    const matchProximidade = titulo.match(/Manutenção na (.*?) de (.*?), inicia em (.*)/i);
+    if (matchProximidade) {
         return (
-            <span className="block" style={{ lineHeight: '1.5' }}>
-                <span className="text-slate-400" style={{ fontSize: '0.7rem', fontWeight: '800', textTransform: 'uppercase' }}>
-                    {matchGeral[1].trim()}
-                </span> <br/>
-                <span className="text-slate-500">Unidade:</span> <strong className="text-blue-600">{matchGeral[2].trim()}</strong> <br/>
-                <span className="text-slate-500">Equip:</span> <strong className="text-slate-900">{matchGeral[3].trim()}</strong>
+            <span className="block" style={{ lineHeight: '1.4', fontSize: '0.85rem' }}>
+                <span className="text-slate-600">Manutenção na </span>
+                <strong className="text-slate-900">{matchProximidade[1].trim()}</strong><br/>
+                <span className="text-slate-600">da unidade </span>
+                <strong className="text-blue-600">{matchProximidade[2].trim()}</strong><br/>
+                <span className="text-slate-400 text-xs uppercase font-bold tracking-widest">
+                    inicia em {matchProximidade[3].trim()}
+                </span>
             </span>
         );
     }
 
-    // 2. Padrão para Confirmação de Conclusão (OS Expirada)
-    const matchConfirmacao = titulo.match(/Confirmar conclusão:\s+(.*?)\s+na unidade de\s+(.*)/i);
+    // 2. Padrão: "Manutenção iniciada na [Equipamento] de [Unidade]"
+    const matchIniciada = titulo.match(/Manutenção iniciada na (.*?) de (.*)/i);
+    if (matchIniciada) {
+        return (
+            <span className="block" style={{ lineHeight: '1.4', fontSize: '0.85rem' }}>
+                <span className="text-green-600 font-bold uppercase text-[10px] tracking-widest">✓ Iniciada na</span><br/>
+                <strong className="text-slate-900">{matchIniciada[1].trim()}</strong><br/>
+                <span className="text-slate-600">da unidade </span>
+                <strong className="text-blue-600">{matchIniciada[2].trim()}</strong>
+            </span>
+        );
+    }
+
+    // 3. Padrão: "Confirmar manutenção da [Equipamento] em [Unidade]"
+    const matchConfirmacao = titulo.match(/Confirmar manutenção da (.*?) em (.*)/i);
     if (matchConfirmacao) {
         return (
-            <span className="block" style={{ lineHeight: '1.5' }}>
-                <strong className="text-amber-600" style={{ fontSize: '0.75rem' }}>⚠️ AÇÃO REQUERIDA</strong> <br/>
-                <span className="text-slate-500">Concluir:</span> <strong className="text-slate-900">{matchConfirmacao[1].trim()}</strong> <br/>
-                <span className="text-slate-500">Local:</span> <strong className="text-blue-600">{matchConfirmacao[2].trim()}</strong>
+            <span className="block" style={{ lineHeight: '1.4', fontSize: '0.85rem' }}>
+                <strong className="text-amber-600 text-[10px] uppercase tracking-widest">⚠️ Confirmar conclusão</strong><br/>
+                <span className="text-slate-600">da máquina </span>
+                <strong className="text-slate-900">{matchConfirmacao[1].trim()}</strong><br/>
+                <span className="text-slate-600">na unidade </span>
+                <strong className="text-blue-600">{matchConfirmacao[2].trim()}</strong>
             </span>
         );
     }
 
-    // 3. Caso não caia nos padrões acima, retorna o texto comum com estilo melhorado
+    // Se a frase não bater, exibe normal
     return <span className="block font-medium text-slate-700">{titulo}</span>;
 };
 
@@ -133,7 +148,7 @@ function AppLayout() {
                         alertasNaoVistos.slice(0, 8).map(notif => {
                           const isObrigatorio = notif.id.startsWith('manut-confirm');
                           
-                          // Captura segura do número da OS no subtítulo (aceita "OS: XXX" ou "OS XXX")
+                          // Captura segura do número da OS no subtítulo
                           const numeroOS = notif.subtitulo?.match(/OS\s*:?\s*([a-zA-Z0-9-]+)/i)?.[1] || '---';
 
                           return (
@@ -145,7 +160,7 @@ function AppLayout() {
                                         {/* CHAMADA PARA A FORMATAÇÃO EM NEGRITO/CORES */}
                                         {formatarNotificacao(notif.titulo)}
                                     </div>
-                                    <div className="text-[10px] text-slate-400 mt-1">OS: {numeroOS}</div>
+                                    <div className="text-[10px] text-slate-400 mt-1 font-bold">OS: {numeroOS}</div>
                                 </div>
                               </Link>
                               
