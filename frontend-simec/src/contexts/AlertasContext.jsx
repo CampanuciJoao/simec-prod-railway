@@ -1,10 +1,9 @@
 // Ficheiro: src/contexts/AlertasContext.jsx
-// VERSÃO PROFISSIONAL - REAL-TIME ESPONTÂNEO COM NOTIFICAÇÃO TOAST
+// VERSÃO PROFISSIONAL - REAL-TIME SILENCIOSO (ATUALIZA APENAS O SINO)
 
 import React, { createContext, useState, useContext, useEffect, useCallback, useMemo } from 'react';
 import { getAlertas, updateAlertaStatus } from '../services/api';
 import { useAuth } from './AuthContext';
-import { useToast } from './ToastContext'; // Importação do sistema de avisos flutuantes
 import { io } from 'socket.io-client';
 
 // 1. Criação do Contexto
@@ -15,13 +14,12 @@ export const AlertasProvider = ({ children }) => {
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
   const { user, isAuthenticated, loading: authLoading } = useAuth();
-  const { addToast } = useToast(); // Hook para disparar o aviso visual na tela
 
   /**
    * @function carregarAlertas
-   * @description Busca os alertas no banco e opcionalmente mostra um balão de aviso
+   * @description Busca os alertas no banco silenciosamente
    */
-  const carregarAlertas = useCallback(async (vindaDoSocket = false) => {
+  const carregarAlertas = useCallback(async () => {
     if (!isAuthenticated || authLoading || !user?.id) {
       setAlertas([]);
       if (!authLoading) setLoading(false);
@@ -31,23 +29,17 @@ export const AlertasProvider = ({ children }) => {
     try {
       const data = await getAlertas(); 
       setAlertas(data || []);
-
-      // SE A ATUALIZAÇÃO FOR ESPONTÂNEA (VIA SOCKET), DISPARA O TOAST NO CANTO DA TELA
-      if (vindaDoSocket) {
-          addToast("🔔 Sistema: Nova atualização de manutenção detectada!", "info");
-      }
-
     } catch (error) {
       console.error("AlertasContext: Falha ao buscar dados de alertas.", error);
       setAlertas([]);
     } finally {
         setLoading(false);
     }
-  }, [isAuthenticated, authLoading, user?.id, addToast]);
+  }, [isAuthenticated, authLoading, user?.id]);
 
   /**
    * @effect [SISTEMA REAL-TIME]
-   * @description Mantém o canal de comunicação aberto com o servidor Railway/Redis.
+   * @description Mantém o canal de comunicação aberto com o servidor Railway.
    */
   useEffect(() => {
     if (isAuthenticated && !authLoading && user?.id) {
@@ -60,10 +52,10 @@ export const AlertasProvider = ({ children }) => {
       // 3. Conecta ao túnel Socket.io
       const socket = io(socketUrl);
 
-      // 4. OUVIDO ATIVO: No milésimo de segundo que o servidor emitir, o frontend obedece
+      // 4. OUVIDO ATIVO: Atualiza a interface silenciosamente quando o servidor mandar sinal
       socket.on('atualizar-alertas', () => {
           console.log("📢 WebSocket: Sinal recebido do servidor! Atualizando interface...");
-          carregarAlertas(true); // 'true' ativa o balão de aviso flutuante
+          carregarAlertas(); // Atualiza os dados sem disparar balões na tela
       });
 
       return () => {
