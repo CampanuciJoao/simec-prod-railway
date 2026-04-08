@@ -1,6 +1,7 @@
 // simec/backend-simec/services/agent/router.js
 import { AgendamentoService } from './agendamentoService.js';
 import { RelatorioService } from './relatorioService.js';
+import { SeguroService } from './seguroService.js';
 import { classificarIntencao } from './intentClassifier.js';
 import { AgentSessionRepository } from './agentSessionRepository.js';
 import { resolverAcaoPorContexto } from './actionResolver.js';
@@ -11,6 +12,7 @@ import { resolverAcaoPorContexto } from './actionResolver.js';
 const STRATEGIES = {
     AGENDAR_MANUTENCAO: AgendamentoService,
     RELATORIO: RelatorioService,
+    SEGURO: SeguroService
 };
 
 /**
@@ -26,6 +28,9 @@ const RESET_COMMANDS = [
     'resetar'
 ];
 
+/**
+ * Detecta se a frase parece uma consulta / relatório.
+ */
 function pareceConsultaRelatorio(msg) {
     const termosConsulta = [
         'quando foi',
@@ -49,12 +54,17 @@ function pareceConsultaRelatorio(msg) {
         'no período',
         'periodo',
         'último ano',
-        'ultimo ano'
+        'ultimo ano',
+        'preventivas',
+        'corretivas'
     ];
 
     return termosConsulta.some(t => msg.includes(t));
 }
 
+/**
+ * Detecta se a frase parece um pedido explícito de agendamento.
+ */
 function pareceAgendamento(msg) {
     const termosAgendamento = [
         'agendar',
@@ -72,7 +82,32 @@ function pareceAgendamento(msg) {
 }
 
 /**
- * Maestro do Agente: Orquestra a conversa, mantendo contexto via AgentSession.
+ * Detecta se a frase parece uma consulta de seguro.
+ */
+function pareceSeguro(msg) {
+    const termosSeguro = [
+        'seguro',
+        'apólice',
+        'apolice',
+        'seguradora',
+        'cobertura',
+        'coberturas',
+        'vencimento do seguro',
+        'vence o seguro',
+        'pdf do seguro',
+        'documento do seguro'
+    ];
+
+    return termosSeguro.some(t => msg.includes(t));
+}
+
+/**
+ * Maestro do Agente:
+ * 1. expira sessões antigas
+ * 2. trata reset manual
+ * 3. tenta resolver ação contextual
+ * 4. continua fluxo ativo
+ * 5. classifica nova intenção
  */
 export const RoteadorAgente = async (mensagem, usuarioNome) => {
     try {
@@ -81,7 +116,7 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
         // 1. Expira sessões antigas do usuário
         await AgentSessionRepository.expirarSessoesAntigas(usuarioNome);
 
-        // 2. Busca sessões ativas
+        // 2. Busca sessões ativas por domínio
         const sessaoAgendamento = await AgentSessionRepository.buscarSessaoAtiva(
             usuarioNome,
             'AGENDAR_MANUTENCAO'
@@ -92,8 +127,14 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
             'RELATORIO'
         );
 
+        const sessaoSeguro = await AgentSessionRepository.buscarSessaoAtiva(
+            usuarioNome,
+            'SEGURO'
+        );
+
         const temAgendamentoAtivo = !!sessaoAgendamento;
         const temRelatorioAtivo = !!sessaoRelatorio;
+        const temSeguroAtivo = !!sessaoSeguro;
 
         // 3. Reset manual explícito
         if (RESET_COMMANDS.some(cmd => msgMinuscula.includes(cmd))) {
@@ -117,16 +158,31 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
                 );
             }
 
-            return "Certo, vamos começar de novo. Como posso ajudar?";
+            if (sessaoSeguro) {
+                await AgentSessionRepository.cancelarSessao(sessaoSeguro.id);
+                await AgentSessionRepository.registrarMensagem(
+                    sessaoSeguro.id,
+                    'user',
+                    mensagem,
+                    { acao: 'RESET_MANUAL' }
+                );
+            }
+
+            return {
+                mensagem: 'Certo, vamos começar de novo. Como posso ajudar?'
+            };
         }
 
-        // 4. Primeiro tenta resolver ação sobre contexto anterior
+        // 4. Tenta resolver ação contextual antes de qualquer classificação
         const acaoRelatorio = sessaoRelatorio
             ? resolverAcaoPorContexto(sessaoRelatorio, mensagem)
             : null;
 
         if (acaoRelatorio?.matched) {
-            console.log(`[ROUTER] Ação contextual detectada para RELATORIO: ${acaoRelatorio.action}`);
+            console.log(
+                `[ROUTER] Ação contextual detectada para RELATORIO: ${acaoRelatorio.action}`
+            );
+
             return await RelatorioService.processar(
                 mensagem,
                 usuarioNome,
@@ -135,10 +191,70 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
             );
         }
 
-        // 5. Classificação de intenção
+        const acaoSeguro = sessaoSeguro
+            ? resolverAcaoPorContexto(sessaoSeguro, mensagem)
+            : null;
+
+        if (acaoSeguro?.matched) {
+            console.log(
+                `[ROUTER] Ação contextual detectada para SEGURO: ${acaoSeguro.action}`
+            );
+
+            return await SeguroService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoSeguro,
+                acaoSeguro
+            );
+        }
+
+        // 5. Se já existe fluxo ativo de agendamento, continua nele
+        if (temAgendamentoAtivo) {
+            console.log(
+                `[AGENT_ROUTER] Usuário: ${usuarioNome} | Continuando fluxo ativo de AGENDAMENTO`
+            );
+            return await AgendamentoService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoAgendamento
+            );
+        }
+
+        // 6. Se já existe fluxo ativo de relatório, continua nele
+        if (temRelatorioAtivo) {
+            console.log(
+                `[AGENT_ROUTER] Usuário: ${usuarioNome} | Continuando fluxo ativo de RELATORIO`
+            );
+            return await RelatorioService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoRelatorio,
+                null
+            );
+        }
+
+        // 7. Se já existe fluxo ativo de seguro, continua nele
+        if (temSeguroAtivo) {
+            console.log(
+                `[AGENT_ROUTER] Usuário: ${usuarioNome} | Continuando fluxo ativo de SEGURO`
+            );
+            return await SeguroService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoSeguro,
+                null
+            );
+        }
+
+        // 8. Sem fluxo ativo: classifica nova intenção
         let intencao = await classificarIntencao(mensagem);
 
-        // 6. Heurísticas de segurança
+        // 9. Heurísticas de segurança
+        if (intencao === 'OUTRO' && pareceSeguro(msgMinuscula)) {
+            console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para SEGURO`);
+            intencao = 'SEGURO';
+        }
+
         if (intencao === 'OUTRO' && pareceConsultaRelatorio(msgMinuscula)) {
             console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para RELATORIO`);
             intencao = 'RELATORIO';
@@ -149,34 +265,33 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
             intencao = 'AGENDAR_MANUTENCAO';
         }
 
-        if (pareceConsultaRelatorio(msgMinuscula)) {
+        // Regra de desempate:
+        // seguro > relatório > agendamento, quando houver termos claros
+        if (pareceSeguro(msgMinuscula)) {
+            intencao = 'SEGURO';
+        } else if (pareceConsultaRelatorio(msgMinuscula)) {
             intencao = 'RELATORIO';
         }
 
         console.log(
-            `[AGENT_ROUTER] Usuário: ${usuarioNome} | AgendamentoAtivo: ${temAgendamentoAtivo} | RelatorioAtivo: ${temRelatorioAtivo} | Intenção: ${intencao}`
+            `[AGENT_ROUTER] Usuário: ${usuarioNome} | AgendamentoAtivo: ${temAgendamentoAtivo} | RelatorioAtivo: ${temRelatorioAtivo} | SeguroAtivo: ${temSeguroAtivo} | Intenção: ${intencao}`
         );
 
-        // 7. Prioridade: continuar agendamento ativo
-        if (temAgendamentoAtivo) {
-            return await AgendamentoService.processar(mensagem, usuarioNome, sessaoAgendamento);
-        }
-
-        // 8. Prioridade: continuar relatório ativo
-        if (temRelatorioAtivo) {
-            return await RelatorioService.processar(mensagem, usuarioNome, sessaoRelatorio, null);
-        }
-
-        // 9. Estratégia padrão
+        // 10. Estratégia padrão
         const executor = STRATEGIES[intencao];
         if (executor) {
             return await executor.processar(mensagem, usuarioNome, null, null);
         }
 
-        // 10. Fallback
-        return "Olá! Sou a SIMEC-IA. Posso ajudar com **agendamentos**, **consultas de histórico** e **relatórios de manutenção**. Como posso ajudar?";
+        // 11. Fallback
+        return {
+            mensagem: 'Olá! Sou a SIMEC-IA. Posso ajudar com agendamentos, relatórios e consultas de seguros. Como posso ajudar?'
+        };
     } catch (error) {
-        console.error(`[AGENT_ROUTER_ERROR] Erro crítico no roteamento:`, error.message);
-        return "Tive um problema técnico ao processar sua mensagem. Poderia repetir de forma mais direta?";
+        console.error(`[AGENT_ROUTER_ERROR] Erro crítico no roteamento:`, error);
+
+        return {
+            mensagem: 'Tive um problema técnico ao processar sua mensagem. Poderia repetir de forma mais direta?'
+        };
     }
 };

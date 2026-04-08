@@ -1,5 +1,5 @@
 // Ficheiro: src/services/api.js
-// VERSÃO FINAL CORRIGIDA - COM A FUNÇÃO 'updateUsuario'
+// VERSÃO ATUALIZADA - COM SUPORTE AO AGENTE IA E RESPOSTAS ESTRUTURADAS
 
 import axios from 'axios';
 
@@ -13,7 +13,7 @@ const api = axios.create({
 // 2. INTERCEPTOR DE REQUISIÇÃO: Adiciona o token JWT
 api.interceptors.request.use(
   (config) => {
-    const userString = localStorage.getItem('userInfo'); 
+    const userString = localStorage.getItem('userInfo');
     if (userString) {
       try {
         const token = JSON.parse(userString)?.token;
@@ -49,100 +49,263 @@ api.interceptors.response.use(
 // ==========================================================================
 
 // --- Autenticação ---
-export const loginUsuario = (credenciais) => api.post('/auth/login', credenciais).then(res => res.data);
-export const registrarUsuario = (dadosUsuario) => api.post('/auth/register', dadosUsuario).then(res => res.data);
+export const loginUsuario = (credenciais) =>
+  api.post('/auth/login', credenciais).then(res => res.data);
+
+export const registrarUsuario = (dadosUsuario) =>
+  api.post('/auth/register', dadosUsuario).then(res => res.data);
 
 // --- Usuários (Admin) ---
-export const getUsuarios = () => api.get('/users').then(res => res.data);
-export const criarUsuario = (dadosUsuario) => api.post('/users', dadosUsuario).then(res => res.data);
-// >> CORREÇÃO APLICADA AQUI <<
-export const updateUsuario = (id, dadosUsuario) => api.put(`/users/${id}`, dadosUsuario).then(res => res.data);
-export const deletarUsuario = (id) => api.delete(`/users/${id}`).then(res => res.data);
+export const getUsuarios = () =>
+  api.get('/users').then(res => res.data);
+
+export const criarUsuario = (dadosUsuario) =>
+  api.post('/users', dadosUsuario).then(res => res.data);
+
+export const updateUsuario = (id, dadosUsuario) =>
+  api.put(`/users/${id}`, dadosUsuario).then(res => res.data);
+
+export const deletarUsuario = (id) =>
+  api.delete(`/users/${id}`).then(res => res.data);
 
 // --- Dashboard ---
-export const getDashboardData = () => api.get('/dashboard-data').then(res => res.data);
+export const getDashboardData = () =>
+  api.get('/dashboard-data').then(res => res.data);
 
 // --- Equipamentos ---
-export const getEquipamentos = (filtros = {}) => api.get('/equipamentos', { params: filtros }).then(res => res.data);
-export const getEquipamentoById = (id) => api.get(`/equipamentos/${id}`).then(res => res.data);
-export const addEquipamento = (equipamentoData) => api.post('/equipamentos', equipamentoData).then(res => res.data);
-export const updateEquipamento = (id, equipamentoData) => api.put(`/equipamentos/${id}`, equipamentoData).then(res => res.data);
-export const deleteEquipamento = (id) => api.delete(`/equipamentos/${id}`).then(res => res.data);
+export const getEquipamentos = (filtros = {}) =>
+  api.get('/equipamentos', { params: filtros }).then(res => res.data);
+
+export const getEquipamentoById = (id) =>
+  api.get(`/equipamentos/${id}`).then(res => res.data);
+
+export const addEquipamento = (equipamentoData) =>
+  api.post('/equipamentos', equipamentoData).then(res => res.data);
+
+export const updateEquipamento = (id, equipamentoData) =>
+  api.put(`/equipamentos/${id}`, equipamentoData).then(res => res.data);
+
+export const deleteEquipamento = (id) =>
+  api.delete(`/equipamentos/${id}`).then(res => res.data);
 
 // --- Anexos de Equipamento ---
-export const uploadAnexoEquipamento = (equipamentoId, formData) => api.post(`/equipamentos/${equipamentoId}/anexos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(res => res.data);
-export const deleteAnexoEquipamento = (equipamentoId, anexoId) => api.delete(`/equipamentos/${equipamentoId}/anexos/${anexoId}`).then(res => res.data);
+export const uploadAnexoEquipamento = (equipamentoId, formData) =>
+  api.post(`/equipamentos/${equipamentoId}/anexos`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(res => res.data);
+
+export const deleteAnexoEquipamento = (equipamentoId, anexoId) =>
+  api.delete(`/equipamentos/${equipamentoId}/anexos/${anexoId}`).then(res => res.data);
 
 // --- Acessórios ---
-export const getAcessoriosPorEquipamento = (equipamentoId) => api.get(`/equipamentos/${equipamentoId}/acessorios`).then(res => res.data);
-export const addAcessorio = (equipamentoId, acessorioData) => api.post(`/equipamentos/${equipamentoId}/acessorios`, acessorioData).then(res => res.data);
-export const updateAcessorio = (equipamentoId, acessorioId, acessorioData) => api.put(`/equipamentos/${equipamentoId}/acessorios/${acessorioId}`, acessorioData).then(res => res.data);
-export const deleteAcessorio = (equipamentoId, acessorioId) => api.delete(`/equipamentos/${equipamentoId}/acessorios/${acessorioId}`).then(res => res.data);
+export const getAcessoriosPorEquipamento = (equipamentoId) =>
+  api.get(`/equipamentos/${equipamentoId}/acessorios`).then(res => res.data);
+
+export const addAcessorio = (equipamentoId, acessorioData) =>
+  api.post(`/equipamentos/${equipamentoId}/acessorios`, acessorioData).then(res => res.data);
+
+export const updateAcessorio = (equipamentoId, acessorioId, acessorioData) =>
+  api.put(`/equipamentos/${equipamentoId}/acessorios/${acessorioId}`, acessorioData).then(res => res.data);
+
+export const deleteAcessorio = (equipamentoId, acessorioId) =>
+  api.delete(`/equipamentos/${equipamentoId}/acessorios/${acessorioId}`).then(res => res.data);
 
 // --- Manutenções ---
-export const getManutencoes = (params = {}) => api.get('/manutencoes', { params }).then(res => res.data);
-export const getManutencaoById = (id) => api.get(`/manutencoes/${id}`).then(res => res.data);
-export const addManutencao = (manutencaoData) => api.post('/manutencoes', manutencaoData).then(res => res.data);
-export const updateManutencao = (id, manutencaoData) => api.put(`/manutencoes/${id}`, manutencaoData).then(res => res.data);
-export const deleteManutencao = (id) => api.delete(`/manutencoes/${id}`).then(res => res.data);
-export const concluirManutencao = (id, data) => api.post(`/manutencoes/${id}/concluir`, data).then(res => res.data);
-export const cancelarManutencao = (id, data) => api.post(`/manutencoes/${id}/cancelar`, data).then(res => res.data);
-export const uploadAnexoManutencao = (manutencaoId, formData) => api.post(`/manutencoes/${manutencaoId}/upload`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(res => res.data);
-export const deleteAnexoManutencao = (manutencaoId, anexoId) => api.delete(`/manutencoes/${manutencaoId}/anexos/${anexoId}`).then(res => res.data);
-export const addNotaAndamento = (manutencaoId, notaData) => api.post(`/manutencoes/${manutencaoId}/notas`, notaData).then(res => res.data);
+export const getManutencoes = (params = {}) =>
+  api.get('/manutencoes', { params }).then(res => res.data);
+
+export const getManutencaoById = (id) =>
+  api.get(`/manutencoes/${id}`).then(res => res.data);
+
+export const addManutencao = (manutencaoData) =>
+  api.post('/manutencoes', manutencaoData).then(res => res.data);
+
+export const updateManutencao = (id, manutencaoData) =>
+  api.put(`/manutencoes/${id}`, manutencaoData).then(res => res.data);
+
+export const deleteManutencao = (id) =>
+  api.delete(`/manutencoes/${id}`).then(res => res.data);
+
+export const concluirManutencao = (id, data) =>
+  api.post(`/manutencoes/${id}/concluir`, data).then(res => res.data);
+
+export const cancelarManutencao = (id, data) =>
+  api.post(`/manutencoes/${id}/cancelar`, data).then(res => res.data);
+
+export const uploadAnexoManutencao = (manutencaoId, formData) =>
+  api.post(`/manutencoes/${manutencaoId}/upload`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(res => res.data);
+
+export const deleteAnexoManutencao = (manutencaoId, anexoId) =>
+  api.delete(`/manutencoes/${manutencaoId}/anexos/${anexoId}`).then(res => res.data);
+
+export const addNotaAndamento = (manutencaoId, notaData) =>
+  api.post(`/manutencoes/${manutencaoId}/notas`, notaData).then(res => res.data);
 
 // --- Alertas ---
-export const getAlertas = () => api.get('/alertas').then(res => res.data);
-export const updateAlertaStatus = (alertaId, status) => api.put(`/alertas/${alertaId}/status`, { status }).then(res => res.data);
+export const getAlertas = () =>
+  api.get('/alertas').then(res => res.data);
+
+export const updateAlertaStatus = (alertaId, status) =>
+  api.put(`/alertas/${alertaId}/status`, { status }).then(res => res.data);
 
 // --- Contratos ---
-export const getContratos = () => api.get('/contratos').then(res => res.data);
-export const getContratoById = (id) => api.get(`/contratos/${id}`).then(res => res.data);
-export const addContrato = (contratoData) => api.post('/contratos', contratoData).then(res => res.data);
-export const updateContrato = (id, contratoData) => api.put(`/contratos/${id}`, contratoData).then(res => res.data);
-export const deleteContrato = (id) => api.delete(`/contratos/${id}`).then(res => res.data);
-export const uploadAnexoContrato = (contratoId, formData) => api.post(`/contratos/${contratoId}/anexos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(res => res.data);
-export const deleteAnexoContrato = (contratoId, anexoId) => api.delete(`/contratos/${contratoId}/anexos/${anexoId}`).then(res => res.data);
+export const getContratos = () =>
+  api.get('/contratos').then(res => res.data);
+
+export const getContratoById = (id) =>
+  api.get(`/contratos/${id}`).then(res => res.data);
+
+export const addContrato = (contratoData) =>
+  api.post('/contratos', contratoData).then(res => res.data);
+
+export const updateContrato = (id, contratoData) =>
+  api.put(`/contratos/${id}`, contratoData).then(res => res.data);
+
+export const deleteContrato = (id) =>
+  api.delete(`/contratos/${id}`).then(res => res.data);
+
+export const uploadAnexoContrato = (contratoId, formData) =>
+  api.post(`/contratos/${contratoId}/anexos`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(res => res.data);
+
+export const deleteAnexoContrato = (contratoId, anexoId) =>
+  api.delete(`/contratos/${contratoId}/anexos/${anexoId}`).then(res => res.data);
 
 // --- Seguros ---
-export const getSeguros = () => api.get('/seguros').then(res => res.data);
-export const getSeguroById = (id) => api.get(`/seguros/${id}`).then(res => res.data);
-export const addSeguro = (seguroData) => api.post('/seguros', seguroData).then(res => res.data);
-export const updateSeguro = (id, seguroData) => api.put(`/seguros/${id}`, seguroData).then(res => res.data);
-export const deleteSeguro = (id) => api.delete(`/seguros/${id}`).then(res => res.data);
-export const uploadAnexoSeguro = (seguroId, formData) => api.post(`/seguros/${seguroId}/anexos`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(res => res.data);
-export const deleteAnexoSeguro = (seguroId, anexoId) => api.delete(`/seguros/${seguroId}/anexos/${anexoId}`).then(res => res.data);
+export const getSeguros = () =>
+  api.get('/seguros').then(res => res.data);
+
+export const getSeguroById = (id) =>
+  api.get(`/seguros/${id}`).then(res => res.data);
+
+export const addSeguro = (seguroData) =>
+  api.post('/seguros', seguroData).then(res => res.data);
+
+export const updateSeguro = (id, seguroData) =>
+  api.put(`/seguros/${id}`, seguroData).then(res => res.data);
+
+export const deleteSeguro = (id) =>
+  api.delete(`/seguros/${id}`).then(res => res.data);
+
+export const uploadAnexoSeguro = (seguroId, formData) =>
+  api.post(`/seguros/${seguroId}/anexos`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }).then(res => res.data);
+
+export const deleteAnexoSeguro = (seguroId, anexoId) =>
+  api.delete(`/seguros/${seguroId}/anexos/${anexoId}`).then(res => res.data);
 
 // --- Relatórios ---
-export const gerarRelatorio = (filtros) => api.post('/relatorios/gerar', filtros).then(res => res.data);
+export const gerarRelatorio = (filtros) =>
+  api.post('/relatorios/gerar', filtros).then(res => res.data);
+
+// --- Dados para PDF (geração no frontend) ---
+export const getPdfDataManutencao = (manutencaoId) =>
+  api.get(`/pdf-data/manutencao/${manutencaoId}`).then(res => res.data);
+
+export const getPdfDataRelatorio = (ids = []) =>
+  api.post('/pdf-data/relatorio', { ids }).then(res => res.data);
 
 // --- Auditoria ---
-export const getLogAuditoria = (params = {}) => api.get('/auditoria', { params }).then(res => res.data);
-export const getFiltrosAuditoria = () => api.get('/auditoria/filtros').then(res => res.data);
+export const getLogAuditoria = (params = {}) =>
+  api.get('/auditoria', { params }).then(res => res.data);
+
+export const getFiltrosAuditoria = () =>
+  api.get('/auditoria/filtros').then(res => res.data);
 
 // --- Unidades ---
-export const getUnidades = () => api.get('/unidades').then(res => res.data);
-export const getUnidadeById = (id) => api.get(`/unidades/${id}`).then(res => res.data);
-export const addUnidade = (unidadeData) => api.post('/unidades', unidadeData).then(res => res.data);
-export const updateUnidade = (id, unidadeData) => api.put(`/unidades/${id}`, unidadeData).then(res => res.data);
-export const deleteUnidade = (id) => api.delete(`/unidades/${id}`).then(res => res.data);
+export const getUnidades = () =>
+  api.get('/unidades').then(res => res.data);
+
+export const getUnidadeById = (id) =>
+  api.get(`/unidades/${id}`).then(res => res.data);
+
+export const addUnidade = (unidadeData) =>
+  api.post('/unidades', unidadeData).then(res => res.data);
+
+export const updateUnidade = (id, unidadeData) =>
+  api.put(`/unidades/${id}`, unidadeData).then(res => res.data);
+
+export const deleteUnidade = (id) =>
+  api.delete(`/unidades/${id}`).then(res => res.data);
 
 // --- E-mails de Notificação (Admin) ---
-export const getEmailsNotificacao = () => api.get('/emails-notificacao').then(res => res.data);
-export const addEmailNotificacao = (dadosEmail) => api.post('/emails-notificacao', dadosEmail).then(res => res.data);
-export const updateEmailNotificacao = (id, dadosEmail) => api.put(`/emails-notificacao/${id}`, dadosEmail).then(res => res.data);
-export const deleteEmailNotificacao = (id) => api.delete(`/emails-notificacao/${id}`).then(res => res.data);
+export const getEmailsNotificacao = () =>
+  api.get('/emails-notificacao').then(res => res.data);
+
+export const addEmailNotificacao = (dadosEmail) =>
+  api.post('/emails-notificacao', dadosEmail).then(res => res.data);
+
+export const updateEmailNotificacao = (id, dadosEmail) =>
+  api.put(`/emails-notificacao/${id}`, dadosEmail).then(res => res.data);
+
+export const deleteEmailNotificacao = (id) =>
+  api.delete(`/emails-notificacao/${id}`).then(res => res.data);
 
 // --- Ocorrências (Ficha Técnica) ---
-export const getOcorrenciasPorEquipamento = (id) => api.get(`/ocorrencias/equipamento/${id}`).then(res => res.data);
-export const addOcorrencia = (dados) => api.post('/ocorrencias', dados).then(res => res.data);
-export const resolverOcorrencia = (id, dados) => api.put(`/ocorrencias/${id}/resolver`, dados).then(res => res.data);
+export const getOcorrenciasPorEquipamento = (id) =>
+  api.get(`/ocorrencias/equipamento/${id}`).then(res => res.data);
+
+export const addOcorrencia = (dados) =>
+  api.post('/ocorrencias', dados).then(res => res.data);
+
+export const resolverOcorrencia = (id, dados) =>
+  api.put(`/ocorrencias/${id}/resolver`, dados).then(res => res.data);
 
 // --- Indicadores BI ---
-export const getIndicadoresBI = () => api.get('/bi/indicadores').then(res => res.data);
+export const getIndicadoresBI = () =>
+  api.get('/bi/indicadores').then(res => res.data);
 
-// chat bot
-export const enviarMensagemAoAgente = (mensagem) => 
-    api.post('/agent/chat', { mensagem }).then(res => res.data);
+// --- CHAT BOT (AGENTE IA) ---
+export const enviarMensagemAoAgente = async (mensagem) => {
+  try {
+    const res = await api.post('/agent/chat', { mensagem });
+
+    if (!res?.data) {
+      throw new Error('Resposta vazia do agente.');
+    }
+
+    // Compatibilidade com respostas antigas em string
+    if (typeof res.data === 'string') {
+      return {
+        resposta: {
+          mensagem: res.data,
+          acao: null,
+          contexto: null,
+          meta: null
+        }
+      };
+    }
+
+    // Novo padrão estruturado
+    if (res.data?.resposta) {
+      return res.data;
+    }
+
+    // Fallback defensivo
+    return {
+      resposta: {
+        mensagem: 'Recebi a resposta, mas em formato inesperado.',
+        acao: null,
+        contexto: null,
+        meta: null
+      }
+    };
+  } catch (error) {
+    console.error('[API_CHAT_ERROR]', error);
+
+    return {
+      resposta: {
+        mensagem: 'Tive um problema ao processar sua solicitação.',
+        acao: null,
+        contexto: null,
+        meta: null
+      }
+    };
+  }
+};
 
 export default api;

@@ -19,6 +19,15 @@ import {
     resetarConfirmacaoSeHouverMudanca
 } from './stateMachine.js';
 
+function respostaPadrao(mensagem, extras = {}) {
+    return {
+        mensagem,
+        acao: extras.acao || null,
+        contexto: extras.contexto || null,
+        meta: extras.meta || null
+    };
+}
+
 export const AgendamentoService = {
     async processar(mensagem, usuarioNome, sessaoExistente = null) {
         // 1. Recupera ou cria sessão ativa
@@ -43,7 +52,7 @@ export const AgendamentoService = {
         // 4. Extrai dados da mensagem
         const extraido = await extrairCamposComIA(mensagem, estado);
 
-        // 4.1 NORMALIZAÇÃO MANUAL DE CONFIRMAÇÃO (ANTI-LOOP)
+        // 4.1 Normalização manual de confirmação (anti-loop)
         const msgNormalizada = mensagem.toLowerCase().trim();
 
         if (['sim', 'confirmar', 'ok', 'pode', 'pode sim'].includes(msgNormalizada)) {
@@ -81,16 +90,20 @@ export const AgendamentoService = {
                 resumo: null
             });
 
+            const resposta = respostaPadrao(
+                'Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?'
+            );
+
             await AgentSessionRepository.registrarMensagem(
                 sessao.id,
                 'agent',
-                "Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?",
+                resposta.mensagem,
                 { step: estado.step, acao: 'CANCELAMENTO' }
             );
 
             await AgentSessionRepository.cancelarSessao(sessao.id);
 
-            return "Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?";
+            return resposta;
         }
 
         // 9. Resolve entidades
@@ -100,7 +113,7 @@ export const AgendamentoService = {
         if (estado.ambiguidadeEquipamento?.length > 0) {
             estado.step = STEPS.COLETANDO_DADOS;
 
-            const resposta = `Encontrei mais de um equipamento compatível. Qual deles você deseja? ${estado.ambiguidadeEquipamento
+            const mensagemResposta = `Encontrei mais de um equipamento compatível. Qual deles você deseja? ${estado.ambiguidadeEquipamento
                 .map(e => `**${e.modelo}** (TAG: ${e.tag}) - ${e.unidade}`)
                 .join(', ')}`;
 
@@ -113,11 +126,16 @@ export const AgendamentoService = {
             await AgentSessionRepository.registrarMensagem(
                 sessao.id,
                 'agent',
-                resposta,
+                mensagemResposta,
                 { step: estado.step, tipo: 'AMBIGUIDADE_EQUIPAMENTO' }
             );
 
-            return resposta;
+            return respostaPadrao(mensagemResposta, {
+                meta: {
+                    step: estado.step,
+                    ambiguidadeEquipamento: estado.ambiguidadeEquipamento
+                }
+            });
         }
 
         // 11. Horário no passado
@@ -142,7 +160,9 @@ export const AgendamentoService = {
                 { step: estado.step, tipo: 'HORARIO_INVALIDO' }
             );
 
-            return validacaoHorario.msg;
+            return respostaPadrao(validacaoHorario.msg, {
+                meta: { step: estado.step, tipo: 'HORARIO_INVALIDO' }
+            });
         }
 
         // 12. Campos faltantes
@@ -167,16 +187,18 @@ export const AgendamentoService = {
 
         // 15. Se continuar coletando
         if (proximoStep === STEPS.COLETANDO_DADOS) {
-            let resposta;
+            let mensagemResposta;
 
             if (conflitoAgenda && !conflitoAgenda.valido) {
                 estado.aguardandoConfirmacao = false;
                 estado.confirmacao = null;
-                resposta = `${conflitoAgenda.mensagem} Por favor, informe outro horário.`;
+                mensagemResposta = `${conflitoAgenda.mensagem} Por favor, informe outro horário.`;
             } else {
-                const houveNovosDados = Object.values(extraido).some(v => v !== null && v !== undefined);
-                const prefixo = houveNovosDados ? "Legal, anotei." : "Entendi.";
-                resposta = `${prefixo} ${proximaPergunta(estado, faltantes)}`;
+                const houveNovosDados = Object.values(extraido).some(
+                    v => v !== null && v !== undefined
+                );
+                const prefixo = houveNovosDados ? 'Legal, anotei.' : 'Entendi.';
+                mensagemResposta = `${prefixo} ${proximaPergunta(estado, faltantes)}`;
             }
 
             await AgentSessionRepository.salvarSessao(sessao.id, {
@@ -188,38 +210,49 @@ export const AgendamentoService = {
             await AgentSessionRepository.registrarMensagem(
                 sessao.id,
                 'agent',
-                resposta,
+                mensagemResposta,
                 { step: estado.step, faltantes }
             );
 
-            return resposta;
+            return respostaPadrao(mensagemResposta, {
+                meta: {
+                    step: estado.step,
+                    faltantes
+                }
+            });
         }
 
         // 16. Aguardando confirmação
         if (proximoStep === STEPS.AGUARDANDO_CONFIRMACAO) {
-            let resposta;
+            let mensagemResposta;
 
             if (!estado.aguardandoConfirmacao) {
                 estado.aguardandoConfirmacao = true;
-                resposta = buildResumoConfirmacao(estado);
+                mensagemResposta = buildResumoConfirmacao(estado);
             } else {
-                resposta = "Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.";
+                mensagemResposta =
+                    'Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.';
             }
 
             await AgentSessionRepository.salvarSessao(sessao.id, {
                 step: estado.step,
                 state: estado,
-                resumo: resposta
+                resumo: mensagemResposta
             });
 
             await AgentSessionRepository.registrarMensagem(
                 sessao.id,
                 'agent',
-                resposta,
+                mensagemResposta,
                 { step: estado.step, aguardandoConfirmacao: true }
             );
 
-            return resposta;
+            return respostaPadrao(mensagemResposta, {
+                meta: {
+                    step: estado.step,
+                    aguardandoConfirmacao: true
+                }
+            });
         }
 
         // 17. Finalização
@@ -232,7 +265,7 @@ export const AgendamentoService = {
                     estado.aguardandoConfirmacao = false;
                     estado.confirmacao = null;
 
-                    const resposta = `${revalidacao.mensagem} O horário ficou indisponível antes da confirmação. Por favor, informe outro horário.`;
+                    const mensagemResposta = `${revalidacao.mensagem} O horário ficou indisponível antes da confirmação. Por favor, informe outro horário.`;
 
                     await AgentSessionRepository.salvarSessao(sessao.id, {
                         step: estado.step,
@@ -243,11 +276,16 @@ export const AgendamentoService = {
                     await AgentSessionRepository.registrarMensagem(
                         sessao.id,
                         'agent',
-                        resposta,
+                        mensagemResposta,
                         { step: estado.step, tipo: 'REVALIDACAO_CONFLITO' }
                     );
 
-                    return resposta;
+                    return respostaPadrao(mensagemResposta, {
+                        meta: {
+                            step: estado.step,
+                            tipo: 'REVALIDACAO_CONFLITO'
+                        }
+                    });
                 }
 
                 const manutencao = await criarManutencaoNoBanco(estado);
@@ -258,25 +296,29 @@ export const AgendamentoService = {
                     ultimaUnidadeNome: estado.unidadeNome || null,
                     ultimoEquipamentoId: estado.equipamentoId || null,
                     ultimoEquipamentoTag: estado.tag || null,
-                    ultimoEquipamentoModelo: estado.equipamentoNome || estado.modelo || null
+                    ultimoEquipamentoModelo:
+                        estado.equipamentoNome || estado.modelo || null
                 });
 
-                const resposta = "✅ **Perfeito! Agendamento realizado com sucesso.** A Ordem de Serviço foi gerada e o ativo atualizado no sistema.";
+                const mensagemResposta =
+                    '✅ **Perfeito! Agendamento realizado com sucesso.** A Ordem de Serviço foi gerada e o ativo atualizado no sistema.';
+
+                const stateFinal = {
+                    ...estado,
+                    manutencaoId: manutencao.id,
+                    numeroOS: manutencao.numeroOS
+                };
 
                 await AgentSessionRepository.salvarSessao(sessao.id, {
                     step: STEPS.FINALIZADO,
-                    state: {
-                        ...estado,
-                        manutencaoId: manutencao.id,
-                        numeroOS: manutencao.numeroOS
-                    },
-                    resumo: resposta
+                    state: stateFinal,
+                    resumo: mensagemResposta
                 });
 
                 await AgentSessionRepository.registrarMensagem(
                     sessao.id,
                     'agent',
-                    resposta,
+                    mensagemResposta,
                     {
                         step: STEPS.FINALIZADO,
                         manutencaoId: manutencao.id,
@@ -286,25 +328,38 @@ export const AgendamentoService = {
 
                 await AgentSessionRepository.finalizarSessao(sessao.id);
 
-                return resposta;
+                return respostaPadrao(mensagemResposta, {
+                    meta: {
+                        step: STEPS.FINALIZADO,
+                        manutencaoId: manutencao.id,
+                        numeroOS: manutencao.numeroOS
+                    }
+                });
             } catch (error) {
-                console.error("[AGENT_DB_ERROR]:", error);
+                console.error('[AGENT_DB_ERROR]:', error);
 
-                const resposta = "Tive um erro técnico ao salvar no banco. Por favor, tente confirmar novamente ou contate o suporte.";
+                const mensagemResposta =
+                    'Tive um erro técnico ao salvar no banco. Por favor, tente confirmar novamente ou contate o suporte.';
 
                 await AgentSessionRepository.registrarMensagem(
                     sessao.id,
                     'agent',
-                    resposta,
+                    mensagemResposta,
                     { step: estado.step, tipo: 'ERRO_BANCO' }
                 );
 
-                return resposta;
+                return respostaPadrao(mensagemResposta, {
+                    meta: {
+                        step: estado.step,
+                        tipo: 'ERRO_BANCO'
+                    }
+                });
             }
         }
 
         // 18. Fallback absoluto
-        const fallback = "Tive dificuldade para continuar o fluxo do agendamento. Pode repetir a última informação?";
+        const fallback =
+            'Tive dificuldade para continuar o fluxo do agendamento. Pode repetir a última informação?';
 
         await AgentSessionRepository.salvarSessao(sessao.id, {
             step: estado.step,
@@ -319,6 +374,11 @@ export const AgendamentoService = {
             { step: estado.step, tipo: 'FALLBACK' }
         );
 
-        return fallback;
+        return respostaPadrao(fallback, {
+            meta: {
+                step: estado.step,
+                tipo: 'FALLBACK'
+            }
+        });
     }
 };

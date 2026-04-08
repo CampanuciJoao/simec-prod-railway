@@ -74,42 +74,51 @@ async function buscarUltimaManutencao({
     });
 }
 
+function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
+    if (acaoContextual.action === ACTIONS.GERAR_PDF_OS) {
+        return {
+            mensagem: `Perfeito. Vou preparar o PDF da OS ${estadoAnterior.numeroOS || ''}.`,
+            acao: 'GERAR_PDF_OS',
+            contexto: {
+                manutencaoId: acaoContextual.context?.manutencaoId || null
+            }
+        };
+    }
+
+    if (acaoContextual.action === ACTIONS.GERAR_PDF_RELATORIO) {
+        return {
+            mensagem: `Perfeito. Vou preparar o PDF do relatório com ${estadoAnterior.total || 0} registros.`,
+            acao: 'GERAR_PDF_RELATORIO',
+            contexto: {
+                ids: acaoContextual.context?.ids || []
+            }
+        };
+    }
+
+    if (acaoContextual.action === ACTIONS.ABRIR_OS) {
+        return {
+            mensagem: `Perfeito. Vou abrir os detalhes da OS ${estadoAnterior.numeroOS || ''}.`,
+            acao: 'ABRIR_OS',
+            contexto: {
+                manutencaoId: acaoContextual.context?.manutencaoId || null
+            }
+        };
+    }
+
+    return {
+        mensagem: 'Entendi a ação sobre a consulta anterior, mas ainda não tenho um tratador específico para ela.'
+    };
+}
+
 export const RelatorioService = {
     async processar(mensagem, usuarioNome, sessaoExistente = null, acaoContextual = null) {
         // 1. Follow-up de ação contextual
         if (acaoContextual?.matched) {
             const estadoAnterior = acaoContextual.state || {};
-            let respostaPayload = null;
-
-            if (acaoContextual.action === ACTIONS.GERAR_PDF_OS) {
-                respostaPayload = {
-                    mensagem: `Perfeito. Vou preparar o PDF da OS ${estadoAnterior.numeroOS || ''}.`,
-                    acao: 'GERAR_PDF_OS',
-                    contexto: {
-                        manutencaoId: acaoContextual.context.manutencaoId
-                    }
-                };
-            } else if (acaoContextual.action === ACTIONS.GERAR_PDF_RELATORIO) {
-                respostaPayload = {
-                    mensagem: `Perfeito. Vou preparar o PDF do relatório com ${estadoAnterior.total || 0} registros.`,
-                    acao: 'GERAR_PDF_RELATORIO',
-                    contexto: {
-                        ids: acaoContextual.context.ids
-                    }
-                };
-            } else if (acaoContextual.action === ACTIONS.ABRIR_OS) {
-                respostaPayload = {
-                    mensagem: `Perfeito. Vou abrir os detalhes da OS ${estadoAnterior.numeroOS || ''}.`,
-                    acao: 'ABRIR_OS',
-                    contexto: {
-                        manutencaoId: acaoContextual.context.manutencaoId
-                    }
-                };
-            } else {
-                respostaPayload = {
-                    mensagem: 'Entendi a ação sobre a consulta anterior, mas ainda não tenho um tratador específico para ela.'
-                };
-            }
+            const respostaPayload = construirRespostaAcaoContextual(
+                acaoContextual,
+                estadoAnterior
+            );
 
             await registrarSessaoRelatorio(
                 usuarioNome,
@@ -142,7 +151,8 @@ export const RelatorioService = {
 
         if (!contexto.unidadeId && !contexto.equipamentoId) {
             return {
-                mensagem: "Não consegui identificar a unidade ou o equipamento da consulta. Pode informar novamente, por exemplo: 'últimas preventivas do último ano na unidade de Coxim'?"
+                mensagem:
+                    "Não consegui identificar a unidade ou o equipamento da consulta. Pode informar novamente, por exemplo: 'últimas preventivas do último ano na unidade de Coxim'?"
             };
         }
 
@@ -156,7 +166,10 @@ export const RelatorioService = {
 
             const respostaTexto = montarResumoUltima(manutencao, filtros, {
                 unidadeNome: contexto.unidadeNome,
-                equipamentoNome: contexto.equipamentoNome || contexto.modelo || contexto.tipoEquipamento
+                equipamentoNome:
+                    contexto.equipamentoNome ||
+                    contexto.modelo ||
+                    contexto.tipoEquipamento
             });
 
             const payload = construirPayloadConsultaUnica(manutencao, respostaTexto);
@@ -170,7 +183,7 @@ export const RelatorioService = {
             );
 
             return {
-                mensagem: `${respostaTexto}${manutencao ? " Deseja que eu gere o PDF da OS ou um relatório em PDF dessa consulta?" : ""}`,
+                mensagem: `${respostaTexto}${manutencao ? ' Deseja que eu gere o PDF da OS ou um relatório em PDF dessa consulta?' : ''}`,
                 meta: payload
             };
         }
@@ -190,7 +203,10 @@ export const RelatorioService = {
 
         const respostaTexto = montarResumoLista(manutencoes, filtros, {
             unidadeNome: contexto.unidadeNome,
-            equipamentoNome: contexto.equipamentoNome || contexto.modelo || contexto.tipoEquipamento
+            equipamentoNome:
+                contexto.equipamentoNome ||
+                contexto.modelo ||
+                contexto.tipoEquipamento
         });
 
         const payload = construirPayloadLista(manutencoes, filtros, respostaTexto);
@@ -204,7 +220,7 @@ export const RelatorioService = {
         );
 
         return {
-            mensagem: `${respostaTexto}${manutencoes.length > 0 ? " Deseja que eu gere um PDF com esse relatório?" : ""}`,
+            mensagem: `${respostaTexto}${manutencoes.length > 0 ? ' Deseja que eu gere um PDF com esse relatório?' : ''}`,
             meta: payload
         };
     }
