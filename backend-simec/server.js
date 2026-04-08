@@ -27,6 +27,7 @@ import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js'; 
+import pdfDataRoutes from './routes/pdfDataRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { alertasQueue } from './services/queueService.js';
@@ -81,6 +82,7 @@ app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes); 
+app.use('/api/pdf-data', pdfDataRoutes)
 
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');

@@ -3,6 +3,7 @@ import { AgendamentoService } from './agendamentoService.js';
 import { RelatorioService } from './relatorioService.js';
 import { classificarIntencao } from './intentClassifier.js';
 import { AgentSessionRepository } from './agentSessionRepository.js';
+import { resolverAcaoPorContexto } from './actionResolver.js';
 
 /**
  * Mapa de Estratégias (Habilidades do Agente)
@@ -80,77 +81,100 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
         // 1. Expira sessões antigas do usuário
         await AgentSessionRepository.expirarSessoesAntigas(usuarioNome);
 
-        // 2. Busca sessão ativa de agendamento
+        // 2. Busca sessões ativas
         const sessaoAgendamento = await AgentSessionRepository.buscarSessaoAtiva(
             usuarioNome,
             'AGENDAR_MANUTENCAO'
         );
 
-        const temProcessoAtivo = !!sessaoAgendamento;
+        const sessaoRelatorio = await AgentSessionRepository.buscarSessaoAtiva(
+            usuarioNome,
+            'RELATORIO'
+        );
+
+        const temAgendamentoAtivo = !!sessaoAgendamento;
+        const temRelatorioAtivo = !!sessaoRelatorio;
 
         // 3. Reset manual explícito
         if (RESET_COMMANDS.some(cmd => msgMinuscula.includes(cmd))) {
             if (sessaoAgendamento) {
                 await AgentSessionRepository.cancelarSessao(sessaoAgendamento.id);
-
                 await AgentSessionRepository.registrarMensagem(
                     sessaoAgendamento.id,
                     'user',
                     mensagem,
                     { acao: 'RESET_MANUAL' }
                 );
+            }
 
+            if (sessaoRelatorio) {
+                await AgentSessionRepository.cancelarSessao(sessaoRelatorio.id);
                 await AgentSessionRepository.registrarMensagem(
-                    sessaoAgendamento.id,
-                    'agent',
-                    "Certo, vamos começar de novo. Qual manutenção você deseja agendar?",
-                    { acao: 'RESET_MANUAL_CONFIRMACAO' }
+                    sessaoRelatorio.id,
+                    'user',
+                    mensagem,
+                    { acao: 'RESET_MANUAL' }
                 );
             }
 
-            return "Certo, vamos começar de novo. Qual manutenção você deseja agendar?";
+            return "Certo, vamos começar de novo. Como posso ajudar?";
         }
 
-        // 4. Classificação de intenção
+        // 4. Primeiro tenta resolver ação sobre contexto anterior
+        const acaoRelatorio = sessaoRelatorio
+            ? resolverAcaoPorContexto(sessaoRelatorio, mensagem)
+            : null;
+
+        if (acaoRelatorio?.matched) {
+            console.log(`[ROUTER] Ação contextual detectada para RELATORIO: ${acaoRelatorio.action}`);
+            return await RelatorioService.processar(
+                mensagem,
+                usuarioNome,
+                sessaoRelatorio,
+                acaoRelatorio
+            );
+        }
+
+        // 5. Classificação de intenção
         let intencao = await classificarIntencao(mensagem);
 
-        // 5. Heurísticas de segurança
-        // Se parece consulta, prioriza RELATORIO
+        // 6. Heurísticas de segurança
         if (intencao === 'OUTRO' && pareceConsultaRelatorio(msgMinuscula)) {
             console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para RELATORIO`);
             intencao = 'RELATORIO';
         }
 
-        // Se parece agendamento explícito, prioriza AGENDAR_MANUTENCAO
         if (intencao === 'OUTRO' && pareceAgendamento(msgMinuscula)) {
             console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para AGENDAR_MANUTENCAO`);
             intencao = 'AGENDAR_MANUTENCAO';
         }
 
-        // Desempate: se tiver palavras de consulta e palavras de preventiva/corretiva,
-        // consulta ganha de agendamento
         if (pareceConsultaRelatorio(msgMinuscula)) {
             intencao = 'RELATORIO';
         }
 
         console.log(
-            `[AGENT_ROUTER] Usuário: ${usuarioNome} | Ativo: ${temProcessoAtivo} | Intenção: ${intencao}`
+            `[AGENT_ROUTER] Usuário: ${usuarioNome} | AgendamentoAtivo: ${temAgendamentoAtivo} | RelatorioAtivo: ${temRelatorioAtivo} | Intenção: ${intencao}`
         );
 
-        // 6. Se já existe sessão ativa de agendamento, prioriza continuidade do fluxo
-        if (temProcessoAtivo) {
+        // 7. Prioridade: continuar agendamento ativo
+        if (temAgendamentoAtivo) {
             return await AgendamentoService.processar(mensagem, usuarioNome, sessaoAgendamento);
         }
 
-        // 7. Se houver estratégia correspondente, delega para ela
-        const executor = STRATEGIES[intencao];
-        if (executor) {
-            return await executor.processar(mensagem, usuarioNome, null);
+        // 8. Prioridade: continuar relatório ativo
+        if (temRelatorioAtivo) {
+            return await RelatorioService.processar(mensagem, usuarioNome, sessaoRelatorio, null);
         }
 
-        // 8. Fallback amigável
-        return "Olá! Sou o Agente Guardião do SIMEC. Posso ajudar com **agendamentos**, **consultas de histórico** e **relatórios de manutenção**. Como posso ser útil agora?";
+        // 9. Estratégia padrão
+        const executor = STRATEGIES[intencao];
+        if (executor) {
+            return await executor.processar(mensagem, usuarioNome, null, null);
+        }
 
+        // 10. Fallback
+        return "Olá! Sou a SIMEC-IA. Posso ajudar com **agendamentos**, **consultas de histórico** e **relatórios de manutenção**. Como posso ajudar?";
     } catch (error) {
         console.error(`[AGENT_ROUTER_ERROR] Erro crítico no roteamento:`, error.message);
         return "Tive um problema técnico ao processar sua mensagem. Poderia repetir de forma mais direta?";

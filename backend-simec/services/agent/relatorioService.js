@@ -9,9 +9,17 @@ import {
     construirPayloadConsultaUnica,
     construirPayloadLista
 } from './relatorioUtils.js';
+import { ACTIONS } from './actionResolver.js';
+import { buscarManutencoesRealizadas } from '../reportQueryService.js';
 
-async function registrarSessaoRelatorio(usuarioNome, mensagem, respostaTexto, payload) {
-    let sessao = await AgentSessionRepository.buscarSessaoAtiva(usuarioNome, 'RELATORIO');
+async function registrarSessaoRelatorio(
+    usuarioNome,
+    mensagem,
+    respostaTexto,
+    payload,
+    sessaoExistente = null
+) {
+    let sessao = sessaoExistente;
 
     if (!sessao) {
         sessao = await AgentSessionRepository.criarSessao({
@@ -30,16 +38,101 @@ async function registrarSessaoRelatorio(usuarioNome, mensagem, respostaTexto, pa
 
     await AgentSessionRepository.registrarMensagem(sessao.id, 'user', mensagem);
     await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', respostaTexto, payload);
+
+    return sessao;
+}
+
+async function buscarUltimaManutencao({
+    tipoManutencao,
+    unidadeId,
+    equipamentoId
+}) {
+    const where = {
+        tipo: tipoManutencao
+    };
+
+    if (equipamentoId) {
+        where.equipamentoId = equipamentoId;
+    } else if (unidadeId) {
+        where.equipamento = {
+            unidadeId
+        };
+    }
+
+    return prisma.manutencao.findFirst({
+        where,
+        include: {
+            equipamento: {
+                include: {
+                    unidade: true
+                }
+            }
+        },
+        orderBy: {
+            dataHoraAgendamentoInicio: 'desc'
+        }
+    });
 }
 
 export const RelatorioService = {
-    async processar(mensagem, usuarioNome) {
+    async processar(mensagem, usuarioNome, sessaoExistente = null, acaoContextual = null) {
+        // 1. Follow-up de ação contextual
+        if (acaoContextual?.matched) {
+            const estadoAnterior = acaoContextual.state || {};
+            let respostaPayload = null;
+
+            if (acaoContextual.action === ACTIONS.GERAR_PDF_OS) {
+                respostaPayload = {
+                    mensagem: `Perfeito. Vou preparar o PDF da OS ${estadoAnterior.numeroOS || ''}.`,
+                    acao: 'GERAR_PDF_OS',
+                    contexto: {
+                        manutencaoId: acaoContextual.context.manutencaoId
+                    }
+                };
+            } else if (acaoContextual.action === ACTIONS.GERAR_PDF_RELATORIO) {
+                respostaPayload = {
+                    mensagem: `Perfeito. Vou preparar o PDF do relatório com ${estadoAnterior.total || 0} registros.`,
+                    acao: 'GERAR_PDF_RELATORIO',
+                    contexto: {
+                        ids: acaoContextual.context.ids
+                    }
+                };
+            } else if (acaoContextual.action === ACTIONS.ABRIR_OS) {
+                respostaPayload = {
+                    mensagem: `Perfeito. Vou abrir os detalhes da OS ${estadoAnterior.numeroOS || ''}.`,
+                    acao: 'ABRIR_OS',
+                    contexto: {
+                        manutencaoId: acaoContextual.context.manutencaoId
+                    }
+                };
+            } else {
+                respostaPayload = {
+                    mensagem: 'Entendi a ação sobre a consulta anterior, mas ainda não tenho um tratador específico para ela.'
+                };
+            }
+
+            await registrarSessaoRelatorio(
+                usuarioNome,
+                mensagem,
+                respostaPayload.mensagem,
+                {
+                    ...estadoAnterior,
+                    ultimaAcaoExecutada: acaoContextual.action
+                },
+                sessaoExistente
+            );
+
+            return respostaPayload;
+        }
+
+        // 2. Extrai filtros da pergunta
         const filtros = extrairFiltrosRelatorio(mensagem);
 
         if (!filtros.tipoManutencao) {
             filtros.tipoManutencao = 'Preventiva';
         }
 
+        // 3. Resolve unidade/equipamento
         let contexto = {
             unidadeTexto: filtros.unidadeTexto,
             equipamentoTexto: filtros.equipamentoTexto
@@ -48,49 +141,17 @@ export const RelatorioService = {
         contexto = await resolverEntidades(contexto);
 
         if (!contexto.unidadeId && !contexto.equipamentoId) {
-            return "Não consegui identificar a unidade ou o equipamento da consulta. Pode informar novamente, por exemplo: 'últimas preventivas do último ano na unidade de Coxim'?";
-        }
-
-        const where = {
-            tipo: filtros.tipoManutencao
-        };
-
-        if (filtros.periodoInicio || filtros.periodoFim) {
-            where.dataHoraAgendamentoInicio = {};
-
-            if (filtros.periodoInicio) {
-                where.dataHoraAgendamentoInicio.gte = new Date(filtros.periodoInicio);
-            }
-
-            if (filtros.periodoFim) {
-                where.dataHoraAgendamentoInicio.lte = new Date(filtros.periodoFim);
-            }
-        }
-
-        if (contexto.equipamentoId) {
-            where.equipamentoId = contexto.equipamentoId;
-        } else if (contexto.unidadeId) {
-            where.equipamento = {
-                unidadeId: contexto.unidadeId
+            return {
+                mensagem: "Não consegui identificar a unidade ou o equipamento da consulta. Pode informar novamente, por exemplo: 'últimas preventivas do último ano na unidade de Coxim'?"
             };
         }
 
-        const include = {
-            equipamento: {
-                include: {
-                    unidade: true
-                }
-            }
-        };
-
-        // Consulta única: última
+        // 4. Consulta única: última manutenção
         if (filtros.somenteUltima) {
-            const manutencao = await prisma.manutencao.findFirst({
-                where,
-                include,
-                orderBy: {
-                    dataHoraAgendamentoInicio: 'desc'
-                }
+            const manutencao = await buscarUltimaManutencao({
+                tipoManutencao: filtros.tipoManutencao,
+                unidadeId: contexto.unidadeId || null,
+                equipamentoId: contexto.equipamentoId || null
             });
 
             const respostaTexto = montarResumoUltima(manutencao, filtros, {
@@ -100,19 +161,31 @@ export const RelatorioService = {
 
             const payload = construirPayloadConsultaUnica(manutencao, respostaTexto);
 
-            await registrarSessaoRelatorio(usuarioNome, mensagem, respostaTexto, payload);
+            await registrarSessaoRelatorio(
+                usuarioNome,
+                mensagem,
+                respostaTexto,
+                payload,
+                sessaoExistente
+            );
 
-            return `${respostaTexto}${manutencao ? " Deseja que eu gere o PDF da OS ou um relatório em PDF dessa consulta?" : ""}`;
+            return {
+                mensagem: `${respostaTexto}${manutencao ? " Deseja que eu gere o PDF da OS ou um relatório em PDF dessa consulta?" : ""}`,
+                meta: payload
+            };
         }
 
-        // Consulta lista
-        const manutencoes = await prisma.manutencao.findMany({
-            where,
-            include,
-            orderBy: {
-                dataHoraAgendamentoInicio: 'desc'
-            },
-            take: 100
+        // 5. Consulta em lista
+        const manutencoes = await buscarManutencoesRealizadas({
+            dataInicio: filtros.periodoInicio
+                ? new Date(filtros.periodoInicio).toISOString().slice(0, 10)
+                : null,
+            dataFim: filtros.periodoFim
+                ? new Date(filtros.periodoFim).toISOString().slice(0, 10)
+                : null,
+            unidadeId: contexto.unidadeId || null,
+            equipamentoId: contexto.equipamentoId || null,
+            tipoManutencao: filtros.tipoManutencao
         });
 
         const respostaTexto = montarResumoLista(manutencoes, filtros, {
@@ -122,8 +195,17 @@ export const RelatorioService = {
 
         const payload = construirPayloadLista(manutencoes, filtros, respostaTexto);
 
-        await registrarSessaoRelatorio(usuarioNome, mensagem, respostaTexto, payload);
+        await registrarSessaoRelatorio(
+            usuarioNome,
+            mensagem,
+            respostaTexto,
+            payload,
+            sessaoExistente
+        );
 
-        return `${respostaTexto}${manutencoes.length > 0 ? " Deseja que eu gere um PDF com esse relatório?" : ""}`;
+        return {
+            mensagem: `${respostaTexto}${manutencoes.length > 0 ? " Deseja que eu gere um PDF com esse relatório?" : ""}`,
+            meta: payload
+        };
     }
 };
