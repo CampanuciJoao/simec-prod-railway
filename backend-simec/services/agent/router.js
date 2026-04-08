@@ -25,6 +25,51 @@ const RESET_COMMANDS = [
     'resetar'
 ];
 
+function pareceConsultaRelatorio(msg) {
+    const termosConsulta = [
+        'quando foi',
+        'qual foi',
+        'última',
+        'ultima',
+        'mais recente',
+        'histórico',
+        'historico',
+        'relatório',
+        'relatorio',
+        'quantas',
+        'quais',
+        'listar',
+        'liste',
+        'mostrar',
+        'mostre',
+        'consulta',
+        'feita em',
+        'feitas em',
+        'no período',
+        'periodo',
+        'último ano',
+        'ultimo ano'
+    ];
+
+    return termosConsulta.some(t => msg.includes(t));
+}
+
+function pareceAgendamento(msg) {
+    const termosAgendamento = [
+        'agendar',
+        'marcar',
+        'abrir os',
+        'abrir uma os',
+        'abrir chamado',
+        'nova manutenção',
+        'novo agendamento',
+        'quero agendar',
+        'preciso agendar'
+    ];
+
+    return termosAgendamento.some(t => msg.includes(t));
+}
+
 /**
  * Maestro do Agente: Orquestra a conversa, mantendo contexto via AgentSession.
  */
@@ -69,21 +114,23 @@ export const RoteadorAgente = async (mensagem, usuarioNome) => {
         // 4. Classificação de intenção
         let intencao = await classificarIntencao(mensagem);
 
-        // 5. Heurística de segurança para agendamento
-        const termosChaveAgendamento = [
-            'agendar',
-            'marcar',
-            'manutenção',
-            'corretiva',
-            'preventiva',
-            'conserto',
-            'os',
-            'abrir'
-        ];
+        // 5. Heurísticas de segurança
+        // Se parece consulta, prioriza RELATORIO
+        if (intencao === 'OUTRO' && pareceConsultaRelatorio(msgMinuscula)) {
+            console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para RELATORIO`);
+            intencao = 'RELATORIO';
+        }
 
-        if (intencao === 'OUTRO' && termosChaveAgendamento.some(t => msgMinuscula.includes(t))) {
+        // Se parece agendamento explícito, prioriza AGENDAR_MANUTENCAO
+        if (intencao === 'OUTRO' && pareceAgendamento(msgMinuscula)) {
             console.log(`[ROUTER] Heurística ativada: Corrigindo intenção para AGENDAR_MANUTENCAO`);
             intencao = 'AGENDAR_MANUTENCAO';
+        }
+
+        // Desempate: se tiver palavras de consulta e palavras de preventiva/corretiva,
+        // consulta ganha de agendamento
+        if (pareceConsultaRelatorio(msgMinuscula)) {
+            intencao = 'RELATORIO';
         }
 
         console.log(
