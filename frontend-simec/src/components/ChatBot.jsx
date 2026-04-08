@@ -26,29 +26,43 @@ function ChatBot() {
     }, [historico]);
 
     const getAuthToken = () => {
-        return localStorage.getItem('token');
+        try {
+            const userInfo = localStorage.getItem('userInfo');
+            if (!userInfo) return null;
+
+            const parsed = JSON.parse(userInfo);
+            return parsed?.token || null;
+        } catch (error) {
+            console.error('[CHATBOT_TOKEN_ERROR]', error);
+            return null;
+        }
+    };
+
+    const getApiBaseUrl = () => {
+        const envUrl = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+        return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
     };
 
     const executarAcaoAgente = async (resposta) => {
         if (!resposta?.acao) return;
 
         const token = getAuthToken();
+        const apiBaseUrl = getApiBaseUrl();
 
         if (resposta.acao === 'GERAR_PDF_OS' && resposta.contexto?.manutencaoId) {
             try {
                 const r = await fetch(
-                    `${import.meta.env.VITE_API_URL || ''}/api/pdf-data/manutencao/${resposta.contexto.manutencaoId}`,
+                    `${apiBaseUrl}/pdf-data/manutencao/${resposta.contexto.manutencaoId}`,
                     {
                         method: 'GET',
                         headers: {
-                            'Content-Type': 'application/json',
                             Authorization: token ? `Bearer ${token}` : ''
                         }
                     }
                 );
 
                 if (!r.ok) {
-                    throw new Error('Falha ao buscar dados da OS para PDF.');
+                    throw new Error(`Falha ao buscar dados da OS para PDF. Status: ${r.status}`);
                 }
 
                 const manutencao = await r.json();
@@ -65,7 +79,7 @@ function ChatBot() {
         if (resposta.acao === 'GERAR_PDF_RELATORIO' && Array.isArray(resposta.contexto?.ids)) {
             try {
                 const r = await fetch(
-                    `${import.meta.env.VITE_API_URL || ''}/api/pdf-data/relatorio`,
+                    `${apiBaseUrl}/pdf-data/relatorio`,
                     {
                         method: 'POST',
                         headers: {
@@ -79,7 +93,7 @@ function ChatBot() {
                 );
 
                 if (!r.ok) {
-                    throw new Error('Falha ao buscar dados do relatório para PDF.');
+                    throw new Error(`Falha ao buscar dados do relatório para PDF. Status: ${r.status}`);
                 }
 
                 const resultado = await r.json();
