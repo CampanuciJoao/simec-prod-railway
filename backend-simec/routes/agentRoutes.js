@@ -7,34 +7,56 @@ const router = express.Router();
 
 /**
  * ROTA: POST /api/agent/chat
- * DESCRIÇÃO: Ponto de entrada para conversas com o Agente Guardião.
+ * DESCRIÇÃO: Ponto de entrada para conversas com o agente do SIMEC.
  * ACESSO: Protegido por JWT.
  */
 router.post('/chat', proteger, async (req, res) => {
     const { mensagem } = req.body;
 
-    // 1. Validação de Entrada: Impede o processamento de mensagens vazias.
-    if (!mensagem || mensagem.trim() === "") {
-        return res.status(400).json({ 
-            message: "Por favor, digite uma mensagem para o Agente." 
+    if (!mensagem || mensagem.trim() === '') {
+        return res.status(400).json({
+            message: 'Por favor, digite uma mensagem para o agente.'
         });
     }
 
     try {
-        // 2. Orquestração: O Controller apenas recebe o dado e o entrega ao Maestro (Router).
-        // Passamos o nome do usuário extraído do token para o agente manter a pessoalidade.
         const resposta = await RoteadorAgente(mensagem, req.usuario.nome);
-        
-        // 3. Resposta de Sucesso: Retorna o texto gerado pela lógica do Agente.
-        return res.json({ resposta });
+
+        // Caso 1: fluxo legado ou resposta simples em texto
+        if (typeof resposta === 'string') {
+            return res.json({
+                resposta: {
+                    mensagem: resposta
+                }
+            });
+        }
+
+        // Caso 2: resposta estruturada moderna
+        if (resposta && typeof resposta === 'object') {
+            return res.json({
+                resposta: {
+                    mensagem: resposta.mensagem || 'Operação concluída.',
+                    acao: resposta.acao || null,
+                    contexto: resposta.contexto || null,
+                    meta: resposta.meta || null
+                }
+            });
+        }
+
+        // Caso 3: fallback extremo
+        return res.json({
+            resposta: {
+                mensagem: 'Recebi sua solicitação, mas não consegui montar uma resposta válida.'
+            }
+        });
 
     } catch (error) {
-        // 4. Observabilidade: Log detalhado para o desenvolvedor no terminal do Railway.
         console.error(`[AGENT_CONTROLLER_ERROR] Usuário: ${req.usuario.nome} | Erro:`, error.message);
-        
-        // 5. Segurança de Resposta: Mensagem genérica para o frontend em caso de falha crítica.
-        return res.status(500).json({ 
-            message: "O Agente Guardião encontrou uma instabilidade técnica. Tente novamente em alguns minutos.",
+
+        return res.status(500).json({
+            resposta: {
+                mensagem: 'O agente encontrou uma instabilidade técnica. Tente novamente em alguns instantes.'
+            },
             error: true
         });
     }
