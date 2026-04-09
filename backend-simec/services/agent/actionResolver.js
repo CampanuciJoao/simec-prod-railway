@@ -33,16 +33,56 @@ export const DOMAINS = {
 export function detectarAcao(mensagem) {
     const msg = normalizarMensagem(mensagem);
 
-    const termosConfirmacao = ['sim', 'ok', 'confirmar', 'pode'];
-    const termosCancelamento = ['não', 'nao', 'cancela', 'cancelar', 'parar'];
+    const termosConfirmacao = ['sim', 'ok', 'confirmar', 'pode', 'pode sim'];
+    const termosCancelamento = ['não', 'nao', 'cancela', 'cancelar', 'parar', 'negativo'];
 
-    const termosPdfOS = ['pdf da os', 'imprima a os', 'gere a os', 'ordem de serviço'];
-    const termosAbrirOS = ['abrir os', 'ver a os', 'mostrar os'];
-    const termosAbrirDocumento = ['abrir documento', 'abrir pdf', 'abrir arquivo'];
+    const termosPdfOS = [
+        'pdf da os',
+        'pdf da ordem de serviço',
+        'pdf da ordem de servico',
+        'imprima a os',
+        'gere a os',
+        'quero a os',
+        'ordem de serviço',
+        'ordem de servico'
+    ];
 
-    const termosCobertura = ['cobertura', 'o que cobre'];
-    const termosVencimento = ['vencimento', 'quando vence', 'validade'];
-    const termosDadosApolice = ['dados do seguro', 'detalhes do seguro'];
+    const termosAbrirOS = [
+        'abrir os',
+        'abrir a os',
+        'abrir ordem de serviço',
+        'abrir ordem de servico',
+        'ver a os',
+        'mostrar os'
+    ];
+
+    const termosAbrirDocumento = [
+        'abrir documento',
+        'abrir pdf',
+        'abrir arquivo'
+    ];
+
+    const termosCobertura = [
+        'cobertura',
+        'coberturas',
+        'o que cobre',
+        'mostrar cobertura',
+        'me mostre a cobertura'
+    ];
+
+    const termosVencimento = [
+        'vencimento',
+        'quando vence',
+        'validade',
+        'data de vencimento'
+    ];
+
+    const termosDadosApolice = [
+        'dados do seguro',
+        'detalhes do seguro',
+        'dados da apólice',
+        'dados da apolice'
+    ];
 
     if (contemAlgum(msg, termosPdfOS)) return ACTIONS.GERAR_PDF_OS;
     if (contemAlgum(msg, termosAbrirOS)) return ACTIONS.ABRIR_OS;
@@ -51,9 +91,7 @@ export function detectarAcao(mensagem) {
     if (contemAlgum(msg, termosVencimento)) return ACTIONS.MOSTRAR_VENCIMENTO;
     if (contemAlgum(msg, termosDadosApolice)) return ACTIONS.MOSTRAR_DADOS_APOLICE;
 
-    // 👇 CONFIRMAÇÃO FLEXÍVEL (CORRIGIDO)
     if (contemAlgum(msg, termosConfirmacao)) return ACTIONS.CONFIRMAR_ACAO;
-
     if (contemAlgum(msg, termosCancelamento)) return ACTIONS.CANCELAR_ACAO;
 
     if (msg.includes('pdf') || msg.includes('imprimir')) {
@@ -64,15 +102,51 @@ export function detectarAcao(mensagem) {
 }
 
 /**
- * Normaliza o contexto independente de onde veio
+ * Normaliza o contexto independentemente de onde veio.
+ * Prioriza o novo padrão: contextoPDF
  */
 function extrairContexto(state) {
-    return (
-        state?.contextoPDF ||
-        state?.contexto ||
-        state?.meta ||
-        null
-    );
+    return state?.contextoPDF || state?.contexto || state?.meta || null;
+}
+
+/**
+ * Resolve ação sugerida com base no contexto padronizado.
+ */
+function resolverAcaoSugerida(contexto, action, domain, state) {
+    if (!contexto?.acaoSugerida) return null;
+
+    const acoesConfirmacao = [
+        ACTIONS.GERAR_PDF,
+        ACTIONS.CONFIRMAR_ACAO
+    ];
+
+    if (
+        contexto.acaoSugerida === ACTIONS.GERAR_PDF_OS &&
+        [...acoesConfirmacao, ACTIONS.GERAR_PDF_OS].includes(action)
+    ) {
+        return {
+            matched: true,
+            domain,
+            action: ACTIONS.GERAR_PDF_OS,
+            context: contexto,
+            state
+        };
+    }
+
+    if (
+        contexto.acaoSugerida === ACTIONS.GERAR_PDF_RELATORIO &&
+        acoesConfirmacao.includes(action)
+    ) {
+        return {
+            matched: true,
+            domain,
+            action: ACTIONS.GERAR_PDF_RELATORIO,
+            context: contexto,
+            state
+        };
+    }
+
+    return null;
 }
 
 /**
@@ -83,9 +157,19 @@ function resolverAcaoRelatorio(state, action) {
 
     if (!contexto) return null;
 
+    const resolvidoPorSugestao = resolverAcaoSugerida(
+        contexto,
+        action,
+        DOMAINS.RELATORIO,
+        state
+    );
+
+    if (resolvidoPorSugestao) {
+        return resolvidoPorSugestao;
+    }
+
     const tipo = contexto.tipo;
 
-    // OS
     if (
         tipo === 'OS_MANUTENCAO' &&
         [ACTIONS.GERAR_PDF, ACTIONS.GERAR_PDF_OS, ACTIONS.CONFIRMAR_ACAO].includes(action)
@@ -99,7 +183,6 @@ function resolverAcaoRelatorio(state, action) {
         };
     }
 
-    // RELATÓRIO
     if (
         tipo === 'RELATORIO_MANUTENCOES' &&
         [ACTIONS.GERAR_PDF, ACTIONS.CONFIRMAR_ACAO].includes(action)
@@ -113,7 +196,6 @@ function resolverAcaoRelatorio(state, action) {
         };
     }
 
-    // Abrir OS
     if (tipo === 'OS_MANUTENCAO' && action === ACTIONS.ABRIR_OS) {
         return {
             matched: true,
@@ -124,16 +206,37 @@ function resolverAcaoRelatorio(state, action) {
         };
     }
 
+    if (tipo === 'OS_MANUTENCAO' && action === ACTIONS.ABRIR_DOCUMENTO) {
+        return {
+            matched: true,
+            domain: DOMAINS.RELATORIO,
+            action: ACTIONS.ABRIR_DOCUMENTO,
+            context: contexto,
+            state
+        };
+    }
+
     return null;
 }
 
 /**
- * Resolve ação para seguro (futuro)
+ * Resolve ação para seguro (pronto para o próximo módulo)
  */
 function resolverAcaoSeguro(state, action) {
     const contexto = extrairContexto(state);
 
     if (!contexto) return null;
+
+    const resolvidoPorSugestao = resolverAcaoSugerida(
+        contexto,
+        action,
+        DOMAINS.SEGURO,
+        state
+    );
+
+    if (resolvidoPorSugestao) {
+        return resolvidoPorSugestao;
+    }
 
     if ([ACTIONS.GERAR_PDF, ACTIONS.CONFIRMAR_ACAO].includes(action)) {
         return {
@@ -146,29 +249,82 @@ function resolverAcaoSeguro(state, action) {
     }
 
     if (action === ACTIONS.MOSTRAR_COBERTURA) {
-        return { matched: true, domain: DOMAINS.SEGURO, action, context: state };
+        return {
+            matched: true,
+            domain: DOMAINS.SEGURO,
+            action,
+            context: contexto,
+            state
+        };
     }
 
     if (action === ACTIONS.MOSTRAR_VENCIMENTO) {
-        return { matched: true, domain: DOMAINS.SEGURO, action, context: state };
+        return {
+            matched: true,
+            domain: DOMAINS.SEGURO,
+            action,
+            context: contexto,
+            state
+        };
+    }
+
+    if (action === ACTIONS.MOSTRAR_DADOS_APOLICE) {
+        return {
+            matched: true,
+            domain: DOMAINS.SEGURO,
+            action,
+            context: contexto,
+            state
+        };
+    }
+
+    if (action === ACTIONS.ABRIR_DOCUMENTO) {
+        return {
+            matched: true,
+            domain: DOMAINS.SEGURO,
+            action,
+            context: contexto,
+            state
+        };
     }
 
     return null;
 }
 
 /**
- * Resolve ação para contrato (futuro)
+ * Resolve ação para contrato (pronto para o próximo módulo)
  */
 function resolverAcaoContrato(state, action) {
     const contexto = extrairContexto(state);
 
     if (!contexto) return null;
 
+    const resolvidoPorSugestao = resolverAcaoSugerida(
+        contexto,
+        action,
+        DOMAINS.CONTRATO,
+        state
+    );
+
+    if (resolvidoPorSugestao) {
+        return resolvidoPorSugestao;
+    }
+
     if ([ACTIONS.GERAR_PDF, ACTIONS.CONFIRMAR_ACAO].includes(action)) {
         return {
             matched: true,
             domain: DOMAINS.CONTRATO,
             action: ACTIONS.GERAR_PDF,
+            context: contexto,
+            state
+        };
+    }
+
+    if (action === ACTIONS.ABRIR_DOCUMENTO) {
+        return {
+            matched: true,
+            domain: DOMAINS.CONTRATO,
+            action,
             context: contexto,
             state
         };

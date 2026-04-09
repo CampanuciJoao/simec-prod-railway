@@ -5,59 +5,75 @@ import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-/**
- * ROTA: POST /api/agent/chat
- * DESCRIÇÃO: Ponto de entrada para conversas com o agente do SIMEC.
- * ACESSO: Protegido por JWT.
- */
 router.post('/chat', proteger, async (req, res) => {
-    const { mensagem } = req.body;
+    const mensagem = req.body?.mensagem;
 
-    if (!mensagem || mensagem.trim() === '') {
+    if (!mensagem || typeof mensagem !== 'string' || mensagem.trim() === '') {
         return res.status(400).json({
-            message: 'Por favor, digite uma mensagem para o agente.'
+            resposta: {
+                mensagem: 'Por favor, digite uma mensagem para o agente.',
+                acao: null,
+                contexto: null,
+                meta: null
+            }
         });
     }
 
     try {
-        const resposta = await RoteadorAgente(mensagem, req.usuario.nome);
+        const usuarioNome =
+            req.usuario?.nome ||
+            req.user?.nome ||
+            req.usuario?.name ||
+            'Usuário';
 
-        // Caso 1: fluxo legado ou resposta simples em texto
-        if (typeof resposta === 'string') {
+        const resultado = await RoteadorAgente(mensagem.trim(), usuarioNome);
+
+        // 1) Compatibilidade com retorno legado em string
+        if (typeof resultado === 'string') {
             return res.json({
                 resposta: {
-                    mensagem: resposta
+                    mensagem: resultado,
+                    acao: null,
+                    contexto: null,
+                    meta: null
                 }
             });
         }
 
-        // Caso 2: resposta estruturada moderna
-        if (resposta && typeof resposta === 'object') {
+        // 2) Retorno estruturado esperado
+        if (resultado && typeof resultado === 'object') {
             return res.json({
                 resposta: {
-                    mensagem: resposta.mensagem || 'Operação concluída.',
-                    acao: resposta.acao || null,
-                    contexto: resposta.contexto || null,
-                    meta: resposta.meta || null
+                    mensagem: resultado.mensagem || 'Operação concluída.',
+                    acao: resultado.acao || null,
+                    contexto: resultado.contexto || null,
+                    meta: resultado.meta || null
                 }
             });
         }
 
-        // Caso 3: fallback extremo
+        // 3) Fallback defensivo
         return res.json({
             resposta: {
-                mensagem: 'Recebi sua solicitação, mas não consegui montar uma resposta válida.'
+                mensagem: 'Recebi sua solicitação, mas não consegui montar uma resposta válida.',
+                acao: null,
+                contexto: null,
+                meta: null
             }
         });
-
     } catch (error) {
-        console.error(`[AGENT_CONTROLLER_ERROR] Usuário: ${req.usuario.nome} | Erro:`, error.message);
+        console.error(
+            `[AGENT_CHAT_ERROR] Usuário: ${req.usuario?.nome || 'desconhecido'} | Erro:`,
+            error
+        );
 
         return res.status(500).json({
             resposta: {
-                mensagem: 'O agente encontrou uma instabilidade técnica. Tente novamente em alguns instantes.'
-            },
-            error: true
+                mensagem: 'Tive um problema ao processar sua solicitação.',
+                acao: null,
+                contexto: null,
+                meta: null
+            }
         });
     }
 });

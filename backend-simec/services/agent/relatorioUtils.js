@@ -60,7 +60,12 @@ function extrairPeriodo(lower) {
         };
     }
 
-    if (lower.includes('último mês') || lower.includes('ultimo mes') || lower.includes('últimos 30 dias') || lower.includes('ultimos 30 dias')) {
+    if (
+        lower.includes('último mês') ||
+        lower.includes('ultimo mes') ||
+        lower.includes('últimos 30 dias') ||
+        lower.includes('ultimos 30 dias')
+    ) {
         const inicio = new Date(hoje);
         inicio.setDate(inicio.getDate() - 30);
 
@@ -91,7 +96,6 @@ function extrairUnidade(mensagem, lower) {
         if (match?.[1]) {
             const texto = limparTexto(match[1]);
 
-            // Evita capturar frases genéricas demais
             if (
                 texto.length > 1 &&
                 !/^tomografia$/i.test(texto) &&
@@ -150,6 +154,34 @@ function detectarSomenteUltima(lower) {
     return pistas.some(p => lower.includes(p));
 }
 
+function construirContextoPDFOS(manutencao) {
+    if (!manutencao) return null;
+
+    return {
+        tipo: 'OS_MANUTENCAO',
+        entidade: 'MANUTENCAO',
+        idPrincipal: manutencao.id,
+        ids: [manutencao.id],
+        numeroOS: manutencao.numeroOS || null,
+        total: 1,
+        acaoSugerida: 'GERAR_PDF_OS'
+    };
+}
+
+function construirContextoPDFLista(manutencoes) {
+    if (!manutencoes || manutencoes.length === 0) return null;
+
+    return {
+        tipo: 'RELATORIO_MANUTENCOES',
+        entidade: 'MANUTENCAO',
+        idPrincipal: null,
+        ids: manutencoes.map(m => m.id),
+        numeroOS: null,
+        total: manutencoes.length,
+        acaoSugerida: 'GERAR_PDF_RELATORIO'
+    };
+}
+
 export function extrairFiltrosRelatorio(mensagem) {
     const lower = mensagem.toLowerCase().trim();
 
@@ -162,7 +194,6 @@ export function extrairFiltrosRelatorio(mensagem) {
         periodoFim: null
     };
 
-    // Se o usuário falar só "últimas preventivas/corretivas", assume lista
     if (
         (lower.includes('últimas') || lower.includes('ultimas')) &&
         !lower.includes('quando foi')
@@ -170,12 +201,10 @@ export function extrairFiltrosRelatorio(mensagem) {
         filtros.somenteUltima = false;
     }
 
-    // Período
     const periodo = extrairPeriodo(lower);
     filtros.periodoInicio = periodo.periodoInicio;
     filtros.periodoFim = periodo.periodoFim;
 
-    // Padrão prioritário: "tomografia de coxim", "tc de coxim", "rm de dourados"
     const equipDeUnidade = extrairEquipamentoDeUnidade(mensagem);
     if (equipDeUnidade) {
         filtros.equipamentoTexto = equipDeUnidade.equipamentoTexto;
@@ -183,10 +212,7 @@ export function extrairFiltrosRelatorio(mensagem) {
         return filtros;
     }
 
-    // Unidade explícita
     filtros.unidadeTexto = extrairUnidade(mensagem, lower);
-
-    // Equipamento explícito
     filtros.equipamentoTexto = extrairEquipamento(mensagem);
 
     return filtros;
@@ -247,12 +273,7 @@ export function construirPayloadConsultaUnica(manutencao, respostaTexto) {
         manutencaoId: manutencao?.id || null,
         numeroOS: manutencao?.numeroOS || null,
         total: manutencao ? 1 : 0,
-        contextoPDF: manutencao
-            ? {
-                  tipo: 'OS_MANUTENCAO',
-                  manutencaoId: manutencao.id
-              }
-            : null
+        contextoPDF: construirContextoPDFOS(manutencao)
     };
 }
 
@@ -262,11 +283,6 @@ export function construirPayloadLista(manutencoes, filtros, respostaTexto) {
         respostaTexto,
         total: manutencoes?.length || 0,
         ids: manutencoes?.map(m => m.id) || [],
-        contextoPDF: manutencoes?.length
-            ? {
-                  tipo: 'RELATORIO_MANUTENCOES',
-                  ids: manutencoes.map(m => m.id)
-              }
-            : null
+        contextoPDF: construirContextoPDFLista(manutencoes)
     };
 }

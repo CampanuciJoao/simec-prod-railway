@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/routes/relatoriosRoutes.js
-// VERSÃO ATUALIZADA - USANDO reportQueryService SEM QUEBRAR A API EXISTENTE
+// VERSÃO PROFISSIONAL - INTEGRADA COM reportQueryService (SEM QUEBRAR O MANUAL)
 
 import express from 'express';
 import {
@@ -10,7 +10,6 @@ import {
 const router = express.Router();
 
 // ROTA: POST /api/relatorios/gerar
-// FINALIDADE: Gerar diferentes tipos de relatórios com base em filtros dinâmicos.
 router.post('/gerar', async (req, res) => {
     const {
         tipoRelatorio,
@@ -32,6 +31,7 @@ router.post('/gerar', async (req, res) => {
     try {
         let dadosRelatorio = [];
 
+        // 🔹 INVENTÁRIO DE EQUIPAMENTOS
         if (tipoRelatorio === 'inventarioEquipamentos') {
             dadosRelatorio = await buscarInventarioEquipamentos({
                 unidadeId,
@@ -40,6 +40,7 @@ router.post('/gerar', async (req, res) => {
             });
         }
 
+        // 🔹 MANUTENÇÕES REALIZADAS
         else if (tipoRelatorio === 'manutencoesRealizadas') {
             if (!dataInicio || !dataFim) {
                 return res.status(400).json({
@@ -56,6 +57,7 @@ router.post('/gerar', async (req, res) => {
             });
         }
 
+        // 🔹 TIPO INVÁLIDO
         else {
             return res.status(400).json({
                 message: 'Tipo de relatório inválido ou não implementado.'
@@ -64,7 +66,10 @@ router.post('/gerar', async (req, res) => {
 
         return res.json({
             tipoRelatorio,
-            periodo: { inicio: dataInicio, fim: dataFim },
+            periodo: {
+                inicio: dataInicio,
+                fim: dataFim
+            },
             filtros: {
                 unidadeId,
                 fabricante,
@@ -76,7 +81,7 @@ router.post('/gerar', async (req, res) => {
         });
 
     } catch (error) {
-        console.error('[RELATORIOS_ROUTE_ERROR] Erro ao gerar relatório:', error);
+        console.error('[RELATORIOS_ROUTE_ERROR]', error);
         return res.status(500).json({
             message: 'Erro interno do servidor ao gerar relatório.'
         });

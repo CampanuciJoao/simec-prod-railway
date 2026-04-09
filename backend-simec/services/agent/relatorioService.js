@@ -37,7 +37,12 @@ async function registrarSessaoRelatorio(
     }
 
     await AgentSessionRepository.registrarMensagem(sessao.id, 'user', mensagem);
-    await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', respostaTexto, payload);
+    await AgentSessionRepository.registrarMensagem(
+        sessao.id,
+        'agent',
+        respostaTexto,
+        payload
+    );
 
     return sessao;
 }
@@ -75,43 +80,65 @@ async function buscarUltimaManutencao({
 }
 
 function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
+    const contextoPDF = estadoAnterior?.contextoPDF || {};
+    const numeroOS = contextoPDF?.numeroOS || '';
+    const total = contextoPDF?.total || 0;
+    const idPrincipal = contextoPDF?.idPrincipal || null;
+    const ids = contextoPDF?.ids || [];
+
     if (acaoContextual.action === ACTIONS.GERAR_PDF_OS) {
         return {
-            mensagem: `Perfeito. Vou preparar o PDF da OS ${estadoAnterior.numeroOS || ''}.`,
+            mensagem: `Perfeito. Vou preparar o PDF da OS ${numeroOS}.`,
             acao: 'GERAR_PDF_OS',
             contexto: {
-                manutencaoId: acaoContextual.context?.manutencaoId || null
+                manutencaoId: idPrincipal
             }
         };
     }
 
     if (acaoContextual.action === ACTIONS.GERAR_PDF_RELATORIO) {
         return {
-            mensagem: `Perfeito. Vou preparar o PDF do relatório com ${estadoAnterior.total || 0} registros.`,
+            mensagem: `Perfeito. Vou preparar o PDF do relatório com ${total} registros.`,
             acao: 'GERAR_PDF_RELATORIO',
             contexto: {
-                ids: acaoContextual.context?.ids || []
+                ids
             }
         };
     }
 
     if (acaoContextual.action === ACTIONS.ABRIR_OS) {
         return {
-            mensagem: `Perfeito. Vou abrir os detalhes da OS ${estadoAnterior.numeroOS || ''}.`,
+            mensagem: `Perfeito. Vou abrir os detalhes da OS ${numeroOS}.`,
             acao: 'ABRIR_OS',
             contexto: {
-                manutencaoId: acaoContextual.context?.manutencaoId || null
+                manutencaoId: idPrincipal
+            }
+        };
+    }
+
+    if (acaoContextual.action === ACTIONS.ABRIR_DOCUMENTO) {
+        return {
+            mensagem: `Perfeito. Vou abrir o documento relacionado à OS ${numeroOS}.`,
+            acao: 'ABRIR_DOCUMENTO',
+            contexto: {
+                manutencaoId: idPrincipal
             }
         };
     }
 
     return {
-        mensagem: 'Entendi a ação sobre a consulta anterior, mas ainda não tenho um tratador específico para ela.'
+        mensagem:
+            'Entendi a ação sobre a consulta anterior, mas ainda não tenho um tratador específico para ela.'
     };
 }
 
 export const RelatorioService = {
-    async processar(mensagem, usuarioNome, sessaoExistente = null, acaoContextual = null) {
+    async processar(
+        mensagem,
+        usuarioNome,
+        sessaoExistente = null,
+        acaoContextual = null
+    ) {
         // 1. Follow-up de ação contextual
         if (acaoContextual?.matched) {
             const estadoAnterior = acaoContextual.state || {};
@@ -172,7 +199,10 @@ export const RelatorioService = {
                     contexto.tipoEquipamento
             });
 
-            const payload = construirPayloadConsultaUnica(manutencao, respostaTexto);
+            const payload = construirPayloadConsultaUnica(
+                manutencao,
+                respostaTexto
+            );
 
             await registrarSessaoRelatorio(
                 usuarioNome,
@@ -209,7 +239,11 @@ export const RelatorioService = {
                 contexto.tipoEquipamento
         });
 
-        const payload = construirPayloadLista(manutencoes, filtros, respostaTexto);
+        const payload = construirPayloadLista(
+            manutencoes,
+            filtros,
+            respostaTexto
+        );
 
         await registrarSessaoRelatorio(
             usuarioNome,

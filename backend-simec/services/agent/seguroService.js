@@ -21,6 +21,26 @@ function respostaPadrao(mensagem, extras = {}) {
     };
 }
 
+function obterEstadoAnterior(sessaoExistente) {
+    if (!sessaoExistente?.stateJson) return {};
+    try {
+        return JSON.parse(sessaoExistente.stateJson);
+    } catch {
+        return {};
+    }
+}
+
+function mergeFiltrosComContexto(filtros, estadoAnterior = {}) {
+    return {
+        ...filtros,
+        unidadeTexto: filtros.unidadeTexto || estadoAnterior.unidadeNome || null,
+        equipamentoTexto:
+            filtros.equipamentoTexto ||
+            estadoAnterior.equipamentoNome ||
+            null
+    };
+}
+
 async function registrarSessaoSeguro(
     usuarioNome,
     mensagem,
@@ -46,21 +66,38 @@ async function registrarSessaoSeguro(
     }
 
     await AgentSessionRepository.registrarMensagem(sessao.id, 'user', mensagem);
-    await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', respostaTexto, payload);
+    await AgentSessionRepository.registrarMensagem(
+        sessao.id,
+        'agent',
+        respostaTexto,
+        payload
+    );
 
     return sessao;
 }
 
 function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
     if (acaoContextual.action === ACTIONS.GERAR_PDF) {
+        if (estadoAnterior?.contextoPDF?.anexoId) {
+            return respostaPadrao(
+                `Perfeito. Vou preparar o PDF da apólice ${estadoAnterior.numeroApolice || ''}.`,
+                {
+                    acao: 'ABRIR_PDF_SEGURO',
+                    contexto: {
+                        seguroId: estadoAnterior.seguroId || null,
+                        anexoId: estadoAnterior.contextoPDF.anexoId
+                    },
+                    meta: {
+                        tipoResposta: 'SEGURO_ACAO',
+                        ultimaAcaoExecutada: ACTIONS.GERAR_PDF
+                    }
+                }
+            );
+        }
+
         return respostaPadrao(
-            `Perfeito. Vou preparar o PDF da apólice ${estadoAnterior.numeroApolice || ''}.`,
+            `Encontrei a apólice ${estadoAnterior.numeroApolice || ''}, mas ela não possui PDF anexado no sistema.`,
             {
-                acao: 'ABRIR_PDF_SEGURO',
-                contexto: {
-                    seguroId: estadoAnterior.seguroId || null,
-                    anexoId: estadoAnterior?.contextoPDF?.anexoId || null
-                },
                 meta: {
                     tipoResposta: 'SEGURO_ACAO',
                     ultimaAcaoExecutada: ACTIONS.GERAR_PDF
@@ -70,14 +107,26 @@ function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
     }
 
     if (acaoContextual.action === ACTIONS.ABRIR_DOCUMENTO) {
+        if (estadoAnterior?.contextoPDF?.anexoId) {
+            return respostaPadrao(
+                `Perfeito. Vou abrir o documento da apólice ${estadoAnterior.numeroApolice || ''}.`,
+                {
+                    acao: 'ABRIR_PDF_SEGURO',
+                    contexto: {
+                        seguroId: estadoAnterior.seguroId || null,
+                        anexoId: estadoAnterior.contextoPDF.anexoId
+                    },
+                    meta: {
+                        tipoResposta: 'SEGURO_ACAO',
+                        ultimaAcaoExecutada: ACTIONS.ABRIR_DOCUMENTO
+                    }
+                }
+            );
+        }
+
         return respostaPadrao(
-            `Perfeito. Vou abrir o documento da apólice ${estadoAnterior.numeroApolice || ''}.`,
+            `Encontrei a apólice ${estadoAnterior.numeroApolice || ''}, mas ela não possui documento anexado no sistema.`,
             {
-                acao: 'ABRIR_PDF_SEGURO',
-                contexto: {
-                    seguroId: estadoAnterior.seguroId || null,
-                    anexoId: estadoAnterior?.contextoPDF?.anexoId || null
-                },
                 meta: {
                     tipoResposta: 'SEGURO_ACAO',
                     ultimaAcaoExecutada: ACTIONS.ABRIR_DOCUMENTO
@@ -89,7 +138,7 @@ function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
     if (acaoContextual.action === ACTIONS.MOSTRAR_COBERTURA) {
         return respostaPadrao(
             estadoAnterior.cobertura
-                ? `A cobertura informada para esta apólice é: ${estadoAnterior.cobertura}`
+                ? `As coberturas informadas para esta apólice são: ${estadoAnterior.cobertura}`
                 : 'Esta apólice não possui uma descrição de cobertura cadastrada.',
             {
                 meta: {
@@ -137,12 +186,75 @@ function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
     );
 }
 
+function construirRespostaDiretaPorPedido(filtros, payload, respostaBase) {
+    if (!payload?.seguroId) {
+        return respostaPadrao(respostaBase, {
+            meta: payload
+        });
+    }
+
+    if (filtros.pedirCobertura) {
+        return respostaPadrao(
+            payload.cobertura
+                ? `As coberturas da apólice ${payload.numeroApolice} são: ${payload.cobertura}`
+                : `Encontrei a apólice ${payload.numeroApolice}, mas ela não possui cobertura descritiva cadastrada.`,
+            {
+                meta: payload
+            }
+        );
+    }
+
+    if (filtros.pedirVencimento) {
+        return respostaPadrao(
+            payload.vencimento
+                ? `A apólice ${payload.numeroApolice} vence em ${new Date(payload.vencimento).toLocaleDateString('pt-BR')}.`
+                : `Encontrei a apólice ${payload.numeroApolice}, mas não localizei a data de vencimento.`,
+            {
+                meta: payload
+            }
+        );
+    }
+
+    if (filtros.pedirDocumento) {
+        if (payload.temAnexo && payload.contextoPDF?.anexoId) {
+            return respostaPadrao(
+                `Perfeito. Vou abrir o PDF da apólice ${payload.numeroApolice}.`,
+                {
+                    acao: 'ABRIR_PDF_SEGURO',
+                    contexto: {
+                        seguroId: payload.seguroId,
+                        anexoId: payload.contextoPDF.anexoId
+                    },
+                    meta: payload
+                }
+            );
+        }
+
+        return respostaPadrao(
+            `Encontrei a apólice ${payload.numeroApolice}, mas ela não possui PDF anexado no sistema.`,
+            {
+                meta: payload
+            }
+        );
+    }
+
+    return respostaPadrao(
+        `${respostaBase}${payload.temAnexo ? ' Deseja que eu abra o PDF da apólice, mostre a cobertura ou informe o vencimento?' : ''}`,
+        {
+            meta: payload
+        }
+    );
+}
+
 export const SeguroService = {
     async processar(mensagem, usuarioNome, sessaoExistente = null, acaoContextual = null) {
-        // 1. Follow-up de ação contextual
+        // 1. Follow-up contextual
         if (acaoContextual?.matched) {
             const estadoAnterior = acaoContextual.state || {};
-            const resposta = construirRespostaAcaoContextual(acaoContextual, estadoAnterior);
+            const resposta = construirRespostaAcaoContextual(
+                acaoContextual,
+                estadoAnterior
+            );
 
             await registrarSessaoSeguro(
                 usuarioNome,
@@ -158,10 +270,12 @@ export const SeguroService = {
             return resposta;
         }
 
-        // 2. Extrai filtros da pergunta
-        const filtros = extrairFiltrosSeguro(mensagem);
+        // 2. Extrai filtros + merge com contexto anterior
+        const filtrosExtraidos = extrairFiltrosSeguro(mensagem);
+        const estadoAnterior = obterEstadoAnterior(sessaoExistente);
+        const filtros = mergeFiltrosComContexto(filtrosExtraidos, estadoAnterior);
 
-        // 3. Resolve unidade/equipamento
+        // 3. Resolve entidades
         let contexto = {
             unidadeTexto: filtros.unidadeTexto,
             equipamentoTexto: filtros.equipamentoTexto
@@ -169,13 +283,34 @@ export const SeguroService = {
 
         contexto = await resolverEntidades(contexto);
 
+        // 4. Se o usuário mandou algo curto como "de coxim" e ainda não resolvemos,
+        // tentamos usar o contexto anterior para continuar a conversa
         if (!contexto.unidadeId && !contexto.equipamentoId) {
+            if (estadoAnterior?.seguroId) {
+                const resposta = respostaPadrao(
+                    'Entendi que você está continuando a consulta do seguro anterior, mas não consegui identificar o novo alvo. Pode informar, por exemplo: "da unidade de Coxim", "da sede" ou "da tomografia de Coxim"?',
+                    {
+                        meta: estadoAnterior
+                    }
+                );
+
+                await registrarSessaoSeguro(
+                    usuarioNome,
+                    mensagem,
+                    resposta.mensagem,
+                    estadoAnterior,
+                    sessaoExistente
+                );
+
+                return resposta;
+            }
+
             return respostaPadrao(
                 "Não consegui identificar a unidade ou o equipamento do seguro. Pode informar novamente, por exemplo: 'me traga o seguro da unidade de Coxim'?"
             );
         }
 
-        // 4. Busca seguro
+        // 5. Busca seguro
         let seguro = null;
 
         if (filtros.somenteVigente) {
@@ -190,7 +325,7 @@ export const SeguroService = {
             });
         }
 
-        // 5. Monta resposta e payload
+        // 6. Monta resumo e payload
         const respostaTexto = montarResumoSeguro(seguro, contexto);
         const payload = construirPayloadSeguro(seguro, respostaTexto);
 
@@ -202,11 +337,7 @@ export const SeguroService = {
             sessaoExistente
         );
 
-        return respostaPadrao(
-            `${respostaTexto}${payload.temAnexo ? ' Deseja que eu abra o PDF da apólice, mostre a cobertura ou informe o vencimento?' : ''}`,
-            {
-                meta: payload
-            }
-        );
+        // 7. Se o usuário já pediu algo específico, responde direto
+        return construirRespostaDiretaPorPedido(filtros, payload, respostaTexto);
     }
 };

@@ -6,16 +6,19 @@ import { enviarMensagemAoAgente } from '../services/api';
 import { useToast } from '../contexts/ToastContext';
 import { exportarOSManutencaoPDF, exportarRelatorioPDF } from '../utils/pdfUtils';
 
-// Importação com o caminho correto para a pasta styles
 import '../styles/components/ChatBot.css';
 
 function ChatBot() {
     const [isOpen, setIsOpen] = useState(false);
     const [mensagem, setMensagem] = useState('');
     const [historico, setHistorico] = useState([
-        { role: 'assistant', text: 'Olá! Sou a SIMEC-IA. Como posso ajudar na engenharia clínica hoje?' }
+        {
+            role: 'assistant',
+            text: 'Olá! Sou a SIMEC-IA. Como posso ajudar na engenharia clínica hoje?'
+        }
     ]);
     const [loading, setLoading] = useState(false);
+
     const scrollRef = useRef(null);
     const { addToast } = useToast();
 
@@ -23,7 +26,7 @@ function ChatBot() {
         if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [historico]);
+    }, [historico, loading]);
 
     const getAuthToken = () => {
         try {
@@ -43,96 +46,204 @@ function ChatBot() {
         return envUrl.endsWith('/api') ? envUrl : `${envUrl}/api`;
     };
 
+    const getApiOriginUrl = () => {
+        const apiBaseUrl = getApiBaseUrl();
+        return apiBaseUrl.replace(/\/api$/, '');
+    };
+
+    const normalizarRespostaAgente = (data) => {
+        const payload = data?.resposta ?? {};
+
+        if (typeof payload === 'string') {
+            return {
+                role: 'assistant',
+                text: payload,
+                acao: null,
+                contexto: null,
+                meta: null
+            };
+        }
+
+        return {
+            role: 'assistant',
+            text: payload?.mensagem || 'Sem resposta do agente.',
+            acao: payload?.acao || null,
+            contexto: payload?.contexto || null,
+            meta: payload?.meta || null
+        };
+    };
+
+    const buscarDadosOSParaPDF = async (manutencaoId, token, apiBaseUrl) => {
+        const response = await fetch(
+            `${apiBaseUrl}/pdf-data/manutencao/${manutencaoId}`,
+            {
+                method: 'GET',
+                headers: {
+                    Authorization: token ? `Bearer ${token}` : ''
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Falha ao buscar dados da OS para PDF. Status: ${response.status}`);
+        }
+
+        return response.json();
+    };
+
+    const buscarDadosRelatorioParaPDF = async (ids, token, apiBaseUrl) => {
+        const response = await fetch(
+            `${apiBaseUrl}/pdf-data/relatorio`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: token ? `Bearer ${token}` : ''
+                },
+                body: JSON.stringify({ ids })
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Falha ao buscar dados do relatório para PDF. Status: ${response.status}`);
+        }
+
+        return response.json();
+    };
+
+    const buscarSeguroPorId = async (seguroId, token, apiBaseUrl) => {
+        const response = await fetch(
+            `${apiBaseUrl}/seguros/${seguroId}`,
+            {
+                method: 'GET',
+                headers: {
+                    Authorization: token ? `Bearer ${token}` : ''
+                }
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Falha ao buscar dados do seguro. Status: ${response.status}`);
+        }
+
+        return response.json();
+    };
+
     const executarAcaoAgente = async (resposta) => {
         if (!resposta?.acao) return;
 
         const token = getAuthToken();
         const apiBaseUrl = getApiBaseUrl();
+        const apiOriginUrl = getApiOriginUrl();
 
-        if (resposta.acao === 'GERAR_PDF_OS' && resposta.contexto?.manutencaoId) {
-            try {
-                const r = await fetch(
-                    `${apiBaseUrl}/pdf-data/manutencao/${resposta.contexto.manutencaoId}`,
-                    {
-                        method: 'GET',
-                        headers: {
-                            Authorization: token ? `Bearer ${token}` : ''
-                        }
-                    }
-                );
+        try {
+            // PDF DA OS
+            if (resposta.acao === 'GERAR_PDF_OS') {
+                const manutencaoId = resposta.contexto?.manutencaoId;
 
-                if (!r.ok) {
-                    throw new Error(`Falha ao buscar dados da OS para PDF. Status: ${r.status}`);
+                if (!manutencaoId) {
+                    throw new Error('manutencaoId não informado para gerar PDF da OS.');
                 }
 
-                const manutencao = await r.json();
+                const manutencao = await buscarDadosOSParaPDF(
+                    manutencaoId,
+                    token,
+                    apiBaseUrl
+                );
+
                 exportarOSManutencaoPDF(manutencao);
                 addToast('PDF da OS gerado com sucesso.', 'success');
-            } catch (error) {
-                console.error('[CHATBOT_PDF_OS_ERROR]', error);
-                addToast('Não consegui gerar o PDF da OS.', 'error');
+                return;
             }
 
-            return;
-        }
+            // PDF DO RELATÓRIO
+            if (resposta.acao === 'GERAR_PDF_RELATORIO') {
+                const ids = resposta.contexto?.ids;
 
-        if (resposta.acao === 'GERAR_PDF_RELATORIO' && Array.isArray(resposta.contexto?.ids)) {
-            try {
-                const r = await fetch(
-                    `${apiBaseUrl}/pdf-data/relatorio`,
-                    {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            Authorization: token ? `Bearer ${token}` : ''
-                        },
-                        body: JSON.stringify({
-                            ids: resposta.contexto.ids
-                        })
-                    }
-                );
-
-                if (!r.ok) {
-                    throw new Error(`Falha ao buscar dados do relatório para PDF. Status: ${r.status}`);
+                if (!Array.isArray(ids) || ids.length === 0) {
+                    throw new Error('IDs não informados para gerar PDF do relatório.');
                 }
 
-                const resultado = await r.json();
+                const resultado = await buscarDadosRelatorioParaPDF(
+                    ids,
+                    token,
+                    apiBaseUrl
+                );
+
                 exportarRelatorioPDF(resultado, 'relatorio_manutencoes');
                 addToast('PDF do relatório gerado com sucesso.', 'success');
-            } catch (error) {
-                console.error('[CHATBOT_PDF_RELATORIO_ERROR]', error);
-                addToast('Não consegui gerar o PDF do relatório.', 'error');
+                return;
             }
+
+            // ABRIR OS
+            if (resposta.acao === 'ABRIR_OS') {
+                const manutencaoId = resposta.contexto?.manutencaoId;
+
+                if (!manutencaoId) {
+                    throw new Error('manutencaoId não informado para abrir OS.');
+                }
+
+                window.open(`/manutencoes/detalhes/${manutencaoId}`, '_blank', 'noopener,noreferrer');
+                addToast('Abrindo detalhes da OS.', 'success');
+                return;
+            }
+
+            // ABRIR PDF / DOCUMENTO DO SEGURO
+            if (
+                resposta.acao === 'ABRIR_PDF_SEGURO' ||
+                resposta.acao === 'ABRIR_DOCUMENTO'
+            ) {
+                const seguroId = resposta.contexto?.seguroId;
+
+                if (!seguroId) {
+                    throw new Error('seguroId não informado para abrir documento do seguro.');
+                }
+
+                const seguro = await buscarSeguroPorId(
+                    seguroId,
+                    token,
+                    apiBaseUrl
+                );
+
+                const anexos = Array.isArray(seguro?.anexos) ? seguro.anexos : [];
+                const anexo =
+                    anexos.find(a => a.id === resposta.contexto?.anexoId) ||
+                    anexos[0] ||
+                    null;
+
+                if (!anexo?.path) {
+                    throw new Error('Nenhum PDF/anexo encontrado para este seguro.');
+                }
+
+                const urlDocumento = `${apiOriginUrl}/${anexo.path}`;
+                window.open(urlDocumento, '_blank', 'noopener,noreferrer');
+                addToast('Abrindo documento.', 'success');
+                return;
+            }
+        } catch (error) {
+            console.error('[CHATBOT_EXECUTAR_ACAO_ERROR]', error);
+            addToast('Não consegui executar a ação solicitada.', 'error');
         }
     };
 
     const handleEnviar = async (e) => {
         e.preventDefault();
+
         if (!mensagem.trim() || loading) return;
 
-        const textoMensagem = mensagem;
+        const textoMensagem = mensagem.trim();
 
-        const novaMensagemUsuario = { role: 'user', text: textoMensagem };
-        setHistorico(prev => [...prev, novaMensagemUsuario]);
+        setHistorico(prev => [
+            ...prev,
+            { role: 'user', text: textoMensagem }
+        ]);
+
         setMensagem('');
         setLoading(true);
 
         try {
             const data = await enviarMensagemAoAgente(textoMensagem);
-
-            const payload = data?.resposta ?? {};
-            const mensagemAssistente =
-                typeof payload === 'string'
-                    ? payload
-                    : payload?.mensagem || 'Sem resposta do agente.';
-
-            const respostaEstruturada = {
-                role: 'assistant',
-                text: mensagemAssistente,
-                acao: typeof payload === 'object' ? payload?.acao || null : null,
-                contexto: typeof payload === 'object' ? payload?.contexto || null : null,
-                meta: typeof payload === 'object' ? payload?.meta || null : null
-            };
+            const respostaEstruturada = normalizarRespostaAgente(data);
 
             setHistorico(prev => [...prev, respostaEstruturada]);
 
@@ -141,7 +252,10 @@ function ChatBot() {
             }
         } catch (error) {
             console.error('[CHATBOT_ERROR]', error);
-            addToast('A IA está temporariamente indisponível. Tente novamente em breve.', 'info');
+            addToast(
+                'A IA está temporariamente indisponível. Tente novamente em breve.',
+                'info'
+            );
         } finally {
             setLoading(false);
         }
@@ -150,7 +264,10 @@ function ChatBot() {
     return (
         <div className="chatbot-wrapper no-print">
             {!isOpen && (
-                <button className="chatbot-trigger" onClick={() => setIsOpen(true)}>
+                <button
+                    className="chatbot-trigger"
+                    onClick={() => setIsOpen(true)}
+                >
                     <FontAwesomeIcon icon={faRobot} />
                     <span className="chatbot-tooltip">Falar com SIMEC-IA</span>
                 </button>
@@ -165,21 +282,30 @@ function ChatBot() {
                             </div>
                             <span className="bot-name">SIMEC-IA</span>
                         </div>
-                        <button className="close-btn" onClick={() => setIsOpen(false)}>
+
+                        <button
+                            className="close-btn"
+                            onClick={() => setIsOpen(false)}
+                        >
                             <FontAwesomeIcon icon={faMinus} />
                         </button>
                     </div>
 
                     <div className="chatbot-messages" ref={scrollRef}>
                         {historico.map((msg, index) => (
-                            <div key={index} className={`chat-bubble ${msg.role}`}>
+                            <div
+                                key={index}
+                                className={`chat-bubble ${msg.role}`}
+                            >
                                 {typeof msg.text === 'string' ? msg.text : ''}
                             </div>
                         ))}
 
                         {loading && (
                             <div className="chat-bubble assistant loading">
-                                <span>.</span><span>.</span><span>.</span>
+                                <span>.</span>
+                                <span>.</span>
+                                <span>.</span>
                             </div>
                         )}
                     </div>
@@ -192,7 +318,11 @@ function ChatBot() {
                             onChange={(e) => setMensagem(e.target.value)}
                             disabled={loading}
                         />
-                        <button type="submit" disabled={loading || !mensagem.trim()}>
+
+                        <button
+                            type="submit"
+                            disabled={loading || !mensagem.trim()}
+                        >
                             <FontAwesomeIcon icon={faPaperPlane} />
                         </button>
                     </form>
