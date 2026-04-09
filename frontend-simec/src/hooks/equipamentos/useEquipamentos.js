@@ -2,8 +2,8 @@
 // VERSÃO 6.1 - ADICIONADO EXPORTAÇÃO DE REFETCH PARA ATUALIZAÇÃO DE ANEXOS
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getEquipamentos, getUnidades, deleteEquipamento } from '../services/api';
-import { useToast } from '../contexts/ToastContext';
+import { getEquipamentos, getUnidades, deleteEquipamento } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 export const useEquipamentos = () => {
   const [equipamentosOriginais, setEquipamentosOriginais] = useState([]);

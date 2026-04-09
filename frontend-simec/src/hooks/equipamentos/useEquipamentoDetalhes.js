@@ -2,8 +2,8 @@
 // VERSÃO FINAL SIMPLIFICADA
 
 import { useState, useEffect, useCallback } from 'react';
-import { getEquipamentoById, updateEquipamento } from '../services/api';
-import { useToast } from '../contexts/ToastContext';
+import { getEquipamentoById, updateEquipamento } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
 export function useEquipamentoDetalhes(equipamentoId) {
   const { addToast } = useToast();

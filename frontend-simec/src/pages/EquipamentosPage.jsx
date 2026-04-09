@@ -3,9 +3,9 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus } from '@fortawesome/free-solid-svg-icons';
 
-import { useEquipamentos } from '../hooks/useEquipamentos';
+import { useEquipamentos } from '../hooks/equipamentos/useEquipamentos';
 import { useModal } from '../hooks/useModal';
-import { useEquipamentosExpansion } from '../hooks/useEquipamentosExpansion';
+import { useEquipamentosExpansion } from '../hooks/equipamentos/useEquipamentosExpansion';
 
 import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
