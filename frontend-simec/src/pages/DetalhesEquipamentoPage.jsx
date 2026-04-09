@@ -7,10 +7,10 @@ import { useEquipamentoDetalhes } from '../hooks/useEquipamentoDetalhes';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faArrowLeft, faInfoCircle, faHdd, faPaperclip, faHistory } from '@fortawesome/free-solid-svg-icons';
 
-import TabCadastro from '../components/abas-equipamento/TabCadastro';
-import TabAcessorios from '../components/abas-equipamento/TabAcessorios';
-import TabAnexos from '../components/abas-equipamento/TabAnexos';
-import TabHistorico from '../components/abas-equipamento/TabHistorico';
+import TabCadastro from '../components/equipamento/abas-equipamento/TabCadastro';
+import TabAcessorios from '../components/equipamento/abas-equipamento/TabAcessorios';
+import TabAnexos from '../components/equipamento/abas-equipamento/TabAnexos';
+import TabHistorico from '../components/equipamento/abas-equipamento/TabHistorico';
 
 function DetalhesEquipamentoPage() {
   const { equipamentoId } = useParams();
