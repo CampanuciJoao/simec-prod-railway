@@ -30,7 +30,6 @@ function respostaPadrao(mensagem, extras = {}) {
 
 export const AgendamentoService = {
     async processar(mensagem, usuarioNome, sessaoExistente = null) {
-        // 1. Recupera ou cria sessão ativa
         let sessao = sessaoExistente;
 
         if (!sessao) {
@@ -42,17 +41,13 @@ export const AgendamentoService = {
             });
         }
 
-        // 2. Recupera estado da sessão
         let estado = JSON.parse(sessao.stateJson || '{}');
         estado = inicializarStep(estado);
 
-        // 3. Registra mensagem do usuário
         await AgentSessionRepository.registrarMensagem(sessao.id, 'user', mensagem);
 
-        // 4. Extrai dados da mensagem
         const extraido = await extrairCamposComIA(mensagem, estado);
 
-        // 4.1 Normalização manual de confirmação (anti-loop)
         const msgNormalizada = mensagem.toLowerCase().trim();
 
         if (['sim', 'confirmar', 'ok', 'pode', 'pode sim'].includes(msgNormalizada)) {
@@ -63,12 +58,10 @@ export const AgendamentoService = {
             extraido.confirmacao = false;
         }
 
-        // 5. Merge seguro
         estado = mergeEstadoSeguro(estado, extraido);
 
-        // 6. Detecta correção em campos reais
         const houveCorrecao =
-            !!extraido.tipo ||
+            !!extraido.tipoManutencao ||
             !!extraido.unidadeTexto ||
             !!extraido.equipamentoTexto ||
             !!extraido.data ||
@@ -77,10 +70,8 @@ export const AgendamentoService = {
             !!extraido.numeroChamado ||
             !!extraido.descricao;
 
-        // 7. Reseta confirmação se houve correção
         estado = resetarConfirmacaoSeHouverMudanca(estado, houveCorrecao);
 
-        // 8. Cancelamento explícito sem correção
         if (extraido.confirmacao === false && !houveCorrecao) {
             estado.step = STEPS.CANCELADO;
 
@@ -106,15 +97,13 @@ export const AgendamentoService = {
             return resposta;
         }
 
-        // 9. Resolve entidades
         estado = await resolverEntidades(estado);
 
-        // 10. Ambiguidade de equipamento
         if (estado.ambiguidadeEquipamento?.length > 0) {
             estado.step = STEPS.COLETANDO_DADOS;
 
             const mensagemResposta = `Encontrei mais de um equipamento compatível. Qual deles você deseja? ${estado.ambiguidadeEquipamento
-                .map(e => `**${e.modelo}** (TAG: ${e.tag}) - ${e.unidade}`)
+                .map(e => `**${e.modelo}** (TAG: ${e.tag})${e.tipoEquipamento ? ` - ${e.tipoEquipamento}` : ''}`)
                 .join(', ')}`;
 
             await AgentSessionRepository.salvarSessao(sessao.id, {
@@ -138,7 +127,6 @@ export const AgendamentoService = {
             });
         }
 
-        // 11. Horário no passado
         const validacaoHorario = validarHorarioFuturo(estado.data, estado.horaInicio);
         if (!validacaoHorario.valido) {
             estado.horaInicio = null;
@@ -165,16 +153,13 @@ export const AgendamentoService = {
             });
         }
 
-        // 12. Campos faltantes
         const faltantes = getFaltantes(estado);
 
-        // 13. Conflito de agenda só quando tudo está preenchido
         let conflitoAgenda = null;
         if (faltantes.length === 0) {
             conflitoAgenda = await validarConflitoAgenda(estado);
         }
 
-        // 14. State machine decide próximo passo
         const proximoStep = determinarProximoStep({
             estado,
             faltantes,
@@ -185,7 +170,6 @@ export const AgendamentoService = {
 
         estado.step = proximoStep;
 
-        // 15. Se continuar coletando
         if (proximoStep === STEPS.COLETANDO_DADOS) {
             let mensagemResposta;
 
@@ -222,7 +206,6 @@ export const AgendamentoService = {
             });
         }
 
-        // 16. Aguardando confirmação
         if (proximoStep === STEPS.AGUARDANDO_CONFIRMACAO) {
             let mensagemResposta;
 
@@ -255,7 +238,6 @@ export const AgendamentoService = {
             });
         }
 
-        // 17. Finalização
         if (proximoStep === STEPS.FINALIZADO) {
             try {
                 const revalidacao = await validarConflitoAgenda(estado);
@@ -290,7 +272,6 @@ export const AgendamentoService = {
 
                 const manutencao = await criarManutencaoNoBanco(estado);
 
-                // Atualiza memória leve do usuário
                 await UserAgentMemoryRepository.upsertMemoria(usuarioNome, {
                     ultimaUnidadeId: estado.unidadeId || null,
                     ultimaUnidadeNome: estado.unidadeNome || null,
@@ -357,7 +338,6 @@ export const AgendamentoService = {
             }
         }
 
-        // 18. Fallback absoluto
         const fallback =
             'Tive dificuldade para continuar o fluxo do agendamento. Pode repetir a última informação?';
 

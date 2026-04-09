@@ -25,6 +25,7 @@ function expandirSinonimosEquipamento(texto = '') {
         sinonimos.add('tomografo');
         sinonimos.add('tc');
         sinonimos.add('ct');
+        sinonimos.add('tomografia computadorizada');
     }
 
     if (/\b(rx|raio x|raio-x|radiografia)\b/.test(t)) {
@@ -135,13 +136,15 @@ export async function resolverEntidades(estado) {
             novo.equipamentoId = equipamentos[0].id;
             novo.equipamentoNome = equipamentos[0].modelo;
             novo.modelo = equipamentos[0].modelo;
-            novo.tipo = equipamentos[0].tipo || null;
+            novo.tag = equipamentos[0].tag || null;
+            novo.tipoEquipamento = equipamentos[0].tipo || null;
         } else if (equipamentos.length > 1) {
             novo.ambiguidadeEquipamento = equipamentos.map((e) => ({
                 id: e.id,
                 modelo: e.modelo,
                 tag: e.tag,
-                tipo: e.tipo || null
+                tipoEquipamento: e.tipo || null,
+                unidade: novo.unidadeNome || null
             }));
         }
     }

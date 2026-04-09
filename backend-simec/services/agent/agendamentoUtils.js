@@ -3,11 +3,10 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { z } from 'zod';
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
 
-// --- CONTRATO DE DADOS (ZOD) ---
 const AgendamentoSchema = z.object({
-    tipo: z.enum(['Corretiva', 'Preventiva']).nullable(),
+    tipoManutencao: z.enum(['Corretiva', 'Preventiva']).nullable(),
     unidadeTexto: z.string().nullable(),
     equipamentoTexto: z.string().nullable(),
     data: z.string().nullable(),
@@ -20,7 +19,7 @@ const AgendamentoSchema = z.object({
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-const normalizarTipo = (valor) => {
+const normalizarTipoManutencao = (valor) => {
     if (!valor || typeof valor !== 'string') return null;
     const v = valor.trim().toLowerCase();
 
@@ -66,7 +65,7 @@ const extrairCamposHeuristico = (mensagem, estado = {}) => {
     const lower = msg.toLowerCase();
 
     const extraido = {
-        tipo: null,
+        tipoManutencao: null,
         unidadeTexto: null,
         equipamentoTexto: null,
         data: null,
@@ -77,24 +76,20 @@ const extrairCamposHeuristico = (mensagem, estado = {}) => {
         confirmacao: null
     };
 
-    // confirmação
     if (/^(sim|s|confirmo|pode confirmar|ok|certo)$/i.test(lower)) {
         extraido.confirmacao = true;
     } else if (/^(não|nao|n|cancelar|cancela)$/i.test(lower)) {
         extraido.confirmacao = false;
     }
 
-    // tipo
-    if (lower.includes('corretiva')) extraido.tipo = 'Corretiva';
-    if (lower.includes('preventiva')) extraido.tipo = 'Preventiva';
+    if (lower.includes('corretiva')) extraido.tipoManutencao = 'Corretiva';
+    if (lower.includes('preventiva')) extraido.tipoManutencao = 'Preventiva';
 
-    // unidade
     const matchUnidade = msg.match(/(?:unidade|hospital)\s+(?:de\s+)?(.+)/i);
     if (matchUnidade) {
         extraido.unidadeTexto = matchUnidade[1].trim();
     }
 
-    // padrão "Tomografia de Coxim"
     const matchEquipUnidade = msg.match(/^(.+?)\s+de\s+([a-zà-ú0-9\s-]+)$/i);
     if (matchEquipUnidade && !extraido.equipamentoTexto && !extraido.unidadeTexto) {
         const esquerda = matchEquipUnidade[1].trim();
@@ -109,27 +104,25 @@ const extrairCamposHeuristico = (mensagem, estado = {}) => {
         }
     }
 
-    // horário tipo "das 12h até as 15h"
-    const matchIntervalo = msg.match(/(?:das|de)\s+(\d{1,2}(?::\d{2})?\s*h?)\s+(?:até|as?|à|a)\s+(\d{1,2}(?::\d{2})?\s*h?)/i);
+    const matchIntervalo = msg.match(
+        /(?:das|de)\s+(\d{1,2}(?::\d{2})?\s*h?)\s+(?:até|as?|à|a)\s+(\d{1,2}(?::\d{2})?\s*h?)/i
+    );
     if (matchIntervalo) {
         extraido.horaInicio = normalizarHora(matchIntervalo[1]);
         extraido.horaFim = normalizarHora(matchIntervalo[2]);
     }
 
-    // data
     if (lower.includes('hoje')) {
         extraido.data = new Date().toISOString().split('T')[0];
     }
 
-    // número do chamado
     const matchChamado = msg.match(/\b\d{4,}\b/);
-    if (matchChamado && (estado.tipo === 'Corretiva' || lower.includes('chamado'))) {
+    if (matchChamado && (estado.tipoManutencao === 'Corretiva' || lower.includes('chamado'))) {
         extraido.numeroChamado = matchChamado[0];
     }
 
-    // descrição simples quando já estamos numa corretiva e nada mais encaixou
     if (
-        !extraido.tipo &&
+        !extraido.tipoManutencao &&
         !extraido.unidadeTexto &&
         !extraido.equipamentoTexto &&
         !extraido.data &&
@@ -138,7 +131,7 @@ const extrairCamposHeuristico = (mensagem, estado = {}) => {
         !extraido.numeroChamado &&
         extraido.confirmacao === null &&
         msg.length > 3 &&
-        estado.tipo === 'Corretiva'
+        estado.tipoManutencao === 'Corretiva'
     ) {
         extraido.descricao = msg;
     }
@@ -148,7 +141,7 @@ const extrairCamposHeuristico = (mensagem, estado = {}) => {
 
 const normalizarObjetoIA = (obj) => {
     return {
-        tipo: normalizarTipo(obj?.tipo),
+        tipoManutencao: normalizarTipoManutencao(obj?.tipoManutencao ?? obj?.tipo),
         unidadeTexto: typeof obj?.unidadeTexto === 'string' ? obj.unidadeTexto.trim() : null,
         equipamentoTexto: typeof obj?.equipamentoTexto === 'string' ? obj.equipamentoTexto.trim() : null,
         data: normalizarData(obj?.data),
@@ -162,7 +155,7 @@ const normalizarObjetoIA = (obj) => {
 
 const mesclarPreferindoIAComFallback = (normalizadoIA, fallback) => {
     return {
-        tipo: normalizadoIA.tipo ?? fallback.tipo,
+        tipoManutencao: normalizadoIA.tipoManutencao ?? fallback.tipoManutencao,
         unidadeTexto: normalizadoIA.unidadeTexto ?? fallback.unidadeTexto,
         equipamentoTexto: normalizadoIA.equipamentoTexto ?? fallback.equipamentoTexto,
         data: normalizadoIA.data ?? fallback.data,
@@ -174,21 +167,13 @@ const mesclarPreferindoIAComFallback = (normalizadoIA, fallback) => {
     };
 };
 
-/**
- * Extrai dados estruturados e normaliza formatos.
- * Regras:
- * 1. confirmação curta é tratada localmente sem depender da IA
- * 2. IA + fallback heurístico são mesclados
- * 3. retry curto para 503
- */
 export const extrairCamposComIA = async (mensagem, estado) => {
     const dataHoje = new Date().toISOString().split('T')[0];
     const fallback = extrairCamposHeuristico(mensagem, estado);
 
-    // atalha confirmações curtas
     if (mensagemEhConfirmacaoCurta(mensagem)) {
         return AgendamentoSchema.parse({
-            tipo: null,
+            tipoManutencao: null,
             unidadeTexto: null,
             equipamentoTexto: null,
             data: null,
@@ -208,7 +193,7 @@ export const extrairCamposComIA = async (mensagem, estado) => {
     TAREFA:
     Extraia os dados do agendamento para este JSON:
     {
-      "tipo": null,
+      "tipoManutencao": null,
       "unidadeTexto": null,
       "equipamentoTexto": null,
       "data": null,
@@ -221,7 +206,7 @@ export const extrairCamposComIA = async (mensagem, estado) => {
 
     REGRAS:
     1. Se disser "Tomografia de Coxim", extraia "Tomografia" em equipamentoTexto e "Coxim" em unidadeTexto.
-    2. "tipo" deve ser apenas "Corretiva" ou "Preventiva".
+    2. "tipoManutencao" deve ser apenas "Corretiva" ou "Preventiva".
     3. "horaInicio/horaFim" em HH:mm.
     4. Se disser "hoje", use ${dataHoje}.
     5. "confirmacao": true para sim/confirmar, false para não/cancelar, null caso contrário.
@@ -281,7 +266,7 @@ export const validarHorarioFuturo = (data, hora) => {
 export const mergeEstadoSeguro = (estado, extraido) => {
     const novo = { ...estado };
     const CAMPOS = [
-        'tipo',
+        'tipoManutencao',
         'unidadeTexto',
         'equipamentoTexto',
         'data',
@@ -302,8 +287,8 @@ export const mergeEstadoSeguro = (estado, extraido) => {
 };
 
 export const getFaltantes = (estado) => {
-    const base = ['unidadeId', 'equipamentoId', 'tipo', 'data', 'horaInicio', 'horaFim'];
-    const obrigatorios = estado.tipo === 'Corretiva'
+    const base = ['unidadeId', 'equipamentoId', 'tipoManutencao', 'data', 'horaInicio', 'horaFim'];
+    const obrigatorios = estado.tipoManutencao === 'Corretiva'
         ? [...base, 'numeroChamado', 'descricao']
         : base;
 
@@ -314,7 +299,7 @@ export const proximaPergunta = (estado, faltantes) => {
     const mapa = {
         unidadeId: 'a unidade (hospital)',
         equipamentoId: 'o equipamento',
-        tipo: 'o tipo (Preventiva ou Corretiva)',
+        tipoManutencao: 'o tipo da manutenção (Preventiva ou Corretiva)',
         data: 'a data',
         horaInicio: 'o horário de início',
         horaFim: 'o horário de término',
@@ -331,9 +316,10 @@ export const buildResumoConfirmacao = (estado) => {
     return `📋 **Resumo para Agendamento**
 - **Ativo:** ${estado.equipamentoNome || estado.modelo || estado.tipoEquipamento || 'Equipamento não resolvido'} (Tag: ${estado.tag || 'sem tag'})
 - **Local:** ${estado.unidadeNome || 'Unidade não resolvida'}
-- **Tipo:** ${estado.tipo}
+- **Tipo de Manutenção:** ${estado.tipoManutencao || 'Não informado'}
+- **Categoria do Equipamento:** ${estado.tipoEquipamento || 'Não informado'}
 - **Horário:** ${dataFmt} | das ${estado.horaInicio} às ${estado.horaFim}
-${estado.tipo === 'Corretiva' ? `- **Chamado:** ${estado.numeroChamado}` : ''}
+${estado.tipoManutencao === 'Corretiva' ? `- **Chamado:** ${estado.numeroChamado}` : ''}
 
 **Confirma a criação desta manutenção?** (Responda **Sim** ou **Não**)`;
 };
