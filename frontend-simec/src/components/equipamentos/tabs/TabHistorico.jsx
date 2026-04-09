@@ -1,4 +1,4 @@
-// Ficheiro: src/components/abas-equipamento/TabHistorico.jsx
+// Ficheiro: src/components/tabs/TabHistorico.jsx
 // VERSÃO 6.0 - HISTÓRICO COM LINKS REAIS, CHAMADO NO TÍTULO E PDF DINÂMICO
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';

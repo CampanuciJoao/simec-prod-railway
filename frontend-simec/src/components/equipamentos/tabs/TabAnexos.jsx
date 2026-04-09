@@ -1,4 +1,4 @@
-// Ficheiro: src/components/abas-equipamento/TabAnexos.jsx
+// Ficheiro: src/components/tabs/TabAnexos.jsx
 // VERSÃO FINAL SÊNIOR - COM UI REFINADA
 
 import React, { useRef, useState } from 'react';
