@@ -1,8 +1,8 @@
 import React from 'react';
-import TabCadastro from './abas-equipamento/TabCadastro';
-import TabAcessorios from './abas-equipamento/TabAcessorios';
-import TabAnexos from './abas-equipamento/TabAnexos';
-import TabHistorico from './abas-equipamento/TabHistorico';
+import TabCadastro from './tabs/TabCadastro';
+import TabAcessorios from './tabs/TabAcessorios';
+import TabAnexos from './tabs/TabAnexos';
+import TabHistorico from './tabs/TabHistorico';
 
 const TABS = [
   { id: 'cadastro', label: 'Cadastro' },

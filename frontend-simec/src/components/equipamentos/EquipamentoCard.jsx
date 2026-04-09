@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlusCircle, faMinusCircle, faFileMedical } from '@fortawesome/free-solid-svg-icons';
 import StatusSelector from './StatusSelector';
 import EquipamentoCardExpanded from './EquipamentoCardExpanded';
-import { getEquipamentoCardStyles } from '../utils/equipamentoCardStyles';
+import { getEquipamentoCardStyles } from '../../utils/equipamentoCardStyles';
 
 function EquipamentoCard({
   equipamento,

@@ -2,17 +2,17 @@
 // VERSÃO FINAL SÊNIOR - COM UI REFINADA
 
 import React, { useRef, useState } from 'react';
-import { useModal } from '../../hooks/useModal';
-import ModalConfirmacao from '../ModalConfirmacao';
+import { useModal } from '../../../hooks/useModal';
+import ModalConfirmacao from '../../ModalConfirmacao';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faPaperclip, faUpload, faTrashAlt, faFilePdf, faFileImage, faFileWord, 
     faFileExcel, faFilePowerpoint, faFileArchive, faFileAudio, faFileVideo, 
     faFileAlt, faSpinner 
 } from '@fortawesome/free-solid-svg-icons';
-import { useToast } from '../../contexts/ToastContext';
-import { uploadAnexoEquipamento, deleteAnexoEquipamento } from '../../services/api';
-import { formatarData } from '../../utils/timeUtils';
+import { useToast } from '../../../contexts/ToastContext';
+import { uploadAnexoEquipamento, deleteAnexoEquipamento } from '../../../services/api';
+import { formatarData } from '../../../utils/timeUtils';
 
 // URL base para downloads, lida das variáveis de ambiente do Vite.
 const API_BASE_URL_DOWNLOAD = import.meta.env.VITE_API_URL || 'http://localhost:5000';

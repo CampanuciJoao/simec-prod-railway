@@ -3,17 +3,17 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, Link } from 'react-router-dom'; // <<< IMPORTADO 'Link' PARA NOVAS ABAS
-import { getManutencoes, getOcorrenciasPorEquipamento } from '../../services/api';
-import { useToast } from '../../contexts/ToastContext';
-import { formatarDataHora } from '../../utils/timeUtils';
-import { exportarHistoricoEquipamentoPDF } from '../../utils/pdfUtils';
+import { getManutencoes, getOcorrenciasPorEquipamento } from '../../../services/api';
+import { useToast } from '../../../contexts/ToastContext';
+import { formatarDataHora } from '../../../utils/timeUtils';
+import { exportarHistoricoEquipamentoPDF } from '../../../utils/pdfUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
   faHistory, faSpinner, faFilePdf, faChevronDown, faChevronUp, 
   faCheckCircle, faExclamationTriangle, faInfoCircle, 
   faUser, faWrench, faFileDownload, faExternalLinkAlt, faFilter 
 } from '@fortawesome/free-solid-svg-icons';
-import DateInput from '../DateInput';
+import DateInput from '../../DateInput';
 
 // URL base para arquivos
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';

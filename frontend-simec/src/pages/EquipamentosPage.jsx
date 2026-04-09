@@ -10,7 +10,7 @@ import { useEquipamentosExpansion } from '../hooks/useEquipamentosExpansion';
 import GlobalFilterBar from '../components/GlobalFilterBar';
 import ModalConfirmacao from '../components/ModalConfirmacao';
 import SkeletonCard from '../components/SkeletonCard';
-import EquipamentosList from '../components/EquipamentosList';
+import EquipamentosList from '../components/equipamentos/EquipamentosList';
 
 function EquipamentosPage() {
   const navigate = useNavigate();
