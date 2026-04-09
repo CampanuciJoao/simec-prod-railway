@@ -1,32 +1,34 @@
-// Ficheiro: src/components/abas-equipamento/TabAcessorios.jsx
-// NOVO COMPONENTE - RESPONSÁVEL PELA ABA DE ACESSÓRIOS
+// Ficheiro: src/components/equipamentos/tabs/TabAcessorios.jsx
 
 import React, { useState } from 'react';
-import { useAcessorios } from '../../hooks/useAcessorios';
-import { useModal } from '../../hooks/useModal';
-import AcessorioForm from '../AcessorioForm';
-import ModalConfirmacao from '../ModalConfirmacao';
+import { useAcessorios } from '../../../hooks/useAcessorios';
+import { useModal } from '../../../hooks/useModal';
+import AcessorioForm from '../../AcessorioForm';
+import ModalConfirmacao from '../../ModalConfirmacao';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faHdd, faPlus, faEdit, faTrashAlt, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import {
+  faHdd,
+  faPlus,
+  faEdit,
+  faTrashAlt,
+  faSpinner
+} from '@fortawesome/free-solid-svg-icons';
 
 function TabAcessorios({ equipamentoId }) {
-  // --- Hooks ---
-  const { 
-    acessorios, 
-    loading, 
-    submitting, 
+  const {
+    acessorios,
+    loading,
+    submitting,
     error,
-    salvarAcessorio, 
-    removerAcessorio 
+    salvarAcessorio,
+    removerAcessorio
   } = useAcessorios(equipamentoId);
-  
+
   const { isOpen, modalData, openModal, closeModal } = useModal();
 
-  // Estado local para controlar a UI desta aba
   const [showForm, setShowForm] = useState(false);
   const [editingAcessorio, setEditingAcessorio] = useState(null);
 
-  // --- Handlers ---
   const handleAddNewClick = () => {
     setEditingAcessorio(null);
     setShowForm(true);
@@ -43,26 +45,29 @@ function TabAcessorios({ equipamentoId }) {
   };
 
   const handleFormSubmit = async (formData) => {
-    const success = await salvarAcessorio(formData, editingAcessorio ? editingAcessorio.id : null);
+    const success = await salvarAcessorio(
+      formData,
+      editingAcessorio ? editingAcessorio.id : null
+    );
+
     if (success) {
-      handleCancelForm(); // Fecha e limpa o formulário em caso de sucesso
+      handleCancelForm();
     }
   };
-  
+
   const handleDeleteClick = (acessorio) => {
-    openModal(acessorio); // Abre o modal de confirmação com os dados do acessório
+    openModal(acessorio);
   };
 
-  const handleConfirmarExclusao = () => {
+  const handleConfirmarExclusao = async () => {
     if (modalData) {
-      removerAcessorio(modalData.id);
+      await removerAcessorio(modalData.id);
     }
     closeModal();
   };
 
   return (
     <>
-      {/* O Modal de confirmação agora pertence a esta aba */}
       <ModalConfirmacao
         isOpen={isOpen}
         onClose={closeModal}
@@ -77,14 +82,18 @@ function TabAcessorios({ equipamentoId }) {
           <h3 className="tab-title">
             <FontAwesomeIcon icon={faHdd} /> Acessórios Vinculados
           </h3>
+
           {!showForm && (
-            <button className="btn btn-primary btn-sm" onClick={handleAddNewClick} disabled={submitting}>
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={handleAddNewClick}
+              disabled={submitting}
+            >
               <FontAwesomeIcon icon={faPlus} /> Adicionar Acessório
             </button>
           )}
         </div>
 
-        {/* Renderiza o formulário se showForm for true */}
         {showForm && (
           <div className="form-container-inline">
             <AcessorioForm
@@ -94,50 +103,60 @@ function TabAcessorios({ equipamentoId }) {
               isSubmitting={submitting}
               onSubmit={handleFormSubmit}
               onCancel={handleCancelForm}
-              error={error} // Passa o erro do hook para o formulário
+              error={error}
             />
           </div>
         )}
 
-        {/* Renderiza o loader ou a tabela de acessórios */}
         {loading ? (
           <div style={{ textAlign: 'center', padding: '20px' }}>
             <FontAwesomeIcon icon={faSpinner} spin /> Carregando acessórios...
           </div>
-        ) : (
-          acessorios.length > 0 ? (
-            <div className="table-responsive-wrapper">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Nome</th>
-                    <th>Nº de Série</th>
-                    <th>Descrição</th>
-                    <th className="text-right">Ações</th>
+        ) : acessorios.length > 0 ? (
+          <div className="table-responsive-wrapper">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Nº de Série</th>
+                  <th>Descrição</th>
+                  <th className="text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {acessorios.map((acessorio) => (
+                  <tr key={acessorio.id}>
+                    <td data-label="Nome">{acessorio.nome}</td>
+                    <td data-label="Nº Série">{acessorio.numeroSerie || 'N/A'}</td>
+                    <td data-label="Descrição">{acessorio.descricao || 'N/A'}</td>
+                    <td className="actions-cell text-right">
+                      <button
+                        onClick={() => handleEditClick(acessorio)}
+                        className="btn-action edit"
+                        title="Editar"
+                        disabled={submitting}
+                      >
+                        <FontAwesomeIcon icon={faEdit} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(acessorio)}
+                        className="btn-action delete"
+                        title="Excluir"
+                        disabled={submitting}
+                      >
+                        <FontAwesomeIcon icon={faTrashAlt} />
+                      </button>
+                    </td>
                   </tr>
-                </thead>
-                <tbody>
-                  {acessorios.map(acessorio => (
-                    <tr key={acessorio.id}>
-                      <td data-label="Nome">{acessorio.nome}</td>
-                      <td data-label="Nº Série">{acessorio.numeroSerie || 'N/A'}</td>
-                      <td data-label="Descrição">{acessorio.descricao || 'N/A'}</td>
-                      <td className="actions-cell text-right">
-                        <button onClick={() => handleEditClick(acessorio)} className="btn-action edit" title="Editar" disabled={submitting}>
-                          <FontAwesomeIcon icon={faEdit} />
-                        </button>
-                        <button onClick={() => handleDeleteClick(acessorio)} className="btn-action delete" title="Excluir" disabled={submitting}>
-                          <FontAwesomeIcon icon={faTrashAlt} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            // Mensagem exibida apenas se não estiver carregando e não houver acessórios
-            !showForm && <p className="no-data-message">Nenhum acessório cadastrado para este equipamento.</p>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          !showForm && (
+            <p className="no-data-message">
+              Nenhum acessório cadastrado para este equipamento.
+            </p>
           )
         )}
       </div>
