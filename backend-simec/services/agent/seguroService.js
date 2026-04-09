@@ -41,6 +41,59 @@ function mergeFiltrosComContexto(filtros, estadoAnterior = {}) {
     };
 }
 
+function formatarMoedaBR(valor) {
+    return Number(valor || 0).toLocaleString('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+    });
+}
+
+function formatarDataBR(data) {
+    if (!data) return null;
+
+    try {
+        return new Date(data).toLocaleDateString('pt-BR');
+    } catch {
+        return null;
+    }
+}
+
+function montarListaCoberturas(seguro) {
+    if (!seguro) return [];
+
+    const coberturas = [
+        { rotulo: 'APP', valor: seguro.lmiAPP },
+        { rotulo: 'Danos Corporais', valor: seguro.lmiDanosCorporais },
+        { rotulo: 'Danos Elétricos', valor: seguro.lmiDanosEletricos },
+        { rotulo: 'Danos Materiais', valor: seguro.lmiDanosMateriais },
+        { rotulo: 'Danos Morais', valor: seguro.lmiDanosMorais },
+        { rotulo: 'Incêndio', valor: seguro.lmiIncendio },
+        { rotulo: 'Responsabilidade Civil', valor: seguro.lmiResponsabilidadeCivil },
+        { rotulo: 'Roubo / Furto', valor: seguro.lmiRoubo },
+        { rotulo: 'Vidros', valor: seguro.lmiVidros }
+    ]
+        .filter(item => Number(item.valor || 0) > 0)
+        .map(item => `${item.rotulo}: ${formatarMoedaBR(item.valor)}`);
+
+    return coberturas;
+}
+
+function montarMensagemCoberturas(payload) {
+    const coberturasEstruturadas = Array.isArray(payload?.coberturasDetalhadas)
+        ? payload.coberturasDetalhadas
+        : [];
+
+    if (coberturasEstruturadas.length > 0) {
+        return `As coberturas cadastradas para a apólice ${payload.numeroApolice} são:\n- ${coberturasEstruturadas.join('\n- ')}`;
+    }
+
+    if (payload?.cobertura) {
+        return `A descrição de cobertura cadastrada para a apólice ${payload.numeroApolice} é: ${payload.cobertura}`;
+    }
+
+    return `Encontrei a apólice ${payload?.numeroApolice || ''}, mas não há coberturas cadastradas com valor no sistema.`;
+}
+
 async function registrarSessaoSeguro(
     usuarioNome,
     mensagem,
@@ -74,6 +127,21 @@ async function registrarSessaoSeguro(
     );
 
     return sessao;
+}
+
+function enriquecerPayloadSeguro(seguro, payloadBase) {
+    if (!seguro) return payloadBase;
+
+    return {
+        ...payloadBase,
+        seguroId: seguro.id,
+        numeroApolice: seguro.apoliceNumero || payloadBase.numeroApolice || null,
+        seguradora: seguro.seguradora || payloadBase.seguradora || null,
+        cobertura: seguro.cobertura || payloadBase.cobertura || null,
+        vencimento: seguro.dataFim || payloadBase.vencimento || null,
+        premioTotal: seguro.premioTotal ?? 0,
+        coberturasDetalhadas: montarListaCoberturas(seguro)
+    };
 }
 
 function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
@@ -136,23 +204,21 @@ function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
     }
 
     if (acaoContextual.action === ACTIONS.MOSTRAR_COBERTURA) {
-        return respostaPadrao(
-            estadoAnterior.cobertura
-                ? `As coberturas informadas para esta apólice são: ${estadoAnterior.cobertura}`
-                : 'Esta apólice não possui uma descrição de cobertura cadastrada.',
-            {
-                meta: {
-                    tipoResposta: 'SEGURO_ACAO',
-                    ultimaAcaoExecutada: ACTIONS.MOSTRAR_COBERTURA
-                }
+        return respostaPadrao(montarMensagemCoberturas(estadoAnterior), {
+            meta: {
+                tipoResposta: 'SEGURO_ACAO',
+                ultimaAcaoExecutada: ACTIONS.MOSTRAR_COBERTURA,
+                coberturasDetalhadas: estadoAnterior.coberturasDetalhadas || []
             }
-        );
+        });
     }
 
     if (acaoContextual.action === ACTIONS.MOSTRAR_VENCIMENTO) {
+        const vencimentoFormatado = formatarDataBR(estadoAnterior.vencimento);
+
         return respostaPadrao(
-            estadoAnterior.vencimento
-                ? `O vencimento desta apólice é em ${new Date(estadoAnterior.vencimento).toLocaleDateString('pt-BR')}.`
+            vencimentoFormatado
+                ? `O vencimento da apólice ${estadoAnterior.numeroApolice || ''} é em ${vencimentoFormatado}.`
                 : 'Não encontrei a data de vencimento desta apólice.',
             {
                 meta: {
@@ -164,8 +230,10 @@ function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
     }
 
     if (acaoContextual.action === ACTIONS.MOSTRAR_DADOS_APOLICE) {
+        const vencimentoFormatado = formatarDataBR(estadoAnterior.vencimento);
+
         return respostaPadrao(
-            `Apólice ${estadoAnterior.numeroApolice || 'N/A'}, seguradora ${estadoAnterior.seguradora || 'N/A'}.`,
+            `Apólice ${estadoAnterior.numeroApolice || 'N/A'}, seguradora ${estadoAnterior.seguradora || 'N/A'}${vencimentoFormatado ? `, vencimento em ${vencimentoFormatado}` : ''}.`,
             {
                 meta: {
                     tipoResposta: 'SEGURO_ACAO',
@@ -194,20 +262,17 @@ function construirRespostaDiretaPorPedido(filtros, payload, respostaBase) {
     }
 
     if (filtros.pedirCobertura) {
-        return respostaPadrao(
-            payload.cobertura
-                ? `As coberturas da apólice ${payload.numeroApolice} são: ${payload.cobertura}`
-                : `Encontrei a apólice ${payload.numeroApolice}, mas ela não possui cobertura descritiva cadastrada.`,
-            {
-                meta: payload
-            }
-        );
+        return respostaPadrao(montarMensagemCoberturas(payload), {
+            meta: payload
+        });
     }
 
     if (filtros.pedirVencimento) {
+        const vencimentoFormatado = formatarDataBR(payload.vencimento);
+
         return respostaPadrao(
-            payload.vencimento
-                ? `A apólice ${payload.numeroApolice} vence em ${new Date(payload.vencimento).toLocaleDateString('pt-BR')}.`
+            vencimentoFormatado
+                ? `A apólice ${payload.numeroApolice} vence em ${vencimentoFormatado}.`
                 : `Encontrei a apólice ${payload.numeroApolice}, mas não localizei a data de vencimento.`,
             {
                 meta: payload
@@ -239,7 +304,7 @@ function construirRespostaDiretaPorPedido(filtros, payload, respostaBase) {
     }
 
     return respostaPadrao(
-        `${respostaBase}${payload.temAnexo ? ' Deseja que eu abra o PDF da apólice, mostre a cobertura ou informe o vencimento?' : ''}`,
+        `${respostaBase}${payload.temAnexo ? ' Deseja que eu abra o PDF da apólice, mostre a cobertura ou informe o vencimento?' : ' Deseja que eu mostre a cobertura ou informe o vencimento?'}`,
         {
             meta: payload
         }
@@ -248,7 +313,6 @@ function construirRespostaDiretaPorPedido(filtros, payload, respostaBase) {
 
 export const SeguroService = {
     async processar(mensagem, usuarioNome, sessaoExistente = null, acaoContextual = null) {
-        // 1. Follow-up contextual
         if (acaoContextual?.matched) {
             const estadoAnterior = acaoContextual.state || {};
             const resposta = construirRespostaAcaoContextual(
@@ -270,12 +334,10 @@ export const SeguroService = {
             return resposta;
         }
 
-        // 2. Extrai filtros + merge com contexto anterior
         const filtrosExtraidos = extrairFiltrosSeguro(mensagem);
         const estadoAnterior = obterEstadoAnterior(sessaoExistente);
         const filtros = mergeFiltrosComContexto(filtrosExtraidos, estadoAnterior);
 
-        // 3. Resolve entidades
         let contexto = {
             unidadeTexto: filtros.unidadeTexto,
             equipamentoTexto: filtros.equipamentoTexto
@@ -283,8 +345,6 @@ export const SeguroService = {
 
         contexto = await resolverEntidades(contexto);
 
-        // 4. Se o usuário mandou algo curto como "de coxim" e ainda não resolvemos,
-        // tentamos usar o contexto anterior para continuar a conversa
         if (!contexto.unidadeId && !contexto.equipamentoId) {
             if (estadoAnterior?.seguroId) {
                 const resposta = respostaPadrao(
@@ -310,7 +370,6 @@ export const SeguroService = {
             );
         }
 
-        // 5. Busca seguro
         let seguro = null;
 
         if (filtros.somenteVigente) {
@@ -325,9 +384,9 @@ export const SeguroService = {
             });
         }
 
-        // 6. Monta resumo e payload
         const respostaTexto = montarResumoSeguro(seguro, contexto);
-        const payload = construirPayloadSeguro(seguro, respostaTexto);
+        const payloadBase = construirPayloadSeguro(seguro, respostaTexto);
+        const payload = enriquecerPayloadSeguro(seguro, payloadBase);
 
         await registrarSessaoSeguro(
             usuarioNome,
@@ -337,7 +396,6 @@ export const SeguroService = {
             sessaoExistente
         );
 
-        // 7. Se o usuário já pediu algo específico, responde direto
         return construirRespostaDiretaPorPedido(filtros, payload, respostaTexto);
     }
 };

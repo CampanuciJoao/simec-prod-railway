@@ -7,7 +7,8 @@ function getSeguroInclude() {
             select: {
                 id: true,
                 modelo: true,
-                tag: true
+                tag: true,
+                tipo: true
             }
         },
         unidade: {
@@ -16,21 +17,43 @@ function getSeguroInclude() {
                 nomeSistema: true
             }
         },
-        anexos: true
+        anexos: {
+            select: {
+                id: true,
+                nomeOriginal: true,
+                path: true,
+                tipoMime: true,
+                createdAt: true
+            },
+            orderBy: {
+                createdAt: 'desc'
+            }
+        }
     };
+}
+
+function aplicarFiltroAlvo(where, { unidadeId = null, equipamentoId = null }) {
+    if (equipamentoId) {
+        where.equipamentoId = equipamentoId;
+    } else if (unidadeId) {
+        where.unidadeId = unidadeId;
+    }
+
+    return where;
 }
 
 export async function buscarSeguroMaisRecente({
     unidadeId = null,
     equipamentoId = null
 }) {
-    const where = {};
-
-    if (equipamentoId) {
-        where.equipamentoId = equipamentoId;
-    } else if (unidadeId) {
-        where.unidadeId = unidadeId;
-    }
+    const where = aplicarFiltroAlvo(
+        {
+            status: {
+                not: 'Cancelado'
+            }
+        },
+        { unidadeId, equipamentoId }
+    );
 
     return prisma.seguro.findFirst({
         where,
@@ -50,16 +73,16 @@ export async function buscarSeguroVigente({
     const fimDoDia = new Date(agora);
     fimDoDia.setHours(23, 59, 59, 999);
 
-    const where = {
-        dataInicio: { lte: fimDoDia },
-        dataFim: { gte: agora }
-    };
-
-    if (equipamentoId) {
-        where.equipamentoId = equipamentoId;
-    } else if (unidadeId) {
-        where.unidadeId = unidadeId;
-    }
+    const where = aplicarFiltroAlvo(
+        {
+            dataInicio: { lte: fimDoDia },
+            dataFim: { gte: agora },
+            status: {
+                in: ['Ativo', 'Vigente']
+            }
+        },
+        { unidadeId, equipamentoId }
+    );
 
     return prisma.seguro.findFirst({
         where,
@@ -77,27 +100,38 @@ export async function buscarSegurosPorPeriodo({
     dataInicio = null,
     dataFim = null
 }) {
-    const where = {};
+    const where = aplicarFiltroAlvo(
+        {
+            status: {
+                not: 'Cancelado'
+            }
+        },
+        { unidadeId, equipamentoId }
+    );
 
-    if (equipamentoId) {
-        where.equipamentoId = equipamentoId;
-    } else if (unidadeId) {
-        where.unidadeId = unidadeId;
+    const and = [];
+
+    if (dataInicio) {
+        and.push({
+            dataFim: {
+                gte: new Date(dataInicio)
+            }
+        });
     }
 
-    if (dataInicio || dataFim) {
-        const inicio = dataInicio ? new Date(dataInicio) : null;
-        const fim = dataFim ? new Date(dataFim) : null;
+    if (dataFim) {
+        const fim = new Date(dataFim);
+        fim.setHours(23, 59, 59, 999);
 
-        if (fim) {
-            fim.setHours(23, 59, 59, 999);
-        }
+        and.push({
+            dataInicio: {
+                lte: fim
+            }
+        });
+    }
 
-        // Retorna seguros que cruzam o período informado
-        where.AND = [
-            inicio ? { dataFim: { gte: inicio } } : {},
-            fim ? { dataInicio: { lte: fim } } : {}
-        ];
+    if (and.length > 0) {
+        where.AND = and;
     }
 
     return prisma.seguro.findMany({

@@ -21,7 +21,6 @@ function isPalavraEquipamento(texto = '') {
 }
 
 function extrairUnidade(mensagem, lower) {
-    // Casos explícitos de sede
     if (
         lower.includes('unidade sede') ||
         lower.includes('da sede') ||
@@ -47,10 +46,7 @@ function extrairUnidade(mensagem, lower) {
         if (match?.[1]) {
             const texto = limparTexto(match[1]);
 
-            if (
-                texto.length > 1 &&
-                !isPalavraEquipamento(texto)
-            ) {
+            if (texto.length > 1 && !isPalavraEquipamento(texto)) {
                 return texto;
             }
         }
@@ -103,6 +99,29 @@ function detectarPedidoMaisRecente(lower) {
     );
 }
 
+function montarCoberturasDetalhadas(seguro) {
+    if (!seguro) return [];
+
+    const itens = [
+        { chave: 'APP', valor: seguro.lmiAPP },
+        { chave: 'Danos Corporais', valor: seguro.lmiDanosCorporais },
+        { chave: 'Danos Elétricos', valor: seguro.lmiDanosEletricos },
+        { chave: 'Danos Materiais', valor: seguro.lmiDanosMateriais },
+        { chave: 'Danos Morais', valor: seguro.lmiDanosMorais },
+        { chave: 'Incêndio', valor: seguro.lmiIncendio },
+        { chave: 'Responsabilidade Civil', valor: seguro.lmiResponsabilidadeCivil },
+        { chave: 'Roubo / Furto', valor: seguro.lmiRoubo },
+        { chave: 'Vidros', valor: seguro.lmiVidros }
+    ];
+
+    return itens
+        .filter(item => Number(item.valor || 0) > 0)
+        .map(item => ({
+            nome: item.chave,
+            valor: Number(item.valor || 0)
+        }));
+}
+
 export function extrairFiltrosSeguro(mensagem) {
     const lower = mensagem.toLowerCase().trim();
 
@@ -152,12 +171,13 @@ export function extrairFiltrosSeguro(mensagem) {
         lower.includes('preciso da apolice') ||
         lower.includes('preciso da apólice') ||
         lower.includes('quero a apolice') ||
-        lower.includes('quero a apólice')
+        lower.includes('quero a apólice') ||
+        lower.includes('me traga o pdf') ||
+        lower.includes('me traz o pdf')
     ) {
         filtros.pedirDocumento = true;
     }
 
-    // Prioridade 1: equipamento + unidade
     const equipDeUnidade = extrairEquipamentoDeUnidade(mensagem);
     if (equipDeUnidade) {
         filtros.equipamentoTexto = equipDeUnidade.equipamentoTexto;
@@ -167,7 +187,6 @@ export function extrairFiltrosSeguro(mensagem) {
         filtros.equipamentoTexto = extrairEquipamento(mensagem);
     }
 
-    // Frases curtíssimas como "de coxim"
     if (!filtros.unidadeTexto) {
         const matchCurto = mensagem.match(/^\s*de\s+([a-zà-ú0-9\s-]+)\s*$/i);
         if (matchCurto?.[1]) {
@@ -178,7 +197,6 @@ export function extrairFiltrosSeguro(mensagem) {
         }
     }
 
-    // Se o usuário não especificou vigente/mais recente, prefere o mais recente
     if (!filtros.somenteVigente && !filtros.somenteMaisRecente) {
         filtros.somenteMaisRecente = true;
     }
@@ -210,6 +228,8 @@ export function construirPayloadSeguro(seguro, respostaTexto) {
           ? 'UNIDADE'
           : 'GERAL';
 
+    const coberturasDetalhadas = montarCoberturasDetalhadas(seguro);
+
     return {
         tipoResposta: 'SEGURO_UNICO',
         respostaTexto,
@@ -226,12 +246,19 @@ export function construirPayloadSeguro(seguro, respostaTexto) {
         dataInicio: seguro?.dataInicio || null,
         vencimento: seguro?.dataFim || null,
         cobertura: seguro?.cobertura || null,
+        premioTotal: seguro?.premioTotal ?? 0,
+        coberturasDetalhadas,
         temAnexo,
         contextoPDF: temAnexo
             ? {
                   tipo: 'SEGURO_DOCUMENTO',
+                  entidade: 'SEGURO',
+                  idPrincipal: seguro.id,
                   seguroId: seguro.id,
-                  anexoId: seguro.anexos[0].id
+                  anexoId: seguro.anexos[0].id,
+                  numeroApolice: seguro.apoliceNumero || null,
+                  total: 1,
+                  acaoSugerida: 'GERAR_PDF'
               }
             : null
     };
