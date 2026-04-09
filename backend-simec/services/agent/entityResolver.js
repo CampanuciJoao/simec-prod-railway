@@ -56,12 +56,14 @@ function expandirSinonimosEquipamento(texto = '') {
     if (/\b(act revolution)\b/.test(t)) {
         sinonimos.add('act revolution');
         sinonimos.add('tomografia');
+        sinonimos.add('tomografia computadorizada');
     }
 
     if (/\b(aquilion ct)\b/.test(t)) {
         sinonimos.add('aquilion ct');
         sinonimos.add('ct');
         sinonimos.add('tomografia');
+        sinonimos.add('tomografia computadorizada');
     }
 
     return Array.from(sinonimos);
@@ -78,9 +80,24 @@ export async function resolverEntidades(estado) {
         const unidade = await prisma.unidade.findFirst({
             where: {
                 OR: [
-                    { nomeSistema: { contains: unidadeTextoNormalizado, mode: 'insensitive' } },
-                    { nomeFantasia: { contains: unidadeTextoNormalizado, mode: 'insensitive' } },
-                    { cidade: { contains: unidadeTextoNormalizado, mode: 'insensitive' } }
+                    {
+                        nomeSistema: {
+                            contains: unidadeTextoNormalizado,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        nomeFantasia: {
+                            contains: unidadeTextoNormalizado,
+                            mode: 'insensitive'
+                        }
+                    },
+                    {
+                        cidade: {
+                            contains: unidadeTextoNormalizado,
+                            mode: 'insensitive'
+                        }
+                    }
                 ]
             }
         });
@@ -97,7 +114,7 @@ export async function resolverEntidades(estado) {
         const whereBase = {
             OR: sinonimos.flatMap((s) => [
                 { modelo: { contains: s, mode: 'insensitive' } },
-                { tipoEquipamento: { contains: s, mode: 'insensitive' } },
+                { tipo: { contains: s, mode: 'insensitive' } },
                 { fabricante: { contains: s, mode: 'insensitive' } }
             ])
         };
@@ -118,12 +135,13 @@ export async function resolverEntidades(estado) {
             novo.equipamentoId = equipamentos[0].id;
             novo.equipamentoNome = equipamentos[0].modelo;
             novo.modelo = equipamentos[0].modelo;
-            novo.tipoEquipamento = equipamentos[0].tipoEquipamento;
+            novo.tipo = equipamentos[0].tipo || null;
         } else if (equipamentos.length > 1) {
             novo.ambiguidadeEquipamento = equipamentos.map((e) => ({
                 id: e.id,
                 modelo: e.modelo,
-                tag: e.tag
+                tag: e.tag,
+                tipo: e.tipo || null
             }));
         }
     }
