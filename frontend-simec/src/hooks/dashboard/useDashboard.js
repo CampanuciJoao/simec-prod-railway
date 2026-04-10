@@ -6,9 +6,11 @@ const INITIAL_STATE = {
   emManutencao: 0,
   contratosVencendo: 0,
   alertasAtivos: 0,
-  manutencoesPorTipo: null,
-  statusEquipamentos: null,
+  ativos: 0,
+  inativos: 0,
   alertas: [],
+  statusEquipamentos: null,
+  manutencoesPorTipo: null,
 };
 
 export function useDashboard() {
@@ -24,14 +26,14 @@ export function useDashboard() {
       const response = await getDashboardData();
 
       const statusLabels = response?.statusEquipamentos?.labels || [];
-      const statusData = response?.statusEquipamentos?.data || [];
+      const statusValues = response?.statusEquipamentos?.data || [];
 
       const ativos =
-        statusData[statusLabels.findIndex((label) => label === 'Operante')] || 0;
+        statusValues[statusLabels.findIndex((label) => label === 'Operante')] || 0;
 
       const inativos =
-        (statusData[statusLabels.findIndex((label) => label === 'Inoperante')] || 0) +
-        (statusData[statusLabels.findIndex((label) => label === 'UsoLimitado')] || 0);
+        (statusValues[statusLabels.findIndex((label) => label === 'Inoperante')] || 0) +
+        (statusValues[statusLabels.findIndex((label) => label === 'UsoLimitado')] || 0);
 
       setData({
         totalEquipamentos: Number(response?.equipamentosCount ?? 0),
@@ -40,9 +42,9 @@ export function useDashboard() {
         alertasAtivos: Number(response?.alertasAtivos ?? 0),
         ativos,
         inativos,
-        manutencoesPorTipo: response?.manutencoesPorTipoMes || null,
-        statusEquipamentos: response?.statusEquipamentos || null,
         alertas: Array.isArray(response?.alertasRecentes) ? response.alertasRecentes : [],
+        statusEquipamentos: response?.statusEquipamentos || null,
+        manutencoesPorTipo: response?.manutencoesPorTipoMes || null,
       });
     } catch (err) {
       setError(
