@@ -1,7 +1,12 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlusCircle, faMinusCircle, faFileMedical } from '@fortawesome/free-solid-svg-icons';
-import StatusSelector from './StatusSelector';
+import {
+  faPlusCircle,
+  faMinusCircle,
+  faFileMedical
+} from '@fortawesome/free-solid-svg-icons';
+
+import StatusSelector from '../StatusSelector';
 import EquipamentoCardExpanded from './EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '../../utils/equipamentoCardStyles';
 
