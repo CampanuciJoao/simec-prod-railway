@@ -1,5 +1,4 @@
 // Ficheiro: frontend-simec/src/pages/notificacoes/EmailsNotificacaoPage.jsx
-// Versão: 2.0 (Sênior - CRUD Completo com Modal de Edição)
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../../contexts/ToastContext';
@@ -9,7 +8,6 @@ import {
   updateEmailNotificacao,
   deleteEmailNotificacao,
 } from '../../services/api';
-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faEnvelope,
@@ -20,10 +18,8 @@ import {
   faCheckCircle,
   faTimesCircle,
 } from '@fortawesome/free-solid-svg-icons';
-
-// ✅ CORREÇÃO AQUI
 import Modal from '../../components/ui/Modal';
-import EmailForm from '../../components/notificacoes/EmailForm';
+import EmailForm from '../../components/ui/EmailForm';
 
 function EmailsNotificacaoPage() {
   const [emails, setEmails] = useState([]);
@@ -80,20 +76,13 @@ function EmailsNotificacaoPage() {
   };
 
   const handleDelete = async (id, email) => {
-    if (
-      window.confirm(
-        `Tem certeza que deseja remover o e-mail "${email}" da lista de notificações?`
-      )
-    ) {
+    if (window.confirm(`Tem certeza que deseja remover o e-mail "${email}" da lista de notificações?`)) {
       try {
         await deleteEmailNotificacao(id);
         addToast('E-mail removido com sucesso!', 'success');
         fetchEmails();
       } catch (err) {
-        addToast(
-          err.response?.data?.message || 'Erro ao remover e-mail.',
-          'error'
-        );
+        addToast(err.response?.data?.message || 'Erro ao remover e-mail.', 'error');
       }
     }
   };
@@ -102,9 +91,7 @@ function EmailsNotificacaoPage() {
     <FontAwesomeIcon
       icon={ativo ? faCheckCircle : faTimesCircle}
       style={{
-        color: ativo
-          ? 'var(--btn-success-bg-light)'
-          : 'var(--btn-danger-bg-light)',
+        color: ativo ? 'var(--btn-success-bg-light)' : 'var(--btn-danger-bg-light)',
       }}
       title={ativo ? 'Sim' : 'Não'}
     />
@@ -115,11 +102,7 @@ function EmailsNotificacaoPage() {
       <Modal
         isOpen={isModalOpen}
         onClose={handleCloseModal}
-        title={
-          editingEmail
-            ? 'Editar Configurações de E-mail'
-            : 'Adicionar Novo E-mail'
-        }
+        title={editingEmail ? 'Editar Configurações de E-mail' : 'Adicionar Novo E-mail'}
         showConfirmButton={false}
         showCancelButton={false}
       >
@@ -134,27 +117,20 @@ function EmailsNotificacaoPage() {
       <section className="page-section">
         <div className="table-header-actions">
           <h3>
-            <FontAwesomeIcon icon={faEnvelope} /> E-mails para Notificação de
-            Alertas
+            <FontAwesomeIcon icon={faEnvelope} /> E-mails para Notificação de Alertas
           </h3>
 
-          <button
-            className="btn btn-primary"
-            onClick={() => handleOpenModal()}
-          >
+          <button className="btn btn-primary" onClick={() => handleOpenModal()}>
             <FontAwesomeIcon icon={faPlus} /> Adicionar E-mail
           </button>
         </div>
 
         <p>
-          Gerencie a lista de e-mails que receberão alertas e configure suas
-          subscrições e antecedência individualmente.
+          Gerencie a lista de e-mails que receberão alertas e configure suas subscrições e
+          antecedência individualmente.
         </p>
 
-        <div
-          className="table-responsive-wrapper"
-          style={{ marginTop: '20px' }}
-        >
+        <div className="table-responsive-wrapper" style={{ marginTop: '20px' }}>
           <table className="data-table">
             <thead>
               <tr>
@@ -178,33 +154,36 @@ function EmailsNotificacaoPage() {
               ) : emails.length > 0 ? (
                 emails.map((email) => (
                   <tr key={email.id}>
-                    <td data-label="Nome">{email.nome || '-'}</td>
-                    <td data-label="E-mail">{email.email}</td>
+                    <td data-label="Nome" className="text-left">
+                      {email.nome || '-'}
+                    </td>
+                    <td data-label="E-mail" className="text-left">
+                      {email.email}
+                    </td>
                     <td data-label="Dias Antec." className="text-center">
                       {email.diasAntecedencia}
                     </td>
-                    <td className="text-center">
+                    <td data-label="Contratos" className="text-center">
                       <IconeStatus ativo={email.recebeAlertasContrato} />
                     </td>
-                    <td className="text-center">
+                    <td data-label="Manutenções" className="text-center">
                       <IconeStatus ativo={email.recebeAlertasManutencao} />
                     </td>
-                    <td className="text-center">
+                    <td data-label="Seguros" className="text-center">
                       <IconeStatus ativo={email.recebeAlertasSeguro} />
                     </td>
-                    <td className="actions-cell text-center">
+                    <td data-label="Ações" className="actions-cell text-center">
                       <button
                         onClick={() => handleOpenModal(email)}
                         className="btn-action edit"
+                        title="Editar Configurações"
                       >
                         <FontAwesomeIcon icon={faEdit} />
                       </button>
-
                       <button
-                        onClick={() =>
-                          handleDelete(email.id, email.email)
-                        }
+                        onClick={() => handleDelete(email.id, email.email)}
                         className="btn-action delete"
+                        title="Remover E-mail"
                       >
                         <FontAwesomeIcon icon={faTrashAlt} />
                       </button>
