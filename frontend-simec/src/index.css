@@ -1,36 +1,67 @@
-/* Ficheiro: src/index.css */
-
-/* 
-   1. IMPORTAÇÕES PRIMEIRO (Regra obrigatória do CSS)
-   Mantemos todos os seus estilos atuais para nada "quebrar" agora.
-*/
+/* =====================================================
+   1. BASE DO PROJETO (RESET + VARIÁVEIS)
+===================================================== */
 @import './styles/global.css';
 @import './styles/layout.css';
+
+/* =====================================================
+   2. COMPONENTES LEGADOS (manter por enquanto)
+===================================================== */
 @import './styles/components/sidebar.css';
-@import './styles/components/ui-elements.css';
 @import './styles/components/forms.css';
 @import './styles/components/modal.css';
 @import './styles/components/tables.css';
 @import './styles/components/tabs.css';
 @import './styles/components/GlobalFilterBar.css';
 @import './styles/components/toast.css';
+
+/* =====================================================
+   3. PÁGINAS LEGADAS
+===================================================== */
 @import './styles/pages/dashboard.css';
 @import './styles/pages/alertas.css';
 @import './styles/pages/login.css';
 @import './styles/pages/unidades.css';
 
-/* 
-   2. ATIVAÇÃO DO TAILWIND (Abaixo dos imports)
-   Isso permite que você use as classes do Tailwind junto com seus estilos antigos.
-*/
+/* =====================================================
+   4. TAILWIND
+===================================================== */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* 
-   ==============================================================
-   |  DICA: A partir de agora, você pode criar novos estilos    |
-   |  diretamente no HTML (JSX) usando as classes do Tailwind,  |
-   |  sem precisar criar novos arquivos .css na pasta styles.   |
-   ==============================================================
-*/
+/* =====================================================
+   5. CAMADA DE DESIGN SYSTEM (NOVO PADRÃO)
+===================================================== */
+
+@layer components {
+
+  .btn {
+    @apply px-4 py-2 rounded-md font-semibold transition;
+  }
+
+  .btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700;
+  }
+
+  .btn-secondary {
+    @apply bg-slate-200 text-slate-800 hover:bg-slate-300;
+  }
+
+  .btn-danger {
+    @apply bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .card {
+    @apply bg-white border border-slate-200 rounded-xl shadow-sm p-4;
+  }
+
+  .input {
+    @apply w-full border border-slate-300 rounded-md px-3 py-2;
+  }
+
+  .label {
+    @apply text-sm font-semibold text-slate-600 mb-1 block;
+  }
+
+}

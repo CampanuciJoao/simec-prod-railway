@@ -2,6 +2,7 @@
 
 import prisma from './prismaService.js';
 import { enviarEmail } from './emailService.js';
+import { gerarRecomendacoesProativasDeManutencao } from './maintenanceRecommendationService.js';
 import { addDays, isBefore, isAfter, differenceInDays, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
@@ -200,7 +201,7 @@ async function gerarAlertasDeProximidadeManutencao() {
   }
 }
 
-// --- NOVO: ALERTAS DE PROXIMIDADE DO FIM DA MANUTENÇÃO ---
+// --- ALERTAS DE PROXIMIDADE DO FIM DA MANUTENÇÃO ---
 async function gerarAlertasDeProximidadeFimManutencao() {
   const agora = getAgora();
 
@@ -378,9 +379,15 @@ async function verificarVencimentoContratos() {
     });
 
     for (const email of emails) {
-      const dataInicioNotif = addDays(startOfDay(new Date(contrato.dataFim)), -email.diasAntecedencia);
+      const dataInicioNotif = addDays(
+        startOfDay(new Date(contrato.dataFim)),
+        -email.diasAntecedencia
+      );
 
-      if (isBefore(hoje, new Date(contrato.dataFim)) && (hoje.getTime() >= dataInicioNotif.getTime())) {
+      if (
+        isBefore(hoje, new Date(contrato.dataFim)) &&
+        hoje.getTime() >= dataInicioNotif.getTime()
+      ) {
         const jaEnviado = await prisma.notificacaoEnviada.findFirst({
           where: {
             entidade: 'Contrato',
@@ -434,9 +441,15 @@ async function verificarVencimentoSeguros() {
     });
 
     for (const email of emails) {
-      const dataInicioNotif = addDays(startOfDay(new Date(seguro.dataFim)), -email.diasAntecedencia);
+      const dataInicioNotif = addDays(
+        startOfDay(new Date(seguro.dataFim)),
+        -email.diasAntecedencia
+      );
 
-      if (isBefore(hoje, new Date(seguro.dataFim)) && (hoje.getTime() >= dataInicioNotif.getTime())) {
+      if (
+        isBefore(hoje, new Date(seguro.dataFim)) &&
+        hoje.getTime() >= dataInicioNotif.getTime()
+      ) {
         const jaEnviado = await prisma.notificacaoEnviada.findFirst({
           where: {
             entidade: 'Seguro',
@@ -486,6 +499,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     await gerarAlertasDeProximidadeManutencao();
     await gerarAlertasDeProximidadeFimManutencao();
     await processarSaudeEquipamentos();
+    await gerarRecomendacoesProativasDeManutencao();
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
 

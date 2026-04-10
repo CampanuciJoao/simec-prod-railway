@@ -13,7 +13,7 @@ import {
   faCheckCircle, faExclamationTriangle, faInfoCircle, 
   faUser, faWrench, faFileDownload, faExternalLinkAlt, faFilter 
 } from '@fortawesome/free-solid-svg-icons';
-import DateInput from '../../DateInput';
+import DateInput from '../../ui/DateInput';
 
 // URL base para arquivos
 const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';

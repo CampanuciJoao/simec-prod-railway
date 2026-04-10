@@ -2,8 +2,8 @@
 // VERSÃO FINAL SÊNIOR - COM UI REFINADA
 
 import React, { useRef, useState } from 'react';
-import { useModal } from '../../../hooks/useModal';
-import ModalConfirmacao from '../../ModalConfirmacao';
+import { useModal } from '../../../hooks/shared/useModal';
+import ModalConfirmacao from '../../ui/ModalConfirmacao';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { 
     faPaperclip, faUpload, faTrashAlt, faFilePdf, faFileImage, faFileWord, 

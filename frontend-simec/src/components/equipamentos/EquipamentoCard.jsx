@@ -6,7 +6,7 @@ import {
   faFileMedical
 } from '@fortawesome/free-solid-svg-icons';
 
-import StatusSelector from '../StatusSelector';
+import StatusSelector from '../ui/StatusSelector';
 import EquipamentoCardExpanded from './EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '../../utils/equipamentoCardStyles';
 
