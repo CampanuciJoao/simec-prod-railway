@@ -1,9 +1,9 @@
-// src/pages/AdicionarContratoPage.jsx
+// src/pages/contratos/AdicionarContratoPage.jsx
 
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import ContratoForm from '../components/ContratoForm';
+import ContratoForm from '../../components/contratos/ContratoForm';
 import { addContrato } from '../../services/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
@@ -19,8 +19,7 @@ function AdicionarContratoPage() {
       setTimeout(() => navigate('/contratos'), 1500);
     } catch (err) {
       addToast(err.message || 'Erro ao adicionar contrato.', 'error');
-      // Relança o erro para que o formulário possa resetar o estado de 'submitting'
-      throw err; 
+      throw err;
     }
   };
 
@@ -32,11 +31,9 @@ function AdicionarContratoPage() {
           <FontAwesomeIcon icon={faArrowLeft} /> Voltar
         </button>
       </div>
+
       <section className="page-section">
-        <ContratoForm 
-            onSubmit={handleAdicionar}
-            isEditing={false}
-        />
+        <ContratoForm onSubmit={handleAdicionar} isEditing={false} />
       </section>
     </div>
   );
