@@ -1,7 +1,9 @@
+// Ficheiro: src/hooks/manutencoes/useDetalhesManutencaoPage.js
+
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 
-import { useManutencaoDetalhes } from '../useManutencaoDetalhes';
+import { useManutencaoDetalhes } from './useManutencaoDetalhes';
 import { useModal } from '../shared/useModal';
 import { useAlertas } from '../../contexts/AlertasContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -50,8 +52,12 @@ export function useDetalhesManutencaoPage() {
   useEffect(() => {
     if (!manutencao) return;
 
-    const inicioReal = manutencao.dataInicioReal ? new Date(manutencao.dataInicioReal) : null;
-    const fimReal = manutencao.dataFimReal ? new Date(manutencao.dataFimReal) : null;
+    const inicioReal = manutencao.dataInicioReal
+      ? new Date(manutencao.dataInicioReal)
+      : null;
+    const fimReal = manutencao.dataFimReal
+      ? new Date(manutencao.dataFimReal)
+      : null;
 
     setFormData({
       descricaoProblemaServico: manutencao.descricaoProblemaServico || '',
@@ -79,6 +85,7 @@ export function useDetalhesManutencaoPage() {
     if (!files || files.length === 0) return;
 
     const uploadData = new FormData();
+
     for (let i = 0; i < files.length; i += 1) {
       uploadData.append('arquivosManutencao', files[i]);
     }
@@ -92,7 +99,9 @@ export function useDetalhesManutencaoPage() {
 
   const handleSalvarAlteracoes = async () => {
     const dataInicio = formData.dataInicioReal
-      ? new Date(`${formData.dataInicioReal}T${formData.horaInicioReal || '00:00:00'}`)
+      ? new Date(
+          `${formData.dataInicioReal}T${formData.horaInicioReal || '00:00:00'}`
+        )
       : null;
 
     const dataFim = formData.dataFimReal

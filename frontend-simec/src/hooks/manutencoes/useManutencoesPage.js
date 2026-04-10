@@ -1,145 +1,153 @@
-import { useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+// Ficheiro: src/hooks/manutencoes/useManutencoes.js
+// VERSÃO FINAL SÊNIOR - COM NOME DE EXPORTAÇÃO CORRETO E LÓGICA COMPLETA
 
-import { useManutencoes } from './useManutencoes';
-import { useModal } from '../shared/useModal';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import {
+  getManutencoes,
+  getEquipamentos,
+  getUnidades,
+  deleteManutencao,
+} from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { deleteManutencao } from '../../services/api';
 
-export function useManutencoesPage() {
-  const navigate = useNavigate();
-  const location = useLocation();
+/**
+ * Hook customizado para gerenciar a lógica da página de listagem de Manutenções.
+ * Encapsula a busca de dados, filtragem, ordenação e ações.
+ */
+export function useManutencoes() {
+  const [manutencoes, setManutencoes] = useState([]);
+  const [equipamentos, setEquipamentos] = useState([]);
+  const [unidades, setUnidades] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtros, setFiltros] = useState({
+    equipamentoId: '',
+    unidadeId: '',
+    tipo: '',
+    status: '',
+  });
+  const [sortConfig, setSortConfig] = useState({
+    key: 'dataHoraAgendamentoInicio',
+    direction: 'descending',
+  });
+
   const { addToast } = useToast();
 
-  const {
-    manutencoes,
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [manutencoesData, equipamentosData, unidadesData] = await Promise.all([
+        getManutencoes(),
+        getEquipamentos(),
+        getUnidades(),
+      ]);
+
+      setManutencoes(manutencoesData || []);
+      setEquipamentos(equipamentosData || []);
+      setUnidades(unidadesData || []);
+    } catch (err) {
+      setError(err);
+      addToast(
+        err.response?.data?.message || 'Falha ao carregar dados de manutenções.',
+        'error'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  const manutencoesProcessadas = useMemo(() => {
+    let items = [...manutencoes];
+
+    if (searchTerm) {
+      const termo = searchTerm.toLowerCase();
+      items = items.filter(
+        (m) =>
+          m.numeroOS?.toLowerCase().includes(termo) ||
+          m.equipamento?.modelo?.toLowerCase().includes(termo) ||
+          m.equipamento?.tag?.toLowerCase().includes(termo)
+      );
+    }
+
+    if (filtros.unidadeId) {
+      items = items.filter((m) => m.equipamento?.unidadeId === filtros.unidadeId);
+    }
+
+    if (filtros.equipamentoId) {
+      items = items.filter((m) => m.equipamentoId === filtros.equipamentoId);
+    }
+
+    if (filtros.tipo) {
+      items = items.filter((m) => m.tipo === filtros.tipo);
+    }
+
+    if (filtros.status) {
+      items = items.filter((m) => m.status === filtros.status);
+    }
+
+    if (sortConfig.key) {
+      items.sort((a, b) => {
+        const valA =
+          sortConfig.key === 'equipamento'
+            ? a.equipamento?.modelo
+            : a[sortConfig.key];
+        const valB =
+          sortConfig.key === 'equipamento'
+            ? b.equipamento?.modelo
+            : b[sortConfig.key];
+
+        if (
+          sortConfig.key.includes('data') ||
+          sortConfig.key.includes('Data')
+        ) {
+          return sortConfig.direction === 'ascending'
+            ? new Date(valA) - new Date(valB)
+            : new Date(valB) - new Date(valA);
+        }
+
+        if (typeof valA === 'string' && typeof valB === 'string') {
+          return sortConfig.direction === 'ascending'
+            ? valA.localeCompare(valB)
+            : valB.localeCompare(valA);
+        }
+
+        return 0;
+      });
+    }
+
+    return items;
+  }, [manutencoes, searchTerm, filtros, sortConfig]);
+
+  const removerManutencao = async (id) => {
+    try {
+      await deleteManutencao(id);
+      setManutencoes((prev) => prev.filter((m) => m.id !== id));
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Erro ao apagar manutenção.', 'error');
+      fetchData();
+    }
+  };
+
+  return {
+    manutencoes: manutencoesProcessadas,
     equipamentos,
-    unidadesDisponiveis,
+    unidadesDisponiveis: unidades,
     loading,
     error,
     searchTerm,
     setSearchTerm,
     filtros,
     setFiltros,
-    refetch,
-  } = useManutencoes();
-
-  const deleteModal = useModal();
-
-  useEffect(() => {
-    if (location.state?.filtroTipoInicial || location.state?.filtroEquipamentoId) {
-      setFiltros((prev) => ({
-        ...prev,
-        tipo: location.state.filtroTipoInicial || prev.tipo,
-        equipamentoId: location.state.filtroEquipamentoId || prev.equipamentoId,
-      }));
-
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, setFiltros, navigate, location.pathname]);
-
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      refetch();
-    }, 30 * 1000);
-
-    return () => clearInterval(intervalId);
-  }, [refetch]);
-
-  const handleConfirmDelete = async () => {
-    if (!deleteModal.modalData) return;
-
-    try {
-      await deleteManutencao(deleteModal.modalData.id);
-      addToast('Ordem de Serviço excluída.', 'success');
-      refetch();
-    } catch (err) {
-      addToast('Erro ao excluir.', 'error');
-    } finally {
-      deleteModal.closeModal();
-    }
-  };
-
-  const goToCreate = () => {
-    navigate('/manutencoes/agendar');
-  };
-
-  const statusOptions = useMemo(
-    () => [
-      'Agendada',
-      'EmAndamento',
-      'Concluida',
-      'Cancelada',
-      'AguardandoConfirmacao',
-    ].map((status) => ({
-      value: status,
-      label: status.replace(/([A-Z])/g, ' $1').trim(),
-    })),
-    []
-  );
-
-  const equipamentosOptions = useMemo(
-    () =>
-      (equipamentos || []).map((equipamento) => ({
-        value: equipamento.id,
-        label: `${equipamento.modelo} (${equipamento.tag})`,
-      })),
-    [equipamentos]
-  );
-
-  const unidadesOptions = useMemo(
-    () =>
-      (unidadesDisponiveis || []).map((unidade) => ({
-        value: unidade.id,
-        label: unidade.nomeSistema,
-      })),
-    [unidadesDisponiveis]
-  );
-
-  const selectFiltersConfig = useMemo(
-    () => [
-      {
-        id: 'unidadeId',
-        value: filtros.unidadeId,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, unidadeId: value })),
-        options: unidadesOptions,
-        defaultLabel: 'Todas Unidades',
-      },
-      {
-        id: 'equipamentoId',
-        value: filtros.equipamentoId,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, equipamentoId: value })),
-        options: equipamentosOptions,
-        defaultLabel: 'Todos Equipamentos',
-      },
-      {
-        id: 'tipo',
-        value: filtros.tipo,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, tipo: value })),
-        options: ['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'],
-        defaultLabel: 'Todos Tipos',
-      },
-      {
-        id: 'status',
-        value: filtros.status,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, status: value })),
-        options: statusOptions,
-        defaultLabel: 'Todos Status',
-      },
-    ],
-    [filtros, setFiltros, unidadesOptions, equipamentosOptions, statusOptions]
-  );
-
-  return {
-    manutencoes,
-    loading,
-    error,
-    searchTerm,
-    setSearchTerm,
-    selectFiltersConfig,
-    goToCreate,
-    refetch,
-    deleteModal,
-    handleConfirmDelete,
+    sortConfig,
+    setSortConfig,
+    removerManutencao,
+    refetch: fetchData,
   };
 }
