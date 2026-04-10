@@ -1,16 +1,16 @@
-// Ficheiro: src/pages/SalvarManutencaoPage.jsx
+// Ficheiro: src/pages/manutencoes/SalvarManutencaoPage.jsx
 // VERSÃO FINAL SÊNIOR - COM SINAL DE ATUALIZAÇÃO NO REDIRECIONAMENTO
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import ManutencaoForm from '../components/ManutencaoForm';
-import { 
-    getManutencaoById, 
-    addManutencao,
-    updateManutencao, 
-    getEquipamentos, 
-    getUnidades 
+import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
+import {
+  getManutencaoById,
+  addManutencao,
+  updateManutencao,
+  getEquipamentos,
+  getUnidades,
 } from '../../services/api';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
@@ -27,28 +27,25 @@ function SalvarManutencaoPage() {
 
   const isEditing = !!manutencaoId;
 
-  // Estados para os dados da página
   const [initialData, setInitialData] = useState(null);
   const [todosEquipamentos, setTodosEquipamentos] = useState([]);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // Busca todos os dados necessários para o formulário.
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError('');
+
     try {
-      // Busca dados de suporte em paralelo para otimizar
       const [equipamentosData, unidadesData] = await Promise.all([
         getEquipamentos(),
-        getUnidades()
+        getUnidades(),
       ]);
-      
+
       setTodosEquipamentos(equipamentosData || []);
       setUnidadesDisponiveis(unidadesData || []);
-      
-      // Se estiver no modo de edição, busca os dados da manutenção específica.
+
       if (isEditing) {
         const manutencaoData = await getManutencaoById(manutencaoId);
         setInitialData(manutencaoData);
@@ -65,10 +62,6 @@ function SalvarManutencaoPage() {
     fetchData();
   }, [fetchData]);
 
-  /**
-   * Função de callback que é passada para o ManutencaoForm.
-   * @param {object} formData - Os dados do formulário a serem salvos.
-   */
   const handleSave = async (formData) => {
     try {
       if (isEditing) {
@@ -78,20 +71,37 @@ function SalvarManutencaoPage() {
         await addManutencao(formData);
         addToast('Manutenção agendada com sucesso!', 'success');
       }
-      
-      // Navega de volta para a lista e passa um estado para forçar a atualização da página de manutenções.
-      navigate('/manutencoes', { state: { refresh: true } });
 
+      navigate('/manutencoes', { state: { refresh: true } });
     } catch (err) {
       addToast(err.response?.data?.message || 'Erro ao salvar a manutenção.', 'error');
-      // Relança o erro para que o formulário saiba que a submissão falhou e possa parar o estado de 'submitting'.
       throw err;
     }
   };
 
-  if (loading) return <div className="page-content-wrapper centered-loader"><FontAwesomeIcon icon={faSpinner} spin size="2x"/></div>;
-  if (error) return <div className="page-content-wrapper"><p className="form-error">{error}</p></div>;
-  if (isEditing && !initialData) return <div className="page-content-wrapper"><p className="no-data-message">Manutenção não encontrada.</p></div>;
+  if (loading) {
+    return (
+      <div className="page-content-wrapper centered-loader">
+        <FontAwesomeIcon icon={faSpinner} spin size="2x" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="page-content-wrapper">
+        <p className="form-error">{error}</p>
+      </div>
+    );
+  }
+
+  if (isEditing && !initialData) {
+    return (
+      <div className="page-content-wrapper">
+        <p className="no-data-message">Manutenção não encontrada.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="page-content-wrapper">
@@ -99,13 +109,14 @@ function SalvarManutencaoPage() {
         <h1 className="page-title-internal">
           {isEditing ? `Editar Manutenção (OS: ${initialData?.numeroOS})` : 'Agendar Nova Manutenção'}
         </h1>
+
         <button className="btn btn-secondary" onClick={() => navigate('/manutencoes')}>
           <FontAwesomeIcon icon={faArrowLeft} /> Voltar
         </button>
       </div>
+
       <section className="page-section">
-        {/* Renderiza o formulário "burro", passando todos os dados e callbacks necessários */}
-        <ManutencaoForm 
+        <ManutencaoForm
           onSubmit={handleSave}
           initialData={initialData}
           isEditing={isEditing}

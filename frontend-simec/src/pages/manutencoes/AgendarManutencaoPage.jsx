@@ -1,9 +1,6 @@
-// src/pages/AgendarManutencaoPage.jsx
-// VERSÃO FINAL CORRETA
-
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import ManutencaoForm from '../components/ManutencaoForm';
+import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
 import { agendarManutencao } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -19,9 +16,9 @@ function AgendarManutencaoPage() {
       addToast('Manutenção agendada com sucesso!', 'success');
       setTimeout(() => {
         navigate('/manutencoes');
-      }, 1500); 
+      }, 1500);
     } catch (error) {
-      console.error("Falha ao agendar manutenção na página:", error);
+      console.error('Falha ao agendar manutenção na página:', error);
       throw error;
     }
   };
@@ -35,10 +32,7 @@ function AgendarManutencaoPage() {
         </button>
       </div>
       <section className="page-section">
-        <ManutencaoForm 
-          onSubmit={handleAgendar} 
-          isEditing={false} 
-        />
+        <ManutencaoForm onSubmit={handleAgendar} isEditing={false} />
       </section>
     </div>
   );
