@@ -1,10 +1,10 @@
-// Ficheiro: frontend-simec/src/pages/LoginPage.jsx
+// Ficheiro: frontend-simec/src/pages/auth/LoginPage.jsx
 // VERSÃO FINAL SÊNIOR - COMPLETA E CORRIGIDA
 
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import logoSimec from '../assets/images/logo-simec.png';
+import logoSimec from '../../assets/images/logo-simec.png';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faUser, faLock } from '@fortawesome/free-solid-svg-icons';
 import '@/styles/pages/login.css';
@@ -14,8 +14,9 @@ function LoginPage() {
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
   const { login } = useAuth();
-  const navigate = useNavigate(); // Embora o AuthContext já redirecione, é bom tê-lo aqui.
+  const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -23,16 +24,11 @@ function LoginPage() {
     setLoading(true);
 
     try {
-      // CORREÇÃO: Mantém a chamada com dois argumentos, como no seu código original.
-      // Agora o AuthContext sabe como lidar com isso.
       await login(username, senha);
-      
-      // O AuthContext já redireciona, mas esta linha é um fallback seguro.
-      // Se o fluxo no AuthContext mudar, a página não quebra.
       navigate('/dashboard', { replace: true });
-
     } catch (err) {
-      const errorMessage = err.message || 'Falha no login. Verifique suas credenciais e a conexão.';
+      const errorMessage =
+        err.message || 'Falha no login. Verifique suas credenciais e a conexão.';
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -44,15 +40,17 @@ function LoginPage() {
       <div className="login-wrapper">
         <div className="login-branding">
           <img src={logoSimec} alt="SIMEC Logo" className="login-logo-bg" />
-          <p className="login-brand-subtitle">Sistema de Monitoramento de Engenharia Clinica</p>
+          <p className="login-brand-subtitle">
+            Sistema de Monitoramento de Engenharia Clinica
+          </p>
         </div>
 
         <div className="login-box">
           <h2 className="login-title">Entrar</h2>
-          
+
           <form onSubmit={handleSubmit} className="login-form">
             {error && <p className="login-error-message">{error}</p>}
-            
+
             <div className="form-group">
               <label htmlFor="username">Nome de Usuário</label>
               <div className="input-wrapper">
@@ -69,11 +67,11 @@ function LoginPage() {
                 />
               </div>
             </div>
-            
+
             <div className="form-group">
               <label htmlFor="senha">Senha</label>
               <div className="input-wrapper">
-                 <FontAwesomeIcon icon={faLock} className="input-icon" />
+                <FontAwesomeIcon icon={faLock} className="input-icon" />
                 <input
                   type="password"
                   id="senha"
