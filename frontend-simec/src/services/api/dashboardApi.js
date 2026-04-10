@@ -1,4 +1,6 @@
 import api from '../http/apiClient';
 
-export const getDashboardData = () =>
-  api.get('/dashboard-data').then((res) => res.data);
+export const getDashboardData = async () => {
+  const response = await api.get('/dashboard-data');
+  return response.data;
+};

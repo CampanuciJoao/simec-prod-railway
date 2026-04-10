@@ -1,8 +1,7 @@
 import React from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChartPie } from '@fortawesome/free-solid-svg-icons';
 
-import { useDashboard } from '../../hooks/useDashboard';
+import { useDashboard } from '../../hooks/dashboard/useDashboard';
 
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
@@ -15,20 +14,13 @@ import DonutChart from '../../components/charts/DonutChart';
 function DashboardPage() {
   const { data, loading, error } = useDashboard();
 
-  const isInitialLoading = loading && !data;
-  const hasError = !!error;
-
   return (
     <PageLayout>
-      <PageHeader
-        title="Dashboard"
-        icon={faChartPie}
-        variant="light"
-      />
+      <PageHeader title="Dashboard" icon={faChartPie} variant="light" />
 
-      {(isInitialLoading || hasError) ? (
+      {loading || error ? (
         <PageState
-          loading={isInitialLoading}
+          loading={loading}
           error={error || ''}
           isEmpty={false}
         />
@@ -79,12 +71,12 @@ function DashboardPage() {
           <PageSection title="Alertas Recentes" className="mt-6">
             {data.alertas?.length > 0 ? (
               <ul className="space-y-2">
-                {data.alertas.map((alerta) => (
+                {data.alertas.map((alerta, index) => (
                   <li
-                    key={alerta.id}
+                    key={alerta.id || alerta._id || `${alerta.mensagem || 'alerta'}-${index}`}
                     className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg"
                   >
-                    {alerta.mensagem}
+                    {alerta.mensagem || alerta.descricao || alerta.titulo || 'Alerta sem descrição'}
                   </li>
                 ))}
               </ul>
