@@ -1,3 +1,5 @@
+// Ficheiro: src/hooks/equipamentos/useDetalhesEquipamentoPage.js
+
 import { useState, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
 import {
@@ -19,12 +21,15 @@ export function useDetalhesEquipamentoPage() {
     refetch: refetchEquipamento,
   } = useEquipamentoDetalhes(equipamentoId);
 
-  const abas = useMemo(() => ([
-    { id: 'detalhes', label: 'Cadastro', icon: faInfoCircle },
-    { id: 'acessorios', label: 'Acessórios', icon: faHdd },
-    { id: 'anexos', label: 'Anexos', icon: faPaperclip },
-    { id: 'historico', label: 'Histórico', icon: faHistory },
-  ]), []);
+  const abas = useMemo(
+    () => [
+      { id: 'detalhes', label: 'Cadastro', icon: faInfoCircle },
+      { id: 'acessorios', label: 'Acessórios', icon: faHdd },
+      { id: 'anexos', label: 'Anexos', icon: faPaperclip },
+      { id: 'historico', label: 'Histórico', icon: faHistory },
+    ],
+    []
+  );
 
   return {
     equipamentoId,
