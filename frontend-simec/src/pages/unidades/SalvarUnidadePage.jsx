@@ -1,4 +1,4 @@
-// Ficheiro: frontend-simec/src/pages/SalvarUnidadePage.jsx
+// Ficheiro: frontend-simec/src/pages/unidades/SalvarUnidadePage.jsx
 // VERSÃO FINAL, COMPLETA E CORRIGIDA
 
 // --- Core & Routing Dependencies ---
@@ -10,7 +10,7 @@ import { useToast } from '../../contexts/ToastContext';
 import { getUnidadeById, addUnidade, updateUnidade } from '../../services/api';
 
 // --- UI Components & Assets ---
-import UnidadeForm from '../components/UnidadeForm';
+import UnidadeForm from '../../components/unidades/UnidadeForm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
@@ -36,11 +36,11 @@ function SalvarUnidadePage() {
     if (isEditing) {
       setLoading(true);
       getUnidadeById(id)
-        .then(data => {
+        .then((data) => {
           setInitialData(data);
         })
-        .catch(err => {
-          console.error("Erro ao buscar unidade para edição:", err);
+        .catch((err) => {
+          console.error('Erro ao buscar unidade para edição:', err);
           setError('Falha ao carregar dados da unidade.');
           addToast('Falha ao carregar dados da unidade.', 'error');
         })
@@ -62,10 +62,6 @@ function SalvarUnidadePage() {
    */
   const handleSave = async (formData) => {
     try {
-      // >> CORREÇÃO PRINCIPAL APLICADA AQUI <<
-      // A lógica de "achatamento" (flattening) foi removida.
-      // Agora, esta página confia que o `UnidadeForm` já está fornecendo
-      // os dados no formato que a API espera. Ela simplesmente passa os dados adiante.
       if (isEditing) {
         await updateUnidade(id, formData);
         addToast('Unidade atualizada com sucesso!', 'success');
@@ -73,12 +69,13 @@ function SalvarUnidadePage() {
         await addUnidade(formData);
         addToast('Unidade adicionada com sucesso!', 'success');
       }
+
       setTimeout(() => navigate('/cadastros/unidades'), 1000);
     } catch (apiError) {
-      console.error("Falha ao salvar unidade:", apiError);
-      const errorMessage = apiError?.message || 'Falha ao salvar. Verifique os dados e tente novamente.';
+      console.error('Falha ao salvar unidade:', apiError);
+      const errorMessage =
+        apiError?.message || 'Falha ao salvar. Verifique os dados e tente novamente.';
       addToast(errorMessage, 'error');
-      // Relança o erro para que o UnidadeForm saiba que a submissão falhou.
       throw apiError;
     }
   };
@@ -95,7 +92,7 @@ function SalvarUnidadePage() {
       </div>
     );
   }
-  
+
   if (error) {
     return (
       <div className="page-content-wrapper">
@@ -103,7 +100,7 @@ function SalvarUnidadePage() {
       </div>
     );
   }
-  
+
   if (isEditing && !initialData) {
     return (
       <div className="page-content-wrapper">
@@ -118,10 +115,12 @@ function SalvarUnidadePage() {
         <h1 className="page-title-internal">
           {isEditing ? `Editar Unidade: ${initialData?.nomeSistema}` : 'Adicionar Nova Unidade'}
         </h1>
+
         <button className="btn btn-secondary" onClick={() => navigate('/cadastros/unidades')}>
           <FontAwesomeIcon icon={faArrowLeft} /> Voltar
         </button>
       </div>
+
       <section className="page-section">
         <UnidadeForm
           onSubmit={handleSave}
