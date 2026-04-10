@@ -8,7 +8,7 @@ import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
 import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
-import RelatorioResultado from '../components/RelatorioResultado';
+import RelatorioResultado from '../../components/relatorios/RelatorioResultado';
 
 function RelatoriosPage() {
   const page = useRelatoriosPage();
