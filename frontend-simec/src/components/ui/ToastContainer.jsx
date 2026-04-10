@@ -1,4 +1,5 @@
-// src/components/ToastContainer.jsx
+// src/components/ui/ToastContainer.jsx
+
 import React from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import Toast from './Toast';
@@ -8,7 +9,7 @@ function ToastContainer() {
 
   return (
     <div className="toast-container">
-      {toasts.map(toast => (
+      {toasts.map((toast) => (
         <Toast
           key={toast.id}
           message={toast.message}

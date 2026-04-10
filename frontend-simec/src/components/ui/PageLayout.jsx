@@ -1,3 +1,5 @@
+// src/components/ui/PageLayout.jsx
+
 import React from 'react';
 
 function PageLayout({
@@ -20,7 +22,9 @@ function PageLayout({
   const backgroundClass = backgroundClassMap[background] || '';
 
   return (
-    <div className={`${baseClass}${paddingClass}${heightClass}${backgroundClass} ${className}`.trim()}>
+    <div
+      className={`${baseClass}${paddingClass}${heightClass}${backgroundClass} ${className}`.trim()}
+    >
       {children}
     </div>
   );

@@ -1,6 +1,11 @@
+// src/components/ui/PageState.jsx
+
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faTriangleExclamation } from '@fortawesome/free-solid-svg-icons';
+import {
+  faSpinner,
+  faTriangleExclamation,
+} from '@fortawesome/free-solid-svg-icons';
 
 function PageState({
   loading,

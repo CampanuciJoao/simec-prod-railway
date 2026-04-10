@@ -1,9 +1,14 @@
-// src/components/Toast.jsx
+// src/components/ui/Toast.jsx
 // VERSÃO ATUALIZADA - COM LÓGICA DE AUTO-FECHAMENTO
 
 import React, { useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle, faTimesCircle, faInfoCircle, faTimes } from '@fortawesome/free-solid-svg-icons';
+import {
+  faCheckCircle,
+  faTimesCircle,
+  faInfoCircle,
+  faTimes,
+} from '@fortawesome/free-solid-svg-icons';
 
 const toastConfig = {
   success: { icon: faCheckCircle, className: 'toast-success' },
@@ -12,16 +17,10 @@ const toastConfig = {
 };
 
 function Toast({ message, type, onClose }) {
-  // ==============================================================
-  // >> ALTERAÇÃO PRINCIPAL APLICADA AQUI <<
-  // Este useEffect cria um timer que chama a função onClose após 5 segundos.
-  // A função de cleanup (return) limpa o timer se o componente for
-  // removido antes (ex: se o usuário clicar no 'X').
-  // ==============================================================
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose();
-    }, 5000); // 5000 milissegundos = 5 segundos
+    }, 5000);
 
     return () => {
       clearTimeout(timer);
@@ -34,7 +33,7 @@ function Toast({ message, type, onClose }) {
     <div className={`toast ${config.className}`}>
       <FontAwesomeIcon icon={config.icon} className="toast-icon" />
       <span className="toast-message">{message}</span>
-      <button onClick={onClose} className="toast-close-btn">
+      <button type="button" onClick={onClose} className="toast-close-btn">
         <FontAwesomeIcon icon={faTimes} />
       </button>
     </div>

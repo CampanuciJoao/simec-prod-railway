@@ -1,37 +1,35 @@
-// src/components/DateInput.jsx
+// src/components/ui/DateInput.jsx
 // NOVO COMPONENTE DE INPUT DE DATA COM MÁSCARA 'dd/mm/aaaa'
 
 import React, { useState, useEffect } from 'react';
 
-// Função para converter 'YYYY-MM-DD' para 'DD/MM/YYYY'
 const toDisplayFormat = (isoDate) => {
   if (!isoDate || typeof isoDate !== 'string') return '';
+
   const parts = isoDate.split('-');
-  if (parts.length < 3) return isoDate; // Retorna o que tiver se não for formato completo
+  if (parts.length < 3) return isoDate;
+
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 };
 
-// Função para converter 'DD/MM/YYYY' para 'YYYY-MM-DD'
 const toISOFormat = (displayDate) => {
   if (!displayDate || displayDate.length < 10) return '';
+
   const parts = displayDate.split('/');
   if (parts.length < 3) return '';
+
   return `${parts[2]}-${parts[1]}-${parts[0]}`;
 };
 
-
 function DateInput({ value, onChange, name, ...props }) {
-  // `value` (do pai) está no formato 'YYYY-MM-DD'
-  // `displayValue` (local) está no formato 'DD/MM/YYYY'
   const [displayValue, setDisplayValue] = useState(toDisplayFormat(value));
 
-  // Atualiza o display se o valor do pai mudar (ex: ao carregar dados de edição)
   useEffect(() => {
     setDisplayValue(toDisplayFormat(value));
   }, [value]);
 
   const handleInputChange = (e) => {
-    let input = e.target.value.replace(/\D/g, ''); // Remove tudo que não for dígito
+    let input = e.target.value.replace(/\D/g, '');
     let formatted = '';
 
     if (input.length > 0) {
@@ -46,12 +44,11 @@ function DateInput({ value, onChange, name, ...props }) {
 
     setDisplayValue(formatted);
 
-    // Converte de volta para o formato ISO para o estado do formulário pai
     const isoValue = toISOFormat(formatted);
-    // Simula o evento onChange para o formulário pai
+
     onChange({
       target: {
-        name: name,
+        name,
         value: isoValue,
       },
     });

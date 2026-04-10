@@ -1,14 +1,16 @@
-// src/components/CurrencyInput.jsx
+// src/components/ui/CurrencyInput.jsx
+
 import React from 'react';
 
 const formatCurrency = (value) => {
   if (!value) return '';
-  // Remove tudo que não for dígito
+
   const numericValue = value.toString().replace(/\D/g, '');
+
   if (numericValue === '') return '';
-  
-  // Converte para número e formata para BRL
+
   const number = parseFloat(numericValue) / 100;
+
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
@@ -17,12 +19,12 @@ const formatCurrency = (value) => {
 
 const CurrencyInput = ({ value, onChange, ...props }) => {
   const handleChange = (e) => {
-    // Remove o R$, pontos e vírgula para obter apenas os números
     const rawValue = e.target.value.replace(/\D/g, '');
+
     onChange({
       target: {
         name: e.target.name,
-        value: rawValue, // Passa apenas os números para o estado do formulário
+        value: rawValue,
       },
     });
   };

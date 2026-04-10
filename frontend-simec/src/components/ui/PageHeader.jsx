@@ -1,3 +1,5 @@
+// src/components/ui/PageHeader.jsx
+
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 

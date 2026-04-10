@@ -1,3 +1,5 @@
+// src/components/ui/PageSection.jsx
+
 import React from 'react';
 
 function PageSection({
@@ -19,8 +21,9 @@ function PageSection({
   const paddingClass = noPadding ? '' : ' p-6';
 
   return (
-    <section className={`${baseClass} ${variants[variant]}${paddingClass} ${className}`.trim()}>
-      
+    <section
+      className={`${baseClass} ${variants[variant]}${paddingClass} ${className}`.trim()}
+    >
       {(title || actions) && (
         <div className="flex justify-between items-center mb-6">
           {title && (
