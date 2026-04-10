@@ -4,39 +4,11 @@ import { getDashboardData } from '../../services/api';
 const INITIAL_STATE = {
   totalEquipamentos: 0,
   emManutencao: 0,
-  ativos: 0,
-  inativos: 0,
-  manutencoesPorTipo: [],
-  statusEquipamentos: [],
+  contratosVencendo: 0,
+  alertasAtivos: 0,
+  manutencoesPorTipo: null,
+  statusEquipamentos: null,
   alertas: [],
-};
-
-const normalizarLista = (valor) => (Array.isArray(valor) ? valor : []);
-
-const normalizarPontos = (lista) => {
-  if (!Array.isArray(lista)) return [];
-
-  return lista
-    .map((item) => {
-      if (item?.name && typeof item?.value !== 'undefined') {
-        return { name: item.name, value: Number(item.value) || 0 };
-      }
-
-      if (item?.label && typeof item?.value !== 'undefined') {
-        return { name: item.label, value: Number(item.value) || 0 };
-      }
-
-      if (item?.tipo && typeof item?.total !== 'undefined') {
-        return { name: item.tipo, value: Number(item.total) || 0 };
-      }
-
-      if (item?.status && typeof item?.total !== 'undefined') {
-        return { name: item.status, value: Number(item.total) || 0 };
-      }
-
-      return null;
-    })
-    .filter(Boolean);
 };
 
 export function useDashboard() {
@@ -51,18 +23,26 @@ export function useDashboard() {
     try {
       const response = await getDashboardData();
 
+      const statusLabels = response?.statusEquipamentos?.labels || [];
+      const statusData = response?.statusEquipamentos?.data || [];
+
+      const ativos =
+        statusData[statusLabels.findIndex((label) => label === 'Operante')] || 0;
+
+      const inativos =
+        (statusData[statusLabels.findIndex((label) => label === 'Inoperante')] || 0) +
+        (statusData[statusLabels.findIndex((label) => label === 'UsoLimitado')] || 0);
+
       setData({
-        totalEquipamentos: Number(response?.totalEquipamentos ?? 0),
-        emManutencao: Number(response?.emManutencao ?? 0),
-        ativos: Number(response?.ativos ?? 0),
-        inativos: Number(response?.inativos ?? 0),
-        manutencoesPorTipo: normalizarPontos(
-          normalizarLista(response?.manutencoesPorTipo)
-        ),
-        statusEquipamentos: normalizarPontos(
-          normalizarLista(response?.statusEquipamentos)
-        ),
-        alertas: normalizarLista(response?.alertas),
+        totalEquipamentos: Number(response?.equipamentosCount ?? 0),
+        emManutencao: Number(response?.manutencoesCount ?? 0),
+        contratosVencendo: Number(response?.contratosVencendoCount ?? 0),
+        alertasAtivos: Number(response?.alertasAtivos ?? 0),
+        ativos,
+        inativos,
+        manutencoesPorTipo: response?.manutencoesPorTipoMes || null,
+        statusEquipamentos: response?.statusEquipamentos || null,
+        alertas: Array.isArray(response?.alertasRecentes) ? response.alertasRecentes : [],
       });
     } catch (err) {
       setError(

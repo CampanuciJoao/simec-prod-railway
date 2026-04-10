@@ -5,6 +5,7 @@ import {
   faWrench,
   faCircleCheck,
   faTriangleExclamation,
+  faFileContract,
 } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
@@ -37,16 +38,21 @@ function KpiCard({ icon, title, value, subtitle }) {
 function DashboardPage() {
   const { data, loading, error } = useDashboard();
 
-  const isEmptyGraphs =
-    data.manutencoesPorTipo.length === 0 &&
-    data.statusEquipamentos.length === 0;
+  const isInitialLoading = loading;
+  const hasError = !!error;
+  const hasCharts =
+    !!data.manutencoesPorTipo?.labels?.length || !!data.statusEquipamentos?.labels?.length;
 
   return (
     <PageLayout background="slate">
       <PageHeader title="Dashboard" icon={faChartPie} variant="light" />
 
-      {loading || error ? (
-        <PageState loading={loading} error={error || ''} isEmpty={false} />
+      {isInitialLoading || hasError ? (
+        <PageState
+          loading={isInitialLoading}
+          error={error || ''}
+          isEmpty={false}
+        />
       ) : (
         <>
           <PageSection title="Resumo Geral">
@@ -61,36 +67,47 @@ function DashboardPage() {
                 icon={faWrench}
                 title="Em Manutenção"
                 value={data.emManutencao}
-                subtitle="OS ativas no momento"
+                subtitle="OS pendentes e em andamento"
               />
               <KpiCard
-                icon={faCircleCheck}
-                title="Ativos"
-                value={data.ativos}
-                subtitle="Equipamentos operantes"
+                icon={faFileContract}
+                title="Contratos Vencendo"
+                value={data.contratosVencendo}
+                subtitle="Próximos 30 dias"
               />
               <KpiCard
                 icon={faTriangleExclamation}
-                title="Inativos"
+                title="Alertas Ativos"
+                value={data.alertasAtivos}
+                subtitle="Ainda não vistos"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <KpiCard
+                icon={faCircleCheck}
+                title="Equipamentos Operantes"
+                value={data.ativos}
+                subtitle="Status operante"
+              />
+              <KpiCard
+                icon={faTriangleExclamation}
+                title="Equipamentos com Atenção"
                 value={data.inativos}
-                subtitle="Necessitam atenção"
+                subtitle="Inoperantes ou uso limitado"
               />
             </div>
           </PageSection>
 
           <PageSection title="Visão Analítica" className="mt-6">
-            {isEmptyGraphs ? (
-              <div className="py-14 text-center text-slate-400 italic">
-                Ainda não há dados suficientes para montar os gráficos do dashboard.
-              </div>
-            ) : (
+            {hasCharts ? (
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4 min-h-[320px]">
                   <h4 className="mb-4 text-sm font-semibold text-slate-600">
                     Manutenções por Tipo
                   </h4>
                   <div className="h-[240px]">
-                    <BarChart data={data.manutencoesPorTipo} />
+                    <BarChart chartData={data.manutencoesPorTipo} />
                   </div>
                 </div>
 
@@ -99,9 +116,13 @@ function DashboardPage() {
                     Status dos Equipamentos
                   </h4>
                   <div className="h-[240px]">
-                    <DonutChart data={data.statusEquipamentos} />
+                    <DonutChart chartData={data.statusEquipamentos} />
                   </div>
                 </div>
+              </div>
+            ) : (
+              <div className="py-14 text-center text-slate-400 italic">
+                Ainda não há dados suficientes para montar os gráficos do dashboard.
               </div>
             )}
           </PageSection>
@@ -109,16 +130,16 @@ function DashboardPage() {
           <PageSection title="Alertas Recentes" className="mt-6">
             {data.alertas?.length > 0 ? (
               <div className="space-y-3">
-                {data.alertas.map((alerta, index) => (
+                {data.alertas.map((alerta) => (
                   <div
-                    key={alerta.id || alerta._id || index}
+                    key={alerta.id}
                     className="p-4 rounded-xl border border-amber-200 bg-amber-50"
                   >
                     <div className="font-semibold text-amber-800">
                       {alerta.titulo || 'Alerta'}
                     </div>
                     <div className="text-sm text-amber-700 mt-1">
-                      {alerta.mensagem || alerta.descricao || 'Sem descrição.'}
+                      Prioridade: {alerta.prioridade || 'Normal'}
                     </div>
                   </div>
                 ))}
