@@ -1,6 +1,4 @@
-// Ficheiro: src/pages/DetalhesSeguroPage.jsx
-// Versão: 1.0 (Placeholder)
-// Descrição: Página de detalhes para um seguro. Será expandida futuramente.
+// Ficheiro: src/pages/seguros/DetalhesSeguroPage.jsx
 
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -23,8 +21,7 @@ function DetalhesSeguroPage() {
     async function fetchSeguroDetails() {
       try {
         setLoading(true);
-        // A API de seguro já inclui equipamento e unidade
-        const data = await getSeguroById(id); 
+        const data = await getSeguroById(id);
         setSeguro(data);
       } catch (err) {
         setError(err.response?.data?.message || 'Erro ao carregar detalhes do seguro.');
@@ -50,10 +47,12 @@ function DetalhesSeguroPage() {
   if (error) {
     return (
       <div className="page-content-wrapper">
-        <div className="page-title-card"><h1 className="page-title-internal">Erro</h1></div>
+        <div className="page-title-card">
+          <h1 className="page-title-internal">Erro</h1>
+        </div>
         <p className="form-error">{error}</p>
         <button className="btn btn-secondary" onClick={() => navigate('/seguros')}>
-            <FontAwesomeIcon icon={faArrowLeft} /> Voltar para Seguros
+          <FontAwesomeIcon icon={faArrowLeft} /> Voltar para Seguros
         </button>
       </div>
     );
@@ -61,13 +60,15 @@ function DetalhesSeguroPage() {
 
   if (!seguro) {
     return (
-        <div className="page-content-wrapper">
-            <div className="page-title-card"><h1 className="page-title-internal">Não Encontrado</h1></div>
-            <p className="no-data-message">O seguro solicitado não foi encontrado.</p>
-            <button className="btn btn-secondary" onClick={() => navigate('/seguros')}>
-                <FontAwesomeIcon icon={faArrowLeft} /> Voltar para Seguros
-            </button>
+      <div className="page-content-wrapper">
+        <div className="page-title-card">
+          <h1 className="page-title-internal">Não Encontrado</h1>
         </div>
+        <p className="no-data-message">O seguro solicitado não foi encontrado.</p>
+        <button className="btn btn-secondary" onClick={() => navigate('/seguros')}>
+          <FontAwesomeIcon icon={faArrowLeft} /> Voltar para Seguros
+        </button>
+      </div>
     );
   }
 
@@ -81,25 +82,29 @@ function DetalhesSeguroPage() {
           <FontAwesomeIcon icon={faArrowLeft} /> Voltar
         </button>
       </div>
+
       <section className="page-section">
         <h3>Informações da Apólice</h3>
+
         <div className="info-grid">
-            <p><strong>Número da Apólice:</strong> {seguro.apoliceNumero}</p>
-            <p><strong>Seguradora:</strong> {seguro.seguradora}</p>
-            <p><strong>Início da Vigência:</strong> {formatarData(seguro.dataInicio)}</p>
-            <p><strong>Fim da Vigência:</strong> {formatarData(seguro.dataFim)}</p>
-            <p><strong>Status:</strong> {seguro.status}</p>
+          <p><strong>Número da Apólice:</strong> {seguro.apoliceNumero}</p>
+          <p><strong>Seguradora:</strong> {seguro.seguradora}</p>
+          <p><strong>Início da Vigência:</strong> {formatarData(seguro.dataInicio)}</p>
+          <p><strong>Fim da Vigência:</strong> {formatarData(seguro.dataFim)}</p>
+          <p><strong>Status:</strong> {seguro.status}</p>
         </div>
-        <div className="info-grid" style={{marginTop: '15px'}}>
-            <p><strong>Vínculo:</strong> 
-              {seguro.equipamento ? 
-                `Equipamento: ${seguro.equipamento.modelo} (Tag: ${seguro.equipamento.tag})` :
-                (seguro.unidade ? `Unidade: ${seguro.unidade.nomeSistema}` : 'Nenhum vínculo específico')
-              }
-            </p>
-            <p><strong>Descrição da Cobertura:</strong> {seguro.cobertura || 'N/A'}</p>
+
+        <div className="info-grid" style={{ marginTop: '15px' }}>
+          <p>
+            <strong>Vínculo:</strong>{' '}
+            {seguro.equipamento
+              ? `Equipamento: ${seguro.equipamento.modelo} (Tag: ${seguro.equipamento.tag})`
+              : seguro.unidade
+                ? `Unidade: ${seguro.unidade.nomeSistema || seguro.unidade.nome || 'Não informada'}`
+                : 'Nenhum vínculo específico'}
+          </p>
+          <p><strong>Descrição da Cobertura:</strong> {seguro.cobertura || 'N/A'}</p>
         </div>
-        {/* Você pode adicionar mais seções e detalhes aqui, como anexos, histórico, etc. */}
       </section>
     </div>
   );

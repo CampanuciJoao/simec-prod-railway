@@ -1,11 +1,19 @@
-// frontend-simec/src/hooks/useSeguros.js
+// Ficheiro: src/hooks/seguros/useSeguros.js
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getSeguros, getUnidades, deleteSeguro } from '../../services/api';
 
+const getNomeUnidade = (seguro) => {
+  if (typeof seguro.unidade === 'string') return seguro.unidade;
+  if (seguro.unidade?.nomeSistema) return seguro.unidade.nomeSistema;
+  if (seguro.unidade?.nome) return seguro.unidade.nome;
+  if (seguro.equipamento?.unidade?.nomeSistema) return seguro.equipamento.unidade.nomeSistema;
+  return '';
+};
+
 export function useSeguros() {
   const [seguros, setSeguros] = useState([]);
-  const [unidades, setUnidades] = useState([]); // <-- Novo estado
+  const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -16,12 +24,14 @@ export function useSeguros() {
     try {
       setLoading(true);
       setError(null);
+
       const [segurosData, unidadesData] = await Promise.all([
         getSeguros(),
-        getUnidades()
+        getUnidades(),
       ]);
+
       setSeguros(Array.isArray(segurosData) ? segurosData : []);
-      setUnidades(unidadesData);
+      setUnidades(Array.isArray(unidadesData) ? unidadesData : []);
     } catch (err) {
       setError(err);
     } finally {
@@ -35,39 +45,57 @@ export function useSeguros() {
 
   const segurosFiltradosEOrdenados = useMemo(() => {
     let items = [...seguros];
+
     if (searchTerm) {
       const termo = searchTerm.toLowerCase();
-      items = items.filter(s =>
+      items = items.filter((s) =>
         s.apoliceNumero?.toLowerCase().includes(termo) ||
         s.nomeVinculo?.toLowerCase().includes(termo) ||
         s.seguradora?.toLowerCase().includes(termo)
       );
     }
-    if (filtros.seguradora) items = items.filter(s => s.seguradora === filtros.seguradora);
-    if (filtros.status) items = items.filter(s => s.status === filtros.status);
-    if (filtros.unidade) items = items.filter(s => s.unidade === filtros.unidade);
+
+    if (filtros.seguradora) {
+      items = items.filter((s) => s.seguradora === filtros.seguradora);
+    }
+
+    if (filtros.status) {
+      items = items.filter((s) => s.status === filtros.status);
+    }
+
+    if (filtros.unidade) {
+      items = items.filter((s) => getNomeUnidade(s) === filtros.unidade);
+    }
 
     if (sortConfig.key) {
       items.sort((a, b) => {
         const valA = a[sortConfig.key];
         const valB = b[sortConfig.key];
+
         if (sortConfig.key.includes('data')) {
-          return sortConfig.direction === 'ascending' ? new Date(valA) - new Date(valB) : new Date(valB) - new Date(valA);
+          return sortConfig.direction === 'ascending'
+            ? new Date(valA) - new Date(valB)
+            : new Date(valB) - new Date(valA);
         }
+
         return String(valA || '').localeCompare(String(valB || ''));
       });
     }
+
     return items;
   }, [seguros, searchTerm, filtros, sortConfig]);
 
-  const removerSeguro = useCallback(async (id) => {
-    await deleteSeguro(id);
-    await fetchData();
-  }, [fetchData]);
+  const removerSeguro = useCallback(
+    async (id) => {
+      await deleteSeguro(id);
+      await fetchData();
+    },
+    [fetchData]
+  );
 
   return {
     seguros: segurosFiltradosEOrdenados,
-    unidadesDisponiveis: unidades, // <-- Exporta para o filtro
+    unidadesDisponiveis: unidades,
     loading,
     error,
     searchTerm,
@@ -77,6 +105,6 @@ export function useSeguros() {
     sortConfig,
     setSortConfig,
     removerSeguro,
-    refetch: fetchData
+    refetch: fetchData,
   };
 }

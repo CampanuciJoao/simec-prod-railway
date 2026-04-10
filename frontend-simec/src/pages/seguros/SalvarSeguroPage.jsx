@@ -1,5 +1,4 @@
 // Ficheiro: src/pages/seguros/SalvarSeguroPage.jsx
-// VERSÃO CORRIGIDA - CAMINHOS AJUSTADOS
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -23,7 +22,7 @@ function SalvarSeguroPage() {
   const isEditing = !!id;
 
   const [initialData, setInitialData] = useState(null);
-  const [todosEquipamentos, setTodosEquipamentos] = useState([]);
+  const [equipamentosDisponiveis, setEquipamentosDisponiveis] = useState([]);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,7 +37,7 @@ function SalvarSeguroPage() {
         getUnidades(),
       ]);
 
-      setTodosEquipamentos(equipamentosData || []);
+      setEquipamentosDisponiveis(equipamentosData || []);
       setUnidadesDisponiveis(unidadesData || []);
 
       if (isEditing) {
@@ -103,14 +102,11 @@ function SalvarSeguroPage() {
       <div className="page-title-card">
         <h1 className="page-title-internal">
           {isEditing
-            ? `Editar Seguro (Nº: ${initialData?.numeroApolice})`
+            ? `Editar Seguro (Nº: ${initialData?.apoliceNumero})`
             : 'Cadastrar Novo Seguro'}
         </h1>
 
-        <button
-          className="btn btn-secondary"
-          onClick={() => navigate('/seguros')}
-        >
+        <button className="btn btn-secondary" onClick={() => navigate('/seguros')}>
           <FontAwesomeIcon icon={faArrowLeft} /> Voltar
         </button>
       </div>
@@ -120,7 +116,7 @@ function SalvarSeguroPage() {
           onSubmit={handleSave}
           initialData={initialData}
           isEditing={isEditing}
-          todosEquipamentos={todosEquipamentos}
+          equipamentosDisponiveis={equipamentosDisponiveis}
           unidadesDisponiveis={unidadesDisponiveis}
         />
       </section>

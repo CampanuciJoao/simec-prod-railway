@@ -1,3 +1,5 @@
+// Ficheiro: src/hooks/seguros/useSegurosPage.js
+
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 

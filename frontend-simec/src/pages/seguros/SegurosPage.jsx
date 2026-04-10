@@ -5,7 +5,6 @@ import {
   faEdit,
   faTrashAlt,
   faEye,
-  faExclamationTriangle,
   faBuilding,
   faShieldAlt,
   faPlus,
@@ -62,6 +61,14 @@ const getRowHighlightClass = (seguro) => {
   return 'status-row-ativo';
 };
 
+const getNomeUnidadeSeguro = (seguro) => {
+  if (typeof seguro.unidade === 'string') return seguro.unidade;
+  if (seguro.unidade?.nomeSistema) return seguro.unidade.nomeSistema;
+  if (seguro.unidade?.nome) return seguro.unidade.nome;
+  if (seguro.equipamento?.unidade?.nomeSistema) return seguro.equipamento.unidade.nomeSistema;
+  return 'Não informada';
+};
+
 function SegurosPage() {
   const page = useSegurosPage();
 
@@ -101,7 +108,7 @@ function SegurosPage() {
           />
         </PageSection>
 
-        {(isInitialLoading || hasError || isEmpty) ? (
+        {isInitialLoading || hasError || isEmpty ? (
           <PageState
             loading={isInitialLoading}
             error={page.error?.message || page.error || ''}
@@ -180,7 +187,7 @@ function SegurosPage() {
                           </h5>
                           <div className="chips-container">
                             <span className="chip-item">
-                              {seguro.unidade || seguro.unidade?.nomeSistema || 'Não informada'}
+                              {getNomeUnidadeSeguro(seguro)}
                             </span>
                           </div>
                         </div>
@@ -197,7 +204,13 @@ function SegurosPage() {
                                 </span>
                               ))
                             ) : (
-                              <p style={{ fontSize: '0.85rem', color: '#94a3b8', fontStyle: 'italic' }}>
+                              <p
+                                style={{
+                                  fontSize: '0.85rem',
+                                  color: '#94a3b8',
+                                  fontStyle: 'italic',
+                                }}
+                              >
                                 Nenhuma cobertura cadastrada.
                               </p>
                             )}
