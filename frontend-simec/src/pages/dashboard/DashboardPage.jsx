@@ -2,7 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChartPie } from '@fortawesome/free-solid-svg-icons';
 
-import { useDashboard } from '../hooks/useDashboard';
+import { useDashboard } from '../../hooks/useDashboard';
 
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
@@ -34,7 +34,6 @@ function DashboardPage() {
         />
       ) : (
         <>
-          {/* KPIs */}
           <PageSection title="Resumo Geral">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="kpi-card">
@@ -59,7 +58,6 @@ function DashboardPage() {
             </div>
           </PageSection>
 
-          {/* Gráficos */}
           <PageSection title="Visão Analítica" className="mt-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <div>
@@ -78,7 +76,6 @@ function DashboardPage() {
             </div>
           </PageSection>
 
-          {/* Alertas */}
           <PageSection title="Alertas Recentes" className="mt-6">
             {data.alertas?.length > 0 ? (
               <ul className="space-y-2">
