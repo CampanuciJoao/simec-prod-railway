@@ -1,7 +1,4 @@
-// src/components/ui/DateInput.jsx
-// NOVO COMPONENTE DE INPUT DE DATA COM MÁSCARA 'dd/mm/aaaa'
-
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 const toDisplayFormat = (isoDate) => {
   if (!isoDate || typeof isoDate !== 'string') return '';
@@ -21,7 +18,14 @@ const toISOFormat = (displayDate) => {
   return `${parts[2]}-${parts[1]}-${parts[0]}`;
 };
 
-function DateInput({ value, onChange, name, ...props }) {
+function DateInput({
+  value,
+  onChange,
+  name,
+  className = '',
+  disabled = false,
+  ...props
+}) {
   const [displayValue, setDisplayValue] = useState(toDisplayFormat(value));
 
   useEffect(() => {
@@ -36,17 +40,17 @@ function DateInput({ value, onChange, name, ...props }) {
       formatted = input.substring(0, 2);
     }
     if (input.length > 2) {
-      formatted += '/' + input.substring(2, 4);
+      formatted += `/${input.substring(2, 4)}`;
     }
     if (input.length > 4) {
-      formatted += '/' + input.substring(4, 8);
+      formatted += `/${input.substring(4, 8)}`;
     }
 
     setDisplayValue(formatted);
 
     const isoValue = toISOFormat(formatted);
 
-    onChange({
+    onChange?.({
       target: {
         name,
         value: isoValue,
@@ -57,12 +61,19 @@ function DateInput({ value, onChange, name, ...props }) {
   return (
     <input
       type="text"
-      {...props}
       name={name}
       value={displayValue}
       onChange={handleInputChange}
       placeholder="dd/mm/aaaa"
-      maxLength="10"
+      maxLength={10}
+      disabled={disabled}
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400',
+        'focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:opacity-60',
+        className,
+      ].join(' ')}
+      {...props}
     />
   );
 }

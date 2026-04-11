@@ -1,17 +1,17 @@
 import React from 'react';
 
-function PageSection({ children, className = '', noPadding = false }) {
+function Card({ children, className = '', padded = true }) {
   return (
-    <section
+    <div
       className={[
         'rounded-2xl border border-slate-200 bg-white shadow-sm',
-        noPadding ? '' : 'p-4 md:p-6',
+        padded ? 'p-4 md:p-6' : '',
         className,
       ].join(' ')}
     >
       {children}
-    </section>
+    </div>
   );
 }
 
-export default PageSection;
+export default Card;

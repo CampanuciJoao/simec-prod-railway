@@ -1,10 +1,16 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft, faWrench } from '@fortawesome/free-solid-svg-icons';
+
 import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
 import { agendarManutencao } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+
+import Button from '../../components/ui/Button';
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageSection from '../../components/ui/PageSection';
 
 function AgendarManutencaoPage() {
   const navigate = useNavigate();
@@ -14,6 +20,7 @@ function AgendarManutencaoPage() {
     try {
       await agendarManutencao(formData);
       addToast('Manutenção agendada com sucesso!', 'success');
+
       setTimeout(() => {
         navigate('/manutencoes');
       }, 1500);
@@ -24,17 +31,23 @@ function AgendarManutencaoPage() {
   };
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">Agendar Nova Manutenção</h1>
-        <button className="btn btn-secondary" onClick={() => navigate('/manutencoes')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
-      <section className="page-section">
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title="Agendar Nova Manutenção"
+        subtitle="Crie uma nova ordem de serviço para o equipamento"
+        icon={faWrench}
+        actions={
+          <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+            <FontAwesomeIcon icon={faArrowLeft} />
+            Voltar
+          </Button>
+        }
+      />
+
+      <PageSection>
         <ManutencaoForm onSubmit={handleAgendar} isEditing={false} />
-      </section>
-    </div>
+      </PageSection>
+    </PageLayout>
   );
 }
 

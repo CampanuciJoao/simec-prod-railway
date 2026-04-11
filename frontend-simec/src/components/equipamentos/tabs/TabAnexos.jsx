@@ -1,171 +1,89 @@
-// Ficheiro: src/components/tabs/TabAnexos.jsx
-// VERSÃO FINAL SÊNIOR - COM UI REFINADA
+// TRECHO PRINCIPAL ALTERADO (UI)
 
-import React, { useRef, useState } from 'react';
-import { useModal } from '../../../hooks/shared/useModal';
-import ModalConfirmacao from '../../ui/ModalConfirmacao';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-    faPaperclip, faUpload, faTrashAlt, faFilePdf, faFileImage, faFileWord, 
-    faFileExcel, faFilePowerpoint, faFileArchive, faFileAudio, faFileVideo, 
-    faFileAlt, faSpinner 
-} from '@fortawesome/free-solid-svg-icons';
-import { useToast } from '../../../contexts/ToastContext';
-import { uploadAnexoEquipamento, deleteAnexoEquipamento } from '../../../services/api';
-import { formatarData } from '../../../utils/timeUtils';
+<div className="space-y-5">
+  {/* HEADER */}
+  <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+    <div className="flex items-center gap-3">
+      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+        <FontAwesomeIcon icon={faPaperclip} />
+      </span>
 
-// URL base para downloads, lida das variáveis de ambiente do Vite.
-const API_BASE_URL_DOWNLOAD = import.meta.env.VITE_API_URL || 'http://localhost:5000';
-
-// Função utilitária mais completa para ícones e cores de ficheiro
-const getIconePorTipoArquivo = (mimeType = '') => {
-    if (mimeType.startsWith('image/')) return { icon: faFileImage, color: '#3B82F6' };
-    if (mimeType === 'application/pdf') return { icon: faFilePdf, color: '#EF4444' };
-    if (mimeType.includes('word')) return { icon: faFileWord, color: '#2563EB' };
-    if (mimeType.includes('excel') || mimeType.includes('spreadsheet')) return { icon: faFileExcel, color: '#16A34A' };
-    if (mimeType.includes('powerpoint')) return { icon: faFilePowerpoint, color: '#D97706' };
-    if (mimeType.startsWith('audio/')) return { icon: faFileAudio, color: '#9333EA' };
-    if (mimeType.startsWith('video/')) return { icon: faFileVideo, color: '#DB2777' };
-    if (mimeType.includes('zip') || mimeType.includes('archive')) return { icon: faFileArchive, color: '#78716C' };
-    return { icon: faFileAlt, color: '#64748B' };
-};
-
-// Função para formatar o tamanho do ficheiro de bytes para KB/MB
-const formatarTamanhoArquivo = (bytes) => {
-    if (!bytes || bytes === 0) return '0 KB';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
-};
-
-function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
-  const { addToast } = useToast();
-  const { isOpen, modalData, openModal, closeModal } = useModal();
-  const anexoInputRef = useRef(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const handleAnexosUpload = async (event) => {
-    const files = event.target.files;
-    if (!files || files.length === 0) return;
-    
-    setIsSubmitting(true);
-    const uploadData = new FormData();
-    for (let i = 0; i < files.length; i++) {
-        uploadData.append('anexosEquipamento', files[i]);
-    }
-    
-    try {
-      await uploadAnexoEquipamento(equipamentoId, uploadData);
-      addToast('Anexo(s) enviado(s) com sucesso!', 'success');
-      if (onUpdate) onUpdate();
-    } catch (error) {
-      addToast(error.response?.data?.message || 'Erro ao enviar anexo.', 'error');
-    } finally {
-      setIsSubmitting(false);
-      if (anexoInputRef.current) anexoInputRef.current.value = null;
-    }
-  };
-
-  const handleDeleteClick = (anexo) => {
-    openModal(anexo);
-  };
-
-  const handleConfirmarExclusao = async () => {
-    if (modalData) {
-      setIsSubmitting(true);
-      try {
-        await deleteAnexoEquipamento(equipamentoId, modalData.id);
-        addToast('Anexo excluído com sucesso!', 'success');
-        if (onUpdate) onUpdate();
-      } catch (error) {
-        addToast(error.response?.data?.message || 'Erro ao excluir anexo.', 'error');
-      } finally {
-        setIsSubmitting(false);
-        closeModal();
-      }
-    }
-  };
-
-  return (
-    <>
-      <ModalConfirmacao
-        isOpen={isOpen}
-        onClose={closeModal}
-        onConfirm={handleConfirmarExclusao}
-        title="Confirmar Exclusão de Anexo"
-        message={`Tem certeza que deseja excluir o anexo "${modalData?.nomeOriginal}"?`}
-        isDestructive={true}
-      />
-    
       <div>
-        <div className="section-header">
-          <h3 className="tab-title">
-            <FontAwesomeIcon icon={faPaperclip} /> Anexos ({anexosIniciais.length})
-          </h3>
-          <button 
-            className="btn btn-primary btn-sm" 
-            onClick={() => anexoInputRef.current?.click()} 
-            disabled={isSubmitting}
-          >
-            <FontAwesomeIcon icon={isSubmitting ? faSpinner : faUpload} spin={isSubmitting} /> 
-            {isSubmitting ? 'Enviando...' : 'Enviar Anexo'}
-          </button>
-          <input 
-            type="file" 
-            multiple 
-            ref={anexoInputRef} 
-            style={{ display: 'none' }} 
-            onChange={handleAnexosUpload} 
-            disabled={isSubmitting} 
-          />
-        </div>
-
-        {anexosIniciais.length > 0 ? (
-          <div className="anexos-grid-container">
-            {anexosIniciais.map(anexo => {
-              const { icon, color } = getIconePorTipoArquivo(anexo.tipoMime);
-              return (
-                <div key={anexo.id} className="anexo-card">
-                  <div className="anexo-card-icon" style={{ backgroundColor: `${color}20`, color: color }}>
-                    <FontAwesomeIcon icon={icon} />
-                  </div>
-                  <div className="anexo-card-details">
-                    <a 
-                      href={`${API_BASE_URL_DOWNLOAD}/${anexo.path}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="anexo-card-title"
-                      title={anexo.nomeOriginal}
-                    >
-                      {anexo.nomeOriginal}
-                    </a>
-                    <div className="anexo-card-meta">
-                      {/* O backend precisa fornecer o tamanho do arquivo para isso funcionar */}
-                      {/* <span>{formatarTamanhoArquivo(anexo.tamanho || 0)}</span> */}
-                      <span>{formatarData(anexo.createdAt)}</span>
-                    </div>
-                  </div>
-                  <div className="anexo-card-actions">
-                    <button 
-                      onClick={() => handleDeleteClick(anexo)} 
-                      className="btn-action delete" 
-                      title="Excluir Anexo"
-                      disabled={isSubmitting}
-                    >
-                      <FontAwesomeIcon icon={faTrashAlt} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <p className="no-data-message">Nenhum anexo encontrado para este equipamento.</p>
-        )}
+        <h3 className="text-lg font-semibold text-slate-900">
+          Anexos ({anexosIniciais.length})
+        </h3>
+        <p className="text-sm text-slate-500">
+          Documentos vinculados ao equipamento
+        </p>
       </div>
-    </>
-  );
-}
+    </div>
 
-export default TabAnexos;
+    <button
+      className="btn btn-primary"
+      onClick={() => anexoInputRef.current?.click()}
+      disabled={isSubmitting}
+    >
+      <FontAwesomeIcon icon={isSubmitting ? faSpinner : faUpload} spin={isSubmitting} />
+      {isSubmitting ? 'Enviando...' : 'Enviar'}
+    </button>
+
+    <input
+      type="file"
+      multiple
+      ref={anexoInputRef}
+      className="hidden"
+      onChange={handleAnexosUpload}
+      disabled={isSubmitting}
+    />
+  </div>
+
+  {/* GRID */}
+  {anexosIniciais.length > 0 ? (
+    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+      {anexosIniciais.map((anexo) => {
+        const { icon, color } = getIconePorTipoArquivo(anexo.tipoMime);
+
+        return (
+          <div
+            key={anexo.id}
+            className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm hover:shadow-md transition"
+          >
+            <div
+              className="h-12 w-12 flex items-center justify-center rounded-xl"
+              style={{ backgroundColor: `${color}20`, color }}
+            >
+              <FontAwesomeIcon icon={icon} />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <a
+                href={`${API_BASE_URL_DOWNLOAD}/${anexo.path}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block text-sm font-semibold text-blue-600 truncate hover:underline"
+              >
+                {anexo.nomeOriginal}
+              </a>
+
+              <span className="text-xs text-slate-400">
+                {formatarData(anexo.createdAt)}
+              </span>
+            </div>
+
+            <button
+              onClick={() => handleDeleteClick(anexo)}
+              className="h-9 w-9 flex items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"
+              disabled={isSubmitting}
+            >
+              <FontAwesomeIcon icon={faTrashAlt} />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  ) : (
+    <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+      Nenhum anexo encontrado.
+    </div>
+  )}
+</div>

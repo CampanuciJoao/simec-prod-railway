@@ -1,5 +1,5 @@
 // Ficheiro: simec/backend-simec/server.js
-// Versão ajustada - estável para produção/desenvolvimento
+// VERSÃO ATUALIZADA - CICLO INTELIGENTE INTEGRADO
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -11,6 +11,7 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
+// Rotas
 import authRoutes from './routes/authRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -28,9 +29,11 @@ import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js';
 import pdfDataRoutes from './routes/pdfDataRoutes.js';
 
+// Middlewares / serviços
 import { proteger } from './middleware/authMiddleware.js';
 import { alertasQueue } from './services/queueService.js';
 
+// Inicializa o worker e quaisquer jobs acoplados
 import './worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -39,9 +42,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
+// Configurações principais
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// Novo job inteligente
+const JOB_NAME = 'ciclo-inteligente-simec';
+const JOB_INTERVAL_MS = Number(process.env.INTELLIGENCE_JOB_INTERVAL_MS || 20000);
 
 /**
  * Socket.IO
@@ -83,7 +91,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 /**
- * Health check simples
+ * Health check
  */
 app.get('/', (req, res) => {
     res.send('API do SIMEC ativa e operante em tempo real!');
@@ -116,7 +124,7 @@ app.use('/api/bi', biRoutes);
 app.use('/api/pdf-data', pdfDataRoutes);
 
 /**
- * 404 de API
+ * 404 da API
  */
 app.use('/api', (req, res) => {
     return res.status(404).json({
@@ -136,38 +144,40 @@ app.use((err, req, res, next) => {
 });
 
 /**
- * Inicialização do servidor + agendador
+ * Inicialização do servidor + agendador BullMQ
  */
 httpServer.listen(PORT, '0.0.0.0', async () => {
     console.log('======================================================');
     console.log(`✅ SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
-    console.log(`📡 Ciclo de Verificação: 20 segundos`);
+    console.log(`📡 Intervalo do ciclo inteligente: ${JOB_INTERVAL_MS} ms`);
     console.log(`🌐 FRONTEND_URL: ${FRONTEND_URL}`);
     console.log(`🛠️ Ambiente: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`🧠 Job agendado: ${JOB_NAME}`);
     console.log('======================================================');
 
     try {
-        // Em desenvolvimento pode limpar a fila.
-        // Em produção é melhor preservar.
+        // Em desenvolvimento, limpar fila ajuda a evitar jobs repetidos antigos
         if (!IS_PRODUCTION) {
             await alertasQueue.obliterate({ force: true });
             console.log('🧹 Fila de alertas limpa em ambiente não produtivo.');
         }
 
         await alertasQueue.add(
-            'verificar-tarefas-diarias',
+            JOB_NAME,
             {},
             {
                 repeat: {
-                    every: 20000,
+                    every: JOB_INTERVAL_MS,
                     immediately: true
-                }
+                },
+                removeOnComplete: 20,
+                removeOnFail: 50
             }
         );
 
-        console.log('⏰ Agendador BullMQ: ciclo de 20 segundos iniciado.');
+        console.log(`⏰ Agendador BullMQ iniciado com sucesso para o job "${JOB_NAME}".`);
     } catch (error) {
-        console.error('❌ Erro no Agendador:', error.message);
+        console.error('❌ Erro no Agendador BullMQ:', error.message);
     }
 });
 

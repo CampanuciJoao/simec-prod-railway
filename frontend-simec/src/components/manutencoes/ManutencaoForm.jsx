@@ -1,13 +1,13 @@
-// Ficheiro: src/components/ManutencaoForm.jsx
-// VERSÃO 2.0 - FIX: BOTÕES VISÍVEIS E DESIGN CLEAN
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import PropTypes from 'prop-types';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faSave, faSpinner } from '@fortawesome/free-solid-svg-icons';
+
 import DateInput from '../ui/DateInput';
 import TimeInput from '../ui/TimeInput';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faSave, faTimes } from '@fortawesome/free-solid-svg-icons';
+import Button from '../ui/Button';
+import PageState from '../ui/PageState';
 
 const ESTADO_INICIAL_VAZIO = {
   equipamentoId: '',
@@ -20,12 +20,12 @@ const ESTADO_INICIAL_VAZIO = {
   numeroChamado: '',
 };
 
-function ManutencaoForm({ 
-  onSubmit, 
-  initialData = null, 
-  isEditing = false, 
-  todosEquipamentos = [], 
-  unidadesDisponiveis = [] 
+function ManutencaoForm({
+  onSubmit,
+  initialData = null,
+  isEditing = false,
+  todosEquipamentos = [],
+  unidadesDisponiveis = [],
 }) {
   const navigate = useNavigate();
   const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
@@ -36,15 +36,22 @@ function ManutencaoForm({
 
   useEffect(() => {
     if (isEditing && initialData && todosEquipamentos.length > 0) {
-      const equipamentoDaOs = todosEquipamentos.find(eq => eq.id === initialData.equipamentoId);
+      const equipamentoDaOs = todosEquipamentos.find(
+        (eq) => eq.id === initialData.equipamentoId
+      );
+
       if (equipamentoDaOs) {
         setUnidadeSelecionada(equipamentoDaOs.unidadeId || '');
         setModeloSelecionado(equipamentoDaOs.modelo || '');
       }
-      
-      const dataInicio = initialData.dataHoraAgendamentoInicio ? new Date(initialData.dataHoraAgendamentoInicio) : null;
-      const dataFim = initialData.dataHoraAgendamentoFim ? new Date(initialData.dataHoraAgendamentoFim) : null;
-      
+
+      const dataInicio = initialData.dataHoraAgendamentoInicio
+        ? new Date(initialData.dataHoraAgendamentoInicio)
+        : null;
+      const dataFim = initialData.dataHoraAgendamentoFim
+        ? new Date(initialData.dataHoraAgendamentoFim)
+        : null;
+
       setFormData({
         equipamentoId: initialData.equipamentoId || '',
         tipo: initialData.tipo || 'Preventiva',
@@ -59,173 +66,299 @@ function ManutencaoForm({
       setFormData(ESTADO_INICIAL_VAZIO);
     }
   }, [initialData, isEditing, todosEquipamentos]);
-  
+
   const modelosFiltrados = useMemo(() => {
     if (!unidadeSelecionada) return [];
-    return [...new Set(todosEquipamentos.filter(eq => eq.unidadeId === unidadeSelecionada).map(eq => eq.modelo))].sort();
+    return [
+      ...new Set(
+        todosEquipamentos
+          .filter((eq) => eq.unidadeId === unidadeSelecionada)
+          .map((eq) => eq.modelo)
+      ),
+    ].sort();
   }, [unidadeSelecionada, todosEquipamentos]);
 
   const seriesFiltradas = useMemo(() => {
     if (!unidadeSelecionada || !modeloSelecionado) return [];
-    return todosEquipamentos.filter(eq => eq.unidadeId === unidadeSelecionada && eq.modelo === modeloSelecionado);
+    return todosEquipamentos.filter(
+      (eq) =>
+        eq.unidadeId === unidadeSelecionada && eq.modelo === modeloSelecionado
+    );
   }, [unidadeSelecionada, modeloSelecionado, todosEquipamentos]);
 
   const handleUnidadeChange = (e) => {
     setUnidadeSelecionada(e.target.value);
     setModeloSelecionado('');
-    setFormData(prev => ({ ...prev, equipamentoId: '' }));
+    setFormData((prev) => ({ ...prev, equipamentoId: '' }));
   };
 
   const handleModeloChange = (e) => {
     setModeloSelecionado(e.target.value);
-    setFormData(prev => ({ ...prev, equipamentoId: '' }));
+    setFormData((prev) => ({ ...prev, equipamentoId: '' }));
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     const isPreventiva = formData.tipo === 'Preventiva';
     const temDescricao = formData.descricaoProblemaServico.trim() !== '';
 
     if (!formData.equipamentoId || !formData.dataLocal || (!isPreventiva && !temDescricao)) {
-      setError(isPreventiva ? 'Seleção de Equipamento e Data são obrigatórios.' : 'Seleção de Equipamento, Data e Descrição são obrigatórios.');
+      setError(
+        isPreventiva
+          ? 'Seleção de equipamento e data são obrigatórios.'
+          : 'Seleção de equipamento, data e descrição são obrigatórios.'
+      );
       return;
     }
-    
+
     setIsSubmitting(true);
-    
+
     try {
-      const dataHoraInicioLocal = new Date(`${formData.dataLocal}T${formData.horaLocalInicio || '00:00:00'}`);
-      const dataHoraFimLocal = formData.horaLocalFim ? new Date(`${formData.dataLocal}T${formData.horaLocalFim}:00`) : null;
+      const dataHoraInicioLocal = new Date(
+        `${formData.dataLocal}T${formData.horaLocalInicio || '00:00:00'}`
+      );
+
+      const dataHoraFimLocal = formData.horaLocalFim
+        ? new Date(`${formData.dataLocal}T${formData.horaLocalFim}:00`)
+        : null;
 
       const dadosParaApi = {
-          equipamentoId: formData.equipamentoId,
-          tipo: formData.tipo,
-          descricaoProblemaServico: !temDescricao && isPreventiva ? 'Manutenção Preventiva de Rotina' : formData.descricaoProblemaServico,
-          tecnicoResponsavel: formData.tecnicoResponsavel,
-          numeroChamado: formData.numeroChamado,
-          dataHoraAgendamentoInicio: dataHoraInicioLocal.toISOString(),
-          dataHoraAgendamentoFim: dataHoraFimLocal && !isNaN(dataHoraFimLocal) ? dataHoraFimLocal.toISOString() : null,
+        equipamentoId: formData.equipamentoId,
+        tipo: formData.tipo,
+        descricaoProblemaServico:
+          !temDescricao && isPreventiva
+            ? 'Manutenção Preventiva de Rotina'
+            : formData.descricaoProblemaServico,
+        tecnicoResponsavel: formData.tecnicoResponsavel,
+        numeroChamado: formData.numeroChamado,
+        dataHoraAgendamentoInicio: dataHoraInicioLocal.toISOString(),
+        dataHoraAgendamentoFim:
+          dataHoraFimLocal && !isNaN(dataHoraFimLocal)
+            ? dataHoraFimLocal.toISOString()
+            : null,
       };
 
       await onSubmit(dadosParaApi);
     } catch (apiError) {
-      setError(apiError.response?.data?.message || `Erro ao processar manutenção.`);
+      setError(apiError.response?.data?.message || 'Erro ao processar manutenção.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="form-elegante" noValidate>
-      {error && <div className="form-error bg-red-50 text-red-600 p-3 rounded-lg mb-6 text-sm font-bold border border-red-100">{error}</div>}
-      
-      <div className="form-section">
-        <h4 className="text-slate-800 font-bold uppercase text-xs tracking-widest mb-4">Seleção de Equipamento</h4>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="form-group">
-            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Unidade / Local *</label>
-            <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" value={unidadeSelecionada} onChange={handleUnidadeChange} required disabled={isEditing}>
-              <option value="">Selecione a Unidade</option>
-              {unidadesDisponiveis.map(unidade => ( <option key={unidade.id} value={unidade.id}>{unidade.nomeSistema}</option> ))}
+    <form onSubmit={handleSubmit} className="space-y-8" noValidate>
+      {error && <PageState error={error} />}
+
+      <div className="space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-700">
+            Seleção de equipamento
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Unidade / Local
+            </label>
+            <select
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              value={unidadeSelecionada}
+              onChange={handleUnidadeChange}
+              required
+              disabled={isEditing}
+            >
+              <option value="">Selecione a unidade</option>
+              {unidadesDisponiveis.map((unidade) => (
+                <option key={unidade.id} value={unidade.id}>
+                  {unidade.nomeSistema}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="form-group">
-            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Modelo *</label>
-            <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" value={modeloSelecionado} onChange={handleModeloChange} required disabled={!unidadeSelecionada || isEditing}>
-              <option value="">Selecione o Modelo</option>
-              {modelosFiltrados.map(modelo => ( <option key={modelo} value={modelo}>{modelo}</option> ))}
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Modelo
+            </label>
+            <select
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              value={modeloSelecionado}
+              onChange={handleModeloChange}
+              required
+              disabled={!unidadeSelecionada || isEditing}
+            >
+              <option value="">Selecione o modelo</option>
+              {modelosFiltrados.map((modelo) => (
+                <option key={modelo} value={modelo}>
+                  {modelo}
+                </option>
+              ))}
             </select>
           </div>
-          <div className="form-group">
-            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Nº de Série (Tag) *</label>
-            <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="equipamentoId" value={formData.equipamentoId} onChange={handleChange} required disabled={!modeloSelecionado || isEditing}>
-              <option value="">Selecione a Tag</option>
-              {seriesFiltradas.map(eq => ( <option key={eq.id} value={eq.id}>{eq.tag}</option>))}
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Nº de Série (Tag)
+            </label>
+            <select
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              name="equipamentoId"
+              value={formData.equipamentoId}
+              onChange={handleChange}
+              required
+              disabled={!modeloSelecionado || isEditing}
+            >
+              <option value="">Selecione a tag</option>
+              {seriesFiltradas.map((eq) => (
+                <option key={eq.id} value={eq.id}>
+                  {eq.tag}
+                </option>
+              ))}
             </select>
           </div>
         </div>
       </div>
 
-      <div className="form-section mt-10">
-        <h4 className="text-slate-800 font-bold uppercase text-xs tracking-widest mb-4">Detalhes da Manutenção</h4>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="form-group">
-                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Tipo de Manutenção *</label>
-                <select className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="tipo" value={formData.tipo} onChange={handleChange} required>
-                    {["Preventiva", "Corretiva", "Calibracao", "Inspecao"].map(tipoOpt => (<option key={tipoOpt} value={tipoOpt}>{tipoOpt}</option>))}
-                </select>
-            </div>
-             <div className="form-group">
-                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Técnico Responsável</label>
-                <input className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" type="text" name="tecnicoResponsavel" value={formData.tecnicoResponsavel} onChange={handleChange}/>
-            </div>
+      <div className="space-y-4">
+        <div className="border-b border-slate-200 pb-3">
+          <h3 className="text-sm font-bold uppercase tracking-[0.16em] text-slate-700">
+            Detalhes da manutenção
+          </h3>
         </div>
-        
-        {formData.tipo === 'Corretiva' && (
-            <div className="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl">
-                <div className="form-group">
-                    <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Nº do Chamado (Opcional)</label>
-                    <input className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" type="text" name="numeroChamado" value={formData.numeroChamado} onChange={handleChange} />
-                </div>
-            </div>
-        )}
-        
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-            <div className="form-group">
-                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Data do Agendamento *</label>
-                <DateInput className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="dataLocal" value={formData.dataLocal} onChange={handleChange} required />
-            </div>
-            <div className="form-group">
-                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Horário de Início</label>
-                <TimeInput className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="horaLocalInicio" value={formData.horaLocalInicio} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-                <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">Previsão de Fim</label>
-                <TimeInput className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all" name="horaLocalFim" value={formData.horaLocalFim} onChange={handleChange} />
-            </div>
-        </div>
-        <div className="form-group mt-6">
-            <label className="text-[11px] font-black uppercase text-slate-400 mb-1 block">
-                Descrição {formData.tipo !== 'Preventiva' ? '*' : '(Opcional para Preventiva)'}
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Tipo de manutenção
             </label>
-            <textarea 
-                className="w-full p-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 outline-none focus:ring-2 focus:ring-blue-500 transition-all min-h-[100px]"
-                name="descricaoProblemaServico" 
-                value={formData.descricaoProblemaServico} 
-                onChange={handleChange} 
-                rows="4"
-            ></textarea>
+            <select
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              name="tipo"
+              value={formData.tipo}
+              onChange={handleChange}
+              required
+            >
+              {['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'].map(
+                (tipoOpt) => (
+                  <option key={tipoOpt} value={tipoOpt}>
+                    {tipoOpt}
+                  </option>
+                )
+              )}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Técnico responsável
+            </label>
+            <input
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              type="text"
+              name="tecnicoResponsavel"
+              value={formData.tecnicoResponsavel}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        {formData.tipo === 'Corretiva' && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Nº do chamado
+            </label>
+            <input
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              type="text"
+              name="numeroChamado"
+              value={formData.numeroChamado}
+              onChange={handleChange}
+            />
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Data do agendamento
+            </label>
+            <DateInput
+              name="dataLocal"
+              value={formData.dataLocal}
+              onChange={handleChange}
+              required
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Horário de início
+            </label>
+            <TimeInput
+              name="horaLocalInicio"
+              value={formData.horaLocalInicio}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">
+              Previsão de fim
+            </label>
+            <TimeInput
+              name="horaLocalFim"
+              value={formData.horaLocalFim}
+              onChange={handleChange}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-slate-700">
+            Descrição {formData.tipo !== 'Preventiva' ? '*' : '(opcional para preventiva)'}
+          </label>
+          <textarea
+            className="min-h-[110px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            name="descricaoProblemaServico"
+            value={formData.descricaoProblemaServico}
+            onChange={handleChange}
+            rows={4}
+          />
         </div>
       </div>
-      
-      {/* BOTÕES CORRIGIDOS: Visibilidade total e Design Clean */}
-      <div className="flex justify-end items-center gap-3 mt-10 pt-6 border-t border-slate-100">
-        <button 
-          type="button" 
-          className="px-6 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg font-bold text-xs uppercase tracking-widest transition-all border-none cursor-pointer" 
-          onClick={() => navigate('/manutencoes')} 
+
+      <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-6">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => navigate('/manutencoes')}
           disabled={isSubmitting}
         >
           Cancelar
-        </button>
-        <button 
-          type="submit" 
-          className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-black text-xs uppercase tracking-widest transition-all shadow-md hover:shadow-lg border-none cursor-pointer flex items-center gap-2" 
-          disabled={isSubmitting}
-        >
+        </Button>
+
+        <Button type="submit" disabled={isSubmitting}>
           {isSubmitting ? (
-            <><FontAwesomeIcon icon={faSpinner} spin /> Salvando...</>
+            <>
+              <FontAwesomeIcon icon={faSpinner} spin />
+              Salvando...
+            </>
           ) : (
-            <><FontAwesomeIcon icon={faSave} /> {isEditing ? 'Atualizar Manutenção' : 'Agendar Manutenção'}</>
+            <>
+              <FontAwesomeIcon icon={faSave} />
+              {isEditing ? 'Atualizar manutenção' : 'Agendar manutenção'}
+            </>
           )}
-        </button>
+        </Button>
       </div>
     </form>
   );

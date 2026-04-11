@@ -16,23 +16,35 @@ import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
 import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
+import Card from '../../components/ui/Card';
+import Badge from '../../components/ui/Badge';
 
 import BarChart from '../../components/charts/BarChart';
 import DonutChart from '../../components/charts/DonutChart';
 
 function SummaryCard({ icon, title, value, subtitle }) {
   return (
-    <div className="card">
-      <div className="card-icon">
-        <FontAwesomeIcon icon={icon} />
-      </div>
+    <Card>
+      <div className="flex items-center gap-4">
+        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+          <FontAwesomeIcon icon={icon} />
+        </div>
 
-      <div className="card-text-content">
-        <span className="card-title">{title}</span>
-        <span className="card-value">{value}</span>
-        {subtitle ? <small className="card-subtitle">{subtitle}</small> : null}
+        <div className="flex flex-col">
+          <span className="text-xs font-bold uppercase text-slate-500">
+            {title}
+          </span>
+
+          <span className="text-3xl font-extrabold text-slate-900">
+            {value}
+          </span>
+
+          {subtitle && (
+            <span className="text-sm text-slate-500">{subtitle}</span>
+          )}
+        </div>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -50,103 +62,144 @@ function DashboardPage() {
 
   if (loading || error || isEmpty) {
     return (
-      <PageLayout background="slate">
-        <PageHeader title="Dashboard" icon={faChartPie} variant="default" />
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title="Dashboard"
+          subtitle="Visão geral do sistema"
+          icon={faChartPie}
+        />
+
         <PageState
           loading={loading}
           error={error}
           isEmpty={isEmpty}
-          emptyMessage="Nenhum dado disponível para o dashboard."
+          emptyMessage="Nenhum dado disponível."
         />
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout background="slate">
-      <PageHeader title="Dashboard" icon={faChartPie} variant="default" />
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title="Dashboard"
+        subtitle="Visão geral operacional e analítica"
+        icon={faChartPie}
+      />
 
-      <div className="summary-cards">
-        <div className="card-link">
-          <SummaryCard
-            icon={faHeartbeat}
-            title="Equipamentos"
-            value={data.totalEquipamentos}
-            subtitle="Parque total"
-          />
-        </div>
+      {/* KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <SummaryCard
+          icon={faHeartbeat}
+          title="Equipamentos"
+          value={data.totalEquipamentos}
+          subtitle="Parque total"
+        />
 
-        <div className="card-link">
-          <SummaryCard
-            icon={faWrench}
-            title="Manutenções Pendentes"
-            value={data.emManutencao}
-            subtitle="OS abertas"
-          />
-        </div>
+        <SummaryCard
+          icon={faWrench}
+          title="Manutenções"
+          value={data.emManutencao}
+          subtitle="OS abertas"
+        />
 
-        <div className="card-link">
-          <SummaryCard
-            icon={faFileContract}
-            title="Contratos Vencendo"
-            value={data.contratosVencendo}
-            subtitle="Próximos 30 dias"
-          />
-        </div>
+        <SummaryCard
+          icon={faFileContract}
+          title="Contratos"
+          value={data.contratosVencendo}
+          subtitle="Vencendo"
+        />
 
-        <div className="card-link">
-          <SummaryCard
-            icon={faBell}
-            title="Alertas Ativos"
-            value={data.alertasAtivos}
-            subtitle="Não visualizados"
-          />
-        </div>
+        <SummaryCard
+          icon={faBell}
+          title="Alertas"
+          value={data.alertasAtivos}
+          subtitle="Ativos"
+        />
       </div>
 
-      <div className="detailed-sections">
-        <PageSection
-          title="Alertas Recentes / Críticos"
-          className="alerts-section"
-        >
-          <div className="alerts-list">
+      {/* CONTEÚDO PRINCIPAL */}
+      <div className="grid grid-cols-1 xl:grid-cols-[1fr_1.5fr] gap-6">
+
+        {/* ALERTAS */}
+        <PageSection>
+          <div className="flex justify-between items-center mb-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">
+                Alertas Recentes
+              </h2>
+              <p className="text-sm text-slate-500">
+                Eventos críticos do sistema
+              </p>
+            </div>
+
+            <Badge variant="warning">Monitoramento</Badge>
+          </div>
+
+          <div className="flex flex-col gap-3">
             {data.alertas?.length > 0 ? (
-              <ul>
-                {data.alertas.map((alerta) => (
-                  <li key={alerta.id}>
-                    <FontAwesomeIcon
-                      icon={faExclamationTriangle}
-                      className="alert-icon"
-                    />
-                    <span>{alerta.titulo}</span>
-                  </li>
-                ))}
-              </ul>
+              data.alertas.map((alerta) => (
+                <div
+                  key={alerta.id}
+                  className="flex items-start gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50"
+                >
+                  <div className="w-8 h-8 flex items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                    <FontAwesomeIcon icon={faExclamationTriangle} />
+                  </div>
+
+                  <span className="text-sm font-medium text-slate-700">
+                    {alerta.titulo}
+                  </span>
+                </div>
+              ))
             ) : (
-              <p className="no-data-message">Nenhum alerta recente.</p>
+              <div className="text-center text-sm text-slate-400 py-6">
+                Nenhum alerta recente
+              </div>
             )}
           </div>
         </PageSection>
 
-        <PageSection title="Visão Analítica" className="charts-section">
-          <div className="chart-container-dashboard">
-            <h2>
-              <FontAwesomeIcon icon={faChartPie} /> Status dos Equipamentos
+        {/* GRÁFICOS */}
+        <PageSection>
+          <div className="mb-6">
+            <h2 className="text-base font-bold text-slate-900">
+              Visão Analítica
             </h2>
-            <div className="chart-wrapper">
-              <DonutChart chartData={data.statusEquipamentos} />
+            <p className="text-sm text-slate-500">
+              Indicadores operacionais do sistema
+            </p>
+          </div>
+
+          <div className="space-y-8">
+
+            {/* DONUT */}
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
+                <FontAwesomeIcon icon={faChartPie} />
+                Status dos Equipamentos
+              </h3>
+
+              <div className="bg-slate-50 border rounded-xl p-4 h-[300px]">
+                <DonutChart data={data.statusEquipamentos} />
+              </div>
             </div>
 
-            <hr className="chart-separator" />
+            {/* BAR */}
+            <div>
+              <h3 className="flex items-center gap-2 text-sm font-semibold mb-2">
+                <FontAwesomeIcon icon={faChartColumn} />
+                Manutenções (6 meses)
+              </h3>
 
-            <h2>
-              <FontAwesomeIcon icon={faChartColumn} /> Manutenções nos Últimos 6 Meses
-            </h2>
-            <div className="chart-wrapper">
-              <BarChart chartData={data.manutencoesPorTipo} />
+              <div className="bg-slate-50 border rounded-xl p-4 h-[300px]">
+                <BarChart data={data.manutencoesPorTipo} />
+              </div>
             </div>
+
           </div>
         </PageSection>
+
       </div>
     </PageLayout>
   );

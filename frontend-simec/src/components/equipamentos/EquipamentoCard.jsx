@@ -1,9 +1,9 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faPlusCircle,
-  faMinusCircle,
-  faFileMedical
+  faPlus,
+  faMinus,
+  faFileMedical,
 } from '@fortawesome/free-solid-svg-icons';
 
 import StatusSelector from '../ui/StatusSelector';
@@ -24,62 +24,70 @@ function EquipamentoCard({
 
   return (
     <div
-      className={`bg-white border-y border-r border-slate-200 border-l-[10px] ${borderClass} rounded-xl shadow-sm transition-all mb-2`}
+      className={[
+        'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all',
+        'border-l-[10px]',
+        borderClass,
+      ].join(' ')}
     >
       <div
-        className={`p-4 flex items-center justify-between cursor-pointer hover:bg-black/5 transition-colors ${backgroundClass}`}
+        className={[
+          'flex cursor-pointer flex-col gap-4 p-4 transition-colors md:flex-row md:items-center md:justify-between',
+          'hover:bg-slate-50',
+          backgroundClass,
+        ].join(' ')}
         onClick={(e) => {
           e.stopPropagation();
           onToggleExpandir(equipamento.id);
         }}
       >
-        <div className="flex items-center gap-6 flex-1">
-          <div className="bg-white text-[#3b82f6] rounded-full w-8 h-8 flex items-center justify-center shadow-sm shrink-0 border border-blue-100">
-            <FontAwesomeIcon icon={isAberto ? faMinusCircle : faPlusCircle} size="lg" />
+        <div className="flex min-w-0 flex-1 items-start gap-4 md:items-center md:gap-6">
+          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-blue-600 shadow-sm">
+            <FontAwesomeIcon icon={isAberto ? faMinus : faPlus} />
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 flex-1">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+          <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 Modelo
               </span>
-              <span className="font-bold text-slate-800 text-[14px] uppercase leading-none mt-1">
-                {equipamento.modelo}
+              <span className="mt-1 truncate text-sm font-bold uppercase text-slate-800">
+                {equipamento.modelo || '—'}
               </span>
             </div>
 
-            <div className="flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 Nº Série / Tag
               </span>
-              <span className="font-bold text-slate-800 text-[14px] italic leading-none mt-1">
-                {equipamento.tag}
+              <span className="mt-1 truncate text-sm font-bold italic text-slate-800">
+                {equipamento.tag || '—'}
               </span>
             </div>
 
-            <div className="hidden md:flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 Tipo
               </span>
-              <span className="font-bold text-slate-800 text-[14px] leading-none mt-1">
-                {equipamento.tipo}
+              <span className="mt-1 truncate text-sm font-semibold text-slate-800">
+                {equipamento.tipo || '—'}
               </span>
             </div>
 
-            <div className="hidden md:flex flex-col">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter">
+            <div className="flex min-w-0 flex-col">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 Unidade
               </span>
-              <span className="font-bold text-slate-800 text-[14px] leading-none mt-1 truncate">
+              <span className="mt-1 truncate text-sm font-semibold text-slate-800">
                 {equipamento.unidade?.nomeSistema || '—'}
               </span>
             </div>
 
             <div
-              className="flex flex-col"
+              className="flex min-w-0 flex-col"
               onClick={(e) => e.stopPropagation()}
             >
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-tighter mb-1">
+              <span className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
                 Status Atual
               </span>
               <StatusSelector
@@ -91,13 +99,13 @@ function EquipamentoCard({
         </div>
 
         <div
-          className="flex items-center gap-2 ml-4 shrink-0"
+          className="flex shrink-0 items-center gap-2"
           onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
-            className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100 cursor-pointer"
-            title="Ficha Técnica"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-blue-100 bg-blue-50 text-blue-600 shadow-sm transition-all hover:bg-blue-600 hover:text-white"
+            title="Abrir ficha técnica"
             onClick={() => onGoToFichaTecnica(equipamento.id)}
           >
             <FontAwesomeIcon icon={faFileMedical} />
@@ -106,12 +114,14 @@ function EquipamentoCard({
       </div>
 
       {isAberto && (
-        <EquipamentoCardExpanded
-          equipamento={equipamento}
-          abaAtiva={abaAtiva}
-          onChangeTab={onTrocarAba}
-          onRefresh={onRefresh}
-        />
+        <div className="border-t border-slate-200 bg-white">
+          <EquipamentoCardExpanded
+            equipamento={equipamento}
+            abaAtiva={abaAtiva}
+            onChangeTab={onTrocarAba}
+            onRefresh={onRefresh}
+          />
+        </div>
       )}
     </div>
   );

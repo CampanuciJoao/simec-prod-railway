@@ -1,5 +1,3 @@
-// simec/backend-simec/services/maintenanceRecommendationService.js
-
 import prisma from './prismaService.js';
 import { subDays } from 'date-fns';
 
@@ -7,22 +5,12 @@ function calcularHorasParadas(manutencoes = []) {
   let totalMs = 0;
 
   for (const manut of manutencoes) {
-    const inicio =
-      manut.dataInicioReal ||
-      manut.dataHoraAgendamentoInicio ||
-      null;
-
-    const fim =
-      manut.dataFimReal ||
-      manut.dataConclusao ||
-      manut.dataHoraAgendamentoFim ||
-      null;
+    const inicio = manut.dataInicioReal || manut.dataHoraAgendamentoInicio || null;
+    const fim = manut.dataFimReal || manut.dataConclusao || manut.dataHoraAgendamentoFim || null;
 
     if (inicio && fim) {
       const diff = new Date(fim).getTime() - new Date(inicio).getTime();
-      if (diff > 0) {
-        totalMs += diff;
-      }
+      if (diff > 0) totalMs += diff;
     }
   }
 
@@ -114,9 +102,7 @@ export async function gerarRecomendacoesProativasDeManutencao() {
       unidade: true,
       manutencoes: {
         where: {
-          createdAt: {
-            gte: dataCorte
-          }
+          createdAt: { gte: dataCorte }
         },
         select: {
           id: true,
@@ -133,9 +119,7 @@ export async function gerarRecomendacoesProativasDeManutencao() {
       },
       ocorrencias: {
         where: {
-          data: {
-            gte: dataCorte
-          }
+          data: { gte: dataCorte }
         },
         select: {
           id: true,
@@ -148,17 +132,14 @@ export async function gerarRecomendacoesProativasDeManutencao() {
     }
   });
 
-  for (const equipamento of equipamentos) {
-    const corretivas = equipamento.manutencoes.filter(
-      (m) => m.tipo === 'Corretiva'
-    );
+  let totalProcessados = 0;
 
+  for (const equipamento of equipamentos) {
+    const corretivas = equipamento.manutencoes.filter((m) => m.tipo === 'Corretiva');
     const totalCorretivas = corretivas.length;
     const horasParadas = calcularHorasParadas(corretivas);
     const totalOcorrencias = equipamento.ocorrencias.length;
-    const ocorrenciasNaoResolvidas = equipamento.ocorrencias.filter(
-      (o) => !o.resolvido
-    ).length;
+    const ocorrenciasNaoResolvidas = equipamento.ocorrencias.filter((o) => !o.resolvido).length;
 
     const analise = montarAnalise({
       totalCorretivas,
@@ -174,7 +155,6 @@ export async function gerarRecomendacoesProativasDeManutencao() {
     const tag = equipamento.tag || 'Sem TAG';
 
     const idAlerta = `recomendacao-manut-${equipamento.id}-${dataCorte.toISOString().slice(0, 10)}`;
-
     const titulo = `Recomendação preventiva para ${modelo} (${tag})`;
     const subtitulo = montarSubtitulo({
       totalCorretivas,
@@ -205,8 +185,12 @@ export async function gerarRecomendacoesProativasDeManutencao() {
       }
     });
 
+    totalProcessados += 1;
+
     console.log(
-      `[RECOMENDACAO_MANUTENCAO] ${unidadeNome} | ${modelo} (${tag}) | corretivas=${totalCorretivas} | horasParadas=${horasParadas} | ocorrencias=${totalOcorrencias} | naoResolvidas=${ocorrenciasNaoResolvidas} | score=${analise.score}`
+      `[RECOMENDACAO_MANUTENCAO] ${unidadeNome} | ${modelo} (${tag}) | corretivas=${totalCorretivas} | horas=${horasParadas} | ocorrencias=${totalOcorrencias} | abertas=${ocorrenciasNaoResolvidas} | prioridade=${analise.prioridade} | score=${analise.score}`
     );
   }
+
+  return totalProcessados;
 }

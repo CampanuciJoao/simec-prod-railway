@@ -1,29 +1,30 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faPrint } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faPrint, faWrench } from '@fortawesome/free-solid-svg-icons';
+
+import Button from '../ui/Button';
+import PageHeader from '../ui/PageHeader';
 
 function DetalhesManutencaoPageHeader({ numeroOS, onPrint, onBack }) {
   return (
-    <div className="page-title-card no-print">
-      <h1 className="page-title-internal">
-        Detalhes da Ordem de Serviço: {numeroOS}
-      </h1>
+    <PageHeader
+      title={`Detalhes da Ordem de Serviço: ${numeroOS}`}
+      subtitle="Visualização, atualização e acompanhamento da OS"
+      icon={faWrench}
+      actions={
+        <>
+          <Button onClick={onPrint}>
+            <FontAwesomeIcon icon={faPrint} />
+            Imprimir PDF
+          </Button>
 
-      <div className="page-title-actions">
-        <button type="button" className="btn btn-primary" onClick={onPrint}>
-          <FontAwesomeIcon icon={faPrint} /> Imprimir PDF
-        </button>
-
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onBack}
-          style={{ marginLeft: '10px' }}
-        >
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
-    </div>
+          <Button variant="secondary" onClick={onBack}>
+            <FontAwesomeIcon icon={faArrowLeft} />
+            Voltar
+          </Button>
+        </>
+      }
+    />
   );
 }
 

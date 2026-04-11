@@ -1,20 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faSave,
-  faBan,
-} from '@fortawesome/free-solid-svg-icons';
+import { faSave, faBan } from '@fortawesome/free-solid-svg-icons';
 
 import DateInput from '../ui/DateInput';
 import TimeInput from '../ui/TimeInput';
 import { formatarDataHora } from '../../utils/timeUtils';
-
-const getStatusBadgeClassManutencao = (status) => {
-  const statusClass = status?.toLowerCase().replace(/ /g, '-') || 'default';
-  if (status === 'AguardandoConfirmacao') return 'status-badge status-os-emandamento';
-  return `status-badge status-os-${statusClass}`;
-};
 
 function InformacoesManutencaoSection({
   manutencao,
@@ -27,155 +18,158 @@ function InformacoesManutencaoSection({
   submitting,
 }) {
   return (
-    <section className="page-section">
-      <h3 className="text-slate-800 font-bold text-sm uppercase tracking-wider mb-6 border-b border-slate-100 pb-4">
-        Informações da Manutenção
-      </h3>
+    <div className="card space-y-6">
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Equipamento</span>
-          <Link to="/equipamentos" className="font-bold text-blue-600 no-underline hover:underline">
+      {/* HEADER */}
+      <div className="border-b pb-3">
+        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-700">
+          Informações da Manutenção
+        </h3>
+      </div>
+
+      {/* GRID PRINCIPAL */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-sm">
+
+        <div>
+          <span className="text-xs font-bold uppercase text-slate-400">Equipamento</span>
+          <Link to="/equipamentos" className="block font-semibold text-blue-600 hover:underline">
             {manutencao.equipamento?.modelo} ({manutencao.equipamento?.tag})
           </Link>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Tipo / Categoria</span>
-          <span className="font-bold text-slate-700">{manutencao.tipo}</span>
+        <div>
+          <span className="text-xs font-bold uppercase text-slate-400">Tipo</span>
+          <p className="font-semibold">{manutencao.tipo}</p>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Status da OS</span>
-          <span className={getStatusBadgeClassManutencao(manutencao.status)}>
+        <div>
+          <span className="text-xs font-bold uppercase text-slate-400">Status</span>
+          <span className="inline-block px-2 py-1 rounded bg-slate-100 text-slate-700 text-xs font-bold">
             {manutencao.status}
           </span>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Nº do Chamado</span>
-          <span className="font-black text-slate-900 text-lg">
+        <div>
+          <span className="text-xs font-bold uppercase text-slate-400">Chamado</span>
+          <p className="font-bold text-lg">
             {manutencao.numeroChamado || '---'}
-          </span>
+          </p>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Previsão Original</span>
-          <span className="font-bold text-slate-700">
+        <div>
+          <span className="text-xs font-bold uppercase text-slate-400">Previsão</span>
+          <p className="font-medium">
             {formatarDataHora(manutencao.dataHoraAgendamentoInicio)}
-            {manutencao.dataHoraAgendamentoFim && (
-              <>
-                {' '}às{' '}
-                {new Date(manutencao.dataHoraAgendamentoFim).toLocaleTimeString('pt-BR', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </>
-            )}
-          </span>
+          </p>
         </div>
 
-        <div className="flex flex-col">
-          <span className="text-[10px] font-black uppercase text-slate-400 mb-1">Unidade</span>
-          <span className="font-bold text-slate-700">
-            {manutencao.equipamento?.unidade?.nomeSistema ||
-              manutencao.equipamento?.unidade?.nome ||
-              manutencao.unidade?.nomeSistema ||
-              '---'}
-          </span>
+        <div>
+          <span className="text-xs font-bold uppercase text-slate-400">Unidade</span>
+          <p className="font-medium">
+            {manutencao.equipamento?.unidade?.nomeSistema || '---'}
+          </p>
         </div>
+
       </div>
 
-      <div className="form-group" style={{ marginTop: '20px' }}>
-        <label>Descrição do Problema / Serviço:</label>
+      {/* DESCRIÇÃO */}
+      <div>
+        <label className="label">Descrição</label>
         <textarea
           name="descricaoProblemaServico"
           value={formData.descricaoProblemaServico}
           onChange={onFormChange}
-          rows="3"
           disabled={camposPrincipaisBloqueados}
+          className="input min-h-[100px]"
         />
       </div>
 
-      <div className="info-grid" style={{ marginTop: '15px', alignItems: 'flex-end' }}>
-        <div className="form-group">
-          <label>Técnico Responsável</label>
+      {/* CAMPOS DE EXECUÇÃO */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+
+        <div>
+          <label className="label">Técnico</label>
           <input
-            type="text"
             name="tecnicoResponsavel"
             value={formData.tecnicoResponsavel}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados}
+            className="input"
           />
         </div>
 
-        <div className="form-group">
-          <label>Data Início Real</label>
+        <div>
+          <label className="label">Data Início</label>
           <DateInput
             name="dataInicioReal"
             value={formData.dataInicioReal}
             onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados}
+            className="input"
           />
         </div>
 
-        <div className="form-group">
-          <label>Hora Início Real</label>
+        <div>
+          <label className="label">Hora Início</label>
           <TimeInput
             name="horaInicioReal"
             value={formData.horaInicioReal}
             onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados}
+            className="input"
           />
         </div>
 
-        <div className="form-group">
-          <label>Data Fim Real</label>
+        <div>
+          <label className="label">Data Fim</label>
           <DateInput
             name="dataFimReal"
             value={formData.dataFimReal}
             onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados}
+            className="input"
           />
         </div>
 
-        <div className="form-group">
-          <label>Hora Fim Real</label>
+        <div>
+          <label className="label">Hora Fim</label>
           <TimeInput
             name="horaFimReal"
             value={formData.horaFimReal}
             onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados}
+            className="input"
           />
         </div>
+
       </div>
 
+      {/* AÇÕES */}
       {!camposPrincipaisBloqueados && (
-        <div className="form-actions" style={{ justifyContent: 'space-between', marginTop: '20px' }}>
+        <div className="flex justify-between items-center pt-4 border-t">
+
           <div>
             {isCancelavel && (
               <button
-                type="button"
-                className="btn btn-danger"
+                className="btn btn-danger flex items-center gap-2"
                 onClick={onAbrirCancelamento}
                 disabled={submitting}
               >
-                <FontAwesomeIcon icon={faBan} /> Cancelar OS
+                <FontAwesomeIcon icon={faBan} />
+                Cancelar OS
               </button>
             )}
           </div>
 
           <button
-            type="button"
-            className="btn btn-primary"
+            className="btn btn-primary flex items-center gap-2"
             onClick={onSalvarAlteracoes}
             disabled={submitting}
           >
-            <FontAwesomeIcon icon={faSave} /> {submitting ? 'Salvando...' : 'Salvar Alterações'}
+            <FontAwesomeIcon icon={faSave} />
+            {submitting ? 'Salvando...' : 'Salvar'}
           </button>
+
         </div>
       )}
-    </section>
+
+    </div>
   );
 }
 

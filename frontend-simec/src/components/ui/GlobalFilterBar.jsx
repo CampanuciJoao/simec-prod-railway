@@ -1,95 +1,96 @@
-// Ficheiro: frontend-simec/src/components/ui/GlobalFilterBar.jsx
-// VERSÃO 6.0 - COM LIMPEZA DE BUSCA E FORMATAÇÃO DE RÓTULOS AVANÇADA
-
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 
-import '../../styles/components/GlobalFilterBar.css';
-
 /**
- * @function formatarLabel
- * @description Transforma valores de Enum (CamelCase) em textos legíveis.
+ * Transforma valores de Enum/CamelCase em textos legíveis.
  * Ex: "UsoLimitado" -> "Uso Limitado"
  */
 const formatarLabel = (valor) => {
   if (!valor) return '';
-  return valor.replace(/([A-Z])/g, ' $1').trim();
+  return String(valor).replace(/([A-Z])/g, ' $1').trim();
 };
 
-/**
- * @component CustomSelect
- * @description Componente interno para os menus de seleção (filtros laterais).
- */
-const CustomSelect = ({ config }) => (
-  <div className="filter-select-wrapper">
-    <FontAwesomeIcon icon={faFilter} className="filter-icon" />
-    <select
-      id={config.id}
-      value={config.value || ''}
-      onChange={(e) => config.onChange(e.target.value)}
-      className="filter-select"
-    >
-      <option value="">{config.defaultLabel}</option>
+function CustomSelect({ config }) {
+  return (
+    <div className="flex min-w-[180px] items-center rounded-xl border border-slate-200 bg-white px-3">
+      <FontAwesomeIcon icon={faFilter} className="mr-2 text-slate-400" />
 
-      {config.options.map((opt) => {
-        const valor = typeof opt === 'object' ? opt.value : opt;
-        const rotulo = typeof opt === 'object' ? opt.label : formatarLabel(opt);
+      <select
+        id={config.id}
+        value={config.value || ''}
+        onChange={(e) => config.onChange(e.target.value)}
+        className="select w-full border-0 bg-transparent px-0 py-2.5 pr-6 text-sm text-slate-700 shadow-none focus:ring-0"
+      >
+        <option value="">{config.defaultLabel}</option>
 
-        return (
-          <option key={valor} value={valor}>
-            {rotulo}
-          </option>
-        );
-      })}
-    </select>
-  </div>
-);
+        {config.options.map((opt) => {
+          const valor = typeof opt === 'object' ? opt.value : opt;
+          const rotulo = typeof opt === 'object' ? opt.label : formatarLabel(opt);
 
-/**
- * @component GlobalFilterBar
- * @description Barra de ferramentas principal para busca e filtragem.
- */
+          return (
+            <option key={valor} value={valor}>
+              {rotulo}
+            </option>
+          );
+        })}
+      </select>
+    </div>
+  );
+}
+
 function GlobalFilterBar({
   searchTerm,
   onSearchChange,
   searchPlaceholder,
   selectFilters = [],
+  className = '',
 }) {
   const handleClearSearch = () => {
     onSearchChange({ target: { value: '' } });
   };
 
   return (
-    <div className="global-filter-bar">
-      <div className="search-input-wrapper">
-        <FontAwesomeIcon icon={faSearch} className="search-icon" />
+    <div
+      className={[
+        'flex flex-col gap-4 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between',
+        className,
+      ].join(' ')}
+    >
+      <div className="relative flex w-full items-center md:max-w-md">
+        <FontAwesomeIcon
+          icon={faSearch}
+          className="pointer-events-none absolute left-3 text-slate-400"
+        />
 
         <input
           type="text"
           placeholder={searchPlaceholder || 'Buscar...'}
           value={searchTerm}
           onChange={onSearchChange}
-          className="filter-input"
+          className="input w-full pl-10 pr-10"
         />
 
         {searchTerm && (
           <button
             type="button"
-            className="clear-search-btn"
+            className="absolute right-2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
             onClick={handleClearSearch}
             title="Limpar busca"
+            aria-label="Limpar busca"
           >
             <FontAwesomeIcon icon={faTimes} />
           </button>
         )}
       </div>
 
-      <div className="select-filters-container">
-        {selectFilters.map((filterConfig) => (
-          <CustomSelect key={filterConfig.id} config={filterConfig} />
-        ))}
-      </div>
+      {selectFilters.length > 0 && (
+        <div className="flex flex-wrap items-center gap-3">
+          {selectFilters.map((filterConfig) => (
+            <CustomSelect key={filterConfig.id} config={filterConfig} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

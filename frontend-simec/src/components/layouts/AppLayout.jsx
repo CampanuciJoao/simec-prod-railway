@@ -1,11 +1,13 @@
-// Ficheiro: frontend-simec/src/components/layouts/AppLayout.jsx
+// src/layouts/AppLayout.jsx (FINAL)
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useAlertas } from '@/contexts/AlertasContext';
 import { useAuth } from '@/contexts/AuthContext';
+
 import Sidebar from '@/components/ui/Sidebar';
-import ChatBot from '@/components/charts/ChatBot';
+import ChatBot from '@/components/ui/ChatBot';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMoon,
@@ -14,78 +16,26 @@ import {
   faExclamationCircle,
   faSignOutAlt,
   faBars,
-  faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 
-const formatarNotificacao = (titulo) => {
-  const matchGeral = titulo?.match(
-    /(.*?)\s+na unidade de\s+(.*?),\s+no equipamento\s+(.*)/i
-  );
-
-  if (matchGeral) {
-    return (
-      <span className="block" style={{ lineHeight: '1.5' }}>
-        <span
-          className="text-slate-400"
-          style={{
-            fontSize: '0.7rem',
-            fontWeight: '800',
-            textTransform: 'uppercase',
-          }}
-        >
-          {matchGeral[1].trim()}
-        </span>
-        <br />
-        <span className="text-slate-500">Unidade:</span>{' '}
-        <strong className="text-blue-600">{matchGeral[2].trim()}</strong>
-        <br />
-        <span className="text-slate-500">Equip:</span>{' '}
-        <strong className="text-slate-900">{matchGeral[3].trim()}</strong>
-      </span>
-    );
-  }
-
-  const matchConfirmacao = titulo?.match(
-    /Confirmar conclusão:\s+(.*?)\s+na unidade de\s+(.*)/i
-  );
-
-  if (matchConfirmacao) {
-    return (
-      <span className="block" style={{ lineHeight: '1.5' }}>
-        <strong className="text-amber-600" style={{ fontSize: '0.75rem' }}>
-          ⚠️ AÇÃO REQUERIDA
-        </strong>
-        <br />
-        <span className="text-slate-500">Concluir:</span>{' '}
-        <strong className="text-slate-900">{matchConfirmacao[1].trim()}</strong>
-        <br />
-        <span className="text-slate-500">Local:</span>{' '}
-        <strong className="text-blue-600">{matchConfirmacao[2].trim()}</strong>
-      </span>
-    );
-  }
-
-  return <span className="block font-medium text-slate-700">{titulo}</span>;
-};
-
 function AppLayout() {
-  const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'light');
+  const [theme, setTheme] = useState(
+    () => localStorage.getItem('theme') || 'light'
+  );
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
   const notificationRef = useRef(null);
+
   const { alertas = [], updateStatus } = useAlertas();
   const { user, logout } = useAuth();
   const location = useLocation();
 
+  // ✅ APLICA DARK MODE DE VERDADE
   useEffect(() => {
-    document.body.className = '';
-
-    if (theme === 'dark') {
-      document.body.classList.add('dark-mode');
-    }
-
     localStorage.setItem('theme', theme);
+    document.documentElement.classList.toggle('dark', theme === 'dark');
   }, [theme]);
 
   useEffect(() => {
@@ -94,7 +44,10 @@ function AppLayout() {
 
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+      if (
+        notificationRef.current &&
+        !notificationRef.current.contains(event.target)
+      ) {
         setIsDropdownOpen(false);
       }
     };
@@ -107,157 +60,122 @@ function AppLayout() {
     setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
   };
 
-  const handleMarcarTodasComoVistas = (e) => {
-    e.stopPropagation();
-
-    const alertasPassiveisDeLimpeza = alertas.filter(
-      (a) => a.status === 'NaoVisto' && !String(a.id).startsWith('manut-confirm')
-    );
-
-    alertasPassiveisDeLimpeza.forEach((notif) => updateStatus(notif.id, 'Visto'));
-  };
-
   const alertasNaoVistos = alertas.filter((a) => a.status === 'NaoVisto');
 
+  const handleLimparNotificacoes = () => {
+    alertasNaoVistos.forEach((n) => updateStatus(n.id, 'Visto'));
+  };
+
   return (
-    <div className={`app-container ${isSidebarMobileOpen ? 'sidebar-mobile-open' : ''}`}>
-      <Sidebar notificacoesCount={alertasNaoVistos.length} />
+    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
+      {/* SIDEBAR */}
+      <Sidebar
+        notificacoesCount={alertasNaoVistos.length}
+        isMobileOpen={isSidebarMobileOpen}
+        onClose={() => setSidebarMobileOpen(false)}
+      />
 
-      {isSidebarMobileOpen && (
-        <div
-          className="sidebar-overlay"
-          onClick={() => setSidebarMobileOpen(false)}
-        />
-      )}
-
-      <div className="main-content-wrapper">
-        <header className="header-actions">
-          <div className="mobile-menu-btn-wrapper">
+      {/* CONTEÚDO */}
+      <div className="flex flex-1 flex-col">
+        {/* HEADER */}
+        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:px-6">
+          
+          <div className="flex items-center gap-3">
             <button
-              className="header-action-btn mobile-menu-btn"
+              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700"
               onClick={() => setSidebarMobileOpen(true)}
             >
               <FontAwesomeIcon icon={faBars} />
             </button>
+
+            <span className="hidden md:block text-sm text-slate-600 dark:text-slate-300">
+              Olá, <strong>{user?.nome}</strong>
+            </span>
           </div>
 
-          <div className="header-right-actions">
-            <span className="user-greeting">Olá, {user?.nome}</span>
+          <div className="flex items-center gap-3">
 
+            {/* THEME */}
             <button
               onClick={toggleTheme}
-              className="header-action-btn"
-              title="Alternar Tema"
+              className="btn btn-ghost"
             >
               <FontAwesomeIcon icon={theme === 'light' ? faMoon : faSun} />
             </button>
 
-            <div className="notification-bell" ref={notificationRef}>
+            {/* NOTIFICAÇÕES */}
+            <div className="relative" ref={notificationRef}>
               <button
-                className="header-action-btn"
-                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                onClick={() => setIsDropdownOpen((prev) => !prev)}
+                className="btn btn-ghost relative"
               >
                 <FontAwesomeIcon icon={faBell} />
+
                 {alertasNaoVistos.length > 0 && (
-                  <span className="notification-badge">
+                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
                     {alertasNaoVistos.length > 9 ? '9+' : alertasNaoVistos.length}
                   </span>
                 )}
               </button>
 
               {isDropdownOpen && (
-                <div className="notification-dropdown">
-                  <div className="dropdown-header">
-                    <span className="font-bold">Centro de Notificações</span>
+                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
+                  
+                  <div className="flex justify-between p-3 border-b dark:border-slate-700">
+                    <span className="font-semibold">Notificações</span>
                     <button
-                      className="limpar-btn bg-transparent border-none text-blue-600 font-bold text-xs cursor-pointer hover:underline"
-                      onClick={handleMarcarTodasComoVistas}
+                      onClick={handleLimparNotificacoes}
+                      className="text-blue-600 text-xs"
                     >
-                      Limpar avisos
+                      Limpar
                     </button>
                   </div>
 
-                  <ul className="notification-list">
+                  <div className="max-h-80 overflow-y-auto">
                     {alertasNaoVistos.length > 0 ? (
-                      alertasNaoVistos.slice(0, 8).map((notif) => {
-                        const isObrigatorio = String(notif.id).startsWith('manut-confirm');
-                        const numeroOS =
-                          notif.subtitulo?.match(/OS\s*:?\s*([a-zA-Z0-9-]+)/i)?.[1] || '---';
-
-                        return (
-                          <li
-                            key={notif.id}
-                            className="notification-dropdown-item"
-                            style={{ alignItems: 'flex-start' }}
-                          >
-                            <Link
-                              to={notif.link || '/alertas'}
-                              onClick={() => setIsDropdownOpen(false)}
-                              className="notification-link"
-                              style={{ alignItems: 'flex-start' }}
-                            >
-                              <FontAwesomeIcon
-                                icon={faExclamationCircle}
-                                className={`icon-prioridade-${notif.prioridade?.toLowerCase()}`}
-                                style={{ marginTop: '4px' }}
-                              />
-
-                              <div className="notification-text">
-                                <div className="notification-title">
-                                  {formatarNotificacao(notif.titulo)}
-                                </div>
-                                <div className="text-[10px] text-slate-400 mt-1">
-                                  OS: {numeroOS}
-                                </div>
-                              </div>
-                            </Link>
-
-                            {!isObrigatorio && (
-                              <button
-                                className="btn-mark-seen-mini"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  updateStatus(notif.id, 'Visto');
-                                }}
-                                title="Marcar como visto"
-                                style={{ marginTop: '2px' }}
-                              >
-                                <FontAwesomeIcon icon={faCheck} />
-                              </button>
-                            )}
-                          </li>
-                        );
-                      })
+                      alertasNaoVistos.slice(0, 8).map((notif) => (
+                        <Link
+                          key={notif.id}
+                          to={notif.link || '/alertas'}
+                          className="flex gap-3 p-3 hover:bg-slate-100 dark:hover:bg-slate-700"
+                        >
+                          <FontAwesomeIcon
+                            icon={faExclamationCircle}
+                            className="text-red-500 mt-1"
+                          />
+                          <span className="text-sm">{notif.titulo}</span>
+                        </Link>
+                      ))
                     ) : (
-                      <li className="no-notifications p-4 text-center text-slate-400">
-                        Tudo em dia por aqui!
-                      </li>
+                      <div className="p-4 text-center text-sm text-slate-400">
+                        Sem notificações
+                      </div>
                     )}
-                  </ul>
+                  </div>
 
-                  <div className="dropdown-footer">
-                    <Link
-                      to="/alertas"
-                      className="text-blue-600 font-black text-xs no-underline hover:underline"
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      VER TODOS OS ALERTAS
+                  <div className="p-3 text-center border-t dark:border-slate-700">
+                    <Link to="/alertas" className="text-xs text-blue-600">
+                      Ver todos
                     </Link>
                   </div>
                 </div>
               )}
             </div>
 
-            <button onClick={logout} className="header-action-btn" title="Sair">
+            {/* LOGOUT */}
+            <button onClick={logout} className="btn btn-ghost text-red-500">
               <FontAwesomeIcon icon={faSignOutAlt} />
             </button>
+
           </div>
         </header>
 
-        <main className="main-content">
+        {/* CONTEÚDO */}
+        <main className="flex-1 p-4 md:p-6">
           <Outlet />
         </main>
 
+        {/* CHAT */}
         <ChatBot />
       </div>
     </div>

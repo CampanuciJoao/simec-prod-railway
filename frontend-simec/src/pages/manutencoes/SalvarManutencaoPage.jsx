@@ -1,8 +1,8 @@
-// Ficheiro: src/pages/manutencoes/SalvarManutencaoPage.jsx
-// VERSÃO FINAL SÊNIOR - COM SINAL DE ATUALIZAÇÃO NO REDIRECIONAMENTO
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowLeft, faSpinner, faWrench } from '@fortawesome/free-solid-svg-icons';
+
 import { useToast } from '../../contexts/ToastContext';
 import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
 import {
@@ -12,14 +12,13 @@ import {
   getEquipamentos,
   getUnidades,
 } from '../../services/api';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
-/**
- * Componente de página "inteligente" que orquestra a criação e edição de Manutenções.
- * É responsável por buscar os dados necessários (manutenção, equipamentos, unidades)
- * e passar a lógica de submissão para o componente de formulário.
- */
+import Button from '../../components/ui/Button';
+import PageHeader from '../../components/ui/PageHeader';
+import PageLayout from '../../components/ui/PageLayout';
+import PageSection from '../../components/ui/PageSection';
+import PageState from '../../components/ui/PageState';
+
 function SalvarManutencaoPage() {
   const { manutencaoId } = useParams();
   const navigate = useNavigate();
@@ -81,41 +80,76 @@ function SalvarManutencaoPage() {
 
   if (loading) {
     return (
-      <div className="page-content-wrapper centered-loader">
-        <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-      </div>
+      <PageLayout background="slate" padded fullHeight>
+        <PageState loading />
+      </PageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="page-content-wrapper">
-        <p className="form-error">{error}</p>
-      </div>
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title={isEditing ? 'Editar Manutenção' : 'Agendar Nova Manutenção'}
+          icon={faWrench}
+          actions={
+            <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar
+            </Button>
+          }
+        />
+
+        <PageState error={error} />
+      </PageLayout>
     );
   }
 
   if (isEditing && !initialData) {
     return (
-      <div className="page-content-wrapper">
-        <p className="no-data-message">Manutenção não encontrada.</p>
-      </div>
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title="Editar Manutenção"
+          icon={faWrench}
+          actions={
+            <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar
+            </Button>
+          }
+        />
+
+        <PageState
+          isEmpty
+          emptyMessage="Manutenção não encontrada."
+        />
+      </PageLayout>
     );
   }
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">
-          {isEditing ? `Editar Manutenção (OS: ${initialData?.numeroOS})` : 'Agendar Nova Manutenção'}
-        </h1>
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title={
+          isEditing
+            ? `Editar Manutenção (${initialData?.numeroOS || ''})`
+            : 'Agendar Nova Manutenção'
+        }
+        subtitle={
+          isEditing
+            ? 'Atualize os dados da ordem de serviço'
+            : 'Preencha os dados para criar uma nova ordem de serviço'
+        }
+        icon={faWrench}
+        actions={
+          <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+            <FontAwesomeIcon icon={faArrowLeft} />
+            Voltar
+          </Button>
+        }
+      />
 
-        <button className="btn btn-secondary" onClick={() => navigate('/manutencoes')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
-
-      <section className="page-section">
+      <PageSection>
         <ManutencaoForm
           onSubmit={handleSave}
           initialData={initialData}
@@ -123,8 +157,8 @@ function SalvarManutencaoPage() {
           todosEquipamentos={todosEquipamentos}
           unidadesDisponiveis={unidadesDisponiveis}
         />
-      </section>
-    </div>
+      </PageSection>
+    </PageLayout>
   );
 }
 

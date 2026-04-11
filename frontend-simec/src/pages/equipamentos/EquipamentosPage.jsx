@@ -19,8 +19,14 @@ function EquipamentosPage() {
   const expansion = useEquipamentosExpansion('cadastro');
 
   const isInitialLoading = page.loading && page.equipamentos.length === 0;
-  const hasError = !!page.error;
-  const isEmpty = !page.loading && !page.error && page.equipamentos.length === 0;
+  const hasError = Boolean(page.error);
+  const isEmpty =
+    !page.loading &&
+    !page.error &&
+    Array.isArray(page.equipamentos) &&
+    page.equipamentos.length === 0;
+
+  const shouldShowState = isInitialLoading || hasError || isEmpty;
 
   return (
     <PageLayout background="slate" padded fullHeight className="font-sans">
@@ -28,9 +34,9 @@ function EquipamentosPage() {
         isOpen={page.deleteModal.isOpen}
         onClose={page.deleteModal.closeModal}
         onConfirm={page.handleConfirmDelete}
-        title="Excluir"
-        message="Deseja excluir este registro?"
-        isDestructive={true}
+        title="Excluir equipamento"
+        message="Deseja excluir este equipamento?"
+        isDestructive
       />
 
       <PageHeader
@@ -39,16 +45,16 @@ function EquipamentosPage() {
         actions={
           <button
             type="button"
-            className="bg-[#3b82f6] hover:bg-blue-600 text-white px-3 py-1.5 rounded-md text-[10px] font-black transition-all flex items-center gap-2 shadow-md uppercase"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-700"
             onClick={page.goToCreate}
           >
             <FontAwesomeIcon icon={faPlus} />
-            Adicionar Equipamento
+            <span>Adicionar equipamento</span>
           </button>
         }
       />
 
-      <PageSection noPadding className="mb-8 overflow-hidden">
+      <PageSection noPadding className="mb-8 overflow-hidden rounded-2xl">
         <GlobalFilterBar
           searchTerm={page.searchTerm}
           onSearchChange={page.onSearchChange}
@@ -57,7 +63,7 @@ function EquipamentosPage() {
         />
       </PageSection>
 
-      {(isInitialLoading || hasError || isEmpty) ? (
+      {shouldShowState ? (
         <PageState
           loading={isInitialLoading}
           error={page.error?.message || page.error || ''}

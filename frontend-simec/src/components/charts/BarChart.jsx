@@ -1,16 +1,8 @@
-import React, { useRef } from 'react';
-import { Bar, getElementAtEvent } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
+import React from 'react';
+import { Doughnut } from 'react-chartjs-2';
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 function toChartData(data) {
   if (!Array.isArray(data) || data.length === 0) return null;
@@ -19,50 +11,38 @@ function toChartData(data) {
     labels: data.map((item) => item.name),
     datasets: [
       {
-        label: 'Quantidade',
+        label: 'Status',
         data: data.map((item) => item.value),
-        borderRadius: 8,
+        borderWidth: 2,
       },
     ],
   };
 }
 
-function BarChart({ data = [], onBarClick }) {
-  const chartRef = useRef(null);
+function DonutChart({ data = [] }) {
   const chartData = toChartData(data);
-
-  const handleClick = (event) => {
-    if (!chartRef.current || !onBarClick || !chartData) return;
-
-    const element = getElementAtEvent(chartRef.current, event);
-    if (element.length > 0) {
-      const { index } = element[0];
-      onBarClick(data[index]);
-    }
-  };
 
   if (!chartData) {
     return (
       <p className="text-center text-slate-400 italic py-12">
-        Aguardando dados para o gráfico...
+        Dados inválidos para o gráfico.
       </p>
     );
   }
 
   return (
-    <Bar
-      ref={chartRef}
+    <Doughnut
       data={chartData}
-      onClick={handleClick}
       options={{
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false },
+          legend: { position: 'bottom' },
         },
+        cutout: '60%',
       }}
     />
   );
 }
 
-export default BarChart;
+export default DonutChart;

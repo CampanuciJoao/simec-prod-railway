@@ -1,5 +1,3 @@
-// src/components/ui/PageLayout.jsx
-
 import React from 'react';
 
 function PageLayout({
@@ -7,25 +5,24 @@ function PageLayout({
   className = '',
   padded = true,
   fullHeight = false,
-  background = 'default',
+  background = 'transparent',
 }) {
-  const baseClass = 'page-content-wrapper';
-  const paddingClass = padded ? ' p-6' : '';
-  const heightClass = fullHeight ? ' min-h-screen' : '';
-
-  const backgroundClassMap = {
-    default: '',
-    slate: ' bg-[#f8fafc]',
-    white: ' bg-white',
-  };
-
-  const backgroundClass = backgroundClassMap[background] || '';
+  const backgroundClass =
+    background === 'slate' ? 'bg-slate-100' : 'bg-transparent';
 
   return (
     <div
-      className={`${baseClass}${paddingClass}${heightClass}${backgroundClass} ${className}`.trim()}
+      className={[
+        'w-full',
+        padded ? 'px-4 py-4 md:px-6 md:py-6' : '',
+        fullHeight ? 'min-h-full' : '',
+        backgroundClass,
+        className,
+      ].join(' ')}
     >
-      {children}
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+        {children}
+      </div>
     </div>
   );
 }

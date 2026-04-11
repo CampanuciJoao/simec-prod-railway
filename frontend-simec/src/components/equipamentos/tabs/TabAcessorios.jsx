@@ -1,5 +1,3 @@
-// Ficheiro: src/components/equipamentos/tabs/TabAcessorios.jsx
-
 import React, { useState } from 'react';
 import { useAcessorios } from '../../../hooks/equipamentos/useAcessorios';
 import { useModal } from '../../../hooks/shared/useModal';
@@ -11,7 +9,7 @@ import {
   faPlus,
   faEdit,
   faTrashAlt,
-  faSpinner
+  faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 
 function TabAcessorios({ equipamentoId }) {
@@ -21,7 +19,7 @@ function TabAcessorios({ equipamentoId }) {
     submitting,
     error,
     salvarAcessorio,
-    removerAcessorio
+    removerAcessorio,
   } = useAcessorios(equipamentoId);
 
   const { isOpen, modalData, openModal, closeModal } = useModal();
@@ -50,9 +48,7 @@ function TabAcessorios({ equipamentoId }) {
       editingAcessorio ? editingAcessorio.id : null
     );
 
-    if (success) {
-      handleCancelForm();
-    }
+    if (success) handleCancelForm();
   };
 
   const handleDeleteClick = (acessorio) => {
@@ -60,9 +56,7 @@ function TabAcessorios({ equipamentoId }) {
   };
 
   const handleConfirmarExclusao = async () => {
-    if (modalData) {
-      await removerAcessorio(modalData.id);
-    }
+    if (modalData) await removerAcessorio(modalData.id);
     closeModal();
   };
 
@@ -72,30 +66,44 @@ function TabAcessorios({ equipamentoId }) {
         isOpen={isOpen}
         onClose={closeModal}
         onConfirm={handleConfirmarExclusao}
-        title="Confirmar Exclusão de Acessório"
-        message={`Tem certeza que deseja excluir o acessório "${modalData?.nome}"?`}
-        isDestructive={true}
+        title="Excluir acessório"
+        message={`Deseja excluir "${modalData?.nome}"?`}
+        isDestructive
       />
 
-      <div>
-        <div className="section-header">
-          <h3 className="tab-title">
-            <FontAwesomeIcon icon={faHdd} /> Acessórios Vinculados
-          </h3>
+      <div className="space-y-5">
+        {/* HEADER */}
+        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+              <FontAwesomeIcon icon={faHdd} />
+            </span>
+
+            <div>
+              <h3 className="text-lg font-semibold text-slate-900">
+                Acessórios vinculados
+              </h3>
+              <p className="text-sm text-slate-500">
+                Gerencie os acessórios associados ao equipamento
+              </p>
+            </div>
+          </div>
 
           {!showForm && (
             <button
-              className="btn btn-primary btn-sm"
+              className="btn btn-primary"
               onClick={handleAddNewClick}
               disabled={submitting}
             >
-              <FontAwesomeIcon icon={faPlus} /> Adicionar Acessório
+              <FontAwesomeIcon icon={faPlus} />
+              <span>Adicionar</span>
             </button>
           )}
         </div>
 
+        {/* FORM */}
         {showForm && (
-          <div className="form-container-inline">
+          <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <AcessorioForm
               key={editingAcessorio ? editingAcessorio.id : 'novo'}
               initialData={editingAcessorio}
@@ -108,56 +116,73 @@ function TabAcessorios({ equipamentoId }) {
           </div>
         )}
 
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: '20px' }}>
-            <FontAwesomeIcon icon={faSpinner} spin /> Carregando acessórios...
+        {/* LOADING */}
+        {loading && (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+            <FontAwesomeIcon icon={faSpinner} spin />
+            Carregando acessórios...
           </div>
-        ) : acessorios.length > 0 ? (
-          <div className="table-responsive-wrapper">
-            <table className="data-table">
-              <thead>
+        )}
+
+        {/* LISTA */}
+        {!loading && acessorios.length > 0 && (
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th>Nome</th>
-                  <th>Nº de Série</th>
-                  <th>Descrição</th>
-                  <th className="text-right">Ações</th>
+                  <th className="px-4 py-3">Nome</th>
+                  <th className="px-4 py-3">Nº Série</th>
+                  <th className="px-4 py-3">Descrição</th>
+                  <th className="px-4 py-3 text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody>
+
+              <tbody className="divide-y divide-slate-100">
                 {acessorios.map((acessorio) => (
-                  <tr key={acessorio.id}>
-                    <td data-label="Nome">{acessorio.nome}</td>
-                    <td data-label="Nº Série">{acessorio.numeroSerie || 'N/A'}</td>
-                    <td data-label="Descrição">{acessorio.descricao || 'N/A'}</td>
-                    <td className="actions-cell text-right">
-                      <button
-                        onClick={() => handleEditClick(acessorio)}
-                        className="btn-action edit"
-                        title="Editar"
-                        disabled={submitting}
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteClick(acessorio)}
-                        className="btn-action delete"
-                        title="Excluir"
-                        disabled={submitting}
-                      >
-                        <FontAwesomeIcon icon={faTrashAlt} />
-                      </button>
+                  <tr key={acessorio.id} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {acessorio.nome}
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-600">
+                      {acessorio.numeroSerie || 'N/A'}
+                    </td>
+
+                    <td className="px-4 py-3 text-slate-600">
+                      {acessorio.descricao || 'N/A'}
+                    </td>
+
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          onClick={() => handleEditClick(acessorio)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
+                          disabled={submitting}
+                        >
+                          <FontAwesomeIcon icon={faEdit} />
+                        </button>
+
+                        <button
+                          onClick={() => handleDeleteClick(acessorio)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"
+                          disabled={submitting}
+                        >
+                          <FontAwesomeIcon icon={faTrashAlt} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          !showForm && (
-            <p className="no-data-message">
-              Nenhum acessório cadastrado para este equipamento.
-            </p>
-          )
+        )}
+
+        {/* EMPTY */}
+        {!loading && acessorios.length === 0 && !showForm && (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
+            Nenhum acessório cadastrado.
+          </div>
         )}
       </div>
     </>

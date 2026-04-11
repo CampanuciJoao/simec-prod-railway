@@ -1,6 +1,5 @@
 import React from 'react';
 import { faWrench } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { useDetalhesManutencaoPage } from '../../hooks/manutencoes/useDetalhesManutencaoPage';
 
@@ -8,8 +7,10 @@ import DetalhesManutencaoPageHeader from '../../components/manutencoes/DetalhesM
 import InformacoesManutencaoSection from '../../components/manutencoes/InformacoesManutencaoSection';
 import ConfirmacaoFinalManutencao from '../../components/manutencoes/ConfirmacaoFinalManutencao';
 
+import Button from '../../components/ui/Button';
 import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
 import PageHeader from '../../components/ui/PageHeader';
+import PageLayout from '../../components/ui/PageLayout';
 import PageState from '../../components/ui/PageState';
 
 function DetalhesManutencaoPage() {
@@ -19,7 +20,7 @@ function DetalhesManutencaoPage() {
 
   if (showState) {
     return (
-      <div className="page-content-wrapper">
+      <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title={
             page.manutencao?.numeroOS
@@ -28,11 +29,10 @@ function DetalhesManutencaoPage() {
           }
           icon={faWrench}
           actions={
-            <button type="button" className="btn btn-secondary" onClick={page.goBack}>
+            <Button variant="secondary" onClick={page.goBack}>
               Voltar
-            </button>
+            </Button>
           }
-          variant="light"
         />
 
         <PageState
@@ -41,7 +41,7 @@ function DetalhesManutencaoPage() {
           isEmpty={!page.loading && !page.error && !page.manutencao}
           emptyMessage="Ordem de serviço não encontrada."
         />
-      </div>
+      </PageLayout>
     );
   }
 
@@ -51,12 +51,12 @@ function DetalhesManutencaoPage() {
         isOpen={page.deleteAnexoModal.isOpen}
         onClose={page.deleteAnexoModal.closeModal}
         onConfirm={page.handleDeleteAnexo}
-        title="Excluir Anexo"
+        title="Excluir anexo"
         message="Deseja remover este anexo?"
         isDestructive
       />
 
-      <div className="page-content-wrapper">
+      <PageLayout background="slate" padded fullHeight>
         <DetalhesManutencaoPageHeader
           numeroOS={page.manutencao.numeroOS}
           onPrint={page.handlePrint}
@@ -87,7 +87,7 @@ function DetalhesManutencaoPage() {
           onConfirm={page.handleConfirmacaoFinal}
           submitting={page.submitting}
         />
-      </div>
+      </PageLayout>
     </>
   );
 }

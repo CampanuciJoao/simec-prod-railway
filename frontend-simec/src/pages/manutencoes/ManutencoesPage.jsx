@@ -15,6 +15,7 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 import { useManutencoesPage } from '../../hooks/manutencoes/useManutencoesPage';
 
+import Button from '../../components/ui/Button';
 import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
 import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
 
@@ -84,21 +85,19 @@ function ManutencoesPage() {
         onConfirm={page.handleConfirmDelete}
         title="Excluir OS"
         message={`Deseja apagar a OS nº ${page.deleteModal.modalData?.numeroOS}?`}
-        isDestructive={true}
+        isDestructive
       />
 
-      <PageLayout className="pb-20">
+      <PageLayout className="pb-20" background="slate" padded fullHeight>
         <PageHeader
           title="Gerenciamento de Manutenções"
+          subtitle="Acompanhe, filtre e gerencie as ordens de serviço"
           icon={faWrench}
           actions={
-            <button
-              type="button"
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-bold shadow-lg transition-all flex items-center gap-2 border-none cursor-pointer"
-              onClick={page.goToCreate}
-            >
-              <FontAwesomeIcon icon={faPlus} /> Agendar Nova
-            </button>
+            <Button onClick={page.goToCreate}>
+              <FontAwesomeIcon icon={faPlus} />
+              Agendar nova
+            </Button>
           }
         />
 
@@ -111,7 +110,7 @@ function ManutencoesPage() {
           />
         </PageSection>
 
-        {(isInitialLoading || hasError || isEmpty) ? (
+        {isInitialLoading || hasError || isEmpty ? (
           <PageState
             loading={isInitialLoading}
             error={page.error?.message || page.error || ''}
