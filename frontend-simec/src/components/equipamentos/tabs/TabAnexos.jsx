@@ -14,7 +14,7 @@ import {
 
 import ModalConfirmacao from '../../ui/ModalConfirmacao';
 import { formatarData } from '../../../utils/timeUtils';
-import { uploadAnexosEquipamento, deleteAnexoEquipamento } from '../../../services/api';
+import * as api from '../../../services/api';
 
 const API_BASE_URL_DOWNLOAD =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -34,18 +34,40 @@ function getIconePorTipoArquivo(tipoMime = '') {
     return { icon: faFileWord, color: '#2563eb' };
   }
 
-  if (mime.includes('excel') || mime.includes('spreadsheet') || mime.includes('sheet')) {
+  if (
+    mime.includes('excel') ||
+    mime.includes('spreadsheet') ||
+    mime.includes('sheet')
+  ) {
     return { icon: faFileExcel, color: '#16a34a' };
   }
 
   return { icon: faFileAlt, color: '#64748b' };
 }
 
-function TabAnexos({
-  equipamentoId,
-  anexosIniciais = [],
-  onUpdate,
-}) {
+function getUploadFn() {
+  return (
+    api.uploadAnexosEquipamento ||
+    api.uploadAnexoEquipamento ||
+    api.enviarAnexosEquipamento ||
+    api.enviarAnexoEquipamento ||
+    null
+  );
+}
+
+function getDeleteFn() {
+  return (
+    api.deleteAnexoEquipamento ||
+    api.deleteAnexo ||
+    api.removerAnexoEquipamento ||
+    api.removerAnexo ||
+    api.excluirAnexoEquipamento ||
+    api.excluirAnexo ||
+    null
+  );
+}
+
+function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
   const anexoInputRef = useRef(null);
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -60,9 +82,20 @@ function TabAnexos({
   const handleConfirmDelete = async () => {
     if (!anexoSelecionado) return;
 
+    const deleteFn = getDeleteFn();
+
+    if (!deleteFn) {
+      console.error(
+        'Nenhuma função de exclusão de anexo foi encontrada em services/api.'
+      );
+      setDeleteModalOpen(false);
+      setAnexoSelecionado(null);
+      return;
+    }
+
     try {
       setIsSubmitting(true);
-      await deleteAnexoEquipamento(anexoSelecionado.id);
+      await deleteFn(anexoSelecionado.id);
 
       if (typeof onUpdate === 'function') {
         await onUpdate();
@@ -78,8 +111,16 @@ function TabAnexos({
 
   const handleAnexosUpload = async (event) => {
     const files = Array.from(event.target.files || []);
-
     if (!files.length) return;
+
+    const uploadFn = getUploadFn();
+
+    if (!uploadFn) {
+      console.error(
+        'Nenhuma função de upload de anexos foi encontrada em services/api.'
+      );
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -87,7 +128,7 @@ function TabAnexos({
       const formData = new FormData();
       files.forEach((file) => formData.append('anexos', file));
 
-      await uploadAnexosEquipamento(equipamentoId, formData);
+      await uploadFn(equipamentoId, formData);
 
       if (typeof onUpdate === 'function') {
         await onUpdate();
