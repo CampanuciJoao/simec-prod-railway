@@ -6,7 +6,7 @@ import { useAlertas } from '@/contexts/AlertasContext';
 import { useAuth } from '@/contexts/AuthContext';
 
 import Sidebar from '@/components/ui/Sidebar';
-import ChatBot from '@/components/ui/ChatBot';
+import ChatBot from '@/components/charts/ChatBot';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
