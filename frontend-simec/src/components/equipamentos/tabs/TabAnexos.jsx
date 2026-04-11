@@ -14,7 +14,7 @@ import {
 
 import ModalConfirmacao from '../../ui/ModalConfirmacao';
 import { formatarData } from '../../../utils/timeUtils';
-import { uploadAnexosEquipamento, deleteAnexo } from '../../../services/api';
+import { uploadAnexosEquipamento, deleteAnexoEquipamento } from '../../../services/api';
 
 const API_BASE_URL_DOWNLOAD =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -62,7 +62,7 @@ function TabAnexos({
 
     try {
       setIsSubmitting(true);
-      await deleteAnexo(anexoSelecionado.id);
+      await deleteAnexoEquipamento(anexoSelecionado.id);
 
       if (typeof onUpdate === 'function') {
         await onUpdate();
