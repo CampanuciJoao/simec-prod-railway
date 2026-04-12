@@ -1,13 +1,29 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { getEquipamentoById, getOcorrenciasPorEquipamento, addOcorrencia, resolverOcorrencia } from '../../services/api';
+import {
+  getEquipamentoById,
+  getOcorrenciasPorEquipamento,
+  addOcorrencia,
+  resolverOcorrencia,
+} from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { formatarDataHora } from '../../utils/timeUtils';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-  faArrowLeft, faSave, faSpinner, faFileMedical, faHistory, faUser, 
-  faChevronDown, faChevronUp, faCheckCircle, faExclamationTriangle, faInfoCircle 
+import {
+  faArrowLeft,
+  faSave,
+  faSpinner,
+  faFileMedical,
+  faHistory,
+  faCheckCircle,
+  faExclamationTriangle,
 } from '@fortawesome/free-solid-svg-icons';
+
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageSection from '../../components/ui/PageSection';
+import PageState from '../../components/ui/PageState';
 
 function FichaTecnicaPage() {
   const { id } = useParams();
@@ -18,12 +34,19 @@ function FichaTecnicaPage() {
   const [ocorrencias, setOcorrencias] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
   const [resolvendoId, setResolvendoId] = useState(null);
-  const [dadosSolucao, setDadosSolucao] = useState({ solucao: '', tecnicoResolucao: '' });
+  const [dadosSolucao, setDadosSolucao] = useState({
+    solucao: '',
+    tecnicoResolucao: '',
+  });
 
   const [novaOcorrencia, setNovaOcorrencia] = useState({
-    titulo: '', descricao: '', tipo: 'Operacional', tecnico: ''
+    titulo: '',
+    descricao: '',
+    tipo: 'Operacional',
+    tecnico: '',
   });
 
   const carregarDados = useCallback(async () => {
@@ -31,155 +54,278 @@ function FichaTecnicaPage() {
     try {
       const [equip, lista] = await Promise.all([
         getEquipamentoById(id),
-        getOcorrenciasPorEquipamento(id)
+        getOcorrenciasPorEquipamento(id),
       ]);
       setEquipamento(equip);
       setOcorrencias(lista);
-    } catch (err) {
+    } catch {
       addToast('Erro ao carregar dados.', 'error');
     } finally {
       setLoading(false);
     }
   }, [id, addToast]);
 
-  useEffect(() => { carregarDados(); }, [carregarDados]);
+  useEffect(() => {
+    carregarDados();
+  }, [carregarDados]);
 
   const toggleExpandir = (id) => {
-    const novosExpandidos = new Set(itensExpandidos);
-    novosExpandidos.has(id) ? novosExpandidos.delete(id) : novosExpandidos.add(id);
-    setItensExpandidos(novosExpandidos);
-  };
-
-  const handleSalvarSolucao = async (idOcorr) => {
-    if (!dadosSolucao.solucao.trim()) return addToast('Descreva a solução.', 'error');
-    setSubmitting(true);
-    try {
-      await resolverOcorrencia(idOcorr, dadosSolucao);
-      addToast('Ocorrência resolvida!', 'success');
-      setResolvendoId(null);
-      setDadosSolucao({ solucao: '', tecnicoResolucao: '' });
-      carregarDados();
-    } catch { addToast('Erro ao salvar.', 'error'); } finally { setSubmitting(false); }
+    const set = new Set(itensExpandidos);
+    set.has(id) ? set.delete(id) : set.add(id);
+    setItensExpandidos(set);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSubmitting(true);
+
     try {
       await addOcorrencia({ ...novaOcorrencia, equipamentoId: id });
-      addToast('Registro adicionado!', 'success');
-      setNovaOcorrencia({ titulo: '', descricao: '', tipo: 'Operacional', tecnico: '' });
+      addToast('Ocorrência registrada!', 'success');
+      setNovaOcorrencia({
+        titulo: '',
+        descricao: '',
+        tipo: 'Operacional',
+        tecnico: '',
+      });
       carregarDados();
-    } catch (err) {
+    } catch {
       addToast('Erro ao salvar.', 'error');
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (loading) return <div className="page-content-wrapper centered-loader"><FontAwesomeIcon icon={faSpinner} spin size="2x" /></div>;
+  const handleSalvarSolucao = async (idOcorr) => {
+    if (!dadosSolucao.solucao.trim()) {
+      return addToast('Descreva a solução.', 'error');
+    }
+
+    setSubmitting(true);
+
+    try {
+      await resolverOcorrencia(idOcorr, dadosSolucao);
+      addToast('Ocorrência resolvida!', 'success');
+      setResolvendoId(null);
+      setDadosSolucao({ solucao: '', tecnicoResolucao: '' });
+      carregarDados();
+    } catch {
+      addToast('Erro ao salvar.', 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <PageLayout background="slate" padded fullHeight contentClassName="page-stack">
+        <PageHeader title="Ficha Técnica" />
+        <PageState loading />
+      </PageLayout>
+    );
+  }
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">
-          <FontAwesomeIcon icon={faFileMedical} /> Ficha Técnica: {equipamento?.modelo}
-        </h1>
-        <button className="btn btn-secondary" onClick={() => navigate('/equipamentos')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
+    <PageLayout
+      background="slate"
+      padded
+      fullHeight
+      contentClassName="page-stack content-fade-in"
+    >
+      <PageHeader
+        title={`Ficha Técnica: ${equipamento?.modelo}`}
+        subtitle="Histórico operacional e ocorrências"
+        icon={faFileMedical}
+        actions={
+          <button
+            className="btn btn-secondary"
+            onClick={() => navigate('/equipamentos')}
+          >
+            <FontAwesomeIcon icon={faArrowLeft} />
+            Voltar
+          </button>
+        }
+      />
 
-      <div className="page-layout-split">
-        <div className="layout-split-form-column">
-          <section className="page-section">
-            <h3 className="section-title">Registrar Ocorrência</h3>
-            <form onSubmit={handleSubmit} className="form-elegante">
-              <div className="form-group">
-                <label>Título do Evento *</label>
-                <input type="text" value={novaOcorrencia.titulo} onChange={e => setNovaOcorrencia({...novaOcorrencia, titulo: e.target.value})} required />
-              </div>
-              <div className="info-grid grid-cols-2">
-                <div className="form-group">
-                  <label>Tipo</label>
-                  <select value={novaOcorrencia.tipo} onChange={e => setNovaOcorrencia({...novaOcorrencia, tipo: e.target.value})}>
-                    <option value="Operacional">Operacional</option>
-                    <option value="Ajuste">Ajuste / Configuração</option>
-                    <option value="Infraestrutura">Infraestrutura</option>
-                  </select>
-                </div>
-                <div className="form-group">
-                  <label>Responsável</label>
-                  <input type="text" value={novaOcorrencia.tecnico} onChange={e => setNovaOcorrencia({...novaOcorrencia, tecnico: e.target.value})} />
-                </div>
-              </div>
-              <div className="form-group">
-                <label>Descrição</label>
-                <textarea rows="3" value={novaOcorrencia.descricao} onChange={e => setNovaOcorrencia({...novaOcorrencia, descricao: e.target.value})}></textarea>
-              </div>
-              <button type="submit" className="btn btn-primary" disabled={submitting}>Salvar no Histórico</button>
-            </form>
-          </section>
-        </div>
+      {/* REGISTRAR OCORRÊNCIA */}
+      <PageSection title="Registrar ocorrência">
+        <form
+          onSubmit={handleSubmit}
+          className="grid gap-4 md:grid-cols-2"
+        >
+          <input
+            placeholder="Título do evento"
+            value={novaOcorrencia.titulo}
+            onChange={(e) =>
+              setNovaOcorrencia({ ...novaOcorrencia, titulo: e.target.value })
+            }
+            className="input"
+            required
+          />
 
-        <div className="layout-split-table-column">
-          <section className="page-section">
-            <h3 className="section-title"><FontAwesomeIcon icon={faHistory} /> Histórico de Vida</h3>
-            <div className="timeline-cards-list" style={{ marginTop: '20px' }}>
-              {ocorrencias.map(item => {
-                const expandido = itensExpandidos.has(item.id);
-                return (
-                  <div key={item.id} className={`history-card-item ${item.resolvido ? 'resolvido-card' : 'pendente-card'}`}>
-                    <div className="history-card-header" onClick={() => toggleExpandir(item.id)} style={{ padding: '15px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                        <div className={`icon-indicator ${item.resolvido ? 'resolvido-bg' : 'pendente-bg'}`}>
-                          <FontAwesomeIcon icon={item.resolvido ? faCheckCircle : faExclamationTriangle} />
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column' }}>
-                          <span style={{ fontSize: '0.7rem', fontWeight: 'bold', color: '#64748b' }}>{formatarDataHora(item.data)}</span>
-                          <h4 style={{ margin: 0, fontSize: '1rem' }}>{item.titulo}</h4>
-                        </div>
-                      </div>
-                      <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} />
+          <select
+            value={novaOcorrencia.tipo}
+            onChange={(e) =>
+              setNovaOcorrencia({ ...novaOcorrencia, tipo: e.target.value })
+            }
+            className="input"
+          >
+            <option>Operacional</option>
+            <option>Ajuste</option>
+            <option>Infraestrutura</option>
+          </select>
+
+          <input
+            placeholder="Responsável"
+            value={novaOcorrencia.tecnico}
+            onChange={(e) =>
+              setNovaOcorrencia({ ...novaOcorrencia, tecnico: e.target.value })
+            }
+            className="input"
+          />
+
+          <textarea
+            placeholder="Descrição"
+            value={novaOcorrencia.descricao}
+            onChange={(e) =>
+              setNovaOcorrencia({
+                ...novaOcorrencia,
+                descricao: e.target.value,
+              })
+            }
+            className="input md:col-span-2"
+          />
+
+          <button
+            className="btn btn-primary md:col-span-2"
+            disabled={submitting}
+          >
+            <FontAwesomeIcon icon={faSave} />
+            Salvar no histórico
+          </button>
+        </form>
+      </PageSection>
+
+      {/* HISTÓRICO */}
+      <PageSection title="Histórico de vida">
+        <div className="space-y-4">
+          {ocorrencias.map((item) => {
+            const expandido = itensExpandidos.has(item.id);
+
+            return (
+              <div
+                key={item.id}
+                className="rounded-xl border bg-white p-4 shadow-sm"
+              >
+                {/* HEADER */}
+                <div
+                  className="flex cursor-pointer items-center justify-between"
+                  onClick={() => toggleExpandir(item.id)}
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={`rounded-full p-2 ${
+                        item.resolvido
+                          ? 'bg-emerald-100 text-emerald-600'
+                          : 'bg-red-100 text-red-600'
+                      }`}
+                    >
+                      <FontAwesomeIcon
+                        icon={
+                          item.resolvido
+                            ? faCheckCircle
+                            : faExclamationTriangle
+                        }
+                      />
+                    </span>
+
+                    <div>
+                      <p className="text-xs text-slate-500">
+                        {formatarDataHora(item.data)}
+                      </p>
+                      <p className="font-semibold">{item.titulo}</p>
                     </div>
+                  </div>
+                </div>
 
-                    {expandido && (
-                      <div className="history-card-body" style={{ padding: '15px 15px 15px 70px', borderTop: '1px solid #f1f5f9' }}>
-                        <p style={{ fontSize: '0.9rem' }}><strong>Descrição:</strong> {item.descricao || 'Sem detalhes.'}</p>
-                        <p style={{ fontSize: '0.9rem' }}><strong>Registrado por:</strong> {item.tecnico || 'N/A'}</p>
-                        
-                        <div className="solution-area" style={{ marginTop: '15px' }}>
-                          {item.resolvido ? (
-                            <div style={{ background: '#f0fdf4', padding: '10px', borderRadius: '6px', border: '1px solid #dcfce7' }}>
-                              <h5 style={{ color: '#166534', margin: '0 0 5px 0' }}>Solução Técnica:</h5>
-                              <p style={{ color: '#15803d', fontSize: '0.9rem', margin: 0 }}>{item.solucao}</p>
-                              <small>Resolvido por <strong>{item.tecnicoResolucao}</strong></small>
-                            </div>
-                          ) : (
-                            resolvendoId === item.id ? (
-                              <div className="solution-mini-form">
-                                <textarea placeholder="Como foi resolvido?" value={dadosSolucao.solucao} onChange={e => setDadosSolucao({...dadosSolucao, solucao: e.target.value})} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                                <input type="text" placeholder="Técnico" value={dadosSolucao.tecnicoResolucao} onChange={e => setDadosSolucao({...dadosSolucao, tecnicoResolucao: e.target.value})} style={{ width: '100%', marginTop: '10px', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }} />
-                                <button className="btn btn-success btn-sm" style={{ marginTop: '10px' }} onClick={() => handleSalvarSolucao(item.id)}>Confirmar</button>
-                                <button className="btn btn-secondary btn-sm" style={{ marginTop: '10px', marginLeft: '5px' }} onClick={() => setResolvendoId(null)}>Cancelar</button>
-                              </div>
-                            ) : (
-                              <button className="btn btn-outline-success btn-sm" onClick={(e) => { e.stopPropagation(); setResolvendoId(item.id); }}>
-                                <FontAwesomeIcon icon={faCheckCircle} /> Resolver Problema
-                              </button>
-                            )
-                          )}
+                {/* BODY */}
+                {expandido && (
+                  <div className="mt-4 space-y-2 text-sm text-slate-600">
+                    <p>
+                      <strong>Descrição:</strong> {item.descricao || '-'}
+                    </p>
+                    <p>
+                      <strong>Responsável:</strong> {item.tecnico || '-'}
+                    </p>
+
+                    {item.resolvido ? (
+                      <div className="rounded-lg bg-emerald-50 p-3">
+                        <p className="font-semibold text-emerald-700">
+                          Solução
+                        </p>
+                        <p>{item.solucao}</p>
+                      </div>
+                    ) : resolvendoId === item.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          className="input"
+                          placeholder="Solução"
+                          value={dadosSolucao.solucao}
+                          onChange={(e) =>
+                            setDadosSolucao({
+                              ...dadosSolucao,
+                              solucao: e.target.value,
+                            })
+                          }
+                        />
+
+                        <input
+                          className="input"
+                          placeholder="Técnico"
+                          value={dadosSolucao.tecnicoResolucao}
+                          onChange={(e) =>
+                            setDadosSolucao({
+                              ...dadosSolucao,
+                              tecnicoResolucao: e.target.value,
+                            })
+                          }
+                        />
+
+                        <div className="flex gap-2">
+                          <button
+                            className="btn btn-success"
+                            onClick={() => handleSalvarSolucao(item.id)}
+                          >
+                            Confirmar
+                          </button>
+
+                          <button
+                            className="btn btn-secondary"
+                            onClick={() => setResolvendoId(null)}
+                          >
+                            Cancelar
+                          </button>
                         </div>
                       </div>
+                    ) : (
+                      <button
+                        className="btn btn-outline-success"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setResolvendoId(item.id);
+                        }}
+                      >
+                        Resolver problema
+                      </button>
                     )}
                   </div>
-                );
-              })}
-            </div>
-          </section>
+                )}
+              </div>
+            );
+          })}
         </div>
-      </div>
-    </div>
+      </PageSection>
+    </PageLayout>
   );
 }
 
