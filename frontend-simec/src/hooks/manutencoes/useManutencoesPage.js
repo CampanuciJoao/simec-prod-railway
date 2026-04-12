@@ -138,6 +138,6 @@ export function useManutencoesPage() {
     clearAllFilters,
     deleteModal,
     handleConfirmDelete,
-    goToCreate: () => navigate('/manutencoes/nova'),
+    goToCreate: () => navigate('/manutencoes/agendar'),
   };
 }
