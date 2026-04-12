@@ -5,9 +5,32 @@ import { enviarEmail } from './emailService.js';
 import { gerarRecomendacoesProativasDeManutencao } from './maintenanceRecommendationService.js';
 import { addDays, isBefore, isAfter, differenceInDays, format, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getAgora } from './timeService.js';
 
-// Função auxiliar para obter o horário atual
-const getAgora = () => new Date();
+// ==========================================================================
+// HELPERS
+// ==========================================================================
+
+function isSeguroPredial(seguro) {
+  return !seguro?.equipamentoId;
+}
+
+function temCoberturaVendaval(seguro) {
+  return Number(seguro?.lmiVendaval || 0) > 0;
+}
+
+function getDescricaoAlvoSeguro(seguro) {
+  if (seguro?.unidade?.nomeSistema) {
+    return `na unidade de ${seguro.unidade.nomeSistema}`;
+  }
+
+  if (seguro?.equipamento?.modelo) {
+    const tag = seguro.equipamento?.tag ? ` (${seguro.equipamento.tag})` : '';
+    return `no equipamento ${seguro.equipamento.modelo}${tag}`;
+  }
+
+  return 'no objeto segurado';
+}
 
 // ==========================================================================
 // SEÇÃO DE MANUTENÇÕES E SAÚDE PREDITIVA
@@ -75,7 +98,7 @@ export async function atualizarStatusManutencoes() {
   }
 
   // --- 2. INÍCIO AUTOMÁTICO ---
-  const margemInicio = new Date(agora.getTime() + 60000); // 1 minuto no futuro
+  const margemInicio = new Date(agora.getTime() + 60000);
 
   const manutsParaIniciar = await prisma.manutencao.findMany({
     where: {
@@ -201,7 +224,6 @@ async function gerarAlertasDeProximidadeManutencao() {
   }
 }
 
-// --- ALERTAS DE PROXIMIDADE DO FIM DA MANUTENÇÃO ---
 async function gerarAlertasDeProximidadeFimManutencao() {
   const agora = getAgora();
 
@@ -282,7 +304,8 @@ export async function processarSaudeEquipamentos() {
     );
 
     if (score >= 10) {
-      const idAlerta = `alerta-saude-${eq.id}-${getAgora().getMonth()}`;
+      const agora = getAgora();
+      const idAlerta = `alerta-saude-${eq.id}-${agora.getFullYear()}-${agora.getMonth() + 1}`;
       const unidade = eq.unidade?.nomeSistema || 'N/A';
       const novoTitulo = `Risco de falha crítico na unidade de ${unidade}, no equipamento ${eq.modelo} (${eq.tag})`;
 
@@ -293,7 +316,7 @@ export async function processarSaudeEquipamentos() {
           id: idAlerta,
           titulo: novoTitulo,
           subtitulo: 'Este ativo atingiu um nível elevado de reincidência de falhas.',
-          data: getAgora(),
+          data: agora,
           prioridade: 'Alta',
           tipo: 'Manutenção',
           link: `/equipamentos/ficha-tecnica/${eq.id}`
@@ -347,7 +370,7 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
     }
   } else {
     const idAlerta = `${tipoEntidade.toLowerCase()}-vencido-${item.id}`;
-    const novoTitulo = `${tipoEntidade} Vencido`;
+    const novoTitulo = `${tipoEntidade} vencido`;
 
     await prisma.alerta.upsert({
       where: { id: idAlerta },
@@ -368,7 +391,9 @@ async function gerarAlertasVencimento(item, tipoEntidade) {
 }
 
 async function verificarVencimentoContratos() {
-  const contratosAtivos = await prisma.contrato.findMany({ where: { status: 'Ativo' } });
+  const contratosAtivos = await prisma.contrato.findMany({
+    where: { status: 'Ativo' }
+  });
   const hoje = startOfDay(getAgora());
 
   for (const contrato of contratosAtivos) {
@@ -430,7 +455,25 @@ async function verificarVencimentoContratos() {
 }
 
 async function verificarVencimentoSeguros() {
-  const segurosAtivos = await prisma.seguro.findMany({ where: { status: 'Ativo' } });
+  const segurosAtivos = await prisma.seguro.findMany({
+    where: { status: 'Ativo' },
+    include: {
+      unidade: {
+        select: {
+          id: true,
+          nomeSistema: true
+        }
+      },
+      equipamento: {
+        select: {
+          id: true,
+          modelo: true,
+          tag: true
+        }
+      }
+    }
+  });
+
   const hoje = startOfDay(getAgora());
 
   for (const seguro of segurosAtivos) {
@@ -491,6 +534,72 @@ async function verificarVencimentoSeguros() {
   }
 }
 
+// ==========================================================================
+// SEÇÃO DE SEGUROS PREDIAIS / COBERTURAS
+// ==========================================================================
+
+async function gerarAlertasSegurosSemVendaval() {
+  const segurosAtivos = await prisma.seguro.findMany({
+    where: {
+      status: { in: ['Ativo', 'Vigente'] }
+    },
+    include: {
+      unidade: {
+        select: {
+          id: true,
+          nomeSistema: true
+        }
+      },
+      equipamento: {
+        select: {
+          id: true,
+          modelo: true,
+          tag: true
+        }
+      }
+    }
+  });
+
+  for (const seguro of segurosAtivos) {
+    const ehPredial = !seguro.equipamentoId;
+    const semVendaval = Number(seguro.lmiVendaval || 0) <= 0;
+
+    if (!ehPredial || !semVendaval) continue;
+
+    const alvo = seguro.unidade?.nomeSistema
+      ? `na unidade de ${seguro.unidade.nomeSistema}`
+      : 'no seguro predial';
+
+    const idAlerta = `seguro-vendaval-ausente-${seguro.id}`;
+    const titulo = `Seguro sem cobertura de vendaval ${alvo}`;
+
+    await prisma.alerta.upsert({
+      where: { id: idAlerta },
+      update: {
+        titulo,
+        subtitulo: `Apólice ${seguro.apoliceNumero} sem cobertura de vendaval cadastrada.`,
+        data: getAgora(),
+        prioridade: 'Media',
+        tipo: 'Seguro',
+        link: `/seguros/editar/${seguro.id}`
+      },
+      create: {
+        id: idAlerta,
+        titulo,
+        subtitulo: `Apólice ${seguro.apoliceNumero} sem cobertura de vendaval cadastrada.`,
+        data: getAgora(),
+        prioridade: 'Media',
+        tipo: 'Seguro',
+        link: `/seguros/editar/${seguro.id}`
+      }
+    });
+  }
+}
+
+// ==========================================================================
+// ORQUESTRADOR
+// ==========================================================================
+
 export async function processarAlertasEEnviarNotificacoes() {
   try {
     console.log('[TAREFA PROGRAMADA] Iniciando ciclo de verificações...');
@@ -502,6 +611,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     await gerarRecomendacoesProativasDeManutencao();
     await verificarVencimentoContratos();
     await verificarVencimentoSeguros();
+    await gerarAlertasSegurosSemVendaval();
 
     if (global.io) {
       global.io.emit('atualizar-alertas');

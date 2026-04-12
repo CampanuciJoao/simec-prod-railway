@@ -146,6 +146,7 @@ model Seguro {
   lmiResponsabilidadeCivil Float?       @default(0)
   lmiRoubo                 Float?       @default(0)
   lmiVidros                Float?       @default(0)
+  lmiVendaval              Float?       @default(0)
   premioTotal              Float?       @default(0) @map("premio_total")
   anexos                   Anexo[]
   equipamento              Equipamento? @relation(fields: [equipamentoId], references: [id])

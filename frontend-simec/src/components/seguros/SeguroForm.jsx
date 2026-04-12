@@ -7,11 +7,10 @@ import {
   faShieldAlt,
   faHospital,
   faCoins,
-  faFileLines,
   faTimes,
+  faCalendarDays,
 } from '@fortawesome/free-solid-svg-icons';
 
-import DateInput from '../ui/DateInput';
 import PageSection from '../ui/PageSection';
 
 const TIPOS_VINCULO = {
@@ -39,9 +38,14 @@ const ESTADO_INICIAL_VAZIO = {
   lmiDanosCorporais: 0,
   lmiDanosMorais: 0,
   lmiAPP: 0,
+  lmiVendaval: 0,
 };
 
-function FormField({ label, required = false, children }) {
+function hojeISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function FormField({ label, required = false, hint = '', children }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm font-medium text-slate-700">
@@ -49,50 +53,162 @@ function FormField({ label, required = false, children }) {
         {required ? ' *' : ''}
       </label>
       {children}
+      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
 }
 
-function TextInput(props) {
+FormField.propTypes = {
+  label: PropTypes.string.isRequired,
+  required: PropTypes.bool,
+  hint: PropTypes.string,
+  children: PropTypes.node.isRequired,
+};
+
+function TextInput({ className = '', ...props }) {
   return (
     <input
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     />
   );
 }
 
-function SelectInput({ children, ...props }) {
+TextInput.propTypes = {
+  className: PropTypes.string,
+};
+
+function SelectInput({ children, className = '', ...props }) {
   return (
     <select
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     >
       {children}
     </select>
   );
 }
 
-function TextareaInput(props) {
+SelectInput.propTypes = {
+  children: PropTypes.node.isRequired,
+  className: PropTypes.string,
+};
+
+function TextareaInput({ className = '', ...props }) {
   return (
     <textarea
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     />
   );
 }
 
-function NumberInput(props) {
+TextareaInput.propTypes = {
+  className: PropTypes.string,
+};
+
+function NumberInput({ className = '', ...props }) {
   return (
     <input
       type="number"
       step="0.01"
       min="0"
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     />
   );
 }
+
+NumberInput.propTypes = {
+  className: PropTypes.string,
+};
+
+function DateField({ name, value, onChange, required = false, min }) {
+  const handleHoje = () => {
+    onChange({
+      target: {
+        name,
+        value: hojeISO(),
+      },
+    });
+  };
+
+  const handleLimpar = () => {
+    onChange({
+      target: {
+        name,
+        value: '',
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <FontAwesomeIcon
+          icon={faCalendarDays}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
+
+        <input
+          type="date"
+          name={name}
+          value={value || ''}
+          onChange={onChange}
+          required={required}
+          min={min}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleHoje}
+          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+        >
+          <FontAwesomeIcon icon={faCalendarDays} />
+          Hoje
+        </button>
+
+        {!!value && (
+          <button
+            type="button"
+            onClick={handleLimpar}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+            Limpar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+DateField.propTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  required: PropTypes.bool,
+  min: PropTypes.string,
+};
 
 function SeguroForm({
   onSubmit,
@@ -134,6 +250,7 @@ function SeguroForm({
         lmiDanosCorporais: Number(initialData.lmiDanosCorporais || 0),
         lmiDanosMorais: Number(initialData.lmiDanosMorais || 0),
         lmiAPP: Number(initialData.lmiAPP || 0),
+        lmiVendaval: Number(initialData.lmiVendaval || 0),
       });
     } else {
       setFormData(ESTADO_INICIAL_VAZIO);
@@ -148,6 +265,10 @@ function SeguroForm({
       ...prev,
       [name]: finalValue,
     }));
+
+    if (error) {
+      setError('');
+    }
   };
 
   const handleTipoVinculoChange = (e) => {
@@ -159,6 +280,10 @@ function SeguroForm({
       equipamentoId: '',
       unidadeId: '',
     }));
+
+    if (error) {
+      setError('');
+    }
   };
 
   const equipamentosFiltradosPorUnidade = useMemo(() => {
@@ -178,13 +303,18 @@ function SeguroForm({
     e.preventDefault();
     setError('');
 
-    if (!formData.apoliceNumero || !formData.seguradora) {
+    if (!formData.apoliceNumero.trim() || !formData.seguradora.trim()) {
       setError('Número da apólice e seguradora são campos obrigatórios.');
       return;
     }
 
     if (!formData.dataInicio || !formData.dataFim) {
       setError('Início e fim da vigência são campos obrigatórios.');
+      return;
+    }
+
+    if (formData.dataFim < formData.dataInicio) {
+      setError('A data final da vigência não pode ser anterior à data inicial.');
       return;
     }
 
@@ -210,6 +340,9 @@ function SeguroForm({
     try {
       const payload = {
         ...formData,
+        apoliceNumero: formData.apoliceNumero.trim(),
+        seguradora: formData.seguradora.trim(),
+        cobertura: String(formData.cobertura || '').trim(),
         equipamentoId:
           formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO
             ? formData.equipamentoId
@@ -284,8 +417,12 @@ function SeguroForm({
             />
           </FormField>
 
-          <FormField label="Início da vigência" required>
-            <DateInput
+          <FormField
+            label="Início da vigência"
+            required
+            hint="Você pode selecionar no calendário ou digitar."
+          >
+            <DateField
               name="dataInicio"
               value={formData.dataInicio}
               onChange={handleChange}
@@ -293,12 +430,17 @@ function SeguroForm({
             />
           </FormField>
 
-          <FormField label="Fim da vigência" required>
-            <DateInput
+          <FormField
+            label="Fim da vigência"
+            required
+            hint="A vigência final não pode ser anterior ao início."
+          >
+            <DateField
               name="dataFim"
               value={formData.dataFim}
               onChange={handleChange}
               required
+              min={formData.dataInicio || undefined}
             />
           </FormField>
         </div>
@@ -442,6 +584,15 @@ function SeguroForm({
             <NumberInput
               name="lmiVidros"
               value={formData.lmiVidros}
+              onChange={handleChange}
+              placeholder="0,00"
+            />
+          </FormField>
+
+          <FormField label="Vendaval">
+            <NumberInput
+              name="lmiVendaval"
+              value={formData.lmiVendaval}
               onChange={handleChange}
               placeholder="0,00"
             />

@@ -69,7 +69,10 @@ function montarListaCoberturas(seguro) {
         { rotulo: 'Incêndio', valor: seguro.lmiIncendio },
         { rotulo: 'Responsabilidade Civil', valor: seguro.lmiResponsabilidadeCivil },
         { rotulo: 'Roubo / Furto', valor: seguro.lmiRoubo },
-        { rotulo: 'Vidros', valor: seguro.lmiVidros }
+        { rotulo: 'Vidros', valor: seguro.lmiVidros },
+
+        // 🔥 NOVO
+        { rotulo: 'Vendaval', valor: seguro.lmiVendaval },
     ]
         .filter(item => Number(item.valor || 0) > 0)
         .map(item => `${item.rotulo}: ${formatarMoedaBR(item.valor)}`);

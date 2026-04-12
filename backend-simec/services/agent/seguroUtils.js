@@ -111,7 +111,8 @@ function montarCoberturasDetalhadas(seguro) {
         { chave: 'Incêndio', valor: seguro.lmiIncendio },
         { chave: 'Responsabilidade Civil', valor: seguro.lmiResponsabilidadeCivil },
         { chave: 'Roubo / Furto', valor: seguro.lmiRoubo },
-        { chave: 'Vidros', valor: seguro.lmiVidros }
+        { chave: 'Vidros', valor: seguro.lmiVidros },
+        { chave: 'Vendaval', valor: seguro.lmiVendaval }
     ];
 
     return itens
