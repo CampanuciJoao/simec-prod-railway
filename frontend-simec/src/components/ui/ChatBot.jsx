@@ -9,8 +9,11 @@ import {
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 
-import ChatMessageBubble from './chat/ChatMessageBubble';
-import { enviarMensagemAoAgente } from '../../services/api/agentApi';
+import ChatMessageBubble from '../chat/ChatMessageBubble';
+import {
+  enviarMensagemAoAgente,
+  mapearHistoricoParaAPI,
+} from '../../services/api/agentApi';
 
 function formatTime(date = new Date()) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -122,17 +125,24 @@ function ChatBot() {
       createdAt: formatTime(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    const nextMessages = [...messages, userMessage];
+
+    setMessages(nextMessages);
     setInput('');
     setIsTyping(true);
     focusInput();
 
     try {
-      const resultado = await enviarMensagemAoAgente(texto);
+      const historico = mapearHistoricoParaAPI(nextMessages);
+
+      const resultado = await enviarMensagemAoAgente({
+        mensagem: texto,
+        historico,
+        contextoExtra: null,
+      });
 
       const mensagemAgente =
-        resultado?.resposta?.mensagem ||
-        'Não recebi uma resposta válida do agente.';
+        resultado?.mensagem || 'Não recebi uma resposta válida do agente.';
 
       appendAssistantMessage(mensagemAgente);
     } catch (error) {
@@ -150,8 +160,7 @@ function ChatBot() {
       {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content:
-          'Conversa reiniciada.\n\nComo posso ajudar você agora?',
+        content: 'Conversa reiniciada.\n\nComo posso ajudar você agora?',
         createdAt: formatTime(),
       },
     ]);
