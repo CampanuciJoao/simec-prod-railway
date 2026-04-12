@@ -1,5 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getUnidades, getEquipamentos, gerarRelatorio } from '../../services/api';
+import {
+  getUnidades,
+  getEquipamentos,
+  gerarRelatorio,
+} from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { exportarRelatorioPDF } from '../../utils/pdfUtils';
 import { getErrorMessage } from '../../utils/getErrorMessage';
@@ -35,16 +39,23 @@ export function useRelatoriosPage() {
         ]);
 
         setUnidadesDisponiveis(
-          (unidadesData || []).sort((a, b) => a.nomeSistema.localeCompare(b.nomeSistema))
+          (unidadesData || []).sort((a, b) =>
+            a.nomeSistema.localeCompare(b.nomeSistema)
+          )
         );
 
         const fabricantes = [
-          ...new Set((equipamentosData || []).map((eq) => eq.fabricante).filter(Boolean)),
+          ...new Set(
+            (equipamentosData || []).map((eq) => eq.fabricante).filter(Boolean)
+          ),
         ].sort();
 
         setFabricantesUnicos(fabricantes);
       } catch (err) {
-        const message = getErrorMessage(err, 'Erro ao carregar dados para os filtros.');
+        const message = getErrorMessage(
+          err,
+          'Erro ao carregar dados para os filtros.'
+        );
         setError(message);
         addToast(message, 'error');
       } finally {
@@ -114,6 +125,96 @@ export function useRelatoriosPage() {
     [unidadesDisponiveis]
   );
 
+  const tipoRelatorioOptions = useMemo(
+    () => [
+      {
+        value: 'inventarioEquipamentos',
+        label: 'Inventário de Equipamentos',
+      },
+      {
+        value: 'manutencoesRealizadas',
+        label: 'Manutenções Realizadas',
+      },
+    ],
+    []
+  );
+
+  const metricas = useMemo(() => {
+    return {
+      unidades: unidadesDisponiveis.length,
+      fabricantes: fabricantesUnicos.length,
+      tipoAtual:
+        filtros.tipoRelatorio === 'inventarioEquipamentos'
+          ? 'Inventário'
+          : 'Manutenções',
+      registros:
+        Array.isArray(resultadoRelatorio?.dados) ? resultadoRelatorio.dados.length : 0,
+    };
+  }, [unidadesDisponiveis, fabricantesUnicos, filtros.tipoRelatorio, resultadoRelatorio]);
+
+  const activeFilters = useMemo(() => {
+    const unidadeSelecionada = unidadesOptions.find(
+      (u) => String(u.value) === String(filtros.unidadeId)
+    );
+
+    return [
+      filtros.tipoRelatorio
+        ? {
+            key: 'tipoRelatorio',
+            label: `Tipo: ${
+              filtros.tipoRelatorio === 'inventarioEquipamentos'
+                ? 'Inventário'
+                : 'Manutenções'
+            }`,
+            value: filtros.tipoRelatorio,
+          }
+        : null,
+      filtros.unidadeId
+        ? {
+            key: 'unidadeId',
+            label: `Unidade: ${unidadeSelecionada?.label || filtros.unidadeId}`,
+            value: filtros.unidadeId,
+          }
+        : null,
+      filtros.fabricante
+        ? {
+            key: 'fabricante',
+            label: `Fabricante: ${filtros.fabricante}`,
+            value: filtros.fabricante,
+          }
+        : null,
+      filtros.dataInicio
+        ? {
+            key: 'dataInicio',
+            label: `Início: ${filtros.dataInicio}`,
+            value: filtros.dataInicio,
+          }
+        : null,
+      filtros.dataFim
+        ? {
+            key: 'dataFim',
+            label: `Fim: ${filtros.dataFim}`,
+            value: filtros.dataFim,
+          }
+        : null,
+    ].filter(Boolean);
+  }, [filtros, unidadesOptions]);
+
+  const clearFilter = (key) => {
+    setFiltros((prev) => ({ ...prev, [key]: '' }));
+  };
+
+  const clearAllFilters = () => {
+    setFiltros({
+      tipoRelatorio: 'inventarioEquipamentos',
+      unidadeId: '',
+      fabricante: '',
+      tipoManutencao: '',
+      dataInicio: '',
+      dataFim: '',
+    });
+  };
+
   return {
     filtros,
     setFiltros,
@@ -123,6 +224,11 @@ export function useRelatoriosPage() {
     error,
     fabricantesOptions,
     unidadesOptions,
+    tipoRelatorioOptions,
+    metricas,
+    activeFilters,
+    clearFilter,
+    clearAllFilters,
     handleFiltroChange,
     handleGerarRelatorio,
     handleExportarPDF,

@@ -1,63 +1,98 @@
-// Ficheiro: src/pages/CadastrosGeraisPage.jsx
-// VERSÃO ATUALIZADA - COM ABA DEDICADA A "ADICIONAR EQUIPAMENTO"
-
 import React from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBuilding, faEnvelope, faPlus, faMicrochip } from '@fortawesome/free-solid-svg-icons'; // Adicionado faPlus e faMicrochip
+import {
+  faBuilding,
+  faMicrochip,
+  faUsers,
+  faEnvelope,
+  faPlus,
+} from '@fortawesome/free-solid-svg-icons';
 
-/**
- * Componente de layout para a seção de "Cadastros Gerais".
- * Renderiza um título padrão e a navegação por abas, e usa o <Outlet>
- * do React Router para renderizar o conteúdo da rota aninhada ativa
- * (seja uma lista ou um formulário).
- */
-function CadastrosGeraisPage() {
-  const location = useLocation();
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import Card from '../../components/ui/Card';
 
-  // A lógica para determinar se as abas de navegação devem ser exibidas.
-  // Elas são ocultadas quando o usuário está em uma rota de formulário de EDIÇÃO
-  // para dar mais foco à tarefa. A aba "Adicionar Equipamento" sempre será visível.
-  const mostrarAbas = !/editar/.test(location.pathname); // Modificado para ocultar abas APENAS na edição.
+function CadastroCard({ icon, title, description, onClick, tone = 'blue' }) {
+  const toneMap = {
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-emerald-100 text-emerald-600',
+    yellow: 'bg-amber-100 text-amber-600',
+    slate: 'bg-slate-100 text-slate-600',
+  };
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">Cadastros Gerais</h1>
-      </div>
-      
-      {/* A navegação por abas é renderizada, exceto quando em modo de edição. */}
-      {mostrarAbas && (
-        <div className="tabs-navigation">
-          <NavLink 
-            to="/cadastros/unidades" 
-            className={({ isActive }) => `tab-button ${isActive ? 'active' : ''}`}
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <Card className="h-full">
+        <div className="flex flex-col gap-4">
+          <div
+            className={[
+              'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
+              toneMap[tone] || toneMap.blue,
+            ].join(' ')}
           >
-            <FontAwesomeIcon icon={faBuilding} /> Unidades
-          </NavLink>
-          {/* NOVA ABA: Adicionar Equipamento */}
-          <NavLink 
-            to="/cadastros/equipamentos/adicionar" 
-            className={({ isActive }) => `tab-button ${isActive ? 'active' : ''}`}
-          >
-            <FontAwesomeIcon icon={faPlus} /> <FontAwesomeIcon icon={faMicrochip} /> Add Equipamento
-          </NavLink>
-          <NavLink 
-              to="/cadastros/emails" 
-              className={({ isActive }) => `tab-button ${isActive ? 'active' : ''}`}
-            >
-              <FontAwesomeIcon icon={faEnvelope} /> E-mails de Notificação
-            </NavLink>
-        </div>
-        )}
+            <FontAwesomeIcon icon={icon} />
+          </div>
 
-      {/* O <Outlet> é o marcador de posição onde o React Router irá renderizar o
-        componente correspondente à rota filha que foi acessada.
-      */}
-      <div className="tab-content-container">
-        <Outlet /> 
+          <div>
+            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+            <p className="mt-1 text-sm leading-6 text-slate-500">{description}</p>
+          </div>
+        </div>
+      </Card>
+    </button>
+  );
+}
+
+function CadastrosGeraisPage() {
+  const navigate = useNavigate();
+
+  return (
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title="Cadastros Gerais"
+        subtitle="Centralize os cadastros administrativos do sistema"
+        icon={faPlus}
+      />
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <CadastroCard
+          icon={faBuilding}
+          title="Unidades"
+          description="Gerencie as unidades cadastradas no sistema."
+          tone="blue"
+          onClick={() => navigate('/cadastros/unidades')}
+        />
+
+        <CadastroCard
+          icon={faMicrochip}
+          title="Equipamentos"
+          description="Cadastre e mantenha o parque de equipamentos."
+          tone="green"
+          onClick={() => navigate('/cadastros/equipamentos/adicionar')}
+        />
+
+        <CadastroCard
+          icon={faUsers}
+          title="Usuários"
+          description="Gerencie usuários e permissões de acesso."
+          tone="yellow"
+          onClick={() => navigate('/gerenciamento/usuarios')}
+        />
+
+        <CadastroCard
+          icon={faEnvelope}
+          title="E-mails de Notificação"
+          description="Configure e-mails usados para alertas e comunicação."
+          tone="slate"
+          onClick={() => navigate('/gerenciamento/emails')}
+        />
       </div>
-    </div>
+    </PageLayout>
   );
 }
 
