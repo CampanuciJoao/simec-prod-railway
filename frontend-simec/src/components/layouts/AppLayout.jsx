@@ -1,13 +1,5 @@
-// src/layouts/AppLayout.jsx (FINAL)
-
-import React, { useState, useEffect, useRef } from 'react';
-import { Link, useLocation, Outlet } from 'react-router-dom';
-import { useAlertas } from '@/contexts/AlertasContext';
-import { useAuth } from '@/contexts/AuthContext';
-
-import Sidebar from '@/components/ui/Sidebar';
-import ChatBot from '@/components/charts/ChatBot';
-
+import React, { useEffect, useRef, useState } from 'react';
+import { Link, Outlet, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faMoon,
@@ -18,11 +10,16 @@ import {
   faBars,
 } from '@fortawesome/free-solid-svg-icons';
 
+import { useAlertas } from '@/contexts/AlertasContext';
+import { useAuth } from '@/contexts/AuthContext';
+
+import Sidebar from '@/components/ui/Sidebar';
+import ChatBot from '@/components/charts/ChatBot';
+
 function AppLayout() {
   const [theme, setTheme] = useState(
     () => localStorage.getItem('theme') || 'light'
   );
-
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSidebarMobileOpen, setSidebarMobileOpen] = useState(false);
 
@@ -32,7 +29,6 @@ function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
 
-  // ✅ APLICA DARK MODE DE VERDADE
   useEffect(() => {
     localStorage.setItem('theme', theme);
     document.documentElement.classList.toggle('dark', theme === 'dark');
@@ -67,65 +63,72 @@ function AppLayout() {
   };
 
   return (
-    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-900">
-      {/* SIDEBAR */}
+    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950">
       <Sidebar
         notificacoesCount={alertasNaoVistos.length}
         isMobileOpen={isSidebarMobileOpen}
         onClose={() => setSidebarMobileOpen(false)}
       />
 
-      {/* CONTEÚDO */}
-      <div className="flex flex-1 flex-col">
-        {/* HEADER */}
-        <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4 shadow-sm dark:border-slate-700 dark:bg-slate-800 md:px-6">
-          
+      <div className="flex min-w-0 flex-1 flex-col lg:ml-0">
+        <header className="sticky top-0 z-30 flex h-[88px] items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:px-6">
           <div className="flex items-center gap-3">
             <button
-              className="lg:hidden p-2 rounded-xl border border-slate-200 dark:border-slate-700"
+              type="button"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 lg:hidden"
               onClick={() => setSidebarMobileOpen(true)}
+              aria-label="Abrir menu"
             >
               <FontAwesomeIcon icon={faBars} />
             </button>
 
-            <span className="hidden md:block text-sm text-slate-600 dark:text-slate-300">
-              Olá, <strong>{user?.nome}</strong>
-            </span>
+            <div className="hidden md:block">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Olá,
+              </p>
+              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                {user?.nome || 'Usuário'}
+              </p>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
-
-            {/* THEME */}
             <button
+              type="button"
               onClick={toggleTheme}
-              className="btn btn-ghost"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              title="Alternar tema"
             >
               <FontAwesomeIcon icon={theme === 'light' ? faMoon : faSun} />
             </button>
 
-            {/* NOTIFICAÇÕES */}
             <div className="relative" ref={notificationRef}>
               <button
+                type="button"
                 onClick={() => setIsDropdownOpen((prev) => !prev)}
-                className="btn btn-ghost relative"
+                className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+                title="Notificações"
               >
                 <FontAwesomeIcon icon={faBell} />
 
                 {alertasNaoVistos.length > 0 && (
-                  <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+                  <span className="absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
                     {alertasNaoVistos.length > 9 ? '9+' : alertasNaoVistos.length}
                   </span>
                 )}
               </button>
 
               {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl">
-                  
-                  <div className="flex justify-between p-3 border-b dark:border-slate-700">
-                    <span className="font-semibold">Notificações</span>
+                <div className="absolute right-0 mt-2 w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
+                  <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
+                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+                      Notificações
+                    </span>
+
                     <button
+                      type="button"
                       onClick={handleLimparNotificacoes}
-                      className="text-blue-600 text-xs"
+                      className="text-xs font-semibold text-blue-600 hover:underline"
                     >
                       Limpar
                     </button>
@@ -137,24 +140,39 @@ function AppLayout() {
                         <Link
                           key={notif.id}
                           to={notif.link || '/alertas'}
-                          className="flex gap-3 p-3 hover:bg-slate-100 dark:hover:bg-slate-700"
+                          className="flex items-start gap-3 border-b border-slate-100 px-4 py-3 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
+                          onClick={() => setIsDropdownOpen(false)}
                         >
                           <FontAwesomeIcon
                             icon={faExclamationCircle}
-                            className="text-red-500 mt-1"
+                            className="mt-1 text-red-500"
                           />
-                          <span className="text-sm">{notif.titulo}</span>
+
+                          <div className="min-w-0 flex-1">
+                            <p className="text-sm text-slate-700 dark:text-slate-200">
+                              {notif.titulo}
+                            </p>
+                            {notif.subtitulo ? (
+                              <p className="mt-1 text-xs text-slate-400">
+                                {notif.subtitulo}
+                              </p>
+                            ) : null}
+                          </div>
                         </Link>
                       ))
                     ) : (
-                      <div className="p-4 text-center text-sm text-slate-400">
+                      <div className="p-5 text-center text-sm text-slate-400">
                         Sem notificações
                       </div>
                     )}
                   </div>
 
-                  <div className="p-3 text-center border-t dark:border-slate-700">
-                    <Link to="/alertas" className="text-xs text-blue-600">
+                  <div className="border-t border-slate-200 px-4 py-3 text-center dark:border-slate-800">
+                    <Link
+                      to="/alertas"
+                      className="text-xs font-semibold text-blue-600 hover:underline"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
                       Ver todos
                     </Link>
                   </div>
@@ -162,20 +180,21 @@ function AppLayout() {
               )}
             </div>
 
-            {/* LOGOUT */}
-            <button onClick={logout} className="btn btn-ghost text-red-500">
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-red-600 transition hover:bg-red-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-red-950/40"
+              title="Sair"
+            >
               <FontAwesomeIcon icon={faSignOutAlt} />
             </button>
-
           </div>
         </header>
 
-        {/* CONTEÚDO */}
-        <main className="flex-1 p-4 md:p-6">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
           <Outlet />
         </main>
 
-        {/* CHAT */}
         <ChatBot />
       </div>
     </div>

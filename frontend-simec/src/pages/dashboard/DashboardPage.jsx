@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -35,7 +35,7 @@ function KpiCard({ icon, title, value, subtitle, tone = 'blue' }) {
   };
 
   return (
-    <Card className="h-full">
+    <Card className="h-full p-4">
       <div className="flex items-center gap-4">
         <div
           className={[
@@ -71,7 +71,6 @@ function SectionHeader({ title, subtitle, action }) {
           <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
         ) : null}
       </div>
-
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
@@ -114,42 +113,87 @@ function AlertItem({ alerta }) {
 
 function EmptyPanel({ message }) {
   return (
-    <div className="flex h-full min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500">
+    <div className="flex h-full min-h-[120px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 text-center text-sm text-slate-500">
       {message}
     </div>
   );
 }
 
+function normalizarListaGrafico(input) {
+  if (!input) return [];
+
+  if (Array.isArray(input)) {
+    return input
+      .map((item) => {
+        if (item?.name !== undefined && item?.value !== undefined) {
+          return { name: String(item.name), value: Number(item.value) || 0 };
+        }
+
+        if (item?.label !== undefined && item?.value !== undefined) {
+          return { name: String(item.label), value: Number(item.value) || 0 };
+        }
+
+        if (item?.tipo !== undefined && item?.quantidade !== undefined) {
+          return { name: String(item.tipo), value: Number(item.quantidade) || 0 };
+        }
+
+        if (item?.status !== undefined && item?.quantidade !== undefined) {
+          return { name: String(item.status), value: Number(item.quantidade) || 0 };
+        }
+
+        if (item?.mes !== undefined && item?.total !== undefined) {
+          return { name: String(item.mes), value: Number(item.total) || 0 };
+        }
+
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  if (typeof input === 'object') {
+    return Object.entries(input).map(([key, value]) => ({
+      name: String(key),
+      value: Number(value) || 0,
+    }));
+  }
+
+  return [];
+}
+
 function DashboardPage() {
   const { data, loading, error } = useDashboard();
 
-  const safeData = {
-    totalEquipamentos: data?.totalEquipamentos ?? data?.equipamentosCount ?? 0,
-    emManutencao: data?.emManutencao ?? data?.manutencoesCount ?? 0,
-    contratosVencendo: data?.contratosVencendo ?? data?.contratosVencendoCount ?? 0,
-    alertasAtivos: data?.alertasAtivos ?? 0,
-    alertas: data?.alertas ?? data?.alertasRecentes ?? [],
-    statusEquipamentos: data?.statusEquipamentos ?? [],
-    manutencoesPorTipo: data?.manutencoesPorTipo ?? data?.manutencoesPorTipoMes ?? [],
-  };
+  const dashboard = useMemo(() => {
+    const raw = data || {};
+
+    return {
+      totalEquipamentos: raw.totalEquipamentos ?? raw.equipamentosCount ?? 0,
+      emManutencao: raw.emManutencao ?? raw.manutencoesPendentes ?? 0,
+      contratosVencendo: raw.contratosVencendo ?? raw.contratosVencendoCount ?? 0,
+      alertasAtivos: raw.alertasAtivos ?? raw.alertasNaoVistos ?? 0,
+      alertas: Array.isArray(raw.alertas) ? raw.alertas : [],
+      statusEquipamentos: normalizarListaGrafico(raw.statusEquipamentos),
+      manutencoesPorTipo: normalizarListaGrafico(raw.manutencoesPorTipo),
+    };
+  }, [data]);
 
   const isEmpty =
     !loading &&
     !error &&
-    safeData.totalEquipamentos === 0 &&
-    safeData.emManutencao === 0 &&
-    safeData.contratosVencendo === 0 &&
-    safeData.alertasAtivos === 0 &&
-    safeData.alertas.length === 0 &&
-    safeData.statusEquipamentos.length === 0 &&
-    safeData.manutencoesPorTipo.length === 0;
+    dashboard.totalEquipamentos === 0 &&
+    dashboard.emManutencao === 0 &&
+    dashboard.contratosVencendo === 0 &&
+    dashboard.alertasAtivos === 0 &&
+    dashboard.alertas.length === 0 &&
+    dashboard.statusEquipamentos.length === 0 &&
+    dashboard.manutencoesPorTipo.length === 0;
 
   if (loading || error || isEmpty) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Dashboard"
-          subtitle="Visão geral operacional do SIMEC"
+          subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
           icon={faChartPie}
         />
 
@@ -164,157 +208,167 @@ function DashboardPage() {
   }
 
   return (
-    <PageLayout background="slate" padded fullHeight>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
-        icon={faChartPie}
-      />
-
-      {/* KPIs */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
-        <KpiCard
-          icon={faHeartbeat}
-          title="Equipamentos"
-          value={safeData.totalEquipamentos}
-          subtitle="Parque total"
-          tone="blue"
+    <PageLayout
+      background="slate"
+      padded
+      fullHeight
+      className="h-[calc(100vh-88px)] overflow-hidden"
+    >
+      <div className="flex h-full flex-col gap-5 overflow-hidden">
+        <PageHeader
+          title="Dashboard"
+          subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
+          icon={faChartPie}
         />
 
-        <KpiCard
-          icon={faWrench}
-          title="Em manutenção"
-          value={safeData.emManutencao}
-          subtitle="Ordens abertas"
-          tone="amber"
-        />
-
-        <KpiCard
-          icon={faFileContract}
-          title="Contratos vencendo"
-          value={safeData.contratosVencendo}
-          subtitle="Próximos 30 dias"
-          tone="red"
-        />
-
-        <KpiCard
-          icon={faBell}
-          title="Alertas ativos"
-          value={safeData.alertasAtivos}
-          subtitle="Não visualizados"
-          tone="emerald"
-        />
-      </div>
-
-      {/* Linha analítica principal */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.25fr]">
-        <PageSection className="h-full">
-          <SectionHeader
-            title="Status dos equipamentos"
-            subtitle="Distribuição atual do parque por condição operacional"
+        {/* KPIs */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
+          <KpiCard
+            icon={faHeartbeat}
+            title="Equipamentos"
+            value={dashboard.totalEquipamentos}
+            subtitle="Parque total"
+            tone="blue"
           />
 
-          <div className="h-[320px]">
-            <DonutChart data={safeData.statusEquipamentos} />
+          <KpiCard
+            icon={faWrench}
+            title="Em manutenção"
+            value={dashboard.emManutencao}
+            subtitle="Ordens abertas"
+            tone="amber"
+          />
+
+          <KpiCard
+            icon={faFileContract}
+            title="Contratos vencendo"
+            value={dashboard.contratosVencendo}
+            subtitle="Próximos 30 dias"
+            tone="red"
+          />
+
+          <KpiCard
+            icon={faBell}
+            title="Alertas ativos"
+            value={dashboard.alertasAtivos}
+            subtitle="Não visualizados"
+            tone="emerald"
+          />
+        </div>
+
+        {/* Área principal sem crescer indefinidamente */}
+        <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 xl:grid-cols-[1fr_1.2fr]">
+          {/* Coluna esquerda */}
+          <div className="grid min-h-0 grid-rows-[1fr_auto] gap-6">
+            <PageSection className="min-h-0 overflow-hidden">
+              <SectionHeader
+                title="Status dos equipamentos"
+                subtitle="Distribuição atual do parque por condição operacional"
+              />
+
+              <div className="h-[260px]">
+                <DonutChart data={dashboard.statusEquipamentos} />
+              </div>
+            </PageSection>
+
+            <PageSection className="overflow-hidden">
+              <SectionHeader
+                title="Últimos alertas"
+                subtitle="Ocorrências recentes e pontos de atenção do sistema"
+                action={
+                  <Link
+                    to="/alertas"
+                    className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
+                  >
+                    Ver todos
+                    <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+                  </Link>
+                }
+              />
+
+              {dashboard.alertas.length > 0 ? (
+                <div className="max-h-[220px] space-y-3 overflow-y-auto pr-1">
+                  {dashboard.alertas.slice(0, 4).map((alerta) => (
+                    <AlertItem key={alerta.id} alerta={alerta} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyPanel message="Nenhum alerta recente no momento." />
+              )}
+            </PageSection>
           </div>
-        </PageSection>
 
-        <PageSection className="h-full">
-          <SectionHeader
-            title="Manutenções nos últimos 6 meses"
-            subtitle="Acompanhe a evolução por tipo de manutenção"
-          />
+          {/* Coluna direita */}
+          <div className="grid min-h-0 grid-rows-[1fr_auto] gap-6">
+            <PageSection className="min-h-0 overflow-hidden">
+              <SectionHeader
+                title="Manutenções nos últimos 6 meses"
+                subtitle="Acompanhe a evolução por tipo de manutenção"
+              />
 
-          <div className="h-[320px]">
-            <BarChart data={safeData.manutencoesPorTipo} />
-          </div>
-        </PageSection>
-      </div>
+              <div className="h-[260px]">
+                <BarChart data={dashboard.manutencoesPorTipo} />
+              </div>
+            </PageSection>
 
-      {/* Linha operacional */}
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <PageSection className="h-full">
-          <SectionHeader
-            title="Últimos alertas"
-            subtitle="Ocorrências recentes e pontos de atenção do sistema"
-            action={
-              <Link
-                to="/alertas"
-                className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-              >
-                Ver todos
-                <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
-              </Link>
-            }
-          />
+            <PageSection className="overflow-hidden">
+              <SectionHeader
+                title="Resumo operacional"
+                subtitle="Leitura rápida do estado atual do sistema"
+              />
 
-          {safeData.alertas.length > 0 ? (
-            <div className="max-h-[360px] space-y-3 overflow-y-auto pr-1">
-              {safeData.alertas.slice(0, 6).map((alerta) => (
-                <AlertItem key={alerta.id} alerta={alerta} />
-              ))}
-            </div>
-          ) : (
-            <EmptyPanel message="Nenhum alerta recente no momento." />
-          )}
-        </PageSection>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3 xl:grid-cols-1">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+                      <FontAwesomeIcon icon={faHeartbeat} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Parque monitorado
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {dashboard.totalEquipamentos} equipamento(s) cadastrados
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-        <PageSection className="h-full">
-          <SectionHeader
-            title="Resumo operacional"
-            subtitle="Leitura rápida do estado atual do sistema"
-          />
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                      <FontAwesomeIcon icon={faScrewdriverWrench} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Carga de manutenção
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        {dashboard.emManutencao} ordem(ns) em aberto
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-                  <FontAwesomeIcon icon={faHeartbeat} />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    Parque monitorado
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {safeData.totalEquipamentos} equipamento(s) cadastrados
-                  </p>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="flex items-center gap-3">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
+                      <FontAwesomeIcon icon={faExclamationTriangle} />
+                    </span>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">
+                        Prioridade do dia
+                      </p>
+                      <p className="text-sm text-slate-500">
+                        Acompanhar alertas ativos e contratos próximos do vencimento
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-                  <FontAwesomeIcon icon={faScrewdriverWrench} />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    Carga de manutenção
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    {safeData.emManutencao} ordem(ns) em andamento ou pendentes
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex items-center gap-3">
-                <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
-                  <FontAwesomeIcon icon={faExclamationTriangle} />
-                </span>
-                <div>
-                  <p className="text-sm font-semibold text-slate-800">
-                    Prioridade do dia
-                  </p>
-                  <p className="text-sm text-slate-500">
-                    Monitore alertas ativos e contratos próximos do vencimento
-                  </p>
-                </div>
-              </div>
-            </div>
+            </PageSection>
           </div>
-        </PageSection>
+        </div>
       </div>
     </PageLayout>
   );
