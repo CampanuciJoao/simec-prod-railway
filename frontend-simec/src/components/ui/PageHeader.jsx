@@ -1,27 +1,46 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
-function PageHeader({ title, subtitle, icon, actions }) {
+function PageHeader({
+  title,
+  subtitle,
+  icon,
+  actions,
+  className = '',
+}) {
   return (
-    <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-      <div className="flex items-center gap-3">
+    <div
+      className={[
+        'flex flex-col gap-4 md:flex-row md:items-center md:justify-between',
+        'mb-6 md:mb-8', // 👈 AQUI ESTÁ A CORREÇÃO PRINCIPAL
+        className,
+      ].join(' ')}
+    >
+      <div className="flex items-start gap-4">
         {icon && (
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
             <FontAwesomeIcon icon={icon} />
-          </span>
+          </div>
         )}
 
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+          <h1 className="text-xl md:text-2xl font-semibold text-slate-900">
             {title}
           </h1>
+
           {subtitle && (
-            <p className="text-sm text-slate-500">{subtitle}</p>
+            <p className="text-sm text-slate-500">
+              {subtitle}
+            </p>
           )}
         </div>
       </div>
 
-      {actions && <div className="flex items-center gap-2">{actions}</div>}
+      {actions && (
+        <div className="flex items-center gap-2">
+          {actions}
+        </div>
+      )}
     </div>
   );
 }
