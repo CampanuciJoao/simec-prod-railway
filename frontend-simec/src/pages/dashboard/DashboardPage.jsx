@@ -9,6 +9,7 @@ import {
   faChartPie,
   faExclamationTriangle,
   faArrowRight,
+  faChartColumn,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useDashboard } from '../../hooks/dashboard/useDashboard';
@@ -18,7 +19,6 @@ import PageHeader from '../../components/ui/PageHeader';
 import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
 import Card from '../../components/ui/Card';
-import Badge from '../../components/ui/Badge';
 
 import BarChart from '../../components/charts/BarChart';
 import DonutChart from '../../components/charts/DonutChart';
@@ -68,53 +68,30 @@ function SectionHeader({ title, subtitle, action }) {
           <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
         ) : null}
       </div>
+
       {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
 
-function AlertItem({ alerta }) {
-  const prioridadeVariant =
+function AlertListItem({ alerta }) {
+  const prioridadeCor =
     alerta.prioridade === 'Alta'
-      ? 'red'
+      ? 'bg-red-500'
       : alerta.prioridade === 'Media'
-        ? 'yellow'
-        : 'blue';
+        ? 'bg-amber-400'
+        : 'bg-slate-400';
 
   return (
     <Link
       to={alerta.link || '/alertas'}
-      className="block rounded-xl border border-slate-200 bg-slate-50 p-4 transition hover:border-slate-300 hover:bg-white"
+      className="flex items-center gap-3 border-b border-slate-200 py-3 last:border-b-0 hover:bg-slate-50"
     >
-      <div className="flex items-start gap-3">
-        <span className="mt-0.5 inline-flex h-9 w-9 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-          <FontAwesomeIcon icon={faExclamationTriangle} />
-        </span>
-
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-3">
-            <p className="text-sm font-medium leading-6 text-slate-800">
-              {alerta.titulo}
-            </p>
-            <Badge variant={prioridadeVariant}>
-              {alerta.prioridade || 'Info'}
-            </Badge>
-          </div>
-
-          {alerta.subtitulo ? (
-            <p className="mt-1 text-sm text-slate-500">{alerta.subtitulo}</p>
-          ) : null}
-        </div>
-      </div>
+      <span className={`inline-block h-2.5 w-2.5 rounded-full ${prioridadeCor}`} />
+      <span className="line-clamp-1 text-sm text-slate-700 hover:text-blue-600">
+        {alerta.titulo}
+      </span>
     </Link>
-  );
-}
-
-function EmptyPanel({ message }) {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
-      {message}
-    </div>
   );
 }
 
@@ -159,6 +136,7 @@ function DashboardPage() {
           icon={faChartPie}
         />
 
+        {/* Cards do topo */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
           <ActionCard
             to="/equipamentos"
@@ -197,53 +175,60 @@ function DashboardPage() {
           />
         </div>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-          <PageSection>
+        {/* Conteúdo principal */}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_1.2fr]">
+          {/* Avisos à esquerda */}
+          <PageSection className="h-full">
             <SectionHeader
-              title="Status dos equipamentos"
-              subtitle="Distribuição atual do parque por condição operacional"
+              title="Últimos avisos"
+              subtitle="10 alertas mais recentes do sistema"
+              action={
+                <Link
+                  to="/alertas"
+                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
+                >
+                  Ver todos
+                  <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+                </Link>
+              }
             />
-            <div className="h-[280px]">
-              <DonutChart data={data.statusEquipamentos} />
-            </div>
+
+            {data.alertas.length > 0 ? (
+              <div className="space-y-0">
+                {data.alertas.slice(0, 10).map((alerta) => (
+                  <AlertListItem key={alerta.id} alerta={alerta} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+                Nenhum aviso recente.
+              </div>
+            )}
           </PageSection>
 
-          <PageSection>
-            <SectionHeader
-              title="Manutenções nos últimos meses"
-              subtitle="Volume total de ordens registradas no período"
-            />
-            <div className="h-[280px]">
-              <BarChart data={data.manutencoesPorTipo} />
-            </div>
-          </PageSection>
+          {/* Gráficos à direita */}
+          <div className="grid grid-cols-1 gap-6">
+            <PageSection>
+              <SectionHeader
+                title="Status dos equipamentos"
+                subtitle="Distribuição atual por condição operacional"
+              />
+              <div className="h-[220px]">
+                <DonutChart data={data.statusEquipamentos} />
+              </div>
+            </PageSection>
+
+            <PageSection>
+              <SectionHeader
+                title="Manutenções nos últimos meses"
+                subtitle="Volume total de ordens registradas no período"
+              />
+              <div className="h-[220px]">
+                <BarChart data={data.manutencoesPorTipo} />
+              </div>
+            </PageSection>
+          </div>
         </div>
-
-        <PageSection>
-          <SectionHeader
-            title="Últimos alertas"
-            subtitle="Ocorrências recentes e pontos de atenção do sistema"
-            action={
-              <Link
-                to="/alertas"
-                className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-              >
-                Ver todos
-                <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
-              </Link>
-            }
-          />
-
-          {data.alertas.length > 0 ? (
-            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              {data.alertas.slice(0, 4).map((alerta) => (
-                <AlertItem key={alerta.id} alerta={alerta} />
-              ))}
-            </div>
-          ) : (
-            <EmptyPanel message="Nenhum alerta recente no momento." />
-          )}
-        </PageSection>
       </div>
     </PageLayout>
   );

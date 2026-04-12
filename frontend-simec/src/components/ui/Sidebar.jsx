@@ -35,7 +35,6 @@ function Sidebar({
 
   return (
     <>
-      {/* Overlay mobile */}
       {isMobileOpen && (
         <button
           type="button"
@@ -47,22 +46,21 @@ function Sidebar({
 
       <aside
         className={[
-          'fixed left-0 top-0 z-50 flex h-screen w-[280px] flex-col border-r border-slate-800 bg-slate-900 transition-transform duration-300 lg:sticky lg:z-20',
+          'fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-slate-800 bg-slate-900 transition-transform duration-300 lg:sticky lg:z-20',
           isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
       >
-        {/* Topo / logo */}
-        <div className="flex items-center justify-between px-4 pt-4 lg:justify-center">
+        <div className="flex items-center justify-between px-3 pt-4 lg:justify-center">
           <Link
             to="/dashboard"
             title="Ir para o Dashboard"
-            className="flex w-full items-center justify-center rounded-2xl bg-slate-950 px-3 py-4"
+            className="flex w-full items-center justify-center rounded-2xl bg-slate-950 px-2 py-4"
             onClick={onClose}
           >
             <img
               src={logoSimec}
               alt="SIMEC Logo"
-              className="h-auto w-auto max-h-24 max-w-[220px] object-contain"
+              className="h-auto w-auto max-h-[150px] max-w-[170px] object-contain"
             />
           </Link>
 
@@ -76,8 +74,7 @@ function Sidebar({
           </button>
         </div>
 
-        {/* Navegação */}
-        <div className="mt-6 flex-1 overflow-y-auto px-4 pb-6">
+        <div className="mt-5 flex-1 overflow-y-auto px-3 pb-6">
           <nav>
             <ul className="space-y-2">
               <li>
