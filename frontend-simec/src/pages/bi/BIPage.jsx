@@ -11,6 +11,7 @@ import {
   faShieldHeart,
   faScrewdriverWrench,
   faTriangleExclamation,
+  faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useBIPage } from '../../hooks/bi/useBIPage';
@@ -22,7 +23,14 @@ import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import BarChart from '../../components/charts/BarChart';
 
-function KpiCard({ icon, title, value, subtitle, tone = 'slate' }) {
+function InteractiveKpiCard({
+  icon,
+  title,
+  value,
+  subtitle,
+  tone = 'slate',
+  onClick,
+}) {
   const toneMap = {
     slate: 'bg-slate-100 text-slate-600',
     blue: 'bg-blue-100 text-blue-600',
@@ -32,30 +40,47 @@ function KpiCard({ icon, title, value, subtitle, tone = 'slate' }) {
   };
 
   return (
-    <Card className="h-full">
-      <div className="flex items-center gap-4">
-        <div
-          className={[
-            'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
-            toneMap[tone] || toneMap.slate,
-          ].join(' ')}
-        >
-          <FontAwesomeIcon icon={icon} />
-        </div>
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full text-left transition hover:-translate-y-0.5 hover:shadow-md"
+    >
+      <Card className="h-full min-h-[148px]">
+        <div className="flex h-full flex-col justify-between gap-4">
+          <div className="flex items-start gap-4">
+            <div
+              className={[
+                'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
+                toneMap[tone] || toneMap.slate,
+              ].join(' ')}
+            >
+              <FontAwesomeIcon icon={icon} />
+            </div>
 
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {title}
-          </p>
-          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-            {value}
-          </p>
-          {subtitle ? (
-            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-          ) : null}
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {title}
+              </p>
+
+              <p className="mt-2 break-words text-3xl font-bold leading-tight tracking-tight text-slate-900">
+                {value}
+              </p>
+
+              {subtitle ? (
+                <p className="mt-2 text-sm leading-5 text-slate-500">
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+            <span>Ver detalhes</span>
+            <FontAwesomeIcon icon={faArrowRight} />
+          </div>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </button>
   );
 }
 
@@ -131,50 +156,59 @@ function BIPage() {
         }
       />
 
-      {/* KPIs */}
-      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <KpiCard
+      {/* KPIs INTERATIVOS */}
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+        <InteractiveKpiCard
           icon={faMicrochip}
           title="Ativos no sistema"
           value={page.resumoCards.totalAtivos}
+          subtitle="Abrir parque de equipamentos"
           tone="blue"
+          onClick={page.handleGoToAtivos}
         />
 
-        <KpiCard
+        <InteractiveKpiCard
           icon={faShieldHeart}
           title="Preventivas realizadas"
           value={page.resumoCards.preventivas}
+          subtitle="Abrir manutenções preventivas"
           tone="green"
+          onClick={page.handleGoToPreventivas}
         />
 
-        <KpiCard
+        <InteractiveKpiCard
           icon={faTriangleExclamation}
           title="Falhas corretivas"
           value={page.resumoCards.corretivas}
+          subtitle="Abrir corretivas filtradas"
           tone="red"
+          onClick={page.handleGoToCorretivas}
         />
 
-        <KpiCard
+        <InteractiveKpiCard
           icon={faClock}
           title="Downtime acumulado"
           value={page.resumoCards.downtimeAcumulado}
+          subtitle="Abrir visão de manutenção"
           tone="yellow"
+          onClick={page.handleGoToDowntime}
         />
 
-        <KpiCard
+        <InteractiveKpiCard
           icon={faHospital}
           title="Unidade mais crítica"
           value={page.resumoCards.unidadeCritica?.nome || '—'}
           subtitle={
             page.resumoCards.unidadeCritica
-              ? page.resumoCards.unidadeCritica.downtime
+              ? `Downtime: ${page.resumoCards.unidadeCritica.downtime}`
               : 'Sem dados'
           }
           tone="slate"
+          onClick={page.handleGoToUnidadeCritica}
         />
       </div>
 
-      {/* Linha principal */}
+      {/* CONTEÚDO PRINCIPAL */}
       <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
         <Card>
           <SectionTitle
@@ -201,7 +235,7 @@ function BIPage() {
 
           {page.rankingFrequencia.length > 0 ? (
             <div className="overflow-hidden rounded-xl border border-slate-200">
-              <div className="grid grid-cols-[1fr_110px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="grid grid-cols-[1fr_120px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 <span>Equipamento</span>
                 <span className="text-center">Qtd. corretivas</span>
               </div>
@@ -212,7 +246,7 @@ function BIPage() {
                     key={`${e.tag}-${index}`}
                     type="button"
                     onClick={() => page.handleDrillDownEquipamento(e.id)}
-                    className="grid w-full grid-cols-[1fr_110px] items-center px-4 py-3 text-left transition hover:bg-slate-50"
+                    className="grid w-full grid-cols-[1fr_120px] items-center px-4 py-3 text-left transition hover:bg-slate-50"
                   >
                     <div className="min-w-0">
                       <div className="font-semibold text-blue-700">
@@ -241,7 +275,6 @@ function BIPage() {
         </Card>
       </div>
 
-      {/* Ranking completo */}
       <Card>
         <SectionTitle
           icon={faScrewdriverWrench}
@@ -286,5 +319,4 @@ function BIPage() {
     </PageLayout>
   );
 }
-
 export default BIPage;

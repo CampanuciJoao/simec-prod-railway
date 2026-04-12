@@ -109,6 +109,41 @@ export function useBIPage() {
     [navigate]
   );
 
+  const handleGoToAtivos = useCallback(() => {
+    navigate('/equipamentos');
+  }, [navigate]);
+
+  const handleGoToPreventivas = useCallback(() => {
+    navigate('/manutencoes', {
+      state: {
+        filtroTipoInicial: 'Preventiva',
+      },
+    });
+  }, [navigate]);
+
+  const handleGoToCorretivas = useCallback(() => {
+    navigate('/manutencoes', {
+      state: {
+        filtroTipoInicial: 'Corretiva',
+      },
+    });
+  }, [navigate]);
+
+  const handleGoToUnidadeCritica = useCallback(() => {
+    const unidadeNome = dados?.rankingUnidades?.[0]?.nome;
+    if (!unidadeNome) return;
+
+    navigate('/equipamentos', {
+      state: {
+        filtroUnidadeNomeInicial: unidadeNome,
+      },
+    });
+  }, [dados, navigate]);
+
+  const handleGoToDowntime = useCallback(() => {
+    navigate('/manutencoes');
+  }, [navigate]);
+
   const handlePrint = useCallback(() => {
     if (!dados) return;
     exportarBIPDF(dados);
@@ -123,6 +158,11 @@ export function useBIPage() {
     rankingFrequencia,
     rankingDowntime,
     handleDrillDownEquipamento,
+    handleGoToAtivos,
+    handleGoToPreventivas,
+    handleGoToCorretivas,
+    handleGoToDowntime,
+    handleGoToUnidadeCritica,
     handlePrint,
     recarregar: carregarBI,
   };
