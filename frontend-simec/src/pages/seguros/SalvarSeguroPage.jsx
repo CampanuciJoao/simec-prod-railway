@@ -1,5 +1,3 @@
-// Ficheiro: src/pages/seguros/SalvarSeguroPage.jsx
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
@@ -11,15 +9,20 @@ import {
   getEquipamentos,
   getUnidades,
 } from '../../services/api';
+
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faShieldAlt } from '@fortawesome/free-solid-svg-icons';
+
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageState from '../../components/ui/PageState';
 
 function SalvarSeguroPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const isEditing = !!id;
+  const isEditing = Boolean(id);
 
   const [initialData, setInitialData] = useState(null);
   const [equipamentosDisponiveis, setEquipamentosDisponiveis] = useState([]);
@@ -37,15 +40,19 @@ function SalvarSeguroPage() {
         getUnidades(),
       ]);
 
-      setEquipamentosDisponiveis(equipamentosData || []);
-      setUnidadesDisponiveis(unidadesData || []);
+      setEquipamentosDisponiveis(Array.isArray(equipamentosData) ? equipamentosData : []);
+      setUnidadesDisponiveis(Array.isArray(unidadesData) ? unidadesData : []);
 
       if (isEditing) {
         const seguroData = await getSeguroById(id);
-        setInitialData(seguroData);
+        setInitialData(seguroData || null);
       }
     } catch (err) {
-      setError('Falha ao carregar dados necessários para o formulário.');
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Erro ao carregar dados.'
+      );
       addToast('Falha ao carregar dados.', 'error');
     } finally {
       setLoading(false);
@@ -66,61 +73,98 @@ function SalvarSeguroPage() {
         addToast('Seguro cadastrado com sucesso!', 'success');
       }
 
-      setTimeout(() => navigate('/seguros'), 1000);
+      navigate('/seguros');
     } catch (err) {
-      addToast(err.message || 'Erro ao salvar o seguro.', 'error');
       throw err;
     }
   };
 
   if (loading) {
     return (
-      <div className="page-content-wrapper centered-loader">
-        <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-      </div>
+      <PageLayout background="slate" padded fullHeight contentClassName="page-stack">
+        <PageHeader
+          title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
+          subtitle="Cadastro e gestão de apólices"
+          icon={faShieldAlt}
+        />
+        <PageState loading />
+      </PageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="page-content-wrapper">
-        <p className="form-error">{error}</p>
-      </div>
-    );
-  }
+      <PageLayout background="slate" padded fullHeight contentClassName="page-stack">
+        <PageHeader
+          title="Erro"
+          subtitle="Não foi possível carregar o formulário"
+          icon={faShieldAlt}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="btn btn-secondary"
+                onClick={() => navigate('/cadastros')}
+              >
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Cadastros
+              </button>
 
-  if (isEditing && !initialData) {
-    return (
-      <div className="page-content-wrapper">
-        <p className="no-data-message">Seguro não encontrado.</p>
-      </div>
+              <button
+                className="btn btn-secondary"
+                onClick={() => navigate('/seguros')}
+              >
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Seguros
+              </button>
+            </div>
+          }
+        />
+        <PageState error={error} />
+      </PageLayout>
     );
   }
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">
-          {isEditing
-            ? `Editar Seguro (Nº: ${initialData?.apoliceNumero})`
-            : 'Cadastrar Novo Seguro'}
-        </h1>
+    <PageLayout
+      background="slate"
+      padded
+      fullHeight
+      contentClassName="page-stack content-fade-in"
+    >
+      <PageHeader
+        title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
+        subtitle="Cadastro e gestão de apólices"
+        icon={faShieldAlt}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/cadastros')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Cadastros
+            </button>
 
-        <button className="btn btn-secondary" onClick={() => navigate('/seguros')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/seguros')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Seguros
+            </button>
+          </div>
+        }
+      />
 
-      <section className="page-section">
-        <SeguroForm
-          onSubmit={handleSave}
-          initialData={initialData}
-          isEditing={isEditing}
-          equipamentosDisponiveis={equipamentosDisponiveis}
-          unidadesDisponiveis={unidadesDisponiveis}
-        />
-      </section>
-    </div>
+      <SeguroForm
+        onSubmit={handleSave}
+        initialData={initialData}
+        isEditing={isEditing}
+        equipamentosDisponiveis={equipamentosDisponiveis}
+        unidadesDisponiveis={unidadesDisponiveis}
+        onCancel={() => navigate('/seguros')}
+      />
+    </PageLayout>
   );
 }
 
