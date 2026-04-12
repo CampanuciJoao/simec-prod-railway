@@ -8,6 +8,10 @@ import {
   faBuilding,
   faShieldAlt,
   faPlus,
+  faFileShield,
+  faTriangleExclamation,
+  faClockRotateLeft,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useSegurosPage } from '../../hooks/seguros/useSegurosPage';
@@ -16,58 +20,114 @@ import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
 import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
-
-const getDynamicStatus = (seguro) => {
-  if (seguro.status !== 'Ativo') return seguro.status;
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  const dataFim = new Date(seguro.dataFim);
-
-  if (dataFim < hoje) return 'Expirado';
-
-  const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 30) return 'Vence em breve';
-
-  return 'Ativo';
-};
+import Card from '../../components/ui/Card';
 
 const getStatusBadgeClass = (statusText) => {
-  const statusMap = {
-    ativo: 'status-ativo',
-    expirado: 'status-inativo',
-    cancelado: 'status-cancelado',
-    'vence em breve': 'status-vence-em-breve',
+  const normalized = String(statusText || '').toLowerCase();
+
+  if (normalized === 'ativo') {
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  }
+
+  if (normalized === 'vence em breve') {
+    return 'bg-amber-100 text-amber-700 border-amber-200';
+  }
+
+  if (normalized === 'expirado') {
+    return 'bg-red-100 text-red-700 border-red-200';
+  }
+
+  if (normalized === 'cancelado') {
+    return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
+
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+};
+
+const getRowHighlightClass = (statusText) => {
+  const normalized = String(statusText || '').toLowerCase();
+
+  if (normalized === 'ativo') return 'border-l-emerald-500';
+  if (normalized === 'vence em breve') return 'border-l-amber-500';
+  if (normalized === 'expirado') return 'border-l-red-500';
+  if (normalized === 'cancelado') return 'border-l-slate-400';
+
+  return 'border-l-slate-300';
+};
+
+function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
+  const toneMap = {
+    slate: 'bg-slate-100 text-slate-600',
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-emerald-100 text-emerald-600',
+    yellow: 'bg-amber-100 text-amber-600',
+    red: 'bg-red-100 text-red-600',
   };
 
-  return `status-badge ${statusMap[statusText?.toLowerCase()] || 'default'}`;
-};
+  const Wrapper = onClick ? 'button' : 'div';
 
-const getRowHighlightClass = (seguro) => {
-  if (seguro.status !== 'Ativo') return 'status-row-inativo';
+  return (
+    <Wrapper
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={[
+        'w-full text-left',
+        onClick ? 'transition hover:-translate-y-0.5 hover:shadow-md' : '',
+      ].join(' ')}
+    >
+      <Card className="h-full">
+        <div className="flex items-center gap-4">
+          <div
+            className={[
+              'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
+              toneMap[tone] || toneMap.slate,
+            ].join(' ')}
+          >
+            <FontAwesomeIcon icon={icon} />
+          </div>
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {title}
+            </p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+              {value}
+            </p>
+          </div>
+        </div>
+      </Card>
+    </Wrapper>
+  );
+}
 
-  const dataFim = new Date(seguro.dataFim);
-  const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
+function ActiveFiltersBar({ filters = [], onRemove, onClearAll }) {
+  if (!filters.length) return null;
 
-  if (diffDays <= 7) return 'status-row-vencendo-danger';
-  if (diffDays <= 30) return 'status-row-vencendo-warning';
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-2">
+      {filters.map((filter) => (
+        <button
+          key={`${filter.key}-${filter.value}`}
+          type="button"
+          onClick={() => onRemove(filter.key)}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <span>{filter.label}</span>
+          <FontAwesomeIcon icon={faXmark} className="text-[10px]" />
+        </button>
+      ))}
 
-  return 'status-row-ativo';
-};
-
-const getNomeUnidadeSeguro = (seguro) => {
-  if (typeof seguro.unidade === 'string') return seguro.unidade;
-  if (seguro.unidade?.nomeSistema) return seguro.unidade.nomeSistema;
-  if (seguro.unidade?.nome) return seguro.unidade.nome;
-  if (seguro.equipamento?.unidade?.nomeSistema) return seguro.equipamento.unidade.nomeSistema;
-  return 'Não informada';
-};
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="ml-1 inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold text-blue-600 hover:underline"
+      >
+        Limpar tudo
+      </button>
+    </div>
+  );
+}
 
 function SegurosPage() {
   const page = useSegurosPage();
@@ -82,31 +142,71 @@ function SegurosPage() {
         isOpen={page.deleteModal.isOpen}
         onClose={page.deleteModal.closeModal}
         onConfirm={page.confirmarExclusao}
-        title="Confirmar Exclusão"
+        title="Excluir seguro"
         message={`Tem certeza que deseja excluir a apólice nº ${page.deleteModal.modalData?.apoliceNumero}?`}
-        isDestructive={true}
+        isDestructive
       />
 
-      <PageLayout>
+      <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Gestão de Seguros"
+          subtitle="Acompanhe, filtre e gerencie as apólices cadastradas"
           icon={faShieldAlt}
           actions={
             <button type="button" className="btn btn-primary" onClick={page.goToCreate}>
               <FontAwesomeIcon icon={faPlus} /> Novo Seguro
             </button>
           }
-          variant="light"
         />
 
-        <PageSection variant="transparent" noPadding className="mb-6">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <KpiCard
+            icon={faFileShield}
+            title="Total"
+            value={page.metricas.total}
+            tone="blue"
+            onClick={page.clearAllFilters}
+          />
+
+          <KpiCard
+            icon={faShieldAlt}
+            title="Ativos"
+            value={page.metricas.ativos}
+            tone="green"
+            onClick={() => page.filtrarPorStatus('Ativo')}
+          />
+
+          <KpiCard
+            icon={faClockRotateLeft}
+            title="Vencendo"
+            value={page.metricas.vencendo}
+            tone="yellow"
+            onClick={() => page.filtrarPorStatus('Vence em breve')}
+          />
+
+          <KpiCard
+            icon={faTriangleExclamation}
+            title="Vencidos"
+            value={page.metricas.vencidos}
+            tone="red"
+            onClick={() => page.filtrarPorStatus('Expirado')}
+          />
+        </div>
+
+        <div className="mb-6">
           <GlobalFilterBar
             searchTerm={page.searchTerm}
-            onSearchChange={(e) => page.setSearchTerm(e.target.value)}
+            onSearchChange={page.onSearchChange}
             searchPlaceholder="Buscar por apólice, vínculo ou seguradora..."
             selectFilters={page.selectFiltersConfig}
           />
-        </PageSection>
+        </div>
+
+        <ActiveFiltersBar
+          filters={page.activeFilters}
+          onRemove={page.clearFilter}
+          onClearAll={page.clearAllFilters}
+        />
 
         {isInitialLoading || hasError || isEmpty ? (
           <PageState
@@ -116,117 +216,111 @@ function SegurosPage() {
             emptyMessage="Nenhum seguro encontrado."
           />
         ) : (
-          <PageSection variant="transparent" noPadding>
-            <div className="lista-contratos-moderna">
-              {page.seguros.map((seguro) => {
-                const statusDinamico = getDynamicStatus(seguro);
+          <div className="flex flex-col gap-4">
+            {page.seguros.map((seguro) => {
+              const statusDinamico = page.getStatusDinamico(seguro);
 
-                return (
-                  <div
-                    key={seguro.id}
-                    className={`contrato-card-expansivel ${getRowHighlightClass(seguro)}`}
-                  >
-                    <div className="contrato-header">
-                      <div
-                        style={{
-                          width: '34px',
-                          height: '34px',
-                          borderRadius: '999px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          background: '#eff6ff',
-                          color: '#2563eb',
-                          border: '1px solid #bfdbfe',
-                          flexShrink: 0,
-                        }}
-                      >
-                        <FontAwesomeIcon icon={faShieldAlt} />
+              return (
+                <div
+                  key={seguro.id}
+                  className={`overflow-hidden rounded-xl border-y border-r border-slate-200 border-l-[8px] bg-white shadow-sm transition-all hover:shadow-md ${getRowHighlightClass(
+                    statusDinamico
+                  )}`}
+                >
+                  <div className="flex flex-col gap-5 p-5">
+                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+                      <div className="flex min-w-0 flex-1 items-start gap-4">
+                        <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+                          <FontAwesomeIcon icon={faShieldAlt} />
+                        </div>
+
+                        <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                              Apólice
+                            </span>
+                            <div className="mt-1 text-base font-bold text-slate-900">
+                              {seguro.apoliceNumero}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                              Seguradora
+                            </span>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {seguro.seguradora}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                              Vínculo
+                            </span>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {seguro.nomeVinculo || '—'}
+                            </div>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                              Vigência final
+                            </span>
+                            <div className="mt-1 text-sm font-semibold text-slate-800">
+                              {formatarData(seguro.dataFim)}
+                            </div>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="contrato-header-info">
-                        <div>
-                          <span className="header-label">Apólice</span>
-                          <div className="header-value">{seguro.apoliceNumero}</div>
-                        </div>
-
-                        <div>
-                          <span className="header-label">Seguradora</span>
-                          <div className="header-value">{seguro.seguradora}</div>
-                        </div>
-
-                        <div>
-                          <span className="header-label">Vínculo</span>
-                          <div className="header-value">{seguro.nomeVinculo || '—'}</div>
-                        </div>
-
-                        <div>
-                          <span className="header-label">Vigência Final</span>
-                          <div className="header-value">{formatarData(seguro.dataFim)}</div>
-                        </div>
-                      </div>
-
-                      <div
-                        className="header-status-badge"
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                      >
-                        <span className={getStatusBadgeClass(statusDinamico)}>
+                      <div className="shrink-0">
+                        <span
+                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
+                            statusDinamico
+                          )}`}
+                        >
                           {statusDinamico}
                         </span>
                       </div>
                     </div>
 
-                    <div
-                      className="contrato-detalhes-expandidos"
-                      style={{ display: 'block' }}
-                    >
-                      <div className="detalhes-grid-contrato">
-                        <div className="lista-cobertura">
-                          <h5>
-                            <FontAwesomeIcon icon={faBuilding} /> Unidade
-                          </h5>
-                          <div className="chips-container">
-                            <span className="chip-item">
-                              {getNomeUnidadeSeguro(seguro)}
-                            </span>
-                          </div>
-                        </div>
+                    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[260px_1fr_auto]">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                          <FontAwesomeIcon icon={faBuilding} className="text-slate-500" />
+                          Unidade
+                        </h5>
 
-                        <div className="lista-cobertura">
-                          <h5>
-                            <FontAwesomeIcon icon={faShieldAlt} /> Coberturas
-                          </h5>
-                          <div className="chips-container">
-                            {seguro.coberturas?.length > 0 ? (
-                              seguro.coberturas.map((cobertura, index) => (
-                                <span key={`${seguro.id}-cob-${index}`} className="chip-item">
-                                  {cobertura.nome || cobertura.tipo || 'Cobertura'}
-                                </span>
-                              ))
-                            ) : (
-                              <p
-                                style={{
-                                  fontSize: '0.85rem',
-                                  color: '#94a3b8',
-                                  fontStyle: 'italic',
-                                }}
+                        <span className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
+                          {page.getNomeUnidadeSeguro(seguro)}
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                          <FontAwesomeIcon icon={faShieldAlt} className="text-slate-500" />
+                          Coberturas
+                        </h5>
+
+                        <div className="flex flex-wrap gap-2">
+                          {seguro.coberturas?.length > 0 ? (
+                            seguro.coberturas.map((cobertura, index) => (
+                              <span
+                                key={`${seguro.id}-cob-${index}`}
+                                className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
                               >
-                                Nenhuma cobertura cadastrada.
-                              </p>
-                            )}
-                          </div>
+                                {cobertura.nome || cobertura.tipo || 'Cobertura'}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-sm italic text-slate-400">
+                              Nenhuma cobertura cadastrada.
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div
-                        className="contrato-acoes-expandidas"
-                        style={{
-                          marginTop: '20px',
-                          display: 'flex',
-                          justifyContent: 'flex-end',
-                          gap: '10px',
-                        }}
-                      >
+                      <div className="flex flex-col justify-end gap-2 xl:min-w-[160px]">
                         <button
                           type="button"
                           className="btn btn-secondary"
@@ -253,10 +347,10 @@ function SegurosPage() {
                       </div>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-          </PageSection>
+                </div>
+              );
+            })}
+          </div>
         )}
       </PageLayout>
     </>
