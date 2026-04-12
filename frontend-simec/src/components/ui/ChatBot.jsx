@@ -9,7 +9,7 @@ import {
   faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 
-import ChatMessageBubble from '../chat/ChatMessageBubble';
+import ChatMessageBubble from '../ui/ChatMessageBubble';
 import {
   enviarMensagemAoAgente,
   mapearHistoricoParaAPI,
