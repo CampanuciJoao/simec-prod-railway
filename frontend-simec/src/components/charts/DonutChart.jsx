@@ -4,22 +4,30 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+function getStatusColor(label) {
+  const normalized = String(label || '').toLowerCase().replace(/\s+/g, '');
+
+  if (normalized === 'operante') return 'rgba(16, 185, 129, 0.9)';
+  if (normalized === 'inoperante') return 'rgba(239, 68, 68, 0.9)';
+  if (normalized === 'emmanutencao') return 'rgba(245, 158, 11, 0.9)';
+  if (normalized === 'usolimitado') return 'rgba(59, 130, 246, 0.9)';
+
+  return 'rgba(100, 116, 139, 0.9)';
+}
+
 function normalizarDados(input) {
   if (!Array.isArray(input) || input.length === 0) return null;
 
+  const labels = input.map((item) => item.name);
+  const values = input.map((item) => item.value);
+  const colors = labels.map((label) => getStatusColor(label));
+
   return {
-    labels: input.map((item) => item.name),
+    labels,
     datasets: [
       {
-        label: 'Status',
-        data: input.map((item) => item.value),
-        backgroundColor: [
-          'rgba(16, 185, 129, 0.9)',
-          'rgba(239, 68, 68, 0.9)',
-          'rgba(245, 158, 11, 0.9)',
-          'rgba(59, 130, 246, 0.9)',
-          'rgba(100, 116, 139, 0.9)',
-        ],
+        data: values,
+        backgroundColor: colors,
         borderColor: '#ffffff',
         borderWidth: 3,
         hoverOffset: 6,
@@ -28,25 +36,20 @@ function normalizarDados(input) {
   };
 }
 
-function DonutChart({ data = [], chartData }) {
-  const sourceData = chartData ?? data;
+function DonutChart({ data = [] }) {
+  const chartData = useMemo(() => normalizarDados(data), [data]);
 
-  const normalizedChartData = useMemo(
-    () => normalizarDados(sourceData),
-    [sourceData]
-  );
-
-  if (!normalizedChartData) {
+  if (!chartData) {
     return (
-      <div className="flex min-h-[220px] items-center justify-center text-center text-sm italic text-slate-400">
-        Dados inválidos para o gráfico.
+      <div className="flex h-full items-center justify-center text-center text-sm italic text-slate-400">
+        Sem dados válidos para o gráfico.
       </div>
     );
   }
 
   return (
     <Doughnut
-      data={normalizedChartData}
+      data={chartData}
       options={{
         responsive: true,
         maintainAspectRatio: false,
@@ -62,6 +65,21 @@ function DonutChart({ data = [], chartData }) {
               font: {
                 size: 12,
                 weight: '600',
+              },
+              generateLabels(chart) {
+                const labels = chart.data.labels || [];
+                const dataset = chart.data.datasets[0];
+                const values = dataset?.data || [];
+                const colors = dataset?.backgroundColor || [];
+
+                return labels.map((label, index) => ({
+                  text: `${label} (${values[index]})`,
+                  fillStyle: colors[index],
+                  strokeStyle: colors[index],
+                  lineWidth: 0,
+                  hidden: false,
+                  index,
+                }));
               },
             },
           },

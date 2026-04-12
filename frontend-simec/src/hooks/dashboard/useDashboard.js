@@ -9,9 +9,45 @@ const INITIAL_STATE = {
   ativos: 0,
   inativos: 0,
   alertas: [],
-  statusEquipamentos: null,
-  manutencoesPorTipo: null,
+  statusEquipamentos: [],
+  manutencoesPorTipo: [],
 };
+
+function normalizarStatusEquipamentos(statusEquipamentos) {
+  const labels = statusEquipamentos?.labels || [];
+  const values = statusEquipamentos?.data || [];
+
+  if (!Array.isArray(labels) || !Array.isArray(values)) return [];
+
+  return labels.map((label, index) => ({
+    name: String(label),
+    value: Number(values[index] ?? 0),
+  }));
+}
+
+function normalizarManutencoesPorTipo(manutencoesPorTipoMes) {
+  const labels = manutencoesPorTipoMes?.labels || [];
+  const datasets = manutencoesPorTipoMes?.datasets || [];
+
+  if (!Array.isArray(labels) || !Array.isArray(datasets) || datasets.length === 0) {
+    return [];
+  }
+
+  return labels.map((label, index) => {
+    let total = 0;
+
+    datasets.forEach((dataset) => {
+      if (Array.isArray(dataset?.data)) {
+        total += Number(dataset.data[index] ?? 0);
+      }
+    });
+
+    return {
+      name: String(label),
+      value: total,
+    };
+  });
+}
 
 export function useDashboard() {
   const [data, setData] = useState(INITIAL_STATE);
@@ -25,15 +61,23 @@ export function useDashboard() {
     try {
       const response = await getDashboardData();
 
-      const statusLabels = response?.statusEquipamentos?.labels || [];
-      const statusValues = response?.statusEquipamentos?.data || [];
+      const statusEquipamentosNormalizados = normalizarStatusEquipamentos(
+        response?.statusEquipamentos
+      );
+
+      const manutencoesPorTipoNormalizadas = normalizarManutencoesPorTipo(
+        response?.manutencoesPorTipoMes
+      );
 
       const ativos =
-        statusValues[statusLabels.findIndex((label) => label === 'Operante')] || 0;
+        statusEquipamentosNormalizados.find((item) => item.name === 'Operante')
+          ?.value || 0;
 
       const inativos =
-        (statusValues[statusLabels.findIndex((label) => label === 'Inoperante')] || 0) +
-        (statusValues[statusLabels.findIndex((label) => label === 'UsoLimitado')] || 0);
+        (statusEquipamentosNormalizados.find((item) => item.name === 'Inoperante')
+          ?.value || 0) +
+        (statusEquipamentosNormalizados.find((item) => item.name === 'UsoLimitado')
+          ?.value || 0);
 
       setData({
         totalEquipamentos: Number(response?.equipamentosCount ?? 0),
@@ -42,9 +86,11 @@ export function useDashboard() {
         alertasAtivos: Number(response?.alertasAtivos ?? 0),
         ativos,
         inativos,
-        alertas: Array.isArray(response?.alertasRecentes) ? response.alertasRecentes : [],
-        statusEquipamentos: response?.statusEquipamentos || null,
-        manutencoesPorTipo: response?.manutencoesPorTipoMes || null,
+        alertas: Array.isArray(response?.alertasRecentes)
+          ? response.alertasRecentes
+          : [],
+        statusEquipamentos: statusEquipamentosNormalizados,
+        manutencoesPorTipo: manutencoesPorTipoNormalizadas,
       });
     } catch (err) {
       setError(
