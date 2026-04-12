@@ -4,7 +4,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faEdit,
   faTrashAlt,
-  faExclamationTriangle,
   faPlusCircle,
   faMinusCircle,
   faHospital,
@@ -13,6 +12,10 @@ import {
   faUpload,
   faFilePdf,
   faExternalLinkAlt,
+  faFileContract,
+  faClockRotateLeft,
+  faTriangleExclamation,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useContratosPage } from '../../hooks/contratos/useContratosPage';
@@ -21,51 +24,117 @@ import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
 import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
+import Card from '../../components/ui/Card';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
-
-const getDynamicStatus = (contrato) => {
-  if (contrato.status !== 'Ativo') return contrato.status;
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  const dataFim = new Date(contrato.dataFim);
-  if (dataFim < hoje) return 'Expirado';
-
-  const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 30) return 'Vence em breve';
-
-  return 'Ativo';
-};
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 const getStatusBadgeClass = (statusText) => {
-  const statusMap = {
-    ativo: 'status-ativo',
-    expirado: 'status-inativo',
-    cancelado: 'status-cancelado',
-    'vence em breve': 'status-vence-em-breve',
+  const normalized = String(statusText || '').toLowerCase();
+
+  if (normalized === 'ativo') {
+    return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+  }
+
+  if (normalized === 'vence em breve') {
+    return 'bg-amber-100 text-amber-700 border-amber-200';
+  }
+
+  if (normalized === 'expirado') {
+    return 'bg-red-100 text-red-700 border-red-200';
+  }
+
+  if (normalized === 'cancelado') {
+    return 'bg-slate-100 text-slate-700 border-slate-200';
+  }
+
+  return 'bg-slate-100 text-slate-700 border-slate-200';
+};
+
+const getRowHighlightClass = (statusText) => {
+  const normalized = String(statusText || '').toLowerCase();
+
+  if (normalized === 'ativo') return 'border-l-emerald-500';
+  if (normalized === 'vence em breve') return 'border-l-amber-500';
+  if (normalized === 'expirado') return 'border-l-red-500';
+  if (normalized === 'cancelado') return 'border-l-slate-400';
+
+  return 'border-l-slate-300';
+};
+
+function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
+  const toneMap = {
+    slate: 'bg-slate-100 text-slate-600',
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-emerald-100 text-emerald-600',
+    yellow: 'bg-amber-100 text-amber-600',
+    red: 'bg-red-100 text-red-600',
   };
 
-  return `status-badge ${statusMap[statusText?.toLowerCase()] || 'default'}`;
-};
+  const Wrapper = onClick ? 'button' : 'div';
 
-const getRowHighlightClass = (contrato) => {
-  if (contrato.status !== 'Ativo') return 'status-row-inativo';
+  return (
+    <Wrapper
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={[
+        'w-full text-left',
+        onClick ? 'transition hover:-translate-y-0.5 hover:shadow-md' : '',
+      ].join(' ')}
+    >
+      <Card className="h-full">
+        <div className="flex items-center gap-4">
+          <div
+            className={[
+              'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
+              toneMap[tone] || toneMap.slate,
+            ].join(' ')}
+          >
+            <FontAwesomeIcon icon={icon} />
+          </div>
 
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {title}
+            </p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+              {value}
+            </p>
+          </div>
+        </div>
+      </Card>
+    </Wrapper>
+  );
+}
 
-  const dataFim = new Date(contrato.dataFim);
-  const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
+function ActiveFiltersBar({ filters = [], onRemove, onClearAll }) {
+  if (!filters.length) return null;
 
-  if (diffDays <= 7) return 'status-row-vencendo-danger';
-  if (diffDays <= 30) return 'status-row-vencendo-warning';
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-2">
+      {filters.map((filter) => (
+        <button
+          key={`${filter.key}-${filter.value}`}
+          type="button"
+          onClick={() => onRemove(filter.key)}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <span>{filter.label}</span>
+          <FontAwesomeIcon icon={faXmark} className="text-[10px]" />
+        </button>
+      ))}
 
-  return 'status-row-ativo';
-};
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="ml-1 inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold text-blue-600 hover:underline"
+      >
+        Limpar tudo
+      </button>
+    </div>
+  );
+}
 
 function ContratosPage() {
   const page = useContratosPage();
@@ -80,32 +149,73 @@ function ContratosPage() {
         isOpen={page.deleteModal.isOpen}
         onClose={page.deleteModal.closeModal}
         onConfirm={page.confirmarExclusao}
-        title="Confirmar Exclusão"
+        title="Excluir contrato"
         message={`Tem certeza que deseja excluir o contrato nº ${page.deleteModal.modalData?.numeroContrato}?`}
-        isDestructive={true}
+        isDestructive
       />
 
-      <PageLayout>
+      <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Gestão de Contratos de Manutenção"
+          subtitle="Acompanhe, filtre e gerencie os contratos cadastrados"
+          icon={faFileContract}
           actions={
             <button type="button" className="btn btn-primary" onClick={page.goToCreate}>
               <FontAwesomeIcon icon={faPlusCircle} /> Novo Contrato
             </button>
           }
-          variant="light"
         />
 
-        <PageSection variant="transparent" noPadding className="mb-6">
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+          <KpiCard
+            icon={faFileContract}
+            title="Total"
+            value={page.metricas.total}
+            tone="blue"
+            onClick={page.clearAllFilters}
+          />
+
+          <KpiCard
+            icon={faFileContract}
+            title="Ativos"
+            value={page.metricas.ativos}
+            tone="green"
+            onClick={() => page.filtrarPorStatus('Ativo')}
+          />
+
+          <KpiCard
+            icon={faClockRotateLeft}
+            title="Vencendo"
+            value={page.metricas.vencendo}
+            tone="yellow"
+            onClick={() => page.filtrarPorStatus('Vence em breve')}
+          />
+
+          <KpiCard
+            icon={faTriangleExclamation}
+            title="Expirados"
+            value={page.metricas.expirados}
+            tone="red"
+            onClick={() => page.filtrarPorStatus('Expirado')}
+          />
+        </div>
+
+        <div className="mb-6">
           <GlobalFilterBar
             searchTerm={page.searchTerm}
-            onSearchChange={(e) => page.setSearchTerm(e.target.value)}
+            onSearchChange={page.onSearchChange}
             searchPlaceholder="Buscar por número, fornecedor..."
             selectFilters={page.selectFiltersConfig}
           />
-        </PageSection>
+        </div>
 
-        {(isInitialLoading || hasError || isEmpty) ? (
+        <ActiveFiltersBar
+          filters={page.activeFilters}
+          onRemove={page.clearFilter}
+          onClearAll={page.clearAllFilters}
+        />
+
+        {isInitialLoading || hasError || isEmpty ? (
           <PageState
             loading={isInitialLoading}
             error={page.error?.message || page.error || ''}
@@ -113,247 +223,236 @@ function ContratosPage() {
             emptyMessage="Nenhum contrato encontrado."
           />
         ) : (
-          <PageSection variant="transparent" noPadding>
-            <div className="lista-contratos-moderna">
-              {page.contratos.map((contrato) => {
-                const isAberto = page.expandidos[contrato.id];
-                const statusDinamico = getDynamicStatus(contrato);
+          <div className="flex flex-col gap-4">
+            {page.contratos.map((contrato) => {
+              const isAberto = page.expandidos[contrato.id];
+              const statusDinamico = page.getDynamicStatus(contrato);
 
-                return (
+              return (
+                <div
+                  key={contrato.id}
+                  className={`overflow-hidden rounded-xl border-y border-r border-slate-200 border-l-[8px] bg-white shadow-sm transition-all hover:shadow-md ${getRowHighlightClass(
+                    statusDinamico
+                  )}`}
+                >
                   <div
-                    key={contrato.id}
-                    className={`contrato-card-expansivel ${getRowHighlightClass(contrato)}`}
+                    className="flex cursor-pointer flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between"
+                    onClick={() => page.toggleExpandir(contrato.id)}
                   >
-                    <div
-                      className="contrato-header"
-                      onClick={() => page.toggleExpandir(contrato.id)}
-                    >
-                      <FontAwesomeIcon
-                        icon={isAberto ? faMinusCircle : faPlusCircle}
-                        style={{ color: 'var(--cor-primaria-light)', fontSize: '1.3rem' }}
-                      />
-
-                      <div className="contrato-header-info">
-                        <div>
-                          <span className="header-label">Nº Contrato</span>
-                          <div className="header-value">{contrato.numeroContrato}</div>
-                        </div>
-                        <div>
-                          <span className="header-label">Fornecedor</span>
-                          <div className="header-value">{contrato.fornecedor}</div>
-                        </div>
-                        <div>
-                          <span className="header-label">Categoria</span>
-                          <div className="header-value">{contrato.categoria}</div>
-                        </div>
-                        <div>
-                          <span className="header-label">Vencimento</span>
-                          <div className="header-value">{formatarData(contrato.dataFim)}</div>
-                        </div>
+                    <div className="flex min-w-0 flex-1 items-start gap-4">
+                      <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+                        <FontAwesomeIcon
+                          icon={isAberto ? faMinusCircle : faPlusCircle}
+                        />
                       </div>
 
-                      <div
-                        className="header-status-badge"
-                        style={{ display: 'flex', alignItems: 'center', gap: '15px' }}
-                      >
-                        <span className={getStatusBadgeClass(statusDinamico)}>
-                          {statusDinamico}
-                        </span>
+                      <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                            Nº Contrato
+                          </span>
+                          <div className="mt-1 text-base font-bold text-slate-900">
+                            {contrato.numeroContrato}
+                          </div>
+                        </div>
 
-                        <FontAwesomeIcon
-                          icon={faPaperclip}
-                          style={{
-                            color: contrato.anexos?.length > 0 ? '#22C55E' : '#CBD5E1',
-                            fontSize: '1.1rem',
-                          }}
-                          title={
-                            contrato.anexos?.length > 0
-                              ? 'Documento anexado'
-                              : 'Sem anexo'
-                          }
-                        />
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                            Fornecedor
+                          </span>
+                          <div className="mt-1 text-sm font-semibold text-slate-800">
+                            {contrato.fornecedor}
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                            Categoria
+                          </span>
+                          <div className="mt-1 text-sm font-semibold text-slate-800">
+                            {contrato.categoria}
+                          </div>
+                        </div>
+
+                        <div>
+                          <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                            Vencimento
+                          </span>
+                          <div className="mt-1 text-sm font-semibold text-slate-800">
+                            {formatarData(contrato.dataFim)}
+                          </div>
+                        </div>
                       </div>
                     </div>
 
-                    {isAberto && (
-                      <div className="contrato-detalhes-expandidos">
-                        <div className="detalhes-grid-contrato">
-                          <div className="lista-cobertura">
-                            <h5>
-                              <FontAwesomeIcon icon={faHospital} /> Unidades Cobertas
-                            </h5>
-                            <div className="chips-container">
-                              {contrato.unidadesCobertas?.length > 0 ? (
-                                contrato.unidadesCobertas.map((u) => (
-                                  <span key={u.id} className="chip-item">
-                                    {u.nomeSistema}
-                                  </span>
-                                ))
-                              ) : (
-                                <p>Nenhuma unidade vinculada.</p>
-                              )}
-                            </div>
-                          </div>
+                    <div className="flex shrink-0 items-center gap-3">
+                      <span
+                        className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
+                          statusDinamico
+                        )}`}
+                      >
+                        {statusDinamico}
+                      </span>
 
-                          <div className="lista-cobertura">
-                            <h5>
-                              <FontAwesomeIcon icon={faMicrochip} /> Equipamentos Vinculados ({contrato.equipamentosCobertos?.length || 0})
-                            </h5>
-                            <div
-                              className="equipamentos-lista-scroll"
-                              style={{ maxHeight: '250px', overflowY: 'auto' }}
-                            >
-                              {contrato.equipamentosCobertos?.length > 0 ? (
-                                contrato.equipamentosCobertos.map((eq) => (
-                                  <div key={eq.id} className="equip-item-contrato">
-                                    <span>{eq.modelo}</span>
-                                    <span className="equip-tag-contrato">{eq.tag}</span>
-                                  </div>
-                                ))
-                              ) : (
-                                <p
-                                  style={{
-                                    fontSize: '0.85rem',
-                                    color: '#94a3b8',
-                                    fontStyle: 'italic',
-                                  }}
-                                >
-                                  Sem equipamentos específicos.
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
+                      <FontAwesomeIcon
+                        icon={faPaperclip}
+                        className={
+                          contrato.anexos?.length > 0
+                            ? 'text-green-500'
+                            : 'text-slate-300'
+                        }
+                        title={
+                          contrato.anexos?.length > 0
+                            ? 'Documento anexado'
+                            : 'Sem anexo'
+                        }
+                      />
+                    </div>
+                  </div>
 
-                        <div
-                          className="anexos-seguro-container"
-                          style={{
-                            marginTop: '20px',
-                            background: '#f8fafc',
-                            padding: '15px',
-                            borderRadius: '8px',
-                            border: '1px solid #e2e8f0',
-                          }}
-                        >
-                          <h5
-                            style={{
-                              marginBottom: '12px',
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '8px',
-                              color: '#475569',
-                              fontSize: '0.9rem',
-                            }}
-                          >
-                            <FontAwesomeIcon icon={faPaperclip} /> DOCUMENTOS DO CONTRATO
+                  {isAberto && (
+                    <div className="border-t border-slate-200 bg-slate-50/70 p-5">
+                      <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr]">
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
+                          <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                            <FontAwesomeIcon icon={faHospital} className="text-slate-500" />
+                            Unidades cobertas
                           </h5>
 
-                          <div
-                            style={{
-                              display: 'flex',
-                              flexDirection: 'column',
-                              gap: '10px',
-                            }}
-                          >
-                            {contrato.anexos?.length > 0 ? (
-                              contrato.anexos.map((anexo) => (
-                                <div
-                                  key={anexo.id}
-                                  style={{
-                                    display: 'flex',
-                                    justifyContent: 'space-between',
-                                    alignItems: 'center',
-                                    background: '#fff',
-                                    border: '1px solid #e2e8f0',
-                                    borderRadius: '6px',
-                                    padding: '10px 12px',
-                                  }}
+                          <div className="flex flex-wrap gap-2">
+                            {contrato.unidadesCobertas?.length > 0 ? (
+                              contrato.unidadesCobertas.map((u) => (
+                                <span
+                                  key={u.id}
+                                  className="inline-flex rounded-full bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
                                 >
-                                  <a
-                                    href={`${API_BASE_URL}/${anexo.path}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{
-                                      textDecoration: 'none',
-                                      color: '#2563eb',
-                                      fontWeight: 600,
-                                      display: 'flex',
-                                      alignItems: 'center',
-                                      gap: '8px',
-                                    }}
-                                  >
-                                    <FontAwesomeIcon icon={faFilePdf} />
-                                    {anexo.nomeOriginal}
-                                    <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" />
-                                  </a>
-
-                                  <button
-                                    type="button"
-                                    className="btn-action delete"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      page.handleDeleteAnexo(contrato.id, anexo.id);
-                                    }}
-                                  >
-                                    <FontAwesomeIcon icon={faTrashAlt} />
-                                  </button>
-                                </div>
+                                  {u.nomeSistema}
+                                </span>
                               ))
                             ) : (
-                              <p style={{ color: '#64748b', fontStyle: 'italic' }}>
-                                Nenhum documento anexado.
+                              <p className="text-sm italic text-slate-400">
+                                Nenhuma unidade vinculada.
                               </p>
                             )}
-
-                            <div>
-                              <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer' }}>
-                                <FontAwesomeIcon
-                                  icon={faUpload}
-                                  spin={page.uploadingId === contrato.id}
-                                />{' '}
-                                {page.uploadingId === contrato.id ? 'Enviando...' : 'Enviar Documento'}
-                                <input
-                                  type="file"
-                                  hidden
-                                  onChange={(e) => page.handleUploadArquivo(contrato.id, e)}
-                                />
-                              </label>
-                            </div>
                           </div>
                         </div>
 
-                        <div
-                          className="contrato-acoes-expandidas"
-                          style={{
-                            marginTop: '20px',
-                            display: 'flex',
-                            justifyContent: 'flex-end',
-                            gap: '10px',
-                          }}
-                        >
-                          <button
-                            type="button"
-                            className="btn btn-secondary"
-                            onClick={() => page.goToEdit(contrato.id)}
-                          >
-                            <FontAwesomeIcon icon={faEdit} /> Editar
-                          </button>
+                        <div className="rounded-xl border border-slate-200 bg-white p-4">
+                          <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                            <FontAwesomeIcon icon={faMicrochip} className="text-slate-500" />
+                            Equipamentos vinculados ({contrato.equipamentosCobertos?.length || 0})
+                          </h5>
 
-                          <button
-                            type="button"
-                            className="btn btn-danger"
-                            onClick={() => page.deleteModal.openModal(contrato)}
-                          >
-                            <FontAwesomeIcon icon={faTrashAlt} /> Excluir
-                          </button>
+                          <div className="max-h-[250px] overflow-y-auto pr-1">
+                            {contrato.equipamentosCobertos?.length > 0 ? (
+                              <div className="flex flex-col gap-2">
+                                {contrato.equipamentosCobertos.map((eq) => (
+                                  <div
+                                    key={eq.id}
+                                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                                  >
+                                    <span className="text-sm font-medium text-slate-800">
+                                      {eq.modelo}
+                                    </span>
+                                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                                      {eq.tag}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm italic text-slate-400">
+                                Sem equipamentos específicos.
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </PageSection>
+
+                      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+                        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+                          <FontAwesomeIcon icon={faPaperclip} className="text-slate-500" />
+                          Documentos do contrato
+                        </h5>
+
+                        <div className="flex flex-col gap-3">
+                          {contrato.anexos?.length > 0 ? (
+                            contrato.anexos.map((anexo) => (
+                              <div
+                                key={anexo.id}
+                                className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                              >
+                                <a
+                                  href={`${API_BASE_URL}/${anexo.path}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 no-underline hover:underline"
+                                >
+                                  <FontAwesomeIcon icon={faFilePdf} />
+                                  <span>{anexo.nomeOriginal}</span>
+                                  <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" />
+                                </a>
+
+                                <button
+                                  type="button"
+                                  className="btn btn-danger"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    page.handleDeleteAnexo(contrato.id, anexo.id);
+                                  }}
+                                >
+                                  <FontAwesomeIcon icon={faTrashAlt} /> Remover
+                                </button>
+                              </div>
+                            ))
+                          ) : (
+                            <p className="text-sm italic text-slate-400">
+                              Nenhum documento anexado.
+                            </p>
+                          )}
+
+                          <div>
+                            <label className="btn btn-secondary cursor-pointer">
+                              <FontAwesomeIcon
+                                icon={faUpload}
+                                spin={page.uploadingId === contrato.id}
+                              />{' '}
+                              {page.uploadingId === contrato.id
+                                ? 'Enviando...'
+                                : 'Enviar documento'}
+                              <input
+                                type="file"
+                                hidden
+                                onChange={(e) => page.handleUploadArquivo(contrato.id, e)}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-5 flex justify-end gap-2">
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          onClick={() => page.goToEdit(contrato.id)}
+                        >
+                          <FontAwesomeIcon icon={faEdit} /> Editar
+                        </button>
+
+                        <button
+                          type="button"
+                          className="btn btn-danger"
+                          onClick={() => page.deleteModal.openModal(contrato)}
+                        >
+                          <FontAwesomeIcon icon={faTrashAlt} /> Excluir
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         )}
       </PageLayout>
     </>
