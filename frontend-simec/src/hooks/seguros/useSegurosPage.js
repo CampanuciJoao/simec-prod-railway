@@ -5,30 +5,6 @@ import { useSeguros } from './useSeguros';
 import { useModal } from '../shared/useModal';
 import { useToast } from '../../contexts/ToastContext';
 
-const getNomeUnidadeSeguro = (seguro) => {
-  if (typeof seguro.unidade === 'string') return seguro.unidade;
-  if (seguro.unidade?.nomeSistema) return seguro.unidade.nomeSistema;
-  if (seguro.unidade?.nome) return seguro.unidade.nome;
-  if (seguro.equipamento?.unidade?.nomeSistema) return seguro.equipamento.unidade.nomeSistema;
-  return 'Não informada';
-};
-
-const getStatusDinamico = (seguro) => {
-  if (seguro.status !== 'Ativo') return seguro.status;
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  const dataFim = new Date(seguro.dataFim);
-
-  if (dataFim < hoje) return 'Expirado';
-
-  const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 30) return 'Vence em breve';
-
-  return 'Ativo';
-};
-
 export function useSegurosPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
@@ -43,6 +19,8 @@ export function useSegurosPage() {
     filtros,
     setFiltros,
     removerSeguro,
+    getNomeUnidade,
+    getStatusDinamico,
   } = useSeguros();
 
   const deleteModal = useModal();
@@ -131,7 +109,7 @@ export function useSegurosPage() {
       vencendo,
       vencidos,
     };
-  }, [seguros]);
+  }, [seguros, getStatusDinamico]);
 
   const activeFilters = useMemo(() => {
     return [
@@ -184,7 +162,7 @@ export function useSegurosPage() {
     });
   };
 
-  const setSearchTermFromEvent = (event) => {
+  const onSearchChange = (event) => {
     setSearchTerm(event.target.value);
   };
 
@@ -198,7 +176,7 @@ export function useSegurosPage() {
     loading,
     error,
     searchTerm,
-    onSearchChange: setSearchTermFromEvent,
+    onSearchChange,
     selectFiltersConfig,
     deleteModal,
     confirmarExclusao,
@@ -206,7 +184,7 @@ export function useSegurosPage() {
     activeFilters,
     clearFilter,
     clearAllFilters,
-    getNomeUnidadeSeguro,
+    getNomeUnidadeSeguro: getNomeUnidade,
     getStatusDinamico,
     filtrarPorStatus,
     goToCreate: () => navigate('/seguros/adicionar'),

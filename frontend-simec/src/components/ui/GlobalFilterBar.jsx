@@ -1,129 +1,91 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSearch, faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
-
-const formatarLabel = (valor) => {
-  if (!valor) return '';
-  return String(valor).replace(/([A-Z])/g, ' $1').trim();
-};
-
-const getOptionValue = (opt) => {
-  return typeof opt === 'object' ? opt.value : opt;
-};
-
-const getOptionLabel = (opt) => {
-  if (typeof opt === 'object') {
-    return opt.label ?? formatarLabel(opt.value);
-  }
-  return formatarLabel(opt);
-};
-
-function CustomSelect({ config }) {
-  const {
-    id,
-    label,
-    value,
-    onChange,
-    options = [],
-    defaultLabel,
-  } = config;
-
-  const placeholder = defaultLabel || `Filtrar por ${label?.toLowerCase() || 'opção'}`;
-
-  return (
-    <div className="space-y-1.5">
-      {label ? (
-        <label
-          htmlFor={id}
-          className="block text-xs font-semibold uppercase tracking-wide text-slate-500"
-        >
-          {label}
-        </label>
-      ) : null}
-
-      <div className="relative">
-        <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-          <FontAwesomeIcon icon={faFilter} />
-        </span>
-
-        <select
-          id={id}
-          value={value || ''}
-          onChange={(e) => onChange?.(e.target.value)}
-          className="select w-full pl-10 pr-10 text-slate-700"
-        >
-          <option value="">{placeholder}</option>
-
-          {options.map((opt) => {
-            const optionValue = getOptionValue(opt);
-            const optionLabel = getOptionLabel(opt);
-
-            return (
-              <option key={optionValue} value={optionValue}>
-                {optionLabel}
-              </option>
-            );
-          })}
-        </select>
-      </div>
-    </div>
-  );
-}
+import { faSearch, faFilter } from '@fortawesome/free-solid-svg-icons';
 
 function GlobalFilterBar({
-  searchTerm,
+  searchTerm = '',
   onSearchChange,
-  searchPlaceholder,
+  searchPlaceholder = 'Buscar...',
   selectFilters = [],
+  className = '',
 }) {
-  const handleClearSearch = () => {
-    onSearchChange?.({ target: { value: '' } });
-  };
-
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div
+      className={[
+        'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:p-5',
+        className,
+      ].join(' ')}
+    >
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
         <div className="xl:col-span-4">
-          <div className="space-y-1.5">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Busca
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Busca
+          </label>
+
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <FontAwesomeIcon icon={faSearch} />
+            </span>
+
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={onSearchChange}
+              placeholder={searchPlaceholder}
+              className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            />
+          </div>
+        </div>
+
+        {selectFilters.map((filter) => (
+          <div
+            key={filter.id || filter.name}
+            className="min-w-0 xl:col-span-2"
+          >
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {filter.label || filter.defaultLabel || 'Filtro'}
             </label>
 
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                <FontAwesomeIcon icon={faSearch} />
+                <FontAwesomeIcon icon={faFilter} />
               </span>
 
-              <input
-                type="text"
-                placeholder={searchPlaceholder || 'Buscar...'}
-                value={searchTerm}
-                onChange={onSearchChange}
-                className="input w-full pl-10 pr-10"
-              />
+              <select
+                value={filter.value ?? ''}
+                onChange={(e) => filter.onChange(e.target.value)}
+                className="w-full min-w-0 rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                title={
+                  filter.options?.find((opt) => opt.value === filter.value)?.label ||
+                  filter.defaultLabel ||
+                  ''
+                }
+              >
+                <option value="">
+                  {filter.defaultLabel || 'Todos'}
+                </option>
 
-              {searchTerm && (
-                <button
-                  type="button"
-                  onClick={handleClearSearch}
-                  title="Limpar busca"
-                  className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                >
-                  <FontAwesomeIcon icon={faTimes} />
-                </button>
-              )}
+                {(filter.options || []).map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:col-span-8 xl:grid-cols-4">
-          {selectFilters.map((filterConfig) => (
-            <CustomSelect key={filterConfig.id} config={filterConfig} />
-          ))}
-        </div>
+        ))}
       </div>
     </div>
   );
 }
+
+GlobalFilterBar.propTypes = {
+  searchTerm: PropTypes.string,
+  onSearchChange: PropTypes.func,
+  searchPlaceholder: PropTypes.string,
+  selectFilters: PropTypes.array,
+  className: PropTypes.string,
+};
 
 export default GlobalFilterBar;

@@ -129,6 +129,41 @@ function ActiveFiltersBar({ filters = [], onRemove, onClearAll }) {
   );
 }
 
+function renderCoberturas(seguro) {
+  const coberturas = [
+    { label: 'Incêndio', value: seguro.lmiIncendio },
+    { label: 'Danos Elétricos', value: seguro.lmiDanosEletricos },
+    { label: 'Roubo/Furto', value: seguro.lmiRoubo },
+    { label: 'Vidros', value: seguro.lmiVidros },
+    { label: 'Resp. Civil', value: seguro.lmiResponsabilidadeCivil },
+    { label: 'Danos Materiais', value: seguro.lmiDanosMateriais },
+    { label: 'Danos Corporais', value: seguro.lmiDanosCorporais },
+    { label: 'Danos Morais', value: seguro.lmiDanosMorais },
+    { label: 'APP', value: seguro.lmiAPP },
+  ].filter((item) => Number(item.value) > 0);
+
+  if (!coberturas.length) {
+    return (
+      <p className="text-sm italic text-slate-400">
+        Nenhuma cobertura cadastrada.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {coberturas.map((item) => (
+        <span
+          key={item.label}
+          className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
+        >
+          {item.label}: {Number(item.value).toLocaleString('pt-BR')}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function SegurosPage() {
   const page = useSegurosPage();
 
@@ -147,7 +182,12 @@ function SegurosPage() {
         isDestructive
       />
 
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout
+        background="slate"
+        padded
+        fullHeight
+        contentClassName="page-stack content-fade-in"
+      >
         <PageHeader
           title="Gestão de Seguros"
           subtitle="Acompanhe, filtre e gerencie as apólices cadastradas"
@@ -159,7 +199,7 @@ function SegurosPage() {
           }
         />
 
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <KpiCard
             icon={faFileShield}
             title="Total"
@@ -193,14 +233,13 @@ function SegurosPage() {
           />
         </div>
 
-        <div className="mb-6">
-          <GlobalFilterBar
-            searchTerm={page.searchTerm}
-            onSearchChange={page.onSearchChange}
-            searchPlaceholder="Buscar por apólice, vínculo ou seguradora..."
-            selectFilters={page.selectFiltersConfig}
-          />
-        </div>
+        <GlobalFilterBar
+          className="w-full"
+          searchTerm={page.searchTerm}
+          onSearchChange={page.onSearchChange}
+          searchPlaceholder="Buscar por apólice, vínculo ou seguradora..."
+          selectFilters={page.selectFiltersConfig}
+        />
 
         <ActiveFiltersBar
           filters={page.activeFilters}
@@ -292,7 +331,7 @@ function SegurosPage() {
                         </h5>
 
                         <span className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
-                          {page.getNomeUnidadeSeguro(seguro)}
+                          {page.getNomeUnidadeSeguro(seguro) || 'Não informada'}
                         </span>
                       </div>
 
@@ -302,22 +341,7 @@ function SegurosPage() {
                           Coberturas
                         </h5>
 
-                        <div className="flex flex-wrap gap-2">
-                          {seguro.coberturas?.length > 0 ? (
-                            seguro.coberturas.map((cobertura, index) => (
-                              <span
-                                key={`${seguro.id}-cob-${index}`}
-                                className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
-                              >
-                                {cobertura.nome || cobertura.tipo || 'Cobertura'}
-                              </span>
-                            ))
-                          ) : (
-                            <p className="text-sm italic text-slate-400">
-                              Nenhuma cobertura cadastrada.
-                            </p>
-                          )}
-                        </div>
+                        {renderCoberturas(seguro)}
                       </div>
 
                       <div className="flex flex-col justify-end gap-2 xl:min-w-[160px]">

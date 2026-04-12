@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../ui/Sidebar';
+import ChatBot from '../ui/ChatBot';
 
 function AppLayout() {
   const location = useLocation();
@@ -189,53 +190,57 @@ function AppLayout() {
   }, [location.pathname]);
 
   return (
-    <div className="flex min-h-screen bg-slate-100">
-      <Sidebar />
+    <>
+      <div className="flex min-h-screen bg-slate-100">
+        <Sidebar />
 
-      <div className="flex min-h-screen flex-1 flex-col">
-        <header className="border-b border-slate-800 bg-slate-900 px-6 py-4 text-white">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-slate-300">Olá,</p>
-              <h2 className="font-semibold text-white">
-                Administrador do Sistema
-              </h2>
+        <div className="flex min-h-screen flex-1 flex-col">
+          <header className="border-b border-slate-800 bg-slate-900 px-6 py-4 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-300">Olá,</p>
+                <h2 className="font-semibold text-white">
+                  Administrador do Sistema
+                </h2>
+              </div>
             </div>
+          </header>
+
+          <div className="border-b border-slate-200 bg-white px-6 py-3">
+            <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+              {breadcrumbItems.length > 0 ? (
+                breadcrumbItems.map((item, index) => (
+                  <React.Fragment key={`${item.label}-${index}`}>
+                    {index > 0 && <span className="text-slate-300">/</span>}
+
+                    {item.to ? (
+                      <Link
+                        to={item.to}
+                        className="font-medium text-slate-600 transition hover:text-blue-600"
+                      >
+                        {item.label}
+                      </Link>
+                    ) : (
+                      <span className="font-semibold text-slate-900">
+                        {item.label}
+                      </span>
+                    )}
+                  </React.Fragment>
+                ))
+              ) : (
+                <span className="font-medium text-slate-500">SIMEC</span>
+              )}
+            </nav>
           </div>
-        </header>
 
-        <div className="border-b border-slate-200 bg-white px-6 py-3">
-          <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
-            {breadcrumbItems.length > 0 ? (
-              breadcrumbItems.map((item, index) => (
-                <React.Fragment key={`${item.label}-${index}`}>
-                  {index > 0 && <span className="text-slate-300">/</span>}
-
-                  {item.to ? (
-                    <Link
-                      to={item.to}
-                      className="font-medium text-slate-600 transition hover:text-blue-600"
-                    >
-                      {item.label}
-                    </Link>
-                  ) : (
-                    <span className="font-semibold text-slate-900">
-                      {item.label}
-                    </span>
-                  )}
-                </React.Fragment>
-              ))
-            ) : (
-              <span className="font-medium text-slate-500">SIMEC</span>
-            )}
-          </nav>
+          <main className="flex-1">
+            <Outlet />
+          </main>
         </div>
-
-        <main className="flex-1">
-          <Outlet />
-        </main>
       </div>
-    </div>
+
+      <ChatBot />
+    </>
   );
 }
 

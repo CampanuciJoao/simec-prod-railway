@@ -60,7 +60,7 @@ function Sidebar({
             <img
               src={logoSimec}
               alt="SIMEC Logo"
-              className="h-auto w-auto max-h-[150px] max-w-[170px] object-contain"
+              className="h-auto w-auto max-h-[200px] max-w-[170px] object-contain"
             />
           </Link>
 
