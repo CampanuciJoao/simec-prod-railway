@@ -18,11 +18,11 @@ import {
 
 import { useAlertasPage } from '../../hooks/alertas/useAlertasPage';
 
-import GlobalFilterBar from '../components/ui/GlobalFilterBar';
-import PageLayout from '../components/ui/PageLayout';
-import PageHeader from '../components/ui/PageHeader';
-import PageState from '../components/ui/PageState';
-import Card from '../components/ui/Card';
+import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageState from '../../components/ui/PageState';
+import Card from '../../components/ui/Card';
 
 function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {
