@@ -1,172 +1,290 @@
-// Ficheiro: src/pages/BIPage.jsx
-// VERSÃO RESTAURADA - VISUAL ORIGINAL COM DRILL-DOWN E ALINHAMENTO CORRIGIDO
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { getIndicadoresBI } from '../../services/api';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { 
-    faPrint, 
-    faSpinner, 
-    faClock, 
-    faExclamationTriangle, 
-    faHospital, 
-    faChartBar,
-    faExternalLinkAlt 
+import {
+  faPrint,
+  faClock,
+  faExclamationTriangle,
+  faHospital,
+  faChartBar,
+  faExternalLinkAlt,
+  faMicrochip,
+  faShieldHeart,
+  faScrewdriverWrench,
+  faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-import { exportarBIPDF } from '../../utils/pdfUtils';
+
+import { useBIPage } from '../../hooks/bi/useBIPage';
+
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageState from '../../components/ui/PageState';
+import Card from '../../components/ui/Card';
+import Button from '../../components/ui/Button';
 import BarChart from '../../components/charts/BarChart';
 
-function BIPage() {
-    const [dados, setDados] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const navigate = useNavigate();
+function KpiCard({ icon, title, value, subtitle, tone = 'slate' }) {
+  const toneMap = {
+    slate: 'bg-slate-100 text-slate-600',
+    blue: 'bg-blue-100 text-blue-600',
+    green: 'bg-emerald-100 text-emerald-600',
+    red: 'bg-red-100 text-red-600',
+    yellow: 'bg-amber-100 text-amber-600',
+  };
 
-    useEffect(() => {
-        getIndicadoresBI()
-            .then(res => {
-                setDados(res);
-                setLoading(false);
-            })
-            .catch(err => {
-                console.error("Erro ao carregar BI:", err);
-                setLoading(false);
-            });
-    }, []);
-
-    // Função Drill-down: Direciona para as corretivas do equipamento específico
-    const handleDrillDown = (equipamentoId) => {
-        navigate('/manutencoes', { 
-            state: { 
-                filtroEquipamentoId: equipamentoId, 
-                filtroTipoInicial: 'Corretiva' 
-            } 
-        });
-    };
-
-    if (loading) return <div className="page-content-wrapper centered-loader"><FontAwesomeIcon icon={faSpinner} spin size="2x"/></div>;
-    if (!dados) return <div className="page-content-wrapper"><p className="no-data-message">Dados de BI não disponíveis para o período.</p></div>;
-
-    const chartUnidades = {
-        labels: dados.rankingUnidades?.map(u => u.nome) || [],
-        datasets: [{ 
-            label: 'Horas Totais Parado', 
-            data: dados.rankingUnidades?.map(u => u.horasParado) || [], 
-            backgroundColor: 'rgba(59, 130, 246, 0.8)', 
-            borderColor: '#2563eb',
-            borderWidth: 1
-        }]
-    };
-
-    return (
-        <div className="page-content-wrapper">
-            <div className="page-title-card">
-                <h1 className="page-title-internal">
-                    <FontAwesomeIcon icon={faChartBar} /> Business Intelligence - {dados.ano}
-                </h1>
-                <button className="btn btn-primary" onClick={() => exportarBIPDF(dados)}>
-                    <FontAwesomeIcon icon={faPrint} /> Imprimir Relatório Executivo
-                </button>
-            </div>
-
-            {/* CARDS DE RESUMO ORIGINAIS */}
-            <div className="summary-cards">
-                <div className="card" style={{ borderLeft: '6px solid #6366f1' }}>
-                    <div className="card-text-content">
-                        <div className="card-title">Ativos no Sistema</div>
-                        <div className="card-value">{dados.resumoGeral?.totalAtivos || 0}</div>
-                    </div>
-                </div>
-                <div className="card" style={{ borderLeft: '6px solid #22c55e' }}>
-                    <div className="card-text-content">
-                        <div className="card-title">Preventivas Realizadas</div>
-                        <div className="card-value" style={{ color: '#22c55e' }}>{dados.resumoGeral?.preventivas || 0}</div>
-                    </div>
-                </div>
-                <div className="card" style={{ borderLeft: '6px solid #ef4444' }}>
-                    <div className="card-text-content">
-                        <div className="card-title">Corretivas (Falhas)</div>
-                        <div className="card-value" style={{ color: '#ef4444' }}>{dados.resumoGeral?.corretivas || 0}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div className="detailed-sections" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                
-                <section className="page-section">
-                    <h3><FontAwesomeIcon icon={faHospital} /> Downtime por Unidade (Horas)</h3>
-                    <div style={{ height: '280px', marginTop: '15px' }}>
-                        <BarChart chartData={chartUnidades} />
-                    </div>
-                </section>
-
-                <section className="page-section">
-                    <h3><FontAwesomeIcon icon={faExclamationTriangle} /> Reincidência de Falhas</h3>
-                    <div className="table-responsive-wrapper" style={{ marginTop: '15px' }}>
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Equipamento</th>
-                                    <th className="text-center">Qtd. Corretivas</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {dados.rankingFrequencia?.length > 0 ? (
-                                    dados.rankingFrequencia.map((e, index) => (
-                                        <tr key={index} onClick={() => handleDrillDown(e.id)} style={{ cursor: 'pointer' }}>
-                                            <td>
-                                                <div style={{ fontWeight: 'bold', color: 'var(--cor-primaria-light)' }}>
-                                                    {e.modelo} <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" style={{opacity: 0.5, marginLeft: '5px'}}/>
-                                                </div>
-                                                <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Tag: {e.tag}</div>
-                                            </td>
-                                            <td className="text-center">
-                                                <span style={{ fontWeight: 'bold', color: '#ef4444', fontSize: '1.1rem' }}>{e.corretivas}</span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr><td colSpan="2" className="text-center">Sem dados de corretivas.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                {/* TABELA DE DOWNTIME COM ALINHAMENTO CORRIGIDO */}
-                <section className="page-section" style={{ gridColumn: '1 / -1' }}>
-                    <h3><FontAwesomeIcon icon={faClock} /> Ranking de Downtime (Maior Tempo Parado)</h3>
-                    <div className="table-responsive-wrapper" style={{ marginTop: '15px' }}>
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th className="text-left">Equipamento</th>
-                                    <th className="text-left">Nº de Série (Tag)</th>
-                                    <th className="text-left">Unidade</th>
-                                    <th className="text-center">Total Parado</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {dados.rankingDowntime?.length > 0 ? (
-                                    dados.rankingDowntime.map((e, index) => (
-                                        <tr key={index}>
-                                            <td className="text-left">{e.modelo}</td>
-                                            <td className="text-left" style={{ fontWeight: 'bold' }}>{e.tag}</td>
-                                            <td className="text-left">{e.unidade}</td>
-                                            <td className="text-center">
-                                                <span style={{ fontWeight: 'bold', color: '#f59e0b' }}>{e.horasParado} Horas</span>
-                                            </td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr><td colSpan="4" className="text-center">Nenhum equipamento parado registrado.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-            </div>
+  return (
+    <Card className="h-full">
+      <div className="flex items-center gap-4">
+        <div
+          className={[
+            'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
+            toneMap[tone] || toneMap.slate,
+          ].join(' ')}
+        >
+          <FontAwesomeIcon icon={icon} />
         </div>
+
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {title}
+          </p>
+          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+          {subtitle ? (
+            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+          ) : null}
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+function SectionTitle({ icon, title, subtitle }) {
+  return (
+    <div className="mb-4">
+      <h3 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+        <FontAwesomeIcon icon={icon} className="text-slate-500" />
+        {title}
+      </h3>
+      {subtitle ? (
+        <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function EmptyPanel({ message }) {
+  return (
+    <div className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+      {message}
+    </div>
+  );
+}
+
+function BIPage() {
+  const page = useBIPage();
+
+  const isEmpty =
+    !page.loading &&
+    !page.error &&
+    (!page.dados ||
+      (!page.rankingDowntime.length &&
+        !page.rankingFrequencia.length &&
+        !page.downtimePorUnidadeChartData.length));
+
+  if (page.loading || page.error || isEmpty) {
+    return (
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title={`Business Intelligence${page.dados?.ano ? ` - ${page.dados.ano}` : ''}`}
+          subtitle="Painel executivo para acompanhamento gerencial"
+          icon={faChartBar}
+          actions={
+            <Button onClick={page.handlePrint} disabled={!page.dados}>
+              <FontAwesomeIcon icon={faPrint} />
+              Imprimir relatório executivo
+            </Button>
+          }
+        />
+
+        <PageState
+          loading={page.loading}
+          error={page.error}
+          isEmpty={isEmpty}
+          emptyMessage="Dados de BI não disponíveis para o período."
+        />
+      </PageLayout>
     );
+  }
+
+  return (
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title={`Business Intelligence - ${page.dados?.ano || ''}`}
+        subtitle="Painel executivo para acompanhamento gerencial"
+        icon={faChartBar}
+        actions={
+          <Button onClick={page.handlePrint}>
+            <FontAwesomeIcon icon={faPrint} />
+            Imprimir relatório executivo
+          </Button>
+        }
+      />
+
+      {/* KPIs */}
+      <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+        <KpiCard
+          icon={faMicrochip}
+          title="Ativos no sistema"
+          value={page.resumoCards.totalAtivos}
+          tone="blue"
+        />
+
+        <KpiCard
+          icon={faShieldHeart}
+          title="Preventivas realizadas"
+          value={page.resumoCards.preventivas}
+          tone="green"
+        />
+
+        <KpiCard
+          icon={faTriangleExclamation}
+          title="Falhas corretivas"
+          value={page.resumoCards.corretivas}
+          tone="red"
+        />
+
+        <KpiCard
+          icon={faClock}
+          title="Downtime acumulado"
+          value={page.resumoCards.downtimeAcumulado}
+          tone="yellow"
+        />
+
+        <KpiCard
+          icon={faHospital}
+          title="Unidade mais crítica"
+          value={page.resumoCards.unidadeCritica?.nome || '—'}
+          subtitle={
+            page.resumoCards.unidadeCritica
+              ? page.resumoCards.unidadeCritica.downtime
+              : 'Sem dados'
+          }
+          tone="slate"
+        />
+      </div>
+
+      {/* Linha principal */}
+      <div className="mb-6 grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_1fr]">
+        <Card>
+          <SectionTitle
+            icon={faHospital}
+            title="Downtime por unidade"
+            subtitle="Tempo acumulado de indisponibilidade"
+          />
+
+          <div className="h-[320px]">
+            {page.downtimePorUnidadeChartData.length > 0 ? (
+              <BarChart data={page.downtimePorUnidadeChartData} />
+            ) : (
+              <EmptyPanel message="Sem dados válidos para o gráfico." />
+            )}
+          </div>
+        </Card>
+
+        <Card>
+          <SectionTitle
+            icon={faExclamationTriangle}
+            title="Reincidência de falhas"
+            subtitle="Equipamentos com maior volume de corretivas"
+          />
+
+          {page.rankingFrequencia.length > 0 ? (
+            <div className="overflow-hidden rounded-xl border border-slate-200">
+              <div className="grid grid-cols-[1fr_110px] border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <span>Equipamento</span>
+                <span className="text-center">Qtd. corretivas</span>
+              </div>
+
+              <div className="divide-y divide-slate-100">
+                {page.rankingFrequencia.map((e, index) => (
+                  <button
+                    key={`${e.tag}-${index}`}
+                    type="button"
+                    onClick={() => page.handleDrillDownEquipamento(e.id)}
+                    className="grid w-full grid-cols-[1fr_110px] items-center px-4 py-3 text-left transition hover:bg-slate-50"
+                  >
+                    <div className="min-w-0">
+                      <div className="font-semibold text-blue-700">
+                        {e.modelo}
+                        <FontAwesomeIcon
+                          icon={faExternalLinkAlt}
+                          size="xs"
+                          className="ml-2 opacity-60"
+                        />
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        Tag: {e.tag}
+                      </div>
+                    </div>
+
+                    <div className="text-center text-xl font-bold text-red-500">
+                      {e.corretivas}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <EmptyPanel message="Sem dados de corretivas." />
+          )}
+        </Card>
+      </div>
+
+      {/* Ranking completo */}
+      <Card>
+        <SectionTitle
+          icon={faScrewdriverWrench}
+          title="Ranking de downtime"
+          subtitle="Equipamentos com maior tempo parado no período"
+        />
+
+        {page.rankingDowntime.length > 0 ? (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <th className="px-4 py-3">Equipamento</th>
+                  <th className="px-4 py-3">Nº Série / Tag</th>
+                  <th className="px-4 py-3">Unidade</th>
+                  <th className="px-4 py-3 text-center">Total parado</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {page.rankingDowntime.map((e, index) => (
+                  <tr key={`${e.tag}-${index}`} className="hover:bg-slate-50">
+                    <td className="px-4 py-3 font-medium text-slate-800">
+                      {e.modelo}
+                    </td>
+                    <td className="px-4 py-3 font-semibold text-slate-700">
+                      {e.tag}
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">{e.unidade}</td>
+                    <td className="px-4 py-3 text-center font-bold text-amber-600">
+                      {e.downtimeFormatado}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <EmptyPanel message="Nenhum equipamento parado registrado." />
+        )}
+      </Card>
+    </PageLayout>
+  );
 }
 
 export default BIPage;
