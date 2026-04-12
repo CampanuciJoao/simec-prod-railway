@@ -1,48 +1,106 @@
-// Ficheiro: src/components/EquipamentoForm.jsx
-// VERSÃO 9.0 - COM SELEÇÃO PADRONIZADA DE TIPOS E CHECKBOX DE PATRIMÔNIO
-
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave, faTimes, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import {
+  faSave,
+  faTimes,
+  faSpinner,
+  faCircleInfo,
+  faScrewdriverWrench,
+} from '@fortawesome/free-solid-svg-icons';
+
 import DateInput from '../ui/DateInput';
+import PageSection from '../ui/PageSection';
 import { getUnidades } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
-// --- LISTA DE TIPOS PADRONIZADA (RADIOLOGIA E CLÍNICA) ---
 const LISTA_TIPOS = [
-    "Arco Cirúrgico",
-    "Bomba Injetora",
-    "Cintilografia",
-    "CR (Radiologia Computadorizada)",
-    "Densitometria Óssea",
-    "DR (Radiologia Digital)",
-    "Esteira Ergométrica",
-    "Mamografia",
-    "PET-CT",
-    "Raio-X",
-    "Ressonância Magnética",
-    "Tomografia Computadorizada",
-    "Ultrassom",
-    "Outros"
+  'Arco Cirúrgico',
+  'Bomba Injetora',
+  'Cintilografia',
+  'CR (Radiologia Computadorizada)',
+  'Densitometria Óssea',
+  'DR (Radiologia Digital)',
+  'Esteira Ergométrica',
+  'Mamografia',
+  'PET-CT',
+  'Raio-X',
+  'Ressonância Magnética',
+  'Tomografia Computadorizada',
+  'Ultrassom',
+  'Outros',
 ].sort();
 
 const OPCOES_STATUS = [
-    { valor: 'Operante', rotulo: 'Operante' },
-    { valor: 'Inoperante', rotulo: 'Inoperante' },
-    { valor: 'UsoLimitado', rotulo: 'Uso Limitado' },
-    { valor: 'EmManutencao', rotulo: 'Em Manutenção' },
+  { valor: 'Operante', rotulo: 'Operante' },
+  { valor: 'Inoperante', rotulo: 'Inoperante' },
+  { valor: 'UsoLimitado', rotulo: 'Uso Limitado' },
+  { valor: 'EmManutencao', rotulo: 'Em Manutenção' },
 ];
 
 const ESTADO_INICIAL_VAZIO = {
-  tag: '', modelo: '', tipo: '', setor: '', unidadeId: '', fabricante: '',
-  anoFabricacao: '', dataInstalacao: '', status: 'Operante',
-  numeroPatrimonio: '', registroAnvisa: '', observacoes: ''
+  tag: '',
+  modelo: '',
+  tipo: '',
+  setor: '',
+  unidadeId: '',
+  fabricante: '',
+  anoFabricacao: '',
+  dataInstalacao: '',
+  status: 'Operante',
+  numeroPatrimonio: '',
+  registroAnvisa: '',
+  observacoes: '',
 };
 
-function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = false }) {
+function FormField({ label, required = false, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-slate-700">
+        {label}
+        {required ? ' *' : ''}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function TextInput(props) {
+  return (
+    <input
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    />
+  );
+}
+
+function SelectInput({ children, ...props }) {
+  return (
+    <select
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    >
+      {children}
+    </select>
+  );
+}
+
+function TextareaInput(props) {
+  return (
+    <textarea
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    />
+  );
+}
+
+function EquipamentoForm({
+  onSubmit,
+  onCancel,
+  initialData = null,
+  isEditing = false,
+}) {
   const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
@@ -52,17 +110,24 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  // Carrega as unidades ao montar o componente
   useEffect(() => {
     getUnidades()
-      .then(data => setUnidadesDisponiveis(data.sort((a, b) => a.nomeSistema.localeCompare(b.nomeSistema))))
+      .then((data) =>
+        setUnidadesDisponiveis(
+          (data || []).sort((a, b) =>
+            (a.nomeSistema || '').localeCompare(b.nomeSistema || '')
+          )
+        )
+      )
       .catch(() => addToast('Erro ao carregar lista de unidades.', 'error'));
   }, [addToast]);
 
-  // Preenche o formulário se estiver em modo de edição
   useEffect(() => {
     if (isEditing && initialData) {
-      const isSemPat = initialData.numeroPatrimonio?.toLowerCase() === "sem patrimônio";
+      const isSemPat =
+        String(initialData.numeroPatrimonio || '').toLowerCase() ===
+        'sem patrimônio';
+
       setSemPatrimonio(isSemPat);
 
       setFormData({
@@ -73,11 +138,13 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
         unidadeId: initialData.unidade?.id || initialData.unidadeId || '',
         fabricante: initialData.fabricante || '',
         anoFabricacao: initialData.anoFabricacao || '',
-        dataInstalacao: initialData.dataInstalacao ? initialData.dataInstalacao.split('T')[0] : '',
+        dataInstalacao: initialData.dataInstalacao
+          ? initialData.dataInstalacao.split('T')[0]
+          : '',
         status: initialData.status || 'Operante',
         numeroPatrimonio: initialData.numeroPatrimonio || '',
         registroAnvisa: initialData.registroAnvisa || '',
-        observacoes: initialData.observacoes || ''
+        observacoes: initialData.observacoes || '',
       });
     } else {
       setFormData(ESTADO_INICIAL_VAZIO);
@@ -87,31 +154,45 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleCheckboxChange = (e) => {
     const checked = e.target.checked;
     setSemPatrimonio(checked);
+
     if (checked) {
-      setFormData(prev => ({ ...prev, numeroPatrimonio: 'Sem Patrimônio' }));
+      setFormData((prev) => ({
+        ...prev,
+        numeroPatrimonio: 'Sem Patrimônio',
+      }));
     } else {
-      setFormData(prev => ({ ...prev, numeroPatrimonio: '' }));
+      setFormData((prev) => ({
+        ...prev,
+        numeroPatrimonio: '',
+      }));
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
     if (!formData.tag || !formData.modelo || !formData.tipo || !formData.unidadeId) {
       setError('Tag, Modelo, Tipo e Unidade são campos obrigatórios.');
       return;
     }
+
     setIsSubmitting(true);
+
     try {
       await onSubmit(formData);
     } catch (apiError) {
-      setError(apiError.response?.data?.message || apiError.message || 'Erro ao salvar.');
+      setError(
+        apiError?.response?.data?.message ||
+          apiError?.message ||
+          'Erro ao salvar equipamento.'
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -123,108 +204,234 @@ function EquipamentoForm({ onSubmit, onCancel, initialData = null, isEditing = f
   };
 
   return (
-    <form onSubmit={handleSubmit} className="form-elegante">
-      {error && <p className="form-error">{error}</p>}
-      
-      <div className="form-section">
-        <h4>Informações Gerais</h4>
-        <div className="info-grid grid-cols-3">
-          <div className="form-group">
-            <label htmlFor="tag">Nº Série (Tag) *</label>
-            <input type="text" id="tag" name="tag" value={formData.tag} onChange={handleChange} required disabled={isEditing} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="modelo">Modelo *</label>
-            <input type="text" id="modelo" name="modelo" value={formData.modelo} onChange={handleChange} required />
-          </div>
-          
-          {/* CAMPO TIPO ATUALIZADO PARA SELECT */}
-          <div className="form-group">
-            <label htmlFor="tipo">Tipo de Equipamento *</label>
-            <select id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} required>
-                <option value="">Selecione...</option>
-                {LISTA_TIPOS.map(tipo => (
-                    <option key={tipo} value={tipo}>{tipo}</option>
-                ))}
-            </select>
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
 
-          <div className="form-group">
-            <label htmlFor="unidadeId">Unidade / Hospital *</label>
-            <select id="unidadeId" name="unidadeId" value={formData.unidadeId} onChange={handleChange} required>
-              <option value="">Selecione uma Unidade</option>
-              {unidadesDisponiveis.map(unidade => (
-                <option key={unidade.id} value={unidade.id}>{unidade.nomeSistema}</option>
-              ))}
-            </select>
-          </div>
-          <div className="form-group">
-            <label htmlFor="setor">Localização / Setor</label>
-            <input type="text" id="setor" name="setor" value={formData.setor} onChange={handleChange} />
-          </div>
-          <div className="form-group">
-            <label htmlFor="status">Status Inicial</label>
-            <select id="status" name="status" value={formData.status} onChange={handleChange}>
-              {OPCOES_STATUS.map(opt => (
-                <option key={opt.valor} value={opt.valor}>{opt.rotulo}</option>
-              ))}
-            </select>
+      <PageSection
+        title="Informações gerais"
+        description="Dados principais de identificação e localização do equipamento."
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <FontAwesomeIcon icon={faCircleInfo} />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Cadastro principal do ativo
+            </p>
+            <p className="text-sm text-slate-500">
+              Preencha os dados obrigatórios para registrar o equipamento.
+            </p>
           </div>
         </div>
-      </div>
-      
-      <div className="form-section">
-        <h4>Detalhes Técnicos e de Controle</h4>
-        <div className="info-grid grid-cols-3">
-            <div className="form-group">
-              <label htmlFor="fabricante">Fabricante</label>
-              <input type="text" id="fabricante" name="fabricante" value={formData.fabricante} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="anoFabricacao">Ano Fabricação</label>
-              <input type="number" id="anoFabricacao" name="anoFabricacao" value={formData.anoFabricacao} onChange={handleChange} placeholder="ex: 2024" />
-            </div>
-            <div className="form-group">
-              <label htmlFor="dataInstalacao">Data Instalação</label>
-              <DateInput id="dataInstalacao" name="dataInstalacao" value={formData.dataInstalacao} onChange={handleChange} />
-            </div>
 
-            <div className="form-group">
-              <label htmlFor="numeroPatrimonio">Número de Patrimônio</label>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <input 
-                  type="text" 
-                  id="numeroPatrimonio" 
-                  name="numeroPatrimonio" 
-                  value={formData.numeroPatrimonio} 
-                  onChange={handleChange} 
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <FormField label="Nº Série (Tag)" required>
+            <TextInput
+              type="text"
+              name="tag"
+              value={formData.tag}
+              onChange={handleChange}
+              placeholder="Digite a tag do equipamento"
+              required
+              disabled={isEditing}
+            />
+          </FormField>
+
+          <FormField label="Modelo" required>
+            <TextInput
+              type="text"
+              name="modelo"
+              value={formData.modelo}
+              onChange={handleChange}
+              placeholder="Digite o modelo"
+              required
+            />
+          </FormField>
+
+          <FormField label="Tipo de equipamento" required>
+            <SelectInput
+              name="tipo"
+              value={formData.tipo}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Selecione...</option>
+              {LISTA_TIPOS.map((tipo) => (
+                <option key={tipo} value={tipo}>
+                  {tipo}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+
+          <FormField label="Unidade / Hospital" required>
+            <SelectInput
+              name="unidadeId"
+              value={formData.unidadeId}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Selecione uma unidade</option>
+              {unidadesDisponiveis.map((unidade) => (
+                <option key={unidade.id} value={unidade.id}>
+                  {unidade.nomeSistema}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+
+          <FormField label="Localização / Setor">
+            <TextInput
+              type="text"
+              name="setor"
+              value={formData.setor}
+              onChange={handleChange}
+              placeholder="Ex.: Sala 2, Bloco A"
+            />
+          </FormField>
+
+          <FormField label="Status inicial">
+            <SelectInput
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+            >
+              {OPCOES_STATUS.map((opt) => (
+                <option key={opt.valor} value={opt.valor}>
+                  {opt.rotulo}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Detalhes técnicos e controle"
+        description="Informações complementares para rastreabilidade e gestão do ativo."
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+            <FontAwesomeIcon icon={faScrewdriverWrench} />
+          </span>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Dados técnicos e patrimoniais
+            </p>
+            <p className="text-sm text-slate-500">
+              Esses dados ajudam no inventário, manutenção e auditoria.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <FormField label="Fabricante">
+            <TextInput
+              type="text"
+              name="fabricante"
+              value={formData.fabricante}
+              onChange={handleChange}
+              placeholder="Digite o fabricante"
+            />
+          </FormField>
+
+          <FormField label="Ano de fabricação">
+            <TextInput
+              type="number"
+              name="anoFabricacao"
+              value={formData.anoFabricacao}
+              onChange={handleChange}
+              placeholder="Ex.: 2024"
+            />
+          </FormField>
+
+          <FormField label="Data de instalação">
+            <DateInput
+              name="dataInstalacao"
+              value={formData.dataInstalacao}
+              onChange={handleChange}
+            />
+          </FormField>
+
+          <div className="md:col-span-2 xl:col-span-1">
+            <FormField label="Número de patrimônio">
+              <div className="space-y-2">
+                <TextInput
+                  type="text"
+                  name="numeroPatrimonio"
+                  value={formData.numeroPatrimonio}
+                  onChange={handleChange}
                   disabled={semPatrimonio}
-                  placeholder={semPatrimonio ? "" : "Digite o número"}
+                  placeholder={semPatrimonio ? '' : 'Digite o número'}
                 />
-                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.82em', cursor: 'pointer', fontWeight: 'normal', color: 'var(--cor-texto-secundario-light)' }}>
-                  <input type="checkbox" checked={semPatrimonio} onChange={handleCheckboxChange} />
+
+                <label className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={semPatrimonio}
+                    onChange={handleCheckboxChange}
+                    className="h-4 w-4 rounded border-slate-300"
+                  />
                   Equipamento sem etiqueta de patrimônio
                 </label>
               </div>
-            </div>
+            </FormField>
+          </div>
 
-            <div className="form-group">
-              <label htmlFor="registroAnvisa">Registro ANVISA</label>
-              <input type="text" id="registroAnvisa" name="registroAnvisa" value={formData.registroAnvisa} onChange={handleChange} />
-            </div>
+          <FormField label="Registro ANVISA">
+            <TextInput
+              type="text"
+              name="registroAnvisa"
+              value={formData.registroAnvisa}
+              onChange={handleChange}
+              placeholder="Digite o registro"
+            />
+          </FormField>
         </div>
-        <div className="form-group" style={{marginTop: '20px'}}>
-            <label htmlFor="observacoes">Observações</label>
-            <textarea id="observacoes" name="observacoes" rows="3" value={formData.observacoes} onChange={handleChange}></textarea>
+
+        <div className="mt-4">
+          <FormField label="Observações">
+            <TextareaInput
+              name="observacoes"
+              rows={4}
+              value={formData.observacoes}
+              onChange={handleChange}
+              placeholder="Adicione observações relevantes sobre o equipamento"
+            />
+          </FormField>
         </div>
-      </div>
-      
-      <div className="form-actions" style={{ justifyContent: 'flex-end', display: 'flex', gap: '10px' }}>
-        <button type="button" className="btn btn-secondary" onClick={handleCancelClick} disabled={isSubmitting}>
-          <FontAwesomeIcon icon={faTimes} /> Cancelar
+      </PageSection>
+
+      <div className="flex flex-wrap justify-end gap-3">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleCancelClick}
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon icon={faTimes} />
+          Cancelar
         </button>
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          <FontAwesomeIcon icon={isSubmitting ? faSpinner : faSave} spin={isSubmitting} /> {isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Adicionar Equipamento')}
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon
+            icon={isSubmitting ? faSpinner : faSave}
+            spin={isSubmitting}
+          />
+          {isSubmitting
+            ? 'Salvando...'
+            : isEditing
+              ? 'Salvar alterações'
+              : 'Adicionar equipamento'}
         </button>
       </div>
     </form>

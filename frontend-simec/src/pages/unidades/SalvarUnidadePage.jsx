@@ -1,134 +1,150 @@
-// Ficheiro: frontend-simec/src/pages/unidades/SalvarUnidadePage.jsx
-// VERSÃO FINAL, COMPLETA E CORRIGIDA
-
-// --- Core & Routing Dependencies ---
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-
-// --- Custom Hooks, Context & API Services ---
-import { useToast } from '../../contexts/ToastContext';
-import { getUnidadeById, addUnidade, updateUnidade } from '../../services/api';
-
-// --- UI Components & Assets ---
-import UnidadeForm from '../../components/unidades/UnidadeForm';
+import React, { useCallback, useEffect, useState } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faBuilding } from '@fortawesome/free-solid-svg-icons';
 
-/**
- * @component SalvarUnidadePage
- * @description Componente "inteligente" que orquestra a criação e edição de Unidades.
- * Ele busca os dados necessários, gerencia estados de UI (loading, error) e
- * passa a lógica de submissão e os dados iniciais para o componente de formulário.
- */
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageState from '../../components/ui/PageState';
+import UnidadeForm from '../../components/unidades/UnidadeForm';
+
+import { addUnidade, getUnidadeById, updateUnidade } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+
 function SalvarUnidadePage() {
-  const { id } = useParams();
   const navigate = useNavigate();
+  const { id } = useParams();
   const { addToast } = useToast();
 
-  const isEditing = !!id;
+  const isEditing = Boolean(id);
 
   const [initialData, setInitialData] = useState(null);
   const [loading, setLoading] = useState(isEditing);
   const [error, setError] = useState('');
 
-  // Lógica para buscar os dados da unidade para edição, memorizada com useCallback.
-  const fetchUnidade = useCallback(() => {
-    if (isEditing) {
-      setLoading(true);
-      getUnidadeById(id)
-        .then((data) => {
-          setInitialData(data);
-        })
-        .catch((err) => {
-          console.error('Erro ao buscar unidade para edição:', err);
-          setError('Falha ao carregar dados da unidade.');
-          addToast('Falha ao carregar dados da unidade.', 'error');
-        })
-        .finally(() => {
-          setLoading(false);
-        });
+  const carregarUnidade = useCallback(async () => {
+    if (!isEditing) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const data = await getUnidadeById(id);
+      setInitialData(data || null);
+    } catch (err) {
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Erro ao carregar unidade.'
+      );
+    } finally {
+      setLoading(false);
     }
-  }, [id, isEditing, addToast]);
+  }, [id, isEditing]);
 
-  // Executa a busca de dados quando o componente é montado no modo de edição.
   useEffect(() => {
-    fetchUnidade();
-  }, [fetchUnidade]);
+    carregarUnidade();
+  }, [carregarUnidade]);
 
-  /**
-   * @function handleSave
-   * @description Recebe os dados do formulário e os submete para a API.
-   * @param {object} formData - O objeto de estado já no formato "achatado" correto, vindo do UnidadeForm.
-   */
-  const handleSave = async (formData) => {
+  const handleSubmit = async (formData) => {
     try {
       if (isEditing) {
         await updateUnidade(id, formData);
         addToast('Unidade atualizada com sucesso!', 'success');
       } else {
         await addUnidade(formData);
-        addToast('Unidade adicionada com sucesso!', 'success');
+        addToast('Unidade cadastrada com sucesso!', 'success');
       }
 
-      setTimeout(() => navigate('/cadastros/unidades'), 1000);
-    } catch (apiError) {
-      console.error('Falha ao salvar unidade:', apiError);
-      const errorMessage =
-        apiError?.message || 'Falha ao salvar. Verifique os dados e tente novamente.';
-      addToast(errorMessage, 'error');
-      throw apiError;
+      navigate('/cadastros/unidades');
+    } catch (err) {
+      throw err;
     }
   };
 
-  // --- Lógica de Renderização Condicional ---
-
   if (loading) {
     return (
-      <div className="page-content-wrapper">
-        <div style={{ textAlign: 'center', padding: '50px' }}>
-          <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-          <p>Carregando dados da unidade...</p>
-        </div>
-      </div>
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
+          subtitle="Cadastre e gerencie informações da unidade"
+          icon={faBuilding}
+        />
+        <PageState loading />
+      </PageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="page-content-wrapper">
-        <p className="form-error">{error}</p>
-      </div>
-    );
-  }
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
+          subtitle="Cadastre e gerencie informações da unidade"
+          icon={faBuilding}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => navigate('/cadastros')}
+              >
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Voltar ao menu de cadastros
+              </button>
 
-  if (isEditing && !initialData) {
-    return (
-      <div className="page-content-wrapper">
-        <p className="no-data-message">A unidade solicitada não foi encontrada.</p>
-      </div>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => navigate('/cadastros/unidades')}
+              >
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Voltar para unidades
+              </button>
+            </div>
+          }
+        />
+        <PageState error={error} />
+      </PageLayout>
     );
   }
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">
-          {isEditing ? `Editar Unidade: ${initialData?.nomeSistema}` : 'Adicionar Nova Unidade'}
-        </h1>
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
+        subtitle="Cadastre e gerencie informações da unidade"
+        icon={faBuilding}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate('/cadastros')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar ao menu de cadastros
+            </button>
 
-        <button className="btn btn-secondary" onClick={() => navigate('/cadastros/unidades')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => navigate('/cadastros/unidades')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar para unidades
+            </button>
+          </div>
+        }
+      />
 
-      <section className="page-section">
-        <UnidadeForm
-          onSubmit={handleSave}
-          initialData={initialData}
-          isEditing={isEditing}
-        />
-      </section>
-    </div>
+      <UnidadeForm
+        onSubmit={handleSubmit}
+        initialData={initialData}
+        isEditing={isEditing}
+        onCancel={() => navigate('/cadastros/unidades')}
+      />
+    </PageLayout>
   );
 }
 

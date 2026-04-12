@@ -1,201 +1,239 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faMoon,
-  faSun,
-  faBell,
-  faExclamationCircle,
-  faSignOutAlt,
-  faBars,
-} from '@fortawesome/free-solid-svg-icons';
-
-import { useAlertas } from '@/contexts/AlertasContext';
-import { useAuth } from '@/contexts/AuthContext';
-
-import Sidebar from '@/components/ui/Sidebar';
-import ChatBot from '@/components/charts/ChatBot';
+import Sidebar from '../ui/Sidebar';
 
 function AppLayout() {
-  const [theme, setTheme] = useState(
-    () => localStorage.getItem('theme') || 'light'
-  );
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-  const [isSidebarMobileOpen, setSidebarMobileOpen] = useState(false);
-
-  const notificationRef = useRef(null);
-
-  const { alertas = [], updateStatus } = useAlertas();
-  const { user, logout } = useAuth();
   const location = useLocation();
 
-  useEffect(() => {
-    localStorage.setItem('theme', theme);
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-  }, [theme]);
+  const breadcrumbItems = useMemo(() => {
+    const path = location.pathname;
 
-  useEffect(() => {
-    setSidebarMobileOpen(false);
+    if (path === '/dashboard') {
+      return [{ label: 'Dashboard', to: '/dashboard' }];
+    }
+
+    if (path === '/cadastros') {
+      return [{ label: 'Cadastros Gerais', to: '/cadastros' }];
+    }
+
+    if (path.startsWith('/cadastros/unidades/adicionar')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'Unidades', to: '/cadastros/unidades' },
+        { label: 'Nova Unidade' },
+      ];
+    }
+
+    if (path.startsWith('/cadastros/unidades/editar')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'Unidades', to: '/cadastros/unidades' },
+        { label: 'Editar Unidade' },
+      ];
+    }
+
+    if (path.startsWith('/cadastros/unidades')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'Unidades' },
+      ];
+    }
+
+    if (path.startsWith('/cadastros/equipamentos/adicionar')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'Equipamentos', to: '/equipamentos' },
+        { label: 'Novo Equipamento' },
+      ];
+    }
+
+    if (path.startsWith('/cadastros/equipamentos/editar')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'Equipamentos', to: '/equipamentos' },
+        { label: 'Editar Equipamento' },
+      ];
+    }
+
+    if (path.startsWith('/cadastros/emails')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'E-mails de Notificação' },
+      ];
+    }
+
+    if (path.startsWith('/gerenciamento/usuarios')) {
+      return [
+        { label: 'Cadastros Gerais', to: '/cadastros' },
+        { label: 'Usuários' },
+      ];
+    }
+
+    if (path === '/equipamentos') {
+      return [{ label: 'Equipamentos' }];
+    }
+
+    if (path.startsWith('/equipamentos/detalhes/')) {
+      return [
+        { label: 'Equipamentos', to: '/equipamentos' },
+        { label: 'Detalhes do Equipamento' },
+      ];
+    }
+
+    if (path.startsWith('/equipamentos/ficha-tecnica/')) {
+      return [
+        { label: 'Equipamentos', to: '/equipamentos' },
+        { label: 'Ficha Técnica' },
+      ];
+    }
+
+    if (path === '/manutencoes') {
+      return [{ label: 'Manutenções' }];
+    }
+
+    if (path.startsWith('/manutencoes/agendar')) {
+      return [
+        { label: 'Manutenções', to: '/manutencoes' },
+        { label: 'Nova Manutenção' },
+      ];
+    }
+
+    if (path.startsWith('/manutencoes/editar/')) {
+      return [
+        { label: 'Manutenções', to: '/manutencoes' },
+        { label: 'Editar Manutenção' },
+      ];
+    }
+
+    if (path.startsWith('/manutencoes/detalhes/')) {
+      return [
+        { label: 'Manutenções', to: '/manutencoes' },
+        { label: 'Detalhes da OS' },
+      ];
+    }
+
+    if (path === '/contratos') {
+      return [{ label: 'Contratos' }];
+    }
+
+    if (path.startsWith('/contratos/adicionar')) {
+      return [
+        { label: 'Contratos', to: '/contratos' },
+        { label: 'Novo Contrato' },
+      ];
+    }
+
+    if (path.startsWith('/contratos/editar/')) {
+      return [
+        { label: 'Contratos', to: '/contratos' },
+        { label: 'Editar Contrato' },
+      ];
+    }
+
+    if (path.startsWith('/contratos/detalhes/')) {
+      return [
+        { label: 'Contratos', to: '/contratos' },
+        { label: 'Detalhes do Contrato' },
+      ];
+    }
+
+    if (path === '/seguros') {
+      return [{ label: 'Seguros' }];
+    }
+
+    if (path.startsWith('/seguros/adicionar')) {
+      return [
+        { label: 'Seguros', to: '/seguros' },
+        { label: 'Novo Seguro' },
+      ];
+    }
+
+    if (path.startsWith('/seguros/editar/')) {
+      return [
+        { label: 'Seguros', to: '/seguros' },
+        { label: 'Editar Seguro' },
+      ];
+    }
+
+    if (path.startsWith('/seguros/detalhes/')) {
+      return [
+        { label: 'Seguros', to: '/seguros' },
+        { label: 'Detalhes do Seguro' },
+      ];
+    }
+
+    if (path === '/alertas') {
+      return [{ label: 'Alertas' }];
+    }
+
+    if (path === '/bi') {
+      return [{ label: 'Business Intelligence' }];
+    }
+
+    if (path === '/relatorios') {
+      return [{ label: 'Relatórios' }];
+    }
+
+    if (path === '/gerenciamento') {
+      return [{ label: 'Gerenciamento' }];
+    }
+
+    if (path.startsWith('/gerenciamento/auditoria')) {
+      return [
+        { label: 'Gerenciamento', to: '/gerenciamento' },
+        { label: 'Auditoria' },
+      ];
+    }
+
+    return [];
   }, [location.pathname]);
 
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (
-        notificationRef.current &&
-        !notificationRef.current.contains(event.target)
-      ) {
-        setIsDropdownOpen(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
-  };
-
-  const alertasNaoVistos = alertas.filter((a) => a.status === 'NaoVisto');
-
-  const handleLimparNotificacoes = () => {
-    alertasNaoVistos.forEach((n) => updateStatus(n.id, 'Visto'));
-  };
-
   return (
-    <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950">
-      <Sidebar
-        notificacoesCount={alertasNaoVistos.length}
-        isMobileOpen={isSidebarMobileOpen}
-        onClose={() => setSidebarMobileOpen(false)}
-      />
+    <div className="flex min-h-screen bg-slate-100">
+      <Sidebar />
 
-      <div className="flex min-w-0 flex-1 flex-col lg:ml-0">
-        <header className="sticky top-0 z-30 flex h-[88px] items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 md:px-6">
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 lg:hidden"
-              onClick={() => setSidebarMobileOpen(true)}
-              aria-label="Abrir menu"
-            >
-              <FontAwesomeIcon icon={faBars} />
-            </button>
-
-            <div className="hidden md:block">
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Olá,
-              </p>
-              <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                {user?.nome || 'Usuário'}
-              </p>
+      <div className="flex min-h-screen flex-1 flex-col">
+        <header className="border-b border-slate-800 bg-slate-900 px-6 py-4 text-white">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-slate-300">Olá,</p>
+              <h2 className="font-semibold text-white">
+                Administrador do Sistema
+              </h2>
             </div>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-              title="Alternar tema"
-            >
-              <FontAwesomeIcon icon={theme === 'light' ? faMoon : faSun} />
-            </button>
-
-            <div className="relative" ref={notificationRef}>
-              <button
-                type="button"
-                onClick={() => setIsDropdownOpen((prev) => !prev)}
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
-                title="Notificações"
-              >
-                <FontAwesomeIcon icon={faBell} />
-
-                {alertasNaoVistos.length > 0 && (
-                  <span className="absolute -right-1 -top-1 inline-flex min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    {alertasNaoVistos.length > 9 ? '9+' : alertasNaoVistos.length}
-                  </span>
-                )}
-              </button>
-
-              {isDropdownOpen && (
-                <div className="absolute right-0 mt-2 w-[340px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-900">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3 dark:border-slate-800">
-                    <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-                      Notificações
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={handleLimparNotificacoes}
-                      className="text-xs font-semibold text-blue-600 hover:underline"
-                    >
-                      Limpar
-                    </button>
-                  </div>
-
-                  <div className="max-h-80 overflow-y-auto">
-                    {alertasNaoVistos.length > 0 ? (
-                      alertasNaoVistos.slice(0, 8).map((notif) => (
-                        <Link
-                          key={notif.id}
-                          to={notif.link || '/alertas'}
-                          className="flex items-start gap-3 border-b border-slate-100 px-4 py-3 transition hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-800"
-                          onClick={() => setIsDropdownOpen(false)}
-                        >
-                          <FontAwesomeIcon
-                            icon={faExclamationCircle}
-                            className="mt-1 text-red-500"
-                          />
-
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm text-slate-700 dark:text-slate-200">
-                              {notif.titulo}
-                            </p>
-                            {notif.subtitulo ? (
-                              <p className="mt-1 text-xs text-slate-400">
-                                {notif.subtitulo}
-                              </p>
-                            ) : null}
-                          </div>
-                        </Link>
-                      ))
-                    ) : (
-                      <div className="p-5 text-center text-sm text-slate-400">
-                        Sem notificações
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="border-t border-slate-200 px-4 py-3 text-center dark:border-slate-800">
-                    <Link
-                      to="/alertas"
-                      className="text-xs font-semibold text-blue-600 hover:underline"
-                      onClick={() => setIsDropdownOpen(false)}
-                    >
-                      Ver todos
-                    </Link>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={logout}
-              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-red-600 transition hover:bg-red-50 dark:border-slate-700 dark:bg-slate-800 dark:hover:bg-red-950/40"
-              title="Sair"
-            >
-              <FontAwesomeIcon icon={faSignOutAlt} />
-            </button>
           </div>
         </header>
 
-        <main className="min-w-0 flex-1 overflow-x-hidden p-4 md:p-6">
+        <div className="border-b border-slate-200 bg-white px-6 py-3">
+          <nav className="flex flex-wrap items-center gap-2 text-sm text-slate-500">
+            {breadcrumbItems.length > 0 ? (
+              breadcrumbItems.map((item, index) => (
+                <React.Fragment key={`${item.label}-${index}`}>
+                  {index > 0 && <span className="text-slate-300">/</span>}
+
+                  {item.to ? (
+                    <Link
+                      to={item.to}
+                      className="font-medium text-slate-600 transition hover:text-blue-600"
+                    >
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <span className="font-semibold text-slate-900">
+                      {item.label}
+                    </span>
+                  )}
+                </React.Fragment>
+              ))
+            ) : (
+              <span className="font-medium text-slate-500">SIMEC</span>
+            )}
+          </nav>
+        </div>
+
+        <main className="flex-1">
           <Outlet />
         </main>
-
-        <ChatBot />
       </div>
     </div>
   );

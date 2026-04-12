@@ -1,16 +1,18 @@
-// src/pages/AdicionarEquipamentoPage.jsx
-// VERSÃO COMPLETA E ATUALIZADA com Toast Notifications
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { addEquipamento } from '../../services/api';
-import { useToast } from '../../contexts/ToastContext'; // Importa o hook para usar toasts
+import { useToast } from '../../contexts/ToastContext';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faSave } from '@fortawesome/free-solid-svg-icons';
+import { faSave, faMicrochip } from '@fortawesome/free-solid-svg-icons';
+
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageSection from '../../components/ui/PageSection';
 
 function AdicionarEquipamentoPage() {
   const navigate = useNavigate();
-  const { addToast } = useToast(); // Pega a função para adicionar toasts
+  const { addToast } = useToast();
+
   const [formData, setFormData] = useState({
     id: '',
     modelo: '',
@@ -20,18 +22,19 @@ function AdicionarEquipamentoPage() {
     fabricante: '',
     ano_fabricacao: '',
     data_instalacao: '',
-    status: 'Ativo',
+    status: 'Operante',
     numeroPatrimonio: '',
     registroAnvisa: '',
-    observacoes: ''
+    observacoes: '',
   });
+
   const [submitting, setSubmitting] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prevState => ({
-      ...prevState,
-      [name]: value
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
     }));
   };
 
@@ -40,58 +43,121 @@ function AdicionarEquipamentoPage() {
     setSubmitting(true);
 
     if (!formData.id || !formData.modelo || !formData.tipo) {
-      addToast('Nº Série (ID), Modelo e Tipo são campos obrigatórios.', 'error');
+      addToast('Nº Série, Modelo e Tipo são obrigatórios.', 'error');
       setSubmitting(false);
       return;
     }
 
     try {
       await addEquipamento(formData);
-      addToast('Equipamento adicionado com sucesso!', 'success');
-      // Navega de volta para a lista após um pequeno delay para o usuário ver o toast
-      setTimeout(() => navigate('/equipamentos'), 1500); 
+      addToast('Equipamento cadastrado com sucesso!', 'success');
+
+      setTimeout(() => {
+        navigate('/equipamentos');
+      }, 1200);
     } catch (err) {
-      console.error(err);
-      addToast(err.message || 'Erro ao adicionar equipamento.', 'error');
+      addToast(err.message || 'Erro ao cadastrar equipamento.', 'error');
       setSubmitting(false);
     }
-    // Não precisa mais do `finally` aqui se a navegação acontece no sucesso
   };
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">Adicionar Novo Equipamento</h1>
-        <button className="btn btn-secondary" onClick={() => navigate('/equipamentos')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title="Novo Equipamento"
+        subtitle="Cadastre um novo equipamento no sistema"
+        icon={faMicrochip}
+        actions={
+          <button
+            onClick={() => navigate(-1)}
+            className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-300"
+          >
+            Voltar
+          </button>
+        }
+      />
 
-      <section className="page-section">
-        <form onSubmit={handleSubmit}>
-          {/* O JSX do formulário continua o mesmo */}
-          <div className="info-grid" style={{ marginBottom: '20px' }}>
-            <div className="form-group"><label htmlFor="id">Nº Série (ID) *</label><input type="text" id="id" name="id" value={formData.id} onChange={handleChange} required /></div>
-            <div className="form-group"><label htmlFor="modelo">Modelo *</label><input type="text" id="modelo" name="modelo" value={formData.modelo} onChange={handleChange} required /></div>
-            <div className="form-group"><label htmlFor="tipo">Tipo *</label><input type="text" id="tipo" name="tipo" value={formData.tipo} onChange={handleChange} required /></div>
-            <div className="form-group"><label htmlFor="unidade">Unidade / Hospital</label><input type="text" id="unidade" name="unidade" value={formData.unidade} onChange={handleChange} /></div>
-            <div className="form-group"><label htmlFor="setor">Localização / Setor</label><input type="text" id="setor" name="setor" value={formData.setor} onChange={handleChange} /></div>
-            <div className="form-group"><label htmlFor="fabricante">Fabricante</label><input type="text" id="fabricante" name="fabricante" value={formData.fabricante} onChange={handleChange} /></div>
-            <div className="form-group"><label htmlFor="ano_fabricacao">Ano Fabricação</label><input type="number" id="ano_fabricacao" name="ano_fabricacao" value={formData.ano_fabricacao} onChange={handleChange} /></div>
-            <div className="form-group"><label htmlFor="data_instalacao">Data Instalação</label><input type="date" id="data_instalacao" name="data_instalacao" value={formData.data_instalacao} onChange={handleChange} /></div>
-            <div className="form-group"><label htmlFor="status">Status</label><select id="status" name="status" value={formData.status} onChange={handleChange}><option value="Ativo">Ativo</option><option value="Inativo">Inativo</option><option value="Pendente Instalação">Pendente Instalação</option><option value="Em Manutenção">Em Manutenção</option></select></div>
+      <PageSection>
+        <form onSubmit={handleSubmit} className="space-y-6">
+
+          {/* GRID PRINCIPAL */}
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+
+            <Input label="Nº Série (ID)*" name="id" value={formData.id} onChange={handleChange} />
+
+            <Input label="Modelo*" name="modelo" value={formData.modelo} onChange={handleChange} />
+
+            <Input label="Tipo*" name="tipo" value={formData.tipo} onChange={handleChange} />
+
+            <Input label="Unidade" name="unidade" value={formData.unidade} onChange={handleChange} />
+
+            <Input label="Setor" name="setor" value={formData.setor} onChange={handleChange} />
+
+            <Input label="Fabricante" name="fabricante" value={formData.fabricante} onChange={handleChange} />
+
+            <Input label="Ano Fabricação" type="number" name="ano_fabricacao" value={formData.ano_fabricacao} onChange={handleChange} />
+
+            <Input label="Data Instalação" type="date" name="data_instalacao" value={formData.data_instalacao} onChange={handleChange} />
+
+            <Select
+              label="Status"
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              options={[
+                'Operante',
+                'Inoperante',
+                'UsoLimitado',
+                'EmManutencao',
+              ]}
+            />
+
           </div>
-          <div className="info-grid" style={{ gridTemplateColumns: '1fr 1fr', marginBottom: '20px' }}>
-            <div className="form-group"><label htmlFor="numeroPatrimonio">Número de Patrimônio</label><input type="text" id="numeroPatrimonio" name="numeroPatrimonio" value={formData.numeroPatrimonio} onChange={handleChange} /></div>
-            <div className="form-group"><label htmlFor="registroAnvisa">Registro ANVISA</label><input type="text" id="registroAnvisa" name="registroAnvisa" value={formData.registroAnvisa} onChange={handleChange} /></div>
+
+          {/* SEGUNDA LINHA */}
+          <div className="grid gap-4 md:grid-cols-2">
+            <Input label="Nº Patrimônio" name="numeroPatrimonio" value={formData.numeroPatrimonio} onChange={handleChange} />
+
+            <Input label="Registro ANVISA" name="registroAnvisa" value={formData.registroAnvisa} onChange={handleChange} />
           </div>
-          <div className="form-group"><label htmlFor="observacoes">Observações</label><textarea id="observacoes" name="observacoes" rows="4" value={formData.observacoes} onChange={handleChange}></textarea></div>
-          <div className="form-actions" style={{ justifyContent: 'flex-start', marginTop: '30px' }}>
-            <button type="submit" className="btn btn-primary" disabled={submitting}><FontAwesomeIcon icon={faSave} /> {submitting ? 'Salvando...' : 'Salvar Equipamento'}</button>
+
+          {/* OBS */}
+          <div>
+            <label className="text-sm font-medium text-slate-600">
+              Observações
+            </label>
+            <textarea
+              name="observacoes"
+              value={formData.observacoes}
+              onChange={handleChange}
+              rows={4}
+              className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus:ring-2 focus:ring-blue-100"
+            />
           </div>
+
+          {/* ACTIONS */}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              className="rounded-xl bg-slate-200 px-4 py-2 text-sm font-medium hover:bg-slate-300"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
+            >
+              <FontAwesomeIcon icon={faSave} />
+              {submitting ? 'Salvando...' : 'Salvar'}
+            </button>
+          </div>
+
         </form>
-      </section>
-    </div>
+      </PageSection>
+    </PageLayout>
   );
 }
 

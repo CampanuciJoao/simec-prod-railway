@@ -1,16 +1,17 @@
-// Ficheiro: frontend-simec/src/components/UnidadeForm.jsx
-// VERSÃO FINAL, COMPLETA E COM LISTA DE ESTADOS CORRETA
-
-// --- Core & Routing Dependencies ---
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
+import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
-
-// --- UI Components & Assets ---
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSave, faTimes, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import {
+  faSave,
+  faTimes,
+  faSpinner,
+  faBuilding,
+  faMapLocationDot,
+} from '@fortawesome/free-solid-svg-icons';
 
-// --- Módulo de Constantes ---
-// Definir constantes estáticas fora do componente previne recriações desnecessárias a cada renderização.
+import PageSection from '../ui/PageSection';
+
 const ESTADO_INICIAL_VAZIO = {
   nomeSistema: '',
   nomeFantasia: '',
@@ -24,45 +25,98 @@ const ESTADO_INICIAL_VAZIO = {
   cep: '',
 };
 
-// >> CORREÇÃO PRINCIPAL APLICADA AQUI <<
-// A lista de estados foi completada para incluir todas as 27 unidades federativas do Brasil.
 const ESTADOS_BRASILEIROS = [
-  { uf: 'AC', nome: 'Acre' }, { uf: 'AL', nome: 'Alagoas' }, { uf: 'AP', nome: 'Amapá' },
-  { uf: 'AM', nome: 'Amazonas' }, { uf: 'BA', nome: 'Bahia' }, { uf: 'CE', nome: 'Ceará' },
-  { uf: 'DF', nome: 'Distrito Federal' }, { uf: 'ES', nome: 'Espírito Santo' }, { uf: 'GO', nome: 'Goiás' },
-  { uf: 'MA', nome: 'Maranhão' }, { uf: 'MT', nome: 'Mato Grosso' }, { uf: 'MS', nome: 'Mato Grosso do Sul' },
-  { uf: 'MG', nome: 'Minas Gerais' }, { uf: 'PA', nome: 'Pará' }, { uf: 'PB', nome: 'Paraíba' },
-  { uf: 'PR', nome: 'Paraná' }, { uf: 'PE', nome: 'Pernambuco' }, { uf: 'PI', nome: 'Piauí' },
-  { uf: 'RJ', nome: 'Rio de Janeiro' }, { uf: 'RN', nome: 'Rio Grande do Norte' }, { uf: 'RS', nome: 'Rio Grande do Sul' },
-  { uf: 'RO', nome: 'Rondônia' }, { uf: 'RR', nome: 'Roraima' }, { uf: 'SC', nome: 'Santa Catarina' },
-  { uf: 'SP', nome: 'São Paulo' }, { uf: 'SE', nome: 'Sergipe' }, { uf: 'TO', nome: 'Tocantins' }
+  { uf: 'AC', nome: 'Acre' },
+  { uf: 'AL', nome: 'Alagoas' },
+  { uf: 'AP', nome: 'Amapá' },
+  { uf: 'AM', nome: 'Amazonas' },
+  { uf: 'BA', nome: 'Bahia' },
+  { uf: 'CE', nome: 'Ceará' },
+  { uf: 'DF', nome: 'Distrito Federal' },
+  { uf: 'ES', nome: 'Espírito Santo' },
+  { uf: 'GO', nome: 'Goiás' },
+  { uf: 'MA', nome: 'Maranhão' },
+  { uf: 'MT', nome: 'Mato Grosso' },
+  { uf: 'MS', nome: 'Mato Grosso do Sul' },
+  { uf: 'MG', nome: 'Minas Gerais' },
+  { uf: 'PA', nome: 'Pará' },
+  { uf: 'PB', nome: 'Paraíba' },
+  { uf: 'PR', nome: 'Paraná' },
+  { uf: 'PE', nome: 'Pernambuco' },
+  { uf: 'PI', nome: 'Piauí' },
+  { uf: 'RJ', nome: 'Rio de Janeiro' },
+  { uf: 'RN', nome: 'Rio Grande do Norte' },
+  { uf: 'RS', nome: 'Rio Grande do Sul' },
+  { uf: 'RO', nome: 'Rondônia' },
+  { uf: 'RR', nome: 'Roraima' },
+  { uf: 'SC', nome: 'Santa Catarina' },
+  { uf: 'SP', nome: 'São Paulo' },
+  { uf: 'SE', nome: 'Sergipe' },
+  { uf: 'TO', nome: 'Tocantins' },
 ];
 
-// --- Módulo de Funções Utilitárias ---
-// Funções puras e isoladas para manipulação de strings (máscaras).
 const formatarCNPJ = (value) => {
-  if (!value) return "";
-  return value.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1.$2').replace(/(\d{3})(\d)/, '$1/$2').replace(/(\d{4})(\d)/, '$1-$2').replace(/(-\d{2})\d+?$/, '$1');
+  if (!value) return '';
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{2})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1/$2')
+    .replace(/(\d{4})(\d)/, '$1-$2')
+    .replace(/(-\d{2})\d+?$/, '$1');
 };
 
 const formatarCEP = (value) => {
-  if (!value) return "";
-  return value.replace(/\D/g, '').replace(/(\d{5})(\d)/, '$1-$2').replace(/(-\d{3})\d+?$/, '$1');
+  if (!value) return '';
+  return value
+    .replace(/\D/g, '')
+    .replace(/(\d{5})(\d)/, '$1-$2')
+    .replace(/(-\d{3})\d+?$/, '$1');
 };
 
-/**
- * @component UnidadeForm
- * @description Componente de apresentação para o formulário de Unidades. É responsável pela
- * renderização dos campos, validação local, formatação de máscaras e gerenciamento do estado
- * do formulário. Delega a lógica de submissão para o componente pai via `onSubmit`.
- */
-function UnidadeForm({ onSubmit, initialData = null, isEditing = false }) {
+function FormField({ label, required = false, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-slate-700">
+        {label}
+        {required ? ' *' : ''}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+function TextInput(props) {
+  return (
+    <input
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    />
+  );
+}
+
+function SelectInput({ children, ...props }) {
+  return (
+    <select
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    >
+      {children}
+    </select>
+  );
+}
+
+function UnidadeForm({
+  onSubmit,
+  initialData = null,
+  isEditing = false,
+  onCancel,
+}) {
   const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const navigate = useNavigate();
 
-  // Efeito para hidratar o formulário com dados iniciais no modo de edição.
   useEffect(() => {
     if (isEditing && initialData) {
       const dadosFormatados = {
@@ -77,124 +131,256 @@ function UnidadeForm({ onSubmit, initialData = null, isEditing = false }) {
         estado: initialData.estado || '',
         cep: initialData.cep ? formatarCEP(initialData.cep) : '',
       };
+
       setFormData(dadosFormatados);
     } else {
       setFormData(ESTADO_INICIAL_VAZIO);
     }
   }, [initialData, isEditing]);
 
-  // Handler de mudança genérico e performático para todos os inputs do formulário.
   const handleChange = (e) => {
     let { name, value } = e.target;
-    
-    // Aplica formatação de máscara condicionalmente.
+
     if (name === 'cnpj') value = formatarCNPJ(value);
     if (name === 'cep') value = formatarCEP(value);
-    
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  // Handler para a submissão do formulário.
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
     if (!formData.nomeSistema || !formData.nomeFantasia) {
       setError('Nome da Unidade e Nome Fantasia são campos obrigatórios.');
       return;
     }
+
     setIsSubmitting(true);
-    
-    // Prepara o payload para a API, removendo as máscaras dos campos formatados.
+
     const dadosParaApi = {
-        ...formData,
-        cnpj: formData.cnpj.replace(/\D/g, ''),
-        cep: formData.cep.replace(/\D/g, ''),
+      ...formData,
+      cnpj: formData.cnpj.replace(/\D/g, ''),
+      cep: formData.cep.replace(/\D/g, ''),
     };
 
     try {
       await onSubmit(dadosParaApi);
     } catch (apiError) {
-      setError(apiError.message || `Erro ao ${isEditing ? 'atualizar' : 'adicionar'} unidade.`);
+      setError(
+        apiError?.response?.data?.message ||
+          apiError?.message ||
+          `Erro ao ${isEditing ? 'atualizar' : 'adicionar'} unidade.`
+      );
     } finally {
-      // Garante que o estado de submissão seja resetado, reabilitando o botão.
       setIsSubmitting(false);
     }
   };
 
-  return (
-    <form onSubmit={handleSubmit} className="form-elegante">
-      {error && <p className="form-error">{error}</p>}
+  const handleCancelClick = () => {
+    if (onCancel) onCancel();
+    else navigate('/cadastros/unidades');
+  };
 
-      <div className="form-section">
-        <h4>Informações da Unidade</h4>
-        <div className="info-grid grid-cols-2">
-          <div className="form-group">
-            <label htmlFor="nomeSistema">Nome da Unidade (Apelido) *</label>
-            <input type="text" id="nomeSistema" name="nomeSistema" value={formData.nomeSistema} onChange={handleChange} required />
-          </div>
-          <div className="form-group">
-            <label htmlFor="nomeFantasia">Nome Fantasia *</label>
-            <input type="text" id="nomeFantasia" name="nomeFantasia" value={formData.nomeFantasia} onChange={handleChange} required />
-          </div>
-          <div className="form-group">
-            <label htmlFor="cnpj">CNPJ</label>
-            <input type="text" id="cnpj" name="cnpj" value={formData.cnpj} onChange={handleChange} maxLength="18" placeholder="00.000.000/0000-00"/>
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <PageSection
+        title="Informações da unidade"
+        description="Dados principais de identificação da unidade."
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <FontAwesomeIcon icon={faBuilding} />
+          </span>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Cadastro principal da unidade
+            </p>
+            <p className="text-sm text-slate-500">
+              Preencha os dados básicos para registrar a unidade no sistema.
+            </p>
           </div>
         </div>
-      </div>
-      
-      <div className="form-section">
-        <h4>Endereço</h4>
-        <div className="info-grid grid-cols-3">
-            <div className="form-group col-span-2">
-                <label htmlFor="logradouro">Logradouro (Rua, Av.)</label>
-                <input type="text" id="logradouro" name="logradouro" value={formData.logradouro} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-                <label htmlFor="numero">Número</label>
-                <input type="text" id="numero" name="numero" value={formData.numero} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-                <label htmlFor="complemento">Complemento</label>
-                <input type="text" id="complemento" name="complemento" value={formData.complemento} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-                <label htmlFor="bairro">Bairro</label>
-                <input type="text" id="bairro" name="bairro" value={formData.bairro} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-                <label htmlFor="cep">CEP</label>
-                <input type="text" id="cep" name="cep" value={formData.cep} onChange={handleChange} maxLength="9" placeholder="00000-000"/>
-            </div>
-            <div className="form-group">
-                <label htmlFor="cidade">Cidade</label>
-                <input type="text" id="cidade" name="cidade" value={formData.cidade} onChange={handleChange} />
-            </div>
-            <div className="form-group">
-              <label htmlFor="estado">Estado (UF)</label>
-              <select id="estado" name="estado" value={formData.estado} onChange={handleChange}>
-                <option value="">Selecione um Estado</option>
-                {/* O JSX itera sobre a constante completa, renderizando todas as opções. */}
-                {ESTADOS_BRASILEIROS.map(estado => (
-                  <option key={estado.uf} value={estado.uf}>
-                    {estado.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <FormField label="Nome da unidade (apelido)" required>
+            <TextInput
+              type="text"
+              name="nomeSistema"
+              value={formData.nomeSistema}
+              onChange={handleChange}
+              placeholder="Ex.: Hospital Central"
+              required
+            />
+          </FormField>
+
+          <FormField label="Nome fantasia" required>
+            <TextInput
+              type="text"
+              name="nomeFantasia"
+              value={formData.nomeFantasia}
+              onChange={handleChange}
+              placeholder="Ex.: Hospital Central LTDA"
+              required
+            />
+          </FormField>
+
+          <FormField label="CNPJ">
+            <TextInput
+              type="text"
+              name="cnpj"
+              value={formData.cnpj}
+              onChange={handleChange}
+              maxLength={18}
+              placeholder="00.000.000/0000-00"
+            />
+          </FormField>
         </div>
-      </div>
-      
-      <div className="form-actions" style={{ justifyContent: 'flex-end', display: 'flex', gap: '10px' }}>
-        <button type="button" className="btn btn-secondary" onClick={() => navigate('/cadastros/unidades')} disabled={isSubmitting}>
-          <FontAwesomeIcon icon={faTimes} /> Cancelar
+      </PageSection>
+
+      <PageSection
+        title="Endereço"
+        description="Informações de localização da unidade."
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+            <FontAwesomeIcon icon={faMapLocationDot} />
+          </span>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Dados de localização
+            </p>
+            <p className="text-sm text-slate-500">
+              Informe o endereço para facilitar rastreabilidade e gestão.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="md:col-span-2">
+            <FormField label="Logradouro">
+              <TextInput
+                type="text"
+                name="logradouro"
+                value={formData.logradouro}
+                onChange={handleChange}
+                placeholder="Rua, avenida, travessa..."
+              />
+            </FormField>
+          </div>
+
+          <FormField label="Número">
+            <TextInput
+              type="text"
+              name="numero"
+              value={formData.numero}
+              onChange={handleChange}
+              placeholder="Nº"
+            />
+          </FormField>
+
+          <FormField label="Complemento">
+            <TextInput
+              type="text"
+              name="complemento"
+              value={formData.complemento}
+              onChange={handleChange}
+              placeholder="Sala, bloco, andar..."
+            />
+          </FormField>
+
+          <FormField label="Bairro">
+            <TextInput
+              type="text"
+              name="bairro"
+              value={formData.bairro}
+              onChange={handleChange}
+              placeholder="Digite o bairro"
+            />
+          </FormField>
+
+          <FormField label="CEP">
+            <TextInput
+              type="text"
+              name="cep"
+              value={formData.cep}
+              onChange={handleChange}
+              maxLength={9}
+              placeholder="00000-000"
+            />
+          </FormField>
+
+          <FormField label="Cidade">
+            <TextInput
+              type="text"
+              name="cidade"
+              value={formData.cidade}
+              onChange={handleChange}
+              placeholder="Digite a cidade"
+            />
+          </FormField>
+
+          <FormField label="Estado (UF)">
+            <SelectInput
+              name="estado"
+              value={formData.estado}
+              onChange={handleChange}
+            >
+              <option value="">Selecione um estado</option>
+              {ESTADOS_BRASILEIROS.map((estado) => (
+                <option key={estado.uf} value={estado.uf}>
+                  {estado.nome}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+        </div>
+      </PageSection>
+
+      <div className="flex flex-wrap justify-end gap-3">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleCancelClick}
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon icon={faTimes} />
+          Cancelar
         </button>
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          <FontAwesomeIcon icon={isSubmitting ? faSpinner : faSave} spin={isSubmitting} /> {isSubmitting ? 'Salvando...' : (isEditing ? 'Salvar Alterações' : 'Adicionar Unidade')}
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon
+            icon={isSubmitting ? faSpinner : faSave}
+            spin={isSubmitting}
+          />
+          {isSubmitting
+            ? 'Salvando...'
+            : isEditing
+              ? 'Salvar alterações'
+              : 'Adicionar unidade'}
         </button>
       </div>
     </form>
   );
 }
+
+UnidadeForm.propTypes = {
+  onSubmit: PropTypes.func.isRequired,
+  initialData: PropTypes.object,
+  isEditing: PropTypes.bool,
+  onCancel: PropTypes.func,
+};
 
 export default UnidadeForm;
