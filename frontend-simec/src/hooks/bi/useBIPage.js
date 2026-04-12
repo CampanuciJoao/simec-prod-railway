@@ -8,6 +8,10 @@ export function useBIPage() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [drawer, setDrawer] = useState({
+    open: false,
+    type: null,
+  });
 
   const navigate = useNavigate();
 
@@ -95,6 +99,14 @@ export function useBIPage() {
     };
   }, [dados, rankingDowntime]);
 
+  const openDrawer = useCallback((type) => {
+    setDrawer({ open: true, type });
+  }, []);
+
+  const closeDrawer = useCallback(() => {
+    setDrawer({ open: false, type: null });
+  }, []);
+
   const handleDrillDownEquipamento = useCallback(
     (equipamentoId) => {
       if (!equipamentoId) return;
@@ -149,10 +161,122 @@ export function useBIPage() {
     exportarBIPDF(dados);
   }, [dados]);
 
+  const drawerContent = useMemo(() => {
+    if (drawer.type === 'ativos') {
+      return {
+        title: 'Ativos no sistema',
+        subtitle: 'Resumo do parque cadastrado',
+        actionLabel: 'Abrir equipamentos',
+        onAction: handleGoToAtivos,
+        items: [],
+        stats: [
+          { label: 'Total de ativos', value: resumoCards.totalAtivos },
+        ],
+      };
+    }
+
+    if (drawer.type === 'preventivas') {
+      return {
+        title: 'Preventivas realizadas',
+        subtitle: 'Indicador consolidado do período',
+        actionLabel: 'Abrir manutenções preventivas',
+        onAction: handleGoToPreventivas,
+        items: [],
+        stats: [
+          { label: 'Total de preventivas', value: resumoCards.preventivas },
+        ],
+      };
+    }
+
+    if (drawer.type === 'corretivas') {
+      return {
+        title: 'Falhas corretivas',
+        subtitle: 'Equipamentos com reincidência no período',
+        actionLabel: 'Abrir corretivas filtradas',
+        onAction: handleGoToCorretivas,
+        items: rankingFrequencia.slice(0, 10).map((item) => ({
+          title: item.modelo,
+          subtitle: `Tag: ${item.tag || '—'}`,
+          value: `${item.corretivas}`,
+          onClick: () => handleDrillDownEquipamento(item.id),
+        })),
+        stats: [
+          { label: 'Total de corretivas', value: resumoCards.corretivas },
+        ],
+      };
+    }
+
+    if (drawer.type === 'downtime') {
+      return {
+        title: 'Downtime acumulado',
+        subtitle: 'Tempo total de indisponibilidade do período',
+        actionLabel: 'Abrir visão de manutenção',
+        onAction: handleGoToDowntime,
+        items: rankingDowntime.slice(0, 10).map((item) => ({
+          title: item.modelo,
+          subtitle: `${item.unidade} • Tag: ${item.tag || '—'}`,
+          value: item.downtimeFormatado,
+        })),
+        stats: [
+          { label: 'Downtime acumulado', value: resumoCards.downtimeAcumulado },
+        ],
+      };
+    }
+
+    if (drawer.type === 'unidadeCritica') {
+      return {
+        title: 'Unidade mais crítica',
+        subtitle: 'Unidade com maior downtime acumulado',
+        actionLabel: 'Abrir equipamentos da unidade',
+        onAction: handleGoToUnidadeCritica,
+        items: (dados?.rankingUnidades || []).slice(0, 10).map((item) => ({
+          title: item.nome,
+          subtitle: 'Tempo acumulado parado',
+          value: formatarDowntime(item.horasParado),
+        })),
+        stats: [
+          {
+            label: 'Unidade crítica',
+            value: resumoCards.unidadeCritica?.nome || '—',
+          },
+          {
+            label: 'Downtime',
+            value: resumoCards.unidadeCritica?.downtime || '—',
+          },
+        ],
+      };
+    }
+
+    return {
+      title: '',
+      subtitle: '',
+      actionLabel: '',
+      onAction: null,
+      items: [],
+      stats: [],
+    };
+  }, [
+    dados,
+    drawer.type,
+    handleDrillDownEquipamento,
+    handleGoToAtivos,
+    handleGoToCorretivas,
+    handleGoToDowntime,
+    handleGoToPreventivas,
+    handleGoToUnidadeCritica,
+    rankingDowntime,
+    rankingFrequencia,
+    resumoCards,
+  ]);
+
   return {
     dados,
     loading,
     error,
+    drawer,
+    drawerContent,
+    openDrawer,
+    closeDrawer,
     resumoCards,
     downtimePorUnidadeChartData,
     rankingFrequencia,
