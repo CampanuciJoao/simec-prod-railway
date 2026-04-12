@@ -2,10 +2,6 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch, faFilter, faTimes } from '@fortawesome/free-solid-svg-icons';
 
-/**
- * Transforma valores de Enum/CamelCase em textos legíveis.
- * Ex: "UsoLimitado" -> "Uso Limitado"
- */
 const formatarLabel = (valor) => {
   if (!valor) return '';
   return String(valor).replace(/([A-Z])/g, ' $1').trim();
@@ -13,14 +9,16 @@ const formatarLabel = (valor) => {
 
 function CustomSelect({ config }) {
   return (
-    <div className="flex min-w-[180px] items-center rounded-xl border border-slate-200 bg-white px-3">
-      <FontAwesomeIcon icon={faFilter} className="mr-2 text-slate-400" />
+    <div className="relative">
+      <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+        <FontAwesomeIcon icon={faFilter} />
+      </span>
 
       <select
         id={config.id}
         value={config.value || ''}
         onChange={(e) => config.onChange(e.target.value)}
-        className="select w-full border-0 bg-transparent px-0 py-2.5 pr-6 text-sm text-slate-700 shadow-none focus:ring-0"
+        className="select w-full pl-10 pr-10"
       >
         <option value="">{config.defaultLabel}</option>
 
@@ -44,53 +42,49 @@ function GlobalFilterBar({
   onSearchChange,
   searchPlaceholder,
   selectFilters = [],
-  className = '',
 }) {
   const handleClearSearch = () => {
-    onSearchChange({ target: { value: '' } });
+    onSearchChange?.({ target: { value: '' } });
   };
 
   return (
-    <div
-      className={[
-        'flex flex-col gap-4 bg-slate-50 p-4 md:flex-row md:items-center md:justify-between',
-        className,
-      ].join(' ')}
-    >
-      <div className="relative flex w-full items-center md:max-w-md">
-        <FontAwesomeIcon
-          icon={faSearch}
-          className="pointer-events-none absolute left-3 text-slate-400"
-        />
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+        {/* Busca */}
+        <div className="xl:col-span-4">
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <FontAwesomeIcon icon={faSearch} />
+            </span>
 
-        <input
-          type="text"
-          placeholder={searchPlaceholder || 'Buscar...'}
-          value={searchTerm}
-          onChange={onSearchChange}
-          className="input w-full pl-10 pr-10"
-        />
+            <input
+              type="text"
+              placeholder={searchPlaceholder || 'Buscar...'}
+              value={searchTerm}
+              onChange={onSearchChange}
+              className="input w-full pl-10 pr-10"
+            />
 
-        {searchTerm && (
-          <button
-            type="button"
-            className="absolute right-2 inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            onClick={handleClearSearch}
-            title="Limpar busca"
-            aria-label="Limpar busca"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-          </button>
-        )}
-      </div>
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                title="Limpar busca"
+                className="absolute right-3 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+              >
+                <FontAwesomeIcon icon={faTimes} />
+              </button>
+            )}
+          </div>
+        </div>
 
-      {selectFilters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-3">
+        {/* Filtros */}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:col-span-8 xl:grid-cols-4">
           {selectFilters.map((filterConfig) => (
             <CustomSelect key={filterConfig.id} config={filterConfig} />
           ))}
         </div>
-      )}
+      </div>
     </div>
   );
 }

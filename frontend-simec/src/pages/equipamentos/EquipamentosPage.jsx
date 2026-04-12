@@ -11,7 +11,6 @@ import EquipamentosList from '../../components/equipamentos/EquipamentosList';
 
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
 
 function EquipamentosPage() {
@@ -41,6 +40,7 @@ function EquipamentosPage() {
 
       <PageHeader
         title="Gerenciamento de Ativos"
+        subtitle="Acompanhe, filtre e gerencie os equipamentos cadastrados"
         icon={faMicrochip}
         actions={
           <button
@@ -54,14 +54,14 @@ function EquipamentosPage() {
         }
       />
 
-      <PageSection noPadding className="mb-8 overflow-hidden rounded-2xl">
+      <div className="mb-8">
         <GlobalFilterBar
           searchTerm={page.searchTerm}
           onSearchChange={page.onSearchChange}
           searchPlaceholder="Buscar por modelo, tag ou unidade..."
           selectFilters={page.selectFiltersConfig}
         />
-      </PageSection>
+      </div>
 
       {shouldShowState ? (
         <PageState

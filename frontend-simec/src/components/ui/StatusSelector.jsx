@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faSpinner, faChevronDown } from '@fortawesome/free-solid-svg-icons';
 import { useToast } from '../../contexts/ToastContext';
 import { updateEquipamento } from '../../services/api';
 import { getStatusBadgeVariant } from '../ui/uistyles/statusStyles';
@@ -70,11 +70,11 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
 
   return (
     <div
-      className="relative inline-flex w-full min-w-[160px] items-center"
+      className="relative inline-flex w-full min-w-[140px] max-w-[200px] items-center"
       onClick={(e) => e.stopPropagation()}
     >
       {isUpdating && (
-        <span className="pointer-events-none absolute right-9 z-10 text-slate-400">
+        <span className="pointer-events-none absolute right-8 z-10 text-[11px] text-slate-400">
           <FontAwesomeIcon icon={faSpinner} spin />
         </span>
       )}
@@ -84,7 +84,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
         onChange={handleSelectChange}
         disabled={isUpdating}
         className={[
-          'w-full appearance-none rounded-xl border px-3 py-2.5 pr-10 text-sm font-semibold outline-none transition',
+          'w-full appearance-none rounded-xl border px-3 py-2 pr-8 text-sm font-semibold leading-none outline-none transition',
           'focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60',
           colorClass,
         ].join(' ')}
@@ -97,8 +97,8 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
         ))}
       </select>
 
-      <span className="pointer-events-none absolute right-3 text-xs text-current opacity-70">
-        ▾
+      <span className="pointer-events-none absolute right-2.5 text-[10px] opacity-70">
+        <FontAwesomeIcon icon={faChevronDown} />
       </span>
     </div>
   );
