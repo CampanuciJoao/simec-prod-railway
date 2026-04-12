@@ -32,6 +32,55 @@ function getDescricaoAlvoSeguro(seguro) {
   return 'no objeto segurado';
 }
 
+function formatarIntervaloHorario(dataInicio, dataFim) {
+  const horaInicio = dataInicio ? format(new Date(dataInicio), 'HH:mm') : '--:--';
+  const horaFim = dataFim ? format(new Date(dataFim), 'HH:mm') : '--:--';
+  return `${horaInicio} - ${horaFim}`;
+}
+
+function montarTituloProximidadeInicio(manut) {
+  const tipo = String(manut.tipo || 'Manutenção').toLowerCase();
+  const unidade = manut.equipamento?.unidade?.nomeSistema || 'N/A';
+  return `${tipo.charAt(0).toUpperCase()}${tipo.slice(1)} na unidade de ${unidade}`;
+}
+
+function montarSubtituloProximidadeInicio(manut) {
+  const modelo = manut.equipamento?.modelo || 'Equipamento';
+  const tag = manut.equipamento?.tag || 'Sem TAG';
+  const intervalo = formatarIntervaloHorario(
+    manut.dataHoraAgendamentoInicio,
+    manut.dataHoraAgendamentoFim
+  );
+
+  return `${modelo} (${tag}) | ${intervalo} | OS ${manut.numeroOS}`;
+}
+
+function montarTituloProximidadeFim(manut) {
+  const tipo = String(manut.tipo || 'Manutenção').toLowerCase();
+  const unidade = manut.equipamento?.unidade?.nomeSistema || 'N/A';
+  return `Término de ${tipo} na unidade de ${unidade}`;
+}
+
+function montarSubtituloProximidadeFim(manut) {
+  const modelo = manut.equipamento?.modelo || 'Equipamento';
+  const tag = manut.equipamento?.tag || 'Sem TAG';
+  const intervalo = formatarIntervaloHorario(
+    manut.dataHoraAgendamentoInicio,
+    manut.dataHoraAgendamentoFim
+  );
+
+  return `${modelo} (${tag}) | ${intervalo} | OS ${manut.numeroOS}`;
+}
+
+async function existeAlerta(id) {
+  const alerta = await prisma.alerta.findUnique({
+    where: { id },
+    select: { id: true }
+  });
+
+  return !!alerta;
+}
+
 // ==========================================================================
 // SEÇÃO DE MANUTENÇÕES E SAÚDE PREDITIVA
 // ==========================================================================
@@ -165,9 +214,9 @@ async function gerarAlertasDeProximidadeManutencao() {
   const agora = getAgora();
 
   const PONTOS_INICIO = [
-    { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' },
-    { limiar: 60, prioridade: 'Media', label: '1h', texto: 'em 1 hora' },
-    { limiar: 1440, prioridade: 'Baixa', label: '24h', texto: 'em 24 horas' }
+    { limiar: 10, prioridade: 'Alta', label: '10min' },
+    { limiar: 60, prioridade: 'Media', label: '1h' },
+    { limiar: 1440, prioridade: 'Baixa', label: '24h' }
   ];
 
   const manutencoesProximas = await prisma.manutencao.findMany({
@@ -190,33 +239,23 @@ async function gerarAlertasDeProximidadeManutencao() {
     );
 
     for (const ponto of PONTOS_INICIO) {
-      if (minRestantes <= ponto.limiar && minRestantes >= (ponto.limiar - 1)) {
+      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
         const idAlerta = `manut-prox-inicio-${manut.id}-${ponto.label}`;
-        const modelo = manut.equipamento.modelo;
-        const tag = manut.equipamento.tag;
-        const unidade = manut.equipamento.unidade?.nomeSistema || 'N/A';
-        const novoTitulo = `Manutenção começa ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        const jaExiste = await existeAlerta(idAlerta);
 
-        await prisma.alerta.upsert({
-          where: { id: idAlerta },
-          update: {
-            titulo: novoTitulo,
-            subtitulo: `OS ${manut.numeroOS} - Agendado para ${format(manut.dataHoraAgendamentoInicio, 'HH:mm')}`,
-            data: manut.dataHoraAgendamentoInicio,
-            prioridade: ponto.prioridade,
-            tipo: 'Manutenção',
-            link: `/manutencoes/detalhes/${manut.id}`
-          },
-          create: {
-            id: idAlerta,
-            titulo: novoTitulo,
-            subtitulo: `OS ${manut.numeroOS} - Agendado para ${format(manut.dataHoraAgendamentoInicio, 'HH:mm')}`,
-            data: manut.dataHoraAgendamentoInicio,
-            prioridade: ponto.prioridade,
-            tipo: 'Manutenção',
-            link: `/manutencoes/detalhes/${manut.id}`
-          }
-        });
+        if (!jaExiste) {
+          await prisma.alerta.create({
+            data: {
+              id: idAlerta,
+              titulo: montarTituloProximidadeInicio(manut),
+              subtitulo: montarSubtituloProximidadeInicio(manut),
+              data: manut.dataHoraAgendamentoInicio,
+              prioridade: ponto.prioridade,
+              tipo: 'Manutenção',
+              link: `/manutencoes/detalhes/${manut.id}`
+            }
+          });
+        }
 
         break;
       }
@@ -228,8 +267,8 @@ async function gerarAlertasDeProximidadeFimManutencao() {
   const agora = getAgora();
 
   const PONTOS_FIM = [
-    { limiar: 30, prioridade: 'Media', label: '30min', texto: 'em 30 minutos' },
-    { limiar: 10, prioridade: 'Alta', label: '10min', texto: 'em 10 minutos' }
+    { limiar: 30, prioridade: 'Media', label: '30min' },
+    { limiar: 10, prioridade: 'Alta', label: '10min' }
   ];
 
   const manutencoesProximasDoFim = await prisma.manutencao.findMany({
@@ -252,33 +291,23 @@ async function gerarAlertasDeProximidadeFimManutencao() {
     );
 
     for (const ponto of PONTOS_FIM) {
-      if (minRestantes <= ponto.limiar && minRestantes >= (ponto.limiar - 1)) {
+      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
         const idAlerta = `manut-prox-fim-${manut.id}-${ponto.label}`;
-        const modelo = manut.equipamento.modelo;
-        const tag = manut.equipamento.tag;
-        const unidade = manut.equipamento.unidade?.nomeSistema || 'N/A';
-        const novoTitulo = `Manutenção termina ${ponto.texto} na unidade de ${unidade}, no equipamento ${modelo} (${tag})`;
+        const jaExiste = await existeAlerta(idAlerta);
 
-        await prisma.alerta.upsert({
-          where: { id: idAlerta },
-          update: {
-            titulo: novoTitulo,
-            subtitulo: `OS ${manut.numeroOS} - Previsão de término às ${format(manut.dataHoraAgendamentoFim, 'HH:mm')}`,
-            data: manut.dataHoraAgendamentoFim,
-            prioridade: ponto.prioridade,
-            tipo: 'Manutenção',
-            link: `/manutencoes/detalhes/${manut.id}`
-          },
-          create: {
-            id: idAlerta,
-            titulo: novoTitulo,
-            subtitulo: `OS ${manut.numeroOS} - Previsão de término às ${format(manut.dataHoraAgendamentoFim, 'HH:mm')}`,
-            data: manut.dataHoraAgendamentoFim,
-            prioridade: ponto.prioridade,
-            tipo: 'Manutenção',
-            link: `/manutencoes/detalhes/${manut.id}`
-          }
-        });
+        if (!jaExiste) {
+          await prisma.alerta.create({
+            data: {
+              id: idAlerta,
+              titulo: montarTituloProximidadeFim(manut),
+              subtitulo: montarSubtituloProximidadeFim(manut),
+              data: manut.dataHoraAgendamentoFim,
+              prioridade: ponto.prioridade,
+              tipo: 'Manutenção',
+              link: `/manutencoes/detalhes/${manut.id}`
+            }
+          });
+        }
 
         break;
       }
@@ -561,15 +590,12 @@ async function gerarAlertasSegurosSemVendaval() {
   });
 
   for (const seguro of segurosAtivos) {
-    const ehPredial = !seguro.equipamentoId;
-    const semVendaval = Number(seguro.lmiVendaval || 0) <= 0;
+    const ehPredial = isSeguroPredial(seguro);
+    const semVendaval = !temCoberturaVendaval(seguro);
 
     if (!ehPredial || !semVendaval) continue;
 
-    const alvo = seguro.unidade?.nomeSistema
-      ? `na unidade de ${seguro.unidade.nomeSistema}`
-      : 'no seguro predial';
-
+    const alvo = getDescricaoAlvoSeguro(seguro);
     const idAlerta = `seguro-vendaval-ausente-${seguro.id}`;
     const titulo = `Seguro sem cobertura de vendaval ${alvo}`;
 
