@@ -16,7 +16,7 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { useAlertasPage } from '../hooks/alertas/useAlertasPage';
+import { useAlertasPage } from '../../hooks/alertas/useAlertasPage';
 
 import GlobalFilterBar from '../components/ui/GlobalFilterBar';
 import PageLayout from '../components/ui/PageLayout';
