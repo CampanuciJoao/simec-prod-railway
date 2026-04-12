@@ -1,59 +1,38 @@
-// Ficheiro: src/hooks/manutencoes/useManutencoes.js
-// VERSÃO FINAL SÊNIOR - COM NOME DE EXPORTAÇÃO CORRETO E LÓGICA COMPLETA
-
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   getManutencoes,
-  getEquipamentos,
-  getUnidades,
   deleteManutencao,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
-/**
- * Hook customizado para gerenciar a lógica da página de listagem de Manutenções.
- * Encapsula a busca de dados, filtragem, ordenação e ações.
- */
-export function useManutencoes() {
-  const [manutencoes, setManutencoes] = useState([]);
-  const [equipamentos, setEquipamentos] = useState([]);
-  const [unidades, setUnidades] = useState([]);
+export const useManutencoes = () => {
+  const [manutencoesOriginais, setManutencoesOriginais] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { addToast } = useToast();
+
   const [searchTerm, setSearchTerm] = useState('');
   const [filtros, setFiltros] = useState({
-    equipamentoId: '',
-    unidadeId: '',
-    tipo: '',
     status: '',
+    tipo: '',
+    unidade: '',
   });
+
   const [sortConfig, setSortConfig] = useState({
     key: 'dataHoraAgendamentoInicio',
     direction: 'descending',
   });
-
-  const { addToast } = useToast();
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
 
     try {
-      const [manutencoesData, equipamentosData, unidadesData] = await Promise.all([
-        getManutencoes(),
-        getEquipamentos(),
-        getUnidades(),
-      ]);
-
-      setManutencoes(manutencoesData || []);
-      setEquipamentos(equipamentosData || []);
-      setUnidades(unidadesData || []);
+      const data = await getManutencoes();
+      setManutencoesOriginais(Array.isArray(data) ? data : []);
     } catch (err) {
       setError(err);
-      addToast(
-        err.response?.data?.message || 'Falha ao carregar dados de manutenções.',
-        'error'
-      );
+      addToast('Erro ao carregar manutenções.', 'error');
     } finally {
       setLoading(false);
     }
@@ -63,91 +42,145 @@ export function useManutencoes() {
     fetchData();
   }, [fetchData]);
 
-  const manutencoesProcessadas = useMemo(() => {
-    let items = [...manutencoes];
+  const manutencoesFiltradas = useMemo(() => {
+    let filtrados = [...manutencoesOriginais];
 
     if (searchTerm) {
       const termo = searchTerm.toLowerCase();
-      items = items.filter(
-        (m) =>
+
+      filtrados = filtrados.filter((m) => {
+        return (
           m.numeroOS?.toLowerCase().includes(termo) ||
+          m.descricaoProblemaServico?.toLowerCase().includes(termo) ||
           m.equipamento?.modelo?.toLowerCase().includes(termo) ||
-          m.equipamento?.tag?.toLowerCase().includes(termo)
-      );
-    }
-
-    if (filtros.unidadeId) {
-      items = items.filter((m) => m.equipamento?.unidadeId === filtros.unidadeId);
-    }
-
-    if (filtros.equipamentoId) {
-      items = items.filter((m) => m.equipamentoId === filtros.equipamentoId);
-    }
-
-    if (filtros.tipo) {
-      items = items.filter((m) => m.tipo === filtros.tipo);
-    }
-
-    if (filtros.status) {
-      items = items.filter((m) => m.status === filtros.status);
-    }
-
-    if (sortConfig.key) {
-      items.sort((a, b) => {
-        const valA =
-          sortConfig.key === 'equipamento'
-            ? a.equipamento?.modelo
-            : a[sortConfig.key];
-        const valB =
-          sortConfig.key === 'equipamento'
-            ? b.equipamento?.modelo
-            : b[sortConfig.key];
-
-        if (
-          sortConfig.key.includes('data') ||
-          sortConfig.key.includes('Data')
-        ) {
-          return sortConfig.direction === 'ascending'
-            ? new Date(valA) - new Date(valB)
-            : new Date(valB) - new Date(valA);
-        }
-
-        if (typeof valA === 'string' && typeof valB === 'string') {
-          return sortConfig.direction === 'ascending'
-            ? valA.localeCompare(valB)
-            : valB.localeCompare(valA);
-        }
-
-        return 0;
+          m.equipamento?.tag?.toLowerCase().includes(termo) ||
+          m.equipamento?.unidade?.nomeSistema?.toLowerCase().includes(termo)
+        );
       });
     }
 
-    return items;
-  }, [manutencoes, searchTerm, filtros, sortConfig]);
+    if (filtros.status) {
+      filtrados = filtrados.filter((m) => m.status === filtros.status);
+    }
+
+    if (filtros.tipo) {
+      filtrados = filtrados.filter((m) => m.tipo === filtros.tipo);
+    }
+
+    if (filtros.unidade) {
+      filtrados = filtrados.filter(
+        (m) => m.equipamento?.unidade?.nomeSistema === filtros.unidade
+      );
+    }
+
+    return filtrados;
+  }, [manutencoesOriginais, searchTerm, filtros]);
+
+  const manutencoesOrdenadas = useMemo(() => {
+    const ordenadas = [...manutencoesFiltradas];
+
+    if (!sortConfig.key) return ordenadas;
+
+    ordenadas.sort((a, b) => {
+      let valA;
+      let valB;
+
+      switch (sortConfig.key) {
+        case 'unidade':
+          valA = a.equipamento?.unidade?.nomeSistema || '';
+          valB = b.equipamento?.unidade?.nomeSistema || '';
+          break;
+        case 'equipamento':
+          valA = a.equipamento?.modelo || '';
+          valB = b.equipamento?.modelo || '';
+          break;
+        default:
+          valA = a[sortConfig.key];
+          valB = b[sortConfig.key];
+          break;
+      }
+
+      if (
+        sortConfig.key === 'dataHoraAgendamentoInicio' ||
+        sortConfig.key === 'dataHoraAgendamentoFim' ||
+        sortConfig.key === 'dataConclusao' ||
+        sortConfig.key === 'createdAt'
+      ) {
+        const dataA = valA ? new Date(valA).getTime() : 0;
+        const dataB = valB ? new Date(valB).getTime() : 0;
+        return sortConfig.direction === 'ascending'
+          ? dataA - dataB
+          : dataB - dataA;
+      }
+
+      const strA = String(valA || '').toLowerCase();
+      const strB = String(valB || '').toLowerCase();
+
+      if (strA < strB) return sortConfig.direction === 'ascending' ? -1 : 1;
+      if (strA > strB) return sortConfig.direction === 'ascending' ? 1 : -1;
+      return 0;
+    });
+
+    return ordenadas;
+  }, [manutencoesFiltradas, sortConfig]);
+
+  const metricas = useMemo(() => {
+    const base = manutencoesOrdenadas;
+
+    return {
+      total: base.length,
+      emAndamento: base.filter((m) => m.status === 'EmAndamento').length,
+      aguardando: base.filter((m) => m.status === 'AguardandoConfirmacao').length,
+      concluidas: base.filter((m) => m.status === 'Concluida').length,
+      canceladas: base.filter((m) => m.status === 'Cancelada').length,
+    };
+  }, [manutencoesOrdenadas]);
+
+  const requestSort = useCallback((key) => {
+    setSortConfig((current) => ({
+      key,
+      direction:
+        current.key === key && current.direction === 'ascending'
+          ? 'descending'
+          : 'ascending',
+    }));
+  }, []);
+
+  const handleFilterChange = useCallback((key, value) => {
+    setFiltros((prev) => ({ ...prev, [key]: value }));
+  }, []);
+
+  const handleSearchChange = useCallback((e) => {
+    setSearchTerm(e.target.value);
+  }, []);
 
   const removerManutencao = async (id) => {
     try {
       await deleteManutencao(id);
-      setManutencoes((prev) => prev.filter((m) => m.id !== id));
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Erro ao apagar manutenção.', 'error');
+      addToast('Manutenção excluída!', 'success');
       fetchData();
+    } catch (err) {
+      addToast('Erro ao excluir manutenção.', 'error');
     }
   };
 
   return {
-    manutencoes: manutencoesProcessadas,
-    equipamentos,
-    unidadesDisponiveis: unidades,
+    manutencoes: manutencoesOrdenadas,
+    manutencoesOriginais,
     loading,
     error,
-    searchTerm,
-    setSearchTerm,
     filtros,
-    setFiltros,
-    sortConfig,
-    setSortConfig,
-    removerManutencao,
+    searchTerm,
+    metricas,
     refetch: fetchData,
+    removerManutencao,
+    controles: {
+      searchTerm,
+      filtros,
+      sortConfig,
+      handleSearchChange,
+      handleFilterChange,
+      requestSort,
+    },
   };
-}
+};

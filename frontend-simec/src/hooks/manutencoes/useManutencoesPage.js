@@ -1,155 +1,143 @@
-// Ficheiro: src/hooks/manutencoes/useManutencoesPage.js
-
-import { useEffect, useMemo } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
-
-import { useManutencoes } from './useManutencoes';
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useModal } from '../shared/useModal';
-import { useToast } from '../../contexts/ToastContext';
-import { deleteManutencao } from '../../services/api';
+import { useManutencoes } from './useManutencoes';
+
+const formatarLabel = (valor) => {
+  if (!valor) return '';
+  return String(valor).replace(/([A-Z])/g, ' $1').trim();
+};
 
 export function useManutencoesPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { addToast } = useToast();
-
-  const {
-    manutencoes,
-    equipamentos,
-    unidadesDisponiveis,
-    loading,
-    error,
-    searchTerm,
-    setSearchTerm,
-    filtros,
-    setFiltros,
-    refetch,
-  } = useManutencoes();
-
+  const hook = useManutencoes();
   const deleteModal = useModal();
 
-  useEffect(() => {
-    if (location.state?.filtroTipoInicial || location.state?.filtroEquipamentoId) {
-      setFiltros((prev) => ({
-        ...prev,
-        tipo: location.state.filtroTipoInicial || prev.tipo,
-        equipamentoId: location.state.filtroEquipamentoId || prev.equipamentoId,
-      }));
+  const selectFiltersConfig = useMemo(() => {
+    const base = Array.isArray(hook.manutencoesOriginais)
+      ? hook.manutencoesOriginais
+      : [];
 
-      navigate(location.pathname, { replace: true, state: {} });
-    }
-  }, [location.state, setFiltros, navigate, location.pathname]);
+    const status = [...new Set(base.map((m) => m.status).filter(Boolean))].map(
+      (item) => ({
+        value: item,
+        label: formatarLabel(item),
+      })
+    );
 
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      refetch();
-    }, 30 * 1000);
+    const tipos = [...new Set(base.map((m) => m.tipo).filter(Boolean))].map(
+      (item) => ({
+        value: item,
+        label: formatarLabel(item),
+      })
+    );
 
-    return () => clearInterval(intervalId);
-  }, [refetch]);
+    const unidades = [
+      ...new Set(
+        base
+          .map((m) => m.equipamento?.unidade?.nomeSistema)
+          .filter(Boolean)
+      ),
+    ].map((item) => ({
+      value: item,
+      label: item,
+    }));
 
-  const handleConfirmDelete = async () => {
-    if (!deleteModal.modalData) return;
-
-    try {
-      await deleteManutencao(deleteModal.modalData.id);
-      addToast('Ordem de Serviço excluída.', 'success');
-      refetch();
-    } catch (err) {
-      addToast(
-        err?.response?.data?.message || 'Erro ao excluir.',
-        'error'
-      );
-    } finally {
-      deleteModal.closeModal();
-    }
-  };
-
-  const goToCreate = () => {
-    navigate('/manutencoes/agendar');
-  };
-
-  const statusOptions = useMemo(
-    () =>
-      [
-        'Agendada',
-        'EmAndamento',
-        'Concluida',
-        'Cancelada',
-        'AguardandoConfirmacao',
-      ].map((status) => ({
-        value: status,
-        label: status.replace(/([A-Z])/g, ' $1').trim(),
-      })),
-    []
-  );
-
-  const equipamentosOptions = useMemo(
-    () =>
-      (equipamentos || []).map((equipamento) => ({
-        value: equipamento.id,
-        label: `${equipamento.modelo} (${equipamento.tag})`,
-      })),
-    [equipamentos]
-  );
-
-  const unidadesOptions = useMemo(
-    () =>
-      (unidadesDisponiveis || []).map((unidade) => ({
-        value: unidade.id,
-        label: unidade.nomeSistema,
-      })),
-    [unidadesDisponiveis]
-  );
-
-  const selectFiltersConfig = useMemo(
-    () => [
+    return [
       {
-        id: 'unidadeId',
-        value: filtros.unidadeId,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, unidadeId: value })),
-        options: unidadesOptions,
-        defaultLabel: 'Todas Unidades',
-      },
-      {
-        id: 'equipamentoId',
-        value: filtros.equipamentoId,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, equipamentoId: value })),
-        options: equipamentosOptions,
-        defaultLabel: 'Todos Equipamentos',
+        id: 'status',
+        label: 'Status',
+        value: hook.filtros.status,
+        defaultLabel: 'Todos os status',
+        options: status,
+        onChange: (value) => hook.controles.handleFilterChange('status', value),
       },
       {
         id: 'tipo',
-        value: filtros.tipo,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, tipo: value })),
-        options: ['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'],
-        defaultLabel: 'Todos Tipos',
+        label: 'Tipo',
+        value: hook.filtros.tipo,
+        defaultLabel: 'Todos os tipos',
+        options: tipos,
+        onChange: (value) => hook.controles.handleFilterChange('tipo', value),
       },
       {
-        id: 'status',
-        value: filtros.status,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, status: value })),
-        options: statusOptions,
-        defaultLabel: 'Todos Status',
+        id: 'unidade',
+        label: 'Unidade',
+        value: hook.filtros.unidade,
+        defaultLabel: 'Todas as unidades',
+        options: unidades,
+        onChange: (value) => hook.controles.handleFilterChange('unidade', value),
       },
-    ],
-    [filtros, setFiltros, unidadesOptions, equipamentosOptions, statusOptions]
-  );
+    ];
+  }, [hook.manutencoesOriginais, hook.filtros, hook.controles]);
+
+  const activeFilters = useMemo(() => {
+    return [
+      hook.filtros.status
+        ? {
+            key: 'status',
+            label: `Status: ${formatarLabel(hook.filtros.status)}`,
+            value: hook.filtros.status,
+          }
+        : null,
+      hook.filtros.tipo
+        ? {
+            key: 'tipo',
+            label: `Tipo: ${formatarLabel(hook.filtros.tipo)}`,
+            value: hook.filtros.tipo,
+          }
+        : null,
+      hook.filtros.unidade
+        ? {
+            key: 'unidade',
+            label: `Unidade: ${hook.filtros.unidade}`,
+            value: hook.filtros.unidade,
+          }
+        : null,
+      hook.searchTerm
+        ? {
+            key: 'searchTerm',
+            label: `Busca: ${hook.searchTerm}`,
+            value: hook.searchTerm,
+          }
+        : null,
+    ].filter(Boolean);
+  }, [hook.filtros, hook.searchTerm]);
+
+  const clearFilter = (key) => {
+    if (key === 'searchTerm') {
+      hook.controles.handleSearchChange({ target: { value: '' } });
+      return;
+    }
+
+    hook.controles.handleFilterChange(key, '');
+  };
+
+  const clearAllFilters = () => {
+    hook.controles.handleSearchChange({ target: { value: '' } });
+    hook.controles.handleFilterChange('status', '');
+    hook.controles.handleFilterChange('tipo', '');
+    hook.controles.handleFilterChange('unidade', '');
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteModal.modalData?.id) return;
+    await hook.removerManutencao(deleteModal.modalData.id);
+    deleteModal.closeModal();
+  };
 
   return {
-    manutencoes,
-    loading,
-    error,
-    searchTerm,
-    setSearchTerm,
+    ...hook,
+    searchTerm: hook.searchTerm,
+    onSearchChange: hook.controles.handleSearchChange,
+    sortConfig: hook.controles.sortConfig,
+    requestSort: hook.controles.requestSort,
     selectFiltersConfig,
-    goToCreate,
-    refetch,
+    activeFilters,
+    clearFilter,
+    clearAllFilters,
     deleteModal,
     handleConfirmDelete,
+    goToCreate: () => navigate('/manutencoes/nova'),
   };
 }

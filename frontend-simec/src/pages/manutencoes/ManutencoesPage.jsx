@@ -10,6 +10,10 @@ import {
   faHashtag,
   faPlus,
   faWrench,
+  faCircleCheck,
+  faTriangleExclamation,
+  faCircleXmark,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,14 +25,16 @@ import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
 
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageSection from '../../components/ui/PageSection';
 import PageState from '../../components/ui/PageState';
+import Card from '../../components/ui/Card';
 
 const getStatusStyles = (status) => {
   const s = status?.toLowerCase() || '';
   if (s === 'agendada') return 'bg-blue-100 text-blue-800 border-blue-200';
   if (s === 'emandamento') return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-  if (s === 'aguardandoconfirmacao') return 'bg-orange-100 text-orange-800 border-orange-200 animate-pulse';
+  if (s === 'aguardandoconfirmacao') {
+    return 'bg-orange-100 text-orange-800 border-orange-200 animate-pulse';
+  }
   if (s === 'concluida') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
   if (s === 'cancelada') return 'bg-red-100 text-red-800 border-red-200';
   return 'bg-slate-100 text-slate-700 border-slate-200';
@@ -69,6 +75,79 @@ const formatarIntervaloHorario = (dataInicioISO, dataFimISO) => {
   }
 };
 
+function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
+  const toneMap = {
+    slate: 'bg-slate-100 text-slate-600',
+    blue: 'bg-blue-100 text-blue-600',
+    yellow: 'bg-amber-100 text-amber-600',
+    green: 'bg-emerald-100 text-emerald-600',
+    red: 'bg-red-100 text-red-600',
+  };
+
+  const Wrapper = onClick ? 'button' : 'div';
+
+  return (
+    <Wrapper
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={[
+        'w-full text-left',
+        onClick ? 'transition hover:-translate-y-0.5 hover:shadow-md' : '',
+      ].join(' ')}
+    >
+      <Card className="h-full">
+        <div className="flex items-center gap-4">
+          <div
+            className={[
+              'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
+              toneMap[tone] || toneMap.slate,
+            ].join(' ')}
+          >
+            <FontAwesomeIcon icon={icon} />
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {title}
+            </p>
+            <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
+              {value}
+            </p>
+          </div>
+        </div>
+      </Card>
+    </Wrapper>
+  );
+}
+
+function ActiveFiltersBar({ filters = [], onRemove, onClearAll }) {
+  if (!filters.length) return null;
+
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-2">
+      {filters.map((filter) => (
+        <button
+          key={`${filter.key}-${filter.value}`}
+          type="button"
+          onClick={() => onRemove(filter.key)}
+          className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+        >
+          <span>{filter.label}</span>
+          <FontAwesomeIcon icon={faXmark} className="text-[10px]" />
+        </button>
+      ))}
+
+      <button
+        type="button"
+        onClick={onClearAll}
+        className="ml-1 inline-flex items-center rounded-full px-2 py-1 text-xs font-semibold text-blue-600 hover:underline"
+      >
+        Limpar tudo
+      </button>
+    </div>
+  );
+}
+
 function ManutencoesPage() {
   const { user } = useAuth();
   const page = useManutencoesPage();
@@ -101,14 +180,85 @@ function ManutencoesPage() {
           }
         />
 
-        <PageSection noPadding className="mb-8 overflow-hidden">
+        {/* KPIs */}
+        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
+          <KpiCard
+            icon={faWrench}
+            title="Total"
+            value={page.metricas?.total ?? 0}
+            tone="slate"
+            onClick={page.clearAllFilters}
+          />
+
+          <KpiCard
+            icon={faClock}
+            title="Em andamento"
+            value={page.metricas?.emAndamento ?? 0}
+            tone="yellow"
+            onClick={() => {
+              page.clearAllFilters();
+              page.selectFiltersConfig
+                ?.find((f) => f.id === 'status')
+                ?.onChange('EmAndamento');
+            }}
+          />
+
+          <KpiCard
+            icon={faTriangleExclamation}
+            title="Aguardando"
+            value={page.metricas?.aguardando ?? 0}
+            tone="blue"
+            onClick={() => {
+              page.clearAllFilters();
+              page.selectFiltersConfig
+                ?.find((f) => f.id === 'status')
+                ?.onChange('AguardandoConfirmacao');
+            }}
+          />
+
+          <KpiCard
+            icon={faCircleCheck}
+            title="Concluídas"
+            value={page.metricas?.concluidas ?? 0}
+            tone="green"
+            onClick={() => {
+              page.clearAllFilters();
+              page.selectFiltersConfig
+                ?.find((f) => f.id === 'status')
+                ?.onChange('Concluida');
+            }}
+          />
+
+          <KpiCard
+            icon={faCircleXmark}
+            title="Canceladas"
+            value={page.metricas?.canceladas ?? 0}
+            tone="red"
+            onClick={() => {
+              page.clearAllFilters();
+              page.selectFiltersConfig
+                ?.find((f) => f.id === 'status')
+                ?.onChange('Cancelada');
+            }}
+          />
+        </div>
+
+        {/* Filtros */}
+        <div className="mb-6">
           <GlobalFilterBar
             searchTerm={page.searchTerm}
-            onSearchChange={(e) => page.setSearchTerm(e.target.value)}
+            onSearchChange={page.onSearchChange}
             searchPlaceholder="Buscar por OS ou descrição..."
             selectFilters={page.selectFiltersConfig}
           />
-        </PageSection>
+        </div>
+
+        {/* Chips de filtros */}
+        <ActiveFiltersBar
+          filters={page.activeFilters || []}
+          onRemove={page.clearFilter}
+          onClearAll={page.clearAllFilters}
+        />
 
         {isInitialLoading || hasError || isEmpty ? (
           <PageState
@@ -118,47 +268,55 @@ function ManutencoesPage() {
             emptyMessage="Nenhuma manutenção encontrada."
           />
         ) : (
-          <div className="px-1 flex flex-col gap-3">
+          <div className="flex flex-col gap-3 px-1">
             {page.manutencoes.map((m) => (
               <div
                 key={m.id}
-                className={`bg-white border-y border-r border-slate-200 border-l-[8px] ${getRowBorder(m.status)} shadow-sm rounded-xl overflow-hidden transition-all hover:shadow-md`}
+                className={`overflow-hidden rounded-xl border-y border-r border-slate-200 border-l-[8px] bg-white shadow-sm transition-all hover:shadow-md ${getRowBorder(m.status)}`}
               >
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-6 flex-1">
-                    <div className="grid grid-cols-2 md:grid-cols-6 gap-6 flex-1 items-start">
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">
+                <div className="flex items-center justify-between p-4">
+                  <div className="flex flex-1 items-center gap-6">
+                    <div className="grid flex-1 grid-cols-2 items-start gap-6 md:grid-cols-6">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="mb-1 text-[10px] font-black uppercase tracking-tighter text-slate-600">
                           OS / Status
                         </span>
-                        <span className="font-black text-slate-900 text-sm leading-none">
+                        <span className="text-sm font-black leading-none text-slate-900">
                           {m.numeroOS}
                         </span>
-                        <span className={`w-fit mt-2 text-[9px] font-black px-1.5 py-0.5 rounded border uppercase ${getStatusStyles(m.status)}`}>
+                        <span
+                          className={`mt-2 w-fit rounded border px-1.5 py-0.5 text-[9px] font-black uppercase ${getStatusStyles(m.status)}`}
+                        >
                           {m.status.replace(/([A-Z])/g, ' $1').trim()}
                         </span>
                       </div>
 
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="mb-1 text-[10px] font-black uppercase tracking-tighter text-slate-600">
                           Equipamento
                         </span>
-                        <span className="font-black text-slate-900 text-sm leading-tight truncate">
+                        <span className="truncate text-sm font-black leading-tight text-slate-900">
                           {m.equipamento?.modelo}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-medium mt-1">
-                          Nº de Série: <span className="font-bold text-slate-600">{m.equipamento?.tag}</span>
+                        <span className="mt-1 text-[10px] font-medium text-slate-500">
+                          Nº de Série:{' '}
+                          <span className="font-bold text-slate-600">
+                            {m.equipamento?.tag}
+                          </span>
                         </span>
                       </div>
 
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="mb-1 text-[10px] font-black uppercase tracking-tighter text-slate-600">
                           Nº Chamado
                         </span>
-                        <span className="font-black text-slate-900 text-sm mt-0.5">
+                        <span className="mt-0.5 text-sm font-black text-slate-900">
                           {m.numeroChamado ? (
                             <>
-                              <FontAwesomeIcon icon={faHashtag} className="text-slate-400 mr-1" />
+                              <FontAwesomeIcon
+                                icon={faHashtag}
+                                className="mr-1 text-slate-400"
+                              />
                               {m.numeroChamado}
                             </>
                           ) : (
@@ -167,44 +325,57 @@ function ManutencoesPage() {
                         </span>
                       </div>
 
-                      <div className="hidden md:flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">
+                      <div className="hidden min-w-0 flex-col md:flex">
+                        <span className="mb-1 text-[10px] font-black uppercase tracking-tighter text-slate-600">
                           Agendamento
                         </span>
-                        <span className="font-black text-slate-900 text-xs flex items-center gap-1">
-                          <FontAwesomeIcon icon={faClock} className="text-slate-400 text-[9px]" />
+                        <span className="flex items-center gap-1 text-xs font-black text-slate-900">
+                          <FontAwesomeIcon
+                            icon={faClock}
+                            className="text-[9px] text-slate-400"
+                          />
                           {formatarData(m.dataHoraAgendamentoInicio)}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-medium mt-0.5">
-                          {formatarIntervaloHorario(m.dataHoraAgendamentoInicio, m.dataHoraAgendamentoFim)}
+                        <span className="mt-0.5 text-[10px] font-medium text-slate-500">
+                          {formatarIntervaloHorario(
+                            m.dataHoraAgendamentoInicio,
+                            m.dataHoraAgendamentoFim
+                          )}
                         </span>
                       </div>
 
-                      <div className="hidden md:flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">
+                      <div className="hidden min-w-0 flex-col md:flex">
+                        <span className="mb-1 text-[10px] font-black uppercase tracking-tighter text-slate-600">
                           Unidade
                         </span>
-                        <span className="font-bold text-slate-700 text-xs mt-0.5 truncate">
-                          <FontAwesomeIcon icon={faHospital} className="text-slate-400 text-[9px] mr-1" />
-                          {m.equipamento?.unidade?.nomeSistema || m.equipamento?.unidade?.nome || '---'}
+                        <span className="mt-0.5 truncate text-xs font-bold text-slate-700">
+                          <FontAwesomeIcon
+                            icon={faHospital}
+                            className="mr-1 text-[9px] text-slate-400"
+                          />
+                          {m.equipamento?.unidade?.nomeSistema ||
+                            m.equipamento?.unidade?.nome ||
+                            '---'}
                         </span>
                       </div>
 
-                      <div className="flex flex-col min-w-0">
-                        <span className="text-[10px] font-black text-slate-600 uppercase tracking-tighter mb-1">
+                      <div className="flex min-w-0 flex-col">
+                        <span className="mb-1 text-[10px] font-black uppercase tracking-tighter text-slate-600">
                           Tipo
                         </span>
-                        <span className={`font-black text-[9px] px-2.5 py-1 rounded-full border uppercase w-fit mt-0.5 shadow-sm ${getTipoStyles(m.tipo)}`}>
+                        <span
+                          className={`mt-0.5 w-fit rounded-full border px-2.5 py-1 text-[9px] font-black uppercase shadow-sm ${getTipoStyles(m.tipo)}`}
+                        >
                           {m.tipo}
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 ml-4 shrink-0">
+                  <div className="ml-4 flex shrink-0 items-center gap-2">
                     <Link
                       to={`/manutencoes/detalhes/${m.id}`}
-                      className="w-9 h-9 flex items-center justify-center bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all shadow-sm border border-blue-100"
+                      className="flex h-9 w-9 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-600 shadow-sm transition-all hover:bg-blue-600 hover:text-white"
                       title="Ver Detalhes"
                     >
                       <FontAwesomeIcon icon={faEye} />
@@ -214,7 +385,7 @@ function ManutencoesPage() {
                       <button
                         type="button"
                         onClick={() => page.deleteModal.openModal(m)}
-                        className="w-9 h-9 flex items-center justify-center bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all shadow-sm border border-red-100 cursor-pointer"
+                        className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border border-red-100 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-600 hover:text-white"
                         title="Excluir"
                       >
                         <FontAwesomeIcon icon={faTrashAlt} />
