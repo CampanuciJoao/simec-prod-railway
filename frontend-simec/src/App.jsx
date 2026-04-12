@@ -27,38 +27,80 @@ const LoginPage = React.lazy(() => import('@/pages/auth/LoginPage'));
 
 const DashboardPage = React.lazy(() => import('@/pages/dashboard/DashboardPage'));
 
-const CadastrosGeraisPage = React.lazy(() => import('@/pages/cadastros/CadastrosGeraisPage'));
+const CadastrosGeraisPage = React.lazy(() =>
+  import('@/pages/cadastros/CadastrosGeraisPage')
+);
 
-const EquipamentosPage = React.lazy(() => import('@/pages/equipamentos/EquipamentosPage'));
-const DetalhesEquipamentoPage = React.lazy(() => import('@/pages/equipamentos/DetalhesEquipamentoPage'));
-const FichaTecnicaPage = React.lazy(() => import('@/pages/equipamentos/FichaTecnicaPage'));
-const SalvarEquipamentoPage = React.lazy(() => import('@/pages/equipamentos/SalvarEquipamentoPage'));
+const EquipamentosPage = React.lazy(() =>
+  import('@/pages/equipamentos/EquipamentosPage')
+);
+const DetalhesEquipamentoPage = React.lazy(() =>
+  import('@/pages/equipamentos/DetalhesEquipamentoPage')
+);
+const FichaTecnicaPage = React.lazy(() =>
+  import('@/pages/equipamentos/FichaTecnicaPage')
+);
+const SalvarEquipamentoPage = React.lazy(() =>
+  import('@/pages/equipamentos/SalvarEquipamentoPage')
+);
 
-const ManutencoesPage = React.lazy(() => import('@/pages/manutencoes/ManutencoesPage'));
-const DetalhesManutencaoPage = React.lazy(() => import('@/pages/manutencoes/DetalhesManutencaoPage'));
-const SalvarManutencaoPage = React.lazy(() => import('@/pages/manutencoes/SalvarManutencaoPage'));
+const ManutencoesPage = React.lazy(() =>
+  import('@/pages/manutencoes/ManutencoesPage')
+);
+const DetalhesManutencaoPage = React.lazy(() =>
+  import('@/pages/manutencoes/DetalhesManutencaoPage')
+);
+const SalvarManutencaoPage = React.lazy(() =>
+  import('@/pages/manutencoes/SalvarManutencaoPage')
+);
 
-const ContratosPage = React.lazy(() => import('@/pages/contratos/ContratosPage'));
-const SalvarContratoPage = React.lazy(() => import('@/pages/contratos/SalvarContratoPage'));
-const DetalhesContratoPage = React.lazy(() => import('@/pages/contratos/DetalhesContratoPage'));
+const ContratosPage = React.lazy(() =>
+  import('@/pages/contratos/ContratosPage')
+);
+const SalvarContratoPage = React.lazy(() =>
+  import('@/pages/contratos/SalvarContratoPage')
+);
+const DetalhesContratoPage = React.lazy(() =>
+  import('@/pages/contratos/DetalhesContratoPage')
+);
 
 const SegurosPage = React.lazy(() => import('@/pages/seguros/SegurosPage'));
-const SalvarSeguroPage = React.lazy(() => import('@/pages/seguros/SalvarSeguroPage'));
-const DetalhesSeguroPage = React.lazy(() => import('@/pages/seguros/DetalhesSeguroPage'));
+const SalvarSeguroPage = React.lazy(() =>
+  import('@/pages/seguros/SalvarSeguroPage')
+);
+const DetalhesSeguroPage = React.lazy(() =>
+  import('@/pages/seguros/DetalhesSeguroPage')
+);
 
 const UnidadesPage = React.lazy(() => import('@/pages/unidades/UnidadesPage'));
-const SalvarUnidadePage = React.lazy(() => import('@/pages/unidades/SalvarUnidadePage'));
+const SalvarUnidadePage = React.lazy(() =>
+  import('@/pages/unidades/SalvarUnidadePage')
+);
 
-const RelatoriosPage = React.lazy(() => import('@/pages/relatorios/RelatoriosPage'));
+const RelatoriosPage = React.lazy(() =>
+  import('@/pages/relatorios/RelatoriosPage')
+);
 
-const AlertasPage = React.lazy(() => import('@/pages/notificacoes/AlertasPage'));
-const EmailsNotificacaoPage = React.lazy(() => import('@/pages/notificacoes/EmailsNotificacaoPage'));
+const AlertasPage = React.lazy(() =>
+  import('@/pages/notificacoes/AlertasPage')
+);
+const EmailsNotificacaoPage = React.lazy(() =>
+  import('@/pages/notificacoes/EmailsNotificacaoPage')
+);
 
-const GerenciamentoPage = React.lazy(() => import('@/pages/gerenciamento/GerenciamentoPage'));
-const GerenciarUsuariosPage = React.lazy(() => import('@/pages/gerenciamento/GerenciarUsuariosPage'));
+const GerenciamentoPage = React.lazy(() =>
+  import('@/pages/gerenciamento/GerenciamentoPage')
+);
+const GerenciarUsuariosPage = React.lazy(() =>
+  import('@/pages/gerenciamento/GerenciarUsuariosPage')
+);
 
-const LogAuditoriaPage = React.lazy(() => import('@/pages/auditoria/LogAuditoriaPage'));
-const AuditoriaDetalhadaPage = React.lazy(() => import('@/pages/auditoria/AuditoriaDetalhadaPage'));
+const LogAuditoriaPage = React.lazy(() =>
+  import('@/pages/auditoria/LogAuditoriaPage')
+);
+const AuditoriaDetalhadaPage = React.lazy(() =>
+  import('@/pages/auditoria/AuditoriaDetalhadaPage')
+);
 
 function App() {
   const { isAuthenticated, loading } = useAuth();
@@ -95,6 +137,39 @@ function App() {
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="bi" element={<BIPage />} />
 
+            {/* HUB DE CADASTROS */}
+            <Route path="cadastros" element={<CadastrosGeraisPage />} />
+
+            {/* SUBROTAS DE CADASTROS */}
+            <Route path="cadastros/unidades" element={<UnidadesPage />} />
+            <Route
+              path="cadastros/unidades/adicionar"
+              element={<SalvarUnidadePage />}
+            />
+            <Route
+              path="cadastros/unidades/editar/:id"
+              element={<SalvarUnidadePage />}
+            />
+
+            <Route
+              path="cadastros/equipamentos/adicionar"
+              element={<SalvarEquipamentoPage />}
+            />
+            <Route
+              path="cadastros/equipamentos/editar/:equipamentoId"
+              element={<SalvarEquipamentoPage />}
+            />
+
+            <Route
+              path="cadastros/emails"
+              element={
+                <AdminRoute>
+                  <EmailsNotificacaoPage />
+                </AdminRoute>
+              }
+            />
+
+            {/* EQUIPAMENTOS */}
             <Route path="equipamentos" element={<EquipamentosPage />} />
             <Route
               path="equipamentos/detalhes/:equipamentoId"
@@ -105,29 +180,7 @@ function App() {
               element={<FichaTecnicaPage />}
             />
 
-            <Route path="cadastros" element={<CadastrosGeraisPage />}>
-              <Route index element={<Navigate to="unidades" replace />} />
-              <Route path="unidades" element={<UnidadesPage />} />
-              <Route path="unidades/adicionar" element={<SalvarUnidadePage />} />
-              <Route path="unidades/editar/:id" element={<SalvarUnidadePage />} />
-              <Route
-                path="equipamentos/adicionar"
-                element={<SalvarEquipamentoPage />}
-              />
-              <Route
-                path="equipamentos/editar/:equipamentoId"
-                element={<SalvarEquipamentoPage />}
-              />
-              <Route
-                path="emails"
-                element={
-                  <AdminRoute>
-                    <EmailsNotificacaoPage />
-                  </AdminRoute>
-                }
-              />
-            </Route>
-
+            {/* MANUTENÇÕES */}
             <Route path="manutencoes" element={<ManutencoesPage />} />
             <Route
               path="manutencoes/detalhes/:manutencaoId"
@@ -142,21 +195,32 @@ function App() {
               element={<SalvarManutencaoPage />}
             />
 
+            {/* CONTRATOS */}
             <Route path="contratos" element={<ContratosPage />} />
             <Route path="contratos/adicionar" element={<SalvarContratoPage />} />
             <Route path="contratos/editar/:id" element={<SalvarContratoPage />} />
-            <Route path="contratos/detalhes/:id" element={<DetalhesContratoPage />} />
+            <Route
+              path="contratos/detalhes/:id"
+              element={<DetalhesContratoPage />}
+            />
 
+            {/* SEGUROS */}
             <Route path="seguros" element={<SegurosPage />} />
             <Route path="seguros/adicionar" element={<SalvarSeguroPage />} />
             <Route path="seguros/editar/:id" element={<SalvarSeguroPage />} />
             <Route path="seguros/detalhes/:id" element={<DetalhesSeguroPage />} />
 
+            {/* RELATÓRIOS / ALERTAS */}
             <Route path="relatorios" element={<RelatoriosPage />} />
             <Route path="alertas" element={<AlertasPage />} />
 
-            <Route path="auditoria/manutencao/:id" element={<AuditoriaDetalhadaPage />} />
+            {/* AUDITORIA */}
+            <Route
+              path="auditoria/manutencao/:id"
+              element={<AuditoriaDetalhadaPage />}
+            />
 
+            {/* GERENCIAMENTO */}
             <Route path="gerenciamento" element={<GerenciamentoPage />}>
               <Route index element={<Navigate to="usuarios" replace />} />
               <Route path="usuarios" element={<GerenciarUsuariosPage />} />

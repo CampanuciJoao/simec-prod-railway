@@ -89,7 +89,7 @@ function CadastrosGeraisPage() {
           title="E-mails de Notificação"
           description="Configure e-mails usados para alertas e comunicação."
           tone="slate"
-          onClick={() => navigate('/gerenciamento/emails')}
+          onClick={() => navigate('/cadastros/emails')}
         />
       </div>
     </PageLayout>
