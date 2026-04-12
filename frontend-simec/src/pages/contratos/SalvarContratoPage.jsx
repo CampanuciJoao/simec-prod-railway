@@ -1,29 +1,34 @@
-// Ficheiro: src/pages/contratos/SalvarContratoPage.jsx
-// VERSÃO REATORADA - PÁGINA INTELIGENTE
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import ContratoForm from '../../components/contratos/ContratoForm';
+import SeguroForm from '../../components/seguros/SeguroForm';
 import {
-  getContratoById,
-  addContrato,
-  updateContrato,
+  getSeguroById,
+  addSeguro,
+  updateSeguro,
   getEquipamentos,
   getUnidades,
 } from '../../services/api';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
-function SalvarContratoPage() {
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faArrowLeft,
+  faShieldAlt,
+} from '@fortawesome/free-solid-svg-icons';
+
+import PageLayout from '../../components/ui/PageLayout';
+import PageHeader from '../../components/ui/PageHeader';
+import PageState from '../../components/ui/PageState';
+
+function SalvarSeguroPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const isEditing = !!id;
+  const isEditing = Boolean(id);
 
   const [initialData, setInitialData] = useState(null);
-  const [todosEquipamentos, setTodosEquipamentos] = useState([]);
+  const [equipamentosDisponiveis, setEquipamentosDisponiveis] = useState([]);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,15 +43,19 @@ function SalvarContratoPage() {
         getUnidades(),
       ]);
 
-      setTodosEquipamentos(equipamentosData || []);
+      setEquipamentosDisponiveis(equipamentosData || []);
       setUnidadesDisponiveis(unidadesData || []);
 
       if (isEditing) {
-        const contratoData = await getContratoById(id);
-        setInitialData(contratoData);
+        const seguroData = await getSeguroById(id);
+        setInitialData(seguroData || null);
       }
     } catch (err) {
-      setError('Falha ao carregar dados necessários para o formulário.');
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Erro ao carregar dados.'
+      );
       addToast('Falha ao carregar dados.', 'error');
     } finally {
       setLoading(false);
@@ -60,69 +69,89 @@ function SalvarContratoPage() {
   const handleSave = async (formData) => {
     try {
       if (isEditing) {
-        await updateContrato(id, formData);
-        addToast('Contrato atualizado com sucesso!', 'success');
+        await updateSeguro(id, formData);
+        addToast('Seguro atualizado com sucesso!', 'success');
       } else {
-        await addContrato(formData);
-        addToast('Contrato adicionado com sucesso!', 'success');
+        await addSeguro(formData);
+        addToast('Seguro cadastrado com sucesso!', 'success');
       }
 
-      setTimeout(() => navigate('/contratos'), 1000);
+      navigate('/seguros');
     } catch (err) {
-      addToast(err.message || 'Erro ao salvar o contrato.', 'error');
       throw err;
     }
   };
 
   if (loading) {
     return (
-      <div className="page-content-wrapper centered-loader">
-        <FontAwesomeIcon icon={faSpinner} spin size="2x" />
-      </div>
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
+          icon={faShieldAlt}
+        />
+        <PageState loading />
+      </PageLayout>
     );
   }
 
   if (error) {
     return (
-      <div className="page-content-wrapper">
-        <p className="form-error">{error}</p>
-      </div>
-    );
-  }
-
-  if (isEditing && !initialData) {
-    return (
-      <div className="page-content-wrapper">
-        <p className="no-data-message">Contrato não encontrado.</p>
-      </div>
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title="Erro"
+          icon={faShieldAlt}
+          actions={
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/seguros')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar
+            </button>
+          }
+        />
+        <PageState error={error} />
+      </PageLayout>
     );
   }
 
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">
-          {isEditing
-            ? `Editar Contrato (Nº: ${initialData?.numeroContrato})`
-            : 'Cadastrar Novo Contrato'}
-        </h1>
+    <PageLayout background="slate" padded fullHeight>
+      <PageHeader
+        title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
+        subtitle="Cadastro e gestão de apólices"
+        icon={faShieldAlt}
+        actions={
+          <div className="flex gap-2">
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/cadastros')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Cadastros
+            </button>
 
-        <button className="btn btn-secondary" onClick={() => navigate('/contratos')}>
-          <FontAwesomeIcon icon={faArrowLeft} /> Voltar
-        </button>
-      </div>
+            <button
+              className="btn btn-secondary"
+              onClick={() => navigate('/seguros')}
+            >
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Seguros
+            </button>
+          </div>
+        }
+      />
 
-      <section className="page-section">
-        <ContratoForm
-          onSubmit={handleSave}
-          initialData={initialData}
-          isEditing={isEditing}
-          todosEquipamentos={todosEquipamentos}
-          unidadesDisponiveis={unidadesDisponiveis}
-        />
-      </section>
-    </div>
+      <SeguroForm
+        onSubmit={handleSave}
+        initialData={initialData}
+        isEditing={isEditing}
+        equipamentosDisponiveis={equipamentosDisponiveis}
+        unidadesDisponiveis={unidadesDisponiveis}
+        onCancel={() => navigate('/seguros')}
+      />
+    </PageLayout>
   );
 }
 
-export default SalvarContratoPage;
+export default SalvarSeguroPage;

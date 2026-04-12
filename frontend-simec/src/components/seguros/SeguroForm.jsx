@@ -1,13 +1,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import DateInput from '../ui/DateInput';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSpinner,
   faSave,
+  faTimes,
+  faSpinner,
   faShieldAlt,
   faHospital,
   faCoins,
 } from '@fortawesome/free-solid-svg-icons';
+
+import DateInput from '../ui/DateInput';
+import PageSection from '../ui/PageSection';
 
 const TIPOS_VINCULO = {
   GERAL: 'geral',
@@ -15,7 +19,7 @@ const TIPOS_VINCULO = {
   UNIDADE: 'unidade',
 };
 
-const ESTADO_INICIAL_VAZIO = {
+const ESTADO_INICIAL = {
   apoliceNumero: '',
   seguradora: '',
   dataInicio: '',
@@ -25,323 +29,170 @@ const ESTADO_INICIAL_VAZIO = {
   unidadeId: '',
   cobertura: '',
   premioTotal: 0,
-  lmiIncendio: 0,
-  lmiDanosEletricos: 0,
-  lmiRoubo: 0,
-  lmiVidros: 0,
-  lmiResponsabilidadeCivil: 0,
-  lmiDanosMateriais: 0,
-  lmiDanosCorporais: 0,
-  lmiDanosMorais: 0,
-  lmiAPP: 0,
 };
 
 function SeguroForm({
   onSubmit,
-  initialData = null,
-  isEditing = false,
-  equipamentosDisponiveis = [],
-  unidadesDisponiveis = [],
+  initialData,
+  isEditing,
+  equipamentosDisponiveis,
+  unidadesDisponiveis,
+  onCancel,
 }) {
-  const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [formData, setFormData] = useState(ESTADO_INICIAL);
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (isEditing && initialData) {
-      let tipoVinculoInicial = TIPOS_VINCULO.GERAL;
-      if (initialData.equipamentoId) tipoVinculoInicial = TIPOS_VINCULO.EQUIPAMENTO;
-      else if (initialData.unidadeId) tipoVinculoInicial = TIPOS_VINCULO.UNIDADE;
-
+    if (initialData) {
       setFormData({
-        ...ESTADO_INICIAL_VAZIO,
+        ...ESTADO_INICIAL,
         ...initialData,
-        tipoVinculo: tipoVinculoInicial,
-        dataInicio: initialData.dataInicio ? initialData.dataInicio.split('T')[0] : '',
-        dataFim: initialData.dataFim ? initialData.dataFim.split('T')[0] : '',
+        dataInicio: initialData.dataInicio?.split('T')[0] || '',
+        dataFim: initialData.dataFim?.split('T')[0] || '',
       });
-    } else {
-      setFormData(ESTADO_INICIAL_VAZIO);
     }
-  }, [isEditing, initialData]);
+  }, [initialData]);
 
   const handleChange = (e) => {
-    const { name, value, type } = e.target;
-    const finalValue = type === 'number' ? parseFloat(value) || 0 : value;
-    setFormData((prev) => ({ ...prev, [name]: finalValue }));
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
-  const handleTipoVinculoChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      tipoVinculo: e.target.value,
-      equipamentoId: '',
-      unidadeId: '',
-    }));
-  };
-
-  const equipamentosFiltradosPorUnidade = useMemo(() => {
-    if (formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO && formData.unidadeId) {
-      return equipamentosDisponiveis.filter(
-        (eq) => eq.unidadeId === formData.unidadeId
-      );
-    }
-    return [];
-  }, [formData.tipoVinculo, formData.unidadeId, equipamentosDisponiveis]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (!formData.apoliceNumero || !formData.seguradora) {
+      setError('Apólice e seguradora são obrigatórios.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      const payload = {
-        ...formData,
-        equipamentoId:
-          formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO
-            ? formData.equipamentoId
-            : null,
-        unidadeId:
-          formData.tipoVinculo === TIPOS_VINCULO.UNIDADE
-            ? formData.unidadeId
-            : formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO
-              ? formData.unidadeId
-              : null,
-      };
-
-      await onSubmit(payload);
+      await onSubmit(formData);
     } catch (err) {
-      setError(err.message || 'Ocorreu um erro ao salvar o seguro.');
+      setError(err.message || 'Erro ao salvar.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const equipamentosFiltrados = useMemo(() => {
+    if (!formData.unidadeId) return [];
+    return equipamentosDisponiveis.filter(
+      (e) => e.unidadeId === formData.unidadeId
+    );
+  }, [formData.unidadeId, equipamentosDisponiveis]);
+
   return (
-    <form onSubmit={handleSubmit} className="form-elegante">
-      {error && <p className="form-error">{error}</p>}
-
-      <div className="form-section">
-        <h4>
-          <FontAwesomeIcon icon={faShieldAlt} /> Detalhes da Apólice
-        </h4>
-        <div className="info-grid grid-cols-2">
-          <div className="form-group">
-            <label>Número da Apólice *</label>
-            <input
-              type="text"
-              name="apoliceNumero"
-              value={formData.apoliceNumero}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Seguradora *</label>
-            <input
-              type="text"
-              name="seguradora"
-              value={formData.seguradora}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Início da Vigência *</label>
-            <DateInput
-              name="dataInicio"
-              value={formData.dataInicio}
-              onChange={handleChange}
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label>Fim da Vigência *</label>
-            <DateInput
-              name="dataFim"
-              value={formData.dataFim}
-              onChange={handleChange}
-              required
-            />
-          </div>
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-red-700 text-sm">
+          {error}
         </div>
-      </div>
+      )}
 
-      <div className="form-section">
-        <h4>
-          <FontAwesomeIcon icon={faHospital} /> Objeto Segurado (Vínculo)
-        </h4>
+      <PageSection title="Dados da Apólice">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <input
+            name="apoliceNumero"
+            value={formData.apoliceNumero}
+            onChange={handleChange}
+            placeholder="Número da apólice"
+            className="input"
+          />
 
-        <div className="form-group">
-          <label>Tipo de Vínculo</label>
+          <input
+            name="seguradora"
+            value={formData.seguradora}
+            onChange={handleChange}
+            placeholder="Seguradora"
+            className="input"
+          />
+
+          <DateInput
+            name="dataInicio"
+            value={formData.dataInicio}
+            onChange={handleChange}
+          />
+
+          <DateInput
+            name="dataFim"
+            value={formData.dataFim}
+            onChange={handleChange}
+          />
+        </div>
+      </PageSection>
+
+      <PageSection title="Vínculo">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <select
             name="tipoVinculo"
             value={formData.tipoVinculo}
-            onChange={handleTipoVinculoChange}
+            onChange={handleChange}
+            className="select"
           >
-            <option value={TIPOS_VINCULO.GERAL}>Geral (Sem vínculo específico)</option>
-            <option value={TIPOS_VINCULO.UNIDADE}>Vincular à Unidade</option>
-            <option value={TIPOS_VINCULO.EQUIPAMENTO}>Vincular ao Equipamento</option>
+            <option value="geral">Geral</option>
+            <option value="unidade">Unidade</option>
+            <option value="equipamento">Equipamento</option>
           </select>
-        </div>
 
-        {(formData.tipoVinculo === TIPOS_VINCULO.UNIDADE ||
-          formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO) && (
-          <div className="form-group">
-            <label>Unidade *</label>
+          {(formData.tipoVinculo !== 'geral') && (
             <select
               name="unidadeId"
               value={formData.unidadeId}
               onChange={handleChange}
-              required
+              className="select"
             >
-              <option value="">Selecione a Unidade</option>
+              <option value="">Selecione unidade</option>
               {unidadesDisponiveis.map((u) => (
                 <option key={u.id} value={u.id}>
                   {u.nomeSistema}
                 </option>
               ))}
             </select>
-          </div>
-        )}
+          )}
 
-        {formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO && (
-          <div className="form-group">
-            <label>Equipamento *</label>
+          {formData.tipoVinculo === 'equipamento' && (
             <select
               name="equipamentoId"
               value={formData.equipamentoId}
               onChange={handleChange}
-              required
-              disabled={!formData.unidadeId}
+              className="select"
             >
-              <option value="">Selecione o Equipamento</option>
-              {equipamentosFiltradosPorUnidade.map((eq) => (
-                <option key={eq.id} value={eq.id}>
-                  {eq.modelo} (Tag: {eq.tag})
+              <option value="">Selecione equipamento</option>
+              {equipamentosFiltrados.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.modelo}
                 </option>
               ))}
             </select>
-          </div>
-        )}
-      </div>
-
-      <div className="form-section">
-        <h4>
-          <FontAwesomeIcon icon={faCoins} /> Coberturas e Valores (LMI)
-        </h4>
-        <div className="info-grid grid-cols-3">
-          <div className="form-group">
-            <label>Prêmio Total (Custo)</label>
-            <input
-              type="number"
-              step="0.01"
-              name="premioTotal"
-              value={formData.premioTotal}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Incêndio / Explosão</label>
-            <input
-              type="number"
-              name="lmiIncendio"
-              value={formData.lmiIncendio}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Danos Elétricos</label>
-            <input
-              type="number"
-              name="lmiDanosEletricos"
-              value={formData.lmiDanosEletricos}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Roubo / Furto</label>
-            <input
-              type="number"
-              name="lmiRoubo"
-              value={formData.lmiRoubo}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Quebra de Vidros</label>
-            <input
-              type="number"
-              name="lmiVidros"
-              value={formData.lmiVidros}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Resp. Civil (Terceiros)</label>
-            <input
-              type="number"
-              name="lmiResponsabilidadeCivil"
-              value={formData.lmiResponsabilidadeCivil}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Danos Materiais (Auto)</label>
-            <input
-              type="number"
-              name="lmiDanosMateriais"
-              value={formData.lmiDanosMateriais}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Danos Corporais (Auto)</label>
-            <input
-              type="number"
-              name="lmiDanosCorporais"
-              value={formData.lmiDanosCorporais}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>Danos Morais</label>
-            <input
-              type="number"
-              name="lmiDanosMorais"
-              value={formData.lmiDanosMorais}
-              onChange={handleChange}
-            />
-          </div>
-          <div className="form-group">
-            <label>APP (Passageiros)</label>
-            <input
-              type="number"
-              name="lmiAPP"
-              value={formData.lmiAPP}
-              onChange={handleChange}
-            />
-          </div>
+          )}
         </div>
+      </PageSection>
 
-        <div className="form-group" style={{ marginTop: '15px' }}>
-          <label>Observações da Cobertura</label>
-          <textarea
-            name="cobertura"
-            rows="3"
-            value={formData.cobertura}
-            onChange={handleChange}
-          />
-        </div>
-      </div>
+      <PageSection title="Valores">
+        <input
+          type="number"
+          name="premioTotal"
+          value={formData.premioTotal}
+          onChange={handleChange}
+          className="input"
+          placeholder="Prêmio total"
+        />
+      </PageSection>
 
-      <div className="form-actions">
-        <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-          <FontAwesomeIcon icon={isSubmitting ? faSpinner : faSave} spin={isSubmitting} />{' '}
-          {isSubmitting ? 'Salvando...' : 'Salvar Seguro'}
+      <div className="flex justify-end gap-3">
+        <button type="button" className="btn btn-secondary" onClick={onCancel}>
+          <FontAwesomeIcon icon={faTimes} />
+          Cancelar
+        </button>
+
+        <button type="submit" className="btn btn-primary">
+          <FontAwesomeIcon icon={faSave} />
+          Salvar
         </button>
       </div>
     </form>

@@ -1,154 +1,437 @@
-// Ficheiro: src/components/ContratoForm.jsx
-// VERSÃO REATORADA - COMPONENTE DE UI PURO
-
 import React, { useState, useEffect, useMemo } from 'react';
-import DateInput from '../ui/DateInput';
+import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faSave,
+  faTimes,
+  faSpinner,
+  faFileContract,
+  faHospital,
+  faMicrochip,
+} from '@fortawesome/free-solid-svg-icons';
 
-// Estado inicial padrão para um contrato novo.
+import DateInput from '../ui/DateInput';
+import PageSection from '../ui/PageSection';
+
 const ESTADO_INICIAL_VAZIO = {
-    numeroContrato: '',
-    categoria: '',
-    fornecedor: '',
-    dataInicio: '',
-    dataFim: '',
-    status: 'Ativo',
-    unidadesCobertasIds: [],
-    equipamentosCobertosIds: []
+  numeroContrato: '',
+  categoria: '',
+  fornecedor: '',
+  dataInicio: '',
+  dataFim: '',
+  status: 'Ativo',
+  unidadesCobertasIds: [],
+  equipamentosCobertosIds: [],
 };
 
-function ContratoForm({ 
-    onSubmit, 
-    initialData = null, 
-    isEditing = false, 
-    todosEquipamentos = [], 
-    unidadesDisponiveis = [] 
-}) {
-    const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [error, setError] = useState('');
+const OPCOES_CATEGORIA = [
+  'Manutenção Corretiva',
+  'Manutenção Preventiva',
+  'Full Service',
+];
 
-    // Efeito para popular o formulário com dados existentes no modo de edição.
-    useEffect(() => {
-        if (isEditing && initialData) {
-            setFormData({
-                numeroContrato: initialData.numeroContrato || '',
-                categoria: initialData.categoria || '',
-                fornecedor: initialData.fornecedor || '',
-                dataInicio: initialData.dataInicio ? initialData.dataInicio.split('T')[0] : '',
-                dataFim: initialData.dataFim ? initialData.dataFim.split('T')[0] : '',
-                status: initialData.status || 'Ativo',
-                // Mapeia os arrays de objetos para arrays de IDs.
-                unidadesCobertasIds: initialData.unidadesCobertas?.map(u => u.id) || [],
-                equipamentosCobertosIds: initialData.equipamentosCobertos?.map(e => e.id) || []
-            });
-        } else {
-            setFormData(ESTADO_INICIAL_VAZIO);
-        }
-    }, [isEditing, initialData]);
+const OPCOES_STATUS = ['Ativo', 'Expirado', 'Cancelado'];
 
-    const handleChange = (e) => {
-        const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
-    };
-
-    const handleCheckboxChange = (type, id) => {
-        setFormData(prev => {
-            const currentList = prev[type];
-            const newList = currentList.includes(id)
-                ? currentList.filter(itemId => itemId !== id)
-                : [...currentList, id];
-            
-            const newState = { ...prev, [type]: newList };
-
-            // Lógica para desmarcar equipamentos se a unidade for desmarcada
-            if (type === 'unidadesCobertasIds' && !newList.includes(id)) {
-                const equipamentosParaRemover = todosEquipamentos
-                    .filter(e => e.unidadeId === id)
-                    .map(e => e.id);
-                
-                newState.equipamentosCobertosIds = newState.equipamentosCobertosIds.filter(
-                    equipId => !equipamentosParaRemover.includes(equipId)
-                );
-            }
-            return newState;
-        });
-    };
-
-    const equipamentosFiltrados = useMemo(() => {
-        if (formData.unidadesCobertasIds.length === 0) return [];
-        return todosEquipamentos.filter(eq => formData.unidadesCobertasIds.includes(eq.unidadeId));
-    }, [formData.unidadesCobertasIds, todosEquipamentos]);
-
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
-        // ... (validação de campos) ...
-        setIsSubmitting(true);
-        try {
-            await onSubmit(formData); // Delega a submissão para a função do pai.
-        } catch (apiError) {
-            setError(apiError.message || 'Ocorreu um erro ao salvar.');
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="form-elegante">
-            {error && <p className="form-error">{error}</p>}
-            
-            <div className="form-section">
-                <h4>Informações do Contrato</h4>
-                <div className="info-grid grid-cols-3">
-                    <div className="form-group"><label>Número do Contrato *</label><input type="text" name="numeroContrato" value={formData.numeroContrato} onChange={handleChange} required /></div>
-                    <div className="form-group"><label>Categoria *</label><select name="categoria" value={formData.categoria} onChange={handleChange} required><option value="">Selecione</option><option value="Manutenção Corretiva">Manutenção Corretiva</option><option value="Manutenção Preventiva">Manutenção Preventiva</option><option value="Full Service">Full Service</option></select></div>
-                    <div className="form-group"><label>Fornecedor *</label><input type="text" name="fornecedor" value={formData.fornecedor} onChange={handleChange} required /></div>
-                    <div className="form-group"><label>Data de Início *</label><DateInput name="dataInicio" value={formData.dataInicio} onChange={handleChange} required /></div>
-                    <div className="form-group"><label>Data de Fim *</label><DateInput name="dataFim" value={formData.dataFim} onChange={handleChange} required /></div>
-                    <div className="form-group"><label>Status *</label><select name="status" value={formData.status} onChange={handleChange} required><option value="Ativo">Ativo</option><option value="Expirado">Expirado</option><option value="Cancelado">Cancelado</option></select></div>
-                </div>
-            </div>
-            
-            <div className="form-section">
-                <h4>Cobertura</h4>
-                <div className="form-group">
-                    <label>1. Selecione as Unidades para listar os equipamentos</label>
-                    <div className="checkbox-group scrollable">
-                        {unidadesDisponiveis.map(unidade => (
-                            <div key={unidade.id} className="checkbox-item">
-                                <input type="checkbox" id={`unidade-${unidade.id}`} checked={formData.unidadesCobertasIds.includes(unidade.id)} onChange={() => handleCheckboxChange('unidadesCobertasIds', unidade.id)} />
-                                <label htmlFor={`unidade-${unidade.id}`}>{unidade.nomeSistema}</label>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="form-group">
-                    <label>2. Selecione os Equipamentos Cobertos</label>
-                    <div className="checkbox-group scrollable">
-                        {formData.unidadesCobertasIds.length === 0 ? (
-                            <p className="no-data-message" style={{width: '100%'}}>Selecione uma ou mais unidades para listar os equipamentos.</p>
-                        ) : equipamentosFiltrados.length > 0 ? (
-                            equipamentosFiltrados.map(equip => (
-                                <div key={equip.id} className="checkbox-item">
-                                    <input type="checkbox" id={`equip-${equip.id}`} checked={formData.equipamentosCobertosIds.includes(equip.id)} onChange={() => handleCheckboxChange('equipamentosCobertosIds', equip.id)} />
-                                    <label htmlFor={`equip-${equip.id}`}>{equip.modelo} (Tag: {equip.tag})</label>
-                                </div>
-                            ))
-                        ) : (
-                            <p className="no-data-message" style={{width: '100%'}}>Nenhum equipamento encontrado para a(s) unidade(s) selecionada(s).</p>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            <div className="form-actions" style={{ justifyContent: 'flex-end', gap: '10px' }}>
-                <button type="submit" className="btn btn-primary" disabled={isSubmitting}>
-                    {isSubmitting ? 'Salvando...' : 'Salvar Contrato'}
-                </button>
-            </div>
-        </form>
-    );
+function FormField({ label, required = false, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-slate-700">
+        {label}
+        {required ? ' *' : ''}
+      </label>
+      {children}
+    </div>
+  );
 }
+
+function TextInput(props) {
+  return (
+    <input
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    />
+  );
+}
+
+function SelectInput({ children, ...props }) {
+  return (
+    <select
+      {...props}
+      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+    >
+      {children}
+    </select>
+  );
+}
+
+function SelectionCard({
+  title,
+  icon,
+  emptyMessage,
+  items,
+  selectedIds,
+  onToggle,
+  renderLabel,
+}) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4">
+      <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
+        <FontAwesomeIcon icon={icon} className="text-slate-500" />
+        {title}
+      </h4>
+
+      <div className="max-h-[280px] overflow-y-auto pr-1">
+        {items.length > 0 ? (
+          <div className="flex flex-col gap-2">
+            {items.map((item) => {
+              const checked = selectedIds.includes(item.id);
+
+              return (
+                <label
+                  key={item.id}
+                  className={[
+                    'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition',
+                    checked
+                      ? 'border-blue-200 bg-blue-50'
+                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100',
+                  ].join(' ')}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggle(item.id)}
+                    className="mt-1 h-4 w-4 rounded border-slate-300"
+                  />
+
+                  <div className="min-w-0 text-sm text-slate-700">
+                    {renderLabel(item)}
+                  </div>
+                </label>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+            {emptyMessage}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ContratoForm({
+  onSubmit,
+  initialData = null,
+  isEditing = false,
+  todosEquipamentos = [],
+  unidadesDisponiveis = [],
+  onCancel,
+}) {
+  const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isEditing && initialData) {
+      setFormData({
+        numeroContrato: initialData.numeroContrato || '',
+        categoria: initialData.categoria || '',
+        fornecedor: initialData.fornecedor || '',
+        dataInicio: initialData.dataInicio
+          ? initialData.dataInicio.split('T')[0]
+          : '',
+        dataFim: initialData.dataFim ? initialData.dataFim.split('T')[0] : '',
+        status: initialData.status || 'Ativo',
+        unidadesCobertasIds: initialData.unidadesCobertas?.map((u) => u.id) || [],
+        equipamentosCobertosIds:
+          initialData.equipamentosCobertos?.map((e) => e.id) || [],
+      });
+    } else {
+      setFormData(ESTADO_INICIAL_VAZIO);
+    }
+  }, [isEditing, initialData]);
+
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleToggleUnidade = (id) => {
+    setFormData((prev) => {
+      const jaExiste = prev.unidadesCobertasIds.includes(id);
+
+      const novasUnidades = jaExiste
+        ? prev.unidadesCobertasIds.filter((itemId) => itemId !== id)
+        : [...prev.unidadesCobertasIds, id];
+
+      let novosEquipamentos = prev.equipamentosCobertosIds;
+
+      if (jaExiste) {
+        const equipamentosParaRemover = todosEquipamentos
+          .filter((e) => e.unidadeId === id)
+          .map((e) => e.id);
+
+        novosEquipamentos = prev.equipamentosCobertosIds.filter(
+          (equipId) => !equipamentosParaRemover.includes(equipId)
+        );
+      }
+
+      return {
+        ...prev,
+        unidadesCobertasIds: novasUnidades,
+        equipamentosCobertosIds: novosEquipamentos,
+      };
+    });
+  };
+
+  const handleToggleEquipamento = (id) => {
+    setFormData((prev) => {
+      const jaExiste = prev.equipamentosCobertosIds.includes(id);
+
+      return {
+        ...prev,
+        equipamentosCobertosIds: jaExiste
+          ? prev.equipamentosCobertosIds.filter((itemId) => itemId !== id)
+          : [...prev.equipamentosCobertosIds, id],
+      };
+    });
+  };
+
+  const equipamentosFiltrados = useMemo(() => {
+    if (formData.unidadesCobertasIds.length === 0) return [];
+
+    return todosEquipamentos.filter((eq) =>
+      formData.unidadesCobertasIds.includes(eq.unidadeId)
+    );
+  }, [formData.unidadesCobertasIds, todosEquipamentos]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (
+      !formData.numeroContrato ||
+      !formData.categoria ||
+      !formData.fornecedor ||
+      !formData.dataInicio ||
+      !formData.dataFim
+    ) {
+      setError(
+        'Número do contrato, categoria, fornecedor, data de início e data de fim são obrigatórios.'
+      );
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      await onSubmit(formData);
+    } catch (apiError) {
+      setError(
+        apiError?.response?.data?.message ||
+          apiError?.message ||
+          'Ocorreu um erro ao salvar o contrato.'
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelClick = () => {
+    if (onCancel) onCancel();
+    else navigate('/contratos');
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      ) : null}
+
+      <PageSection
+        title="Informações do contrato"
+        description="Dados principais de identificação e vigência."
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <FontAwesomeIcon icon={faFileContract} />
+          </span>
+
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Cadastro principal do contrato
+            </p>
+            <p className="text-sm text-slate-500">
+              Informe dados básicos para registrar o contrato no sistema.
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <FormField label="Número do contrato" required>
+            <TextInput
+              type="text"
+              name="numeroContrato"
+              value={formData.numeroContrato}
+              onChange={handleChange}
+              placeholder="Digite o número do contrato"
+              required
+            />
+          </FormField>
+
+          <FormField label="Categoria" required>
+            <SelectInput
+              name="categoria"
+              value={formData.categoria}
+              onChange={handleChange}
+              required
+            >
+              <option value="">Selecione</option>
+              {OPCOES_CATEGORIA.map((categoria) => (
+                <option key={categoria} value={categoria}>
+                  {categoria}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+
+          <FormField label="Fornecedor" required>
+            <TextInput
+              type="text"
+              name="fornecedor"
+              value={formData.fornecedor}
+              onChange={handleChange}
+              placeholder="Digite o fornecedor"
+              required
+            />
+          </FormField>
+
+          <FormField label="Data de início" required>
+            <DateInput
+              name="dataInicio"
+              value={formData.dataInicio}
+              onChange={handleChange}
+              required
+            />
+          </FormField>
+
+          <FormField label="Data de fim" required>
+            <DateInput
+              name="dataFim"
+              value={formData.dataFim}
+              onChange={handleChange}
+              required
+            />
+          </FormField>
+
+          <FormField label="Status" required>
+            <SelectInput
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              required
+            >
+              {OPCOES_STATUS.map((status) => (
+                <option key={status} value={status}>
+                  {status}
+                </option>
+              ))}
+            </SelectInput>
+          </FormField>
+        </div>
+      </PageSection>
+
+      <PageSection
+        title="Cobertura"
+        description="Selecione unidades e equipamentos cobertos pelo contrato."
+      >
+        <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+          <SelectionCard
+            title="Unidades cobertas"
+            icon={faHospital}
+            items={unidadesDisponiveis}
+            selectedIds={formData.unidadesCobertasIds}
+            onToggle={handleToggleUnidade}
+            emptyMessage="Nenhuma unidade disponível."
+            renderLabel={(unidade) => (
+              <div>
+                <div className="font-medium">{unidade.nomeSistema}</div>
+                {unidade.nomeFantasia ? (
+                  <div className="mt-1 text-xs text-slate-500">
+                    {unidade.nomeFantasia}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          />
+
+          <SelectionCard
+            title="Equipamentos cobertos"
+            icon={faMicrochip}
+            items={equipamentosFiltrados}
+            selectedIds={formData.equipamentosCobertosIds}
+            onToggle={handleToggleEquipamento}
+            emptyMessage={
+              formData.unidadesCobertasIds.length === 0
+                ? 'Selecione uma ou mais unidades para listar os equipamentos.'
+                : 'Nenhum equipamento encontrado para a(s) unidade(s) selecionada(s).'
+            }
+            renderLabel={(equip) => (
+              <div>
+                <div className="font-medium">{equip.modelo}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Tag: {equip.tag || 'N/A'}
+                </div>
+              </div>
+            )}
+          />
+        </div>
+      </PageSection>
+
+      <div className="flex flex-wrap justify-end gap-3">
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={handleCancelClick}
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon icon={faTimes} />
+          Cancelar
+        </button>
+
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={isSubmitting}
+        >
+          <FontAwesomeIcon
+            icon={isSubmitting ? faSpinner : faSave}
+            spin={isSubmitting}
+          />
+          {isSubmitting
+            ? 'Salvando...'
+            : isEditing
+              ? 'Salvar alterações'
+              : 'Salvar contrato'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+ContratoForm.propTypes = {
+  onSubmit: PropTypes.func.isRequired,
+  initialData: PropTypes.object,
+  isEditing: PropTypes.bool,
+  todosEquipamentos: PropTypes.array,
+  unidadesDisponiveis: PropTypes.array,
+  onCancel: PropTypes.func,
+};
 
 export default ContratoForm;
