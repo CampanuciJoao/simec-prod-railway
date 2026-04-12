@@ -9,9 +9,9 @@ import {
   faFileContract,
   faHospital,
   faMicrochip,
+  faCalendarDays,
 } from '@fortawesome/free-solid-svg-icons';
 
-import DateInput from '../ui/DateInput';
 import PageSection from '../ui/PageSection';
 
 const ESTADO_INICIAL_VAZIO = {
@@ -33,7 +33,11 @@ const OPCOES_CATEGORIA = [
 
 const OPCOES_STATUS = ['Ativo', 'Expirado', 'Cancelado'];
 
-function FormField({ label, required = false, children }) {
+function hojeISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function FormField({ label, required = false, hint = '', children }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm font-medium text-slate-700">
@@ -41,29 +45,123 @@ function FormField({ label, required = false, children }) {
         {required ? ' *' : ''}
       </label>
       {children}
+      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
 }
 
-function TextInput(props) {
+FormField.propTypes = {
+  label: PropTypes.string.isRequired,
+  required: PropTypes.bool,
+  hint: PropTypes.string,
+  children: PropTypes.node.isRequired,
+};
+
+function TextInput({ className = '', ...props }) {
   return (
     <input
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     />
   );
 }
 
-function SelectInput({ children, ...props }) {
+TextInput.propTypes = {
+  className: PropTypes.string,
+};
+
+function SelectInput({ children, className = '', ...props }) {
   return (
     <select
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     >
       {children}
     </select>
   );
 }
+
+SelectInput.propTypes = {
+  children: PropTypes.node.isRequired,
+  className: PropTypes.string,
+};
+
+function DateField({ name, value, onChange, min }) {
+  const handleHoje = () => {
+    onChange({
+      target: {
+        name,
+        value: hojeISO(),
+      },
+    });
+  };
+
+  const handleLimpar = () => {
+    onChange({
+      target: {
+        name,
+        value: '',
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <FontAwesomeIcon
+          icon={faCalendarDays}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
+
+        <input
+          type="date"
+          name={name}
+          value={value || ''}
+          onChange={onChange}
+          min={min}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleHoje}
+          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+        >
+          <FontAwesomeIcon icon={faCalendarDays} />
+          Hoje
+        </button>
+
+        {!!value && (
+          <button
+            type="button"
+            onClick={handleLimpar}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+            Limpar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+DateField.propTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+  min: PropTypes.string,
+};
 
 function SelectionCard({
   title,
@@ -121,6 +219,16 @@ function SelectionCard({
   );
 }
 
+SelectionCard.propTypes = {
+  title: PropTypes.string.isRequired,
+  icon: PropTypes.object.isRequired,
+  emptyMessage: PropTypes.string.isRequired,
+  items: PropTypes.array.isRequired,
+  selectedIds: PropTypes.array.isRequired,
+  onToggle: PropTypes.func.isRequired,
+  renderLabel: PropTypes.func.isRequired,
+};
+
 function ContratoForm({
   onSubmit,
   initialData = null,
@@ -146,7 +254,8 @@ function ContratoForm({
           : '',
         dataFim: initialData.dataFim ? initialData.dataFim.split('T')[0] : '',
         status: initialData.status || 'Ativo',
-        unidadesCobertasIds: initialData.unidadesCobertas?.map((u) => u.id) || [],
+        unidadesCobertasIds:
+          initialData.unidadesCobertas?.map((u) => u.id) || [],
         equipamentosCobertosIds:
           initialData.equipamentosCobertos?.map((e) => e.id) || [],
       });
@@ -157,7 +266,15 @@ function ContratoForm({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (error) {
+      setError('');
+    }
   };
 
   const handleToggleUnidade = (id) => {
@@ -214,9 +331,9 @@ function ContratoForm({
     setError('');
 
     if (
-      !formData.numeroContrato ||
+      !formData.numeroContrato.trim() ||
       !formData.categoria ||
-      !formData.fornecedor ||
+      !formData.fornecedor.trim() ||
       !formData.dataInicio ||
       !formData.dataFim
     ) {
@@ -226,10 +343,19 @@ function ContratoForm({
       return;
     }
 
+    if (formData.dataFim < formData.dataInicio) {
+      setError('A data de fim não pode ser menor que a data de início.');
+      return;
+    }
+
     setIsSubmitting(true);
 
     try {
-      await onSubmit(formData);
+      await onSubmit({
+        ...formData,
+        numeroContrato: formData.numeroContrato.trim(),
+        fornecedor: formData.fornecedor.trim(),
+      });
     } catch (apiError) {
       setError(
         apiError?.response?.data?.message ||
@@ -312,21 +438,28 @@ function ContratoForm({
             />
           </FormField>
 
-          <FormField label="Data de início" required>
-            <DateInput
+          <FormField
+            label="Data de início"
+            required
+            hint="Você pode selecionar no calendário ou digitar."
+          >
+            <DateField
               name="dataInicio"
               value={formData.dataInicio}
               onChange={handleChange}
-              required
             />
           </FormField>
 
-          <FormField label="Data de fim" required>
-            <DateInput
+          <FormField
+            label="Data de fim"
+            required
+            hint="A vigência final não pode ser anterior ao início."
+          >
+            <DateField
               name="dataFim"
               value={formData.dataFim}
               onChange={handleChange}
-              required
+              min={formData.dataInicio || undefined}
             />
           </FormField>
 

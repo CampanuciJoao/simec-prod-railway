@@ -32,27 +32,6 @@ const DURACAO_PADRAO_POR_TIPO = {
   Inspecao: 45,
 };
 
-const SUGESTOES_HORARIO = [
-  '07:00',
-  '07:30',
-  '08:00',
-  '08:30',
-  '09:00',
-  '09:30',
-  '10:00',
-  '10:30',
-  '11:00',
-  '13:00',
-  '13:30',
-  '14:00',
-  '14:30',
-  '15:00',
-  '15:30',
-  '16:00',
-  '16:30',
-  '17:00',
-];
-
 function hojeISO() {
   return new Date().toISOString().split('T')[0];
 }
@@ -101,9 +80,7 @@ function FormField({ label, required = false, hint = '', children }) {
         {required ? ' *' : ''}
       </label>
       {children}
-      {hint ? (
-        <p className="mt-1 text-xs text-slate-500">{hint}</p>
-      ) : null}
+      {hint ? <p className="mt-1 text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
 }
@@ -184,13 +161,7 @@ DateField.propTypes = {
   required: PropTypes.bool,
 };
 
-function TimeField({
-  name,
-  value,
-  onChange,
-  quickTimes = SUGESTOES_HORARIO,
-  placeholder = 'HH:mm',
-}) {
+function TimeField({ name, value, onChange, placeholder = 'HH:mm' }) {
   const handleLimpar = () => {
     onChange({
       target: {
@@ -218,26 +189,8 @@ function TimeField({
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {quickTimes.map((hora) => (
-          <button
-            key={`${name}-${hora}`}
-            type="button"
-            onClick={() =>
-              onChange({
-                target: {
-                  name,
-                  value: hora,
-                },
-              })
-            }
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-          >
-            {hora}
-          </button>
-        ))}
-
-        {!!value && (
+      {!!value && (
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={handleLimpar}
@@ -245,8 +198,8 @@ function TimeField({
           >
             Limpar
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -255,7 +208,6 @@ TimeField.propTypes = {
   name: PropTypes.string.isRequired,
   value: PropTypes.string,
   onChange: PropTypes.func.isRequired,
-  quickTimes: PropTypes.arrayOf(PropTypes.string),
   placeholder: PropTypes.string,
 };
 
@@ -684,7 +636,7 @@ function ManutencaoForm({
                 Agendamento
               </p>
               <p className="text-xs text-slate-500">
-                Digite manualmente ou use atalhos rápidos.
+                Digite manualmente ou use os atalhos de apoio.
               </p>
             </div>
 
@@ -726,7 +678,7 @@ function ManutencaoForm({
 
             <FormField
               label="Horário de início"
-              hint="Aceita digitação e seleção rápida."
+              hint="Aceita digitação e seleção no campo nativo."
             >
               <TimeField
                 name="horaLocalInicio"
@@ -745,13 +697,6 @@ function ManutencaoForm({
                 name="horaLocalFim"
                 value={formData.horaLocalFim}
                 onChange={handleChange}
-                quickTimes={
-                  sugestoesFim.length > 0
-                    ? [...sugestoesFim, ...SUGESTOES_HORARIO].filter(
-                        (hora, index, arr) => arr.indexOf(hora) === index
-                      )
-                    : SUGESTOES_HORARIO
-                }
               />
             </FormField>
           </div>

@@ -8,9 +8,9 @@ import {
   faSpinner,
   faCircleInfo,
   faScrewdriverWrench,
+  faCalendarDays,
 } from '@fortawesome/free-solid-svg-icons';
 
-import DateInput from '../ui/DateInput';
 import PageSection from '../ui/PageSection';
 import { getUnidades } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
@@ -54,7 +54,11 @@ const ESTADO_INICIAL_VAZIO = {
   observacoes: '',
 };
 
-function FormField({ label, required = false, children }) {
+function hojeISO() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function FormField({ label, required = false, hint = '', children }) {
   return (
     <div className="flex flex-col gap-1.5">
       <label className="text-sm font-medium text-slate-700">
@@ -62,38 +66,138 @@ function FormField({ label, required = false, children }) {
         {required ? ' *' : ''}
       </label>
       {children}
+      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
     </div>
   );
 }
 
-function TextInput(props) {
+FormField.propTypes = {
+  label: PropTypes.string.isRequired,
+  required: PropTypes.bool,
+  hint: PropTypes.string,
+  children: PropTypes.node.isRequired,
+};
+
+function TextInput({ className = '', ...props }) {
   return (
     <input
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     />
   );
 }
 
-function SelectInput({ children, ...props }) {
+TextInput.propTypes = {
+  className: PropTypes.string,
+};
+
+function SelectInput({ children, className = '', ...props }) {
   return (
     <select
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     >
       {children}
     </select>
   );
 }
 
-function TextareaInput(props) {
+SelectInput.propTypes = {
+  children: PropTypes.node.isRequired,
+  className: PropTypes.string,
+};
+
+function TextareaInput({ className = '', ...props }) {
   return (
     <textarea
       {...props}
-      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+      className={[
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
+        'disabled:cursor-not-allowed disabled:bg-slate-100',
+        className,
+      ].join(' ')}
     />
   );
 }
+
+TextareaInput.propTypes = {
+  className: PropTypes.string,
+};
+
+function DateField({ name, value, onChange }) {
+  const handleHoje = () => {
+    onChange({
+      target: {
+        name,
+        value: hojeISO(),
+      },
+    });
+  };
+
+  const handleLimpar = () => {
+    onChange({
+      target: {
+        name,
+        value: '',
+      },
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <FontAwesomeIcon
+          icon={faCalendarDays}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+        />
+
+        <input
+          type="date"
+          name={name}
+          value={value || ''}
+          onChange={onChange}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+        />
+      </div>
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleHoje}
+          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+        >
+          <FontAwesomeIcon icon={faCalendarDays} />
+          Hoje
+        </button>
+
+        {!!value && (
+          <button
+            type="button"
+            onClick={handleLimpar}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            <FontAwesomeIcon icon={faTimes} />
+            Limpar
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+DateField.propTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.string,
+  onChange: PropTypes.func.isRequired,
+};
 
 function EquipamentoForm({
   onSubmit,
@@ -154,7 +258,15 @@ function EquipamentoForm({
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+
+    if (error) {
+      setError('');
+    }
   };
 
   const handleCheckboxChange = (e) => {
@@ -178,15 +290,38 @@ function EquipamentoForm({
     e.preventDefault();
     setError('');
 
-    if (!formData.tag || !formData.modelo || !formData.tipo || !formData.unidadeId) {
-      setError('Tag, Modelo, Tipo e Unidade são campos obrigatórios.');
+    if (
+      !formData.tag.trim() ||
+      !formData.modelo.trim() ||
+      !formData.tipo ||
+      !formData.unidadeId
+    ) {
+      setError('Tag, modelo, tipo e unidade são campos obrigatórios.');
+      return;
+    }
+
+    if (
+      formData.anoFabricacao &&
+      !/^\d{4}$/.test(String(formData.anoFabricacao).trim())
+    ) {
+      setError('O ano de fabricação deve conter 4 dígitos.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      await onSubmit(formData);
+      await onSubmit({
+        ...formData,
+        tag: formData.tag.trim(),
+        modelo: formData.modelo.trim(),
+        setor: formData.setor.trim(),
+        fabricante: formData.fabricante.trim(),
+        anoFabricacao: String(formData.anoFabricacao || '').trim(),
+        numeroPatrimonio: String(formData.numeroPatrimonio || '').trim(),
+        registroAnvisa: String(formData.registroAnvisa || '').trim(),
+        observacoes: String(formData.observacoes || '').trim(),
+      });
     } catch (apiError) {
       setError(
         apiError?.response?.data?.message ||
@@ -340,18 +475,26 @@ function EquipamentoForm({
             />
           </FormField>
 
-          <FormField label="Ano de fabricação">
+          <FormField
+            label="Ano de fabricação"
+            hint="Use 4 dígitos. Ex.: 2024"
+          >
             <TextInput
               type="number"
               name="anoFabricacao"
               value={formData.anoFabricacao}
               onChange={handleChange}
               placeholder="Ex.: 2024"
+              min="1900"
+              max="2100"
             />
           </FormField>
 
-          <FormField label="Data de instalação">
-            <DateInput
+          <FormField
+            label="Data de instalação"
+            hint="Você pode selecionar no calendário ou digitar."
+          >
+            <DateField
               name="dataInstalacao"
               value={formData.dataInstalacao}
               onChange={handleChange}
