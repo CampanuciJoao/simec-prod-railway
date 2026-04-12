@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import Sidebar from '../ui/Sidebar';
-import ChatBot from '../ui/ChatBot';
+import ChatBot from '../charts/ChatBot';
 
 function AppLayout() {
   const location = useLocation();
