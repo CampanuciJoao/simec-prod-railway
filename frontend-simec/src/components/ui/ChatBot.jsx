@@ -6,10 +6,9 @@ import {
   faRobot,
   faXmark,
   faRotateRight,
-  faWandMagicSparkles,
 } from '@fortawesome/free-solid-svg-icons';
 
-import ChatMessageBubble from '../ui/ChatMessageBubble';
+import ChatMessageBubble from './ChatMessageBubble';
 import {
   enviarMensagemAoAgente,
   mapearHistoricoParaAPI,
@@ -21,13 +20,6 @@ function formatTime(date = new Date()) {
     minute: '2-digit',
   }).format(date);
 }
-
-const QUICK_ACTIONS = [
-  'Mostrar equipamentos inoperantes',
-  'Quais alertas estão pendentes?',
-  'Resumo das manutenções',
-  'Quero a apólice da unidade de Coxim',
-];
 
 function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
@@ -71,7 +63,9 @@ function ChatBot() {
   }, [input]);
 
   useEffect(() => {
-    listRef.current?.scrollTo({
+    if (!listRef.current) return;
+
+    listRef.current.scrollTo({
       top: listRef.current.scrollHeight,
       behavior: 'smooth',
     });
@@ -146,6 +140,8 @@ function ChatBot() {
 
       appendAssistantMessage(mensagemAgente);
     } catch (error) {
+      console.error('[CHATBOT_SEND_ERROR]', error);
+
       appendAssistantMessage(
         'Não consegui responder agora.\n\nTente novamente em instantes.'
       );
@@ -185,7 +181,7 @@ function ChatBot() {
       {isOpen && (
         <div
           ref={chatRef}
-          className="fixed bottom-6 right-6 z-[80] flex h-[78vh] w-[420px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
+          className="fixed bottom-6 right-6 z-[80] flex h-[72vh] w-[420px] max-w-[calc(100vw-24px)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-2xl"
         >
           <div className="flex items-center justify-between border-b border-slate-200 bg-slate-900 px-4 py-3 text-white">
             <div className="flex items-center gap-3">
@@ -221,27 +217,6 @@ function ChatBot() {
               >
                 <FontAwesomeIcon icon={faXmark} />
               </button>
-            </div>
-          </div>
-
-          <div className="border-b border-slate-200 bg-slate-50 px-3 py-3">
-            <div className="flex flex-wrap gap-2">
-              {QUICK_ACTIONS.map((action) => (
-                <button
-                  key={action}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => handleSend(action)}
-                  disabled={isTyping}
-                  className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 shadow-sm transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <FontAwesomeIcon
-                    icon={faWandMagicSparkles}
-                    className="text-blue-500"
-                  />
-                  {action}
-                </button>
-              ))}
             </div>
           </div>
 

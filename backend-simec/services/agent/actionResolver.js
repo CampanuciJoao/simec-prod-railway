@@ -1,5 +1,3 @@
-// simec/backend-simec/services/agent/actionResolver.js
-
 function normalizarMensagem(mensagem = '') {
     return mensagem.toLowerCase().trim();
 }
@@ -27,9 +25,6 @@ export const DOMAINS = {
     CONTRATO: 'CONTRATO'
 };
 
-/**
- * Detecta a ação solicitada pelo usuário.
- */
 export function detectarAcao(mensagem) {
     const msg = normalizarMensagem(mensagem);
 
@@ -101,17 +96,10 @@ export function detectarAcao(mensagem) {
     return null;
 }
 
-/**
- * Normaliza o contexto independentemente de onde veio.
- * Prioriza o novo padrão: contextoPDF
- */
 function extrairContexto(state) {
     return state?.contextoPDF || state?.contexto || state?.meta || null;
 }
 
-/**
- * Resolve ação sugerida com base no contexto padronizado.
- */
 function resolverAcaoSugerida(contexto, action, domain, state) {
     if (!contexto?.acaoSugerida) return null;
 
@@ -146,12 +134,22 @@ function resolverAcaoSugerida(contexto, action, domain, state) {
         };
     }
 
+    if (
+        contexto.acaoSugerida === ACTIONS.GERAR_PDF &&
+        acoesConfirmacao.includes(action)
+    ) {
+        return {
+            matched: true,
+            domain,
+            action: ACTIONS.GERAR_PDF,
+            context: contexto,
+            state
+        };
+    }
+
     return null;
 }
 
-/**
- * Resolve ação para relatório
- */
 function resolverAcaoRelatorio(state, action) {
     const contexto = extrairContexto(state);
 
@@ -216,12 +214,19 @@ function resolverAcaoRelatorio(state, action) {
         };
     }
 
+    if (action === ACTIONS.CANCELAR_ACAO) {
+        return {
+            matched: true,
+            domain: DOMAINS.RELATORIO,
+            action: ACTIONS.CANCELAR_ACAO,
+            context: contexto,
+            state
+        };
+    }
+
     return null;
 }
 
-/**
- * Resolve ação para seguro (pronto para o próximo módulo)
- */
 function resolverAcaoSeguro(state, action) {
     const contexto = extrairContexto(state);
 
@@ -236,6 +241,16 @@ function resolverAcaoSeguro(state, action) {
 
     if (resolvidoPorSugestao) {
         return resolvidoPorSugestao;
+    }
+
+    if (action === ACTIONS.CANCELAR_ACAO) {
+        return {
+            matched: true,
+            domain: DOMAINS.SEGURO,
+            action: ACTIONS.CANCELAR_ACAO,
+            context: contexto,
+            state
+        };
     }
 
     if ([ACTIONS.GERAR_PDF, ACTIONS.CONFIRMAR_ACAO].includes(action)) {
@@ -291,9 +306,6 @@ function resolverAcaoSeguro(state, action) {
     return null;
 }
 
-/**
- * Resolve ação para contrato (pronto para o próximo módulo)
- */
 function resolverAcaoContrato(state, action) {
     const contexto = extrairContexto(state);
 
@@ -330,12 +342,19 @@ function resolverAcaoContrato(state, action) {
         };
     }
 
+    if (action === ACTIONS.CANCELAR_ACAO) {
+        return {
+            matched: true,
+            domain: DOMAINS.CONTRATO,
+            action: ACTIONS.CANCELAR_ACAO,
+            context: contexto,
+            state
+        };
+    }
+
     return null;
 }
 
-/**
- * Entrada principal
- */
 export function resolverAcaoPorContexto(sessao, mensagem) {
     if (!sessao?.stateJson) return null;
 

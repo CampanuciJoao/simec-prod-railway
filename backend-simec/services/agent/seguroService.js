@@ -1,4 +1,3 @@
-// simec/backend-simec/services/agent/seguroService.js
 import { AgentSessionRepository } from './agentSessionRepository.js';
 import { resolverEntidades } from './entityResolver.js';
 import { ACTIONS } from './actionResolver.js';
@@ -145,6 +144,18 @@ function enriquecerPayloadSeguro(seguro, payloadBase) {
 }
 
 function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
+    if (acaoContextual.action === ACTIONS.CANCELAR_ACAO) {
+        return respostaPadrao(
+            'Tudo bem. Não vou abrir PDF nem buscar mais detalhes desse seguro. Posso ajudar com outra coisa.',
+            {
+                meta: {
+                    tipoResposta: 'SEGURO_ACAO',
+                    ultimaAcaoExecutada: ACTIONS.CANCELAR_ACAO
+                }
+            }
+        );
+    }
+
     if (acaoContextual.action === ACTIONS.GERAR_PDF) {
         if (estadoAnterior?.contextoPDF?.anexoId) {
             return respostaPadrao(

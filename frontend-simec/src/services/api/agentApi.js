@@ -2,7 +2,7 @@ import api from '../http/apiClient';
 
 /**
  * Envia mensagem para o agente inteligente do SIMEC
- * Suporta histórico para contexto (chat contínuo)
+ * Suporta histórico para contexto
  */
 export const enviarMensagemAoAgente = async ({
   mensagem,
@@ -12,8 +12,8 @@ export const enviarMensagemAoAgente = async ({
   try {
     const payload = {
       mensagem,
-      historico, // 👈 importante para IA aprender contexto
-      contexto: contextoExtra, // 👈 futuro uso (BI, filtros, etc)
+      historico,
+      contexto: contextoExtra,
     };
 
     const res = await api.post('/agent/chat', payload);
@@ -24,19 +24,16 @@ export const enviarMensagemAoAgente = async ({
 
     const data = res.data;
 
-    // ✅ Caso API retorne string direta
     if (typeof data === 'string') {
       return normalizarResposta({
         mensagem: data,
       });
     }
 
-    // ✅ Caso API já esteja no padrão correto
     if (data?.resposta) {
       return normalizarResposta(data.resposta);
     }
 
-    // ✅ fallback
     return normalizarResposta({
       mensagem: 'Recebi a resposta, mas em formato inesperado.',
     });
@@ -50,9 +47,6 @@ export const enviarMensagemAoAgente = async ({
   }
 };
 
-/**
- * Normaliza qualquer resposta da API para padrão único
- */
 function normalizarResposta(resposta = {}) {
   return {
     mensagem: resposta.mensagem || '',
@@ -62,12 +56,9 @@ function normalizarResposta(resposta = {}) {
   };
 }
 
-/**
- * (OPCIONAL) Função helper para montar histórico no formato esperado
- */
 export const mapearHistoricoParaAPI = (messages = []) => {
   return messages.map((msg) => ({
-    role: msg.role, // 'user' | 'assistant'
+    role: msg.role,
     content: msg.content,
   }));
 };
