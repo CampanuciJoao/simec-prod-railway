@@ -22,15 +22,10 @@ import PageState from '../../components/ui/PageState';
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Drawer from '../../components/ui/Drawer';
+import DrawerList from '../../components/ui/DrawerList';
 import BarChart from '../../components/charts/BarChart';
 
-function InteractiveKpiCard({
-  icon,
-  title,
-  value,
-  tone = 'slate',
-  onClick,
-}) {
+function InteractiveKpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {
     slate: 'bg-slate-100 text-slate-600',
     blue: 'bg-blue-100 text-blue-600',
@@ -96,51 +91,6 @@ function EmptyPanel({ message }) {
   return (
     <div className="flex min-h-[160px] items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
       {message}
-    </div>
-  );
-}
-
-function DrawerList({ items = [] }) {
-  if (!items.length) {
-    return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
-        Nenhum dado disponível.
-      </div>
-    );
-  }
-
-  return (
-    <div className="overflow-hidden rounded-xl border border-slate-200">
-      <div className="divide-y divide-slate-100">
-        {items.map((item, index) => {
-          const Wrapper = item.onClick ? 'button' : 'div';
-
-          return (
-            <Wrapper
-              key={`${item.title}-${index}`}
-              type={item.onClick ? 'button' : undefined}
-              onClick={item.onClick}
-              className={[
-                'w-full px-4 py-3 text-left',
-                item.onClick ? 'transition hover:bg-slate-50' : 'bg-white',
-              ].join(' ')}
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0">
-                  <div className="font-semibold text-slate-800">{item.title}</div>
-                  {item.subtitle ? (
-                    <div className="mt-1 text-xs text-slate-500">{item.subtitle}</div>
-                  ) : null}
-                </div>
-
-                <div className="shrink-0 text-right text-sm font-bold text-slate-900">
-                  {item.value}
-                </div>
-              </div>
-            </Wrapper>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -379,7 +329,10 @@ function BIPage() {
           </div>
         ) : null}
 
-        <DrawerList items={page.drawerContent.items} />
+        <DrawerList
+          items={page.drawerContent.items}
+          emptyMessage="Nenhum dado disponível para esta visualização."
+        />
       </Drawer>
     </>
   );
