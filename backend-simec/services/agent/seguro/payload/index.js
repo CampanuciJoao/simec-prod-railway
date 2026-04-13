@@ -1,0 +1,1 @@
+export { construirPayloadSeguro } from './seguroPayload.js';

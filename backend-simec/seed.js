@@ -1,52 +1,131 @@
-// Ficheiro: simec/backend-simec/seed.js
-// Versão: 2.2 (Sênior - Com normalização de username)
-// Descrição: Script para popular o banco de dados com o usuário administrador inicial.
+// Ficheiro: backend-simec/seed.js
+// Versão: 3.0 (Multi-tenant ready)
+// Descrição: Cria Tenant padrão + Admin + Unidade inicial
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-async function criarAdminInicial() {
-  console.log('Iniciando script de seed para o Prisma...');
+async function seed() {
+  console.log('🌱 Iniciando seed do SIMEC...');
 
-  // --- DADOS DO ADMINISTRADOR DA APLICAÇÃO ---
+  // ==============================
+  // 1. TENANT PADRÃO
+  // ==============================
+  const tenantSlug = 'simec-default';
+
+  const tenant = await prisma.tenant.upsert({
+    where: { slug: tenantSlug },
+    update: {},
+    create: {
+      nome: 'SIMEC Default',
+      slug: tenantSlug,
+      timezone: 'America/Campo_Grande',
+      locale: 'pt-BR',
+      ativo: true,
+    },
+  });
+
+  console.log(`🏢 Tenant OK: ${tenant.nome}`);
+
+  // ==============================
+  // 2. ADMIN
+  // ==============================
   const adminUsername = 'admin';
   const adminNome = 'Administrador do Sistema';
   const adminSenhaPlana = '751953';
 
-  try {
-    const salt = await bcrypt.genSalt(10);
-    const senhaCriptografada = await bcrypt.hash(adminSenhaPlana, salt);
+  const senhaCriptografada = await bcrypt.hash(adminSenhaPlana, 10);
 
-    const user = await prisma.usuario.upsert({
-      where: { username: adminUsername.toLowerCase() },
-      update: {
-        // Dados para atualizar se o usuário 'admin' já existir.
-        senha: senhaCriptografada,
-        nome: adminNome,
-      },
-      create: {
-        // Dados para criar o usuário 'admin' pela primeira vez.
-        username: adminUsername.toLowerCase(), // Garante que seja salvo em minúsculas
+  const adminExistente = await prisma.usuario.findFirst({
+    where: {
+      username: adminUsername.toLowerCase(),
+      tenantId: tenant.id,
+    },
+  });
+
+  let admin;
+
+  if (adminExistente) {
+    admin = await prisma.usuario.update({
+      where: { id: adminExistente.id },
+      data: {
         nome: adminNome,
         senha: senhaCriptografada,
         role: 'admin',
       },
     });
 
-    console.log('----------------------------------------------------');
-    console.log('✅ Usuário administrador configurado com sucesso!');
-    console.log(`   ID: ${user.id}`);
-    console.log(`   Username: ${user.username}`);
-    console.log('----------------------------------------------------');
+    console.log('🔄 Admin atualizado');
+  } else {
+    admin = await prisma.usuario.create({
+      data: {
+        tenantId: tenant.id,
+        username: adminUsername.toLowerCase(),
+        nome: adminNome,
+        senha: senhaCriptografada,
+        role: 'admin',
+      },
+    });
 
-  } catch (error) {
-    console.error('❌ Erro ao executar o script de seed do Prisma:', error);
-    process.exit(1);
-  } finally {
-    await prisma.$disconnect();
+    console.log('✅ Admin criado');
   }
+
+  // ==============================
+  // 3. UNIDADE PADRÃO
+  // ==============================
+  const unidadeNome = 'Unidade Matriz';
+
+  const unidadeExistente = await prisma.unidade.findFirst({
+    where: {
+      nomeSistema: unidadeNome,
+      tenantId: tenant.id,
+    },
+  });
+
+  let unidade;
+
+  if (unidadeExistente) {
+    unidade = await prisma.unidade.update({
+      where: { id: unidadeExistente.id },
+      data: {
+        nomeFantasia: 'SIMEC Matriz',
+        cidade: 'Campo Grande',
+        estado: 'MS',
+        timezone: 'America/Campo_Grande',
+      },
+    });
+
+    console.log('🔄 Unidade atualizada');
+  } else {
+    unidade = await prisma.unidade.create({
+      data: {
+        tenantId: tenant.id,
+        nomeSistema: unidadeNome,
+        nomeFantasia: 'SIMEC Matriz',
+        cidade: 'Campo Grande',
+        estado: 'MS',
+        timezone: 'America/Campo_Grande',
+      },
+    });
+
+    console.log('✅ Unidade criada');
+  }
+
+  console.log('----------------------------------------------------');
+  console.log('🎉 Seed executado com sucesso!');
+  console.log(`Tenant: ${tenant.nome}`);
+  console.log(`Admin: ${admin.username}`);
+  console.log(`Unidade: ${unidade.nomeSistema}`);
+  console.log('----------------------------------------------------');
 }
 
-criarAdminInicial();
+seed()
+  .catch((error) => {
+    console.error('❌ Erro no seed:', error);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

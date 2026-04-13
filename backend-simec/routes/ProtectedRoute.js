@@ -1,5 +1,5 @@
 // Ficheiro: src/components/ProtectedRoute.jsx
-// VERSÃO FINAL SÊNIOR - COMPLETA E FUNCIONAL
+// Versão: Multi-tenant ready
 
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
@@ -8,26 +8,35 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, usuario } = useAuth();
   const location = useLocation();
 
-  // Enquanto o AuthContext verifica o localStorage, mostramos um spinner.
-  // Isso previne qualquer "flash" da tela de login.
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+        }}
+      >
         <FontAwesomeIcon icon={faSpinner} spin size="3x" color="#3b82f6" />
       </div>
     );
   }
 
-  // Após a verificação, se o usuário NÃO estiver autenticado...
   if (!isAuthenticated) {
-    // ...o redirecionamos para o login.
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Se estiver autenticado, renderiza o conteúdo protegido (no seu caso, o AppLayout).
+  // Blindagem extra para SaaS:
+  // se existir usuário autenticado, mas sem tenantId,
+  // tratamos como sessão inválida.
+  if (usuario && !usuario.tenantId) {
+    return <Navigate to="/login" replace />;
+  }
+
   return children;
 }
 

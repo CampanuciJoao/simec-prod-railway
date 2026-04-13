@@ -1,0 +1,1 @@
+export { RoteadorAgente } from './router/router.js';

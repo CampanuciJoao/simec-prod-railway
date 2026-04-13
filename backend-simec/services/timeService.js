@@ -1,17 +1,54 @@
 // Ficheiro: backend-simec/services/timeService.js
-// VERSÃO DEFINITIVA E OTIMIZADA
+// Padrão SaaS: UTC-first
 
 /**
- * Retorna um objeto Date que representa o "agora" exato.
- * Como definimos a variável de ambiente TZ=America/Campo_Grande no Railway,
- * o próprio ambiente do Node.js já tratará o 'new Date()' no fuso correto.
+ * Retorna o instante atual em UTC.
+ * Regra: backend SEMPRE trabalha em UTC.
  */
 export function getAgora() {
-  // Apenas retornando new Date(), o Node.js respeitará a variável TZ definida no Railway.
-  // Isso é o padrão ouro para aplicações servidoras modernas.
-  const agora = new Date();
-  
-  // Apenas uma trava de segurança: garante que o fuso seja respeitado se 
-  // o servidor por algum motivo não ler a variável de ambiente (fallback).
-  return new Date(agora.toLocaleString("en-US", { timeZone: "America/Campo_Grande" }));
+  return new Date();
+}
+
+/**
+ * Cria um Date a partir de data + hora (YYYY-MM-DD + HH:mm)
+ * SEMPRE em UTC.
+ *
+ * Evita inconsistências de parsing do JS.
+ */
+export function criarDateUTC(data, hora = '00:00') {
+  if (!data) return null;
+
+  const [ano, mes, dia] = data.split('-').map(Number);
+  const [h, m] = (hora || '00:00').split(':').map(Number);
+
+  if (
+    !ano ||
+    !mes ||
+    !dia ||
+    Number.isNaN(h) ||
+    Number.isNaN(m)
+  ) {
+    return null;
+  }
+
+  const dt = new Date(Date.UTC(ano, mes - 1, dia, h, m, 0));
+
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+/**
+ * Extrai apenas a data (YYYY-MM-DD) em UTC
+ */
+export function extrairDataUTC(date = new Date()) {
+  if (!(date instanceof Date)) return null;
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString().split('T')[0];
+}
+
+/**
+ * Verifica se uma data é válida
+ */
+export function isDataValida(date) {
+  return date instanceof Date && !Number.isNaN(date.getTime());
 }

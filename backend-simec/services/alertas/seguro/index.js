@@ -1,0 +1,1 @@
+export { gerarAlertasSeguro } from './alertasSeguroService.js';

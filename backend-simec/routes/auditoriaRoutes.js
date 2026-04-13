@@ -1,5 +1,5 @@
-// Ficheiro: simec/backend-simec/routes/auditoriaRoutes.js
-// VERSÃO FINAL SÊNIOR - COM PAGINAÇÃO E FILTROS EFICIENTES
+// Ficheiro: routes/auditoriaRoutes.js
+// Versão: Multi-tenant ready
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -13,59 +13,83 @@ const router = express.Router();
  * @access  Admin
  */
 router.get('/', admin, async (req, res) => {
-    // Extrai filtros e parâmetros de paginação da query string
-    const { autorId, acao, entidade, entidadeId, dataInicio, dataFim, page = 1, limit = 50 } = req.query;
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
+  const {
+    autorId,
+    acao,
+    entidade,
+    entidadeId,
+    dataInicio,
+    dataFim,
+    page = 1,
+    limit = 50,
+  } = req.query;
 
-    try {
-        const whereClause = {};
-        if (autorId) whereClause.autorId = autorId;
-        if (acao) whereClause.acao = acao;
-        if (entidade) whereClause.entidade = entidade;
-        if (entidadeId) whereClause.entidadeId = entidadeId;
-        if (dataInicio || dataFim) {
-            whereClause.timestamp = {};
-            if (dataInicio) whereClause.timestamp.gte = new Date(dataInicio);
-            if (dataFim) {
-                const fimDoDia = new Date(dataFim);
-                fimDoDia.setHours(23, 59, 59, 999);
-                whereClause.timestamp.lte = fimDoDia;
-            }
-        }
+  const tenantId = req.usuario.tenantId;
+  const pageNum = parseInt(page, 10);
+  const limitNum = parseInt(limit, 10);
+  const skip = (pageNum - 1) * limitNum;
 
-        // Executa duas queries em paralelo: uma para os dados da página, outra para a contagem total
-        const [logs, totalLogs] = await prisma.$transaction([
-            prisma.logAuditoria.findMany({
-                where: whereClause,
-                skip: skip,
-                take: limitNum,
-                include: {
-                    autor: { select: { id: true, nome: true } }
-                },
-                orderBy: {
-                    timestamp: 'desc'
-                }
-            }),
-            prisma.logAuditoria.count({ where: whereClause })
-        ]);
+  try {
+    const whereClause = {
+      tenantId,
+    };
 
-        // Retorna um objeto estruturado com os logs e informações de paginação
-        res.json({
-            logs,
-            pagination: {
-                total: totalLogs,
-                page: pageNum,
-                limit: limitNum,
-                hasNextPage: (skip + logs.length) < totalLogs
-            }
-        });
+    if (autorId) whereClause.autorId = autorId;
+    if (acao) whereClause.acao = acao;
+    if (entidade) whereClause.entidade = entidade;
+    if (entidadeId) whereClause.entidadeId = entidadeId;
 
-    } catch (error) {
-        console.error("Erro ao buscar log de auditoria:", error);
-        res.status(500).json({ message: "Erro interno do servidor ao buscar logs." });
+    if (dataInicio || dataFim) {
+      whereClause.timestamp = {};
+
+      if (dataInicio) {
+        whereClause.timestamp.gte = new Date(dataInicio);
+      }
+
+      if (dataFim) {
+        const fimDoDia = new Date(dataFim);
+        fimDoDia.setHours(23, 59, 59, 999);
+        whereClause.timestamp.lte = fimDoDia;
+      }
     }
+
+    const [logs, totalLogs] = await prisma.$transaction([
+      prisma.logAuditoria.findMany({
+        where: whereClause,
+        skip,
+        take: limitNum,
+        include: {
+          autor: {
+            select: {
+              id: true,
+              nome: true,
+            },
+          },
+        },
+        orderBy: {
+          timestamp: 'desc',
+        },
+      }),
+      prisma.logAuditoria.count({
+        where: whereClause,
+      }),
+    ]);
+
+    return res.json({
+      logs,
+      pagination: {
+        total: totalLogs,
+        page: pageNum,
+        limit: limitNum,
+        hasNextPage: skip + logs.length < totalLogs,
+      },
+    });
+  } catch (error) {
+    console.error('[AUDITORIA_LIST_ERROR]', error);
+    return res.status(500).json({
+      message: 'Erro interno do servidor ao buscar logs.',
+    });
+  }
 });
 
 /**
@@ -74,22 +98,65 @@ router.get('/', admin, async (req, res) => {
  * @access  Admin
  */
 router.get('/filtros', admin, async (req, res) => {
-    try {
-        const [usuarios, acoesDistintas, entidadesDistintas] = await Promise.all([
-            prisma.usuario.findMany({ select: { id: true, nome: true }, orderBy: { nome: 'asc' } }),
-            prisma.logAuditoria.findMany({ select: { acao: true }, distinct: ['acao'] }),
-            prisma.logAuditoria.findMany({ select: { entidade: true }, distinct: ['entidade'] })
-        ]);
+  const tenantId = req.usuario.tenantId;
 
-        const acoes = acoesDistintas.map(item => item.acao).sort();
-        const entidades = entidadesDistintas.map(item => item.entidade).sort();
+  try {
+    const [usuarios, acoesDistintas, entidadesDistintas] = await Promise.all([
+      prisma.usuario.findMany({
+        where: {
+          tenantId,
+        },
+        select: {
+          id: true,
+          nome: true,
+        },
+        orderBy: {
+          nome: 'asc',
+        },
+      }),
 
-        res.json({ usuarios, acoes, entidades });
+      prisma.logAuditoria.findMany({
+        where: {
+          tenantId,
+        },
+        select: {
+          acao: true,
+        },
+        distinct: ['acao'],
+      }),
 
-    } catch (error) {
-        console.error("Erro ao buscar dados para filtros de auditoria:", error);
-        res.status(500).json({ message: "Erro ao buscar dados para filtros." });
-    }
+      prisma.logAuditoria.findMany({
+        where: {
+          tenantId,
+        },
+        select: {
+          entidade: true,
+        },
+        distinct: ['entidade'],
+      }),
+    ]);
+
+    const acoes = acoesDistintas
+      .map((item) => item.acao)
+      .filter(Boolean)
+      .sort();
+
+    const entidades = entidadesDistintas
+      .map((item) => item.entidade)
+      .filter(Boolean)
+      .sort();
+
+    return res.json({
+      usuarios,
+      acoes,
+      entidades,
+    });
+  } catch (error) {
+    console.error('[AUDITORIA_FILTROS_ERROR]', error);
+    return res.status(500).json({
+      message: 'Erro ao buscar dados para filtros.',
+    });
+  }
 });
 
 export default router;

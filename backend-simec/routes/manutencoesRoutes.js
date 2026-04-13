@@ -1,5 +1,5 @@
-// Ficheiro: simec/backend-simec/routes/manutencoesRoutes.js
-// VERSÃO 12.0 - ADICIONADA ROTA DE CANCELAMENTO
+// Ficheiro: routes/manutencoesRoutes.js
+// Versão: Multi-tenant ready
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -10,218 +10,441 @@ import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { admin } from '../middleware/authMiddleware.js';
 
-// --- IMPORTAÇÕES DE SEGURANÇA ---
 import validate from '../middleware/validate.js';
 import { manutencaoSchema } from '../validators/manutencaoValidator.js';
 
 const router = express.Router();
 
-// --- Configuração do Multer (Upload de Arquivos) ---
+// ==============================
+// MULTER
+// ==============================
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const dir = path.join('uploads', 'manutencoes');
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => {
-        cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
-    }
+  destination: (req, file, cb) => {
+    const dir = path.join('uploads', 'manutencoes');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
+  },
 });
-const upload = multer({ storage: storage });
 
+const upload = multer({ storage });
 
-// ==========================================================================
-// SEÇÃO: ROTAS DE CONSULTA E CRIAÇÃO (CRUD)
-// ==========================================================================
-
-/** @route   GET /api/manutencoes */
+// ==============================
+// GET LISTAR MANUTENÇÕES
+// ==============================
 router.get('/', async (req, res) => {
-    const { equipamentoId, unidadeId, tipo, status } = req.query;
-    try {
-        const whereClause = {};
-        if (equipamentoId) whereClause.equipamentoId = equipamentoId;
-        if (tipo) whereClause.tipo = tipo;
-        if (status) whereClause.status = status;
-        if (unidadeId) whereClause.equipamento = { unidadeId: unidadeId };
+  const { equipamentoId, unidadeId, tipo, status } = req.query;
 
-        const manutencoes = await prisma.manutencao.findMany({
-            where: whereClause,
-            include: { 
-                equipamento: { include: { unidade: true } }, 
-                anexos: true 
-            },
-            orderBy: { dataHoraAgendamentoInicio: 'desc' }
-        });
-        res.json(manutencoes);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar manutenções.' });
+  try {
+    const whereClause = {
+      tenantId: req.usuario.tenantId,
+    };
+
+    if (equipamentoId) whereClause.equipamentoId = equipamentoId;
+    if (tipo) whereClause.tipo = tipo;
+    if (status) whereClause.status = status;
+
+    if (unidadeId) {
+      whereClause.equipamento = {
+        unidadeId,
+        tenantId: req.usuario.tenantId,
+      };
     }
+
+    const manutencoes = await prisma.manutencao.findMany({
+      where: whereClause,
+      include: {
+        equipamento: {
+          include: {
+            unidade: true,
+          },
+        },
+        anexos: true,
+      },
+      orderBy: {
+        dataHoraAgendamentoInicio: 'desc',
+      },
+    });
+
+    return res.json(manutencoes);
+  } catch (error) {
+    console.error('[MANUTENCAO_LIST_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar manutenções.' });
+  }
 });
 
-/** @route   GET /api/manutencoes/:id */
+// ==============================
+// GET MANUTENÇÃO POR ID
+// ==============================
 router.get('/:id', async (req, res) => {
-    try {
-        const manutencao = await prisma.manutencao.findUnique({
-            where: { id: req.params.id },
-            include: { 
-                anexos: true, 
-                equipamento: {
-                    include: { unidade: true }
-                }, 
-                notasAndamento: { 
-                    orderBy: { data: 'desc' },
-                    include: { autor: { select: { nome: true } } }
-                } 
-            }
-        });
-        if (manutencao) res.json(manutencao);
-        else res.status(404).json({ message: 'Manutenção não encontrada.' });
-    } catch (error) {
-        console.error("Erro ao buscar detalhes da manutenção:", error);
-        res.status(500).json({ message: 'Erro ao buscar detalhes.' });
+  try {
+    const manutencao = await prisma.manutencao.findFirst({
+      where: {
+        id: req.params.id,
+        tenantId: req.usuario.tenantId,
+      },
+      include: {
+        anexos: true,
+        equipamento: {
+          include: {
+            unidade: true,
+          },
+        },
+        notasAndamento: {
+          where: {
+            tenantId: req.usuario.tenantId,
+          },
+          orderBy: {
+            data: 'desc',
+          },
+          include: {
+            autor: {
+              select: { nome: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!manutencao) {
+      return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
+
+    return res.json(manutencao);
+  } catch (error) {
+    console.error('[MANUTENCAO_GET_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar detalhes.' });
+  }
 });
 
-/** @route   POST /api/manutencoes */
+// ==============================
+// POST CRIAR MANUTENÇÃO
+// ==============================
 router.post('/', validate(manutencaoSchema), async (req, res) => {
-    const { equipamentoId, tipo, descricaoProblemaServico, dataHoraAgendamentoInicio, dataHoraAgendamentoFim, ...outrosDados } = req.body;
-    
-    try {
-        const total = await prisma.manutencao.count();
-        const osNumber = String(total + 1).padStart(4, '0');
-        
-        const equip = await prisma.equipamento.findUnique({ where: { id: equipamentoId } });
-        if (!equip) return res.status(404).json({ message: "Equipamento não encontrado." });
-        
-        const tagPrefix = equip.tag.substring(0, 3).toUpperCase();
-        const numeroOS = `${tipo.substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
+  const dados = req.validatedData || req.body;
 
-        const nova = await prisma.manutencao.create({
-            data: { 
-                numeroOS, 
-                tipo, 
-                descricaoProblemaServico, 
-                dataHoraAgendamentoInicio: new Date(dataHoraAgendamentoInicio),
-                dataHoraAgendamentoFim: dataHoraAgendamentoFim ? new Date(dataHoraAgendamentoFim) : null,
-                equipamento: { connect: { id: equipamentoId } },
-                ...outrosDados 
-            }
-        });
+  const {
+    equipamentoId,
+    tipo,
+    descricaoProblemaServico,
+    dataHoraAgendamentoInicio,
+    dataHoraAgendamentoFim,
+    ...outrosDados
+  } = dados;
 
-        await registrarLog({ 
-            usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Manutenção', 
-            entidadeId: nova.id, detalhes: `OS ${numeroOS} agendada para ${equip.modelo}.` 
-        });
+  try {
+    const equipamento = await prisma.equipamento.findFirst({
+      where: {
+        id: equipamentoId,
+        tenantId: req.usuario.tenantId,
+      },
+    });
 
-        res.status(201).json(nova);
-    } catch (error) {
-        console.error("Erro no POST manutenção:", error);
-        res.status(500).json({ message: 'Erro ao agendar manutenção.' });
+    if (!equipamento) {
+      return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
+
+    const totalTenant = await prisma.manutencao.count({
+      where: {
+        tenantId: req.usuario.tenantId,
+      },
+    });
+
+    const osNumber = String(totalTenant + 1).padStart(4, '0');
+    const tagPrefix = (equipamento.tag || 'MAN').substring(0, 3).toUpperCase();
+    const numeroOS = `${tipo.substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
+
+    const nova = await prisma.manutencao.create({
+      data: {
+        tenantId: req.usuario.tenantId,
+        numeroOS,
+        tipo,
+        descricaoProblemaServico,
+        dataHoraAgendamentoInicio: new Date(dataHoraAgendamentoInicio),
+        dataHoraAgendamentoFim: dataHoraAgendamentoFim
+          ? new Date(dataHoraAgendamentoFim)
+          : null,
+        equipamento: {
+          connect: { id: equipamentoId },
+        },
+        ...outrosDados,
+      },
+    });
+
+    await registrarLog({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'CRIAÇÃO',
+      entidade: 'Manutenção',
+      entidadeId: nova.id,
+      detalhes: `OS ${numeroOS} agendada para ${equipamento.modelo}.`,
+    });
+
+    return res.status(201).json(nova);
+  } catch (error) {
+    console.error('[MANUTENCAO_CREATE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao agendar manutenção.' });
+  }
 });
 
-
-// ==========================================================================
-// ROTA DE CONCLUSÃO
-// ==========================================================================
-
+// ==============================
+// POST CONCLUIR MANUTENÇÃO
+// ==============================
 router.post('/:id/concluir', async (req, res) => {
-    const { id: manutencaoId } = req.params;
-    const { equipamentoOperante, dataTerminoReal, novaPrevisao, observacao } = req.body;
+  const { id: manutencaoId } = req.params;
+  const { equipamentoOperante, dataTerminoReal, novaPrevisao, observacao } = req.body;
 
-    try {
-        const resultado = await prisma.$transaction(async (tx) => {
-            const manutAtual = await tx.manutencao.findUnique({ where: { id: manutencaoId } });
-            let notaHistorico = "";
+  try {
+    const resultado = await prisma.$transaction(async (tx) => {
+      const manutAtual = await tx.manutencao.findFirst({
+        where: {
+          id: manutencaoId,
+          tenantId: req.usuario.tenantId,
+        },
+      });
 
-            if (equipamentoOperante) {
-                notaHistorico = `MANUTENÇÃO CONCLUÍDA: Equipamento Operante. Término: ${new Date(dataTerminoReal).toLocaleString('pt-BR')}.`;
-                await tx.manutencao.update({
-                    where: { id: manutencaoId },
-                    data: { status: 'Concluida', dataFimReal: new Date(dataTerminoReal), dataConclusao: new Date() }
-                });
-                await tx.equipamento.update({ where: { id: manutAtual.equipamentoId }, data: { status: 'Operante' } });
-                await tx.alerta.deleteMany({ where: { id: `manut-confirm-${manutencaoId}` } });
-            } else {
-                notaHistorico = `EQUIPAMENTO CONTINUA INOPERANTE: ${observacao}. Nova previsão: ${new Date(novaPrevisao).toLocaleString('pt-BR')}.`;
-                await tx.manutencao.update({
-                    where: { id: manutencaoId },
-                    data: { status: 'EmAndamento', dataHoraAgendamentoFim: new Date(novaPrevisao) }
-                });
-                await tx.equipamento.update({ where: { id: manutAtual.equipamentoId }, data: { status: 'Inoperante' } });
-            }
-            await tx.notaAndamento.create({ data: { nota: notaHistorico, manutencaoId, origem: 'automatico' } });
-            return { status: equipamentoOperante ? 'Concluida' : 'EmAndamento' };
+      if (!manutAtual) {
+        throw new Error('MANUTENCAO_NAO_ENCONTRADA');
+      }
+
+      let notaHistorico = '';
+
+      if (equipamentoOperante) {
+        notaHistorico = `MANUTENÇÃO CONCLUÍDA: Equipamento Operante. Término: ${new Date(
+          dataTerminoReal
+        ).toLocaleString('pt-BR')}.`;
+
+        await tx.manutencao.update({
+          where: { id: manutencaoId },
+          data: {
+            status: 'Concluida',
+            dataFimReal: new Date(dataTerminoReal),
+            dataConclusao: new Date(),
+          },
         });
 
-        res.json(resultado);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao processar a finalização.' });
+        await tx.equipamento.update({
+          where: { id: manutAtual.equipamentoId },
+          data: { status: 'Operante' },
+        });
+
+        await tx.alerta.deleteMany({
+          where: {
+            tenantId: req.usuario.tenantId,
+            id: `manut-confirm-${manutencaoId}`,
+          },
+        });
+      } else {
+        notaHistorico = `EQUIPAMENTO CONTINUA INOPERANTE: ${observacao}. Nova previsão: ${new Date(
+          novaPrevisao
+        ).toLocaleString('pt-BR')}.`;
+
+        await tx.manutencao.update({
+          where: { id: manutencaoId },
+          data: {
+            status: 'EmAndamento',
+            dataHoraAgendamentoFim: new Date(novaPrevisao),
+          },
+        });
+
+        await tx.equipamento.update({
+          where: { id: manutAtual.equipamentoId },
+          data: { status: 'Inoperante' },
+        });
+      }
+
+      await tx.notaAndamento.create({
+        data: {
+          tenantId: req.usuario.tenantId,
+          nota: notaHistorico,
+          manutencaoId,
+          origem: 'automatico',
+        },
+      });
+
+      return { status: equipamentoOperante ? 'Concluida' : 'EmAndamento' };
+    });
+
+    return res.json(resultado);
+  } catch (error) {
+    if (error.message === 'MANUTENCAO_NAO_ENCONTRADA') {
+      return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
+
+    console.error('[MANUTENCAO_CONCLUIR_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao processar a finalização.' });
+  }
 });
 
-// ==========================================================================
-// ROTA DE CANCELAMENTO (ADICIONADA)
-// ==========================================================================
-
+// ==============================
+// POST CANCELAR MANUTENÇÃO
+// ==============================
 router.post('/:id/cancelar', async (req, res) => {
-    const { id } = req.params;
-    const { motivo } = req.body;
+  const { id } = req.params;
+  const { motivo } = req.body;
 
-    if (!motivo) return res.status(400).json({ message: "O motivo do cancelamento é obrigatório." });
+  if (!motivo) {
+    return res.status(400).json({
+      message: 'O motivo do cancelamento é obrigatório.',
+    });
+  }
 
-    try {
-        await prisma.$transaction(async (tx) => {
-            await tx.manutencao.update({ where: { id }, data: { status: 'Cancelada' } });
-            await tx.notaAndamento.create({
-                data: { nota: `CANCELAMENTO: ${motivo}`, manutencaoId: id, origem: 'manual' }
-            });
-        });
-        res.json({ message: "Manutenção cancelada com sucesso." });
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao cancelar manutenção.' });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const manutencao = await tx.manutencao.findFirst({
+        where: {
+          id,
+          tenantId: req.usuario.tenantId,
+        },
+      });
+
+      if (!manutencao) {
+        throw new Error('MANUTENCAO_NAO_ENCONTRADA');
+      }
+
+      await tx.manutencao.update({
+        where: { id },
+        data: { status: 'Cancelada' },
+      });
+
+      await tx.notaAndamento.create({
+        data: {
+          tenantId: req.usuario.tenantId,
+          nota: `CANCELAMENTO: ${motivo}`,
+          manutencaoId: id,
+          origem: 'manual',
+          autorId: req.usuario.id,
+        },
+      });
+    });
+
+    return res.json({ message: 'Manutenção cancelada com sucesso.' });
+  } catch (error) {
+    if (error.message === 'MANUTENCAO_NAO_ENCONTRADA') {
+      return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
+
+    console.error('[MANUTENCAO_CANCELAR_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao cancelar manutenção.' });
+  }
 });
 
-
-// ==========================================================================
-// OUTRAS AÇÕES
-// ==========================================================================
-
+// ==============================
+// POST ADICIONAR NOTA
+// ==============================
 router.post('/:id/notas', async (req, res) => {
-    try {
-        const nova = await prisma.notaAndamento.create({ 
-            data: { nota: req.body.nota, manutencaoId: req.params.id, autorId: req.usuario.id } 
-        });
-        res.status(201).json(nova);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao adicionar nota.' });
+  try {
+    const manutencao = await prisma.manutencao.findFirst({
+      where: {
+        id: req.params.id,
+        tenantId: req.usuario.tenantId,
+      },
+    });
+
+    if (!manutencao) {
+      return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
+
+    const nova = await prisma.notaAndamento.create({
+      data: {
+        tenantId: req.usuario.tenantId,
+        nota: req.body.nota,
+        manutencaoId: req.params.id,
+        autorId: req.usuario.id,
+      },
+    });
+
+    return res.status(201).json(nova);
+  } catch (error) {
+    console.error('[MANUTENCAO_NOTA_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao adicionar nota.' });
+  }
 });
 
+// ==============================
+// POST UPLOAD ANEXOS
+// ==============================
 router.post('/:id/upload', upload.array('arquivosManutencao'), async (req, res) => {
-    try {
-        const anexosData = req.files.map(file => ({
-            manutencaoId: req.params.id, nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype,
-        }));
-        await prisma.anexo.createMany({ data: anexosData });
-        res.status(201).json({ message: "Arquivos salvos com sucesso." });
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao salvar anexos.' });
+  try {
+    const manutencao = await prisma.manutencao.findFirst({
+      where: {
+        id: req.params.id,
+        tenantId: req.usuario.tenantId,
+      },
+    });
+
+    if (!manutencao) {
+      return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
+
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
+    }
+
+    const anexosData = req.files.map((file) => ({
+      tenantId: req.usuario.tenantId,
+      manutencaoId: req.params.id,
+      nomeOriginal: file.originalname,
+      path: file.path,
+      tipoMime: file.mimetype,
+    }));
+
+    await prisma.anexo.createMany({ data: anexosData });
+
+    return res.status(201).json({ message: 'Arquivos salvos com sucesso.' });
+  } catch (error) {
+    console.error('[MANUTENCAO_UPLOAD_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao salvar anexos.' });
+  }
 });
 
+// ==============================
+// DELETE MANUTENÇÃO
+// ==============================
 router.delete('/:id', admin, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const manut = await prisma.manutencao.findUnique({ where: { id }, include: { anexos: true } });
-        if (!manut) return res.status(404).json({ message: 'Não encontrada.' });
-        if (manut.anexos) manut.anexos.forEach(a => { if (fs.existsSync(a.path)) fs.unlinkSync(a.path); });
-        await prisma.manutencao.delete({ where: { id } });
-        res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao excluir manutenção.' });
+  const { id } = req.params;
+
+  try {
+    const manut = await prisma.manutencao.findFirst({
+      where: {
+        id,
+        tenantId: req.usuario.tenantId,
+      },
+      include: {
+        anexos: true,
+      },
+    });
+
+    if (!manut) {
+      return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
+
+    manut.anexos?.forEach((anexo) => {
+      if (anexo.path && fs.existsSync(anexo.path)) {
+        fs.unlinkSync(anexo.path);
+      }
+    });
+
+    await prisma.manutencao.delete({
+      where: { id },
+    });
+
+    await registrarLog({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'EXCLUSÃO',
+      entidade: 'Manutenção',
+      entidadeId: id,
+      detalhes: `Manutenção "${manut.numeroOS}" foi excluída.`,
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error('[MANUTENCAO_DELETE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao excluir manutenção.' });
+  }
 });
 
 export default router;

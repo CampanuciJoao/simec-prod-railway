@@ -1,0 +1,1 @@
+export { extrairFiltrosRelatorio } from './relatorioParser.js';

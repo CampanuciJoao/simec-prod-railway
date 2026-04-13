@@ -1,0 +1,1 @@
+export { montarResumoUltima, montarResumoLista } from './relatorioPresenter.js';

@@ -1,0 +1,1 @@
+export { SeguroService } from './seguroService.js';

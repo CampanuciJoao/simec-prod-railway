@@ -1,0 +1,1 @@
+export { registrarSessaoRelatorio } from './relatorioSessionManager.js';

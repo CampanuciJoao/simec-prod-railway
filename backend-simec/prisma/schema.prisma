@@ -7,90 +7,188 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model Tenant {
+  id        String   @id @default(uuid())
+  nome      String
+  slug      String   @unique
+  timezone  String   @default("UTC")
+  locale    String   @default("pt-BR")
+  ativo     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  usuarios             Usuario[]
+  unidades             Unidade[]
+  equipamentos         Equipamento[]
+  veiculos             Veiculo[]
+  acessorios           Acessorio[]
+  contratos            Contrato[]
+  manutencoes          Manutencao[]
+  seguros              Seguro[]
+  alertas              Alerta[]
+  alertasLidos         AlertaLidoPorUsuario[]
+  logsAuditoria        LogAuditoria[]
+  ocorrencias          Ocorrencia[]
+  anexos               Anexo[]
+  notasAndamento       NotaAndamento[]
+  emailsNotificacao    EmailNotificacao[]
+  notificacoesEnviadas NotificacaoEnviada[]
+  agentSessions        AgentSession[]
+  agentMessages        AgentMessage[]
+  userAgentMemories    UserAgentMemory[]
+  manutencaoEventos    ManutencaoEvento[]
+
+  @@map("tenants")
+}
+
 model Unidade {
-  id                String        @id @default(uuid())
-  nomeSistema       String        @unique
-  nomeFantasia      String?
-  cnpj              String?       @unique
-  logradouro        String?
-  numero            String?
-  complemento       String?
-  bairro            String?
-  cidade            String?
-  estado            String?
-  cep               String?
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+  id           String   @id @default(uuid())
+  tenantId     String
+  nomeSistema  String
+  nomeFantasia String?
+  cnpj         String?
+  logradouro   String?
+  numero       String?
+  complemento  String?
+  bairro       String?
+  cidade       String?
+  estado       String?
+  cep          String?
+  timezone     String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   anexos            Anexo[]
   equipamentos      Equipamento[]
+  veiculos          Veiculo[]
   segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
   contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
 
+  @@unique([tenantId, nomeSistema])
+  @@unique([tenantId, cnpj])
+  @@unique([tenantId, id])
+  @@index([tenantId, cidade])
+  @@index([tenantId, timezone])
   @@map("unidades")
 }
 
 model Usuario {
-  id               String                 @id @default(uuid())
-  username         String                 @unique
-  nome             String
-  senha            String
-  role             Role                   @default(user)
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  alertasLidos     AlertaLidoPorUsuario[]
-  logsDeAuditoria  LogAuditoria[]
-  notasDeAndamento NotaAndamento[]
+  id        String   @id @default(uuid())
+  tenantId  String
+  username  String
+  nome      String
+  senha     String
+  role      Role     @default(user)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alertasLidos      AlertaLidoPorUsuario[]
+  logsDeAuditoria   LogAuditoria[]
+  notasDeAndamento  NotaAndamento[]
+  manutencaoEventos ManutencaoEvento[]
+
+  @@unique([tenantId, username])
+  @@unique([tenantId, id])
+  @@index([tenantId, role])
   @@map("usuarios")
 }
 
 model Equipamento {
-  id                String            @id @default(uuid())
-  tag               String            @unique
-  modelo            String
-  tipo              String?
-  setor             String?
-  fabricante        String?
-  anoFabricacao     String?           @map("ano_fabricacao")
-  dataInstalacao    DateTime?         @map("data_instalacao")
-  status            StatusEquipamento @default(Operante)
-  numeroPatrimonio  String?           @map("numero_patrimonio")
-  registroAnvisa    String?           @map("registro_anvisa")
-  observacoes       String?
-  unidadeId         String
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  id               String            @id @default(uuid())
+  tenantId         String
+  tag              String
+  modelo           String
+  tipo             String?
+  setor            String?
+  fabricante       String?
+  anoFabricacao    String?           @map("ano_fabricacao")
+  dataInstalacao   DateTime?         @map("data_instalacao")
+  status           StatusEquipamento @default(Operante)
+  numeroPatrimonio String?           @map("numero_patrimonio")
+  registroAnvisa   String?           @map("registro_anvisa")
+  observacoes      String?
+  unidadeId        String
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade           Unidade      @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
   acessorios        Acessorio[]
   anexos            Anexo[]
-  unidade           Unidade           @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
   manutencoes       Manutencao[]
   ocorrencias       Ocorrencia[]
   seguros           Seguro[]
-  contratosCobertos Contrato[]        @relation("ContratosEquipamentosCobertos")
+  contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
 
+  @@unique([tenantId, tag])
+  @@unique([tenantId, id])
+  @@index([tenantId, unidadeId, status])
+  @@index([tenantId, modelo])
+  @@index([tenantId, tipo])
+  @@index([tenantId, fabricante])
+  @@index([tenantId, numeroPatrimonio])
   @@map("equipamentos")
 }
 
-model Contrato {
-  id                   String         @id @default(uuid())
-  numeroContrato       String         @unique
-  categoria            String?
-  fornecedor           String?
-  dataInicio           DateTime
-  dataFim              DateTime
-  status               StatusContrato @default(Ativo)
-  createdAt            DateTime       @default(now())
-  updatedAt            DateTime       @updatedAt
-  anexos               Anexo[]
-  equipamentosCobertos Equipamento[]  @relation("ContratosEquipamentosCobertos")
-  unidadesCobertas     Unidade[]      @relation("ContratosUnidadesCobertas")
+model Veiculo {
+  id            String   @id @default(uuid())
+  tenantId      String
+  unidadeId     String?
+  placa         String
+  renavam       String?
+  chassi        String?
+  modelo        String
+  fabricante    String?
+  anoFabricacao String?  @map("ano_fabricacao")
+  categoria     String?
+  status        String?  @default("Ativo")
+  observacoes   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
+  tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade Unidade? @relation(fields: [tenantId, unidadeId], references: [tenantId, id])
+  seguros Seguro[]
+
+  @@unique([tenantId, placa])
+  @@unique([tenantId, renavam])
+  @@unique([tenantId, id])
+  @@index([tenantId, unidadeId])
+  @@index([tenantId, status])
+  @@index([tenantId, modelo])
+  @@map("veiculos")
+}
+
+model Contrato {
+  id             String         @id @default(uuid())
+  tenantId       String
+  numeroContrato String
+  categoria      String?
+  fornecedor     String?
+  dataInicio     DateTime
+  dataFim        DateTime
+  status         StatusContrato @default(Ativo)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  anexos               Anexo[]
+  equipamentosCobertos Equipamento[] @relation("ContratosEquipamentosCobertos")
+  unidadesCobertas     Unidade[]     @relation("ContratosUnidadesCobertas")
+
+  @@unique([tenantId, numeroContrato])
+  @@unique([tenantId, id])
+  @@index([tenantId, status, dataFim])
+  @@index([tenantId, fornecedor])
   @@map("contratos")
 }
 
 model Manutencao {
   id                        String           @id @default(uuid())
-  numeroOS                  String           @unique @map("numero_os")
+  tenantId                  String
+  numeroOS                  String           @map("numero_os")
   tipo                      TipoManutencao   @default(Preventiva) @map("tipo_manutencao")
   status                    StatusManutencao @default(Agendada)
   descricaoProblemaServico  String           @map("descricao_problema_servico")
@@ -105,173 +203,264 @@ model Manutencao {
   equipamentoId             String           @map("equipamento_id")
   createdAt                 DateTime         @default(now())
   updatedAt                 DateTime         @updatedAt
-  anexos                    Anexo[]
-  equipamento               Equipamento      @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
-  notasAndamento            NotaAndamento[]
 
+  tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento    Equipamento        @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  anexos         Anexo[]
+  notasAndamento NotaAndamento[]
+  eventos        ManutencaoEvento[]
+
+  @@unique([tenantId, numeroOS])
+  @@unique([tenantId, id])
+  @@index([tenantId, equipamentoId])
+  @@index([tenantId, status, dataHoraAgendamentoInicio])
+  @@index([tenantId, status, dataHoraAgendamentoFim])
+  @@index([tenantId, tipo, createdAt])
   @@map("manutencoes")
 }
 
-model Acessorio {
-  id            String      @id @default(uuid())
-  nome          String
-  numeroSerie   String?     @unique @map("numero_serie")
-  descricao     String?
-  equipamentoId String      @map("equipamento_id")
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
-  equipamento   Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
+model ManutencaoEvento {
+  id           String   @id @default(uuid())
+  tenantId     String
+  manutencaoId String   @map("manutencao_id")
+  autorId      String?  @map("autor_id")
+  tipo         String
+  descricao    String?
+  metadataJson String?  @db.Text
+  dataEvento   DateTime @default(now()) @map("data_evento")
+  createdAt    DateTime @default(now())
 
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  manutencao Manutencao @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  autor      Usuario?   @relation(fields: [autorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, manutencaoId, dataEvento])
+  @@index([tenantId, tipo, dataEvento])
+  @@map("manutencao_eventos")
+}
+
+model Acessorio {
+  id            String   @id @default(uuid())
+  tenantId      String
+  nome          String
+  numeroSerie   String?  @map("numero_serie")
+  descricao     String?
+  equipamentoId String   @map("equipamento_id")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, numeroSerie])
+  @@index([tenantId, equipamentoId])
   @@map("acessorios")
 }
 
 model Seguro {
-  id                       String       @id @default(uuid())
-  apoliceNumero            String       @unique @map("apolice_numero")
+  id                       String         @id @default(uuid())
+  tenantId                 String
+  tipoAlvo                 TipoSeguroAlvo @default(EQUIPAMENTO)
+  apoliceNumero            String         @map("apolice_numero")
   seguradora               String
-  dataInicio               DateTime     @map("data_inicio")
-  dataFim                  DateTime     @map("data_fim")
-  status                   StatusSeguro @default(Ativo)
+  dataInicio               DateTime       @map("data_inicio")
+  dataFim                  DateTime       @map("data_fim")
+  status                   StatusSeguro   @default(Ativo)
   cobertura                String?
-  equipamentoId            String?      @map("equipamento_id")
-  unidadeId                String?      @map("unidade_id")
-  createdAt                DateTime     @default(now())
-  updatedAt                DateTime     @updatedAt
-  lmiAPP                   Float?       @default(0)
-  lmiDanosCorporais        Float?       @default(0)
-  lmiDanosEletricos        Float?       @default(0)
-  lmiDanosMateriais        Float?       @default(0)
-  lmiDanosMorais           Float?       @default(0)
-  lmiIncendio              Float?       @default(0)
-  lmiResponsabilidadeCivil Float?       @default(0)
-  lmiRoubo                 Float?       @default(0)
-  lmiVidros                Float?       @default(0)
-  lmiVendaval              Float?       @default(0)
-  premioTotal              Float?       @default(0) @map("premio_total")
-  anexos                   Anexo[]
-  equipamento              Equipamento? @relation(fields: [equipamentoId], references: [id])
-  unidade                  Unidade?     @relation("SegurosUnidadesCobertas", fields: [unidadeId], references: [id])
+  equipamentoId            String?        @map("equipamento_id")
+  unidadeId                String?        @map("unidade_id")
+  veiculoId                String?        @map("veiculo_id")
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  lmiAPP                   Float?         @default(0)
+  lmiDanosCorporais        Float?         @default(0)
+  lmiDanosEletricos        Float?         @default(0)
+  lmiDanosMateriais        Float?         @default(0)
+  lmiDanosMorais           Float?         @default(0)
+  lmiIncendio              Float?         @default(0)
+  lmiResponsabilidadeCivil Float?         @default(0)
+  lmiRoubo                 Float?         @default(0)
+  lmiVidros                Float?         @default(0)
+  lmiVendaval              Float?         @default(0)
+  premioTotal              Float?         @default(0) @map("premio_total")
 
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  anexos      Anexo[]
+  equipamento Equipamento? @relation(fields: [tenantId, equipamentoId], references: [tenantId, id])
+  unidade     Unidade?     @relation("SegurosUnidadesCobertas", fields: [tenantId, unidadeId], references: [tenantId, id])
+  veiculo     Veiculo?     @relation(fields: [tenantId, veiculoId], references: [tenantId, id])
+
+  @@unique([tenantId, apoliceNumero])
+  @@unique([tenantId, id])
+  @@index([tenantId, tipoAlvo])
+  @@index([tenantId, status, dataFim])
+  @@index([tenantId, seguradora])
+  @@index([tenantId, equipamentoId])
+  @@index([tenantId, unidadeId])
+  @@index([tenantId, veiculoId])
   @@map("seguros")
 }
 
 model Alerta {
-  id              String                 @id
-  titulo          String
-  subtitulo       String?
-  data            DateTime
-  prioridade      Prioridade
-  tipo            String
-  link            String?
-  emailEnviado    Boolean                @default(false)
-  createdAt       DateTime               @default(now())
-  updatedAt       DateTime               @updatedAt
+  id           String     @id @default(uuid())
+  tenantId     String
+  titulo       String
+  subtitulo    String?
+  data         DateTime
+  prioridade   Prioridade
+  tipo         String
+  link         String?
+  emailEnviado Boolean    @default(false)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lidoPorUsuarios AlertaLidoPorUsuario[]
 
+  @@unique([tenantId, id])
+  @@index([tenantId, data])
+  @@index([tenantId, tipo, data])
+  @@index([tenantId, prioridade, data])
+  @@index([tenantId, emailEnviado])
   @@map("alertas")
 }
 
 model AlertaLidoPorUsuario {
   alertaId  String
   usuarioId String
+  tenantId  String
   visto     Boolean   @default(true)
   dataVisto DateTime? @default(now())
-  alerta    Alerta    @relation(fields: [alertaId], references: [id], onDelete: Cascade)
-  usuario   Usuario   @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  alerta  Alerta  @relation(fields: [tenantId, alertaId], references: [tenantId, id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@id([alertaId, usuarioId])
+  @@index([tenantId, usuarioId, visto])
   @@map("alertas_lidos_por_usuario")
 }
 
 model LogAuditoria {
   id         String   @id @default(uuid())
+  tenantId   String
   acao       String
   entidade   String
   entidadeId String   @map("entidade_id")
   detalhes   String
   timestamp  DateTime @default(now())
   autorId    String   @map("autor_id")
-  autor      Usuario  @relation(fields: [autorId], references: [id], onDelete: Cascade)
 
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor  Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entidade, entidadeId, timestamp])
+  @@index([tenantId, autorId, timestamp])
   @@map("log_auditoria")
 }
 
 model Ocorrencia {
-  id               String      @id @default(uuid())
-  data             DateTime    @default(now())
+  id               String    @id @default(uuid())
+  tenantId         String
+  data             DateTime  @default(now())
   titulo           String
   descricao        String?
   tipo             String
   tecnico          String?
   equipamentoId    String
   dataResolucao    DateTime?
-  resolvido        Boolean     @default(false)
+  resolvido        Boolean   @default(false)
   solucao          String?
   tecnicoResolucao String?
-  equipamento      Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
 
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, equipamentoId, data])
+  @@index([tenantId, resolvido, data])
   @@map("ocorrencias")
 }
 
 model Anexo {
-  id            String       @id @default(uuid())
-  nomeOriginal  String       @map("nome_original")
-  path          String       @unique
-  tipoMime      String       @map("tipo_mime")
-  unidadeId     String?      @map("unidade_id")
-  equipamentoId String?      @map("equipamento_id")
-  manutencaoId  String?      @map("manutencao_id")
-  seguroId      String?      @map("seguro_id")
-  contratoId    String?      @map("contrato_id")
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
-  contrato      Contrato?    @relation(fields: [contratoId], references: [id], onDelete: Cascade)
-  equipamento   Equipamento? @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
-  manutencao    Manutencao?  @relation(fields: [manutencaoId], references: [id], onDelete: Cascade)
-  seguro        Seguro?      @relation(fields: [seguroId], references: [id], onDelete: Cascade)
-  unidade       Unidade?     @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  id            String   @id @default(uuid())
+  tenantId      String
+  nomeOriginal  String   @map("nome_original")
+  path          String   @unique
+  tipoMime      String   @map("tipo_mime")
+  unidadeId     String?  @map("unidade_id")
+  equipamentoId String?  @map("equipamento_id")
+  manutencaoId  String?  @map("manutencao_id")
+  seguroId      String?  @map("seguro_id")
+  contratoId    String?  @map("contrato_id")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contrato    Contrato?    @relation(fields: [tenantId, contratoId], references: [tenantId, id], onDelete: Cascade)
+  equipamento Equipamento? @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  manutencao  Manutencao?  @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  seguro      Seguro?      @relation(fields: [tenantId, seguroId], references: [tenantId, id], onDelete: Cascade)
+  unidade     Unidade?     @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, unidadeId])
+  @@index([tenantId, equipamentoId])
+  @@index([tenantId, manutencaoId])
+  @@index([tenantId, seguroId])
+  @@index([tenantId, contratoId])
   @@map("anexos")
 }
 
 model NotaAndamento {
-  id           String     @id @default(uuid())
+  id           String   @id @default(uuid())
+  tenantId     String
   nota         String
-  data         DateTime   @default(now())
-  origem       String     @default("manual")
-  manutencaoId String     @map("manutencao_id")
-  autorId      String?    @map("autor_id")
-  autor        Usuario?   @relation(fields: [autorId], references: [id], onDelete: Cascade)
-  manutencao   Manutencao @relation(fields: [manutencaoId], references: [id], onDelete: Cascade)
+  data         DateTime @default(now())
+  origem       String   @default("manual")
+  manutencaoId String   @map("manutencao_id")
+  autorId      String?  @map("autor_id")
 
+  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor      Usuario?   @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  manutencao Manutencao @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, manutencaoId, data])
   @@map("notas_andamento")
 }
 
 model EmailNotificacao {
-  id                      String               @id @default(uuid())
+  id                      String   @id @default(uuid())
+  tenantId                String
   nome                    String?
-  email                   String               @unique
-  ativo                   Boolean              @default(true)
-  diasAntecedencia        Int                  @default(30)
-  recebeAlertasContrato   Boolean              @default(true)
-  recebeAlertasManutencao Boolean              @default(false)
-  recebeAlertasSeguro     Boolean              @default(false)
-  createdAt               DateTime             @default(now())
-  updatedAt               DateTime             @updatedAt
-  notificacoesEnviadas    NotificacaoEnviada[]
+  email                   String
+  ativo                   Boolean  @default(true)
+  diasAntecedencia        Int      @default(30)
+  recebeAlertasContrato   Boolean  @default(true)
+  recebeAlertasManutencao Boolean  @default(false)
+  recebeAlertasSeguro     Boolean  @default(false)
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
 
+  tenant               Tenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  notificacoesEnviadas NotificacaoEnviada[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, ativo])
   @@map("emails_notificacao")
 }
 
 model NotificacaoEnviada {
-  id                 String           @id @default(uuid())
+  id                 String   @id @default(uuid())
+  tenantId           String
   entidade           String
   entidadeId         String
-  dataEnvio          DateTime         @default(now())
+  dataEnvio          DateTime @default(now())
   emailNotificacaoId String
-  emailNotificacao   EmailNotificacao @relation(fields: [emailNotificacaoId], references: [id], onDelete: Cascade)
 
-  @@unique([entidade, entidadeId, emailNotificacaoId])
+  tenant           Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  emailNotificacao EmailNotificacao @relation(fields: [emailNotificacaoId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, entidade, entidadeId, emailNotificacaoId])
+  @@index([tenantId, dataEnvio])
   @@map("notificacoes_enviadas")
 }
 
@@ -316,6 +505,13 @@ enum StatusSeguro {
   Vigente
 }
 
+enum TipoSeguroAlvo {
+  EQUIPAMENTO
+  UNIDADE
+  VEICULO
+  EMPRESARIAL_GERAL
+}
+
 enum Prioridade {
   Baixa
   Media
@@ -349,6 +545,7 @@ enum AgentStep {
 
 model AgentSession {
   id                String             @id @default(uuid())
+  tenantId          String
   usuario           String
   intent            AgentIntent
   status            AgentSessionStatus @default(Ativa)
@@ -363,38 +560,48 @@ model AgentSession {
   expiradaAt        DateTime?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
-  mensagens         AgentMessage[]
 
-  @@index([usuario, status])
-  @@index([usuario, intent, status])
-  @@index([expiresAt])
+  tenant    Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  mensagens AgentMessage[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, usuario, status])
+  @@index([tenantId, usuario, intent, status])
+  @@index([tenantId, expiresAt])
   @@map("agent_sessions")
 }
 
 model AgentMessage {
-  id           String       @id @default(uuid())
-  sessionId    String       @map("session_id")
+  id           String   @id @default(uuid())
+  tenantId     String
+  sessionId    String   @map("session_id")
   role         String
-  mensagem     String       @db.Text
-  metadataJson String?      @db.Text
-  createdAt    DateTime     @default(now())
-  session      AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  mensagem     String   @db.Text
+  metadataJson String?  @db.Text
+  createdAt    DateTime @default(now())
 
-  @@index([sessionId, createdAt])
+  tenant  Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session AgentSession @relation(fields: [tenantId, sessionId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId, createdAt])
   @@map("agent_messages")
 }
 
 model UserAgentMemory {
-  id                     String   @id @default(uuid())
-  usuario                String   @unique
-  ultimaUnidadeId        String?  @map("ultima_unidade_id")
-  ultimaUnidadeNome      String?  @map("ultima_unidade_nome")
-  ultimoEquipamentoId    String?  @map("ultimo_equipamento_id")
-  ultimoEquipamentoTag   String?  @map("ultimo_equipamento_tag")
-  ultimoEquipamentoModelo String? @map("ultimo_equipamento_modelo")
-  preferenciasJson       String?  @db.Text
-  updatedAt              DateTime @updatedAt
-  createdAt              DateTime @default(now())
+  id                      String   @id @default(uuid())
+  tenantId                String
+  usuario                 String
+  ultimaUnidadeId         String?  @map("ultima_unidade_id")
+  ultimaUnidadeNome       String?  @map("ultima_unidade_nome")
+  ultimoEquipamentoId     String?  @map("ultimo_equipamento_id")
+  ultimoEquipamentoTag    String?  @map("ultimo_equipamento_tag")
+  ultimoEquipamentoModelo String?  @map("ultimo_equipamento_modelo")
+  preferenciasJson        String?  @db.Text
+  updatedAt               DateTime @updatedAt
+  createdAt               DateTime @default(now())
 
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, usuario])
   @@map("user_agent_memory")
 }

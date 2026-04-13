@@ -1,7 +1,6 @@
-// Ficheiro: simec/backend-simec/routes/equipamentosRoutes.js
-// VERSÃO 9.0 - COM VALIDAÇÃO ZOD (COMPLETA E PARCIAL) E PATRIMÔNIO INTELIGENTE
+// Ficheiro: routes/equipamentosRoutes.js
+// Versão: Multi-tenant ready
 
-// --- 1. Importações ---
 import express from 'express';
 import multer from 'multer';
 import path from 'path';
@@ -11,240 +10,221 @@ import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { admin } from '../middleware/authMiddleware.js';
 
-// --- NOVAS IMPORTAÇÕES DE SEGURANÇA (ATUALIZADO) ---
-import validate from '../middleware/validate.js'; 
+import validate from '../middleware/validate.js';
 import { equipamentoSchema, equipamentoUpdateSchema } from '../validators/equipamentoValidator.js';
 
 const router = express.Router();
 
-// --- 2. Configuração do Multer para Upload de Anexos ---
+// ==============================
+// MULTER
+// ==============================
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const uploadPath = path.join('uploads', 'equipamentos');
-        fs.mkdirSync(uploadPath, { recursive: true });
-        cb(null, uploadPath);
-    },
-    filename: (req, file, cb) => {
-        const uniqueSuffix = uuidv4();
-        cb(null, `${uniqueSuffix}${path.extname(file.originalname)}`);
-    },
+  destination: (req, file, cb) => {
+    const dir = path.join('uploads', 'equipamentos');
+    fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
+  },
 });
+
 const upload = multer({ storage });
 
-// --- 3. Função Auxiliar para Datas ---
-const parseDate = (dateString) => (dateString ? new Date(dateString) : null);
+const parseDate = (date) => (date ? new Date(date) : null);
 
-
-// ==========================================================================
-// SEÇÃO: ROTAS PRINCIPAIS DE EQUIPAMENTOS (CRUD)
-// ==========================================================================
-
-/** @route   GET /api/equipamentos */
+// ==============================
+// GET LISTAR
+// ==============================
 router.get('/', async (req, res) => {
-    try {
-        const equipamentos = await prisma.equipamento.findMany({
-            include: { 
-                unidade: { select: { id: true, nomeSistema: true } },
-                anexos: true,
-                acessorios: true
-            },
-            orderBy: { modelo: 'asc' }
-        });
-        res.json(equipamentos);
-    } catch (error) {
-        console.error("Erro ao buscar equipamentos:", error);
-        res.status(500).json({ message: 'Erro interno do servidor ao buscar equipamentos.' });
-    }
+  try {
+    const equipamentos = await prisma.equipamento.findMany({
+      where: {
+        tenantId: req.usuario.tenantId,
+      },
+      include: {
+        unidade: { select: { id: true, nomeSistema: true } },
+        anexos: true,
+        acessorios: true,
+      },
+      orderBy: { modelo: 'asc' },
+    });
+
+    return res.json(equipamentos);
+  } catch (error) {
+    console.error('[EQUIP_LIST_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar equipamentos.' });
+  }
 });
 
-/** @route   GET /api/equipamentos/:id */
+// ==============================
+// GET POR ID
+// ==============================
 router.get('/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const equipamento = await prisma.equipamento.findUnique({
-            where: { id },
-            include: {
-                unidade: true,
-                acessorios: { orderBy: { nome: 'asc' } },
-                anexos: { orderBy: { createdAt: 'desc' } }
-            }
-        });
-        if (!equipamento) return res.status(404).json({ message: 'Equipamento não encontrado.' });
-        res.json(equipamento);
-    } catch (error) {
-        console.error(`Erro ao buscar equipamento ${id}:`, error);
-        res.status(500).json({ message: 'Erro interno do servidor ao buscar o equipamento.' });
+  try {
+    const equipamento = await prisma.equipamento.findFirst({
+      where: {
+        id: req.params.id,
+        tenantId: req.usuario.tenantId,
+      },
+      include: {
+        unidade: true,
+        acessorios: { orderBy: { nome: 'asc' } },
+        anexos: { orderBy: { createdAt: 'desc' } },
+      },
+    });
+
+    if (!equipamento) {
+      return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
+
+    return res.json(equipamento);
+  } catch (error) {
+    console.error('[EQUIP_GET_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar equipamento.' });
+  }
 });
 
-/** 
- * @route   POST /api/equipamentos 
- * VALIDAÇÃO COMPLETA: Exige todos os campos obrigatórios para novo cadastro.
- */
+// ==============================
+// POST CRIAR
+// ==============================
 router.post('/', validate(equipamentoSchema), async (req, res) => {
-    const { dataInstalacao, ...dados } = req.body;
-    
-    try {
-        // --- REGRA DE PATRIMÔNIO INTELIGENTE ---
-        const patrimonioLimpo = dados.numeroPatrimonio?.trim();
-        
-        if (patrimonioLimpo && patrimonioLimpo.toLowerCase() !== "sem patrimônio") {
-            const patrimonioExistente = await prisma.equipamento.findFirst({
-                where: { 
-                    numeroPatrimonio: { equals: patrimonioLimpo, mode: 'insensitive' } 
-                }
-            });
+  const { dataInstalacao, unidadeId, ...dados } = req.body;
 
-            if (patrimonioExistente) {
-                return res.status(400).json({ 
-                    message: `O número de patrimônio "${patrimonioLimpo}" já está cadastrado.` 
-                });
-            }
-        }
+  try {
+    // valida unidade
+    const unidade = await prisma.unidade.findFirst({
+      where: {
+        id: unidadeId,
+        tenantId: req.usuario.tenantId,
+      },
+    });
 
-        const novoEquipamento = await prisma.equipamento.create({
-            data: { ...dados, dataInstalacao: parseDate(dataInstalacao) }
-        });
-
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Equipamento',
-            entidadeId: novoEquipamento.id, detalhes: `Equipamento "${novoEquipamento.modelo}" criado.`
-        });
-
-        res.status(201).json(novoEquipamento);
-    } catch (error) {
-        if (error.code === 'P2002') return res.status(409).json({ message: 'Já existe um equipamento com esta Tag (Nº Série).' });
-        res.status(500).json({ message: 'Erro ao criar equipamento.' });
+    if (!unidade) {
+      return res.status(404).json({ message: 'Unidade inválida.' });
     }
+
+    // valida patrimônio por tenant
+    const patrimonio = dados.numeroPatrimonio?.trim();
+
+    if (patrimonio && patrimonio.toLowerCase() !== 'sem patrimônio') {
+      const existente = await prisma.equipamento.findFirst({
+        where: {
+          tenantId: req.usuario.tenantId,
+          numeroPatrimonio: {
+            equals: patrimonio,
+            mode: 'insensitive',
+          },
+        },
+      });
+
+      if (existente) {
+        return res.status(400).json({
+          message: `Patrimônio "${patrimonio}" já existe.`,
+        });
+      }
+    }
+
+    const novo = await prisma.equipamento.create({
+      data: {
+        tenantId: req.usuario.tenantId,
+        ...dados,
+        unidade: { connect: { id: unidadeId } },
+        dataInstalacao: parseDate(dataInstalacao),
+      },
+    });
+
+    await registrarLog({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'CRIAÇÃO',
+      entidade: 'Equipamento',
+      entidadeId: novo.id,
+      detalhes: `Equipamento "${novo.modelo}" criado.`,
+    });
+
+    return res.status(201).json(novo);
+  } catch (error) {
+    console.error('[EQUIP_CREATE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao criar equipamento.' });
+  }
 });
 
-/** 
- * @route   PUT /api/equipamentos/:id 
- * VALIDAÇÃO PARCIAL: Usa equipamentoUpdateSchema para permitir mudar APENAS o status.
- */
+// ==============================
+// PUT EDITAR
+// ==============================
 router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
-    const { id } = req.params;
-    const { dataInstalacao, ...dados } = req.body;
-    
-    try {
-        const patrimonioEdicao = dados.numeroPatrimonio?.trim();
+  const { id } = req.params;
+  const { dataInstalacao, ...dados } = req.body;
 
-        if (patrimonioEdicao && patrimonioEdicao.toLowerCase() !== "sem patrimônio") {
-            const conflitoPatrimonio = await prisma.equipamento.findFirst({
-                where: { 
-                    numeroPatrimonio: { equals: patrimonioEdicao, mode: 'insensitive' },
-                    NOT: { id: id } 
-                }
-            });
+  try {
+    const equipamento = await prisma.equipamento.findFirst({
+      where: {
+        id,
+        tenantId: req.usuario.tenantId,
+      },
+    });
 
-            if (conflitoPatrimonio) {
-                return res.status(400).json({ 
-                    message: `O número de patrimônio "${patrimonioEdicao}" já pertence a outro equipamento.` 
-                });
-            }
-        }
-
-        const dadosParaAtualizar = { ...dados };
-        if (dataInstalacao !== undefined) dadosParaAtualizar.dataInstalacao = parseDate(dataInstalacao);
-        
-        const equipamentoAtualizado = await prisma.equipamento.update({
-            where: { id }, data: dadosParaAtualizar
-        });
-
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'EDIÇÃO', entidade: 'Equipamento',
-            entidadeId: id, detalhes: `Equipamento "${equipamentoAtualizado.modelo}" atualizado.`
-        });
-        res.json(equipamentoAtualizado);
-    } catch (error) {
-        if (error.code === 'P2025') return res.status(404).json({ message: 'Equipamento não encontrado.' });
-        res.status(500).json({ message: 'Erro ao atualizar equipamento.' });
+    if (!equipamento) {
+      return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
+
+    const atualizado = await prisma.equipamento.update({
+      where: { id },
+      data: {
+        ...dados,
+        dataInstalacao: parseDate(dataInstalacao),
+      },
+    });
+
+    await registrarLog({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'EDIÇÃO',
+      entidade: 'Equipamento',
+      entidadeId: id,
+      detalhes: `Equipamento atualizado.`,
+    });
+
+    return res.json(atualizado);
+  } catch (error) {
+    console.error('[EQUIP_UPDATE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao atualizar equipamento.' });
+  }
 });
 
-/** @route   DELETE /api/equipamentos/:id */
+// ==============================
+// DELETE
+// ==============================
 router.delete('/:id', admin, async (req, res) => {
-    const { id } = req.params;
-    try {
-        const equipamentoExcluido = await prisma.equipamento.delete({ where: { id } });
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'EXCLUSÃO', entidade: 'Equipamento',
-            entidadeId: id, detalhes: `Equipamento "${equipamentoExcluido.modelo}" excluído.`
-        });
-        res.status(200).json({ message: 'Equipamento excluído com sucesso.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao excluir equipamento.' });
+  const { id } = req.params;
+
+  try {
+    const equipamento = await prisma.equipamento.findFirst({
+      where: {
+        id,
+        tenantId: req.usuario.tenantId,
+      },
+    });
+
+    if (!equipamento) {
+      return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
+
+    await prisma.equipamento.delete({ where: { id } });
+
+    await registrarLog({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'EXCLUSÃO',
+      entidade: 'Equipamento',
+      entidadeId: id,
+      detalhes: `Equipamento excluído.`,
+    });
+
+    return res.json({ message: 'Excluído com sucesso.' });
+  } catch (error) {
+    console.error('[EQUIP_DELETE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao excluir.' });
+  }
 });
-
-// [As rotas de Acessórios e Anexos permanecem conforme sua versão original...]
-
-router.get('/:equipamentoId/acessorios', async (req, res) => {
-    const { equipamentoId } = req.params;
-    try {
-        const acessorios = await prisma.acessorio.findMany({
-            where: { equipamentoId: equipamentoId },
-            orderBy: { nome: 'asc' }
-        });
-        res.json(acessorios);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao buscar acessórios.' });
-    }
-});
-
-router.post('/:equipamentoId/acessorios', async (req, res) => {
-    const { equipamentoId } = req.params;
-    const { nome, numeroSerie, descricao } = req.body;
-    if (!nome) return res.status(400).json({ message: 'O nome do acessório é obrigatório.' });
-    try {
-        const novoAcessorio = await prisma.acessorio.create({
-            data: { nome, numeroSerie: numeroSerie || null, descricao: descricao || null, equipamento: { connect: { id: equipamentoId } } }
-        });
-        await registrarLog({
-            usuarioId: req.usuario.id, acao: 'CRIAÇÃO', entidade: 'Acessório',
-            entidadeId: novoAcessorio.id, detalhes: `Acessório "${nome}" adicionado.`
-        });
-        res.status(201).json(novoAcessorio);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao criar acessório.' });
-    }
-});
-
-router.delete('/:equipamentoId/acessorios/:acessorioId', async (req, res) => {
-    const { acessorioId } = req.params;
-    try {
-        await prisma.acessorio.delete({ where: { id: acessorioId } });
-        res.status(200).json({ message: 'Acessório excluído.' });
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao excluir acessório.' });
-    }
-});
-
-router.post('/:equipamentoId/anexos', upload.array('anexosEquipamento'), async (req, res) => {
-    const { equipamentoId } = req.params;
-    if (!req.files || req.files.length === 0) return res.status(400).json({ message: 'Nenhum ficheiro enviado.' });
-    try {
-        const anexosData = req.files.map(file => ({
-            nomeOriginal: file.originalname, path: file.path, tipoMime: file.mimetype, equipamentoId: equipamentoId
-        }));
-        await prisma.anexo.createMany({ data: anexosData });
-        const anexosAtualizados = await prisma.anexo.findMany({ where: { equipamentoId } });
-        res.status(201).json(anexosAtualizados);
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao salvar anexos.' });
-    }
-});
-
-router.delete('/:equipamentoId/anexos/:anexoId', async (req, res) => {
-    const { anexoId } = req.params;
-    try {
-        const anexo = await prisma.anexo.findUnique({ where: { id: anexoId } });
-        if (anexo?.path && fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
-        await prisma.anexo.delete({ where: { id: anexoId } });
-        res.status(204).send();
-    } catch (error) {
-        res.status(500).json({ message: 'Erro ao excluir anexo.' });
-    }
-});
-
-export default router;

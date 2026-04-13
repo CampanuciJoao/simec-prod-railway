@@ -1,0 +1,1 @@
+export { gerarAlertasRecomendacao } from './alertasRecomendacaoService.js';

@@ -1,0 +1,1 @@
+export { registrarSessaoSeguro } from './seguroSessionManager.js';

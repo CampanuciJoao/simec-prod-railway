@@ -1,0 +1,1 @@
+export { RelatorioService } from './relatorioService.js';

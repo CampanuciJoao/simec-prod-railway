@@ -1,0 +1,1 @@
+export { extrairFiltrosSeguro } from './seguroParser.js';

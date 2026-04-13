@@ -30,13 +30,11 @@ export async function iniciarJobsDeAlertas() {
   try {
     console.log('🧠 Inicializando jobs de alertas...');
 
-    // 🔥 REMOVE jobs antigos (evita duplicação)
-    await alertasQueue.obliterate({ force: true });
-
     await alertasQueue.add(
-      'verificar-tarefas-diarias',
+      'processar-alertas-recorrente',
       {},
       {
+        jobId: 'processar-alertas-recorrente',
         repeat: {
           every: 60000, // roda a cada 1 minuto
           immediately: true,
@@ -49,5 +47,18 @@ export async function iniciarJobsDeAlertas() {
     console.log('⏱️ Job recorrente configurado (1 minuto)');
   } catch (error) {
     console.error('❌ Erro ao iniciar jobs:', error);
+  }
+}
+
+/**
+ * Encerramento opcional da fila/conexão
+ */
+export async function encerrarQueueDeAlertas() {
+  try {
+    await alertasQueue.close();
+    await connection.quit();
+    console.log('🛑 Queue de alertas encerrada com sucesso.');
+  } catch (error) {
+    console.error('❌ Erro ao encerrar queue:', error);
   }
 }

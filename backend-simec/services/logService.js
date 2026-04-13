@@ -1,11 +1,12 @@
 // Ficheiro: services/logService.js
-// VERSÃO COMPLETA E ATUALIZADA PARA PRISMA
+// Versão: Multi-tenant ready
 
 import prisma from './prismaService.js';
 
 /**
  * Registra um evento de auditoria no banco de dados.
- * @param {object} dadosLog - As informações do log.
+ * @param {object} dadosLog
+ * @param {string} dadosLog.tenantId - ID do tenant.
  * @param {string} dadosLog.usuarioId - ID do usuário que realizou a ação.
  * @param {string} dadosLog.acao - A ação realizada (ex: 'CRIAÇÃO', 'EDIÇÃO').
  * @param {string} dadosLog.entidade - A entidade afetada (ex: 'Equipamento', 'Contrato').
@@ -14,28 +15,34 @@ import prisma from './prismaService.js';
  */
 export async function registrarLog(dadosLog) {
   try {
-    const { usuarioId, acao, entidade, entidadeId, detalhes } = dadosLog;
-    
-    // Validação para garantir que dados essenciais não estão faltando
-    if (!usuarioId || !acao || !entidade || !entidadeId || !detalhes) {
-        console.error('Falha ao registrar log: Dados obrigatórios faltando.', dadosLog);
-        return;
+    const {
+      tenantId,
+      usuarioId,
+      acao,
+      entidade,
+      entidadeId,
+      detalhes,
+    } = dadosLog;
+
+    if (!tenantId || !usuarioId || !acao || !entidade || !entidadeId || !detalhes) {
+      console.error(
+        '[LOG_SERVICE_VALIDATION_ERROR] Falha ao registrar log: dados obrigatórios faltando.',
+        dadosLog
+      );
+      return;
     }
 
-    // Cria o registro na tabela 'LogAuditoria'
-    // Note que o campo da relação no schema é 'autorId', então mapeamos 'usuarioId' para ele.
     await prisma.logAuditoria.create({
       data: {
+        tenantId,
         acao,
         entidade,
         entidadeId,
         detalhes,
-        autorId: usuarioId, 
+        autorId: usuarioId,
       },
     });
-
   } catch (error) {
-    console.error('Falha ao registrar log de auditoria no Prisma:', error);
-    // Em um sistema real, você poderia enviar este erro para um serviço de monitoramento.
+    console.error('[LOG_SERVICE_ERROR] Falha ao registrar log de auditoria:', error);
   }
 }
