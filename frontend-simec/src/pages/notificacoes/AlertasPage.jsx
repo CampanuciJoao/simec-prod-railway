@@ -14,6 +14,9 @@ import {
   faCircleCheck,
   faList,
   faXmark,
+  faWrench,
+  faArrowUpRightFromSquare,
+  faLightbulb,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useAlertasPage } from '../../hooks/alertas/useAlertasPage';
@@ -31,6 +34,7 @@ function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
     green: 'bg-emerald-100 text-emerald-600',
     yellow: 'bg-amber-100 text-amber-600',
     red: 'bg-red-100 text-red-600',
+    violet: 'bg-violet-100 text-violet-600',
   };
 
   const Wrapper = onClick ? 'button' : 'div';
@@ -97,7 +101,7 @@ function ActiveFiltersBar({ filters = [], onRemove, onClearAll }) {
   );
 }
 
-function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
+function getAlertaVisual(alerta) {
   const prioridadeMap = {
     Alta: {
       border: 'border-red-500',
@@ -125,14 +129,54 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
     },
   };
 
-  const style = prioridadeMap[alerta.prioridade] || {
-    border: 'border-slate-300',
-    bg: 'bg-slate-50',
-    text: 'text-slate-700',
-    iconBg: 'bg-slate-100',
-    iconColor: 'text-slate-500',
-    badge: 'bg-slate-100 text-slate-700',
+  const recomendacaoStyle = {
+    border: 'border-violet-500',
+    bg: 'bg-violet-50',
+    text: 'text-violet-700',
+    iconBg: 'bg-violet-100',
+    iconColor: 'text-violet-600',
+    badge: 'bg-violet-100 text-violet-700',
   };
+
+  if (alerta.tipo === 'Recomendação') {
+    return recomendacaoStyle;
+  }
+
+  return (
+    prioridadeMap[alerta.prioridade] || {
+      border: 'border-slate-300',
+      bg: 'bg-slate-50',
+      text: 'text-slate-700',
+      iconBg: 'bg-slate-100',
+      iconColor: 'text-slate-500',
+      badge: 'bg-slate-100 text-slate-700',
+    }
+  );
+}
+
+function getAlertaIcon(alerta) {
+  if (alerta.tipo === 'Recomendação') return faLightbulb;
+  if (alerta.prioridade === 'Alta') return faExclamationTriangle;
+  return faInfoCircle;
+}
+
+function buildAgendarPreventivaLink(alerta) {
+  const rawLink = alerta.link || '';
+  const match = rawLink.match(/\/equipamentos\/ficha-tecnica\/([^/?]+)/i);
+  const equipamentoId = match?.[1];
+
+  if (equipamentoId) {
+    return `/manutencoes/agendar?tipo=Preventiva&equipamentoId=${encodeURIComponent(
+      equipamentoId
+    )}`;
+  }
+
+  return '/manutencoes/agendar?tipo=Preventiva';
+}
+
+function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
+  const style = getAlertaVisual(alerta);
+  const isRecomendacao = alerta.tipo === 'Recomendação';
 
   const dataFormatada = alerta.data
     ? new Date(alerta.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
@@ -152,106 +196,150 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
         alerta.status === 'Visto' ? 'opacity-70' : '',
       ].join(' ')}
     >
-      <div className="flex flex-col gap-4 p-5 md:flex-row md:items-center md:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-4">
-          <div
-            className={[
-              'mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
-              style.iconBg,
-              style.iconColor,
-            ].join(' ')}
-          >
-            <FontAwesomeIcon
-              icon={alerta.prioridade === 'Alta' ? faExclamationTriangle : faInfoCircle}
-            />
-          </div>
+      <div className="flex flex-col gap-4 p-5">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 flex-1 items-start gap-4">
+            <div
+              className={[
+                'mt-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full',
+                style.iconBg,
+                style.iconColor,
+              ].join(' ')}
+            >
+              <FontAwesomeIcon icon={getAlertaIcon(alerta)} />
+            </div>
 
-          <div className="min-w-0 flex-1">
-            <h4 className="text-base font-bold leading-tight text-slate-800">
-              {alerta.titulo}
-            </h4>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h4 className="text-base font-bold leading-tight text-slate-800">
+                  {alerta.titulo}
+                </h4>
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
-              {alerta.subtitulo ? (
-                <span className="font-medium">{alerta.subtitulo}</span>
-              ) : null}
+                {isRecomendacao && (
+                  <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-700">
+                    Inteligente
+                  </span>
+                )}
+              </div>
 
-              <span className="flex items-center gap-1 text-xs">
-                <FontAwesomeIcon icon={faClock} />
-                {dataFormatada}
-              </span>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+                {alerta.subtitulo ? (
+                  <span className="font-medium">{alerta.subtitulo}</span>
+                ) : null}
 
-              {alerta.tipo ? (
-                <span
-                  className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${style.badge}`}
-                >
-                  {alerta.tipo}
+                <span className="flex items-center gap-1 text-xs">
+                  <FontAwesomeIcon icon={faClock} />
+                  {dataFormatada}
                 </span>
-              ) : null}
 
-              {alerta.prioridade ? (
+                {alerta.tipo ? (
+                  <span
+                    className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${style.badge}`}
+                  >
+                    {alerta.tipo}
+                  </span>
+                ) : null}
+
+                {alerta.prioridade ? (
+                  <span
+                    className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${style.badge}`}
+                  >
+                    {alerta.prioridade}
+                  </span>
+                ) : null}
+
                 <span
-                  className={`rounded-md px-2 py-1 text-[10px] font-black uppercase ${style.badge}`}
+                  className={[
+                    'rounded-md px-2 py-1 text-[10px] font-black uppercase',
+                    alerta.status === 'NaoVisto'
+                      ? 'bg-slate-900 text-white'
+                      : 'bg-slate-100 text-slate-600',
+                  ].join(' ')}
                 >
-                  {alerta.prioridade}
+                  {alerta.status === 'NaoVisto' ? 'Não visto' : 'Visto'}
                 </span>
-              ) : null}
-
-              <span
-                className={[
-                  'rounded-md px-2 py-1 text-[10px] font-black uppercase',
-                  alerta.status === 'NaoVisto'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-600',
-                ].join(' ')}
-              >
-                {alerta.status === 'NaoVisto' ? 'Não visto' : 'Visto'}
-              </span>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex shrink-0 items-center gap-2 md:border-l md:border-slate-100 md:pl-5">
-          <Link
-            to={alerta.link || '#'}
-            className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-600 no-underline transition-all hover:bg-blue-600 hover:text-white"
-            onClick={handleViewDetails}
-          >
-            <FontAwesomeIcon icon={faEye} />
-            Detalhes
-          </Link>
-
-          {alerta.status === 'Visto' ? (
-            <button
-              type="button"
-              onClick={() => onUpdateStatus(alerta.id, 'NaoVisto')}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors hover:bg-amber-100 hover:text-amber-600"
-              title="Marcar como não visto"
+          <div className="flex shrink-0 items-center gap-2 md:border-l md:border-slate-100 md:pl-5">
+            <Link
+              to={alerta.link || '#'}
+              className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-600 no-underline transition-all hover:bg-blue-600 hover:text-white"
+              onClick={handleViewDetails}
             >
-              <FontAwesomeIcon icon={faEyeSlash} />
-            </button>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => onUpdateStatus(alerta.id, 'Visto')}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 transition-colors hover:bg-green-600 hover:text-white"
-                title="Marcar como visto"
-              >
-                <FontAwesomeIcon icon={faCheck} />
-              </button>
+              <FontAwesomeIcon icon={faEye} />
+              Detalhes
+            </Link>
 
+            {alerta.status === 'Visto' ? (
               <button
                 type="button"
-                onClick={() => onDismiss(alerta.id)}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                title="Dispensar alerta"
+                onClick={() => onUpdateStatus(alerta.id, 'NaoVisto')}
+                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors hover:bg-amber-100 hover:text-amber-600"
+                title="Marcar como não visto"
               >
-                <FontAwesomeIcon icon={faBellSlash} />
+                <FontAwesomeIcon icon={faEyeSlash} />
               </button>
-            </>
-          )}
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => onUpdateStatus(alerta.id, 'Visto')}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 transition-colors hover:bg-green-600 hover:text-white"
+                  title="Marcar como visto"
+                >
+                  <FontAwesomeIcon icon={faCheck} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onDismiss(alerta.id)}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  title="Dispensar alerta"
+                >
+                  <FontAwesomeIcon icon={faBellSlash} />
+                </button>
+              </>
+            )}
+          </div>
         </div>
+
+        {isRecomendacao && (
+          <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-violet-900">
+                  Recomendação proativa
+                </p>
+                <p className="mt-1 text-sm text-violet-700">
+                  O sistema identificou sinais de risco e recomenda avaliar uma
+                  preventiva ou preditiva para esse ativo.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  to={buildAgendarPreventivaLink(alerta)}
+                  className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white no-underline transition hover:bg-violet-700"
+                  onClick={handleViewDetails}
+                >
+                  <FontAwesomeIcon icon={faWrench} />
+                  Agendar preventiva
+                </Link>
+
+                <Link
+                  to={alerta.link || '#'}
+                  className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-4 py-2 text-xs font-bold text-violet-700 no-underline transition hover:bg-violet-100"
+                  onClick={handleViewDetails}
+                >
+                  <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                  Ver ficha técnica
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -264,15 +352,19 @@ function AlertasPage() {
   const hasError = Boolean(page.error);
   const isEmpty = !page.loading && page.alertasFiltrados.length === 0;
 
+  const totalRecomendacoes = page.alertas.filter(
+    (a) => a.tipo === 'Recomendação'
+  ).length;
+
   return (
     <PageLayout background="slate" padded fullHeight>
       <PageHeader
         title="Alertas do Sistema"
-        subtitle="Acompanhe, filtre e trate as notificações operacionais"
+        subtitle="Acompanhe, filtre e trate notificações operacionais e recomendações inteligentes"
         icon={faBell}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-5">
         <KpiCard
           icon={faList}
           title="Total"
@@ -313,6 +405,17 @@ function AlertasPage() {
             page.selectFiltersConfig
               .find((f) => f.id === 'prioridade')
               ?.onChange('Alta');
+          }}
+        />
+
+        <KpiCard
+          icon={faLightbulb}
+          title="Recomendações"
+          value={totalRecomendacoes}
+          tone="violet"
+          onClick={() => {
+            page.clearAllFilters();
+            page.selectFiltersConfig.find((f) => f.id === 'tipo')?.onChange('Recomendação');
           }}
         />
       </div>
@@ -367,6 +470,10 @@ function AlertasPage() {
           <li>
             <strong>Dispensar:</strong> remove o alerta da sua lista atual e marca
             como tratado no sistema.
+          </li>
+          <li>
+            <strong>Recomendações:</strong> são alertas inteligentes baseados em histórico,
+            recorrência e criticidade, sem abertura automática de OS.
           </li>
           <li>
             <strong>Status "Visto":</strong> use o filtro de status para consultar

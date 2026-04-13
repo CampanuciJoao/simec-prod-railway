@@ -1,6 +1,3 @@
-// Ficheiro: simec/backend-simec/server.js
-// VERSÃO ATUALIZADA - CICLO INTELIGENTE INTEGRADO
-
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -31,9 +28,9 @@ import pdfDataRoutes from './routes/pdfDataRoutes.js';
 
 // Middlewares / serviços
 import { proteger } from './middleware/authMiddleware.js';
-import { alertasQueue } from './services/queueService.js';
+import { iniciarJobsDeAlertas } from './services/queueService.js';
 
-// Inicializa o worker e quaisquer jobs acoplados
+// Inicializa o worker
 import './worker.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -42,44 +39,38 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const httpServer = createServer(app);
 
-// Configurações principais
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
-const IS_PRODUCTION = process.env.NODE_ENV === 'production';
-
-// Novo job inteligente
-const JOB_NAME = 'ciclo-inteligente-simec';
-const JOB_INTERVAL_MS = Number(process.env.INTELLIGENCE_JOB_INTERVAL_MS || 20000);
 
 /**
  * Socket.IO
  */
 const io = new Server(httpServer, {
-    cors: {
-        origin: FRONTEND_URL === '*' ? '*' : FRONTEND_URL,
-        methods: ['GET', 'POST']
-    }
+  cors: {
+    origin: FRONTEND_URL === '*' ? '*' : FRONTEND_URL,
+    methods: ['GET', 'POST'],
+  },
 });
 
 global.io = io;
 
 io.on('connection', (socket) => {
-    console.log(`🔌 Novo navegador conectado ao SIMEC: ${socket.id}`);
+  console.log(`🔌 Novo navegador conectado ao SIMEC: ${socket.id}`);
 
-    socket.on('disconnect', () => {
-        console.log(`🔌 Navegador desconectado do SIMEC: ${socket.id}`);
-    });
+  socket.on('disconnect', () => {
+    console.log(`🔌 Navegador desconectado do SIMEC: ${socket.id}`);
+  });
 });
 
 /**
  * Middlewares globais
  */
 app.use(
-    cors({
-        origin: FRONTEND_URL === '*' ? '*' : FRONTEND_URL,
-        methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization']
-    })
+  cors({
+    origin: FRONTEND_URL === '*' ? '*' : FRONTEND_URL,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  })
 );
 
 app.use(express.json());
@@ -94,7 +85,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
  * Health check
  */
 app.get('/', (req, res) => {
-    res.send('API do SIMEC ativa e operante em tempo real!');
+  res.send('API do SIMEC ativa e operante em tempo real!');
 });
 
 /**
@@ -127,58 +118,38 @@ app.use('/api/pdf-data', pdfDataRoutes);
  * 404 da API
  */
 app.use('/api', (req, res) => {
-    return res.status(404).json({
-        message: 'Rota da API não encontrada.'
-    });
+  return res.status(404).json({
+    message: 'Rota da API não encontrada.',
+  });
 });
 
 /**
  * Tratador global de erro do Express
  */
 app.use((err, req, res, next) => {
-    console.error('[SERVER_ERROR]', err);
+  console.error('[SERVER_ERROR]', err);
 
-    return res.status(err.status || 500).json({
-        message: err.message || 'Erro interno do servidor.'
-    });
+  return res.status(err.status || 500).json({
+    message: err.message || 'Erro interno do servidor.',
+  });
 });
 
 /**
- * Inicialização do servidor + agendador BullMQ
+ * Inicialização do servidor
  */
 httpServer.listen(PORT, '0.0.0.0', async () => {
-    console.log('======================================================');
-    console.log(`✅ SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
-    console.log(`📡 Intervalo do ciclo inteligente: ${JOB_INTERVAL_MS} ms`);
-    console.log(`🌐 FRONTEND_URL: ${FRONTEND_URL}`);
-    console.log(`🛠️ Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🧠 Job agendado: ${JOB_NAME}`);
-    console.log('======================================================');
+  console.log('======================================================');
+  console.log(`✅ SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
+  console.log(`🌐 FRONTEND_URL: ${FRONTEND_URL}`);
+  console.log(`🛠️ Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log('======================================================');
 
-    try {
-        // Em desenvolvimento, limpar fila ajuda a evitar jobs repetidos antigos
-        if (!IS_PRODUCTION) {
-            await alertasQueue.obliterate({ force: true });
-            console.log('🧹 Fila de alertas limpa em ambiente não produtivo.');
-        }
-
-        await alertasQueue.add(
-            JOB_NAME,
-            {},
-            {
-                repeat: {
-                    every: JOB_INTERVAL_MS,
-                    immediately: true
-                },
-                removeOnComplete: 20,
-                removeOnFail: 50
-            }
-        );
-
-        console.log(`⏰ Agendador BullMQ iniciado com sucesso para o job "${JOB_NAME}".`);
-    } catch (error) {
-        console.error('❌ Erro no Agendador BullMQ:', error.message);
-    }
+  try {
+    await iniciarJobsDeAlertas();
+    console.log('⏰ Agendador de alertas inicializado com sucesso.');
+  } catch (error) {
+    console.error('❌ Erro ao iniciar agendador de alertas:', error.message);
+  }
 });
 
 /**

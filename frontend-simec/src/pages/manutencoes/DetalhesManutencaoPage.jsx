@@ -6,6 +6,7 @@ import { useDetalhesManutencaoPage } from '../../hooks/manutencoes/useDetalhesMa
 import DetalhesManutencaoPageHeader from '../../components/manutencoes/DetalhesManutencaoPageHeader';
 import InformacoesManutencaoSection from '../../components/manutencoes/InformacoesManutencaoSection';
 import ConfirmacaoFinalManutencao from '../../components/manutencoes/ConfirmacaoFinalManutencao';
+import HistoricoEAnexosManutencaoSection from '../../components/manutencoes/HistoricoEAnexosManutencaoSection';
 
 import Button from '../../components/ui/Button';
 import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
@@ -56,7 +57,7 @@ function DetalhesManutencaoPage() {
         isDestructive
       />
 
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout background="slate" padded fullHeight contentClassName="space-y-6">
         <DetalhesManutencaoPageHeader
           numeroOS={page.manutencao.numeroOS}
           onPrint={page.handlePrint}
@@ -71,6 +72,14 @@ function DetalhesManutencaoPage() {
           onAbrirCancelamento={page.cancelModal.openModal}
           camposPrincipaisBloqueados={page.camposPrincipaisBloqueados}
           isCancelavel={page.isCancelavel}
+          submitting={page.submitting}
+        />
+
+        <HistoricoEAnexosManutencaoSection
+          manutencao={page.manutencao}
+          onAdicionarNota={page.handleAdicionarNota}
+          onUploadAnexos={page.handleUploadAnexos}
+          onRemoverAnexo={page.handleAskDeleteAnexo}
           submitting={page.submitting}
         />
 

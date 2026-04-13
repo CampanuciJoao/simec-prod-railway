@@ -1,44 +1,53 @@
-import { Queue, Worker } from 'bullmq';
+import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import dotenv from 'dotenv';
-import { executarCicloInteligente } from './intelligenceOrchestratorService.js';
 
 dotenv.config();
 
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-console.log('======================================================');
-console.log(`📦 Conectando ao Redis: ${redisUrl.substring(0, 15)}...`);
-console.log('======================================================');
-
 const connection = new IORedis(redisUrl, {
-  maxRetriesPerRequest: null
+  maxRetriesPerRequest: null,
 });
 
 connection.on('error', (err) => {
-  console.error('❌ Erro de conexão com o Redis:', err.message);
+  console.error('❌ Erro Redis (queue):', err.message);
 });
 
-export const alertasQueue = new Queue('alertas-fila', { connection });
+/**
+ * Fila principal de alertas
+ */
+export const alertasQueue = new Queue('alertas-fila', {
+  connection,
+});
 
-const worker = new Worker(
-  'alertas-fila',
-  async (job) => {
-    if (job.name === 'ciclo-inteligente-simec') {
-      console.log('[QUEUE] Executando ciclo inteligente do SIMEC...');
-      await executarCicloInteligente();
-    }
-  },
-  {
-    connection,
-    limiter: { max: 1, duration: 5000 }
+console.log('📦 Queue de alertas inicializada');
+
+/**
+ * Inicializa jobs recorrentes
+ */
+export async function iniciarJobsDeAlertas() {
+  try {
+    console.log('🧠 Inicializando jobs de alertas...');
+
+    // 🔥 REMOVE jobs antigos (evita duplicação)
+    await alertasQueue.obliterate({ force: true });
+
+    await alertasQueue.add(
+      'verificar-tarefas-diarias',
+      {},
+      {
+        repeat: {
+          every: 60000, // roda a cada 1 minuto
+          immediately: true,
+        },
+        removeOnComplete: 50,
+        removeOnFail: 50,
+      }
+    );
+
+    console.log('⏱️ Job recorrente configurado (1 minuto)');
+  } catch (error) {
+    console.error('❌ Erro ao iniciar jobs:', error);
   }
-);
-
-worker.on('completed', (job) => {
-  console.log(`✅ Job concluído: ${job?.name || 'desconhecido'}`);
-});
-
-worker.on('failed', (job, err) => {
-  console.error(`[QUEUE] Erro no job ${job?.name || 'desconhecido'}:`, err.message);
-});
+}
