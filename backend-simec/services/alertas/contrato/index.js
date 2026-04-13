@@ -1,0 +1,1 @@
+export { gerarAlertasContrato } from './contratoAlertas.js';
