@@ -1,27 +1,26 @@
 // Ficheiro: routes/userRoutes.js
-// Versão: Multi-tenant ready
-// Descrição: CRUD de usuários com isolamento por tenant
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import prisma from '../services/prismaService.js';
-import { admin } from '../middleware/authMiddleware.js';
+import { proteger, admin } from '../middleware/authMiddleware.js';
 import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
 
-// Todas as rotas aqui exigem usuário autenticado + admin.
-// No seu server.js, o app.use(proteger) já acontece antes de /api/users.
-// Aqui mantemos o admin para restringir acesso.
+router.use(proteger);
 router.use(admin);
 
-// ROTA: GET /api/users - Listar todos os usuários do tenant atual
+// ==============================
+// GET LISTAR
+// ==============================
 router.get('/', async (req, res) => {
   try {
+    const tenantId = req.usuario.tenantId;
+
     const usuarios = await prisma.usuario.findMany({
-      where: {
-        tenantId: req.usuario.tenantId,
-      },
+      where: { tenantId },
       select: {
         id: true,
         tenantId: true,
@@ -31,9 +30,7 @@ router.get('/', async (req, res) => {
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: {
-        nome: 'asc',
-      },
+      orderBy: { nome: 'asc' },
     });
 
     return res.json(usuarios);
@@ -41,12 +38,13 @@ router.get('/', async (req, res) => {
     console.error('[USER_LIST_ERROR]', error);
     return res.status(500).json({
       message: 'Erro ao buscar usuários.',
-      error: error.message,
     });
   }
 });
 
-// ROTA: POST /api/users - Criar um novo usuário no mesmo tenant do admin logado
+// ==============================
+// POST CRIAR
+// ==============================
 router.post('/', async (req, res) => {
   const { username, senha, nome, role = 'user' } = req.body;
 
@@ -56,48 +54,56 @@ router.post('/', async (req, res) => {
     });
   }
 
-  try {
-    const usernameNormalizado = username.toLowerCase().trim();
+  if (senha.length < 6) {
+    return res.status(400).json({
+      message: 'A senha deve ter no mínimo 6 caracteres.',
+    });
+  }
 
-    const usuarioExistente = await prisma.usuario.findFirst({
+  try {
+    const tenantId = req.usuario.tenantId;
+    const usernameNormalizado = String(username).toLowerCase().trim();
+
+    const existente = await prisma.usuario.findFirst({
       where: {
-        tenantId: req.usuario.tenantId,
+        tenantId,
         username: usernameNormalizado,
       },
       select: { id: true },
     });
 
-    if (usuarioExistente) {
+    if (existente) {
       return res.status(409).json({
         message: 'Este nome de usuário já está em uso neste tenant.',
       });
     }
 
-    const salt = await bcrypt.genSalt(10);
-    const senhaCriptografada = await bcrypt.hash(senha, salt);
+    const senhaHash = await bcrypt.hash(senha, 10);
 
     const novoUsuario = await prisma.usuario.create({
       data: {
-        tenantId: req.usuario.tenantId,
+        tenant: {
+          connect: { id: tenantId },
+        },
         username: usernameNormalizado,
-        senha: senhaCriptografada,
-        nome,
+        senha: senhaHash,
+        nome: String(nome).trim(),
         role,
       },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'CRIAÇÃO',
       entidade: 'Usuário',
       entidadeId: novoUsuario.id,
-      detalhes: `Usuário "${novoUsuario.nome}" (login: ${novoUsuario.username}, role: ${novoUsuario.role}) foi criado.`,
+      detalhes: `Usuário "${novoUsuario.nome}" criado.`,
     });
 
-    const { senha: _senha, ...usuarioCriado } = novoUsuario;
+    const { senha: _senha, ...usuarioSemSenha } = novoUsuario;
 
-    return res.status(201).json(usuarioCriado);
+    return res.status(201).json(usuarioSemSenha);
   } catch (error) {
     console.error('[USER_CREATE_ERROR]', error);
 
@@ -109,139 +115,138 @@ router.post('/', async (req, res) => {
 
     return res.status(500).json({
       message: 'Erro interno do servidor.',
-      error: error.message,
     });
   }
 });
 
-// ROTA: PUT /api/users/:id - Atualiza um usuário do mesmo tenant
+// ==============================
+// PUT EDITAR
+// ==============================
 router.put('/:id', async (req, res) => {
-  const { id: userIdToUpdate } = req.params;
-  const { nome, role, senha: novaSenha } = req.body;
+  const { id } = req.params;
+  const { nome, role, senha } = req.body;
 
   if (!nome || !role) {
     return res.status(400).json({
-      message: 'Nome e Função (role) são obrigatórios.',
+      message: 'Nome e função são obrigatórios.',
     });
   }
 
   try {
-    const usuarioExistente = await prisma.usuario.findFirst({
+    const tenantId = req.usuario.tenantId;
+
+    const usuario = await prisma.usuario.findFirst({
       where: {
-        id: userIdToUpdate,
-        tenantId: req.usuario.tenantId,
+        id,
+        tenantId,
       },
     });
 
-    if (!usuarioExistente) {
+    if (!usuario) {
       return res.status(404).json({
         message: 'Usuário não encontrado.',
       });
     }
 
-    const dadosParaAtualizar = {
-      nome,
+    const dataUpdate = {
+      nome: String(nome).trim(),
       role,
     };
 
-    if (novaSenha) {
-      if (novaSenha.length < 6) {
+    if (senha) {
+      if (senha.length < 6) {
         return res.status(400).json({
-          message: 'A nova senha deve ter no mínimo 6 caracteres.',
+          message: 'A senha deve ter no mínimo 6 caracteres.',
         });
       }
 
-      const salt = await bcrypt.genSalt(10);
-      dadosParaAtualizar.senha = await bcrypt.hash(novaSenha, salt);
+      dataUpdate.senha = await bcrypt.hash(senha, 10);
     }
 
-    const usuarioAtualizado = await prisma.usuario.update({
-      where: { id: userIdToUpdate },
-      data: dadosParaAtualizar,
+    const atualizado = await prisma.usuario.update({
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
+      data: dataUpdate,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EDIÇÃO',
       entidade: 'Usuário',
-      entidadeId: userIdToUpdate,
-      detalhes:
-        `Dados do usuário "${usuarioAtualizado.nome}" foram atualizados.` +
-        (novaSenha ? ' A senha também foi alterada.' : ''),
+      entidadeId: id,
+      detalhes: `Usuário "${atualizado.nome}" atualizado.`,
     });
 
-    const { senha: _senha, ...usuarioSemSenha } = usuarioAtualizado;
+    const { senha: _senha, ...usuarioSemSenha } = atualizado;
 
     return res.json(usuarioSemSenha);
   } catch (error) {
     console.error('[USER_UPDATE_ERROR]', error);
 
-    if (error.code === 'P2025') {
-      return res.status(404).json({
-        message: 'Usuário não encontrado.',
-      });
-    }
-
     return res.status(500).json({
-      message: 'Erro interno do servidor ao atualizar usuário.',
-      error: error.message,
+      message: 'Erro ao atualizar usuário.',
     });
   }
 });
 
-// ROTA: DELETE /api/users/:id - Excluir um usuário do mesmo tenant
+// ==============================
+// DELETE
+// ==============================
 router.delete('/:id', async (req, res) => {
-  const { id: userIdToDelete } = req.params;
+  const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
-  if (req.usuario.id === userIdToDelete) {
+  if (req.usuario.id === id) {
     return res.status(403).json({
-      message: 'Ação não permitida. Você não pode excluir sua própria conta.',
+      message: 'Você não pode excluir sua própria conta.',
     });
   }
 
   try {
-    const usuarioParaExcluir = await prisma.usuario.findFirst({
+    const usuario = await prisma.usuario.findFirst({
       where: {
-        id: userIdToDelete,
-        tenantId: req.usuario.tenantId,
+        id,
+        tenantId,
       },
     });
 
-    if (!usuarioParaExcluir) {
+    if (!usuario) {
       return res.status(404).json({
         message: 'Usuário não encontrado.',
       });
     }
 
     await prisma.usuario.delete({
-      where: { id: userIdToDelete },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃO',
       entidade: 'Usuário',
-      entidadeId: userIdToDelete,
-      detalhes: `O usuário "${usuarioParaExcluir.nome}" (login: ${usuarioParaExcluir.username}) foi excluído.`,
+      entidadeId: id,
+      detalhes: `Usuário "${usuario.nome}" removido.`,
     });
 
-    return res.status(200).json({
+    return res.json({
       message: 'Usuário excluído com sucesso.',
     });
   } catch (error) {
     console.error('[USER_DELETE_ERROR]', error);
 
-    if (error.code === 'P2025') {
-      return res.status(404).json({
-        message: 'Usuário não encontrado.',
-      });
-    }
-
     return res.status(500).json({
-      message: 'Erro interno do servidor.',
-      error: error.message,
+      message: 'Erro ao excluir usuário.',
     });
   }
 });

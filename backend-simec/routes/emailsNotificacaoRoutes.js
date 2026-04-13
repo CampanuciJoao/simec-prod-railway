@@ -1,19 +1,19 @@
 // Ficheiro: routes/emailsNotificacaoRoutes.js
-// Versão: Multi-tenant ready
-// Descrição: CRUD de e-mails de notificação com isolamento por tenant
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
-import { admin } from '../middleware/authMiddleware.js';
+import { proteger, admin } from '../middleware/authMiddleware.js';
 import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
 
-// Todas as rotas exigem admin.
-// No server.js a proteção geral já acontece antes, então aqui reforçamos a permissão.
+router.use(proteger);
 router.use(admin);
 
-// GET /api/emails-notificacao - Lista todos os e-mails do tenant atual
+// ==============================
+// GET LISTAR
+// ==============================
 router.get('/', async (req, res) => {
   try {
     const emails = await prisma.emailNotificacao.findMany({
@@ -34,7 +34,9 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /api/emails-notificacao - Adiciona um novo e-mail no tenant atual
+// ==============================
+// POST CRIAR
+// ==============================
 router.post('/', async (req, res) => {
   const {
     email,
@@ -45,23 +47,23 @@ router.post('/', async (req, res) => {
     recebeAlertasSeguro,
   } = req.body;
 
-  if (!email) {
+  if (!email || typeof email !== 'string') {
     return res.status(400).json({
       message: 'O campo e-mail é obrigatório.',
     });
   }
 
   try {
-    const emailNormalizado = String(email).trim().toLowerCase();
+    const tenantId = req.usuario.tenantId;
+
+    const emailNormalizado = email.trim().toLowerCase();
 
     const existente = await prisma.emailNotificacao.findFirst({
       where: {
-        tenantId: req.usuario.tenantId,
+        tenantId,
         email: emailNormalizado,
       },
-      select: {
-        id: true,
-      },
+      select: { id: true },
     });
 
     if (existente) {
@@ -72,10 +74,12 @@ router.post('/', async (req, res) => {
 
     const novoEmail = await prisma.emailNotificacao.create({
       data: {
-        tenantId: req.usuario.tenantId,
+        tenant: {
+          connect: { id: tenantId },
+        },
         email: emailNormalizado,
         nome,
-        diasAntecedencia: parseInt(diasAntecedencia, 10) || 30,
+        diasAntecedencia: Number.parseInt(diasAntecedencia, 10) || 30,
         recebeAlertasContrato: !!recebeAlertasContrato,
         recebeAlertasManutencao: !!recebeAlertasManutencao,
         recebeAlertasSeguro: !!recebeAlertasSeguro,
@@ -83,12 +87,12 @@ router.post('/', async (req, res) => {
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'CRIAÇÃO',
       entidade: 'EmailNotificacao',
       entidadeId: novoEmail.id,
-      detalhes: `E-mail "${novoEmail.email}" adicionado à lista de notificações.`,
+      detalhes: `E-mail "${novoEmail.email}" adicionado.`,
     });
 
     return res.status(201).json(novoEmail);
@@ -107,9 +111,12 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/emails-notificacao/:id - Atualiza um e-mail do tenant atual
+// ==============================
+// PUT EDITAR
+// ==============================
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
+
   const {
     nome,
     diasAntecedencia,
@@ -118,11 +125,13 @@ router.put('/:id', async (req, res) => {
     recebeAlertasSeguro,
   } = req.body;
 
+  const tenantId = req.usuario.tenantId;
+
   try {
     const emailExistente = await prisma.emailNotificacao.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -133,10 +142,15 @@ router.put('/:id', async (req, res) => {
     }
 
     const emailAtualizado = await prisma.emailNotificacao.update({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
       data: {
         nome,
-        diasAntecedencia: parseInt(diasAntecedencia, 10) || 30,
+        diasAntecedencia: Number.parseInt(diasAntecedencia, 10) || 30,
         recebeAlertasContrato: !!recebeAlertasContrato,
         recebeAlertasManutencao: !!recebeAlertasManutencao,
         recebeAlertasSeguro: !!recebeAlertasSeguro,
@@ -144,23 +158,17 @@ router.put('/:id', async (req, res) => {
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EDIÇÃO',
       entidade: 'EmailNotificacao',
       entidadeId: id,
-      detalhes: `Configurações do e-mail "${emailAtualizado.email}" foram atualizadas.`,
+      detalhes: `E-mail "${emailAtualizado.email}" atualizado.`,
     });
 
     return res.json(emailAtualizado);
   } catch (error) {
     console.error('[EMAIL_NOTIFICACAO_UPDATE_ERROR]', error);
-
-    if (error.code === 'P2025') {
-      return res.status(404).json({
-        message: 'E-mail não encontrado.',
-      });
-    }
 
     return res.status(500).json({
       message: 'Erro ao atualizar e-mail.',
@@ -168,15 +176,18 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/emails-notificacao/:id - Remove um e-mail do tenant atual
+// ==============================
+// DELETE
+// ==============================
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const emailExistente = await prisma.emailNotificacao.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -186,28 +197,27 @@ router.delete('/:id', async (req, res) => {
       });
     }
 
-    const emailExcluido = await prisma.emailNotificacao.delete({
-      where: { id },
+    await prisma.emailNotificacao.delete({
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃO',
       entidade: 'EmailNotificacao',
-      entidadeId: emailExcluido.id,
-      detalhes: `E-mail "${emailExcluido.email}" foi removido.`,
+      entidadeId: id,
+      detalhes: `E-mail "${emailExistente.email}" removido.`,
     });
 
     return res.status(204).send();
   } catch (error) {
     console.error('[EMAIL_NOTIFICACAO_DELETE_ERROR]', error);
-
-    if (error.code === 'P2025') {
-      return res.status(404).json({
-        message: 'E-mail não encontrado.',
-      });
-    }
 
     return res.status(500).json({
       message: 'Erro ao remover e-mail.',

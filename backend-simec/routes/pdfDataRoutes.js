@@ -1,5 +1,5 @@
 // Ficheiro: routes/pdfDataRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -18,7 +18,7 @@ router.get('/manutencao/:id', async (req, res) => {
     const { id } = req.params;
     const tenantId = req.usuario.tenantId;
 
-    if (!id) {
+    if (!id || typeof id !== 'string') {
       return res.status(400).json({
         message: 'O id da manutenção é obrigatório.',
       });
@@ -35,16 +35,29 @@ router.get('/manutencao/:id', async (req, res) => {
             unidade: true,
           },
         },
+        anexos: {
+          where: {
+            tenantId,
+          },
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
         notasAndamento: {
           where: {
             tenantId,
           },
           include: {
             autor: {
-              select: { nome: true },
+              select: {
+                id: true,
+                nome: true,
+              },
             },
           },
-          orderBy: { data: 'asc' },
+          orderBy: {
+            data: 'asc',
+          },
         },
       },
     });
@@ -55,7 +68,7 @@ router.get('/manutencao/:id', async (req, res) => {
       });
     }
 
-    return res.json(manutencao);
+    return res.status(200).json(manutencao);
   } catch (error) {
     console.error('[PDF_DATA_OS_ERROR]', error);
     return res.status(500).json({
@@ -79,9 +92,13 @@ router.post('/relatorio', async (req, res) => {
       });
     }
 
-    const idsValidos = ids.filter(Boolean);
+    const idsValidos = ids
+      .filter((id) => typeof id === 'string' && id.trim() !== '')
+      .map((id) => id.trim());
 
-    if (idsValidos.length === 0) {
+    const idsUnicos = [...new Set(idsValidos)];
+
+    if (idsUnicos.length === 0) {
       return res.status(400).json({
         message: 'Nenhum ID válido foi informado para gerar o relatório.',
       });
@@ -90,7 +107,9 @@ router.post('/relatorio', async (req, res) => {
     const manutencoes = await prisma.manutencao.findMany({
       where: {
         tenantId,
-        id: { in: idsValidos },
+        id: {
+          in: idsUnicos,
+        },
       },
       select: {
         id: true,
@@ -99,17 +118,26 @@ router.post('/relatorio', async (req, res) => {
         status: true,
         dataHoraAgendamentoInicio: true,
         dataHoraAgendamentoFim: true,
+        dataInicioReal: true,
+        dataFimReal: true,
         dataConclusao: true,
         tecnicoResponsavel: true,
         descricaoProblemaServico: true,
         numeroChamado: true,
         equipamento: {
           select: {
+            id: true,
             modelo: true,
             tag: true,
+            tipo: true,
+            fabricante: true,
             unidade: {
               select: {
+                id: true,
                 nomeSistema: true,
+                nomeFantasia: true,
+                cidade: true,
+                estado: true,
               },
             },
           },
@@ -120,10 +148,11 @@ router.post('/relatorio', async (req, res) => {
       },
     });
 
-    return res.json({
+    return res.status(200).json({
       tipoRelatorio: 'manutencoesRealizadas',
-      total: manutencoes.length,
-      ids: idsValidos,
+      totalSolicitado: idsUnicos.length,
+      totalEncontrado: manutencoes.length,
+      ids: idsUnicos,
       dados: manutencoes,
     });
   } catch (error) {

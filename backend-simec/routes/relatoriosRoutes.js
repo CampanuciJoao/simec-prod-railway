@@ -1,5 +1,5 @@
 // Ficheiro: routes/relatoriosRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 // Descrição: Geração de relatórios com isolamento por tenant
 
 import express from 'express';
@@ -7,8 +7,11 @@ import {
   buscarManutencoesRealizadas,
   buscarInventarioEquipamentos,
 } from '../services/reportQueryService.js';
+import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+router.use(proteger);
 
 // ROTA: POST /api/relatorios/gerar
 router.post('/gerar', async (req, res) => {
@@ -31,7 +34,7 @@ router.post('/gerar', async (req, res) => {
     });
   }
 
-  if (!tipoRelatorio) {
+  if (!tipoRelatorio || typeof tipoRelatorio !== 'string') {
     return res.status(400).json({
       message: 'O tipo de relatório é obrigatório.',
     });
@@ -44,9 +47,9 @@ router.post('/gerar', async (req, res) => {
     if (tipoRelatorio === 'inventarioEquipamentos') {
       dadosRelatorio = await buscarInventarioEquipamentos({
         tenantId,
-        unidadeId,
-        fabricante,
-        status,
+        unidadeId: unidadeId || null,
+        fabricante: fabricante ? String(fabricante).trim() : null,
+        status: status ? String(status).trim() : null,
       });
     }
 
@@ -58,13 +61,28 @@ router.post('/gerar', async (req, res) => {
         });
       }
 
+      const inicio = new Date(dataInicio);
+      const fim = new Date(dataFim);
+
+      if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime())) {
+        return res.status(400).json({
+          message: 'As datas informadas são inválidas.',
+        });
+      }
+
+      if (inicio > fim) {
+        return res.status(400).json({
+          message: 'A data inicial não pode ser maior que a data final.',
+        });
+      }
+
       dadosRelatorio = await buscarManutencoesRealizadas({
         tenantId,
         dataInicio,
         dataFim,
-        unidadeId,
-        equipamentoId,
-        tipoManutencao,
+        unidadeId: unidadeId || null,
+        equipamentoId: equipamentoId || null,
+        tipoManutencao: tipoManutencao ? String(tipoManutencao).trim() : null,
       });
     }
 
@@ -75,20 +93,21 @@ router.post('/gerar', async (req, res) => {
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       tipoRelatorio,
       tenantId,
       periodo: {
-        inicio: dataInicio,
-        fim: dataFim,
+        inicio: dataInicio || null,
+        fim: dataFim || null,
       },
       filtros: {
-        unidadeId,
-        fabricante,
-        tipoManutencao,
-        equipamentoId,
-        status,
+        unidadeId: unidadeId || null,
+        fabricante: fabricante || null,
+        tipoManutencao: tipoManutencao || null,
+        equipamentoId: equipamentoId || null,
+        status: status || null,
       },
+      total: Array.isArray(dadosRelatorio) ? dadosRelatorio.length : 0,
       dados: dadosRelatorio,
     });
   } catch (error) {

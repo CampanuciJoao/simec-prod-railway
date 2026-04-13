@@ -1,5 +1,5 @@
 // Ficheiro: routes/contratosRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant HARDENED (produção)
 
 import express from 'express';
 import multer from 'multer';
@@ -41,8 +41,12 @@ router.get('/', async (req, res) => {
         tenantId: req.usuario.tenantId,
       },
       include: {
-        unidadesCobertas: { select: { id: true, nomeSistema: true } },
-        equipamentosCobertos: { select: { id: true, modelo: true, tag: true } },
+        unidadesCobertas: {
+          select: { id: true, nomeSistema: true },
+        },
+        equipamentosCobertos: {
+          select: { id: true, modelo: true, tag: true },
+        },
         anexos: true,
       },
       orderBy: { dataFim: 'asc' },
@@ -133,18 +137,36 @@ router.post('/', validate(contratoSchema), async (req, res) => {
 
     const novo = await prisma.contrato.create({
       data: {
-        tenantId: req.usuario.tenantId,
+        tenant: {
+          connect: { id: req.usuario.tenantId },
+        },
         numeroContrato,
         categoria,
         fornecedor,
         dataInicio: new Date(dataInicio),
         dataFim: new Date(dataFim),
         status: status || 'Ativo',
+
         unidadesCobertas: unidadesCobertasIds?.length
-          ? { connect: unidadesCobertasIds.map(id => ({ id })) }
+          ? {
+              connect: unidadesCobertasIds.map((id) => ({
+                tenantId_id: {
+                  tenantId: req.usuario.tenantId,
+                  id,
+                },
+              })),
+            }
           : undefined,
+
         equipamentosCobertos: equipamentosCobertosIds?.length
-          ? { connect: equipamentosCobertosIds.map(id => ({ id })) }
+          ? {
+              connect: equipamentosCobertosIds.map((id) => ({
+                tenantId_id: {
+                  tenantId: req.usuario.tenantId,
+                  id,
+                },
+              })),
+            }
           : undefined,
       },
     });
@@ -192,13 +214,36 @@ router.put('/:id', validate(contratoSchema), async (req, res) => {
     }
 
     const atualizado = await prisma.contrato.update({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId: req.usuario.tenantId,
+          id,
+        },
+      },
       data: {
         ...dados,
         dataInicio: dados.dataInicio ? new Date(dados.dataInicio) : undefined,
         dataFim: dados.dataFim ? new Date(dados.dataFim) : undefined,
-        unidadesCobertas: { set: unidadesCobertasIds?.map(id => ({ id })) || [] },
-        equipamentosCobertos: { set: equipamentosCobertosIds?.map(id => ({ id })) || [] },
+
+        unidadesCobertas: {
+          set:
+            unidadesCobertasIds?.map((id) => ({
+              tenantId_id: {
+                tenantId: req.usuario.tenantId,
+                id,
+              },
+            })) || [],
+        },
+
+        equipamentosCobertos: {
+          set:
+            equipamentosCobertosIds?.map((id) => ({
+              tenantId_id: {
+                tenantId: req.usuario.tenantId,
+                id,
+              },
+            })) || [],
+        },
       },
     });
 
@@ -241,7 +286,14 @@ router.delete('/:id', admin, async (req, res) => {
       if (fs.existsSync(a.path)) fs.unlinkSync(a.path);
     });
 
-    await prisma.contrato.delete({ where: { id } });
+    await prisma.contrato.delete({
+      where: {
+        tenantId_id: {
+          tenantId: req.usuario.tenantId,
+          id,
+        },
+      },
+    });
 
     await registrarLog({
       tenantId: req.usuario.tenantId,
@@ -260,7 +312,7 @@ router.delete('/:id', admin, async (req, res) => {
 });
 
 // ==============================
-// ANEXOS
+// UPLOAD ANEXOS
 // ==============================
 router.post('/:id/anexos', upload.array('contratos'), async (req, res) => {
   const { id } = req.params;
@@ -287,8 +339,11 @@ router.post('/:id/anexos', upload.array('contratos'), async (req, res) => {
 
     await prisma.anexo.createMany({ data: anexosData });
 
-    const atualizado = await prisma.contrato.findUnique({
-      where: { id },
+    const atualizado = await prisma.contrato.findFirst({
+      where: {
+        id,
+        tenantId: req.usuario.tenantId,
+      },
       include: { anexos: true },
     });
 
@@ -319,7 +374,11 @@ router.delete('/:id/anexos/:anexoId', async (req, res) => {
 
     if (fs.existsSync(anexo.path)) fs.unlinkSync(anexo.path);
 
-    await prisma.anexo.delete({ where: { id: anexoId } });
+    await prisma.anexo.delete({
+      where: {
+        id: anexoId,
+      },
+    });
 
     return res.status(204).send();
   } catch (error) {

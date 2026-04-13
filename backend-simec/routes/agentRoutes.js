@@ -1,5 +1,5 @@
 // Ficheiro: routes/agentRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import { RoteadorAgente } from '../services/agent/index.js';
@@ -7,6 +7,11 @@ import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
+/**
+ * POST /api/agent/chat
+ * Endpoint principal do agente conversacional.
+ * Requer autenticação e contexto multi-tenant válido.
+ */
 router.post('/chat', proteger, async (req, res) => {
   const mensagem = req.body?.mensagem;
 
@@ -24,11 +29,7 @@ router.post('/chat', proteger, async (req, res) => {
   try {
     const usuarioId = req.usuario?.id;
     const tenantId = req.usuario?.tenantId;
-    const usuarioNome =
-      req.usuario?.nome ||
-      req.user?.nome ||
-      req.usuario?.name ||
-      'Usuário';
+    const usuarioNome = req.usuario?.nome || 'Usuário';
 
     if (!usuarioId || !tenantId) {
       return res.status(401).json({
@@ -50,7 +51,7 @@ router.post('/chat', proteger, async (req, res) => {
     });
 
     if (typeof resultado === 'string') {
-      return res.json({
+      return res.status(200).json({
         resposta: {
           mensagem: resultado,
           acao: null,
@@ -61,7 +62,7 @@ router.post('/chat', proteger, async (req, res) => {
     }
 
     if (resultado && typeof resultado === 'object') {
-      return res.json({
+      return res.status(200).json({
         resposta: {
           mensagem: resultado.mensagem || 'Operação concluída.',
           acao: resultado.acao || null,
@@ -71,7 +72,7 @@ router.post('/chat', proteger, async (req, res) => {
       });
     }
 
-    return res.json({
+    return res.status(200).json({
       resposta: {
         mensagem:
           'Recebi sua solicitação, mas não consegui montar uma resposta válida.',

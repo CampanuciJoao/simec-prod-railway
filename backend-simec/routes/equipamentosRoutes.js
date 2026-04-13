@@ -1,5 +1,5 @@
 // Ficheiro: routes/equipamentosRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import multer from 'multer';
@@ -8,7 +8,7 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
-import { admin } from '../middleware/authMiddleware.js';
+import { proteger, admin } from '../middleware/authMiddleware.js';
 
 import validate from '../middleware/validate.js';
 import {
@@ -17,6 +17,8 @@ import {
 } from '../validators/equipamentoValidator.js';
 
 const router = express.Router();
+
+router.use(proteger);
 
 // ==============================
 // MULTER
@@ -95,14 +97,15 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
   const { dataInstalacao, unidadeId, ...dados } = req.body;
 
   try {
+    const tenantId = req.usuario.tenantId;
+
     const unidade = await prisma.unidade.findFirst({
       where: {
         id: unidadeId,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       select: {
         id: true,
-        tenantId: true,
       },
     });
 
@@ -115,7 +118,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
     if (patrimonio && patrimonio.toLowerCase() !== 'sem patrimônio') {
       const existente = await prisma.equipamento.findFirst({
         where: {
-          tenantId: req.usuario.tenantId,
+          tenantId,
           numeroPatrimonio: {
             equals: patrimonio,
             mode: 'insensitive',
@@ -136,15 +139,13 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
         dataInstalacao: parseDate(dataInstalacao),
 
         tenant: {
-          connect: {
-            id: req.usuario.tenantId,
-          },
+          connect: { id: tenantId },
         },
 
         unidade: {
           connect: {
             tenantId_id: {
-              tenantId: req.usuario.tenantId,
+              tenantId,
               id: unidadeId,
             },
           },
@@ -153,7 +154,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'CRIAÇÃO',
       entidade: 'Equipamento',
@@ -175,11 +176,13 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
   const { id } = req.params;
   const { dataInstalacao, unidadeId, ...dados } = req.body;
 
+  const tenantId = req.usuario.tenantId;
+
   try {
     const equipamento = await prisma.equipamento.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -196,11 +199,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       const unidade = await prisma.unidade.findFirst({
         where: {
           id: unidadeId,
-          tenantId: req.usuario.tenantId,
-        },
-        select: {
-          id: true,
-          tenantId: true,
+          tenantId,
         },
       });
 
@@ -211,7 +210,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       dataUpdate.unidade = {
         connect: {
           tenantId_id: {
-            tenantId: req.usuario.tenantId,
+            tenantId,
             id: unidadeId,
           },
         },
@@ -219,12 +218,17 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
     }
 
     const atualizado = await prisma.equipamento.update({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
       data: dataUpdate,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EDIÇÃO',
       entidade: 'Equipamento',
@@ -244,12 +248,13 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
 // ==============================
 router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const equipamento = await prisma.equipamento.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -258,11 +263,16 @@ router.delete('/:id', admin, async (req, res) => {
     }
 
     await prisma.equipamento.delete({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃO',
       entidade: 'Equipamento',

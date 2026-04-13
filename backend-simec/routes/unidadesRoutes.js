@@ -1,5 +1,5 @@
 // Ficheiro: routes/unidadesRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import multer from 'multer';
@@ -8,11 +8,14 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
+import { proteger, admin } from '../middleware/authMiddleware.js';
 
 import validate from '../middleware/validate.js';
 import { unidadeSchema } from '../validators/unidadeValidator.js';
 
 const router = express.Router();
+
+router.use(proteger);
 
 // ==============================
 // MULTER
@@ -20,28 +23,25 @@ const router = express.Router();
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = 'uploads/unidades';
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
   filename: (req, file, cb) => {
-    const nomeUnico = `${uuidv4()}${path.extname(file.originalname)}`;
-    cb(null, nomeUnico);
+    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
   },
 });
 
 const upload = multer({ storage });
 
 // ==============================
-// GET LISTAR UNIDADES
+// GET LISTAR
 // ==============================
 router.get('/', async (req, res) => {
   try {
+    const tenantId = req.usuario.tenantId;
+
     const unidades = await prisma.unidade.findMany({
-      where: {
-        tenantId: req.usuario.tenantId,
-      },
+      where: { tenantId },
       orderBy: { nomeSistema: 'asc' },
     });
 
@@ -53,14 +53,16 @@ router.get('/', async (req, res) => {
 });
 
 // ==============================
-// GET UNIDADE POR ID
+// GET POR ID
 // ==============================
 router.get('/:id', async (req, res) => {
   try {
+    const tenantId = req.usuario.tenantId;
+
     const unidade = await prisma.unidade.findFirst({
       where: {
         id: req.params.id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       include: { anexos: true },
     });
@@ -77,41 +79,24 @@ router.get('/:id', async (req, res) => {
 });
 
 // ==============================
-// POST CRIAR UNIDADE
+// POST CRIAR
 // ==============================
 router.post('/', validate(unidadeSchema), async (req, res) => {
-  const {
-    nomeSistema,
-    nomeFantasia,
-    cnpj,
-    logradouro,
-    numero,
-    complemento,
-    bairro,
-    cidade,
-    estado,
-    cep,
-  } = req.body;
-
   try {
+    const tenantId = req.usuario.tenantId;
+
     const novaUnidade = await prisma.unidade.create({
       data: {
-        tenantId: req.usuario.tenantId,
-        nomeSistema,
-        nomeFantasia,
-        cnpj,
-        logradouro,
-        numero,
-        complemento,
-        bairro,
-        cidade,
-        estado,
-        cep,
+        ...req.body,
+
+        tenant: {
+          connect: { id: tenantId },
+        },
       },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'CRIAÇÃO',
       entidade: 'Unidade',
@@ -134,16 +119,17 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
 });
 
 // ==============================
-// PUT EDITAR UNIDADE
+// PUT EDITAR
 // ==============================
 router.put('/:id', validate(unidadeSchema), async (req, res) => {
   const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const unidadeExistente = await prisma.unidade.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -152,14 +138,19 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
     }
 
     const unidadeAtualizada = await prisma.unidade.update({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
       data: {
         ...req.body,
       },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EDIÇÃO',
       entidade: 'Unidade',
@@ -175,16 +166,17 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
 });
 
 // ==============================
-// DELETE UNIDADE
+// DELETE
 // ==============================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const unidade = await prisma.unidade.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       include: { anexos: true },
     });
@@ -193,17 +185,23 @@ router.delete('/:id', async (req, res) => {
       return res.status(404).json({ message: 'Unidade não encontrada.' });
     }
 
-    await prisma.unidade.delete({ where: { id } });
-
-    // remove arquivos físicos
     unidade.anexos?.forEach((anexo) => {
       if (anexo.path && fs.existsSync(anexo.path)) {
         fs.unlinkSync(anexo.path);
       }
     });
 
+    await prisma.unidade.delete({
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
+    });
+
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃO',
       entidade: 'Unidade',
@@ -230,12 +228,13 @@ router.delete('/:id', async (req, res) => {
 // ==============================
 router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
   const { id: unidadeId } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const unidade = await prisma.unidade.findFirst({
       where: {
         id: unidadeId,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -244,7 +243,7 @@ router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
     }
 
     const anexosData = req.files.map((file) => ({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       unidadeId,
       nomeOriginal: file.originalname,
       path: file.path,
@@ -253,8 +252,11 @@ router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
 
     await prisma.anexo.createMany({ data: anexosData });
 
-    const unidadeAtualizada = await prisma.unidade.findUnique({
-      where: { id: unidadeId },
+    const unidadeAtualizada = await prisma.unidade.findFirst({
+      where: {
+        id: unidadeId,
+        tenantId,
+      },
       include: { anexos: true },
     });
 
@@ -267,12 +269,13 @@ router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
 
 router.delete('/:id/anexos/:anexoId', async (req, res) => {
   const { anexoId } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const anexo = await prisma.anexo.findFirst({
       where: {
         id: anexoId,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -284,7 +287,9 @@ router.delete('/:id/anexos/:anexoId', async (req, res) => {
       fs.unlinkSync(anexo.path);
     }
 
-    await prisma.anexo.delete({ where: { id: anexoId } });
+    await prisma.anexo.delete({
+      where: { id: anexoId },
+    });
 
     return res.status(204).send();
   } catch (error) {

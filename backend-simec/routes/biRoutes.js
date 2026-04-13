@@ -1,11 +1,14 @@
 // Ficheiro: routes/biRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
 import { startOfYear, endOfYear, differenceInHours } from 'date-fns';
+import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+router.use(proteger);
 
 router.get('/indicadores', async (req, res) => {
   try {
@@ -31,6 +34,9 @@ router.get('/indicadores', async (req, res) => {
             },
           },
         },
+        orderBy: {
+          dataConclusao: 'desc',
+        },
       }),
 
       prisma.equipamento.count({
@@ -43,15 +49,21 @@ router.get('/indicadores', async (req, res) => {
     const statsEquip = {};
     const statsUnidade = {};
 
-    manutencoes.forEach((m) => {
+    for (const m of manutencoes) {
+      if (!m.equipamento || !m.equipamento.unidade) {
+        continue;
+      }
+
       const eId = m.equipamentoId;
       const uId = m.equipamento.unidadeId;
       const uNome = m.equipamento.unidade.nomeSistema;
 
       if (!statsEquip[eId]) {
         statsEquip[eId] = {
+          equipamentoId: eId,
           modelo: m.equipamento.modelo,
           tag: m.equipamento.tag,
+          unidadeId: uId,
           unidade: uNome,
           corretivas: 0,
           preventivas: 0,
@@ -61,6 +73,7 @@ router.get('/indicadores', async (req, res) => {
 
       if (!statsUnidade[uId]) {
         statsUnidade[uId] = {
+          unidadeId: uId,
           nome: uNome,
           horasParado: 0,
         };
@@ -83,7 +96,15 @@ router.get('/indicadores', async (req, res) => {
         statsEquip[eId].horasParado += horasValidas;
         statsUnidade[uId].horasParado += horasValidas;
       }
-    });
+    }
+
+    const manutencoesPreventivas = manutencoes.filter(
+      (m) => m.tipo === 'Preventiva'
+    ).length;
+
+    const manutencoesCorretivas = manutencoes.filter(
+      (m) => m.tipo === 'Corretiva'
+    ).length;
 
     const rankingDowntime = Object.values(statsEquip)
       .sort((a, b) => b.horasParado - a.horasParado)
@@ -97,12 +118,13 @@ router.get('/indicadores', async (req, res) => {
       .sort((a, b) => b.horasParado - a.horasParado)
       .slice(0, 10);
 
-    return res.json({
+    return res.status(200).json({
       ano: agora.getFullYear(),
       resumoGeral: {
         totalAtivos: totalEquipamentos,
-        preventivas: manutencoes.filter((m) => m.tipo === 'Preventiva').length,
-        corretivas: manutencoes.filter((m) => m.tipo === 'Corretiva').length,
+        preventivas: manutencoesPreventivas,
+        corretivas: manutencoesCorretivas,
+        totalManutencoesConcluidas: manutencoes.length,
       },
       rankingDowntime,
       rankingFrequencia,

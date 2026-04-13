@@ -4,12 +4,13 @@
   "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "npx prisma db push --force-reset && npm run seed && node server.js",
     "dev": "nodemon server.js",
+    "start": "node server.js",
     "start:prod": "node server.js",
     "seed": "node seed.js",
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push",
+    "prisma:reset": "npx prisma db push --force-reset && npm run seed",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "prisma": {

@@ -1,14 +1,17 @@
 // Ficheiro: middleware/authMiddleware.js
-// Versão: Multi-tenant ready
-// Descrição: Middleware de autenticação com suporte a tenant.
+// Versão: Multi-tenant hardened
+// Descrição: Middleware de autenticação com suporte a tenant e validações reforçadas.
 
 import jwt from 'jsonwebtoken';
 import prisma from '../services/prismaService.js';
 
 /**
  * Middleware para proteger rotas.
- * Valida o token JWT, confirma se o usuário ainda existe
- * e carrega também o contexto do tenant.
+ * - Valida o token JWT
+ * - Busca o usuário no banco
+ * - Carrega o tenant vinculado
+ * - Bloqueia tenants inativos
+ * - Injeta o contexto autenticado em req.usuario e req.auth
  */
 export const proteger = async (req, res, next) => {
   try {
@@ -28,10 +31,25 @@ export const proteger = async (req, res, next) => {
       });
     }
 
+    if (!process.env.JWT_SECRET) {
+      console.error('[AUTH_MIDDLEWARE_ERROR] JWT_SECRET não configurado.');
+      return res.status(500).json({
+        message: 'Erro de configuração do servidor.',
+      });
+    }
+
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    if (!decoded || !decoded.id) {
+      return res.status(401).json({
+        message: 'Não autorizado. Token inválido.',
+      });
+    }
+
     const usuarioAtual = await prisma.usuario.findUnique({
-      where: { id: decoded.id },
+      where: {
+        id: decoded.id,
+      },
       include: {
         tenant: {
           select: {
@@ -39,6 +57,7 @@ export const proteger = async (req, res, next) => {
             nome: true,
             slug: true,
             timezone: true,
+            locale: true,
             ativo: true,
           },
         },
@@ -65,6 +84,14 @@ export const proteger = async (req, res, next) => {
 
     req.usuario = {
       id: usuarioAtual.id,
+      nome: usuarioAtual.nome,
+      role: usuarioAtual.role,
+      tenantId: usuarioAtual.tenantId,
+      tenant: usuarioAtual.tenant,
+    };
+
+    req.auth = {
+      userId: usuarioAtual.id,
       nome: usuarioAtual.nome,
       role: usuarioAtual.role,
       tenantId: usuarioAtual.tenantId,

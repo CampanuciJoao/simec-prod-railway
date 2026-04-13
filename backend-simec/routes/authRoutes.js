@@ -1,5 +1,5 @@
 // Ficheiro: routes/authRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 // Descrição: Autentica usuário, inclui tenantId no JWT e devolve contexto do tenant.
 
 import express from 'express';
@@ -10,8 +10,14 @@ import prisma from '../services/prismaService.js';
 const router = express.Router();
 
 /**
- * ROTA: POST /api/auth/login
- * FINALIDADE: Autenticar um usuário e retornar um token JWT com contexto de tenant.
+ * POST /api/auth/login
+ * Autentica um usuário e retorna token JWT com contexto de tenant.
+ *
+ * OBS:
+ * Nesta fase, o login ainda busca apenas por username.
+ * Isso funciona enquanto usernames forem efetivamente únicos na prática.
+ * No modelo multi-tenant ideal, o login deve incluir também o tenant
+ * (slug, subdomínio ou outro identificador).
  */
 router.post('/login', async (req, res) => {
   try {
@@ -23,17 +29,20 @@ router.post('/login', async (req, res) => {
       });
     }
 
-    const usernameNormalizado = username.toLowerCase().trim();
+    if (!process.env.JWT_SECRET) {
+      console.error('[AUTH_LOGIN_ERROR] JWT_SECRET não configurado.');
+      return res.status(500).json({
+        message: 'Erro de configuração do servidor.',
+      });
+    }
+
+    const usernameNormalizado = String(username).toLowerCase().trim();
 
     console.log(
       `[AUTH] Tentativa de login para o usuário: '${usernameNormalizado}'`
     );
 
-    // Multi-tenant:
-    // Nesta fase de transição, ainda estamos buscando por username.
-    // Quando você evoluir para login com tenant explícito (slug/subdomínio),
-    // este trecho poderá filtrar também por tenant.
-    const usuario = await prisma.usuario.findFirst({
+    const usuariosEncontrados = await prisma.usuario.findMany({
       where: {
         username: usernameNormalizado,
       },
@@ -44,13 +53,15 @@ router.post('/login', async (req, res) => {
             nome: true,
             slug: true,
             timezone: true,
+            locale: true,
             ativo: true,
           },
         },
       },
+      take: 2,
     });
 
-    if (!usuario) {
+    if (!usuariosEncontrados.length) {
       console.log(
         `[AUTH] Falha: Usuário '${usernameNormalizado}' não encontrado no banco de dados.`
       );
@@ -59,12 +70,25 @@ router.post('/login', async (req, res) => {
       });
     }
 
+    if (usuariosEncontrados.length > 1) {
+      console.error(
+        `[AUTH] Ambiguidade de login: username '${usernameNormalizado}' existe em múltiplos tenants.`
+      );
+      return res.status(409).json({
+        message:
+          'Existem múltiplos usuários com esse login em empresas diferentes. O login precisa ser ajustado para considerar a empresa.',
+      });
+    }
+
+    const usuario = usuariosEncontrados[0];
+
     if (!usuario.tenantId || !usuario.tenant) {
       console.log(
         `[AUTH] Falha: Usuário '${usernameNormalizado}' está sem tenant vinculado.`
       );
       return res.status(403).json({
-        message: 'Usuário sem tenant vinculado. Verifique a configuração do sistema.',
+        message:
+          'Usuário sem tenant vinculado. Verifique a configuração do sistema.',
       });
     }
 
@@ -100,7 +124,7 @@ router.post('/login', async (req, res) => {
       expiresIn: '8h',
     });
 
-    return res.json({
+    return res.status(200).json({
       token,
       usuario: {
         id: usuario.id,
@@ -114,6 +138,7 @@ router.post('/login', async (req, res) => {
         nome: usuario.tenant.nome,
         slug: usuario.tenant.slug,
         timezone: usuario.tenant.timezone,
+        locale: usuario.tenant.locale,
       },
     });
   } catch (error) {

@@ -1,5 +1,5 @@
 // Ficheiro: routes/segurosRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import multer from 'multer';
@@ -8,11 +8,14 @@ import fs from 'fs';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
+import { proteger, admin } from '../middleware/authMiddleware.js';
 
 import validate from '../middleware/validate.js';
 import { seguroSchema } from '../validators/seguroValidator.js';
 
 const router = express.Router();
+
+router.use(proteger);
 
 // ==============================
 // MULTER
@@ -35,10 +38,10 @@ const upload = multer({ storage });
 // ==============================
 router.get('/', async (req, res) => {
   try {
+    const tenantId = req.usuario.tenantId;
+
     const seguros = await prisma.seguro.findMany({
-      where: {
-        tenantId: req.usuario.tenantId,
-      },
+      where: { tenantId },
       include: {
         equipamento: { select: { id: true, modelo: true, tag: true } },
         unidade: { select: { id: true, nomeSistema: true } },
@@ -59,10 +62,12 @@ router.get('/', async (req, res) => {
 // ==============================
 router.get('/:id', async (req, res) => {
   try {
+    const tenantId = req.usuario.tenantId;
+
     const seguro = await prisma.seguro.findFirst({
       where: {
         id: req.params.id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       include: {
         anexos: true,
@@ -88,35 +93,23 @@ router.get('/:id', async (req, res) => {
 router.post('/', validate(seguroSchema), async (req, res) => {
   const dados = req.validatedData || req.body;
 
-  const {
-    equipamentoId,
-    unidadeId,
-    dataInicio,
-    dataFim,
-    ...resto
-  } = dados;
+  const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
 
   try {
-    // valida equipamento
+    const tenantId = req.usuario.tenantId;
+
     if (equipamentoId) {
       const equip = await prisma.equipamento.findFirst({
-        where: {
-          id: equipamentoId,
-          tenantId: req.usuario.tenantId,
-        },
+        where: { id: equipamentoId, tenantId },
       });
       if (!equip) {
         return res.status(404).json({ message: 'Equipamento inválido.' });
       }
     }
 
-    // valida unidade
     if (unidadeId) {
       const unidade = await prisma.unidade.findFirst({
-        where: {
-          id: unidadeId,
-          tenantId: req.usuario.tenantId,
-        },
+        where: { id: unidadeId, tenantId },
       });
       if (!unidade) {
         return res.status(404).json({ message: 'Unidade inválida.' });
@@ -125,21 +118,40 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 
     const novoSeguro = await prisma.seguro.create({
       data: {
-        tenantId: req.usuario.tenantId,
         ...resto,
         dataInicio: new Date(dataInicio),
         dataFim: new Date(dataFim),
+
+        tenant: {
+          connect: { id: tenantId },
+        },
+
         equipamento: equipamentoId
-          ? { connect: { id: equipamentoId } }
+          ? {
+              connect: {
+                tenantId_id: {
+                  tenantId,
+                  id: equipamentoId,
+                },
+              },
+            }
           : undefined,
+
         unidade: unidadeId
-          ? { connect: { id: unidadeId } }
+          ? {
+              connect: {
+                tenantId_id: {
+                  tenantId,
+                  id: unidadeId,
+                },
+              },
+            }
           : undefined,
       },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'CRIAÇÃO',
       entidade: 'Seguro',
@@ -169,10 +181,12 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
   const dados = req.validatedData || req.body;
 
   try {
+    const tenantId = req.usuario.tenantId;
+
     const seguro = await prisma.seguro.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -181,7 +195,12 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
     }
 
     const atualizado = await prisma.seguro.update({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
       data: {
         ...dados,
         dataInicio: new Date(dados.dataInicio),
@@ -190,7 +209,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EDIÇÃO',
       entidade: 'Seguro',
@@ -208,14 +227,15 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 // ==============================
 // DELETE
 // ==============================
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const seguro = await prisma.seguro.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       include: { anexos: true },
     });
@@ -230,10 +250,17 @@ router.delete('/:id', async (req, res) => {
       }
     });
 
-    await prisma.seguro.delete({ where: { id } });
+    await prisma.seguro.delete({
+      where: {
+        tenantId_id: {
+          tenantId,
+          id,
+        },
+      },
+    });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃO',
       entidade: 'Seguro',
@@ -253,12 +280,13 @@ router.delete('/:id', async (req, res) => {
 // ==============================
 router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
   const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const seguro = await prisma.seguro.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -267,7 +295,7 @@ router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
     }
 
     const anexosData = req.files.map((file) => ({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       seguroId: id,
       nomeOriginal: file.originalname,
       path: file.path,
@@ -276,8 +304,11 @@ router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
 
     await prisma.anexo.createMany({ data: anexosData });
 
-    const atualizado = await prisma.seguro.findUnique({
-      where: { id },
+    const atualizado = await prisma.seguro.findFirst({
+      where: {
+        id,
+        tenantId,
+      },
       include: { anexos: true },
     });
 
@@ -293,12 +324,13 @@ router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
 // ==============================
 router.delete('/:id/anexos/:anexoId', async (req, res) => {
   const { anexoId } = req.params;
+  const tenantId = req.usuario.tenantId;
 
   try {
     const anexo = await prisma.anexo.findFirst({
       where: {
         id: anexoId,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
     });
 
@@ -310,7 +342,11 @@ router.delete('/:id/anexos/:anexoId', async (req, res) => {
       fs.unlinkSync(anexo.path);
     }
 
-    await prisma.anexo.delete({ where: { id: anexoId } });
+    await prisma.anexo.delete({
+      where: {
+        id: anexoId,
+      },
+    });
 
     return res.status(204).send();
   } catch (error) {

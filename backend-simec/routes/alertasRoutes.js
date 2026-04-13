@@ -1,5 +1,5 @@
 // Ficheiro: routes/alertasRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -19,15 +19,17 @@ router.get('/', async (req, res) => {
   try {
     const alertas = await prisma.alerta.findMany({
       where: {
-        tenantId: tenantId,
+        tenantId,
       },
       include: {
         lidoPorUsuarios: {
           where: {
+            tenantId,
             usuarioId: userId,
           },
           select: {
             visto: true,
+            dataVisto: true,
           },
         },
       },
@@ -39,8 +41,7 @@ router.get('/', async (req, res) => {
     const formatados = alertas.map((alerta) => ({
       ...alerta,
       status:
-        alerta.lidoPorUsuarios.length > 0 &&
-        alerta.lidoPorUsuarios[0].visto
+        alerta.lidoPorUsuarios.length > 0 && alerta.lidoPorUsuarios[0].visto
           ? 'Visto'
           : 'NaoVisto',
     }));
@@ -73,11 +74,11 @@ router.put('/:id/status', async (req, res) => {
   const visto = status === 'Visto';
 
   try {
-    // 🔒 valida se o alerta pertence ao tenant
+    // valida se o alerta pertence ao tenant
     const alerta = await prisma.alerta.findFirst({
       where: {
         id: alertaId,
-        tenantId: tenantId,
+        tenantId,
       },
     });
 
@@ -87,31 +88,87 @@ router.put('/:id/status', async (req, res) => {
       });
     }
 
-    await prisma.alertaLidoPorUsuario.upsert({
+    // valida se o usuário existe dentro do tenant
+    const usuario = await prisma.usuario.findFirst({
       where: {
-        alertaId_usuarioId: {
-          alertaId,
-          usuarioId: userId,
-        },
+        id: userId,
+        tenantId,
       },
-      update: {
-        visto,
-        dataVisto: visto ? new Date() : null,
-      },
-      create: {
-        alertaId,
-        usuarioId: userId,
-        visto,
-        dataVisto: visto ? new Date() : null,
+      select: {
+        id: true,
       },
     });
 
-    const alertaAtualizado = await prisma.alerta.findUnique({
-      where: { id: alertaId },
+    if (!usuario) {
+      return res.status(401).json({
+        message: 'Usuário inválido para este tenant.',
+      });
+    }
+
+    // como o @@id é [alertaId, usuarioId], buscamos primeiro
+    const leituraExistente = await prisma.alertaLidoPorUsuario.findFirst({
+      where: {
+        tenantId,
+        alertaId,
+        usuarioId: userId,
+      },
+    });
+
+    if (leituraExistente) {
+      await prisma.alertaLidoPorUsuario.update({
+        where: {
+          alertaId_usuarioId: {
+            alertaId,
+            usuarioId: userId,
+          },
+        },
+        data: {
+          visto,
+          dataVisto: visto ? new Date() : null,
+        },
+      });
+    } else {
+      await prisma.alertaLidoPorUsuario.create({
+        data: {
+          tenant: {
+            connect: { id: tenantId },
+          },
+          alerta: {
+            connect: {
+              tenantId_id: {
+                tenantId,
+                id: alertaId,
+              },
+            },
+          },
+          usuario: {
+            connect: {
+              tenantId_id: {
+                tenantId,
+                id: userId,
+              },
+            },
+          },
+          visto,
+          dataVisto: visto ? new Date() : null,
+        },
+      });
+    }
+
+    const alertaAtualizado = await prisma.alerta.findFirst({
+      where: {
+        id: alertaId,
+        tenantId,
+      },
       include: {
         lidoPorUsuarios: {
           where: {
+            tenantId,
             usuarioId: userId,
+          },
+          select: {
+            visto: true,
+            dataVisto: true,
           },
         },
       },

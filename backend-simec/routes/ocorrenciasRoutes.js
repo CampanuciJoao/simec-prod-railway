@@ -1,5 +1,5 @@
 // Ficheiro: routes/ocorrenciasRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened + compatível com schema relacional por tenant
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -7,9 +7,12 @@ import { proteger } from '../middleware/authMiddleware.js';
 import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
+
 router.use(proteger);
 
-// Salvar nova ocorrência na Ficha Técnica
+// ==============================
+// POST CRIAR OCORRÊNCIA
+// ==============================
 router.post('/', async (req, res) => {
   const { equipamentoId, titulo, descricao, tipo, tecnico } = req.body;
 
@@ -20,10 +23,12 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const tenantId = req.usuario.tenantId;
+
     const equipamento = await prisma.equipamento.findFirst({
       where: {
         id: equipamentoId,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       select: {
         id: true,
@@ -40,22 +45,35 @@ router.post('/', async (req, res) => {
 
     const nova = await prisma.ocorrencia.create({
       data: {
-        tenantId: req.usuario.tenantId,
-        equipamentoId,
-        titulo,
-        descricao,
-        tipo,
-        tecnico,
+        titulo: String(titulo).trim(),
+        descricao: descricao ? String(descricao).trim() : null,
+        tipo: String(tipo).trim(),
+        tecnico: tecnico ? String(tecnico).trim() : null,
+
+        tenant: {
+          connect: {
+            id: tenantId,
+          },
+        },
+
+        equipamento: {
+          connect: {
+            tenantId_id: {
+              tenantId,
+              id: equipamentoId,
+            },
+          },
+        },
       },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'CRIAÇÃO',
       entidade: 'Ocorrência',
       entidadeId: nova.id,
-      detalhes: `Ocorrência "${titulo}" criada para o equipamento ${equipamento.modelo} (${equipamento.tag}).`,
+      detalhes: `Ocorrência "${nova.titulo}" criada para o equipamento ${equipamento.modelo} (${equipamento.tag}).`,
     });
 
     return res.status(201).json(nova);
@@ -67,20 +85,31 @@ router.post('/', async (req, res) => {
   }
 });
 
-// Marcar ocorrência como resolvida
+// ==============================
+// PUT RESOLVER OCORRÊNCIA
+// ==============================
 router.put('/:id/resolver', async (req, res) => {
   const { id } = req.params;
   const { solucao, tecnicoResolucao } = req.body;
 
+  if (!solucao) {
+    return res.status(400).json({
+      message: 'A solução é obrigatória para resolver a ocorrência.',
+    });
+  }
+
   try {
+    const tenantId = req.usuario.tenantId;
+
     const ocorrencia = await prisma.ocorrencia.findFirst({
       where: {
         id,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       select: {
         id: true,
         titulo: true,
+        resolvido: true,
       },
     });
 
@@ -90,18 +119,28 @@ router.put('/:id/resolver', async (req, res) => {
       });
     }
 
+    if (ocorrencia.resolvido) {
+      return res.status(400).json({
+        message: 'Esta ocorrência já foi resolvida.',
+      });
+    }
+
     const atualizada = await prisma.ocorrencia.update({
-      where: { id },
+      where: {
+        id,
+      },
       data: {
         resolvido: true,
-        solucao,
-        tecnicoResolucao,
+        solucao: String(solucao).trim(),
+        tecnicoResolucao: tecnicoResolucao
+          ? String(tecnicoResolucao).trim()
+          : null,
         dataResolucao: new Date(),
       },
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId,
       usuarioId: req.usuario.id,
       acao: 'EDIÇÃO',
       entidade: 'Ocorrência',
@@ -118,15 +157,19 @@ router.put('/:id/resolver', async (req, res) => {
   }
 });
 
-// Listar histórico da ficha técnica de um equipamento específico
+// ==============================
+// GET HISTÓRICO POR EQUIPAMENTO
+// ==============================
 router.get('/equipamento/:id', async (req, res) => {
   const equipamentoId = req.params.id;
 
   try {
+    const tenantId = req.usuario.tenantId;
+
     const equipamento = await prisma.equipamento.findFirst({
       where: {
         id: equipamentoId,
-        tenantId: req.usuario.tenantId,
+        tenantId,
       },
       select: {
         id: true,
@@ -141,7 +184,7 @@ router.get('/equipamento/:id', async (req, res) => {
 
     const lista = await prisma.ocorrencia.findMany({
       where: {
-        tenantId: req.usuario.tenantId,
+        tenantId,
         equipamentoId,
       },
       orderBy: {

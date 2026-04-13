@@ -1,5 +1,5 @@
 // Ficheiro: src/components/ProtectedRoute.jsx
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
@@ -26,14 +26,13 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !usuario) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
   // Blindagem extra para SaaS:
-  // se existir usuário autenticado, mas sem tenantId,
-  // tratamos como sessão inválida.
-  if (usuario && !usuario.tenantId) {
+  // sessão autenticada sem tenantId é inválida.
+  if (!usuario.tenantId) {
     return <Navigate to="/login" replace />;
   }
 

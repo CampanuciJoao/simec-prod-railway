@@ -1,11 +1,14 @@
 // Ficheiro: routes/dashboardRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant hardened
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
 import { getMonth, getYear } from 'date-fns';
+import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+router.use(proteger);
 
 const getUltimosSeisMesesLabels = () => {
   const mesesNomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -37,6 +40,7 @@ router.get('/', async (req, res) => {
       manutencoesDosUltimos6Meses,
       alertasRecentes
     ] = await Promise.all([
+
       prisma.equipamento.count({
         where: { tenantId }
       }),
@@ -54,7 +58,7 @@ router.get('/', async (req, res) => {
           status: 'Ativo',
           dataFim: {
             gte: hoje,
-            lte: new Date(new Date().setDate(hoje.getDate() + 30))
+            lte: new Date(hoje.getTime() + 30 * 24 * 60 * 60 * 1000)
           }
         }
       }),
@@ -65,6 +69,7 @@ router.get('/', async (req, res) => {
           NOT: {
             lidoPorUsuarios: {
               some: {
+                tenantId,
                 usuarioId: userId,
                 visto: true
               }
@@ -122,7 +127,7 @@ router.get('/', async (req, res) => {
     const labelsMeses = getUltimosSeisMesesLabels();
     const tiposDeManutencao = ["Preventiva", "Corretiva", "Calibracao", "Inspecao"];
 
-    const manutençõesAgrupadas = labelsMeses.reduce((acc, label) => {
+    const manutencoesAgrupadas = labelsMeses.reduce((acc, label) => {
       acc[label] = {};
       tiposDeManutencao.forEach(tipo => acc[label][tipo] = 0);
       return acc;
@@ -131,15 +136,18 @@ router.get('/', async (req, res) => {
     const mesesNomes = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
     manutencoesDosUltimos6Meses.forEach(m => {
+      if (!m.createdAt || !m.tipo) return;
+
       const chaveMes = `${mesesNomes[getMonth(m.createdAt)]}/${getYear(m.createdAt).toString().slice(-2)}`;
-      if (chaveMes in manutençõesAgrupadas && m.tipo) {
-        manutençõesAgrupadas[chaveMes][m.tipo]++;
+
+      if (chaveMes in manutencoesAgrupadas) {
+        manutencoesAgrupadas[chaveMes][m.tipo]++;
       }
     });
 
     const datasetsPorTipo = tiposDeManutencao.map(tipo => ({
       label: tipo,
-      data: labelsMeses.map(mes => manutençõesAgrupadas[mes][tipo] || 0)
+      data: labelsMeses.map(mes => manutencoesAgrupadas[mes][tipo] || 0)
     }));
 
     const manutencoesPorMesFormatado = {
@@ -157,7 +165,7 @@ router.get('/', async (req, res) => {
       manutencoesPorTipoMes: manutencoesPorMesFormatado,
     };
 
-    return res.json(responsePayload);
+    return res.status(200).json(responsePayload);
 
   } catch (error) {
     console.error('[DASHBOARD_ERROR]', error);
