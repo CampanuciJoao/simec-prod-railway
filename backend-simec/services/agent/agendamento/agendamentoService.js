@@ -1,5 +1,5 @@
-// Ficheiro: services/agent/agendamentoService.js
-// Versão: Multi-tenant ready + modularizado
+// Ficheiro: services/agent/agendamento/agendamentoService.js
+// Versão: Multi-tenant ready + modularizado + compatível com router contextual
 
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { UserAgentMemoryRepository } from '../session/userAgentMemoryRepository.js';
@@ -73,8 +73,13 @@ async function salvarERegistrarMensagemAgente(
 }
 
 export const AgendamentoService = {
-  async processar(mensagem, contextoUsuario, sessaoExistente = null) {
-    const { usuarioId, usuarioNome, tenantId } = contextoUsuario;
+  async processar(
+    mensagem,
+    contextoUsuario,
+    sessaoExistente = null,
+    acaoContextual = null
+  ) {
+    const { usuarioId, tenantId } = contextoUsuario;
     const sessionKey = getSessionKey(usuarioId, tenantId);
 
     let sessao = sessaoExistente;
@@ -96,6 +101,21 @@ export const AgendamentoService = {
 
     const extraido = await extrairCamposComIA(mensagem, estado);
     const msgNormalizada = mensagem.toLowerCase().trim();
+
+    // Compatibilidade com ações contextuais do router
+    if (acaoContextual?.matched) {
+      if (acaoContextual.action === 'CONFIRMAR' || acaoContextual.action === 'SIM') {
+        extraido.confirmacao = true;
+      }
+
+      if (
+        acaoContextual.action === 'CANCELAR_ACAO' ||
+        acaoContextual.action === 'NAO' ||
+        acaoContextual.action === 'CANCELAR'
+      ) {
+        extraido.confirmacao = false;
+      }
+    }
 
     if (mensagemEhConfirmacaoPositiva(msgNormalizada)) {
       extraido.confirmacao = true;
@@ -299,7 +319,7 @@ export const AgendamentoService = {
 
         await UserAgentMemoryRepository.upsertMemoria(sessionKey, {
           tenantId,
-          usuarioId,
+          usuario: sessionKey,
           ultimaUnidadeId: estado.unidadeId || null,
           ultimaUnidadeNome: estado.unidadeNome || null,
           ultimoEquipamentoId: estado.equipamentoId || null,
