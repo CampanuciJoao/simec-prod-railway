@@ -1,5 +1,5 @@
 // Ficheiro: routes/manutencoesRoutes.js
-// Versão: Multi-tenant ready
+// Versão: Multi-tenant ready + compatível com schema relacional por tenant
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,8 +48,8 @@ router.get('/', async (req, res) => {
 
     if (unidadeId) {
       whereClause.equipamento = {
-        unidadeId,
         tenantId: req.usuario.tenantId,
+        unidadeId,
       };
     }
 
@@ -140,6 +140,12 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
         id: equipamentoId,
         tenantId: req.usuario.tenantId,
       },
+      select: {
+        id: true,
+        tenantId: true,
+        tag: true,
+        modelo: true,
+      },
     });
 
     if (!equipamento) {
@@ -158,7 +164,7 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
 
     const nova = await prisma.manutencao.create({
       data: {
-        tenantId: req.usuario.tenantId,
+        ...outrosDados,
         numeroOS,
         tipo,
         descricaoProblemaServico,
@@ -166,10 +172,21 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
         dataHoraAgendamentoFim: dataHoraAgendamentoFim
           ? new Date(dataHoraAgendamentoFim)
           : null,
-        equipamento: {
-          connect: { id: equipamentoId },
+
+        tenant: {
+          connect: {
+            id: req.usuario.tenantId,
+          },
         },
-        ...outrosDados,
+
+        equipamento: {
+          connect: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: equipamentoId,
+            },
+          },
+        },
       },
     });
 
@@ -194,7 +211,8 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
 // ==============================
 router.post('/:id/concluir', async (req, res) => {
   const { id: manutencaoId } = req.params;
-  const { equipamentoOperante, dataTerminoReal, novaPrevisao, observacao } = req.body;
+  const { equipamentoOperante, dataTerminoReal, novaPrevisao, observacao } =
+    req.body;
 
   try {
     const resultado = await prisma.$transaction(async (tx) => {
@@ -217,7 +235,12 @@ router.post('/:id/concluir', async (req, res) => {
         ).toLocaleString('pt-BR')}.`;
 
         await tx.manutencao.update({
-          where: { id: manutencaoId },
+          where: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: manutencaoId,
+            },
+          },
           data: {
             status: 'Concluida',
             dataFimReal: new Date(dataTerminoReal),
@@ -226,7 +249,12 @@ router.post('/:id/concluir', async (req, res) => {
         });
 
         await tx.equipamento.update({
-          where: { id: manutAtual.equipamentoId },
+          where: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: manutAtual.equipamentoId,
+            },
+          },
           data: { status: 'Operante' },
         });
 
@@ -242,7 +270,12 @@ router.post('/:id/concluir', async (req, res) => {
         ).toLocaleString('pt-BR')}.`;
 
         await tx.manutencao.update({
-          where: { id: manutencaoId },
+          where: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: manutencaoId,
+            },
+          },
           data: {
             status: 'EmAndamento',
             dataHoraAgendamentoFim: new Date(novaPrevisao),
@@ -250,17 +283,33 @@ router.post('/:id/concluir', async (req, res) => {
         });
 
         await tx.equipamento.update({
-          where: { id: manutAtual.equipamentoId },
+          where: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: manutAtual.equipamentoId,
+            },
+          },
           data: { status: 'Inoperante' },
         });
       }
 
       await tx.notaAndamento.create({
         data: {
-          tenantId: req.usuario.tenantId,
+          tenant: {
+            connect: {
+              id: req.usuario.tenantId,
+            },
+          },
           nota: notaHistorico,
-          manutencaoId,
           origem: 'automatico',
+          manutencao: {
+            connect: {
+              tenantId_id: {
+                tenantId: req.usuario.tenantId,
+                id: manutencaoId,
+              },
+            },
+          },
         },
       });
 
@@ -305,17 +354,37 @@ router.post('/:id/cancelar', async (req, res) => {
       }
 
       await tx.manutencao.update({
-        where: { id },
+        where: {
+          tenantId_id: {
+            tenantId: req.usuario.tenantId,
+            id,
+          },
+        },
         data: { status: 'Cancelada' },
       });
 
       await tx.notaAndamento.create({
         data: {
-          tenantId: req.usuario.tenantId,
+          tenant: {
+            connect: {
+              id: req.usuario.tenantId,
+            },
+          },
           nota: `CANCELAMENTO: ${motivo}`,
-          manutencaoId: id,
           origem: 'manual',
-          autorId: req.usuario.id,
+          autor: {
+            connect: {
+              id: req.usuario.id,
+            },
+          },
+          manutencao: {
+            connect: {
+              tenantId_id: {
+                tenantId: req.usuario.tenantId,
+                id,
+              },
+            },
+          },
         },
       });
     });
@@ -349,10 +418,25 @@ router.post('/:id/notas', async (req, res) => {
 
     const nova = await prisma.notaAndamento.create({
       data: {
-        tenantId: req.usuario.tenantId,
+        tenant: {
+          connect: {
+            id: req.usuario.tenantId,
+          },
+        },
         nota: req.body.nota,
-        manutencaoId: req.params.id,
-        autorId: req.usuario.id,
+        autor: {
+          connect: {
+            id: req.usuario.id,
+          },
+        },
+        manutencao: {
+          connect: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: req.params.id,
+            },
+          },
+        },
       },
     });
 
@@ -383,15 +467,28 @@ router.post('/:id/upload', upload.array('arquivosManutencao'), async (req, res) 
       return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
     }
 
-    const anexosData = req.files.map((file) => ({
-      tenantId: req.usuario.tenantId,
-      manutencaoId: req.params.id,
-      nomeOriginal: file.originalname,
-      path: file.path,
-      tipoMime: file.mimetype,
-    }));
-
-    await prisma.anexo.createMany({ data: anexosData });
+    for (const file of req.files) {
+      await prisma.anexo.create({
+        data: {
+          tenant: {
+            connect: {
+              id: req.usuario.tenantId,
+            },
+          },
+          manutencao: {
+            connect: {
+              tenantId_id: {
+                tenantId: req.usuario.tenantId,
+                id: req.params.id,
+              },
+            },
+          },
+          nomeOriginal: file.originalname,
+          path: file.path,
+          tipoMime: file.mimetype,
+        },
+      });
+    }
 
     return res.status(201).json({ message: 'Arquivos salvos com sucesso.' });
   } catch (error) {
@@ -428,7 +525,12 @@ router.delete('/:id', admin, async (req, res) => {
     });
 
     await prisma.manutencao.delete({
-      where: { id },
+      where: {
+        tenantId_id: {
+          tenantId: req.usuario.tenantId,
+          id,
+        },
+      },
     });
 
     await registrarLog({
