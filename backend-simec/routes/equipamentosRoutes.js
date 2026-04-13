@@ -11,7 +11,10 @@ import { registrarLog } from '../services/logService.js';
 import { admin } from '../middleware/authMiddleware.js';
 
 import validate from '../middleware/validate.js';
-import { equipamentoSchema, equipamentoUpdateSchema } from '../validators/equipamentoValidator.js';
+import {
+  equipamentoSchema,
+  equipamentoUpdateSchema,
+} from '../validators/equipamentoValidator.js';
 
 const router = express.Router();
 
@@ -92,7 +95,6 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
   const { dataInstalacao, unidadeId, ...dados } = req.body;
 
   try {
-    // valida unidade
     const unidade = await prisma.unidade.findFirst({
       where: {
         id: unidadeId,
@@ -104,7 +106,6 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
       return res.status(404).json({ message: 'Unidade inválida.' });
     }
 
-    // valida patrimônio por tenant
     const patrimonio = dados.numeroPatrimonio?.trim();
 
     if (patrimonio && patrimonio.toLowerCase() !== 'sem patrimônio') {
@@ -129,7 +130,14 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
       data: {
         tenantId: req.usuario.tenantId,
         ...dados,
-        unidade: { connect: { id: unidadeId } },
+        unidade: {
+          connect: {
+            tenantId_id: {
+              tenantId: req.usuario.tenantId,
+              id: unidadeId,
+            },
+          },
+        },
         dataInstalacao: parseDate(dataInstalacao),
       },
     });
@@ -155,7 +163,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 // ==============================
 router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
   const { id } = req.params;
-  const { dataInstalacao, ...dados } = req.body;
+  const { dataInstalacao, unidadeId, ...dados } = req.body;
 
   try {
     const equipamento = await prisma.equipamento.findFirst({
@@ -169,12 +177,36 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
 
+    const dataUpdate = {
+      ...dados,
+      dataInstalacao: parseDate(dataInstalacao),
+    };
+
+    if (unidadeId) {
+      const unidade = await prisma.unidade.findFirst({
+        where: {
+          id: unidadeId,
+          tenantId: req.usuario.tenantId,
+        },
+      });
+
+      if (!unidade) {
+        return res.status(404).json({ message: 'Unidade inválida.' });
+      }
+
+      dataUpdate.unidade = {
+        connect: {
+          tenantId_id: {
+            tenantId: req.usuario.tenantId,
+            id: unidadeId,
+          },
+        },
+      };
+    }
+
     const atualizado = await prisma.equipamento.update({
       where: { id },
-      data: {
-        ...dados,
-        dataInstalacao: parseDate(dataInstalacao),
-      },
+      data: dataUpdate,
     });
 
     await registrarLog({
@@ -183,7 +215,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       acao: 'EDIÇÃO',
       entidade: 'Equipamento',
       entidadeId: id,
-      detalhes: `Equipamento atualizado.`,
+      detalhes: 'Equipamento atualizado.',
     });
 
     return res.json(atualizado);
@@ -219,7 +251,7 @@ router.delete('/:id', admin, async (req, res) => {
       acao: 'EXCLUSÃO',
       entidade: 'Equipamento',
       entidadeId: id,
-      detalhes: `Equipamento excluído.`,
+      detalhes: 'Equipamento excluído.',
     });
 
     return res.json({ message: 'Excluído com sucesso.' });
@@ -228,3 +260,5 @@ router.delete('/:id', admin, async (req, res) => {
     return res.status(500).json({ message: 'Erro ao excluir.' });
   }
 });
+
+export default router;
