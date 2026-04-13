@@ -1,4 +1,8 @@
-import { getAgora, criarDateUTC, isDataValida } from '../../../timeService.js';
+import {
+  getAgora,
+  criarDateUTC,
+  isDataValida,
+} from '../../../timeService.js';
 
 export const validarHorarioFuturo = (data, hora) => {
   if (!data || !hora) return { valido: true };
@@ -14,7 +18,10 @@ export const validarHorarioFuturo = (data, hora) => {
   }
 
   if (solicitado < agora) {
-    const agoraFmt = `${agora.getUTCHours()}:${agora
+    const agoraFmt = `${agora
+      .getUTCHours()
+      .toString()
+      .padStart(2, '0')}:${agora
       .getUTCMinutes()
       .toString()
       .padStart(2, '0')}`;
