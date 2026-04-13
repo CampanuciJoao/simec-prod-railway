@@ -1,0 +1,1 @@
+export { gerarAlertasManutencao } from './manutencaoAlertas.js';
