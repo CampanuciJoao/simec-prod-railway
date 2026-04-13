@@ -4,7 +4,7 @@
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { UserAgentMemoryRepository } from '../session/userAgentMemoryRepository.js';
 import { extrairCamposComIA } from './extractor/index.js';
-import { mergeEstadoAgente } from './state/mergeEstado.js';
+import { mergeEstadoAgente } from './state/mergeEstadoAgente.js';
 import { getFaltantes } from './state/faltantes.js';
 import { proximaPergunta } from './ui/perguntas.js';
 import { buildResumoConfirmacao } from './ui/resumoBuilder.js';
