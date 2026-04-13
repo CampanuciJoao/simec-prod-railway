@@ -1,0 +1,1 @@
+export { construirRespostaAcaoContextual } from './relatorioActionHandler.js';

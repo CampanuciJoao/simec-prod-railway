@@ -1,6 +1,9 @@
 import { ACTIONS } from '../../shared/actionResolver.js';
 
-export function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) {
+export function construirRespostaAcaoContextual(
+  acaoContextual,
+  estadoAnterior
+) {
   const contextoPDF = estadoAnterior?.contextoPDF || {};
 
   if (acaoContextual.action === ACTIONS.GERAR_PDF_OS) {
@@ -24,6 +27,16 @@ export function construirRespostaAcaoContextual(acaoContextual, estadoAnterior) 
       mensagem: `Perfeito. Vou abrir os detalhes da OS ${contextoPDF.numeroOS}.`,
       acao: 'ABRIR_OS',
       contexto: { manutencaoId: contextoPDF.idPrincipal },
+    };
+  }
+
+  if (acaoContextual.action === ACTIONS.CANCELAR_ACAO) {
+    return {
+      mensagem: 'Tudo bem. Não vou abrir PDF nem detalhes agora.',
+      meta: {
+        tipoResposta: 'RELATORIO_ACAO',
+        ultimaAcaoExecutada: ACTIONS.CANCELAR_ACAO,
+      },
     };
   }
 
