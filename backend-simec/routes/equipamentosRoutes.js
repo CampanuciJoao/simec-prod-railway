@@ -100,6 +100,10 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
         id: unidadeId,
         tenantId: req.usuario.tenantId,
       },
+      select: {
+        id: true,
+        tenantId: true,
+      },
     });
 
     if (!unidade) {
@@ -128,8 +132,15 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 
     const novo = await prisma.equipamento.create({
       data: {
-        tenantId: req.usuario.tenantId,
         ...dados,
+        dataInstalacao: parseDate(dataInstalacao),
+
+        tenant: {
+          connect: {
+            id: req.usuario.tenantId,
+          },
+        },
+
         unidade: {
           connect: {
             tenantId_id: {
@@ -138,7 +149,6 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
             },
           },
         },
-        dataInstalacao: parseDate(dataInstalacao),
       },
     });
 
@@ -187,6 +197,10 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
         where: {
           id: unidadeId,
           tenantId: req.usuario.tenantId,
+        },
+        select: {
+          id: true,
+          tenantId: true,
         },
       });
 
@@ -243,7 +257,9 @@ router.delete('/:id', admin, async (req, res) => {
       return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
 
-    await prisma.equipamento.delete({ where: { id } });
+    await prisma.equipamento.delete({
+      where: { id },
+    });
 
     await registrarLog({
       tenantId: req.usuario.tenantId,
