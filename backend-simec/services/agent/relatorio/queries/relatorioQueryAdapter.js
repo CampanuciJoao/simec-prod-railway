@@ -1,5 +1,5 @@
-import prisma from '../../prismaService.js';
-import { buscarManutencoesRealizadas } from '../../reportQueryService.js';
+import prisma from '../../../prismaService.js';
+import { buscarManutencoesRealizadas } from '../../../reportQueryService.js';
 
 export async function buscarUltimaManutencao({
   tenantId,
