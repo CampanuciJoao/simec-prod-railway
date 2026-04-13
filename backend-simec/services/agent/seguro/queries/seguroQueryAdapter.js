@@ -1,7 +1,7 @@
 import {
   buscarSeguroMaisRecente,
   buscarSeguroVigente,
-} from '../../insuranceQueryService.js';
+} from '../../../insuranceQueryService.js';
 
 export async function buscarSeguroMaisRecenteAdapter({
   tenantId,
