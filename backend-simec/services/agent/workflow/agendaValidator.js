@@ -1,9 +1,6 @@
 // simec/backend-simec/services/agent/agendaValidator.js
 import prisma from '../../prismaService.js';
-import {
-  criarDateUTC,
-  isDataValida,
-} from '../../timeService.js';
+import { criarDateUTC, isDataValida } from '../../timeService.js';
 
 /**
  * Monta o intervalo de agendamento a partir do estado.

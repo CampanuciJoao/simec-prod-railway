@@ -1,4 +1,4 @@
-import { getAgora, criarDateUTC, isDataValida } from '../../timeService.js';
+import { getAgora, criarDateUTC, isDataValida } from '../../../timeService.js';
 
 export const validarHorarioFuturo = (data, hora) => {
   if (!data || !hora) return { valido: true };
