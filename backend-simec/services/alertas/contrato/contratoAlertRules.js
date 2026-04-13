@@ -41,7 +41,12 @@ export async function gerarAlertaVencimentoContrato(tenantId, contrato, hoje) {
     if (diasRestantes > 0 && diasRestantes <= ponto.limiar) {
       await upsertAlertaContrato(
         tenantId,
-        buildContratoAlertId(tenantId, 'contrato-vence', contrato.id, ponto.label),
+        buildContratoAlertId(
+          tenantId,
+          'contrato-vence',
+          contrato.id,
+          ponto.label
+        ),
         {
           titulo: montarTituloContratoVence(ponto.texto),
           subtitulo: montarSubtituloContrato(contrato),
