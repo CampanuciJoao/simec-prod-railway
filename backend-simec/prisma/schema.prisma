@@ -315,17 +315,28 @@ model Seguro {
 model Alerta {
   id                        String     @id @default(uuid())
   tenantId                  String
+
   titulo                    String
   subtitulo                 String?
   subtituloBase             String?    @map("subtitulo_base")
   numeroOS                  String?    @map("numero_os")
+
   data                      DateTime
   dataHoraAgendamentoInicio DateTime?  @map("data_hora_agendamento_inicio")
   dataHoraAgendamentoFim    DateTime?  @map("data_hora_agendamento_fim")
+
   prioridade                Prioridade
+
+  // 🔥 LEGADO (mantém compatibilidade)
   tipo                      String
+
+  // 🚀 NOVO PADRÃO (ESSENCIAL)
+  tipoCategoria             String?    @map("tipo_categoria")
+  tipoEvento                String?    @map("tipo_evento")
+
   link                      String?
   emailEnviado              Boolean    @default(false)
+
   createdAt                 DateTime   @default(now())
   updatedAt                 DateTime   @updatedAt
 
@@ -338,41 +349,10 @@ model Alerta {
   @@index([tenantId, prioridade, data])
   @@index([tenantId, emailEnviado])
   @@index([tenantId, numeroOS])
+  @@index([tenantId, tipoEvento])       // 🔥 novo
+  @@index([tenantId, tipoCategoria])    // 🔥 novo
+
   @@map("alertas")
-}
-
-model AlertaLidoPorUsuario {
-  alertaId  String
-  usuarioId String
-  tenantId  String
-  visto     Boolean   @default(true)
-  dataVisto DateTime? @default(now())
-
-  alerta  Alerta  @relation(fields: [tenantId, alertaId], references: [tenantId, id], onDelete: Cascade)
-  usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
-  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-
-  @@id([alertaId, usuarioId])
-  @@index([tenantId, usuarioId, visto])
-  @@map("alertas_lidos_por_usuario")
-}
-
-model LogAuditoria {
-  id         String   @id @default(uuid())
-  tenantId   String
-  acao       String
-  entidade   String
-  entidadeId String   @map("entidade_id")
-  detalhes   String
-  timestamp  DateTime @default(now())
-  autorId    String   @map("autor_id")
-
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autor  Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, entidade, entidadeId, timestamp])
-  @@index([tenantId, autorId, timestamp])
-  @@map("log_auditoria")
 }
 
 model Ocorrencia {
