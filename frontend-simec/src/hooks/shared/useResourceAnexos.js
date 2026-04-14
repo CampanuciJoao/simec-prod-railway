@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 import {
   uploadAnexoByResource,
   deleteAnexoByResource,

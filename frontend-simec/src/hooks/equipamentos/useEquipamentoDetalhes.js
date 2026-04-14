@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getEquipamentoById, updateEquipamento } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 
 export function useEquipamentoDetalhes(equipamentoId) {
   const { addToast } = useToast();

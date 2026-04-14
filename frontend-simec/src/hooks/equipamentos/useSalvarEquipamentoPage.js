@@ -6,7 +6,7 @@ import {
   addEquipamento,
   updateEquipamento,
 } from '../../services/api';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 
 export function useSalvarEquipamentoPage() {
   const { equipamentoId } = useParams();

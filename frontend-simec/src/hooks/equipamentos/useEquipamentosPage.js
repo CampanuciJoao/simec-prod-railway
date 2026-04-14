@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../../contexts/ToastContext';
 import { getEquipamentos } from '../../services/api';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 
 export function useEquipamentosPage() {
   const { addToast } = useToast();

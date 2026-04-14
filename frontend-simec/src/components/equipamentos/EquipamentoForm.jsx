@@ -13,7 +13,7 @@ import PageSection from '../ui/PageSection';
 import { ResponsiveGrid, FormActions } from '../ui/layout';
 import { getUnidades } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 
 const LISTA_TIPOS = [
   'Arco Cirúrgico',
