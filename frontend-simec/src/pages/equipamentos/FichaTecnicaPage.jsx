@@ -8,7 +8,7 @@ import {
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { formatarDataHora } from '../../utils/timeUtils';
-import { getErrorMessage } from '../../utils/errorUtils';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
