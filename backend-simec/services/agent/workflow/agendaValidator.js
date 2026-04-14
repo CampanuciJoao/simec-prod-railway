@@ -6,7 +6,7 @@ import {
   getTenantTimezone,
   getAgora,
   isDataValida,
-} from '../../../timeService.js';
+} from '../../timeService.js';
 
 /**
  * Monta intervalo de agendamento corretamente usando timezone do tenant
