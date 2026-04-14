@@ -1,4 +1,4 @@
-import { processarAlertasEEnviarNotificacoes } from './alertasService.js';
+import { processarAlertasEEnviarNotificacoes } from './alertas/alertasOrchestrator.js';
 
 export async function executarCicloInteligente() {
   const inicio = new Date();
@@ -11,7 +11,10 @@ export async function executarCicloInteligente() {
     await processarAlertasEEnviarNotificacoes();
     notificacoesProcessadas = true;
   } catch (error) {
-    console.error('[INTELLIGENCE] Erro ao processar alertas/notificações:', error);
+    console.error(
+      '[INTELLIGENCE] Erro ao processar alertas/notificações:',
+      error
+    );
   }
 
   const fim = new Date();
@@ -24,6 +27,8 @@ export async function executarCicloInteligente() {
   return {
     ok: true,
     notificacoesProcessadas,
-    duracaoMs
+    duracaoMs,
   };
 }
+
+export default executarCicloInteligente;

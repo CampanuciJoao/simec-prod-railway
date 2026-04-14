@@ -30,9 +30,6 @@ import pdfDataRoutes from './routes/pdfDataRoutes.js';
 import { proteger } from './middleware/authMiddleware.js';
 import { iniciarJobsDeAlertas } from './services/queueService.js';
 
-// Inicializa o worker
-import './worker.js';
-
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -146,9 +143,9 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
 
   try {
     await iniciarJobsDeAlertas();
-    console.log('⏰ Agendador de alertas inicializado com sucesso.');
+    console.log('⏰ Jobs recorrentes de alertas inicializados com sucesso.');
   } catch (error) {
-    console.error('❌ Erro ao iniciar agendador de alertas:', error.message);
+    console.error('❌ Erro ao iniciar jobs de alertas:', error.message);
   }
 });
 

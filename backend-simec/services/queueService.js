@@ -30,23 +30,43 @@ export async function iniciarJobsDeAlertas() {
   try {
     console.log('🧠 Inicializando jobs de alertas...');
 
+    // Remove job antigo recorrente, se existir
+    const repeatables = await alertasQueue.getRepeatableJobs();
+    for (const job of repeatables) {
+      if (job.name === 'processar-alertas-recorrente') {
+        await alertasQueue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    // Recria job recorrente estável
     await alertasQueue.add(
       'processar-alertas-recorrente',
       {},
       {
         jobId: 'processar-alertas-recorrente',
         repeat: {
-          every: 60000, // roda a cada 1 minuto
-          immediately: true,
+          every: 60000, // 1 minuto
         },
         removeOnComplete: 50,
         removeOnFail: 50,
       }
     );
 
-    console.log('⏱️ Job recorrente configurado (1 minuto)');
+    // Dispara um ciclo imediato no boot
+    await alertasQueue.add(
+      'processar-alertas-imediato',
+      {},
+      {
+        jobId: `processar-alertas-imediato-${Date.now()}`,
+        removeOnComplete: 50,
+        removeOnFail: 50,
+      }
+    );
+
+    console.log('⏱️ Job recorrente configurado (1 minuto) + execução imediata');
   } catch (error) {
     console.error('❌ Erro ao iniciar jobs:', error);
+    throw error;
   }
 }
 

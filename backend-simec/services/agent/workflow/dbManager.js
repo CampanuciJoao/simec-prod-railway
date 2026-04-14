@@ -169,27 +169,19 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
             },
           },
 
+          // IMPORTANTE: ao criar, fica apenas agendada
           status: 'Agendada',
         },
       });
 
-      await tx.equipamento.update({
-        where: {
-          tenantId_id: {
-            tenantId,
-            id: estado.equipamentoId,
-          },
-        },
-        data: {
-          status: 'EmManutencao',
-        },
-      });
+      // NÃO alteramos o status do equipamento aqui.
+      // O equipamento só deve ir para EmManutencao quando a OS realmente começar.
 
       return novaManutencao;
     });
 
     console.log(
-      `[DB_MANAGER] Sucesso: OS ${resultado.numeroOS} criada no tenant ${tenantId} e ativo atualizado.`
+      `[DB_MANAGER] Sucesso: OS ${resultado.numeroOS} criada no tenant ${tenantId}.`
     );
 
     return resultado;

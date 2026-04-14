@@ -8,6 +8,8 @@ import {
 } from './validators.js';
 import { SYSTEM_DEFAULT_TIMEZONE } from './constants.js';
 
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
 function normalizeTimezone(timezone) {
   return isValidTimezone(timezone) ? timezone : SYSTEM_DEFAULT_TIMEZONE;
 }
@@ -35,6 +37,13 @@ function getZonedParts(date, timeZone) {
     minute: Number(map.minute),
     second: Number(map.second),
   };
+}
+
+function parseLocalDateParts(dateLocal) {
+  if (!isValidLocalDate(dateLocal)) return null;
+
+  const [year, month, day] = dateLocal.split('-').map(Number);
+  return { year, month, day };
 }
 
 export function parseIsoToUtc(isoString) {
@@ -139,6 +148,67 @@ export function extractLocalDateFromIso(isoString, timezone) {
 export function extractLocalTimeFromIso(isoString, timezone) {
   const parts = isoUtcToLocalParts({ isoString, timezone });
   return parts?.timeLocal || null;
+}
+
+export function getCurrentLocalDate({ timezone, now = new Date() }) {
+  if (!isValidDate(now)) return null;
+
+  const parts = utcToLocalParts({
+    date: now,
+    timezone,
+  });
+
+  return parts?.dateLocal || null;
+}
+
+export function addDaysToLocalDate(dateLocal, days) {
+  const parts = parseLocalDateParts(dateLocal);
+  if (!parts || Number.isNaN(Number(days))) return null;
+
+  const baseUtc = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  if (!isValidDate(baseUtc)) return null;
+
+  baseUtc.setUTCDate(baseUtc.getUTCDate() + Number(days));
+
+  const y = baseUtc.getUTCFullYear();
+  const m = String(baseUtc.getUTCMonth() + 1).padStart(2, '0');
+  const d = String(baseUtc.getUTCDate()).padStart(2, '0');
+
+  return `${y}-${m}-${d}`;
+}
+
+export function localDateToUtcStartOfDay({ dateLocal, timezone }) {
+  return localDateTimeToUtc({
+    dateLocal,
+    timeLocal: '00:00',
+    timezone,
+  });
+}
+
+export function localDateToUtcEndOfDay({ dateLocal, timezone }) {
+  const nextDateLocal = addDaysToLocalDate(dateLocal, 1);
+  if (!nextDateLocal) return null;
+
+  const nextDayStartUtc = localDateToUtcStartOfDay({
+    dateLocal: nextDateLocal,
+    timezone,
+  });
+
+  if (!nextDayStartUtc) return null;
+
+  return new Date(nextDayStartUtc.getTime() - 1);
+}
+
+export function diffLocalDateInDays({ fromDateLocal, toDateLocal }) {
+  const fromParts = parseLocalDateParts(fromDateLocal);
+  const toParts = parseLocalDateParts(toDateLocal);
+
+  if (!fromParts || !toParts) return null;
+
+  const fromUtc = Date.UTC(fromParts.year, fromParts.month - 1, fromParts.day);
+  const toUtc = Date.UTC(toParts.year, toParts.month - 1, toParts.day);
+
+  return Math.floor((toUtc - fromUtc) / DAY_IN_MS);
 }
 
 export function toUtcIso(date) {

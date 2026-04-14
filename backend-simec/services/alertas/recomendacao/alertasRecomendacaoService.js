@@ -1,5 +1,4 @@
 import prisma from '../../prismaService.js';
-import { addDays } from 'date-fns';
 import { getAgora } from '../../timeService.js';
 
 import {
@@ -22,19 +21,49 @@ import {
   criarAlertaRecomendacao,
 } from './recomendacaoAlertRepository.js';
 
-// 🔥 NOVO PADRÃO
 import {
   criarPayloadBaseAlerta,
   ALERT_CATEGORIAS,
   ALERT_EVENTOS,
 } from '../alertPayloadFactory.js';
 
-async function processarTenant(tenantId, agora) {
-  const dataCorte = addDays(agora, -JANELA_DIAS);
+import {
+  getCurrentLocalDate,
+  addDaysToLocalDate,
+  localDateToUtcStartOfDay,
+} from '../../time/index.js';
+
+async function processarTenant(tenant, agoraUtc) {
+  const timezone = tenant.timezone || 'America/Campo_Grande';
+
+  const hojeLocal = getCurrentLocalDate({
+    timezone,
+    now: agoraUtc,
+  });
+
+  if (!hojeLocal) {
+    console.warn(
+      `[ALERTA_RECOMENDACAO][${tenant.id}] Não foi possível calcular hojeLocal`
+    );
+    return 0;
+  }
+
+  const dataCorteLocal = addDaysToLocalDate(hojeLocal, -JANELA_DIAS);
+  const dataCorteUtc = localDateToUtcStartOfDay({
+    dateLocal: dataCorteLocal,
+    timezone,
+  });
+
+  if (!dataCorteUtc) {
+    console.warn(
+      `[ALERTA_RECOMENDACAO][${tenant.id}] Não foi possível calcular dataCorteUtc`
+    );
+    return 0;
+  }
 
   const equipamentos = await buscarEquipamentosComHistorico(
-    tenantId,
-    dataCorte
+    tenant.id,
+    dataCorteUtc
   );
 
   let total = 0;
@@ -56,12 +85,12 @@ async function processarTenant(tenantId, agora) {
     }
 
     const alertaId = buildRecomendacaoAlertId(
-      tenantId,
+      tenant.id,
       equipamento.id,
-      agora
+      agoraUtc
     );
 
-    const jaExiste = await existeAlerta(tenantId, alertaId);
+    const jaExiste = await existeAlerta(tenant.id, alertaId);
     if (jaExiste) {
       continue;
     }
@@ -81,18 +110,15 @@ async function processarTenant(tenantId, agora) {
     });
 
     await criarAlertaRecomendacao(
-      tenantId,
+      tenant.id,
       criarPayloadBaseAlerta({
         id: alertaId,
         titulo,
         subtitulo: `${subtitulo}. ${descricaoAnalitica}`,
-        data: agora,
+        data: agoraUtc,
         prioridade: definirPrioridade(metricas.scoreFinal),
-
-        // 🔥 PADRÃO NOVO
         tipoCategoria: ALERT_CATEGORIAS.RECOMENDACAO,
         tipoEvento: ALERT_EVENTOS.RECOM_PREVENTIVA,
-
         link: `/equipamentos/ficha-tecnica/${equipamento.id}`,
       })
     );
@@ -100,7 +126,7 @@ async function processarTenant(tenantId, agora) {
     total += 1;
 
     console.log(
-      `[ALERTA_RECOMENDACAO][${tenantId}] Criado para ${equipamento.modelo} (${equipamento.id}) | score=${metricas.scoreFinal} | unidade=${unidadeNome}`
+      `[ALERTA_RECOMENDACAO][${tenant.id}] Criado para ${equipamento.modelo} (${equipamento.id}) | score=${metricas.scoreFinal} | unidade=${unidadeNome} | timezone=${timezone}`
     );
   }
 
@@ -108,17 +134,20 @@ async function processarTenant(tenantId, agora) {
 }
 
 export async function gerarAlertasRecomendacao() {
-  const agora = getAgora();
+  const agoraUtc = getAgora();
 
   const tenants = await prisma.tenant.findMany({
     where: { ativo: true },
-    select: { id: true },
+    select: {
+      id: true,
+      timezone: true,
+    },
   });
 
   let totalGlobal = 0;
 
   for (const tenant of tenants) {
-    const totalTenant = await processarTenant(tenant.id, agora);
+    const totalTenant = await processarTenant(tenant, agoraUtc);
     totalGlobal += totalTenant;
   }
 

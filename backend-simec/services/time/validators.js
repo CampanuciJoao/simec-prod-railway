@@ -77,14 +77,6 @@ export function validateLocalInterval({
     };
   }
 
-  if (endTimeLocal && endTimeLocal <= startTimeLocal) {
-    return {
-      valid: false,
-      code: 'END_BEFORE_OR_EQUAL_START',
-      message: 'A hora final deve ser maior que a hora inicial.',
-    };
-  }
-
   return {
     valid: true,
     code: 'OK',

@@ -22,7 +22,7 @@ const worker = new Worker(
     const inicio = Date.now();
 
     console.log(
-      `[${new Date().toLocaleTimeString('pt-BR')}] ⚙️ Executando ciclo de alertas... jobId=${job?.id || 'N/A'}`
+      `[${new Date().toLocaleTimeString('pt-BR')}] ⚙️ Executando ciclo de alertas... jobName=${job?.name || 'N/A'} | jobId=${job?.id || 'N/A'}`
     );
 
     const resultado = await processarAlertasEEnviarNotificacoes();
@@ -37,20 +37,29 @@ const worker = new Worker(
   },
   {
     connection,
+    concurrency: 1,
     limiter: { max: 1, duration: 5000 },
   }
 );
 
+worker.on('ready', () => {
+  console.log('✅ Worker pronto para consumir a fila de alertas.');
+});
+
 worker.on('completed', (job, result) => {
   console.log(
-    `✅ Job concluído | id=${job?.id || 'N/A'} | ok=${result?.ok ?? 'N/A'}`
+    `✅ Job concluído | nome=${job?.name || 'N/A'} | id=${job?.id || 'N/A'} | ok=${result?.ok ?? 'N/A'}`
   );
 });
 
 worker.on('failed', (job, err) => {
   console.error(
-    `❌ Erro no worker | jobId=${job?.id || 'N/A'} | erro=${err.message}`
+    `❌ Erro no worker | jobName=${job?.name || 'N/A'} | jobId=${job?.id || 'N/A'} | erro=${err.message}`
   );
+});
+
+worker.on('error', (err) => {
+  console.error('❌ Worker error:', err.message);
 });
 
 connection.on('error', (err) => {
