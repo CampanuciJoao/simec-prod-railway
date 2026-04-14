@@ -51,6 +51,7 @@ export function isFutureLocalDateTime({
       valid: false,
       code: 'INVALID_NOW',
       message: 'Referência de data atual inválida.',
+      timezone,
     };
   }
 
@@ -65,6 +66,7 @@ export function isFutureLocalDateTime({
       valid: false,
       code: 'INVALID_LOCAL_DATETIME',
       message: 'Data/hora local inválida.',
+      timezone,
     };
   }
 
@@ -73,6 +75,7 @@ export function isFutureLocalDateTime({
       valid: false,
       code: 'PAST_LOCAL_DATETIME',
       message: 'A data/hora informada está no passado.',
+      timezone,
     };
   }
 
@@ -81,6 +84,7 @@ export function isFutureLocalDateTime({
     code: 'OK',
     message: null,
     targetUtc,
+    timezone,
   };
 }
 
@@ -98,7 +102,10 @@ export function validateSchedulingWindow({
   });
 
   if (!baseValidation.valid) {
-    return baseValidation;
+    return {
+      ...baseValidation,
+      timezone,
+    };
   }
 
   if (endTimeLocal) {
@@ -113,6 +120,7 @@ export function validateSchedulingWindow({
         valid: false,
         code: 'INVALID_LOCAL_END_TIME',
         message: 'A hora final informada é inválida.',
+        timezone,
       };
     }
   }
@@ -125,7 +133,10 @@ export function validateSchedulingWindow({
   });
 
   if (!futureValidation.valid) {
-    return futureValidation;
+    return {
+      ...futureValidation,
+      timezone,
+    };
   }
 
   const startUtc = localDateTimeToUtc({
@@ -139,6 +150,7 @@ export function validateSchedulingWindow({
       valid: false,
       code: 'INVALID_START_UTC',
       message: 'Não foi possível converter a data/hora inicial.',
+      timezone,
     };
   }
 
@@ -155,11 +167,10 @@ export function validateSchedulingWindow({
         valid: false,
         code: 'INVALID_LOCAL_END_TIME',
         message: 'A hora final informada é inválida.',
+        timezone,
       };
     }
 
-    // Se a hora final for menor ou igual à inicial,
-    // o sistema interpreta como término no dia seguinte.
     if (endMinutes <= startMinutes) {
       effectiveEndDateLocal = proximaDataLocal(dateLocal);
       crossesMidnight = true;
@@ -170,6 +181,7 @@ export function validateSchedulingWindow({
         valid: false,
         code: 'INVALID_END_DATE',
         message: 'Não foi possível calcular a data local final.',
+        timezone,
       };
     }
 
@@ -184,6 +196,7 @@ export function validateSchedulingWindow({
         valid: false,
         code: 'INVALID_END_UTC',
         message: 'Não foi possível converter a data/hora final.',
+        timezone,
       };
     }
 
@@ -192,6 +205,7 @@ export function validateSchedulingWindow({
         valid: false,
         code: 'END_BEFORE_OR_EQUAL_START',
         message: 'A hora final deve ser maior que a hora inicial.',
+        timezone,
       };
     }
   }
@@ -204,6 +218,7 @@ export function validateSchedulingWindow({
     endUtc,
     crossesMidnight,
     effectiveEndDateLocal,
+    timezone,
   };
 }
 
