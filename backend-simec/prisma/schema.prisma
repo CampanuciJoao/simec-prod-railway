@@ -195,13 +195,11 @@ model Manutencao {
   tecnicoResponsavel         String?          @map("tecnico_responsavel")
   numeroChamado              String?          @map("numero_chamado")
 
-  // intenção local do usuário
   agendamentoDataLocal       String           @map("agendamento_data_local")
   agendamentoHoraInicioLocal String           @map("agendamento_hora_inicio_local")
   agendamentoHoraFimLocal    String?          @map("agendamento_hora_fim_local")
   agendamentoTimezone        String           @map("agendamento_timezone")
 
-  // instante real em UTC para comparações, worker e alertas
   dataHoraAgendamentoInicio  DateTime         @map("data_hora_agendamento_inicio")
   dataHoraAgendamentoFim     DateTime?        @map("data_hora_agendamento_fim")
 
@@ -327,10 +325,7 @@ model Alerta {
 
   prioridade                Prioridade
 
-  // 🔥 LEGADO (mantém compatibilidade)
   tipo                      String
-
-  // 🚀 NOVO PADRÃO (ESSENCIAL)
   tipoCategoria             String?    @map("tipo_categoria")
   tipoEvento                String?    @map("tipo_evento")
 
@@ -349,10 +344,43 @@ model Alerta {
   @@index([tenantId, prioridade, data])
   @@index([tenantId, emailEnviado])
   @@index([tenantId, numeroOS])
-  @@index([tenantId, tipoEvento])       // 🔥 novo
-  @@index([tenantId, tipoCategoria])    // 🔥 novo
-
+  @@index([tenantId, tipoEvento])
+  @@index([tenantId, tipoCategoria])
   @@map("alertas")
+}
+
+model AlertaLidoPorUsuario {
+  alertaId  String
+  usuarioId String
+  tenantId  String
+  visto     Boolean   @default(true)
+  dataVisto DateTime? @default(now())
+
+  alerta  Alerta  @relation(fields: [tenantId, alertaId], references: [tenantId, id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([alertaId, usuarioId])
+  @@index([tenantId, usuarioId, visto])
+  @@map("alertas_lidos_por_usuario")
+}
+
+model LogAuditoria {
+  id         String   @id @default(uuid())
+  tenantId   String
+  acao       String
+  entidade   String
+  entidadeId String   @map("entidade_id")
+  detalhes   String
+  timestamp  DateTime @default(now())
+  autorId    String   @map("autor_id")
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor  Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, entidade, entidadeId, timestamp])
+  @@index([tenantId, autorId, timestamp])
+  @@map("log_auditoria")
 }
 
 model Ocorrencia {
