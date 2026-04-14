@@ -1,3 +1,6 @@
+// Ficheiro: services/alertas/manutencao/manutencaoAlertRepository.js
+// Descrição: acesso ao banco para alertas de manutenção
+
 import prisma from '../../prismaService.js';
 
 export async function buscarManutencoesAgendadasFuturas(tenantId, agora) {
@@ -108,72 +111,148 @@ export async function criarAlertaSeNaoExistir(tenantId, payload) {
   await prisma.alerta.create({
     data: {
       ...payload,
-      tenantId,
+      tenant: {
+        connect: { id: tenantId },
+      },
     },
   });
 
   return true;
 }
 
-export async function iniciarManutencaoAutomaticamente(tenantId, manut, agora, alertaPayload) {
+export async function iniciarManutencaoAutomaticamente(
+  tenantId,
+  manut,
+  agora,
+  alertaPayload
+) {
   await prisma.$transaction(async (tx) => {
     await tx.equipamento.update({
-      where: { id: manut.equipamentoId },
-      data: { status: 'EmManutencao' },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id: manut.equipamentoId,
+        },
+      },
+      data: {
+        status: 'EmManutencao',
+      },
     });
 
     await tx.manutencao.update({
-      where: { id: manut.id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id: manut.id,
+        },
+      },
       data: {
         status: 'EmAndamento',
         dataInicioReal: manut.dataInicioReal || manut.dataHoraAgendamentoInicio,
       },
     });
 
-    await tx.alerta.upsert({
-      where: { id: alertaPayload.id },
-      update: {
+    const alertaExistente = await tx.alerta.findFirst({
+      where: {
         tenantId,
-        ...alertaPayload,
-        data: agora,
+        id: alertaPayload.id,
       },
-      create: {
-        tenantId,
-        ...alertaPayload,
-        data: agora,
+      select: {
+        id: true,
       },
     });
+
+    if (alertaExistente) {
+      await tx.alerta.update({
+        where: {
+          tenantId_id: {
+            tenantId,
+            id: alertaPayload.id,
+          },
+        },
+        data: {
+          ...alertaPayload,
+          data: agora,
+        },
+      });
+    } else {
+      await tx.alerta.create({
+        data: {
+          ...alertaPayload,
+          data: agora,
+          tenant: {
+            connect: { id: tenantId },
+          },
+        },
+      });
+    }
   });
 }
 
-export async function moverManutencaoParaAguardandoConfirmacao(tenantId, manut, agora, alertaPayload) {
+export async function moverManutencaoParaAguardandoConfirmacao(
+  tenantId,
+  manut,
+  agora,
+  alertaPayload
+) {
   await prisma.$transaction(async (tx) => {
     await tx.manutencao.update({
-      where: { id: manut.id },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id: manut.id,
+        },
+      },
       data: {
         status: 'AguardandoConfirmacao',
       },
     });
 
     await tx.equipamento.update({
-      where: { id: manut.equipamentoId },
+      where: {
+        tenantId_id: {
+          tenantId,
+          id: manut.equipamentoId,
+        },
+      },
       data: {
         status: 'EmManutencao',
       },
     });
 
-    await tx.alerta.upsert({
-      where: { id: alertaPayload.id },
-      update: {
+    const alertaExistente = await tx.alerta.findFirst({
+      where: {
         tenantId,
-        ...alertaPayload,
-        data: agora,
+        id: alertaPayload.id,
       },
-      create: {
-        tenantId,
-        ...alertaPayload,
-        data: agora,
+      select: {
+        id: true,
       },
     });
+
+    if (alertaExistente) {
+      await tx.alerta.update({
+        where: {
+          tenantId_id: {
+            tenantId,
+            id: alertaPayload.id,
+          },
+        },
+        data: {
+          ...alertaPayload,
+          data: agora,
+        },
+      });
+    } else {
+      await tx.alerta.create({
+        data: {
+          ...alertaPayload,
+          data: agora,
+          tenant: {
+            connect: { id: tenantId },
+          },
+        },
+      });
+    }
   });
 }

@@ -20,6 +20,8 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useAlertasPage } from '../../hooks/alertas/useAlertasPage';
+import { useTenantTime } from '../../hooks/time/useTenantTime';
+import { formatarData, formatarHorario } from '../../utils/timeUtils';
 
 import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
 import PageLayout from '../../components/ui/PageLayout';
@@ -174,13 +176,43 @@ function buildAgendarPreventivaLink(alerta) {
   return '/manutencoes/agendar?tipo=Preventiva';
 }
 
+function montarSubtitulo(alerta, timezone, locale) {
+  const partes = [];
+
+  if (alerta.subtituloBase) {
+    partes.push(alerta.subtituloBase);
+  } else if (alerta.subtitulo) {
+    partes.push(alerta.subtitulo);
+  }
+
+  if (alerta.dataHoraAgendamentoInicio) {
+    partes.push(
+      formatarHorario(
+        alerta.dataHoraAgendamentoInicio,
+        alerta.dataHoraAgendamentoFim,
+        { timeZone: timezone, locale }
+      )
+    );
+  }
+
+  if (alerta.numeroOS) {
+    partes.push(`OS ${alerta.numeroOS}`);
+  }
+
+  return partes.filter(Boolean).join(' | ');
+}
+
 function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
+  const { timezone, locale } = useTenantTime();
+
   const style = getAlertaVisual(alerta);
   const isRecomendacao = alerta.tipo === 'Recomendação';
 
   const dataFormatada = alerta.data
-    ? new Date(alerta.data).toLocaleDateString('pt-BR', { timeZone: 'UTC' })
+    ? formatarData(alerta.data)
     : '-';
+
+  const subtituloRenderizado = montarSubtitulo(alerta, timezone, locale);
 
   const handleViewDetails = () => {
     if (alerta.status === 'NaoVisto') {
@@ -223,8 +255,8 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
               </div>
 
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
-                {alerta.subtitulo ? (
-                  <span className="font-medium">{alerta.subtitulo}</span>
+                {subtituloRenderizado ? (
+                  <span className="font-medium">{subtituloRenderizado}</span>
                 ) : null}
 
                 <span className="flex items-center gap-1 text-xs">
@@ -380,7 +412,9 @@ function AlertasPage() {
           tone="blue"
           onClick={() => {
             page.clearAllFilters();
-            page.selectFiltersConfig.find((f) => f.id === 'status')?.onChange('NaoVisto');
+            page.selectFiltersConfig
+              .find((f) => f.id === 'status')
+              ?.onChange('NaoVisto');
           }}
         />
 
@@ -391,7 +425,9 @@ function AlertasPage() {
           tone="green"
           onClick={() => {
             page.clearAllFilters();
-            page.selectFiltersConfig.find((f) => f.id === 'status')?.onChange('Visto');
+            page.selectFiltersConfig
+              .find((f) => f.id === 'status')
+              ?.onChange('Visto');
           }}
         />
 
@@ -415,7 +451,9 @@ function AlertasPage() {
           tone="violet"
           onClick={() => {
             page.clearAllFilters();
-            page.selectFiltersConfig.find((f) => f.id === 'tipo')?.onChange('Recomendação');
+            page.selectFiltersConfig
+              .find((f) => f.id === 'tipo')
+              ?.onChange('Recomendação');
           }}
         />
       </div>
@@ -465,15 +503,16 @@ function AlertasPage() {
 
         <ul className="space-y-2 text-sm text-blue-700/90">
           <li>
-            <strong>Filtro inicial:</strong> por padrão, exibimos os alertas não vistos.
+            <strong>Filtro inicial:</strong> por padrão, exibimos os alertas não
+            vistos.
           </li>
           <li>
             <strong>Dispensar:</strong> remove o alerta da sua lista atual e marca
             como tratado no sistema.
           </li>
           <li>
-            <strong>Recomendações:</strong> são alertas inteligentes baseados em histórico,
-            recorrência e criticidade, sem abertura automática de OS.
+            <strong>Recomendações:</strong> são alertas inteligentes baseados em
+            histórico, recorrência e criticidade, sem abertura automática de OS.
           </li>
           <li>
             <strong>Status "Visto":</strong> use o filtro de status para consultar

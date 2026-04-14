@@ -1,10 +1,7 @@
-import { format } from 'date-fns';
+// Ficheiro: services/alertas/manutencao/manutencaoAlertFormatter.js
+// Descrição: formata títulos e payload base dos alertas de manutenção
 
-export function formatarIntervaloHorario(dataInicio, dataFim) {
-  const horaInicio = dataInicio ? format(new Date(dataInicio), 'HH:mm') : '--:--';
-  const horaFim = dataFim ? format(new Date(dataFim), 'HH:mm') : '--:--';
-  return `${horaInicio} - ${horaFim}`;
-}
+import { buildAlertMetaManutencao } from './manutencaoAlertMeta.js';
 
 export function montarTituloInicio(manut) {
   const tipo = String(manut.tipo || 'Manutenção').toLowerCase();
@@ -12,32 +9,16 @@ export function montarTituloInicio(manut) {
   return `${tipo.charAt(0).toUpperCase()}${tipo.slice(1)} na unidade de ${unidade}`;
 }
 
-export function montarSubtituloInicio(manut) {
+export function montarSubtituloBase(manut) {
   const modelo = manut.equipamento?.modelo || 'Equipamento';
   const tag = manut.equipamento?.tag || 'Sem TAG';
-  const intervalo = formatarIntervaloHorario(
-    manut.dataHoraAgendamentoInicio,
-    manut.dataHoraAgendamentoFim
-  );
-
-  return `${modelo} (${tag}) | ${intervalo} | OS ${manut.numeroOS}`;
+  return `${modelo} (${tag})`;
 }
 
 export function montarTituloFim(manut) {
   const tipo = String(manut.tipo || 'Manutenção').toLowerCase();
   const unidade = manut.equipamento?.unidade?.nomeSistema || 'N/A';
   return `Término de ${tipo} na unidade de ${unidade}`;
-}
-
-export function montarSubtituloFim(manut) {
-  const modelo = manut.equipamento?.modelo || 'Equipamento';
-  const tag = manut.equipamento?.tag || 'Sem TAG';
-  const intervalo = formatarIntervaloHorario(
-    manut.dataHoraAgendamentoInicio,
-    manut.dataHoraAgendamentoFim
-  );
-
-  return `${modelo} (${tag}) | ${intervalo} | OS ${manut.numeroOS}`;
 }
 
 export function montarTituloConfirmacao(manut) {
@@ -47,15 +28,18 @@ export function montarTituloConfirmacao(manut) {
   return `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
 }
 
-export function montarSubtituloConfirmacao(manut) {
-  const intervalo = formatarIntervaloHorario(
-    manut.dataHoraAgendamentoInicio,
-    manut.dataHoraAgendamentoFim
-  );
-
-  return `OS ${manut.numeroOS} | ${intervalo} | O prazo expirou. Confirme se a manutenção foi concluída ou prorrogada.`;
+export function montarSubtituloConfirmacaoFallback(manut) {
+  return `OS ${manut.numeroOS} | O prazo expirou. Confirme se a manutenção foi concluída ou prorrogada.`;
 }
 
 export function buildAlertId(tenantId, tipo, manutId, label = '') {
   return `tenant-${tenantId}-${tipo}-${manutId}${label ? `-${label}` : ''}`;
+}
+
+export function montarPayloadAlertaManutencaoBase(manut) {
+  const subtituloBase = montarSubtituloBase(manut);
+
+  return buildAlertMetaManutencao(manut, {
+    subtituloBase,
+  });
 }

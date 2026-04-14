@@ -302,17 +302,21 @@ model Seguro {
 }
 
 model Alerta {
-  id           String     @id @default(uuid())
-  tenantId     String
-  titulo       String
-  subtitulo    String?
-  data         DateTime
-  prioridade   Prioridade
-  tipo         String
-  link         String?
-  emailEnviado Boolean    @default(false)
-  createdAt    DateTime   @default(now())
-  updatedAt    DateTime   @updatedAt
+  id                        String     @id @default(uuid())
+  tenantId                  String
+  titulo                    String
+  subtitulo                 String?
+  subtituloBase             String?    @map("subtitulo_base")
+  numeroOS                  String?    @map("numero_os")
+  data                      DateTime
+  dataHoraAgendamentoInicio DateTime?  @map("data_hora_agendamento_inicio")
+  dataHoraAgendamentoFim    DateTime?  @map("data_hora_agendamento_fim")
+  prioridade                Prioridade
+  tipo                      String
+  link                      String?
+  emailEnviado              Boolean    @default(false)
+  createdAt                 DateTime   @default(now())
+  updatedAt                 DateTime   @updatedAt
 
   tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lidoPorUsuarios AlertaLidoPorUsuario[]
@@ -322,6 +326,7 @@ model Alerta {
   @@index([tenantId, tipo, data])
   @@index([tenantId, prioridade, data])
   @@index([tenantId, emailEnviado])
+  @@index([tenantId, numeroOS])
   @@map("alertas")
 }
 
@@ -376,6 +381,7 @@ model Ocorrencia {
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
 
+  @@unique([tenantId, id])
   @@index([tenantId, equipamentoId, data])
   @@index([tenantId, resolvido, data])
   @@map("ocorrencias")
@@ -444,6 +450,7 @@ model EmailNotificacao {
   notificacoesEnviadas NotificacaoEnviada[]
 
   @@unique([tenantId, email])
+  @@unique([tenantId, id])
   @@index([tenantId, ativo])
   @@map("emails_notificacao")
 }
