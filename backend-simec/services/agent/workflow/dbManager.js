@@ -118,6 +118,10 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
         throw new Error(scheduling.code || 'JANELA_AGENDAMENTO_INVALIDA');
       }
 
+      if (!scheduling.startUtc) {
+        throw new Error('FALHA_CONVERSAO_DATA_INICIO');
+      }
+
       const totalTenant = await tx.manutencao.count({
         where: {
           tenantId,
@@ -154,7 +158,7 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
           agendamentoTimezone: timezone,
 
           dataHoraAgendamentoInicio: scheduling.startUtc,
-          dataHoraAgendamentoFim: scheduling.endUtc,
+          dataHoraAgendamentoFim: scheduling.endUtc || null,
 
           equipamento: {
             connect: {
@@ -221,6 +225,12 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
     if (error.message === 'END_BEFORE_OR_EQUAL_START') {
       throw new Error(
         'Falha na persistência: a hora final deve ser maior que a hora inicial.'
+      );
+    }
+
+    if (error.message === 'FALHA_CONVERSAO_DATA_INICIO') {
+      throw new Error(
+        'Falha na persistência: não foi possível converter a data/hora inicial.'
       );
     }
 
