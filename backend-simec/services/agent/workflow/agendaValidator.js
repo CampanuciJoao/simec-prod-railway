@@ -1,135 +1,202 @@
-// Ficheiro: services/agent/workflow/agendaValidator.js
-// Versão: timezone-aware (padrão SIMEC novo)
+// Ficheiro: backend-simec/services/agent/workflow/agendaValidator.js
+// Versão: profissional, timezone-aware, alinhada ao núcleo temporal oficial
 
 import {
-  criarIntervaloUTCFromLocal,
-  getTenantTimezone,
-  getAgora,
-  isDataValida,
-} from '../../timeService.js';
+  buildUtcIntervalFromLocal,
+  resolveOperationalTimezone,
+  validateSchedulingWindow,
+  MANUTENCAO_STATUSS_CONFLITANTES,
+  FAR_FUTURE_UTC_DATE,
+} from '../../time/index.js';
 
 /**
- * Monta intervalo de agendamento corretamente usando timezone do tenant
+ * Resolve o timezone operacional para o contexto da manutenção.
+ * Prioridade:
+ * 1. unidade.timezone
+ * 2. tenant.timezone
+ * 3. fallback do sistema
  */
-export function montarIntervaloAgendamento(estado, tenant) {
-  const { data, horaInicio, horaFim } = estado;
+function resolverTimezoneOperacional(tenant, unidade = null) {
+  return resolveOperationalTimezone({
+    tenantTimezone: tenant?.timezone,
+    unidadeTimezone: unidade?.timezone,
+  });
+}
 
-  if (!data || !horaInicio) return null;
+/**
+ * Monta intervalo UTC a partir da intenção local.
+ * Entrada esperada em estado:
+ * - data
+ * - horaInicio
+ * - horaFim
+ */
+export function montarIntervaloAgendamento(estado, tenant, unidade = null) {
+  const dateLocal = estado?.data;
+  const startTimeLocal = estado?.horaInicio;
+  const endTimeLocal = estado?.horaFim || null;
 
-  const timeZone = getTenantTimezone(tenant);
+  if (!dateLocal || !startTimeLocal) {
+    return null;
+  }
 
-  const { inicio, fim } = criarIntervaloUTCFromLocal({
-    dataLocal: data,
-    horaInicioLocal: horaInicio,
-    horaFimLocal: horaFim,
-    timeZone,
+  const timezone = resolverTimezoneOperacional(tenant, unidade);
+
+  const { startUtc, endUtc } = buildUtcIntervalFromLocal({
+    dateLocal,
+    startTimeLocal,
+    endTimeLocal,
+    timezone,
   });
 
-  if (!isDataValida(inicio)) return null;
+  if (!startUtc) {
+    return null;
+  }
 
   return {
-    inicio,
-    fim,
+    inicio: startUtc,
+    fim: endUtc,
+    timezone,
+    dataLocal: dateLocal,
+    horaInicioLocal: startTimeLocal,
+    horaFimLocal: endTimeLocal,
   };
 }
 
 /**
- * Validação básica de intervalo
+ * Validação básica do intervalo de agendamento.
  */
-export function validarIntervaloBasico(estado, tenant) {
-  const intervalo = montarIntervaloAgendamento(estado, tenant);
+export function validarIntervaloBasico(estado, tenant, unidade = null) {
+  const dateLocal = estado?.data;
+  const startTimeLocal = estado?.horaInicio;
+  const endTimeLocal = estado?.horaFim || null;
 
-  if (!intervalo || !intervalo.inicio) {
+  const timezone = resolverTimezoneOperacional(tenant, unidade);
+
+  const validation = validateSchedulingWindow({
+    dateLocal,
+    startTimeLocal,
+    endTimeLocal,
+    timezone,
+  });
+
+  if (!validation.valid) {
     return {
       valido: false,
-      motivo: 'INTERVALO_INVALIDO',
-      mensagem: 'Data ou horário inválido.',
-    };
-  }
-
-  if (intervalo.fim && intervalo.fim <= intervalo.inicio) {
-    return {
-      valido: false,
-      motivo: 'FIM_ANTES_DO_INICIO',
-      mensagem: 'A hora final deve ser maior que a inicial.',
+      motivo: validation.code,
+      mensagem: validation.message || 'Data ou horário inválido.',
     };
   }
 
   return {
     valido: true,
-    inicio: intervalo.inicio,
-    fim: intervalo.fim,
+    inicio: validation.startUtc,
+    fim: validation.endUtc,
+    timezone,
   };
 }
 
 /**
- * Validação de conflito de agenda
+ * Validação de conflito de agenda para o equipamento.
+ *
+ * Opções:
+ * - manutencaoIdIgnorar: usado em edição para ignorar a própria manutenção
  */
 export async function validarConflitoAgenda(
   estado,
   tenant,
   prisma,
-  equipamentoId
+  equipamentoId,
+  unidade = null,
+  opcoes = {}
 ) {
-  const intervalo = montarIntervaloAgendamento(estado, tenant);
+  const dateLocal = estado?.data;
+  const startTimeLocal = estado?.horaInicio;
+  const endTimeLocal = estado?.horaFim || null;
 
-  if (!intervalo || !intervalo.inicio) {
+  const timezone = resolverTimezoneOperacional(tenant, unidade);
+
+  const validation = validateSchedulingWindow({
+    dateLocal,
+    startTimeLocal,
+    endTimeLocal,
+    timezone,
+  });
+
+  if (!validation.valid) {
     return {
       valido: false,
-      motivo: 'INTERVALO_INVALIDO',
-      mensagem: 'Não foi possível montar o intervalo.',
+      motivo: validation.code,
+      mensagem: validation.message || 'Não foi possível montar o intervalo.',
     };
   }
 
-  const { inicio, fim } = intervalo;
+  const { startUtc, endUtc } = validation;
+  const manutencaoIdIgnorar = opcoes?.manutencaoIdIgnorar || null;
 
-  const conflitos = await prisma.manutencao.findMany({
+  const conflito = await prisma.manutencao.findFirst({
     where: {
       tenantId: tenant.id,
       equipamentoId,
+      ...(manutencaoIdIgnorar
+        ? {
+            id: {
+              not: manutencaoIdIgnorar,
+            },
+          }
+        : {}),
       status: {
-        in: ['Agendada', 'EmAndamento', 'Pendente', 'AguardandoConfirmacao'],
+        in: MANUTENCAO_STATUSS_CONFLITANTES,
       },
       AND: [
         {
           dataHoraAgendamentoInicio: {
-            lt: fim || new Date('9999-12-31'),
+            lt: endUtc || FAR_FUTURE_UTC_DATE,
           },
         },
         {
           OR: [
             {
               dataHoraAgendamentoFim: {
-                gt: inicio,
+                gt: startUtc,
               },
             },
             {
               dataHoraAgendamentoFim: null,
               dataHoraAgendamentoInicio: {
-                lt: fim || new Date('9999-12-31'),
+                lt: endUtc || FAR_FUTURE_UTC_DATE,
               },
             },
           ],
         },
       ],
     },
-    take: 1,
+    select: {
+      id: true,
+      numeroOS: true,
+      tipo: true,
+      status: true,
+      agendamentoDataLocal: true,
+      agendamentoHoraInicioLocal: true,
+      agendamentoHoraFimLocal: true,
+      agendamentoTimezone: true,
+      dataHoraAgendamentoInicio: true,
+      dataHoraAgendamentoFim: true,
+    },
   });
 
-  if (conflitos.length > 0) {
-    const c = conflitos[0];
-
+  if (conflito) {
     return {
       valido: false,
       motivo: 'CONFLITO_AGENDA',
-      conflito: c,
-      mensagem: `Já existe uma manutenção conflitante: OS ${c.numeroOS}`,
+      conflito,
+      mensagem: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
     };
   }
 
   return {
     valido: true,
-    inicio,
-    fim,
+    inicio: startUtc,
+    fim: endUtc,
+    timezone,
   };
 }

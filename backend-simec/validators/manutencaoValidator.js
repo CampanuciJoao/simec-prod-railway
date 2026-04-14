@@ -1,31 +1,77 @@
 // Ficheiro: backend-simec/validators/manutencaoValidator.js
+
 import { z } from 'zod';
 
-export const manutencaoSchema = z.object({
-  // O ID do equipamento é obrigatório para saber o que será consertado
-  equipamentoId: z.string().min(1, "O equipamento é obrigatório."),
+const localDateRegex = /^\d{4}-\d{2}-\d{2}$/;
+const localTimeRegex = /^\d{2}:\d{2}$/;
 
-  // O tipo deve ser um dos quatro permitidos no seu banco de dados
-  tipo: z.enum(['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'], {
-    error_map: () => ({ message: "Tipo de manutenção inválido." })
-  }),
+export const manutencaoSchema = z
+  .object({
+    equipamentoId: z
+      .string({
+        required_error: 'O equipamento é obrigatório.',
+      })
+      .min(1, 'O equipamento é obrigatório.'),
 
-  // Descrição do serviço
-  descricaoProblemaServico: z.string().min(3, "A descrição deve ter pelo menos 3 caracteres."),
+    tipo: z.enum(['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'], {
+      errorMap: () => ({ message: 'Tipo de manutenção inválido.' }),
+    }),
 
-  // Datas de agendamento (recebidas como texto ISO e validadas)
-  dataHoraAgendamentoInicio: z.string().refine((val) => !isNaN(Date.parse(val)), {
-    message: "Data de início inválida."
-  }),
+    descricaoProblemaServico: z
+      .string({
+        required_error: 'A descrição do serviço é obrigatória.',
+      })
+      .min(3, 'A descrição deve ter pelo menos 3 caracteres.'),
 
-  // Data de fim é opcional no agendamento, mas se vier, deve ser válida
-  dataHoraAgendamentoFim: z.string().nullable().optional().refine((val) => {
-    if (!val) return true;
-    return !isNaN(Date.parse(val));
-  }, { message: "Data de previsão de término inválida." }),
+    agendamentoDataLocal: z
+      .string({
+        required_error: 'A data do agendamento é obrigatória.',
+      })
+      .regex(localDateRegex, 'A data deve estar no formato YYYY-MM-DD.'),
 
-  // Campos opcionais
-  tecnicoResponsavel: z.string().nullable().optional(),
-  numeroChamado: z.string().nullable().optional(),
-  custoTotal: z.number().nonnegative().optional().nullable(),
-});
+    agendamentoHoraInicioLocal: z
+      .string({
+        required_error: 'A hora inicial é obrigatória.',
+      })
+      .regex(localTimeRegex, 'A hora inicial deve estar no formato HH:mm.'),
+
+    agendamentoHoraFimLocal: z
+      .string()
+      .regex(localTimeRegex, 'A hora final deve estar no formato HH:mm.')
+      .nullable()
+      .optional(),
+
+    tecnicoResponsavel: z.string().trim().nullable().optional(),
+    numeroChamado: z.string().trim().nullable().optional(),
+    custoTotal: z.number().nonnegative().nullable().optional(),
+    status: z
+      .enum([
+        'Agendada',
+        'EmAndamento',
+        'Concluida',
+        'Cancelada',
+        'Pendente',
+        'AguardandoConfirmacao',
+      ])
+      .optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (
+      data.agendamentoHoraFimLocal &&
+      data.agendamentoHoraFimLocal <= data.agendamentoHoraInicioLocal
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['agendamentoHoraFimLocal'],
+        message: 'A hora final deve ser maior que a hora inicial.',
+      });
+    }
+
+    if (data.tipo === 'Corretiva' && !data.numeroChamado) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['numeroChamado'],
+        message: 'O número do chamado é obrigatório para manutenção corretiva.',
+      });
+    }
+  });

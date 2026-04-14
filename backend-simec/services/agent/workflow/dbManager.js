@@ -1,12 +1,11 @@
-// Ficheiro: services/agent/dbManager.js
-// Versão: Multi-tenant + timezone standardized
+// Ficheiro: backend-simec/services/agent/dbManager.js
+// Versão: profissional, multi-tenant, timezone-aware, alinhada ao núcleo temporal oficial
 
 import prisma from '../../prismaService.js';
 import {
-  criarIntervaloUTCFromLocal,
-  getTenantTimezone,
-  isDataValida,
-} from '../../timeService.js';
+  resolveOperationalTimezone,
+  validateSchedulingWindow,
+} from '../../time/index.js';
 
 function normalizarTipoManutencao(tipoManutencao) {
   const tipo = (tipoManutencao || '').toString().trim().toLowerCase();
@@ -17,6 +16,22 @@ function normalizarTipoManutencao(tipoManutencao) {
   if (tipo === 'inspecao' || tipo === 'inspeção') return 'Inspecao';
 
   return null;
+}
+
+function montarDescricaoFinal(tipoManutencao, estado) {
+  if (estado?.descricaoProblemaServico?.trim()) {
+    return estado.descricaoProblemaServico.trim();
+  }
+
+  if (estado?.descricao?.trim()) {
+    return estado.descricao.trim();
+  }
+
+  if (tipoManutencao === 'Corretiva') {
+    return 'Manutenção Corretiva';
+  }
+
+  return 'Manutenção Preventiva Programada';
 }
 
 export async function criarManutencaoNoBanco(estado, tenantId) {
@@ -59,34 +74,6 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
         throw new Error('TENANT_NAO_ENCONTRADO_OU_INATIVO');
       }
 
-      const tenantTimezone = getTenantTimezone(tenant);
-
-      const dataLocal = estado.data;
-      const horaInicioLocal = estado.horaInicio;
-      const horaFimLocal = estado.horaFim || null;
-
-      const intervalo = criarIntervaloUTCFromLocal({
-        dataLocal,
-        horaInicioLocal,
-        horaFimLocal,
-        timeZone: tenantTimezone,
-      });
-
-      const dataInicio = intervalo.inicio;
-      const dataFim = intervalo.fim;
-
-      if (!isDataValida(dataInicio)) {
-        throw new Error('DATA_HORA_INICIO_INVALIDA');
-      }
-
-      if (dataFim && !isDataValida(dataFim)) {
-        throw new Error('DATA_HORA_FIM_INVALIDA');
-      }
-
-      if (dataFim && dataFim.getTime() <= dataInicio.getTime()) {
-        throw new Error('FIM_ANTES_DO_INICIO');
-      }
-
       const equipamento = await tx.equipamento.findFirst({
         where: {
           id: estado.equipamentoId,
@@ -97,11 +84,38 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
           tag: true,
           modelo: true,
           status: true,
+          unidadeId: true,
+          unidade: {
+            select: {
+              id: true,
+              timezone: true,
+            },
+          },
         },
       });
 
       if (!equipamento) {
         throw new Error('EQUIPAMENTO_NAO_ENCONTRADO_NO_TENANT');
+      }
+
+      const timezone = resolveOperationalTimezone({
+        tenantTimezone: tenant.timezone,
+        unidadeTimezone: equipamento.unidade?.timezone,
+      });
+
+      const dateLocal = estado.data;
+      const startTimeLocal = estado.horaInicio;
+      const endTimeLocal = estado.horaFim || null;
+
+      const scheduling = validateSchedulingWindow({
+        dateLocal,
+        startTimeLocal,
+        endTimeLocal,
+        timezone,
+      });
+
+      if (!scheduling.valid) {
+        throw new Error(scheduling.code || 'JANELA_AGENDAMENTO_INVALIDA');
       }
 
       const totalTenant = await tx.manutencao.count({
@@ -117,10 +131,7 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
       const typeInitial = tipoManutencao.charAt(0).toUpperCase();
       const numeroOS = `${typeInitial}${tagPrefix}-${osSequence}`;
 
-      const descricaoFinal =
-        tipoManutencao === 'Corretiva'
-          ? estado.descricao || 'Manutenção Corretiva'
-          : estado.descricao || 'Manutenção Preventiva Programada';
+      const descricaoFinal = montarDescricaoFinal(tipoManutencao, estado);
 
       const novaManutencao = await tx.manutencao.create({
         data: {
@@ -131,19 +142,19 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
           tipo: tipoManutencao,
           descricaoProblemaServico: descricaoFinal,
           tecnicoResponsavel:
-            estado.tecnicoResponsavel || 'Agente Guardião',
+            estado.tecnicoResponsavel?.trim() || 'Agente Guardião',
           numeroChamado:
             tipoManutencao === 'Corretiva'
-              ? estado.numeroChamado || null
+              ? estado.numeroChamado?.trim() || null
               : null,
 
-          agendamentoDataLocal: dataLocal,
-          agendamentoHoraInicioLocal: horaInicioLocal,
-          agendamentoHoraFimLocal: horaFimLocal,
-          agendamentoTimezone: tenantTimezone,
+          agendamentoDataLocal: dateLocal,
+          agendamentoHoraInicioLocal: startTimeLocal,
+          agendamentoHoraFimLocal: endTimeLocal,
+          agendamentoTimezone: timezone,
 
-          dataHoraAgendamentoInicio: dataInicio,
-          dataHoraAgendamentoFim: dataFim,
+          dataHoraAgendamentoInicio: scheduling.startUtc,
+          dataHoraAgendamentoFim: scheduling.endUtc,
 
           equipamento: {
             connect: {
@@ -189,15 +200,25 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
       throw new Error('Falha na persistência: tenant inválido ou inativo.');
     }
 
-    if (error.message === 'DATA_HORA_INICIO_INVALIDA') {
-      throw new Error('Falha na persistência: data/hora de início inválida.');
+    if (error.message === 'INVALID_LOCAL_DATE') {
+      throw new Error('Falha na persistência: data local inválida.');
     }
 
-    if (error.message === 'DATA_HORA_FIM_INVALIDA') {
-      throw new Error('Falha na persistência: data/hora de término inválida.');
+    if (error.message === 'INVALID_LOCAL_START_TIME') {
+      throw new Error('Falha na persistência: hora inicial inválida.');
     }
 
-    if (error.message === 'FIM_ANTES_DO_INICIO') {
+    if (error.message === 'INVALID_LOCAL_END_TIME') {
+      throw new Error('Falha na persistência: hora final inválida.');
+    }
+
+    if (error.message === 'PAST_LOCAL_DATETIME') {
+      throw new Error(
+        'Falha na persistência: a data/hora de início está no passado.'
+      );
+    }
+
+    if (error.message === 'END_BEFORE_OR_EQUAL_START') {
       throw new Error(
         'Falha na persistência: a hora final deve ser maior que a hora inicial.'
       );
