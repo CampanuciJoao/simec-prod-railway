@@ -1,0 +1,29 @@
+// Ficheiro: backend-simec/services/alertas/alertTypes.js
+
+export const ALERT_CATEGORIAS = {
+  MANUTENCAO: 'Manutenção',
+  RECOMENDACAO: 'Recomendação',
+  SEGURO: 'Seguro',
+  CONTRATO: 'Contrato',
+};
+
+export const ALERT_EVENTOS = {
+  MANUT_PROX_INICIO: 'MANUT_PROX_INICIO',
+  MANUT_INICIADA: 'MANUT_INICIADA',
+  MANUT_PROX_FIM: 'MANUT_PROX_FIM',
+  MANUT_CONFIRMACAO: 'MANUT_CONFIRMACAO',
+
+  RECOM_PREVENTIVA: 'RECOM_PREVENTIVA',
+
+  SEGURO_VENCE: 'SEGURO_VENCE',
+  SEGURO_VENCIDO: 'SEGURO_VENCIDO',
+
+  CONTRATO_VENCE: 'CONTRATO_VENCE',
+  CONTRATO_VENCIDO: 'CONTRATO_VENCIDO',
+};
+
+export const ALERT_PRIORIDADES = {
+  BAIXA: 'Baixa',
+  MEDIA: 'Media',
+  ALTA: 'Alta',
+};

@@ -5,7 +5,10 @@ import { gerarAlertasRecomendacao } from './recomendacao/index.js';
 
 async function executarEtapa(nome, fn) {
   try {
-    const total = await fn();
+    const result = await fn();
+
+    const total =
+      typeof result === 'number' ? result : Number(result?.total || 0);
 
     console.log(`[ALERTAS] ${nome} concluído | total=${total}`);
 
@@ -59,17 +62,21 @@ export async function processarAlertasEEnviarNotificacoes() {
     contratosResult.ok &&
     recomendacoesResult.ok;
 
-  if (global.io) {
+  const totalGeral =
+    manutencoes + seguros + contratos + recomendacoes;
+
+  if (global.io && totalGeral > 0) {
     global.io.emit('atualizar-alertas');
     console.log('📢 WebSockets: Notificando navegadores em tempo real!');
   }
 
   console.log(
-    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | ok=${ok}`
+    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | total=${totalGeral} | ok=${ok}`
   );
 
   return {
     ok,
+    total: totalGeral,
     manutencoes,
     seguros,
     contratos,
@@ -77,16 +84,26 @@ export async function processarAlertasEEnviarNotificacoes() {
     detalhes: {
       manutencoes: {
         ok: manutencoesResult.ok,
+        total: manutencoesResult.total,
+        erro: manutencoesResult.erro?.message || null,
       },
       seguros: {
         ok: segurosResult.ok,
+        total: segurosResult.total,
+        erro: segurosResult.erro?.message || null,
       },
       contratos: {
         ok: contratosResult.ok,
+        total: contratosResult.total,
+        erro: contratosResult.erro?.message || null,
       },
       recomendacoes: {
         ok: recomendacoesResult.ok,
+        total: recomendacoesResult.total,
+        erro: recomendacoesResult.erro?.message || null,
       },
     },
   };
 }
+
+export default processarAlertasEEnviarNotificacoes;

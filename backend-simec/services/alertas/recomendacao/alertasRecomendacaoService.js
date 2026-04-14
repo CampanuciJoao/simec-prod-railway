@@ -1,11 +1,13 @@
 import prisma from '../../prismaService.js';
 import { addDays } from 'date-fns';
 import { getAgora } from '../../timeService.js';
+
 import {
   calcularScoreRisco,
   definirPrioridade,
   deveRecomendar,
 } from './recomendacaoAlertScoring.js';
+
 import {
   montarTituloRecomendacao,
   montarSubtituloRecomendacao,
@@ -13,16 +15,27 @@ import {
   buildRecomendacaoAlertId,
   JANELA_DIAS,
 } from './recomendacaoAlertFormatter.js';
+
 import {
   buscarEquipamentosComHistorico,
   existeAlerta,
   criarAlertaRecomendacao,
 } from './recomendacaoAlertRepository.js';
 
+// 🔥 NOVO PADRÃO
+import {
+  criarPayloadBaseAlerta,
+  ALERT_CATEGORIAS,
+  ALERT_EVENTOS,
+} from '../alertPayloadFactory.js';
+
 async function processarTenant(tenantId, agora) {
   const dataCorte = addDays(agora, -JANELA_DIAS);
 
-  const equipamentos = await buscarEquipamentosComHistorico(tenantId, dataCorte);
+  const equipamentos = await buscarEquipamentosComHistorico(
+    tenantId,
+    dataCorte
+  );
 
   let total = 0;
 
@@ -42,7 +55,11 @@ async function processarTenant(tenantId, agora) {
       continue;
     }
 
-    const alertaId = buildRecomendacaoAlertId(tenantId, equipamento.id, agora);
+    const alertaId = buildRecomendacaoAlertId(
+      tenantId,
+      equipamento.id,
+      agora
+    );
 
     const jaExiste = await existeAlerta(tenantId, alertaId);
     if (jaExiste) {
@@ -50,6 +67,7 @@ async function processarTenant(tenantId, agora) {
     }
 
     const titulo = montarTituloRecomendacao(unidadeNome);
+
     const subtitulo = montarSubtituloRecomendacao({
       equipamento,
       unidadeNome,
@@ -62,15 +80,22 @@ async function processarTenant(tenantId, agora) {
       metricas,
     });
 
-    await criarAlertaRecomendacao(tenantId, {
-      id: alertaId,
-      titulo,
-      subtitulo: `${subtitulo}. ${descricaoAnalitica}`,
-      data: agora,
-      prioridade: definirPrioridade(metricas.scoreFinal),
-      tipo: 'Recomendação',
-      link: `/equipamentos/ficha-tecnica/${equipamento.id}`,
-    });
+    await criarAlertaRecomendacao(
+      tenantId,
+      criarPayloadBaseAlerta({
+        id: alertaId,
+        titulo,
+        subtitulo: `${subtitulo}. ${descricaoAnalitica}`,
+        data: agora,
+        prioridade: definirPrioridade(metricas.scoreFinal),
+
+        // 🔥 PADRÃO NOVO
+        tipoCategoria: ALERT_CATEGORIAS.RECOMENDACAO,
+        tipoEvento: ALERT_EVENTOS.RECOM_PREVENTIVA,
+
+        link: `/equipamentos/ficha-tecnica/${equipamento.id}`,
+      })
+    );
 
     total += 1;
 
@@ -101,3 +126,5 @@ export async function gerarAlertasRecomendacao() {
 
   return totalGlobal;
 }
+
+export default gerarAlertasRecomendacao;
