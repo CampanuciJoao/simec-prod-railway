@@ -29,3 +29,4 @@ export * from './formatters.js';
 // BUSINESS RULES (AGENDA)
 // ==============================
 export * from './businessCalendar.js';
+export * from './validateSchedulingWindow.js';
