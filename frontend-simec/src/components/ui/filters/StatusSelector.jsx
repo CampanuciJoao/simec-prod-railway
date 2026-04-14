@@ -1,9 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import { useToast } from '../../contexts/ToastContext';
-import { updateEquipamento } from '../../services/api';
-import { getStatusBadgeVariant } from '../ui/uistyles/statusStyles';
+import { useToast } from '../../../contexts/ToastContext';
+import { updateEquipamento } from '../../../services/api';
+import { getStatusBadgeVariant } from '../uistyles/statusStyles';
 
 const STATUS_OPTIONS = [
   'Operante',

@@ -14,7 +14,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import Sidebar from '../ui/Sidebar';
-import ChatBot from '../ui/ChatBot';
+import ChatBot from '../ui/chat/ChatBot';
 import { useAuth } from '../../contexts/AuthContext';
 import { useAlertas } from '../../contexts/AlertasContext';
 

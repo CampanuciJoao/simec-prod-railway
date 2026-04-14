@@ -8,11 +8,11 @@ import {
   faRotateRight,
 } from '@fortawesome/free-solid-svg-icons';
 
-import ChatMessageBubble from './ChatMessageBubble';
+import ChatMessageBubble from '../ChatMessageBubble';
 import {
   enviarMensagemAoAgente,
   mapearHistoricoParaAPI,
-} from '../../services/api/agentApi';
+} from '../../../services/api/agentApi';
 
 function formatTime(date = new Date()) {
   return new Intl.DateTimeFormat('pt-BR', {

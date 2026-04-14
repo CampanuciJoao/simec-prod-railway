@@ -3,16 +3,18 @@ import { faWrench } from '@fortawesome/free-solid-svg-icons';
 
 import { useDetalhesManutencaoPage } from '../../hooks/manutencoes/useDetalhesManutencaoPage';
 
-import DetalhesManutencaoPageHeader from '../../components/manutencoes/DetalhesManutencaoPageHeader';
-import InformacoesManutencaoSection from '../../components/manutencoes/InformacoesManutencaoSection';
 import ConfirmacaoFinalManutencao from '../../components/manutencoes/ConfirmacaoFinalManutencao';
+import DetalhesManutencaoPageHeader from '../../components/manutencoes/DetalhesManutencaoPageHeader';
 import HistoricoEAnexosManutencaoSection from '../../components/manutencoes/HistoricoEAnexosManutencaoSection';
+import InformacoesManutencaoSection from '../../components/manutencoes/InformacoesManutencaoSection';
 
-import Button from '../../components/ui/Button';
-import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
-import PageHeader from '../../components/ui/PageHeader';
-import PageLayout from '../../components/ui/PageLayout';
-import PageState from '../../components/ui/PageState';
+import {
+  Button,
+  ModalConfirmacao,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '../../components/ui';
 
 function DetalhesManutencaoPage() {
   const page = useDetalhesManutencaoPage();
@@ -54,6 +56,21 @@ function DetalhesManutencaoPage() {
         onConfirm={page.handleDeleteAnexo}
         title="Excluir anexo"
         message="Deseja remover este anexo?"
+        isDestructive
+      />
+
+      <ModalConfirmacao
+        isOpen={page.cancelModal.isOpen}
+        onClose={page.cancelModal.closeModal}
+        onConfirm={() =>
+          page.handleCancelarManutencao(
+            'Cancelada manualmente a partir da tela de detalhes.'
+          )
+        }
+        title="Cancelar manutenção"
+        message="Tem certeza que deseja cancelar esta ordem de serviço?"
+        confirmText="Confirmar cancelamento"
+        cancelText="Voltar"
         isDestructive
       />
 

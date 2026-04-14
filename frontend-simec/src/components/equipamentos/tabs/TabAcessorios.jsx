@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAcessorios } from '../../../hooks/equipamentos/useAcessorios';
 import { useModal } from '../../../hooks/shared/useModal';
 import AcessorioForm from '../AcessorioForm';
-import ModalConfirmacao from '../../ui/ModalConfirmacao';
+import ModalConfirmacao from '../../ui/feedback/ModalConfirmacao';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faHdd,

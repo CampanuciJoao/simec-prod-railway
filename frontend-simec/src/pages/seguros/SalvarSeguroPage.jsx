@@ -25,7 +25,7 @@ import {
 
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
+import PageState from '../../components/ui/feedback/PageState';
 import PageSection from '../../components/ui/PageSection';
 
 function getAnexoNome(anexo) {
@@ -141,7 +141,7 @@ function SalvarSeguroPage() {
       setUploadingAnexo(true);
 
       const formData = new FormData();
-      formData.append('file', arquivoSelecionado);
+      formData.append('file', file);
 
       await uploadAnexoSeguro(id, formData);
       addToast('Anexo enviado com sucesso!', 'success');

@@ -13,14 +13,14 @@ import {
 import { useEquipamentosPage } from '../../hooks/equipamentos/useEquipamentosPage';
 import { useEquipamentosExpansion } from '../../hooks/equipamentos/useEquipamentosExpansion';
 
-import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
-import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
+import GlobalFilterBar from '../../components/ui/filters/GlobalFilterBar';
+import ModalConfirmacao from '../../components/ui/feedback/ModalConfirmacao';
 import EquipamentosList from '../../components/equipamentos/EquipamentosList';
 
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
-import Card from '../../components/ui/Card';
+import PageState from '../../components/ui/feedback/PageState';
+import Card from '../../components/ui/primitives/Card';
 
 function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {

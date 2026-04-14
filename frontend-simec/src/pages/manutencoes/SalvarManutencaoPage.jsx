@@ -1,84 +1,36 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+// src/pages/manutencoes/SalvarManutencaoPage.jsx
+
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faSpinner, faWrench } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faWrench } from '@fortawesome/free-solid-svg-icons';
 
-import { useToast } from '../../contexts/ToastContext';
+import { useSalvarManutencaoPage } from '../../hooks/manutencoes/useSalvarManutencaoPage';
+
 import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
-import {
-  getManutencaoById,
-  addManutencao,
-  updateManutencao,
-  getEquipamentos,
-  getUnidades,
-} from '../../services/api';
 
-import Button from '../../components/ui/Button';
+import Button from '../../components/ui/primitives/Button';
 import PageHeader from '../../components/ui/PageHeader';
 import PageLayout from '../../components/ui/PageLayout';
 import PageSection from '../../components/ui/PageSection';
-import PageState from '../../components/ui/PageState';
+import PageState from '../../components/ui/feedback/PageState';
 
 function SalvarManutencaoPage() {
-  const { manutencaoId } = useParams();
-  const navigate = useNavigate();
-  const { addToast } = useToast();
+  const page = useSalvarManutencaoPage();
 
-  const isEditing = !!manutencaoId;
+  const title = page.isEditing
+    ? `Editar Manutenção (${page.initialData?.numeroOS || ''})`
+    : 'Agendar Nova Manutenção';
 
-  const [initialData, setInitialData] = useState(null);
-  const [todosEquipamentos, setTodosEquipamentos] = useState([]);
-  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const subtitle = page.isEditing
+    ? 'Atualize os dados da ordem de serviço'
+    : 'Preencha os dados para criar uma nova ordem de serviço';
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError('');
-
-    try {
-      const [equipamentosData, unidadesData] = await Promise.all([
-        getEquipamentos(),
-        getUnidades(),
-      ]);
-
-      setTodosEquipamentos(equipamentosData || []);
-      setUnidadesDisponiveis(unidadesData || []);
-
-      if (isEditing) {
-        const manutencaoData = await getManutencaoById(manutencaoId);
-        setInitialData(manutencaoData);
-      }
-    } catch (err) {
-      setError('Falha ao carregar dados necessários.');
-      addToast(err.response?.data?.message || 'Falha ao carregar dados.', 'error');
-    } finally {
-      setLoading(false);
-    }
-  }, [manutencaoId, isEditing, addToast]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  const handleSave = async (formData) => {
-    try {
-      if (isEditing) {
-        await updateManutencao(manutencaoId, formData);
-        addToast('Manutenção atualizada com sucesso!', 'success');
-      } else {
-        await addManutencao(formData);
-        addToast('Manutenção agendada com sucesso!', 'success');
-      }
-
-      navigate('/manutencoes', { state: { refresh: true } });
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Erro ao salvar a manutenção.', 'error');
-      throw err;
-    }
-  };
-
-  if (loading) {
+  /**
+   * =========================
+   * LOADING
+   * =========================
+   */
+  if (page.loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageState loading />
@@ -86,63 +38,67 @@ function SalvarManutencaoPage() {
     );
   }
 
-  if (error) {
+  /**
+   * =========================
+   * ERROR
+   * =========================
+   */
+  if (page.error) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
-          title={isEditing ? 'Editar Manutenção' : 'Agendar Nova Manutenção'}
+          title={title}
           icon={faWrench}
           actions={
-            <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+            <Button variant="secondary" onClick={page.goBack}>
               <FontAwesomeIcon icon={faArrowLeft} />
               Voltar
             </Button>
           }
         />
 
-        <PageState error={error} />
+        <PageState error={page.error} />
       </PageLayout>
     );
   }
 
-  if (isEditing && !initialData) {
+  /**
+   * =========================
+   * NOT FOUND (edit)
+   * =========================
+   */
+  if (page.isEditing && !page.initialData) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Editar Manutenção"
           icon={faWrench}
           actions={
-            <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+            <Button variant="secondary" onClick={page.goBack}>
               <FontAwesomeIcon icon={faArrowLeft} />
               Voltar
             </Button>
           }
         />
 
-        <PageState
-          isEmpty
-          emptyMessage="Manutenção não encontrada."
-        />
+        <PageState isEmpty emptyMessage="Manutenção não encontrada." />
       </PageLayout>
     );
   }
 
+  /**
+   * =========================
+   * SUCCESS STATE (FORM)
+   * =========================
+   */
   return (
     <PageLayout background="slate" padded fullHeight>
       <PageHeader
-        title={
-          isEditing
-            ? `Editar Manutenção (${initialData?.numeroOS || ''})`
-            : 'Agendar Nova Manutenção'
-        }
-        subtitle={
-          isEditing
-            ? 'Atualize os dados da ordem de serviço'
-            : 'Preencha os dados para criar uma nova ordem de serviço'
-        }
+        title={title}
+        subtitle={subtitle}
         icon={faWrench}
         actions={
-          <Button variant="secondary" onClick={() => navigate('/manutencoes')}>
+          <Button variant="secondary" onClick={page.goBack}>
             <FontAwesomeIcon icon={faArrowLeft} />
             Voltar
           </Button>
@@ -151,11 +107,11 @@ function SalvarManutencaoPage() {
 
       <PageSection>
         <ManutencaoForm
-          onSubmit={handleSave}
-          initialData={initialData}
-          isEditing={isEditing}
-          todosEquipamentos={todosEquipamentos}
-          unidadesDisponiveis={unidadesDisponiveis}
+          initialData={page.initialData}
+          onSubmit={page.handleSave}
+          isEditing={page.isEditing}
+          todosEquipamentos={page.equipamentos}
+          unidadesDisponiveis={page.unidades}
         />
       </PageSection>
     </PageLayout>

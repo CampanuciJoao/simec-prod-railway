@@ -21,7 +21,7 @@ import {
   faCalendarDay,
   faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
-import DateInput from '../../ui/DateInput';
+import DateInput from '../../ui/primitives/DateInput';
 import PageSection from '../../ui/PageSection';
 import { ActionBar, EmptyState, LoadingState } from '../../ui/layout';
 

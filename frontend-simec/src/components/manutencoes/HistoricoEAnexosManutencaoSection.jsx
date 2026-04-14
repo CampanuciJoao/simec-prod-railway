@@ -2,17 +2,17 @@ import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faPaperclip,
-  faTimeline,
-  faUpload,
-  faTrashAlt,
-  faPlus,
-  faFileLines,
   faClock,
+  faEye,
+  faFileLines,
+  faPaperclip,
+  faPlus,
+  faTimeline,
+  faTrashAlt,
+  faUpload,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '../ui/Button';
-import PageSection from '../ui/PageSection';
+import { Button, EmptyState, PageSection } from '../ui';
 
 function formatarDataHora(data) {
   if (!data) return '-';
@@ -35,13 +35,7 @@ function getNomeArquivo(anexo) {
 }
 
 function getLinkArquivo(anexo) {
-  return (
-    anexo?.url ||
-    anexo?.link ||
-    anexo?.path ||
-    anexo?.arquivoUrl ||
-    '#'
-  );
+  return anexo?.url || anexo?.link || anexo?.path || anexo?.arquivoUrl || '#';
 }
 
 function HistoricoEAnexosManutencaoSection({
@@ -68,9 +62,7 @@ function HistoricoEAnexosManutencaoSection({
     });
   }, [manutencao]);
 
-  const anexos = useMemo(() => {
-    return manutencao?.anexos || [];
-  }, [manutencao]);
+  const anexos = useMemo(() => manutencao?.anexos || [], [manutencao]);
 
   const handleAdicionarNota = async (e) => {
     e.preventDefault();
@@ -93,7 +85,7 @@ function HistoricoEAnexosManutencaoSection({
 
     const formData = new FormData();
     arquivos.forEach((arquivo) => {
-      formData.append('files', arquivo);
+      formData.append('file', arquivo);
     });
 
     await onUploadAnexos(formData);
@@ -105,7 +97,7 @@ function HistoricoEAnexosManutencaoSection({
     <div className="space-y-6">
       <PageSection
         title="Histórico de andamento"
-        description="Registre acontecimentos, observações técnicas e evolução da OS."
+        description="Registre acontecimentos, observações técnicas e evolução da ordem de serviço."
       >
         <div className="mb-5 flex items-center gap-3">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
@@ -117,7 +109,7 @@ function HistoricoEAnexosManutencaoSection({
               Acontecimentos da manutenção
             </p>
             <p className="text-sm text-slate-500">
-              Use esta área para registrar visitas, testes, peças, observações e andamento.
+              Registre visitas, testes, peças trocadas, diagnósticos e observações de campo.
             </p>
           </div>
         </div>
@@ -128,8 +120,8 @@ function HistoricoEAnexosManutencaoSection({
             onChange={(e) => setNota(e.target.value)}
             rows={4}
             disabled={submitting}
-            placeholder="Ex.: Equipamento reiniciado, teste funcional executado, aguardando peça, visita técnica realizada..."
-            className="min-h-[110px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+            placeholder="Ex.: Equipamento reiniciado, testes executados, aguardando peça, visita técnica realizada..."
+            className="min-h-[110px] w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
           />
 
           <div className="flex justify-end">
@@ -141,9 +133,7 @@ function HistoricoEAnexosManutencaoSection({
         </form>
 
         {historicoOrdenado.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-            Nenhum acontecimento registrado nesta OS.
-          </div>
+          <EmptyState message="Nenhum acontecimento registrado nesta OS." />
         ) : (
           <div className="space-y-3">
             {historicoOrdenado.map((item) => {
@@ -197,7 +187,7 @@ function HistoricoEAnexosManutencaoSection({
 
       <PageSection
         title="Anexos da OS"
-        description="Envie laudos, imagens, relatórios, orçamentos, PDFs e demais arquivos vinculados à manutenção."
+        description="Envie laudos, imagens, relatórios, PDFs e demais arquivos vinculados à manutenção."
       >
         <div className="mb-5 flex items-center gap-3">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
@@ -209,12 +199,15 @@ function HistoricoEAnexosManutencaoSection({
               Arquivos vinculados à ordem de serviço
             </p>
             <p className="text-sm text-slate-500">
-              Todos os anexos enviados ficam registrados diretamente nesta manutenção.
+              O upload segue o padrão centralizado do sistema usando o campo multipart oficial.
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleUpload} className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <form
+          onSubmit={handleUpload}
+          className="mb-6 rounded-2xl border border-slate-200 bg-slate-50 p-4"
+        >
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div className="flex-1">
               <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -246,9 +239,7 @@ function HistoricoEAnexosManutencaoSection({
         </form>
 
         {anexos.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-            Nenhum anexo enviado para esta OS.
-          </div>
+          <EmptyState message="Nenhum anexo enviado para esta OS." />
         ) : (
           <div className="space-y-3">
             {anexos.map((anexo) => (

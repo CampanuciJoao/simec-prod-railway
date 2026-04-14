@@ -4,15 +4,20 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useModal } from '../shared/useModal';
 import { useManutencaoDetalhes } from './useManutencaoDetalhes';
 
-function toDateInputValue(value) {
+function toDateTimeLocalValue(value) {
   if (!value) return '';
 
   try {
     const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+
     const ano = date.getFullYear();
     const mes = String(date.getMonth() + 1).padStart(2, '0');
     const dia = String(date.getDate()).padStart(2, '0');
-    return `${ano}-${mes}-${dia}`;
+    const hora = String(date.getHours()).padStart(2, '0');
+    const min = String(date.getMinutes()).padStart(2, '0');
+
+    return `${ano}-${mes}-${dia}T${hora}:${min}`;
   } catch {
     return '';
   }
@@ -28,7 +33,6 @@ function extrairFormInicial(manutencao) {
       agendamentoDataLocal: '',
       agendamentoHoraInicioLocal: '',
       agendamentoHoraFimLocal: '',
-      observacoes: '',
     };
   }
 
@@ -52,8 +56,16 @@ function extrairFormInicial(manutencao) {
       manutencao?.agendamentoLocal?.horaFim ||
       manutencao?.agendamentoHoraFimLocal ||
       '',
-    observacoes: manutencao.observacoes || '',
   };
+}
+
+function parseDateTimeLocalToIso(value) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  return date.toISOString();
 }
 
 export function useDetalhesManutencaoPage() {
@@ -81,7 +93,7 @@ export function useDetalhesManutencaoPage() {
 
   const [formData, setFormData] = useState(extrairFormInicial(null));
 
-  const [confirmMode, setConfirmMode] = useState('concluir');
+  const [confirmMode, setConfirmMode] = useState(null);
   const [dataTerminoReal, setDataTerminoReal] = useState('');
   const [novaPrevisao, setNovaPrevisao] = useState('');
   const [observacaoDecisao, setObservacaoDecisao] = useState('');
@@ -94,8 +106,8 @@ export function useDetalhesManutencaoPage() {
 
   useEffect(() => {
     if (manutencao?.status === 'AguardandoConfirmacao') {
-      setConfirmMode('concluir');
-      setDataTerminoReal(toDateInputValue(new Date()));
+      setConfirmMode(null);
+      setDataTerminoReal(toDateTimeLocalValue(new Date()));
       setNovaPrevisao('');
       setObservacaoDecisao('');
     }
@@ -139,21 +151,17 @@ export function useDetalhesManutencaoPage() {
       agendamentoDataLocal: formData.agendamentoDataLocal,
       agendamentoHoraInicioLocal: formData.agendamentoHoraInicioLocal,
       agendamentoHoraFimLocal: formData.agendamentoHoraFimLocal || null,
-      observacoes: formData.observacoes,
     };
 
     await salvarAtualizacoes(payload);
-    await refetch();
   };
 
   const handleAdicionarNota = async (texto) => {
     await adicionarNota(texto);
-    await refetch();
   };
 
   const handleUploadAnexos = async (formDataUpload) => {
     await fazerUploadAnexo(formDataUpload);
-    await refetch();
   };
 
   const handleAskDeleteAnexo = (anexoId) => {
@@ -166,14 +174,12 @@ export function useDetalhesManutencaoPage() {
 
     await removerAnexo(anexoId);
     deleteAnexoModal.closeModal();
-    await refetch();
   };
 
   const handleCancelarManutencao = async (motivo = '') => {
     const ok = await cancelarOS(motivo);
     if (ok) {
       cancelModal.closeModal();
-      await refetch();
     }
   };
 
@@ -181,37 +187,26 @@ export function useDetalhesManutencaoPage() {
     if (confirmMode === 'concluir') {
       await concluirOS({
         acao: 'concluir',
-        dataTerminoReal: dataTerminoReal
-          ? new Date(`${dataTerminoReal}T00:00:00`).toISOString()
-          : new Date().toISOString(),
+        dataTerminoReal:
+          parseDateTimeLocalToIso(dataTerminoReal) || new Date().toISOString(),
         observacao: observacaoDecisao || null,
       });
-
-      await refetch();
       return;
     }
 
     if (confirmMode === 'prorrogar') {
-      await salvarAtualizacoes({
-        equipamentoId: manutencao?.equipamentoId,
-        tipo: manutencao?.tipo,
-        descricaoProblemaServico:
-          formData.descricaoProblemaServico || manutencao?.descricaoProblemaServico || '',
-        tecnicoResponsavel:
-          formData.tecnicoResponsavel || manutencao?.tecnicoResponsavel || '',
-        numeroChamado: formData.numeroChamado || manutencao?.numeroChamado || '',
-        status: 'EmAndamento',
-        agendamentoDataLocal:
-          formData.agendamentoDataLocal || manutencao?.agendamentoLocal?.data || '',
-        agendamentoHoraInicioLocal:
-          formData.agendamentoHoraInicioLocal ||
-          manutencao?.agendamentoLocal?.horaInicio ||
-          '',
-        agendamentoHoraFimLocal: formData.agendamentoHoraFimLocal || null,
-        observacoes: observacaoDecisao || manutencao?.observacoes || '',
+      await concluirOS({
+        acao: 'prorrogar',
+        novaPrevisao: parseDateTimeLocalToIso(novaPrevisao),
+        observacao: observacaoDecisao || null,
       });
+      return;
+    }
 
-      await refetch();
+    if (confirmMode === 'cancelar') {
+      await handleCancelarManutencao(
+        observacaoDecisao || 'Cancelada na etapa de confirmação final.'
+      );
     }
   };
 
@@ -220,8 +215,10 @@ export function useDetalhesManutencaoPage() {
     loading,
     error,
     submitting,
+
     formData,
     setFormData,
+
     confirmMode,
     setConfirmMode,
     dataTerminoReal,
@@ -230,18 +227,22 @@ export function useDetalhesManutencaoPage() {
     setNovaPrevisao,
     observacaoDecisao,
     setObservacaoDecisao,
+
     camposPrincipaisBloqueados,
     isCancelavel,
+
     goBack,
     handlePrint,
     handleFormChange,
     handleSalvarAlteracoes,
+
     handleAdicionarNota,
     handleUploadAnexos,
     handleAskDeleteAnexo,
     handleDeleteAnexo,
     handleCancelarManutencao,
     handleConfirmacaoFinal,
+
     cancelModal,
     deleteAnexoModal,
     refetch,

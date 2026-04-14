@@ -13,7 +13,7 @@ import {
   faDownload,
 } from '@fortawesome/free-solid-svg-icons';
 
-import ModalConfirmacao from '../../ui/ModalConfirmacao';
+import ModalConfirmacao from '../../ui/feedback/ModalConfirmacao';
 import PageSection from '../../ui/PageSection';
 import { ActionBar, EmptyState } from '../../ui/layout';
 import { formatarData } from '../../../utils/timeUtils';

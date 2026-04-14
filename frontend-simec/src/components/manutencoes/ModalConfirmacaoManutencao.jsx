@@ -6,7 +6,7 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '../ui/Button';
+import Button from '../ui/primitives/Button';
 
 function ConfirmacaoFinalManutencao({
   visible,

@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import Button from './Button';
 
 function FormActions({
   onSubmit,
@@ -8,6 +9,7 @@ function FormActions({
   submitLabel = 'Salvar',
   cancelLabel = 'Cancelar',
   align = 'right',
+  className = '',
 }) {
   const alignMap = {
     left: 'justify-start',
@@ -20,27 +22,30 @@ function FormActions({
       className={[
         'flex flex-col gap-2 pt-4 sm:flex-row',
         alignMap[align] || 'justify-end',
+        className,
       ].join(' ')}
     >
       {onCancel ? (
-        <button
+        <Button
           type="button"
-          className="btn btn-secondary w-full sm:w-auto"
+          variant="secondary"
+          className="w-full sm:w-auto"
           onClick={onCancel}
           disabled={loading}
         >
           {cancelLabel}
-        </button>
+        </Button>
       ) : null}
 
-      <button
+      <Button
         type="button"
-        className="btn btn-primary w-full sm:w-auto"
+        variant="primary"
+        className="w-full sm:w-auto"
         onClick={onSubmit}
         disabled={loading}
       >
         {loading ? 'Salvando...' : submitLabel}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -52,6 +57,7 @@ FormActions.propTypes = {
   submitLabel: PropTypes.string,
   cancelLabel: PropTypes.string,
   align: PropTypes.oneOf(['left', 'right', 'between']),
+  className: PropTypes.string,
 };
 
 export default FormActions;

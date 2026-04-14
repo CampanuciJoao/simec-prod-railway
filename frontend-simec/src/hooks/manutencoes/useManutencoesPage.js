@@ -1,143 +1,184 @@
-import { useMemo } from 'react';
+// src/hooks/manutencoes/useManutencoesPage.js
+
+import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useModal } from '../shared/useModal';
 import { useManutencoes } from './useManutencoes';
 
-const formatarLabel = (valor) => {
+function formatarLabel(valor) {
   if (!valor) return '';
   return String(valor).replace(/([A-Z])/g, ' $1').trim();
-};
+}
+
+function buildUniqueOptions(list, accessor) {
+  return [...new Set(list.map(accessor).filter(Boolean))].map((item) => ({
+    value: item,
+    label: formatarLabel(item),
+  }));
+}
 
 export function useManutencoesPage() {
   const navigate = useNavigate();
-  const hook = useManutencoes();
+  const dataHook = useManutencoes();
   const deleteModal = useModal();
 
-  const selectFiltersConfig = useMemo(() => {
-    const base = Array.isArray(hook.manutencoesOriginais)
-      ? hook.manutencoesOriginais
+  const baseList = useMemo(() => {
+    return Array.isArray(dataHook.manutencoesOriginais)
+      ? dataHook.manutencoesOriginais
       : [];
+  }, [dataHook.manutencoesOriginais]);
 
-    const status = [...new Set(base.map((m) => m.status).filter(Boolean))].map(
-      (item) => ({
-        value: item,
-        label: formatarLabel(item),
-      })
+  /**
+   * =========================
+   * FILTER CONFIG (memoizada)
+   * =========================
+   */
+  const selectFiltersConfig = useMemo(() => {
+    const statusOptions = buildUniqueOptions(baseList, (m) => m.status);
+    const tipoOptions = buildUniqueOptions(baseList, (m) => m.tipo);
+    const unidadeOptions = buildUniqueOptions(
+      baseList,
+      (m) => m.equipamento?.unidade?.nomeSistema
     );
-
-    const tipos = [...new Set(base.map((m) => m.tipo).filter(Boolean))].map(
-      (item) => ({
-        value: item,
-        label: formatarLabel(item),
-      })
-    );
-
-    const unidades = [
-      ...new Set(
-        base
-          .map((m) => m.equipamento?.unidade?.nomeSistema)
-          .filter(Boolean)
-      ),
-    ].map((item) => ({
-      value: item,
-      label: item,
-    }));
 
     return [
       {
         id: 'status',
         label: 'Status',
-        value: hook.filtros.status,
+        value: dataHook.filtros.status,
         defaultLabel: 'Todos os status',
-        options: status,
-        onChange: (value) => hook.controles.handleFilterChange('status', value),
+        options: statusOptions,
+        onChange: (value) =>
+          dataHook.controles.handleFilterChange('status', value),
       },
       {
         id: 'tipo',
         label: 'Tipo',
-        value: hook.filtros.tipo,
+        value: dataHook.filtros.tipo,
         defaultLabel: 'Todos os tipos',
-        options: tipos,
-        onChange: (value) => hook.controles.handleFilterChange('tipo', value),
+        options: tipoOptions,
+        onChange: (value) =>
+          dataHook.controles.handleFilterChange('tipo', value),
       },
       {
         id: 'unidade',
         label: 'Unidade',
-        value: hook.filtros.unidade,
+        value: dataHook.filtros.unidade,
         defaultLabel: 'Todas as unidades',
-        options: unidades,
-        onChange: (value) => hook.controles.handleFilterChange('unidade', value),
+        options: unidadeOptions,
+        onChange: (value) =>
+          dataHook.controles.handleFilterChange('unidade', value),
       },
     ];
-  }, [hook.manutencoesOriginais, hook.filtros, hook.controles]);
+  }, [baseList, dataHook.filtros, dataHook.controles]);
 
+  /**
+   * =========================
+   * ACTIVE FILTERS
+   * =========================
+   */
   const activeFilters = useMemo(() => {
+    const { status, tipo, unidade } = dataHook.filtros;
+
     return [
-      hook.filtros.status
-        ? {
-            key: 'status',
-            label: `Status: ${formatarLabel(hook.filtros.status)}`,
-            value: hook.filtros.status,
-          }
-        : null,
-      hook.filtros.tipo
-        ? {
-            key: 'tipo',
-            label: `Tipo: ${formatarLabel(hook.filtros.tipo)}`,
-            value: hook.filtros.tipo,
-          }
-        : null,
-      hook.filtros.unidade
-        ? {
-            key: 'unidade',
-            label: `Unidade: ${hook.filtros.unidade}`,
-            value: hook.filtros.unidade,
-          }
-        : null,
-      hook.searchTerm
-        ? {
-            key: 'searchTerm',
-            label: `Busca: ${hook.searchTerm}`,
-            value: hook.searchTerm,
-          }
-        : null,
+      status && {
+        key: 'status',
+        label: `Status: ${formatarLabel(status)}`,
+        value: status,
+      },
+      tipo && {
+        key: 'tipo',
+        label: `Tipo: ${formatarLabel(tipo)}`,
+        value: tipo,
+      },
+      unidade && {
+        key: 'unidade',
+        label: `Unidade: ${unidade}`,
+        value: unidade,
+      },
+      dataHook.searchTerm && {
+        key: 'searchTerm',
+        label: `Busca: ${dataHook.searchTerm}`,
+        value: dataHook.searchTerm,
+      },
     ].filter(Boolean);
-  }, [hook.filtros, hook.searchTerm]);
+  }, [dataHook.filtros, dataHook.searchTerm]);
 
-  const clearFilter = (key) => {
-    if (key === 'searchTerm') {
-      hook.controles.handleSearchChange({ target: { value: '' } });
-      return;
-    }
+  /**
+   * =========================
+   * FILTER ACTIONS
+   * =========================
+   */
+  const clearFilter = useCallback(
+    (key) => {
+      if (key === 'searchTerm') {
+        dataHook.controles.handleSearchChange({ target: { value: '' } });
+        return;
+      }
 
-    hook.controles.handleFilterChange(key, '');
-  };
+      dataHook.controles.handleFilterChange(key, '');
+    },
+    [dataHook.controles]
+  );
 
-  const clearAllFilters = () => {
-    hook.controles.handleSearchChange({ target: { value: '' } });
-    hook.controles.handleFilterChange('status', '');
-    hook.controles.handleFilterChange('tipo', '');
-    hook.controles.handleFilterChange('unidade', '');
-  };
+  const clearAllFilters = useCallback(() => {
+    dataHook.controles.handleSearchChange({ target: { value: '' } });
 
-  const handleConfirmDelete = async () => {
-    if (!deleteModal.modalData?.id) return;
-    await hook.removerManutencao(deleteModal.modalData.id);
+    ['status', 'tipo', 'unidade'].forEach((filtro) =>
+      dataHook.controles.handleFilterChange(filtro, '')
+    );
+  }, [dataHook.controles]);
+
+  /**
+   * =========================
+   * DELETE FLOW
+   * =========================
+   */
+  const handleConfirmDelete = useCallback(async () => {
+    const id = deleteModal.modalData?.id;
+
+    if (!id) return;
+
+    await dataHook.removerManutencao(id);
     deleteModal.closeModal();
-  };
+  }, [deleteModal, dataHook]);
 
+  /**
+   * =========================
+   * NAVIGATION
+   * =========================
+   */
+  const goToCreate = useCallback(() => {
+    navigate('/manutencoes/agendar');
+  }, [navigate]);
+
+  /**
+   * =========================
+   * RETURN PADRONIZADO
+   * =========================
+   */
   return {
-    ...hook,
-    searchTerm: hook.searchTerm,
-    onSearchChange: hook.controles.handleSearchChange,
-    sortConfig: hook.controles.sortConfig,
-    requestSort: hook.controles.requestSort,
+    ...dataHook,
+
+    // filtros
     selectFiltersConfig,
     activeFilters,
     clearFilter,
     clearAllFilters,
+
+    // busca
+    searchTerm: dataHook.searchTerm,
+    onSearchChange: dataHook.controles.handleSearchChange,
+
+    // sort
+    sortConfig: dataHook.controles.sortConfig,
+    requestSort: dataHook.controles.requestSort,
+
+    // modal
     deleteModal,
     handleConfirmDelete,
-    goToCreate: () => navigate('/manutencoes/agendar'),
+
+    // nav
+    goToCreate,
   };
 }

@@ -23,11 +23,11 @@ import { useAlertasPage } from '../../hooks/alertas/useAlertasPage';
 import { useTenantTime } from '../../hooks/time/useTenantTime';
 import { formatarData, formatarHorario } from '../../utils/timeUtils';
 
-import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
+import GlobalFilterBar from '../../components/ui/filters/GlobalFilterBar';
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
-import Card from '../../components/ui/Card';
+import PageState from '../../components/ui/feedback/PageState';
+import Card from '../../components/ui/primitives/Card';
 
 function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {
