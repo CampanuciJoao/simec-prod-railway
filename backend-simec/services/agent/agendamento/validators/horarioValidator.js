@@ -1,14 +1,32 @@
 import {
   getAgora,
-  criarDateUTC,
+  criarDateUTCFromLocal,
+  getTenantTimezone,
   isDataValida,
 } from '../../../timeService.js';
 
-export const validarHorarioFuturo = (data, hora) => {
-  if (!data || !hora) return { valido: true };
+function formatarHoraNoTimezone(date, timeZone) {
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      timeZone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(date);
+  } catch {
+    return '--:--';
+  }
+}
+
+export const validarHorarioFuturo = (data, hora, tenant = null) => {
+  if (!data || !hora) {
+    return { valido: true };
+  }
 
   const agora = getAgora();
-  const solicitado = criarDateUTC(data, hora);
+  const tenantTimezone = getTenantTimezone(tenant);
+
+  const solicitado = criarDateUTCFromLocal(data, hora, tenantTimezone);
 
   if (!isDataValida(solicitado)) {
     return {
@@ -17,14 +35,8 @@ export const validarHorarioFuturo = (data, hora) => {
     };
   }
 
-  if (solicitado < agora) {
-    const agoraFmt = `${agora
-      .getUTCHours()
-      .toString()
-      .padStart(2, '0')}:${agora
-      .getUTCMinutes()
-      .toString()
-      .padStart(2, '0')}`;
+  if (solicitado.getTime() <= agora.getTime()) {
+    const agoraFmt = formatarHoraNoTimezone(agora, tenantTimezone);
 
     return {
       valido: false,
