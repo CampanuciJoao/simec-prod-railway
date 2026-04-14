@@ -10,6 +10,10 @@ const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
+connection.on('connect', () => {
+  console.log('✅ Redis (queue) conectado com sucesso.');
+});
+
 connection.on('error', (err) => {
   console.error('❌ Erro Redis (queue):', err.message);
 });
@@ -23,6 +27,34 @@ export const alertasQueue = new Queue('alertas-fila', {
 
 console.log('📦 Queue de alertas inicializada');
 
+async function logQueueState(prefix = 'QUEUE_STATE') {
+  try {
+    const counts = await alertasQueue.getJobCounts(
+      'waiting',
+      'active',
+      'completed',
+      'failed',
+      'delayed',
+      'paused'
+    );
+
+    console.log(`[${prefix}]`, counts);
+
+    const repeatables = await alertasQueue.getRepeatableJobs();
+    console.log(
+      `[${prefix}] repeatables=${repeatables.length}`,
+      repeatables.map((job) => ({
+        name: job.name,
+        key: job.key,
+        every: job.every,
+        next: job.next,
+      }))
+    );
+  } catch (error) {
+    console.error(`[${prefix}] Erro ao inspecionar fila:`, error.message);
+  }
+}
+
 /**
  * Inicializa jobs recorrentes
  */
@@ -30,30 +62,33 @@ export async function iniciarJobsDeAlertas() {
   try {
     console.log('🧠 Inicializando jobs de alertas...');
 
-    // Remove job antigo recorrente, se existir
+    await alertasQueue.waitUntilReady();
+
+    // Limpa job recorrente antigo com mesmo nome
     const repeatables = await alertasQueue.getRepeatableJobs();
     for (const job of repeatables) {
       if (job.name === 'processar-alertas-recorrente') {
         await alertasQueue.removeRepeatableByKey(job.key);
+        console.log(`♻️ Repeatable antigo removido: ${job.key}`);
       }
     }
 
-    // Recria job recorrente estável
+    // Recria o job recorrente
     await alertasQueue.add(
       'processar-alertas-recorrente',
       {},
       {
         jobId: 'processar-alertas-recorrente',
         repeat: {
-          every: 60000, // 1 minuto
+          every: 60000,
         },
         removeOnComplete: 50,
         removeOnFail: 50,
       }
     );
 
-    // Dispara um ciclo imediato no boot
-    await alertasQueue.add(
+    // Job imediato no boot
+    const job = await alertasQueue.add(
       'processar-alertas-imediato',
       {},
       {
@@ -62,6 +97,12 @@ export async function iniciarJobsDeAlertas() {
         removeOnFail: 50,
       }
     );
+
+    console.log(
+      `🚀 Job imediato criado | id=${job.id} | name=${job.name}`
+    );
+
+    await logQueueState('QUEUE_AFTER_INIT');
 
     console.log('⏱️ Job recorrente configurado (1 minuto) + execução imediata');
   } catch (error) {

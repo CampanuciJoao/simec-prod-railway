@@ -1,4 +1,4 @@
-import { Worker } from 'bullmq';
+import { Worker, QueueEvents, Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import dotenv from 'dotenv';
 import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasOrchestrator.js';
@@ -11,10 +11,39 @@ const connection = new IORedis(redisUrl, {
   maxRetriesPerRequest: null,
 });
 
+const inspectionConnection = new IORedis(redisUrl, {
+  maxRetriesPerRequest: null,
+});
+
 console.log('======================================================');
 console.log('🚀 WORKER DO SIMEC INICIADO');
-console.log(`📦 Redis: ${redisUrl.substring(0, 25)}...`);
+console.log(`📦 Redis: ${redisUrl.substring(0, 35)}...`);
 console.log('======================================================');
+
+const alertasQueue = new Queue('alertas-fila', {
+  connection: inspectionConnection,
+});
+
+const queueEvents = new QueueEvents('alertas-fila', {
+  connection,
+});
+
+async function logQueueState(prefix = 'WORKER_QUEUE_STATE') {
+  try {
+    const counts = await alertasQueue.getJobCounts(
+      'waiting',
+      'active',
+      'completed',
+      'failed',
+      'delayed',
+      'paused'
+    );
+
+    console.log(`[${prefix}]`, counts);
+  } catch (error) {
+    console.error(`[${prefix}] Erro ao inspecionar fila:`, error.message);
+  }
+}
 
 const worker = new Worker(
   'alertas-fila',
@@ -38,12 +67,20 @@ const worker = new Worker(
   {
     connection,
     concurrency: 1,
+    autorun: true,
     limiter: { max: 1, duration: 5000 },
   }
 );
 
-worker.on('ready', () => {
+worker.on('ready', async () => {
   console.log('✅ Worker pronto para consumir a fila de alertas.');
+  await logQueueState('WORKER_READY_STATE');
+});
+
+worker.on('active', (job) => {
+  console.log(
+    `🟢 Job ativo | nome=${job?.name || 'N/A'} | id=${job?.id || 'N/A'}`
+  );
 });
 
 worker.on('completed', (job, result) => {
@@ -62,6 +99,30 @@ worker.on('error', (err) => {
   console.error('❌ Worker error:', err.message);
 });
 
+queueEvents.on('waiting', ({ jobId }) => {
+  console.log(`📥 Job entrou em waiting | jobId=${jobId}`);
+});
+
+queueEvents.on('active', ({ jobId, prev }) => {
+  console.log(`⚡ Job entrou em active | jobId=${jobId} | prev=${prev}`);
+});
+
+queueEvents.on('completed', ({ jobId }) => {
+  console.log(`🏁 Job completed event | jobId=${jobId}`);
+});
+
+queueEvents.on('failed', ({ jobId, failedReason }) => {
+  console.log(`🧨 Job failed event | jobId=${jobId} | motivo=${failedReason}`);
+});
+
+queueEvents.on('delayed', ({ jobId, delay }) => {
+  console.log(`⏳ Job delayed | jobId=${jobId} | delay=${delay}`);
+});
+
+connection.on('connect', () => {
+  console.log('✅ Redis worker conectado com sucesso.');
+});
+
 connection.on('error', (err) => {
   console.error('❌ Redis worker erro:', err.message);
 });
@@ -71,7 +132,10 @@ async function shutdown(signal) {
 
   try {
     await worker.close();
+    await queueEvents.close();
+    await alertasQueue.close();
     await connection.quit();
+    await inspectionConnection.quit();
     console.log('[WORKER] Encerrado com sucesso.');
     process.exit(0);
   } catch (error) {
