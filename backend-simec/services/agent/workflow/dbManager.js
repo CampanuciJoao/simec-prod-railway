@@ -1,6 +1,12 @@
-// simec/backend-simec/services/agent/dbManager.js
+// Ficheiro: services/agent/dbManager.js
+// Versão: Multi-tenant + timezone standardized
+
 import prisma from '../../prismaService.js';
-import { criarDateUTC, isDataValida } from '../../timeService.js';
+import {
+  criarIntervaloUTCFromLocal,
+  getTenantTimezone,
+  isDataValida,
+} from '../../timeService.js';
 
 function normalizarTipoManutencao(tipoManutencao) {
   const tipo = (tipoManutencao || '').toString().trim().toLowerCase();
@@ -36,21 +42,51 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
     );
   }
 
-  const dataInicio = criarDateUTC(estado.data, estado.horaInicio);
-  const dataFim = estado.horaFim
-    ? criarDateUTC(estado.data, estado.horaFim)
-    : null;
-
-  if (!isDataValida(dataInicio)) {
-    throw new Error('Falha na persistência: data/hora de início inválida.');
-  }
-
-  if (dataFim && !isDataValida(dataFim)) {
-    throw new Error('Falha na persistência: data/hora de término inválida.');
-  }
-
   try {
     const resultado = await prisma.$transaction(async (tx) => {
+      const tenant = await tx.tenant.findFirst({
+        where: {
+          id: tenantId,
+          ativo: true,
+        },
+        select: {
+          id: true,
+          timezone: true,
+        },
+      });
+
+      if (!tenant) {
+        throw new Error('TENANT_NAO_ENCONTRADO_OU_INATIVO');
+      }
+
+      const tenantTimezone = getTenantTimezone(tenant);
+
+      const dataLocal = estado.data;
+      const horaInicioLocal = estado.horaInicio;
+      const horaFimLocal = estado.horaFim || null;
+
+      const intervalo = criarIntervaloUTCFromLocal({
+        dataLocal,
+        horaInicioLocal,
+        horaFimLocal,
+        timeZone: tenantTimezone,
+      });
+
+      const dataInicio = intervalo.inicio;
+      const dataFim = intervalo.fim;
+
+      if (!isDataValida(dataInicio)) {
+        throw new Error('DATA_HORA_INICIO_INVALIDA');
+      }
+
+      if (dataFim && !isDataValida(dataFim)) {
+        throw new Error('DATA_HORA_FIM_INVALIDA');
+      }
+
+      if (dataFim && dataFim.getTime() <= dataInicio.getTime()) {
+        throw new Error('FIM_ANTES_DO_INICIO');
+      }
+
       const equipamento = await tx.equipamento.findFirst({
         where: {
           id: estado.equipamentoId,
@@ -88,26 +124,46 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
 
       const novaManutencao = await tx.manutencao.create({
         data: {
-          tenantId,
+          tenant: {
+            connect: { id: tenantId },
+          },
           numeroOS,
           tipo: tipoManutencao,
           descricaoProblemaServico: descricaoFinal,
           tecnicoResponsavel:
             estado.tecnicoResponsavel || 'Agente Guardião',
-          dataHoraAgendamentoInicio: dataInicio,
-          dataHoraAgendamentoFim: dataFim,
           numeroChamado:
             tipoManutencao === 'Corretiva'
               ? estado.numeroChamado || null
               : null,
-          equipamentoId: estado.equipamentoId,
+
+          agendamentoDataLocal: dataLocal,
+          agendamentoHoraInicioLocal: horaInicioLocal,
+          agendamentoHoraFimLocal: horaFimLocal,
+          agendamentoTimezone: tenantTimezone,
+
+          dataHoraAgendamentoInicio: dataInicio,
+          dataHoraAgendamentoFim: dataFim,
+
+          equipamento: {
+            connect: {
+              tenantId_id: {
+                tenantId,
+                id: estado.equipamentoId,
+              },
+            },
+          },
+
           status: 'Agendada',
         },
       });
 
       await tx.equipamento.update({
         where: {
-          id: estado.equipamentoId,
+          tenantId_id: {
+            tenantId,
+            id: estado.equipamentoId,
+          },
         },
         data: {
           status: 'EmManutencao',
@@ -126,6 +182,24 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
     if (error.message === 'EQUIPAMENTO_NAO_ENCONTRADO_NO_TENANT') {
       throw new Error(
         'Falha na persistência: equipamento não encontrado no tenant informado.'
+      );
+    }
+
+    if (error.message === 'TENANT_NAO_ENCONTRADO_OU_INATIVO') {
+      throw new Error('Falha na persistência: tenant inválido ou inativo.');
+    }
+
+    if (error.message === 'DATA_HORA_INICIO_INVALIDA') {
+      throw new Error('Falha na persistência: data/hora de início inválida.');
+    }
+
+    if (error.message === 'DATA_HORA_FIM_INVALIDA') {
+      throw new Error('Falha na persistência: data/hora de término inválida.');
+    }
+
+    if (error.message === 'FIM_ANTES_DO_INICIO') {
+      throw new Error(
+        'Falha na persistência: a hora final deve ser maior que a hora inicial.'
       );
     }
 

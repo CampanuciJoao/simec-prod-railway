@@ -1,5 +1,5 @@
 // Ficheiro: routes/manutencoesRoutes.js
-// Versão: Multi-tenant hardened
+// Versão: Multi-tenant hardened + timezone standardized
 
 import express from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -9,6 +9,13 @@ import fs from 'fs';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
+import {
+  criarIntervaloUTCFromLocal,
+  extrairDataLocalFromISO,
+  extrairHoraLocalFromISO,
+  getTenantTimezone,
+  parseISOToUTC,
+} from '../services/timeService.js';
 
 import validate from '../middleware/validate.js';
 import { manutencaoSchema } from '../validators/manutencaoValidator.js';
@@ -17,9 +24,6 @@ const router = express.Router();
 
 router.use(proteger);
 
-// ==============================
-// MULTER
-// ==============================
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const dir = path.join('uploads', 'manutencoes');
@@ -33,15 +37,74 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage });
 
-// ==============================
-// GET LISTAR
-// ==============================
+function resolverAgendamentoLocalEDatetimeUTC(dados, tenantTimezone) {
+  const dataLocal =
+    dados.agendamentoDataLocal ||
+    dados.data ||
+    extrairDataLocalFromISO(dados.dataHoraAgendamentoInicio, tenantTimezone);
+
+  const horaInicioLocal =
+    dados.agendamentoHoraInicioLocal ||
+    dados.horaInicio ||
+    extrairHoraLocalFromISO(dados.dataHoraAgendamentoInicio, tenantTimezone);
+
+  const horaFimLocal =
+    dados.agendamentoHoraFimLocal ||
+    dados.horaFim ||
+    extrairHoraLocalFromISO(dados.dataHoraAgendamentoFim, tenantTimezone);
+
+  if (!dataLocal || !horaInicioLocal) {
+    return {
+      ok: false,
+      motivo: 'DATA_HORA_LOCAL_OBRIGATORIA',
+    };
+  }
+
+  const intervalo =
+    dados.dataHoraAgendamentoInicio || dados.dataHoraAgendamentoFim
+      ? {
+          inicio: parseISOToUTC(dados.dataHoraAgendamentoInicio),
+          fim: dados.dataHoraAgendamentoFim
+            ? parseISOToUTC(dados.dataHoraAgendamentoFim)
+            : null,
+        }
+      : criarIntervaloUTCFromLocal({
+          dataLocal,
+          horaInicioLocal,
+          horaFimLocal,
+          timeZone: tenantTimezone,
+        });
+
+  if (!intervalo.inicio) {
+    return {
+      ok: false,
+      motivo: 'DATA_HORA_INICIO_INVALIDA',
+    };
+  }
+
+  if (intervalo.fim && intervalo.fim.getTime() <= intervalo.inicio.getTime()) {
+    return {
+      ok: false,
+      motivo: 'FIM_ANTES_DO_INICIO',
+    };
+  }
+
+  return {
+    ok: true,
+    agendamentoDataLocal: dataLocal,
+    agendamentoHoraInicioLocal: horaInicioLocal,
+    agendamentoHoraFimLocal: horaFimLocal || null,
+    agendamentoTimezone: tenantTimezone,
+    dataHoraAgendamentoInicio: intervalo.inicio,
+    dataHoraAgendamentoFim: intervalo.fim,
+  };
+}
+
 router.get('/', async (req, res) => {
   const { equipamentoId, unidadeId, tipo, status } = req.query;
 
   try {
     const tenantId = req.usuario.tenantId;
-
     const whereClause = { tenantId };
 
     if (equipamentoId) whereClause.equipamentoId = equipamentoId;
@@ -77,9 +140,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ==============================
-// GET POR ID
-// ==============================
 router.get('/:id', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
@@ -123,9 +183,6 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-// ==============================
-// POST CRIAR
-// ==============================
 router.post('/', validate(manutencaoSchema), async (req, res) => {
   const dados = req.validatedData || req.body;
 
@@ -133,13 +190,12 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
     equipamentoId,
     tipo,
     descricaoProblemaServico,
-    dataHoraAgendamentoInicio,
-    dataHoraAgendamentoFim,
     ...outrosDados
   } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
+    const tenantTimezone = getTenantTimezone(req.usuario?.tenant);
 
     const equipamento = await prisma.equipamento.findFirst({
       where: {
@@ -157,6 +213,20 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
       return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
 
+    const agendamento = resolverAgendamentoLocalEDatetimeUTC(
+      dados,
+      tenantTimezone
+    );
+
+    if (!agendamento.ok) {
+      return res.status(400).json({
+        message:
+          agendamento.motivo === 'FIM_ANTES_DO_INICIO'
+            ? 'A hora final deve ser maior que a hora inicial.'
+            : 'Data/hora de agendamento inválida.',
+      });
+    }
+
     const totalTenant = await prisma.manutencao.count({
       where: { tenantId },
     });
@@ -171,10 +241,14 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
         numeroOS,
         tipo,
         descricaoProblemaServico,
-        dataHoraAgendamentoInicio: new Date(dataHoraAgendamentoInicio),
-        dataHoraAgendamentoFim: dataHoraAgendamentoFim
-          ? new Date(dataHoraAgendamentoFim)
-          : null,
+
+        agendamentoDataLocal: agendamento.agendamentoDataLocal,
+        agendamentoHoraInicioLocal: agendamento.agendamentoHoraInicioLocal,
+        agendamentoHoraFimLocal: agendamento.agendamentoHoraFimLocal,
+        agendamentoTimezone: agendamento.agendamentoTimezone,
+
+        dataHoraAgendamentoInicio: agendamento.dataHoraAgendamentoInicio,
+        dataHoraAgendamentoFim: agendamento.dataHoraAgendamentoFim,
 
         tenant: {
           connect: { id: tenantId },
@@ -207,9 +281,6 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
   }
 });
 
-// ==============================
-// POST ADICIONAR NOTA
-// ==============================
 router.post('/:id/notas', async (req, res) => {
   const { nota } = req.body;
 
@@ -265,9 +336,6 @@ router.post('/:id/notas', async (req, res) => {
   }
 });
 
-// ==============================
-// DELETE
-// ==============================
 router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
   const tenantId = req.usuario.tenantId;

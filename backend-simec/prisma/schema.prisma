@@ -42,28 +42,28 @@ model Tenant {
 }
 
 model Unidade {
-  id           String   @id @default(uuid())
-  tenantId     String
-  nomeSistema  String
-  nomeFantasia String?
-  cnpj         String?
-  logradouro   String?
-  numero       String?
-  complemento  String?
-  bairro       String?
-  cidade       String?
-  estado       String?
-  cep          String?
-  timezone     String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(uuid())
+  tenantId      String
+  nomeSistema   String
+  nomeFantasia  String?
+  cnpj          String?
+  logradouro    String?
+  numero        String?
+  complemento   String?
+  bairro        String?
+  cidade        String?
+  estado        String?
+  cep           String?
+  timezone      String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant            Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   anexos            Anexo[]
   equipamentos      Equipamento[]
   veiculos          Veiculo[]
-  segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
-  contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
+  segurosCobertos   Seguro[]   @relation("SegurosUnidadesCobertas")
+  contratosCobertos Contrato[] @relation("ContratosUnidadesCobertas")
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -96,22 +96,22 @@ model Usuario {
 }
 
 model Equipamento {
-  id               String            @id @default(uuid())
-  tenantId         String
-  tag              String
-  modelo           String
-  tipo             String?
-  setor            String?
-  fabricante       String?
-  anoFabricacao    String?           @map("ano_fabricacao")
-  dataInstalacao   DateTime?         @map("data_instalacao")
-  status           StatusEquipamento @default(Operante)
-  numeroPatrimonio String?           @map("numero_patrimonio")
-  registroAnvisa   String?           @map("registro_anvisa")
-  observacoes      String?
-  unidadeId        String
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id                String            @id @default(uuid())
+  tenantId          String
+  tag               String
+  modelo            String
+  tipo              String?
+  setor             String?
+  fabricante        String?
+  anoFabricacao     String?           @map("ano_fabricacao")
+  dataInstalacao    DateTime?         @map("data_instalacao")
+  status            StatusEquipamento @default(Operante)
+  numeroPatrimonio  String?           @map("numero_patrimonio")
+  registroAnvisa    String?           @map("registro_anvisa")
+  observacoes       String?
+  unidadeId         String
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   unidade           Unidade      @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
@@ -133,20 +133,20 @@ model Equipamento {
 }
 
 model Veiculo {
-  id            String   @id @default(uuid())
-  tenantId      String
-  unidadeId     String?
-  placa         String
-  renavam       String?
-  chassi        String?
-  modelo        String
-  fabricante    String?
-  anoFabricacao String?  @map("ano_fabricacao")
-  categoria     String?
-  status        String?  @default("Ativo")
-  observacoes   String?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id             String   @id @default(uuid())
+  tenantId       String
+  unidadeId      String?
+  placa          String
+  renavam        String?
+  chassi         String?
+  modelo         String
+  fabricante     String?
+  anoFabricacao  String?  @map("ano_fabricacao")
+  categoria      String?
+  status         String?  @default("Ativo")
+  observacoes    String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   tenant  Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   unidade Unidade? @relation(fields: [tenantId, unidadeId], references: [tenantId, id])
@@ -162,16 +162,16 @@ model Veiculo {
 }
 
 model Contrato {
-  id             String         @id @default(uuid())
-  tenantId       String
-  numeroContrato String
-  categoria      String?
-  fornecedor     String?
-  dataInicio     DateTime
-  dataFim        DateTime
-  status         StatusContrato @default(Ativo)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id               String         @id @default(uuid())
+  tenantId         String
+  numeroContrato   String
+  categoria        String?
+  fornecedor       String?
+  dataInicio       DateTime
+  dataFim          DateTime
+  status           StatusContrato @default(Ativo)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
 
   tenant               Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   anexos               Anexo[]
@@ -186,23 +186,32 @@ model Contrato {
 }
 
 model Manutencao {
-  id                        String           @id @default(uuid())
-  tenantId                  String
-  numeroOS                  String           @map("numero_os")
-  tipo                      TipoManutencao   @default(Preventiva) @map("tipo_manutencao")
-  status                    StatusManutencao @default(Agendada)
-  descricaoProblemaServico  String           @map("descricao_problema_servico")
-  tecnicoResponsavel        String?          @map("tecnico_responsavel")
-  numeroChamado             String?          @map("numero_chamado")
-  dataHoraAgendamentoInicio DateTime         @map("data_hora_agendamento_inicio")
-  dataHoraAgendamentoFim    DateTime?        @map("data_hora_agendamento_fim")
-  dataInicioReal            DateTime?        @map("data_inicio_real")
-  dataFimReal               DateTime?        @map("data_fim_real")
-  dataConclusao             DateTime?        @map("data_conclusao")
-  custoTotal                Float?           @map("custo_total")
-  equipamentoId             String           @map("equipamento_id")
-  createdAt                 DateTime         @default(now())
-  updatedAt                 DateTime         @updatedAt
+  id                         String           @id @default(uuid())
+  tenantId                   String
+  numeroOS                   String           @map("numero_os")
+  tipo                       TipoManutencao   @default(Preventiva) @map("tipo_manutencao")
+  status                     StatusManutencao @default(Agendada)
+  descricaoProblemaServico   String           @map("descricao_problema_servico")
+  tecnicoResponsavel         String?          @map("tecnico_responsavel")
+  numeroChamado              String?          @map("numero_chamado")
+
+  // intenção local do usuário
+  agendamentoDataLocal       String           @map("agendamento_data_local")
+  agendamentoHoraInicioLocal String           @map("agendamento_hora_inicio_local")
+  agendamentoHoraFimLocal    String?          @map("agendamento_hora_fim_local")
+  agendamentoTimezone        String           @map("agendamento_timezone")
+
+  // instante real em UTC para comparações, worker e alertas
+  dataHoraAgendamentoInicio  DateTime         @map("data_hora_agendamento_inicio")
+  dataHoraAgendamentoFim     DateTime?        @map("data_hora_agendamento_fim")
+
+  dataInicioReal             DateTime?        @map("data_inicio_real")
+  dataFimReal                DateTime?        @map("data_fim_real")
+  dataConclusao              DateTime?        @map("data_conclusao")
+  custoTotal                 Float?           @map("custo_total")
+  equipamentoId              String           @map("equipamento_id")
+  createdAt                  DateTime         @default(now())
+  updatedAt                  DateTime         @updatedAt
 
   tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento    Equipamento        @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
@@ -216,6 +225,8 @@ model Manutencao {
   @@index([tenantId, status, dataHoraAgendamentoInicio])
   @@index([tenantId, status, dataHoraAgendamentoFim])
   @@index([tenantId, tipo, createdAt])
+  @@index([tenantId, agendamentoDataLocal])
+  @@index([tenantId, agendamentoTimezone])
   @@map("manutencoes")
 }
 
@@ -258,31 +269,31 @@ model Acessorio {
 }
 
 model Seguro {
-  id                       String         @id @default(uuid())
-  tenantId                 String
-  tipoAlvo                 TipoSeguroAlvo @default(EQUIPAMENTO)
-  apoliceNumero            String         @map("apolice_numero")
-  seguradora               String
-  dataInicio               DateTime       @map("data_inicio")
-  dataFim                  DateTime       @map("data_fim")
-  status                   StatusSeguro   @default(Ativo)
-  cobertura                String?
-  equipamentoId            String?        @map("equipamento_id")
-  unidadeId                String?        @map("unidade_id")
-  veiculoId                String?        @map("veiculo_id")
-  createdAt                DateTime       @default(now())
-  updatedAt                DateTime       @updatedAt
-  lmiAPP                   Float?         @default(0)
-  lmiDanosCorporais        Float?         @default(0)
-  lmiDanosEletricos        Float?         @default(0)
-  lmiDanosMateriais        Float?         @default(0)
-  lmiDanosMorais           Float?         @default(0)
-  lmiIncendio              Float?         @default(0)
-  lmiResponsabilidadeCivil Float?         @default(0)
-  lmiRoubo                 Float?         @default(0)
-  lmiVidros                Float?         @default(0)
-  lmiVendaval              Float?         @default(0)
-  premioTotal              Float?         @default(0) @map("premio_total")
+  id                        String         @id @default(uuid())
+  tenantId                  String
+  tipoAlvo                  TipoSeguroAlvo @default(EQUIPAMENTO)
+  apoliceNumero             String         @map("apolice_numero")
+  seguradora                String
+  dataInicio                DateTime       @map("data_inicio")
+  dataFim                   DateTime       @map("data_fim")
+  status                    StatusSeguro   @default(Ativo)
+  cobertura                 String?
+  equipamentoId             String?        @map("equipamento_id")
+  unidadeId                 String?        @map("unidade_id")
+  veiculoId                 String?        @map("veiculo_id")
+  createdAt                 DateTime       @default(now())
+  updatedAt                 DateTime       @updatedAt
+  lmiAPP                    Float?         @default(0)
+  lmiDanosCorporais         Float?         @default(0)
+  lmiDanosEletricos         Float?         @default(0)
+  lmiDanosMateriais         Float?         @default(0)
+  lmiDanosMorais            Float?         @default(0)
+  lmiIncendio               Float?         @default(0)
+  lmiResponsabilidadeCivil  Float?         @default(0)
+  lmiRoubo                  Float?         @default(0)
+  lmiVidros                 Float?         @default(0)
+  lmiVendaval               Float?         @default(0)
+  premioTotal               Float?         @default(0) @map("premio_total")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   anexos      Anexo[]
@@ -365,16 +376,16 @@ model LogAuditoria {
 }
 
 model Ocorrencia {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   tenantId         String
-  data             DateTime  @default(now())
+  data             DateTime @default(now())
   titulo           String
   descricao        String?
   tipo             String
   tecnico          String?
   equipamentoId    String
   dataResolucao    DateTime?
-  resolvido        Boolean   @default(false)
+  resolvido        Boolean  @default(false)
   solucao          String?
   tecnicoResolucao String?
 
