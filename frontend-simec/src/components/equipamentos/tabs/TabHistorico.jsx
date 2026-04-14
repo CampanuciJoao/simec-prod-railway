@@ -10,7 +10,6 @@ import { exportarHistoricoEquipamentoPDF } from '../../../utils/pdfUtils';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faHistory,
-  faSpinner,
   faFilePdf,
   faChevronDown,
   faChevronUp,
@@ -23,6 +22,8 @@ import {
   faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import DateInput from '../../ui/DateInput';
+import PageSection from '../../ui/PageSection';
+import { ActionBar, EmptyState, LoadingState } from '../../ui/layout';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -42,7 +43,10 @@ function TabHistorico({ equipamento }) {
   const [filtroTipo, setFiltroTipo] = useState('Todos');
 
   const carregarDados = useCallback(async () => {
-    if (!equipamento?.id) return;
+    if (!equipamento?.id) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
 
@@ -53,8 +57,8 @@ function TabHistorico({ equipamento }) {
       ]);
 
       setHistoricoBruto({
-        manutencoes: manuts || [],
-        ocorrencias: ocorrs || [],
+        manutencoes: Array.isArray(manuts) ? manuts : [],
+        ocorrencias: Array.isArray(ocorrs) ? ocorrs : [],
       });
     } catch (error) {
       addToast('Erro ao carregar histórico.', 'error');
@@ -70,11 +74,13 @@ function TabHistorico({ equipamento }) {
   const toggleExpandir = (id) => {
     setItensExpandidos((prev) => {
       const novos = new Set(prev);
+
       if (novos.has(id)) {
         novos.delete(id);
       } else {
         novos.add(id);
       }
+
       return novos;
     });
   };
@@ -152,6 +158,7 @@ function TabHistorico({ equipamento }) {
 
   const handleSetHoje = (campo) => {
     const hoje = new Date().toISOString().split('T')[0];
+
     if (campo === 'inicio') setDataInicio(hoje);
     if (campo === 'fim') setDataFim(hoje);
   };
@@ -164,9 +171,9 @@ function TabHistorico({ equipamento }) {
 
   const handleExportarPDF = () => {
     exportarHistoricoEquipamentoPDF(linhaDoTempo, {
-      modelo: equipamento.modelo,
-      tag: equipamento.tag,
-      unidade: equipamento.unidade?.nomeSistema,
+      modelo: equipamento?.modelo,
+      tag: equipamento?.tag,
+      unidade: equipamento?.unidade?.nomeSistema,
       inicio: dataInicio,
       fim: dataFim,
       tipoFiltro: filtroTipo,
@@ -218,24 +225,28 @@ function TabHistorico({ equipamento }) {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-              <FontAwesomeIcon icon={faHistory} />
-            </span>
+    <PageSection
+      title="Histórico do equipamento"
+      description="Auditoria consolidada de manutenções e ocorrências"
+    >
+      <div className="mb-5 flex items-center gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+          <FontAwesomeIcon icon={faHistory} />
+        </span>
 
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">
-                Histórico do equipamento
-              </h3>
-              <p className="text-sm text-slate-500">
-                Auditoria consolidada de manutenções e ocorrências
-              </p>
-            </div>
-          </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Linha do tempo operacional
+          </p>
+          <p className="text-sm text-slate-500">
+            Consulte eventos, ordens de serviço e registros associados
+          </p>
+        </div>
+      </div>
 
+      <ActionBar
+        className="mb-5"
+        right={
           <button
             type="button"
             className="btn btn-danger"
@@ -245,118 +256,101 @@ function TabHistorico({ equipamento }) {
             <FontAwesomeIcon icon={faFilePdf} />
             <span>Exportar PDF filtrado</span>
           </button>
-        </div>
+        }
+      />
 
-        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                Tipo de registro
-              </label>
-              <select
-                value={filtroTipo}
-                onChange={(e) => setFiltroTipo(e.target.value)}
-                className="select"
+      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Tipo de registro
+            </label>
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              className="select"
+            >
+              <option value="Todos">Todos os registros</option>
+              <option value="Preventiva">Apenas preventivas</option>
+              <option value="Corretiva">Apenas corretivas</option>
+              <option value="Evento">Apenas ocorrências</option>
+            </select>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Início
+            </label>
+            <div className="flex gap-2">
+              <DateInput
+                value={dataInicio}
+                onChange={(e) => setDataInicio(e.target.value)}
+                className="input"
+              />
+              <button
+                type="button"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                onClick={() => handleSetHoje('inicio')}
+                title="Definir hoje"
               >
-                <option value="Todos">Todos os registros</option>
-                <option value="Preventiva">Apenas preventivas</option>
-                <option value="Corretiva">Apenas corretivas</option>
-                <option value="Evento">Apenas ocorrências</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                Início
-              </label>
-              <div className="flex gap-2">
-                <DateInput
-                  value={dataInicio}
-                  onChange={(e) => setDataInicio(e.target.value)}
-                  className="input"
-                />
-                <button
-                  type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                  onClick={() => handleSetHoje('inicio')}
-                  title="Definir hoje"
-                >
-                  <FontAwesomeIcon icon={faCalendarDay} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                Fim
-              </label>
-              <div className="flex gap-2">
-                <DateInput
-                  value={dataFim}
-                  onChange={(e) => setDataFim(e.target.value)}
-                  className="input"
-                />
-                <button
-                  type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                  onClick={() => handleSetHoje('fim')}
-                  title="Definir hoje"
-                >
-                  <FontAwesomeIcon icon={faCalendarDay} />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-end justify-end">
-              {temFiltroAtivo && (
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={handleLimparFiltros}
-                >
-                  <FontAwesomeIcon icon={faRotateLeft} />
-                  <span>Limpar filtros</span>
-                </button>
-              )}
+                <FontAwesomeIcon icon={faCalendarDay} />
+              </button>
             </div>
           </div>
 
-          {!temFiltroAtivo && totalSemFiltro > 20 && (
-            <div className="mt-4 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-700">
-              <FontAwesomeIcon icon={faFilter} className="mt-0.5 text-blue-400" />
-              <span>
-                Visualizando os 20 registros mais recentes de {totalSemFiltro}.
-                Use os filtros para ver o histórico completo.
-              </span>
+          <div className="flex flex-col gap-1">
+            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              Fim
+            </label>
+            <div className="flex gap-2">
+              <DateInput
+                value={dataFim}
+                onChange={(e) => setDataFim(e.target.value)}
+                className="input"
+              />
+              <button
+                type="button"
+                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
+                onClick={() => handleSetHoje('fim')}
+                title="Definir hoje"
+              >
+                <FontAwesomeIcon icon={faCalendarDay} />
+              </button>
             </div>
-          )}
+          </div>
 
-          <div className="mt-4 text-sm text-slate-500">
-            Exibindo <span className="font-semibold text-slate-700">{linhaDoTempo.length}</span>{' '}
-            de{' '}
-            <span className="font-semibold text-slate-700">
-              {temFiltroAtivo ? totalFiltrado : totalSemFiltro}
-            </span>{' '}
-            registro(s).
+          <div className="flex items-end justify-end">
+            {temFiltroAtivo ? (
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={handleLimparFiltros}
+              >
+                <FontAwesomeIcon icon={faRotateLeft} />
+                <span>Limpar filtros</span>
+              </button>
+            ) : null}
           </div>
         </div>
+
+        {!temFiltroAtivo && totalSemFiltro > 20 ? (
+          <div className="mt-4 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+            <FontAwesomeIcon icon={faFilter} className="mt-0.5" />
+            <div>
+              Exibindo os <strong>20 registros mais recentes</strong> de um
+              total de <strong>{totalSemFiltro}</strong>. Use os filtros para
+              visualizar todo o histórico.
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-10 shadow-sm">
-          <FontAwesomeIcon
-            icon={faSpinner}
-            spin
-            size="2x"
-            className="text-slate-400"
-          />
-        </div>
+        <LoadingState message="Carregando histórico..." />
       ) : linhaDoTempo.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 shadow-sm">
-          Nenhum registro encontrado para os filtros aplicados.
-        </div>
+        <EmptyState message="Nenhum registro encontrado para os filtros selecionados." />
       ) : (
-        <div className="flex flex-col gap-4">
+        <div className="space-y-4">
           {linhaDoTempo.map((item) => {
             const expandido = itensExpandidos.has(item.uniqueId);
 
@@ -364,74 +358,59 @@ function TabHistorico({ equipamento }) {
               <div
                 key={item.uniqueId}
                 className={[
-                  'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all hover:shadow-md',
-                  'border-l-[6px]',
+                  'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm',
+                  'border-l-[8px]',
                   getTimelineBorderClass(item),
                 ].join(' ')}
               >
-                <div
-                  className="flex cursor-pointer flex-col gap-4 p-4 md:flex-row md:items-center md:justify-between hover:bg-slate-50"
+                <button
+                  type="button"
                   onClick={() => toggleExpandir(item.uniqueId)}
+                  className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left hover:bg-slate-50"
                 >
-                  <div className="flex min-w-0 flex-1 items-start gap-4">
-                    <div
+                  <div className="flex min-w-0 items-start gap-4">
+                    <span
                       className={[
-                        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full shadow-inner',
+                        'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
                         getTimelineIconClass(item),
                       ].join(' ')}
                     >
-                      <FontAwesomeIcon icon={item.isOS ? faWrench : faHistory} />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                        {formatarDataHora(item.data)}
-                      </span>
-
-                      <h4 className="mt-1 flex flex-wrap items-center gap-2 text-sm font-bold uppercase tracking-tight text-slate-800 md:text-[15px]">
-                        <span>{item.titulo}</span>
-
-                        {item.isOS && item.chamado && (
-                          <span className="text-xs font-semibold normal-case text-slate-500">
-                            (chamado:{' '}
-                            <span className="font-bold text-slate-700">
-                              {item.chamado}
-                            </span>
-                            )
-                          </span>
-                        )}
-                      </h4>
-                    </div>
-                  </div>
-
-                  <div className="flex shrink-0 flex-wrap items-center gap-3">
-                    {item.isOS && (
-                      <Link
-                        to={`/manutencoes/detalhes/${item.idOriginal}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white no-underline transition hover:bg-blue-700"
-                      >
-                        <span>Ver detalhes</span>
-                        <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" />
-                      </Link>
-                    )}
-
-                    <span className={getCategoriaBadgeClass(item)}>
-                      {item.categoria}
+                      <FontAwesomeIcon icon={faWrench} />
                     </span>
 
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h4 className="text-sm font-bold text-slate-900">
+                          {item.chamado
+                            ? `${item.titulo} • Chamado: ${item.chamado}`
+                            : item.titulo}
+                        </h4>
+
+                        <span className={getCategoriaBadgeClass(item)}>
+                          {item.categoria}
+                        </span>
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        <span>{formatarDataHora(item.data)}</span>
+                        <span>Responsável: {item.responsavel}</span>
+                        <span>Status: {item.status}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <span className="shrink-0 pt-1 text-slate-400">
                     <FontAwesomeIcon
                       icon={expandido ? faChevronUp : faChevronDown}
-                      className="text-slate-400"
                     />
-                  </div>
-                </div>
+                  </span>
+                </button>
 
-                {expandido && (
-                  <div className="border-t border-slate-100 bg-slate-50/40 p-5 md:p-6">
+                {expandido ? (
+                  <div className="border-t border-slate-100 bg-slate-50/40 px-5 py-5">
                     <div className="space-y-4">
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                           Descrição
                         </span>
                         <p className="mt-2 text-sm leading-6 text-slate-700">
@@ -440,26 +419,38 @@ function TabHistorico({ equipamento }) {
                       </div>
 
                       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
                           Responsável
                         </span>
-                        <p className="mt-2 text-sm font-medium text-slate-700">
+                        <p className="mt-2 text-sm font-medium text-slate-800">
                           {item.responsavel}
                         </p>
                       </div>
 
-                      {item.solucao && (
-                        <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4">
-                          <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                      {item.solucao ? (
+                        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
+                          <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
                             Solução técnica
                           </span>
-                          <p className="mt-2 text-sm leading-6 font-medium text-emerald-800">
+                          <p className="mt-2 text-sm font-medium leading-6 text-emerald-800">
                             {item.solucao}
                           </p>
                         </div>
-                      )}
+                      ) : null}
 
-                      {item.isOS && item.anexos?.length > 0 && (
+                      {item.isOS ? (
+                        <div className="flex flex-wrap gap-2">
+                          <Link
+                            to={`/manutencoes/${item.idOriginal}`}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                          >
+                            <FontAwesomeIcon icon={faExternalLinkAlt} />
+                            <span>Abrir manutenção</span>
+                          </Link>
+                        </div>
+                      ) : null}
+
+                      {item.isOS && item.anexos?.length > 0 ? (
                         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
                           <div className="mb-3 flex items-center gap-2">
                             <FontAwesomeIcon
@@ -486,16 +477,23 @@ function TabHistorico({ equipamento }) {
                             ))}
                           </div>
                         </div>
-                      )}
+                      ) : null}
                     </div>
                   </div>
-                )}
+                ) : null}
               </div>
             );
           })}
         </div>
       )}
-    </div>
+
+      {!loading && linhaDoTempo.length > 0 ? (
+        <div className="mt-4 text-right text-xs text-slate-500">
+          Exibindo <strong>{linhaDoTempo.length}</strong> de{' '}
+          <strong>{totalFiltrado}</strong> registro(s) filtrado(s).
+        </div>
+      ) : null}
+    </PageSection>
   );
 }
 

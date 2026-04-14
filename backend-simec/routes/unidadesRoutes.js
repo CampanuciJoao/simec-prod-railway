@@ -1,37 +1,38 @@
 // Ficheiro: routes/unidadesRoutes.js
-// Versão: Multi-tenant hardened
+// Versão: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
-
 import validate from '../middleware/validate.js';
 import { unidadeSchema } from '../validators/unidadeValidator.js';
+import { uploadFor } from '../middleware/uploadMiddleware.js';
+import {
+  adicionarAnexos,
+  removerAnexo,
+} from '../services/uploads/anexoService.js';
+import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
 
 const router = express.Router();
 
 router.use(proteger);
 
-// ==============================
-// MULTER
-// ==============================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = 'uploads/unidades';
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
-  },
-});
-
-const upload = multer({ storage });
+async function buscarUnidadeCompleta(tenantId, id) {
+  return prisma.unidade.findFirst({
+    where: {
+      id,
+      tenantId,
+    },
+    include: {
+      anexos: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+    },
+  });
+}
 
 // ==============================
 // GET LISTAR
@@ -59,13 +60,7 @@ router.get('/:id', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
 
-    const unidade = await prisma.unidade.findFirst({
-      where: {
-        id: req.params.id,
-        tenantId,
-      },
-      include: { anexos: true },
-    });
+    const unidade = await buscarUnidadeCompleta(tenantId, req.params.id);
 
     if (!unidade) {
       return res.status(404).json({ message: 'Unidade não encontrada.' });
@@ -82,13 +77,14 @@ router.get('/:id', async (req, res) => {
 // POST CRIAR
 // ==============================
 router.post('/', validate(unidadeSchema), async (req, res) => {
+  const dados = req.validatedData || req.body;
+
   try {
     const tenantId = req.usuario.tenantId;
 
     const novaUnidade = await prisma.unidade.create({
       data: {
-        ...req.body,
-
+        ...dados,
         tenant: {
           connect: { id: tenantId },
         },
@@ -104,7 +100,9 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
       detalhes: `Unidade "${novaUnidade.nomeSistema}" foi criada.`,
     });
 
-    return res.status(201).json(novaUnidade);
+    const unidadeCompleta = await buscarUnidadeCompleta(tenantId, novaUnidade.id);
+
+    return res.status(201).json(unidadeCompleta || novaUnidade);
   } catch (error) {
     console.error('[UNIDADE_CREATE_ERROR]', error);
 
@@ -124,12 +122,17 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
 router.put('/:id', validate(unidadeSchema), async (req, res) => {
   const { id } = req.params;
   const tenantId = req.usuario.tenantId;
+  const dados = req.validatedData || req.body;
 
   try {
     const unidadeExistente = await prisma.unidade.findFirst({
       where: {
         id,
         tenantId,
+      },
+      select: {
+        id: true,
+        nomeSistema: true,
       },
     });
 
@@ -145,7 +148,7 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
         },
       },
       data: {
-        ...req.body,
+        ...dados,
       },
     });
 
@@ -158,9 +161,18 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
       detalhes: `Unidade "${unidadeAtualizada.nomeSistema}" foi atualizada.`,
     });
 
-    return res.json(unidadeAtualizada);
+    const unidadeCompleta = await buscarUnidadeCompleta(tenantId, id);
+
+    return res.json(unidadeCompleta || unidadeAtualizada);
   } catch (error) {
     console.error('[UNIDADE_UPDATE_ERROR]', error);
+
+    if (error.code === 'P2002') {
+      return res.status(409).json({
+        message: 'Já existe uma unidade com este Nome ou CNPJ.',
+      });
+    }
+
     return res.status(500).json({ message: 'Erro ao atualizar unidade.' });
   }
 });
@@ -178,18 +190,25 @@ router.delete('/:id', admin, async (req, res) => {
         id,
         tenantId,
       },
-      include: { anexos: true },
+      include: {
+        anexos: true,
+      },
     });
 
     if (!unidade) {
       return res.status(404).json({ message: 'Unidade não encontrada.' });
     }
 
-    unidade.anexos?.forEach((anexo) => {
-      if (anexo.path && fs.existsSync(anexo.path)) {
-        fs.unlinkSync(anexo.path);
+    for (const anexo of unidade.anexos || []) {
+      try {
+        deleteStoredFile(anexo.path);
+      } catch (fileError) {
+        console.error(
+          `[UNIDADE_DELETE_FILE_ERROR] unidadeId=${id} anexoId=${anexo.id}`,
+          fileError
+        );
       }
-    });
+    }
 
     await prisma.unidade.delete({
       where: {
@@ -224,77 +243,56 @@ router.delete('/:id', admin, async (req, res) => {
 });
 
 // ==============================
-// ANEXOS
+// UPLOAD ANEXOS
+// Campo multipart oficial do SIMEC: "file"
 // ==============================
-router.post('/:id/anexos', upload.array('anexos'), async (req, res) => {
-  const { id: unidadeId } = req.params;
-  const tenantId = req.usuario.tenantId;
-
+router.post('/:id/anexos', uploadFor('unidades'), async (req, res, next) => {
   try {
-    const unidade = await prisma.unidade.findFirst({
-      where: {
-        id: unidadeId,
-        tenantId,
-      },
-    });
+    const tenantId = req.usuario.tenantId;
+    const usuarioId = req.usuario.id;
+    const unidadeId = req.params.id;
 
-    if (!unidade) {
-      return res.status(404).json({ message: 'Unidade não encontrada.' });
-    }
-
-    const anexosData = req.files.map((file) => ({
+    await adicionarAnexos({
+      resource: 'unidades',
       tenantId,
-      unidadeId,
-      nomeOriginal: file.originalname,
-      path: file.path,
-      tipoMime: file.mimetype,
-    }));
-
-    await prisma.anexo.createMany({ data: anexosData });
-
-    const unidadeAtualizada = await prisma.unidade.findFirst({
-      where: {
-        id: unidadeId,
-        tenantId,
-      },
-      include: { anexos: true },
+      usuarioId,
+      entityId: unidadeId,
+      files: req.files,
     });
+
+    const unidadeAtualizada = await buscarUnidadeCompleta(tenantId, unidadeId);
 
     return res.status(201).json(unidadeAtualizada);
   } catch (error) {
-    console.error('[ANEXO_CREATE_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao salvar anexos.' });
+    console.error('[UNIDADE_UPLOAD_ERROR]', error);
+    return next(error);
   }
 });
 
-router.delete('/:id/anexos/:anexoId', async (req, res) => {
-  const { anexoId } = req.params;
-  const tenantId = req.usuario.tenantId;
-
+// ==============================
+// DELETE ANEXO
+// ==============================
+router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
-    const anexo = await prisma.anexo.findFirst({
-      where: {
-        id: anexoId,
-        tenantId,
-      },
-    });
-
-    if (!anexo) {
-      return res.status(404).json({ message: 'Anexo não encontrado.' });
-    }
-
-    if (anexo.path && fs.existsSync(anexo.path)) {
-      fs.unlinkSync(anexo.path);
-    }
-
-    await prisma.anexo.delete({
-      where: { id: anexoId },
+    await removerAnexo({
+      resource: 'unidades',
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      entityId: req.params.id,
+      anexoId: req.params.anexoId,
     });
 
     return res.status(204).send();
   } catch (error) {
-    console.error('[ANEXO_DELETE_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao excluir anexo.' });
+    console.error('[UNIDADE_ANEXO_DELETE_ERROR]', error);
+
+    if (error.status) {
+      return res.status(error.status).json({
+        message: error.message,
+      });
+    }
+
+    return next(error);
   }
 });
 

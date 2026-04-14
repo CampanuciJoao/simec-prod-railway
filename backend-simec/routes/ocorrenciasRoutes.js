@@ -1,5 +1,5 @@
 // Ficheiro: routes/ocorrenciasRoutes.js
-// Versão: Multi-tenant hardened + compatível com schema relacional por tenant
+// Versão: Multi-tenant hardened + event log operacional
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -10,15 +10,105 @@ const router = express.Router();
 
 router.use(proteger);
 
+const TIPOS_OCORRENCIA_VALIDOS = [
+  'Operacional',
+  'Falha',
+  'Ajuste',
+  'Manutencao',
+  'Inspecao',
+  'Observacao',
+];
+
+const ORIGENS_VALIDAS = ['usuario', 'agente', 'sistema'];
+const GRAVIDADES_VALIDAS = ['baixa', 'media', 'alta'];
+
+function normalizarTexto(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function normalizarTipo(tipo) {
+  const valor = normalizarTexto(tipo);
+  if (!valor) return null;
+
+  const match = TIPOS_OCORRENCIA_VALIDOS.find(
+    (item) => item.toLowerCase() === valor.toLowerCase()
+  );
+
+  return match || null;
+}
+
+function normalizarOrigem(origem) {
+  const valor = normalizarTexto(origem)?.toLowerCase();
+  if (!valor) return 'usuario';
+  return ORIGENS_VALIDAS.includes(valor) ? valor : null;
+}
+
+function normalizarGravidade(gravidade) {
+  const valor = normalizarTexto(gravidade)?.toLowerCase();
+  if (!valor) return 'media';
+  return GRAVIDADES_VALIDAS.includes(valor) ? valor : null;
+}
+
+function normalizarMetadata(metadata) {
+  if (metadata === undefined || metadata === null || metadata === '') {
+    return null;
+  }
+
+  if (typeof metadata === 'object' && !Array.isArray(metadata)) {
+    return metadata;
+  }
+
+  return null;
+}
+
 // ==============================
-// POST CRIAR OCORRÊNCIA
+// POST CRIAR EVENTO / OCORRÊNCIA
 // ==============================
 router.post('/', async (req, res) => {
-  const { equipamentoId, titulo, descricao, tipo, tecnico } = req.body;
+  const {
+    equipamentoId,
+    titulo,
+    descricao,
+    tipo,
+    tecnico,
+    origem,
+    gravidade,
+    metadata,
+  } = req.body;
 
   if (!equipamentoId || !titulo || !tipo) {
     return res.status(400).json({
       message: 'equipamentoId, titulo e tipo são obrigatórios.',
+    });
+  }
+
+  const tipoNormalizado = normalizarTipo(tipo);
+  if (!tipoNormalizado) {
+    return res.status(400).json({
+      message: `Tipo inválido. Use um dos valores: ${TIPOS_OCORRENCIA_VALIDOS.join(', ')}.`,
+    });
+  }
+
+  const origemNormalizada = normalizarOrigem(origem);
+  if (!origemNormalizada) {
+    return res.status(400).json({
+      message: `Origem inválida. Use: ${ORIGENS_VALIDAS.join(', ')}.`,
+    });
+  }
+
+  const gravidadeNormalizada = normalizarGravidade(gravidade);
+  if (!gravidadeNormalizada) {
+    return res.status(400).json({
+      message: `Gravidade inválida. Use: ${GRAVIDADES_VALIDAS.join(', ')}.`,
+    });
+  }
+
+  const metadataNormalizada = normalizarMetadata(metadata);
+  if (metadata !== undefined && metadata !== null && !metadataNormalizada) {
+    return res.status(400).json({
+      message: 'metadata deve ser um objeto JSON válido.',
     });
   }
 
@@ -46,9 +136,12 @@ router.post('/', async (req, res) => {
     const nova = await prisma.ocorrencia.create({
       data: {
         titulo: String(titulo).trim(),
-        descricao: descricao ? String(descricao).trim() : null,
-        tipo: String(tipo).trim(),
-        tecnico: tecnico ? String(tecnico).trim() : null,
+        descricao: normalizarTexto(descricao),
+        tipo: tipoNormalizado,
+        origem: origemNormalizada,
+        gravidade: gravidadeNormalizada,
+        metadata: metadataNormalizada,
+        tecnico: normalizarTexto(tecnico),
 
         tenant: {
           connect: {
@@ -73,14 +166,14 @@ router.post('/', async (req, res) => {
       acao: 'CRIAÇÃO',
       entidade: 'Ocorrência',
       entidadeId: nova.id,
-      detalhes: `Ocorrência "${nova.titulo}" criada para o equipamento ${equipamento.modelo} (${equipamento.tag}).`,
+      detalhes: `Evento "${nova.titulo}" (${nova.tipo}, gravidade ${nova.gravidade}, origem ${nova.origem}) criado para o equipamento ${equipamento.modelo} (${equipamento.tag}).`,
     });
 
     return res.status(201).json(nova);
   } catch (error) {
     console.error('[OCORRENCIA_CREATE_ERROR]', error);
     return res.status(500).json({
-      message: 'Erro ao registrar na ficha técnica.',
+      message: 'Erro ao registrar evento do equipamento.',
     });
   }
 });
@@ -92,7 +185,7 @@ router.put('/:id/resolver', async (req, res) => {
   const { id } = req.params;
   const { solucao, tecnicoResolucao } = req.body;
 
-  if (!solucao) {
+  if (!solucao || typeof solucao !== 'string' || !solucao.trim()) {
     return res.status(400).json({
       message: 'A solução é obrigatória para resolver a ocorrência.',
     });
@@ -132,9 +225,7 @@ router.put('/:id/resolver', async (req, res) => {
       data: {
         resolvido: true,
         solucao: String(solucao).trim(),
-        tecnicoResolucao: tecnicoResolucao
-          ? String(tecnicoResolucao).trim()
-          : null,
+        tecnicoResolucao: normalizarTexto(tecnicoResolucao),
         dataResolucao: new Date(),
       },
     });
@@ -145,14 +236,14 @@ router.put('/:id/resolver', async (req, res) => {
       acao: 'EDIÇÃO',
       entidade: 'Ocorrência',
       entidadeId: id,
-      detalhes: `Ocorrência "${ocorrencia.titulo}" marcada como resolvida.`,
+      detalhes: `Evento "${ocorrencia.titulo}" marcado como resolvido.`,
     });
 
     return res.json(atualizada);
   } catch (error) {
     console.error('[OCORRENCIA_RESOLVE_ERROR]', error);
     return res.status(500).json({
-      message: 'Erro ao registrar solução.',
+      message: 'Erro ao registrar solução do evento.',
     });
   }
 });
@@ -196,7 +287,7 @@ router.get('/equipamento/:id', async (req, res) => {
   } catch (error) {
     console.error('[OCORRENCIA_LIST_ERROR]', error);
     return res.status(500).json({
-      message: 'Erro ao buscar ficha técnica.',
+      message: 'Erro ao buscar histórico técnico do equipamento.',
     });
   }
 });

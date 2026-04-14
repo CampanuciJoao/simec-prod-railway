@@ -1,33 +1,42 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import { getEquipamentoById, addEquipamento, updateEquipamento } from '../../services/api';
+import {
+  getEquipamentoById,
+  addEquipamento,
+  updateEquipamento,
+} from '../../services/api';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 export function useSalvarEquipamentoPage() {
   const { equipamentoId } = useParams();
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const isEditing = !!equipamentoId;
+  const isEditing = Boolean(equipamentoId);
 
   const [initialData, setInitialData] = useState(null);
   const [loading, setLoading] = useState(isEditing);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const fetchEquipamento = useCallback(async () => {
-    if (!isEditing || !equipamentoId) return;
+    if (!isEditing || !equipamentoId) {
+      setLoading(false);
+      return;
+    }
 
     setLoading(true);
     setError('');
 
     try {
       const data = await getEquipamentoById(equipamentoId);
-      setInitialData(data);
+      setInitialData(data || null);
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.message ||
-        err.message ||
-        'Erro ao carregar dados do equipamento.';
+      const errorMessage = getErrorMessage(
+        err,
+        'Erro ao carregar dados do equipamento.'
+      );
 
       setError(errorMessage);
       addToast(errorMessage, 'error');
@@ -41,40 +50,52 @@ export function useSalvarEquipamentoPage() {
   }, [fetchEquipamento]);
 
   const handleSave = async (formData) => {
+    setSaving(true);
+    setError('');
+
     try {
       if (isEditing) {
         await updateEquipamento(equipamentoId, formData);
         addToast('Equipamento atualizado com sucesso!', 'success');
       } else {
         await addEquipamento(formData);
-        addToast('Equipamento adicionado com sucesso!', 'success');
+        addToast('Equipamento cadastrado com sucesso!', 'success');
       }
 
-      setTimeout(() => {
-        navigate('/equipamentos');
-      }, 1000);
+      navigate('/equipamentos');
+      return true;
     } catch (apiError) {
-      const errorMessage =
-        apiError.response?.data?.message ||
-        apiError.message ||
-        'Erro desconhecido ao salvar.';
+      const errorMessage = getErrorMessage(
+        apiError,
+        'Erro ao salvar equipamento.'
+      );
 
+      setError(errorMessage);
       addToast(errorMessage, 'error');
       throw apiError;
+    } finally {
+      setSaving(false);
     }
   };
 
-  const goBack = () => {
+  const goBackToEquipamentos = useCallback(() => {
     navigate('/equipamentos');
-  };
+  }, [navigate]);
+
+  const goBackToCadastros = useCallback(() => {
+    navigate('/cadastros');
+  }, [navigate]);
 
   return {
     equipamentoId,
     isEditing,
     initialData,
     loading,
+    saving,
     error,
     handleSave,
-    goBack,
+    goBackToEquipamentos,
+    goBackToCadastros,
+    refetch: fetchEquipamento,
   };
 }

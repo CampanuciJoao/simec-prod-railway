@@ -14,3 +14,11 @@ export const updateUnidade = (id, unidadeData) =>
 
 export const deleteUnidade = (id) =>
   api.delete(`/unidades/${id}`).then((res) => res.data);
+
+export const uploadAnexoUnidade = (unidadeId, formData) =>
+  api.post(`/unidades/${unidadeId}/anexos`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((res) => res.data);
+
+export const deleteAnexoUnidade = (unidadeId, anexoId) =>
+  api.delete(`/unidades/${unidadeId}/anexos/${anexoId}`).then((res) => res.data);

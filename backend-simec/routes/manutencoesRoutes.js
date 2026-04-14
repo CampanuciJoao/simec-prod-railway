@@ -1,12 +1,8 @@
 // Ficheiro: backend-simec/routes/manutencoesRoutes.js
 // Versão: profissional, multi-tenant hardened, timezone-aware, local-first,
-// com criação, leitura e edição consistentes para frontend e backend.
+// com criação, leitura, edição e anexos centralizados.
 
 import express from 'express';
-import { v4 as uuidv4 } from 'uuid';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
 
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
@@ -23,23 +19,16 @@ import {
   adaptarListaManutencoesResponse,
   adaptarManutencaoResponse,
 } from '../services/manutencaoResponseAdapter.js';
+import { uploadFor } from '../middleware/uploadMiddleware.js';
+import {
+  adicionarAnexos,
+  removerAnexo,
+} from '../services/uploads/anexoService.js';
+import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
 
 const router = express.Router();
 
 router.use(proteger);
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join('uploads', 'manutencoes');
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
-  },
-});
-
-const upload = multer({ storage });
 
 function montarMensagemErroAgendamento(code) {
   switch (code) {
@@ -132,7 +121,11 @@ async function buscarManutencaoPorId({ tenantId, manutencaoId }) {
       tenantId,
     },
     include: {
-      anexos: true,
+      anexos: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
       equipamento: {
         include: {
           unidade: true,
@@ -281,7 +274,11 @@ router.get('/', async (req, res) => {
             unidade: true,
           },
         },
-        anexos: true,
+        anexos: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
       orderBy: {
         dataHoraAgendamentoInicio: 'desc',
@@ -383,7 +380,11 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
             unidade: true,
           },
         },
-        anexos: true,
+        anexos: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
 
@@ -486,7 +487,11 @@ router.put('/:id', validate(manutencaoSchema), async (req, res) => {
             unidade: true,
           },
         },
-        anexos: true,
+        anexos: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
         notasAndamento: {
           where: {
             tenantId,
@@ -536,6 +541,10 @@ router.post('/:id/notas', async (req, res) => {
         id: req.params.id,
         tenantId,
       },
+      select: {
+        id: true,
+        numeroOS: true,
+      },
     });
 
     if (!manutencao) {
@@ -567,10 +576,76 @@ router.post('/:id/notas', async (req, res) => {
       },
     });
 
+    await registrarLog({
+      tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'CRIAÇÃO',
+      entidade: 'NotaAndamento',
+      entidadeId: nova.id,
+      detalhes: `Nota adicionada à OS ${manutencao.numeroOS}.`,
+    });
+
     return res.status(201).json(nova);
   } catch (error) {
     console.error('[MANUTENCAO_NOTA_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao adicionar nota.' });
+  }
+});
+
+// ==============================
+// UPLOAD ANEXOS
+// Campo multipart oficial do SIMEC: "file"
+// ==============================
+router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const usuarioId = req.usuario.id;
+    const manutencaoId = req.params.id;
+
+    await adicionarAnexos({
+      resource: 'manutencoes',
+      tenantId,
+      usuarioId,
+      entityId: manutencaoId,
+      files: req.files,
+    });
+
+    const atualizada = await buscarManutencaoPorId({
+      tenantId,
+      manutencaoId,
+    });
+
+    return res.status(201).json(adaptarManutencaoResponse(atualizada));
+  } catch (error) {
+    console.error('[MANUTENCAO_UPLOAD_ERROR]', error);
+    return next(error);
+  }
+});
+
+// ==============================
+// DELETE ANEXO
+// ==============================
+router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
+  try {
+    await removerAnexo({
+      resource: 'manutencoes',
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      entityId: req.params.id,
+      anexoId: req.params.anexoId,
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error('[MANUTENCAO_ANEXO_DELETE_ERROR]', error);
+
+    if (error.status) {
+      return res.status(error.status).json({
+        message: error.message,
+      });
+    }
+
+    return next(error);
   }
 });
 
@@ -593,11 +668,16 @@ router.delete('/:id', admin, async (req, res) => {
       return res.status(404).json({ message: 'Manutenção não encontrada.' });
     }
 
-    manut.anexos?.forEach((anexo) => {
-      if (anexo.path && fs.existsSync(anexo.path)) {
-        fs.unlinkSync(anexo.path);
+    for (const anexo of manut.anexos || []) {
+      try {
+        deleteStoredFile(anexo.path);
+      } catch (fileError) {
+        console.error(
+          `[MANUTENCAO_DELETE_FILE_ERROR] manutencaoId=${id} anexoId=${anexo.id}`,
+          fileError
+        );
       }
-    });
+    }
 
     await prisma.manutencao.delete({
       where: {
@@ -620,6 +700,14 @@ router.delete('/:id', admin, async (req, res) => {
     return res.status(204).send();
   } catch (error) {
     console.error('[MANUTENCAO_DELETE_ERROR]', error);
+
+    if (error.code === 'P2003') {
+      return res.status(409).json({
+        message:
+          'Não é possível excluir: manutenção possui vínculos ativos no sistema.',
+      });
+    }
+
     return res.status(500).json({ message: 'Erro ao excluir manutenção.' });
   }
 });

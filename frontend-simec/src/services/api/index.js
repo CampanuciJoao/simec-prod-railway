@@ -1,5 +1,6 @@
 export * from './agentApi';
 export * from './alertasApi';
+export * from './anexosApi';
 export * from './auditoriaApi';
 export * from './authApi';
 export * from './biApi';

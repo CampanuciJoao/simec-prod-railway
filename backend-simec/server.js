@@ -39,12 +39,14 @@ const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
 
+const corsOrigin = FRONTEND_URL === '*' ? '*' : FRONTEND_URL;
+
 /**
  * Socket.IO
  */
 const io = new Server(httpServer, {
   cors: {
-    origin: FRONTEND_URL === '*' ? '*' : FRONTEND_URL,
+    origin: corsOrigin,
     methods: ['GET', 'POST'],
   },
 });
@@ -64,7 +66,7 @@ io.on('connection', (socket) => {
  */
 app.use(
   cors({
-    origin: FRONTEND_URL === '*' ? '*' : FRONTEND_URL,
+    origin: corsOrigin,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -75,6 +77,7 @@ app.use(express.urlencoded({ extended: true }));
 
 /**
  * Arquivos estáticos
+ * Mantém acesso público aos anexos persistidos em disco.
  */
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 

@@ -1,37 +1,102 @@
 // Ficheiro: routes/segurosRoutes.js
-// Versão: Multi-tenant hardened
+// Versão: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
-import multer from 'multer';
-import path from 'path';
-import fs from 'fs';
-import { v4 as uuidv4 } from 'uuid';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
-
 import validate from '../middleware/validate.js';
 import { seguroSchema } from '../validators/seguroValidator.js';
+import { uploadFor } from '../middleware/uploadMiddleware.js';
+import {
+  adicionarAnexos,
+  removerAnexo,
+} from '../services/uploads/anexoService.js';
+import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
 
 const router = express.Router();
 
 router.use(proteger);
 
-// ==============================
-// MULTER
-// ==============================
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = 'uploads/seguros';
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${uuidv4()}${path.extname(file.originalname)}`);
-  },
-});
+async function buscarSeguroCompleto(tenantId, id) {
+  return prisma.seguro.findFirst({
+    where: {
+      id,
+      tenantId,
+    },
+    include: {
+      anexos: {
+        orderBy: {
+          createdAt: 'desc',
+        },
+      },
+      equipamento: {
+        select: {
+          id: true,
+          modelo: true,
+          tag: true,
+          tipo: true,
+        },
+      },
+      unidade: {
+        select: {
+          id: true,
+          nomeSistema: true,
+          nomeFantasia: true,
+          cidade: true,
+          estado: true,
+        },
+      },
+    },
+  });
+}
 
-const upload = multer({ storage });
+async function validarEquipamentoDoTenant(tenantId, equipamentoId) {
+  if (!equipamentoId) return null;
+
+  const equipamento = await prisma.equipamento.findFirst({
+    where: {
+      id: equipamentoId,
+      tenantId,
+    },
+    select: {
+      id: true,
+      modelo: true,
+      tag: true,
+    },
+  });
+
+  if (!equipamento) {
+    const error = new Error('Equipamento inválido.');
+    error.status = 404;
+    throw error;
+  }
+
+  return equipamento;
+}
+
+async function validarUnidadeDoTenant(tenantId, unidadeId) {
+  if (!unidadeId) return null;
+
+  const unidade = await prisma.unidade.findFirst({
+    where: {
+      id: unidadeId,
+      tenantId,
+    },
+    select: {
+      id: true,
+      nomeSistema: true,
+    },
+  });
+
+  if (!unidade) {
+    const error = new Error('Unidade inválida.');
+    error.status = 404;
+    throw error;
+  }
+
+  return unidade;
+}
 
 // ==============================
 // GET LISTAR
@@ -43,9 +108,26 @@ router.get('/', async (req, res) => {
     const seguros = await prisma.seguro.findMany({
       where: { tenantId },
       include: {
-        equipamento: { select: { id: true, modelo: true, tag: true } },
-        unidade: { select: { id: true, nomeSistema: true } },
-        anexos: true,
+        equipamento: {
+          select: {
+            id: true,
+            modelo: true,
+            tag: true,
+            tipo: true,
+          },
+        },
+        unidade: {
+          select: {
+            id: true,
+            nomeSistema: true,
+            nomeFantasia: true,
+          },
+        },
+        anexos: {
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
       orderBy: { dataFim: 'asc' },
     });
@@ -64,17 +146,7 @@ router.get('/:id', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
 
-    const seguro = await prisma.seguro.findFirst({
-      where: {
-        id: req.params.id,
-        tenantId,
-      },
-      include: {
-        anexos: true,
-        equipamento: true,
-        unidade: true,
-      },
-    });
+    const seguro = await buscarSeguroCompleto(tenantId, req.params.id);
 
     if (!seguro) {
       return res.status(404).json({ message: 'Seguro não encontrado.' });
@@ -83,7 +155,9 @@ router.get('/:id', async (req, res) => {
     return res.json(seguro);
   } catch (error) {
     console.error('[SEGURO_GET_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao buscar detalhe do seguro.' });
+    return res.status(500).json({
+      message: 'Erro ao buscar detalhe do seguro.',
+    });
   }
 });
 
@@ -92,29 +166,13 @@ router.get('/:id', async (req, res) => {
 // ==============================
 router.post('/', validate(seguroSchema), async (req, res) => {
   const dados = req.validatedData || req.body;
-
   const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
 
-    if (equipamentoId) {
-      const equip = await prisma.equipamento.findFirst({
-        where: { id: equipamentoId, tenantId },
-      });
-      if (!equip) {
-        return res.status(404).json({ message: 'Equipamento inválido.' });
-      }
-    }
-
-    if (unidadeId) {
-      const unidade = await prisma.unidade.findFirst({
-        where: { id: unidadeId, tenantId },
-      });
-      if (!unidade) {
-        return res.status(404).json({ message: 'Unidade inválida.' });
-      }
-    }
+    await validarEquipamentoDoTenant(tenantId, equipamentoId);
+    await validarUnidadeDoTenant(tenantId, unidadeId);
 
     const novoSeguro = await prisma.seguro.create({
       data: {
@@ -159,13 +217,21 @@ router.post('/', validate(seguroSchema), async (req, res) => {
       detalhes: `Seguro nº ${novoSeguro.apoliceNumero} cadastrado.`,
     });
 
-    return res.status(201).json(novoSeguro);
+    const seguroCompleto = await buscarSeguroCompleto(tenantId, novoSeguro.id);
+
+    return res.status(201).json(seguroCompleto || novoSeguro);
   } catch (error) {
     console.error('[SEGURO_CREATE_ERROR]', error);
 
     if (error.code === 'P2002') {
       return res.status(409).json({
         message: 'Este número de apólice já está cadastrado.',
+      });
+    }
+
+    if (error.status) {
+      return res.status(error.status).json({
+        message: error.message,
       });
     }
 
@@ -179,6 +245,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 router.put('/:id', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData || req.body;
+  const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
@@ -188,11 +255,18 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
         id,
         tenantId,
       },
+      select: {
+        id: true,
+        apoliceNumero: true,
+      },
     });
 
     if (!seguro) {
       return res.status(404).json({ message: 'Seguro não encontrado.' });
     }
+
+    await validarEquipamentoDoTenant(tenantId, equipamentoId);
+    await validarUnidadeDoTenant(tenantId, unidadeId);
 
     const atualizado = await prisma.seguro.update({
       where: {
@@ -202,9 +276,37 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
         },
       },
       data: {
-        ...dados,
-        dataInicio: new Date(dados.dataInicio),
-        dataFim: new Date(dados.dataFim),
+        ...resto,
+        dataInicio: dataInicio ? new Date(dataInicio) : undefined,
+        dataFim: dataFim ? new Date(dataFim) : undefined,
+
+        equipamento:
+          equipamentoId === null
+            ? { disconnect: true }
+            : equipamentoId
+              ? {
+                  connect: {
+                    tenantId_id: {
+                      tenantId,
+                      id: equipamentoId,
+                    },
+                  },
+                }
+              : undefined,
+
+        unidade:
+          unidadeId === null
+            ? { disconnect: true }
+            : unidadeId
+              ? {
+                  connect: {
+                    tenantId_id: {
+                      tenantId,
+                      id: unidadeId,
+                    },
+                  },
+                }
+              : undefined,
       },
     });
 
@@ -217,9 +319,24 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
       detalhes: `Seguro nº ${atualizado.apoliceNumero} atualizado.`,
     });
 
-    return res.json(atualizado);
+    const seguroCompleto = await buscarSeguroCompleto(tenantId, id);
+
+    return res.json(seguroCompleto || atualizado);
   } catch (error) {
     console.error('[SEGURO_UPDATE_ERROR]', error);
+
+    if (error.code === 'P2002') {
+      return res.status(409).json({
+        message: 'Este número de apólice já está cadastrado.',
+      });
+    }
+
+    if (error.status) {
+      return res.status(error.status).json({
+        message: error.message,
+      });
+    }
+
     return res.status(500).json({ message: 'Erro ao atualizar seguro.' });
   }
 });
@@ -237,18 +354,25 @@ router.delete('/:id', admin, async (req, res) => {
         id,
         tenantId,
       },
-      include: { anexos: true },
+      include: {
+        anexos: true,
+      },
     });
 
     if (!seguro) {
       return res.status(404).json({ message: 'Seguro não encontrado.' });
     }
 
-    seguro.anexos?.forEach((anexo) => {
-      if (fs.existsSync(anexo.path)) {
-        fs.unlinkSync(anexo.path);
+    for (const anexo of seguro.anexos || []) {
+      try {
+        deleteStoredFile(anexo.path);
+      } catch (fileError) {
+        console.error(
+          `[SEGURO_DELETE_FILE_ERROR] seguroId=${id} anexoId=${anexo.id}`,
+          fileError
+        );
       }
-    });
+    }
 
     await prisma.seguro.delete({
       where: {
@@ -277,81 +401,55 @@ router.delete('/:id', admin, async (req, res) => {
 
 // ==============================
 // UPLOAD ANEXOS
+// Campo multipart oficial do SIMEC: "file"
 // ==============================
-router.post('/:id/anexos', upload.array('apolices'), async (req, res) => {
-  const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
-
+router.post('/:id/anexos', uploadFor('seguros'), async (req, res, next) => {
   try {
-    const seguro = await prisma.seguro.findFirst({
-      where: {
-        id,
-        tenantId,
-      },
-    });
+    const tenantId = req.usuario.tenantId;
+    const usuarioId = req.usuario.id;
+    const seguroId = req.params.id;
 
-    if (!seguro) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
-    }
-
-    const anexosData = req.files.map((file) => ({
+    await adicionarAnexos({
+      resource: 'seguros',
       tenantId,
-      seguroId: id,
-      nomeOriginal: file.originalname,
-      path: file.path,
-      tipoMime: file.mimetype,
-    }));
-
-    await prisma.anexo.createMany({ data: anexosData });
-
-    const atualizado = await prisma.seguro.findFirst({
-      where: {
-        id,
-        tenantId,
-      },
-      include: { anexos: true },
+      usuarioId,
+      entityId: seguroId,
+      files: req.files,
     });
+
+    const atualizado = await buscarSeguroCompleto(tenantId, seguroId);
 
     return res.status(201).json(atualizado);
   } catch (error) {
     console.error('[SEGURO_UPLOAD_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao salvar anexo.' });
+    return next(error);
   }
 });
 
 // ==============================
 // DELETE ANEXO
 // ==============================
-router.delete('/:id/anexos/:anexoId', async (req, res) => {
-  const { anexoId } = req.params;
-  const tenantId = req.usuario.tenantId;
-
+router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
-    const anexo = await prisma.anexo.findFirst({
-      where: {
-        id: anexoId,
-        tenantId,
-      },
-    });
-
-    if (!anexo) {
-      return res.status(404).json({ message: 'Anexo não encontrado.' });
-    }
-
-    if (fs.existsSync(anexo.path)) {
-      fs.unlinkSync(anexo.path);
-    }
-
-    await prisma.anexo.delete({
-      where: {
-        id: anexoId,
-      },
+    await removerAnexo({
+      resource: 'seguros',
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      entityId: req.params.id,
+      anexoId: req.params.anexoId,
     });
 
     return res.status(204).send();
   } catch (error) {
     console.error('[SEGURO_ANEXO_DELETE_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao remover documento.' });
+
+    if (error.status) {
+      return res.status(error.status).json({
+        message: error.message,
+      });
+    }
+
+    return next(error);
   }
 });
 

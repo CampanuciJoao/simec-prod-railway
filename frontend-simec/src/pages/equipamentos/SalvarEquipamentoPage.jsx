@@ -1,66 +1,46 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faMicrochip } from '@fortawesome/free-solid-svg-icons';
 
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
+import { PageLayout, PageHeader, LoadingState, EmptyState } from '../../components/ui/layout';
 import EquipamentoForm from '../../components/equipamentos/EquipamentoForm';
-
-import { addEquipamento, getEquipamentoById, updateEquipamento } from '../../services/api';
-import { useToast } from '../../contexts/ToastContext';
+import { useSalvarEquipamentoPage } from '../../hooks/equipamentos/useSalvarEquipamentoPage';
 
 function SalvarEquipamentoPage() {
-  const navigate = useNavigate();
-  const { equipamentoId } = useParams();
-  const { addToast } = useToast();
+  const {
+    isEditing,
+    initialData,
+    loading,
+    saving,
+    error,
+    handleSave,
+    goBackToEquipamentos,
+    goBackToCadastros,
+  } = useSalvarEquipamentoPage();
 
-  const isEditing = Boolean(equipamentoId);
+  const actions = (
+    <div className="flex flex-wrap gap-2">
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={goBackToCadastros}
+        disabled={saving}
+      >
+        <FontAwesomeIcon icon={faArrowLeft} />
+        Voltar ao menu de cadastros
+      </button>
 
-  const [initialData, setInitialData] = useState(null);
-  const [loading, setLoading] = useState(isEditing);
-  const [error, setError] = useState('');
-
-  const carregarEquipamento = useCallback(async () => {
-    if (!isEditing) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const data = await getEquipamentoById(equipamentoId);
-      setInitialData(data || null);
-    } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Erro ao carregar equipamento.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [equipamentoId, isEditing]);
-
-  useEffect(() => {
-    carregarEquipamento();
-  }, [carregarEquipamento]);
-
-  const handleSubmit = async (formData) => {
-    try {
-      if (isEditing) {
-        await updateEquipamento(equipamentoId, formData);
-        addToast('Equipamento atualizado com sucesso!', 'success');
-      } else {
-        await addEquipamento(formData);
-        addToast('Equipamento cadastrado com sucesso!', 'success');
-      }
-
-      navigate('/equipamentos');
-    } catch (err) {
-      throw err;
-    }
-  };
+      <button
+        type="button"
+        className="btn btn-secondary"
+        onClick={goBackToEquipamentos}
+        disabled={saving}
+      >
+        <FontAwesomeIcon icon={faArrowLeft} />
+        Voltar para equipamentos
+      </button>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -69,42 +49,23 @@ function SalvarEquipamentoPage() {
           title={isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
           subtitle="Cadastre e atualize informações do ativo"
           icon={faMicrochip}
+          actions={actions}
         />
-        <PageState loading />
+        <LoadingState message="Carregando equipamento..." />
       </PageLayout>
     );
   }
 
-  if (error) {
+  if (error && isEditing && !initialData) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title={isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
           subtitle="Cadastre e atualize informações do ativo"
           icon={faMicrochip}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => navigate('/cadastros')}
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
-                Voltar ao menu de cadastros
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => navigate('/equipamentos')}
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
-                Voltar para equipamentos
-              </button>
-            </div>
-          }
+          actions={actions}
         />
-        <PageState error={error} />
+        <EmptyState message={error} />
       </PageLayout>
     );
   }
@@ -115,32 +76,12 @@ function SalvarEquipamentoPage() {
         title={isEditing ? 'Editar Equipamento' : 'Novo Equipamento'}
         subtitle="Cadastre e atualize informações do ativo"
         icon={faMicrochip}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/cadastros')}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Voltar ao menu de cadastros
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/equipamentos')}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Voltar para equipamentos
-            </button>
-          </div>
-        }
+        actions={actions}
       />
 
       <EquipamentoForm
-        onSubmit={handleSubmit}
-        onCancel={() => navigate('/equipamentos')}
+        onSubmit={handleSave}
+        onCancel={goBackToEquipamentos}
         initialData={initialData}
         isEditing={isEditing}
       />

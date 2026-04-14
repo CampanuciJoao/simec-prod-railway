@@ -20,7 +20,9 @@ function EquipamentoCard({
   onStatusUpdated,
   onRefresh,
 }) {
-  const { borderClass, backgroundClass } = getEquipamentoCardStyles(equipamento.status);
+  const { borderClass, backgroundClass } = getEquipamentoCardStyles(
+    equipamento.status
+  );
 
   return (
     <div

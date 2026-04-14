@@ -21,8 +21,12 @@ export const concluirManutencao = (id, data) =>
 export const cancelarManutencao = (id, data) =>
   api.post(`/manutencoes/${id}/cancelar`, data).then((res) => res.data);
 
+/**
+ * Upload de anexos padronizado com o backend novo:
+ * POST /manutencoes/:id/anexos
+ */
 export const uploadAnexoManutencao = (manutencaoId, formData) =>
-  api.post(`/manutencoes/${manutencaoId}/upload`, formData, {
+  api.post(`/manutencoes/${manutencaoId}/anexos`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then((res) => res.data);
 

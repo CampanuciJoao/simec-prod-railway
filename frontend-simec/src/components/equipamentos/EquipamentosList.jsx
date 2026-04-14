@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import EquipamentoCard from './EquipamentoCard';
+import { EmptyState } from '../ui/layout';
 
 function EquipamentosList({
   equipamentos = [],
@@ -8,31 +9,62 @@ function EquipamentosList({
   onStatusUpdated,
   onRefresh,
 }) {
+  const handleToggleExpandir = useCallback(
+    (id) => {
+      expansion.toggleExpandir(id);
+    },
+    [expansion]
+  );
+
+  const handleTrocarAba = useCallback(
+    (id, aba) => {
+      expansion.trocarAba(id, aba);
+    },
+    [expansion]
+  );
+
+  const handleGoToFichaTecnica = useCallback(
+    (id) => {
+      if (typeof onGoToFichaTecnica === 'function') {
+        onGoToFichaTecnica(id);
+      }
+    },
+    [onGoToFichaTecnica]
+  );
+
+  const handleStatusUpdated = useCallback(() => {
+    if (typeof onStatusUpdated === 'function') {
+      onStatusUpdated();
+    }
+  }, [onStatusUpdated]);
+
+  const handleRefresh = useCallback(() => {
+    if (typeof onRefresh === 'function') {
+      onRefresh();
+    }
+  }, [onRefresh]);
+
   if (!Array.isArray(equipamentos) || equipamentos.length === 0) {
-    return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500 shadow-sm">
-        Nenhum equipamento disponível.
-      </div>
-    );
+    return <EmptyState message="Nenhum equipamento disponível." />;
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {equipamentos.map((equip) => {
-        const isAberto = expansion.isExpandido(equip.id);
-        const abaAtiva = expansion.getAbaAtiva(equip.id);
+      {equipamentos.map((equipamento) => {
+        const isAberto = expansion.isExpandido(equipamento.id);
+        const abaAtiva = expansion.getAbaAtiva(equipamento.id);
 
         return (
           <EquipamentoCard
-            key={equip.id}
-            equipamento={equip}
+            key={equipamento.id}
+            equipamento={equipamento}
             isAberto={isAberto}
             abaAtiva={abaAtiva}
-            onToggleExpandir={expansion.toggleExpandir}
-            onTrocarAba={expansion.trocarAba}
-            onGoToFichaTecnica={onGoToFichaTecnica}
-            onStatusUpdated={onStatusUpdated}
-            onRefresh={onRefresh}
+            onToggleExpandir={handleToggleExpandir}
+            onTrocarAba={handleTrocarAba}
+            onGoToFichaTecnica={handleGoToFichaTecnica}
+            onStatusUpdated={handleStatusUpdated}
+            onRefresh={handleRefresh}
           />
         );
       })}
@@ -40,4 +72,4 @@ function EquipamentosList({
   );
 }
 
-export default EquipamentosList;
+export default React.memo(EquipamentosList);

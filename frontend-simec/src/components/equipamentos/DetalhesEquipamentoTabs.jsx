@@ -1,20 +1,20 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { ResponsiveTabs } from '../ui/layout';
 
 function DetalhesEquipamentoTabs({ abas, abaAtiva, onChange }) {
+  const tabs = abas.map((aba) => ({
+    id: aba.id,
+    label: aba.label,
+    icon: aba.icon ? <FontAwesomeIcon icon={aba.icon} /> : null,
+  }));
+
   return (
-    <div className="tabs-navigation">
-      {abas.map((aba) => (
-        <button
-          key={aba.id}
-          type="button"
-          onClick={() => onChange(aba.id)}
-          className={`tab-button ${abaAtiva === aba.id ? 'active' : ''}`}
-        >
-          <FontAwesomeIcon icon={aba.icon} /> {aba.label}
-        </button>
-      ))}
-    </div>
+    <ResponsiveTabs
+      tabs={tabs}
+      activeTab={abaAtiva}
+      onChange={onChange}
+    />
   );
 }
 

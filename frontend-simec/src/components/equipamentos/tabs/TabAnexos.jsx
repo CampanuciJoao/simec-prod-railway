@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPaperclip,
@@ -10,11 +10,14 @@ import {
   faFileWord,
   faFileExcel,
   faFileAlt,
+  faDownload,
 } from '@fortawesome/free-solid-svg-icons';
 
 import ModalConfirmacao from '../../ui/ModalConfirmacao';
+import PageSection from '../../ui/PageSection';
+import { ActionBar, EmptyState } from '../../ui/layout';
 import { formatarData } from '../../../utils/timeUtils';
-import * as api from '../../../services/api';
+import { useResourceAnexos } from '../../../hooks/shared/useResourceAnexos';
 
 const API_BASE_URL_DOWNLOAD =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -23,15 +26,15 @@ function getIconePorTipoArquivo(tipoMime = '') {
   const mime = String(tipoMime).toLowerCase();
 
   if (mime.includes('pdf')) {
-    return { icon: faFilePdf, color: '#ef4444' };
+    return { icon: faFilePdf, colorClass: 'text-red-500' };
   }
 
   if (mime.includes('image')) {
-    return { icon: faFileImage, color: '#10b981' };
+    return { icon: faFileImage, colorClass: 'text-emerald-500' };
   }
 
   if (mime.includes('word') || mime.includes('document')) {
-    return { icon: faFileWord, color: '#2563eb' };
+    return { icon: faFileWord, colorClass: 'text-blue-600' };
   }
 
   if (
@@ -39,119 +42,55 @@ function getIconePorTipoArquivo(tipoMime = '') {
     mime.includes('spreadsheet') ||
     mime.includes('sheet')
   ) {
-    return { icon: faFileExcel, color: '#16a34a' };
+    return { icon: faFileExcel, colorClass: 'text-green-600' };
   }
 
-  return { icon: faFileAlt, color: '#64748b' };
+  return { icon: faFileAlt, colorClass: 'text-slate-500' };
 }
 
-function getUploadFn() {
-  return (
-    api.uploadAnexosEquipamento ||
-    api.uploadAnexoEquipamento ||
-    api.enviarAnexosEquipamento ||
-    api.enviarAnexoEquipamento ||
-    null
-  );
-}
+function montarUrlDownload(pathArquivo = '') {
+  if (!pathArquivo) return '#';
 
-function getDeleteFn() {
-  return (
-    api.deleteAnexoEquipamento ||
-    api.deleteAnexo ||
-    api.removerAnexoEquipamento ||
-    api.removerAnexo ||
-    api.excluirAnexoEquipamento ||
-    api.excluirAnexo ||
-    null
-  );
+  if (
+    String(pathArquivo).startsWith('http://') ||
+    String(pathArquivo).startsWith('https://')
+  ) {
+    return pathArquivo;
+  }
+
+  const normalizedPath = String(pathArquivo).startsWith('/')
+    ? pathArquivo
+    : `/${pathArquivo}`;
+
+  return `${API_BASE_URL_DOWNLOAD}${normalizedPath}`;
 }
 
 function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
-  const anexoInputRef = useRef(null);
-
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
-  const [anexoSelecionado, setAnexoSelecionado] = useState(null);
-
-  const handleDeleteClick = (anexo) => {
-    setAnexoSelecionado(anexo);
-    setDeleteModalOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!anexoSelecionado) return;
-
-    const deleteFn = getDeleteFn();
-
-    if (!deleteFn) {
-      console.error(
-        'Nenhuma função de exclusão de anexo foi encontrada em services/api.'
-      );
-      setDeleteModalOpen(false);
-      setAnexoSelecionado(null);
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      await deleteFn(anexoSelecionado.id);
-
-      if (typeof onUpdate === 'function') {
-        await onUpdate();
-      }
-    } catch (error) {
-      console.error('Erro ao excluir anexo:', error);
-    } finally {
-      setIsSubmitting(false);
-      setDeleteModalOpen(false);
-      setAnexoSelecionado(null);
-    }
-  };
-
-  const handleAnexosUpload = async (event) => {
-    const files = Array.from(event.target.files || []);
-    if (!files.length) return;
-
-    const uploadFn = getUploadFn();
-
-    if (!uploadFn) {
-      console.error(
-        'Nenhuma função de upload de anexos foi encontrada em services/api.'
-      );
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-
-      const formData = new FormData();
-      files.forEach((file) => formData.append('anexos', file));
-
-      await uploadFn(equipamentoId, formData);
-
-      if (typeof onUpdate === 'function') {
-        await onUpdate();
-      }
-    } catch (error) {
-      console.error('Erro ao enviar anexos:', error);
-    } finally {
-      setIsSubmitting(false);
-      if (anexoInputRef.current) {
-        anexoInputRef.current.value = '';
-      }
-    }
-  };
+  const {
+    anexos,
+    error,
+    isSubmitting,
+    inputRef,
+    deleteModalOpen,
+    anexoSelecionado,
+    openFileDialog,
+    openDeleteModal,
+    closeDeleteModal,
+    handleInputChange,
+    confirmDelete,
+  } = useResourceAnexos({
+    resource: 'equipamentos',
+    resourceId: equipamentoId,
+    anexosIniciais,
+    onUpdate,
+  });
 
   return (
     <>
       <ModalConfirmacao
         isOpen={deleteModalOpen}
-        onClose={() => {
-          setDeleteModalOpen(false);
-          setAnexoSelecionado(null);
-        }}
-        onConfirm={handleConfirmDelete}
+        onClose={closeDeleteModal}
+        onConfirm={confirmDelete}
         title="Excluir anexo"
         message={`Deseja excluir o arquivo "${anexoSelecionado?.nomeOriginal || ''}"?`}
         confirmText="Excluir"
@@ -159,97 +98,128 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
         isDestructive
       />
 
-      <div className="space-y-5">
-        <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-              <FontAwesomeIcon icon={faPaperclip} />
-            </span>
+      <PageSection
+        title={`Anexos (${anexos.length})`}
+        description="Documentos vinculados ao equipamento"
+      >
+        <div className="mb-5 flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <FontAwesomeIcon icon={faPaperclip} />
+          </span>
 
-            <div>
-              <h3 className="text-lg font-semibold text-slate-900">
-                Anexos ({anexosIniciais.length})
-              </h3>
-              <p className="text-sm text-slate-500">
-                Documentos vinculados ao equipamento
-              </p>
-            </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-900">
+              Arquivos do equipamento
+            </p>
+            <p className="text-sm text-slate-500">
+              Faça upload e mantenha documentos técnicos ou administrativos
+            </p>
           </div>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => anexoInputRef.current?.click()}
-            disabled={isSubmitting}
-          >
-            <FontAwesomeIcon
-              icon={isSubmitting ? faSpinner : faUpload}
-              spin={isSubmitting}
-            />
-            {isSubmitting ? 'Enviando...' : 'Enviar'}
-          </button>
-
-          <input
-            type="file"
-            multiple
-            ref={anexoInputRef}
-            className="hidden"
-            onChange={handleAnexosUpload}
-            disabled={isSubmitting}
-          />
         </div>
 
-        {anexosIniciais.length > 0 ? (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {anexosIniciais.map((anexo) => {
-              const { icon, color } = getIconePorTipoArquivo(anexo.tipoMime);
+        <ActionBar
+          className="mb-5"
+          right={
+            <button
+              type="button"
+              className="btn btn-primary w-full sm:w-auto"
+              onClick={openFileDialog}
+              disabled={isSubmitting}
+            >
+              <FontAwesomeIcon
+                icon={isSubmitting ? faSpinner : faUpload}
+                spin={isSubmitting}
+              />
+              <span>{isSubmitting ? 'Enviando...' : 'Enviar'}</span>
+            </button>
+          }
+        />
+
+        <input
+          type="file"
+          multiple
+          ref={inputRef}
+          className="hidden"
+          onChange={handleInputChange}
+          disabled={isSubmitting}
+        />
+
+        {error ? (
+          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        {anexos.length === 0 ? (
+          <EmptyState message="Nenhum anexo vinculado a este equipamento." />
+        ) : (
+          <div className="flex flex-col gap-3">
+            {anexos.map((anexo) => {
+              const { icon, colorClass } = getIconePorTipoArquivo(
+                anexo.tipoMime
+              );
+
+              const downloadUrl = montarUrlDownload(anexo.path);
 
               return (
                 <div
                   key={anexo.id}
-                  className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
+                  className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                 >
-                  <div
-                    className="flex h-12 w-12 items-center justify-center rounded-xl"
-                    style={{ backgroundColor: `${color}20`, color }}
-                  >
-                    <FontAwesomeIcon icon={icon} />
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={[
+                        'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50',
+                        colorClass,
+                      ].join(' ')}
+                    >
+                      <FontAwesomeIcon icon={icon} />
+                    </span>
+
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-slate-900">
+                        {anexo.nomeOriginal || 'Arquivo sem nome'}
+                      </p>
+
+                      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                        <span>{anexo.tipoMime || 'Tipo desconhecido'}</span>
+                        <span>
+                          Enviado em {formatarData(anexo.createdAt)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="min-w-0 flex-1">
+                  <div className="flex shrink-0 items-center gap-2">
                     <a
-                      href={`${API_BASE_URL_DOWNLOAD}/${anexo.path}`}
+                      href={downloadUrl}
                       target="_blank"
-                      rel="noopener noreferrer"
-                      className="block truncate text-sm font-semibold text-blue-600 hover:underline"
+                      rel="noreferrer"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition-all hover:bg-slate-50"
+                      title="Baixar / abrir anexo"
                     >
-                      {anexo.nomeOriginal}
+                      <FontAwesomeIcon icon={faDownload} />
                     </a>
 
-                    <span className="text-xs text-slate-400">
-                      {formatarData(anexo.createdAt)}
-                    </span>
+                    <button
+                      type="button"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 shadow-sm transition-all hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+                      title="Excluir anexo"
+                      onClick={() => openDeleteModal(anexo)}
+                      disabled={isSubmitting}
+                    >
+                      <FontAwesomeIcon
+                        icon={isSubmitting ? faSpinner : faTrashAlt}
+                        spin={isSubmitting}
+                      />
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteClick(anexo)}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 hover:bg-red-600 hover:text-white"
-                    disabled={isSubmitting}
-                    title="Excluir anexo"
-                  >
-                    <FontAwesomeIcon icon={faTrashAlt} />
-                  </button>
                 </div>
               );
             })}
           </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-500">
-            Nenhum anexo encontrado.
-          </div>
         )}
-      </div>
+      </PageSection>
     </>
   );
 }

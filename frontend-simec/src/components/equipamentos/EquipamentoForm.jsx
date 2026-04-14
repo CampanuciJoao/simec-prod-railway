@@ -3,17 +3,17 @@ import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSave,
-  faTimes,
-  faSpinner,
   faCircleInfo,
   faScrewdriverWrench,
   faCalendarDays,
+  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 
 import PageSection from '../ui/PageSection';
+import { ResponsiveGrid, FormActions } from '../ui/layout';
 import { getUnidades } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { getErrorMessage } from '../../utils/errorUtils';
 
 const LISTA_TIPOS = [
   'Arco Cirúrgico',
@@ -71,13 +71,6 @@ function FormField({ label, required = false, hint = '', children }) {
   );
 }
 
-FormField.propTypes = {
-  label: PropTypes.string.isRequired,
-  required: PropTypes.bool,
-  hint: PropTypes.string,
-  children: PropTypes.node.isRequired,
-};
-
 function TextInput({ className = '', ...props }) {
   return (
     <input
@@ -90,10 +83,6 @@ function TextInput({ className = '', ...props }) {
     />
   );
 }
-
-TextInput.propTypes = {
-  className: PropTypes.string,
-};
 
 function SelectInput({ children, className = '', ...props }) {
   return (
@@ -110,11 +99,6 @@ function SelectInput({ children, className = '', ...props }) {
   );
 }
 
-SelectInput.propTypes = {
-  children: PropTypes.node.isRequired,
-  className: PropTypes.string,
-};
-
 function TextareaInput({ className = '', ...props }) {
   return (
     <textarea
@@ -128,11 +112,7 @@ function TextareaInput({ className = '', ...props }) {
   );
 }
 
-TextareaInput.propTypes = {
-  className: PropTypes.string,
-};
-
-function DateField({ name, value, onChange }) {
+function DateField({ name, value, onChange, disabled = false }) {
   const handleHoje = () => {
     onChange({
       target: {
@@ -164,7 +144,8 @@ function DateField({ name, value, onChange }) {
           name={name}
           value={value || ''}
           onChange={onChange}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+          disabled={disabled}
+          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100"
         />
       </div>
 
@@ -172,32 +153,28 @@ function DateField({ name, value, onChange }) {
         <button
           type="button"
           onClick={handleHoje}
-          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+          disabled={disabled}
+          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <FontAwesomeIcon icon={faCalendarDays} />
           Hoje
         </button>
 
-        {!!value && (
+        {!!value ? (
           <button
             type="button"
             onClick={handleLimpar}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+            disabled={disabled}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
           >
             <FontAwesomeIcon icon={faTimes} />
             Limpar
           </button>
-        )}
+        ) : null}
       </div>
     </div>
   );
 }
-
-DateField.propTypes = {
-  name: PropTypes.string.isRequired,
-  value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-};
 
 function EquipamentoForm({
   onSubmit,
@@ -208,6 +185,7 @@ function EquipamentoForm({
   const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
+  const [loadingUnidades, setLoadingUnidades] = useState(true);
   const [error, setError] = useState('');
   const [semPatrimonio, setSemPatrimonio] = useState(false);
 
@@ -215,15 +193,39 @@ function EquipamentoForm({
   const navigate = useNavigate();
 
   useEffect(() => {
-    getUnidades()
-      .then((data) =>
+    let mounted = true;
+
+    async function carregarUnidades() {
+      setLoadingUnidades(true);
+
+      try {
+        const data = await getUnidades();
+
+        if (!mounted) return;
+
         setUnidadesDisponiveis(
-          (data || []).sort((a, b) =>
-            (a.nomeSistema || '').localeCompare(b.nomeSistema || '')
+          (Array.isArray(data) ? data : []).sort((a, b) =>
+            String(a.nomeSistema || '').localeCompare(
+              String(b.nomeSistema || '')
+            )
           )
-        )
-      )
-      .catch(() => addToast('Erro ao carregar lista de unidades.', 'error'));
+        );
+      } catch (err) {
+        if (!mounted) return;
+        addToast(
+          getErrorMessage(err, 'Erro ao carregar lista de unidades.'),
+          'error'
+        );
+      } finally {
+        if (mounted) setLoadingUnidades(false);
+      }
+    }
+
+    carregarUnidades();
+
+    return () => {
+      mounted = false;
+    };
   }, [addToast]);
 
   useEffect(() => {
@@ -243,7 +245,7 @@ function EquipamentoForm({
         fabricante: initialData.fabricante || '',
         anoFabricacao: initialData.anoFabricacao || '',
         dataInstalacao: initialData.dataInstalacao
-          ? initialData.dataInstalacao.split('T')[0]
+          ? String(initialData.dataInstalacao).split('T')[0]
           : '',
         status: initialData.status || 'Operante',
         numeroPatrimonio: initialData.numeroPatrimonio || '',
@@ -284,10 +286,13 @@ function EquipamentoForm({
         numeroPatrimonio: '',
       }));
     }
+
+    if (error) {
+      setError('');
+    }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleInternalSubmit = async () => {
     setError('');
 
     if (
@@ -315,31 +320,41 @@ function EquipamentoForm({
         ...formData,
         tag: formData.tag.trim(),
         modelo: formData.modelo.trim(),
-        setor: formData.setor.trim(),
-        fabricante: formData.fabricante.trim(),
+        tipo: formData.tipo,
+        setor: String(formData.setor || '').trim(),
+        unidadeId: formData.unidadeId,
+        fabricante: String(formData.fabricante || '').trim(),
         anoFabricacao: String(formData.anoFabricacao || '').trim(),
+        dataInstalacao: formData.dataInstalacao || '',
+        status: formData.status,
         numeroPatrimonio: String(formData.numeroPatrimonio || '').trim(),
         registroAnvisa: String(formData.registroAnvisa || '').trim(),
         observacoes: String(formData.observacoes || '').trim(),
       });
     } catch (apiError) {
-      setError(
-        apiError?.response?.data?.message ||
-          apiError?.message ||
-          'Erro ao salvar equipamento.'
-      );
+      setError(getErrorMessage(apiError, 'Erro ao salvar equipamento.'));
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleCancelClick = () => {
-    if (onCancel) onCancel();
-    else navigate('/equipamentos');
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+
+    navigate('/equipamentos');
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        handleInternalSubmit();
+      }}
+      className="space-y-6"
+    >
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -364,38 +379,35 @@ function EquipamentoForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <FormField label="Nº Série (Tag)" required>
+        <ResponsiveGrid preset="form">
+          <FormField label="Tag" required hint="Identificação principal do ativo">
             <TextInput
-              type="text"
               name="tag"
               value={formData.tag}
               onChange={handleChange}
-              placeholder="Digite a tag do equipamento"
-              required
-              disabled={isEditing}
+              placeholder="Ex.: RM-01"
+              disabled={isSubmitting}
             />
           </FormField>
 
           <FormField label="Modelo" required>
             <TextInput
-              type="text"
               name="modelo"
               value={formData.modelo}
               onChange={handleChange}
-              placeholder="Digite o modelo"
-              required
+              placeholder="Ex.: Achieva 1.5T"
+              disabled={isSubmitting}
             />
           </FormField>
 
-          <FormField label="Tipo de equipamento" required>
+          <FormField label="Tipo" required>
             <SelectInput
               name="tipo"
               value={formData.tipo}
               onChange={handleChange}
-              required
+              disabled={isSubmitting}
             >
-              <option value="">Selecione...</option>
+              <option value="">Selecione um tipo</option>
               {LISTA_TIPOS.map((tipo) => (
                 <option key={tipo} value={tipo}>
                   {tipo}
@@ -404,12 +416,26 @@ function EquipamentoForm({
             </SelectInput>
           </FormField>
 
-          <FormField label="Unidade / Hospital" required>
+          <FormField label="Setor">
+            <TextInput
+              name="setor"
+              value={formData.setor}
+              onChange={handleChange}
+              placeholder="Ex.: Diagnóstico por imagem"
+              disabled={isSubmitting}
+            />
+          </FormField>
+
+          <FormField
+            label="Unidade"
+            required
+            hint={loadingUnidades ? 'Carregando unidades...' : ''}
+          >
             <SelectInput
               name="unidadeId"
               value={formData.unidadeId}
               onChange={handleChange}
-              required
+              disabled={isSubmitting || loadingUnidades}
             >
               <option value="">Selecione uma unidade</option>
               {unidadesDisponiveis.map((unidade) => (
@@ -420,35 +446,56 @@ function EquipamentoForm({
             </SelectInput>
           </FormField>
 
-          <FormField label="Localização / Setor">
+          <FormField label="Fabricante">
             <TextInput
-              type="text"
-              name="setor"
-              value={formData.setor}
+              name="fabricante"
+              value={formData.fabricante}
               onChange={handleChange}
-              placeholder="Ex.: Sala 2, Bloco A"
+              placeholder="Ex.: Philips"
+              disabled={isSubmitting}
             />
           </FormField>
 
-          <FormField label="Status inicial">
+          <FormField label="Ano de fabricação">
+            <TextInput
+              type="number"
+              name="anoFabricacao"
+              value={formData.anoFabricacao}
+              onChange={handleChange}
+              placeholder="Ex.: 2020"
+              disabled={isSubmitting}
+            />
+          </FormField>
+
+          <FormField label="Data de instalação">
+            <DateField
+              name="dataInstalacao"
+              value={formData.dataInstalacao}
+              onChange={handleChange}
+              disabled={isSubmitting}
+            />
+          </FormField>
+
+          <FormField label="Status">
             <SelectInput
               name="status"
               value={formData.status}
               onChange={handleChange}
+              disabled={isSubmitting}
             >
-              {OPCOES_STATUS.map((opt) => (
-                <option key={opt.valor} value={opt.valor}>
-                  {opt.rotulo}
+              {OPCOES_STATUS.map((status) => (
+                <option key={status.valor} value={status.valor}>
+                  {status.rotulo}
                 </option>
               ))}
             </SelectInput>
           </FormField>
-        </div>
+        </ResponsiveGrid>
       </PageSection>
 
       <PageSection
-        title="Detalhes técnicos e controle"
-        description="Informações complementares para rastreabilidade e gestão do ativo."
+        title="Controle patrimonial e regulatório"
+        description="Informações de patrimônio, registro e observações."
       >
         <div className="mb-5 flex items-center gap-3">
           <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
@@ -456,127 +503,71 @@ function EquipamentoForm({
           </span>
           <div>
             <p className="text-sm font-semibold text-slate-900">
-              Dados técnicos e patrimoniais
+              Dados administrativos
             </p>
             <p className="text-sm text-slate-500">
-              Esses dados ajudam no inventário, manutenção e auditoria.
+              Controle interno, patrimônio e informações regulatórias.
             </p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <FormField label="Fabricante">
+        <ResponsiveGrid preset="twoCols">
+          <FormField label="Número de patrimônio">
             <TextInput
-              type="text"
-              name="fabricante"
-              value={formData.fabricante}
+              name="numeroPatrimonio"
+              value={formData.numeroPatrimonio}
               onChange={handleChange}
-              placeholder="Digite o fabricante"
+              placeholder="Ex.: PAT-12345"
+              disabled={isSubmitting || semPatrimonio}
             />
           </FormField>
-
-          <FormField
-            label="Ano de fabricação"
-            hint="Use 4 dígitos. Ex.: 2024"
-          >
-            <TextInput
-              type="number"
-              name="anoFabricacao"
-              value={formData.anoFabricacao}
-              onChange={handleChange}
-              placeholder="Ex.: 2024"
-              min="1900"
-              max="2100"
-            />
-          </FormField>
-
-          <FormField
-            label="Data de instalação"
-            hint="Você pode selecionar no calendário ou digitar."
-          >
-            <DateField
-              name="dataInstalacao"
-              value={formData.dataInstalacao}
-              onChange={handleChange}
-            />
-          </FormField>
-
-          <div className="md:col-span-2 xl:col-span-1">
-            <FormField label="Número de patrimônio">
-              <div className="space-y-2">
-                <TextInput
-                  type="text"
-                  name="numeroPatrimonio"
-                  value={formData.numeroPatrimonio}
-                  onChange={handleChange}
-                  disabled={semPatrimonio}
-                  placeholder={semPatrimonio ? '' : 'Digite o número'}
-                />
-
-                <label className="flex items-center gap-2 text-sm text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={semPatrimonio}
-                    onChange={handleCheckboxChange}
-                    className="h-4 w-4 rounded border-slate-300"
-                  />
-                  Equipamento sem etiqueta de patrimônio
-                </label>
-              </div>
-            </FormField>
-          </div>
 
           <FormField label="Registro ANVISA">
             <TextInput
-              type="text"
               name="registroAnvisa"
               value={formData.registroAnvisa}
               onChange={handleChange}
-              placeholder="Digite o registro"
+              placeholder="Ex.: 12345678901"
+              disabled={isSubmitting}
             />
           </FormField>
+        </ResponsiveGrid>
+
+        <div className="mt-4">
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={semPatrimonio}
+              onChange={handleCheckboxChange}
+              disabled={isSubmitting}
+              className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            Marcar como “Sem Patrimônio”
+          </label>
         </div>
 
         <div className="mt-4">
           <FormField label="Observações">
             <TextareaInput
               name="observacoes"
-              rows={4}
               value={formData.observacoes}
               onChange={handleChange}
-              placeholder="Adicione observações relevantes sobre o equipamento"
+              rows={5}
+              placeholder="Informações adicionais sobre o equipamento..."
+              disabled={isSubmitting}
             />
           </FormField>
         </div>
       </PageSection>
 
-      <div className="flex flex-wrap justify-end gap-3">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={handleCancelClick}
-          disabled={isSubmitting}
-        >
-          <FontAwesomeIcon icon={faTimes} />
-          Cancelar
-        </button>
-
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-        >
-          <FontAwesomeIcon
-            icon={isSubmitting ? faSpinner : faSave}
-            spin={isSubmitting}
-          />
-          {isSubmitting
-            ? 'Salvando...'
-            : isEditing
-              ? 'Salvar alterações'
-              : 'Adicionar equipamento'}
-        </button>
-      </div>
+      <FormActions
+        onSubmit={handleInternalSubmit}
+        onCancel={handleCancelClick}
+        loading={isSubmitting}
+        submitLabel={isEditing ? 'Salvar alterações' : 'Cadastrar equipamento'}
+        cancelLabel="Cancelar"
+        align="right"
+      />
     </form>
   );
 }

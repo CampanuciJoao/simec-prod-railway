@@ -1,11 +1,16 @@
 import React from 'react';
-import { faArrowLeft, faMicrochip } from '@fortawesome/free-solid-svg-icons';
+import { faMicrochip } from '@fortawesome/free-solid-svg-icons';
 
 import { useDetalhesEquipamentoPage } from '../../hooks/equipamentos/useDetalhesEquipamentoPage';
 import DetalhesEquipamentoTabs from '../../components/equipamentos/DetalhesEquipamentoTabs';
 import DetalhesEquipamentoTabContent from '../../components/equipamentos/DetalhesEquipamentoTabContent';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
+import {
+  PageLayout,
+  PageHeader,
+  PageSection,
+  EmptyState,
+  LoadingState,
+} from '../../components/ui/layout';
 
 function DetalhesEquipamentoPage() {
   const {
@@ -19,34 +24,46 @@ function DetalhesEquipamentoPage() {
     abas,
   } = useDetalhesEquipamentoPage();
 
-  const showState = loading || !!error || !equipamento;
-
-  if (showState) {
+  if (loading) {
     return (
-      <div className="page-content-wrapper">
+      <PageLayout background="slate" padded fullHeight>
         <PageHeader
-          title={equipamento?.modelo ? `Detalhes do Equipamento: ${equipamento.modelo}` : 'Detalhes do Equipamento'}
+          title="Detalhes do Equipamento"
           icon={faMicrochip}
           actions={
             <button className="btn btn-secondary" onClick={() => window.history.back()}>
               Voltar
             </button>
           }
-          variant="light"
         />
 
-        <PageState
-          loading={loading}
-          error={error}
-          isEmpty={!loading && !error && !equipamento}
-          emptyMessage="O equipamento solicitado não foi encontrado."
+        <LoadingState message="Carregando equipamento..." />
+      </PageLayout>
+    );
+  }
+
+  if (error || !equipamento) {
+    return (
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title="Detalhes do Equipamento"
+          icon={faMicrochip}
+          actions={
+            <button className="btn btn-secondary" onClick={() => window.history.back()}>
+              Voltar
+            </button>
+          }
         />
-      </div>
+
+        <EmptyState
+          message={error || 'O equipamento solicitado não foi encontrado.'}
+        />
+      </PageLayout>
     );
   }
 
   return (
-    <div className="page-content-wrapper">
+    <PageLayout background="slate" padded fullHeight>
       <PageHeader
         title={`Detalhes do Equipamento: ${equipamento.modelo}`}
         icon={faMicrochip}
@@ -55,24 +72,25 @@ function DetalhesEquipamentoPage() {
             Voltar
           </button>
         }
-        variant="light"
       />
 
-      <section className="page-section">
+      <PageSection>
         <DetalhesEquipamentoTabs
           abas={abas}
           abaAtiva={abaAtiva}
           onChange={setAbaAtiva}
         />
 
-        <DetalhesEquipamentoTabContent
-          abaAtiva={abaAtiva}
-          equipamento={equipamento}
-          equipamentoId={equipamentoId}
-          onRefresh={refetchEquipamento}
-        />
-      </section>
-    </div>
+        <div className="mt-5">
+          <DetalhesEquipamentoTabContent
+            abaAtiva={abaAtiva}
+            equipamento={equipamento}
+            equipamentoId={equipamentoId}
+            onRefresh={refetchEquipamento}
+          />
+        </div>
+      </PageSection>
+    </PageLayout>
   );
 }
 

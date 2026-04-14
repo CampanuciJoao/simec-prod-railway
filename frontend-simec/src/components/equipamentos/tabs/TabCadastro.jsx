@@ -2,6 +2,9 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle, faEdit } from '@fortawesome/free-solid-svg-icons';
+
+import { EntityInfoGrid, ActionBar } from '../../ui/layout';
+import PageSection from '../../ui/PageSection';
 import { formatarData } from '../../../utils/timeUtils';
 
 function getStatusBadgeClass(status) {
@@ -15,105 +18,99 @@ function getStatusBadgeClass(status) {
   return 'badge badge-slate';
 }
 
-function InfoItem({ label, value, fullWidth = false }) {
-  return (
-    <div
-      className={[
-        'rounded-xl border border-slate-200 bg-white p-4 shadow-sm',
-        fullWidth ? 'md:col-span-2 xl:col-span-3' : '',
-      ].join(' ')}
-    >
-      <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </span>
-      <div className="mt-2 text-sm font-medium text-slate-800 break-words">
-        {value || 'N/A'}
-      </div>
-    </div>
-  );
-}
-
 function TabCadastro({ equipamentoInicial }) {
   const navigate = useNavigate();
 
-  const handleEditClick = () => {
-    navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`);
-  };
+  const items = [
+    { key: 'modelo', label: 'Modelo', value: equipamentoInicial.modelo },
+    { key: 'tag', label: 'Nº Série (Tag)', value: equipamentoInicial.tag },
+    { key: 'tipo', label: 'Tipo', value: equipamentoInicial.tipo },
+    { key: 'setor', label: 'Localização', value: equipamentoInicial.setor },
+    {
+      key: 'unidade',
+      label: 'Unidade',
+      value: equipamentoInicial.unidade?.nomeSistema,
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      value: (
+        <span className={getStatusBadgeClass(equipamentoInicial.status)}>
+          {equipamentoInicial.status || 'N/A'}
+        </span>
+      ),
+    },
+    {
+      key: 'fabricante',
+      label: 'Fabricante',
+      value: equipamentoInicial.fabricante,
+    },
+    {
+      key: 'ano',
+      label: 'Ano Fabricação',
+      value: equipamentoInicial.anoFabricacao,
+    },
+    {
+      key: 'instalacao',
+      label: 'Data Instalação',
+      value: formatarData(equipamentoInicial.dataInstalacao),
+    },
+    {
+      key: 'patrimonio',
+      label: 'Nº de Patrimônio',
+      value: equipamentoInicial.numeroPatrimonio,
+    },
+    {
+      key: 'anvisa',
+      label: 'Registro ANVISA',
+      value: equipamentoInicial.registroAnvisa,
+    },
+    {
+      key: 'observacoes',
+      label: 'Observações',
+      value: equipamentoInicial.observacoes,
+      fullWidth: true,
+    },
+  ];
 
   return (
-    <div className="space-y-5">
-      <div className="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <FontAwesomeIcon icon={faInfoCircle} />
-          </span>
+    <PageSection
+      title="Informações do Cadastro"
+      description="Dados principais do equipamento cadastrado no sistema"
+    >
+      <div className="mb-5 flex items-center gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+          <FontAwesomeIcon icon={faInfoCircle} />
+        </span>
 
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">
-              Informações do Cadastro
-            </h3>
-            <p className="text-sm text-slate-500">
-              Dados principais do equipamento cadastrado no sistema
-            </p>
-          </div>
+        <div>
+          <p className="text-sm font-semibold text-slate-900">
+            Cadastro principal do ativo
+          </p>
+          <p className="text-sm text-slate-500">
+            Informações administrativas e técnicas do equipamento
+          </p>
         </div>
-
-        <button
-          type="button"
-          className="btn btn-primary"
-          onClick={handleEditClick}
-        >
-          <FontAwesomeIcon icon={faEdit} />
-          <span>Editar</span>
-        </button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        <InfoItem label="Modelo" value={equipamentoInicial.modelo} />
-        <InfoItem label="Nº Série (Tag)" value={equipamentoInicial.tag} />
-        <InfoItem label="Tipo" value={equipamentoInicial.tipo} />
-        <InfoItem label="Localização" value={equipamentoInicial.setor} />
-        <InfoItem
-          label="Unidade"
-          value={equipamentoInicial.unidade?.nomeSistema}
-        />
+      <ActionBar
+        className="mb-5"
+        right={
+          <button
+            type="button"
+            className="btn btn-primary w-full sm:w-auto"
+            onClick={() =>
+              navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
+            }
+          >
+            <FontAwesomeIcon icon={faEdit} />
+            <span>Editar</span>
+          </button>
+        }
+      />
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-            Status
-          </span>
-          <div className="mt-2">
-            <span className={getStatusBadgeClass(equipamentoInicial.status)}>
-              {equipamentoInicial.status || 'N/A'}
-            </span>
-          </div>
-        </div>
-
-        <InfoItem label="Fabricante" value={equipamentoInicial.fabricante} />
-        <InfoItem
-          label="Ano Fabricação"
-          value={equipamentoInicial.anoFabricacao}
-        />
-        <InfoItem
-          label="Data Instalação"
-          value={formatarData(equipamentoInicial.dataInstalacao)}
-        />
-        <InfoItem
-          label="Nº de Patrimônio"
-          value={equipamentoInicial.numeroPatrimonio}
-        />
-        <InfoItem
-          label="Registro ANVISA"
-          value={equipamentoInicial.registroAnvisa}
-        />
-
-        <InfoItem
-          label="Observações"
-          value={equipamentoInicial.observacoes}
-          fullWidth
-        />
-      </div>
-    </div>
+      <EntityInfoGrid items={items} />
+    </PageSection>
   );
 }
 
