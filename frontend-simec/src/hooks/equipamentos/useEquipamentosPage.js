@@ -1,65 +1,247 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useMemo, useCallback, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
-import { getEquipamentos } from '../../services/api';
-import { getErrorMessage } from '../../utils/getErrorMessage';
+import { useEquipamentos } from './useEquipamentos';
 
 export function useEquipamentosPage() {
+  const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const [equipamentos, setEquipamentos] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const {
+    equipamentos,
+    unidadesDisponiveis,
+    loading,
+    error,
+    refetch,
+    controles,
+    removerEquipamento,
+    atualizarStatusLocalmente,
+  } = useEquipamentos();
 
-  const carregarEquipamentos = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+  const [equipamentoParaExcluir, setEquipamentoParaExcluir] = useState(null);
+
+  const deleteModal = useMemo(
+    () => ({
+      isOpen: !!equipamentoParaExcluir,
+      openModal: (equipamento) => setEquipamentoParaExcluir(equipamento),
+      closeModal: () => setEquipamentoParaExcluir(null),
+    }),
+    [equipamentoParaExcluir]
+  );
+
+  const handleConfirmDelete = useCallback(async () => {
+    if (!equipamentoParaExcluir?.id) return;
 
     try {
-      const data = await getEquipamentos();
-      setEquipamentos(Array.isArray(data) ? data : []);
+      await removerEquipamento(equipamentoParaExcluir.id);
+      setEquipamentoParaExcluir(null);
     } catch (err) {
-      const message = getErrorMessage(
-        err,
-        'Erro ao carregar equipamentos.'
+      addToast(
+        err?.response?.data?.message || 'Erro ao excluir equipamento.',
+        'error'
+      );
+    }
+  }, [equipamentoParaExcluir, removerEquipamento, addToast]);
+
+  const fabricantesDisponiveis = useMemo(() => {
+    const valores = new Set();
+
+    for (const equipamento of equipamentos) {
+      if (equipamento?.fabricante) {
+        valores.add(String(equipamento.fabricante));
+      }
+    }
+
+    return Array.from(valores)
+      .sort((a, b) => a.localeCompare(b))
+      .map((fabricante) => ({
+        label: fabricante,
+        value: fabricante,
+      }));
+  }, [equipamentos]);
+
+  const tiposDisponiveis = useMemo(() => {
+    const valores = new Set();
+
+    for (const equipamento of equipamentos) {
+      if (equipamento?.tipo) {
+        valores.add(String(equipamento.tipo));
+      }
+    }
+
+    return Array.from(valores)
+      .sort((a, b) => a.localeCompare(b))
+      .map((tipo) => ({
+        label: tipo,
+        value: tipo,
+      }));
+  }, [equipamentos]);
+
+  const selectFiltersConfig = useMemo(
+    () => [
+      {
+        id: 'unidadeId',
+        label: 'Unidade',
+        defaultLabel: 'Todas',
+        value: controles.filtros.unidadeId,
+        onChange: (value) => controles.handleFilterChange('unidadeId', value),
+        options: unidadesDisponiveis.map((unidade) => ({
+          label: unidade.nomeSistema,
+          value: unidade.id,
+        })),
+      },
+      {
+        id: 'tipo',
+        label: 'Tipo',
+        defaultLabel: 'Todos',
+        value: controles.filtros.tipo,
+        onChange: (value) => controles.handleFilterChange('tipo', value),
+        options: tiposDisponiveis,
+      },
+      {
+        id: 'fabricante',
+        label: 'Fabricante',
+        defaultLabel: 'Todos',
+        value: controles.filtros.fabricante,
+        onChange: (value) => controles.handleFilterChange('fabricante', value),
+        options: fabricantesDisponiveis,
+      },
+      {
+        id: 'status',
+        label: 'Status',
+        defaultLabel: 'Todos',
+        value: controles.filtros.status,
+        onChange: (value) => controles.handleFilterChange('status', value),
+        options: [
+          { label: 'Operante', value: 'Operante' },
+          { label: 'Em manutenção', value: 'EmManutencao' },
+          { label: 'Inoperante', value: 'Inoperante' },
+          { label: 'Uso limitado', value: 'UsoLimitado' },
+        ],
+      },
+    ],
+    [controles, unidadesDisponiveis, tiposDisponiveis, fabricantesDisponiveis]
+  );
+
+  const activeFilters = useMemo(() => {
+    const filtrosAtivos = [];
+
+    if (controles.filtros.unidadeId) {
+      const unidade = unidadesDisponiveis.find(
+        (item) => item.id === controles.filtros.unidadeId
       );
 
-      setError(message);
-      addToast(message, 'error');
-    } finally {
-      setLoading(false);
+      filtrosAtivos.push({
+        key: 'unidadeId',
+        value: controles.filtros.unidadeId,
+        label: `Unidade: ${unidade?.nomeSistema || controles.filtros.unidadeId}`,
+      });
     }
-  }, [addToast]);
 
-  useEffect(() => {
-    carregarEquipamentos();
-  }, [carregarEquipamentos]);
+    if (controles.filtros.tipo) {
+      filtrosAtivos.push({
+        key: 'tipo',
+        value: controles.filtros.tipo,
+        label: `Tipo: ${controles.filtros.tipo}`,
+      });
+    }
 
-  /**
-   * Atualiza 1 equipamento localmente (evita reload total)
-   */
-  const atualizarEquipamentoLocal = useCallback((equipAtualizado) => {
-    setEquipamentos((prev) =>
-      prev.map((eq) =>
-        eq.id === equipAtualizado.id ? equipAtualizado : eq
-      )
-    );
-  }, []);
+    if (controles.filtros.fabricante) {
+      filtrosAtivos.push({
+        key: 'fabricante',
+        value: controles.filtros.fabricante,
+        label: `Fabricante: ${controles.filtros.fabricante}`,
+      });
+    }
 
-  /**
-   * Remove equipamento localmente
-   */
-  const removerEquipamentoLocal = useCallback((id) => {
-    setEquipamentos((prev) =>
-      prev.filter((eq) => eq.id !== id)
-    );
-  }, []);
+    if (controles.filtros.status) {
+      const mapaStatus = {
+        Operante: 'Operante',
+        EmManutencao: 'Em manutenção',
+        Inoperante: 'Inoperante',
+        UsoLimitado: 'Uso limitado',
+      };
+
+      filtrosAtivos.push({
+        key: 'status',
+        value: controles.filtros.status,
+        label: `Status: ${mapaStatus[controles.filtros.status] || controles.filtros.status}`,
+      });
+    }
+
+    return filtrosAtivos;
+  }, [controles.filtros, unidadesDisponiveis]);
+
+  const clearFilter = useCallback(
+    (key) => {
+      controles.handleFilterChange(key, '');
+    },
+    [controles]
+  );
+
+  const clearAllFilters = useCallback(() => {
+    controles.handleFilterChange('unidadeId', '');
+    controles.handleFilterChange('tipo', '');
+    controles.handleFilterChange('fabricante', '');
+    controles.handleFilterChange('status', '');
+  }, [controles]);
+
+  const metricas = useMemo(() => {
+    const base = {
+      total: equipamentos.length,
+      operantes: 0,
+      emManutencao: 0,
+      inoperantes: 0,
+      usoLimitado: 0,
+    };
+
+    for (const equipamento of equipamentos) {
+      const status = String(equipamento?.status || '');
+
+      if (status === 'Operante') base.operantes += 1;
+      if (status === 'EmManutencao') base.emManutencao += 1;
+      if (status === 'Inoperante') base.inoperantes += 1;
+      if (status === 'UsoLimitado') base.usoLimitado += 1;
+    }
+
+    return base;
+  }, [equipamentos]);
+
+  const onSearchChange = useCallback(
+    (event) => {
+      controles.handleSearchChange(event);
+    },
+    [controles]
+  );
+
+  const goToCreate = useCallback(() => {
+    navigate('/cadastros/equipamentos/adicionar');
+  }, [navigate]);
+
+  const goToFichaTecnica = useCallback(
+    (equipamentoId) => {
+      navigate(`/equipamentos/ficha-tecnica/${equipamentoId}`);
+    },
+    [navigate]
+  );
 
   return {
     equipamentos,
     loading,
     error,
-    refetch: carregarEquipamentos,
-    atualizarEquipamentoLocal,
-    removerEquipamentoLocal,
+    refetch,
+    metricas,
+    searchTerm: controles.searchTerm,
+    onSearchChange,
+    selectFiltersConfig,
+    activeFilters,
+    clearFilter,
+    clearAllFilters,
+    goToCreate,
+    goToFichaTecnica,
+    atualizarStatusLocalmente,
+    deleteModal,
+    handleConfirmDelete,
+    openDeleteModal: deleteModal.openModal,
   };
 }

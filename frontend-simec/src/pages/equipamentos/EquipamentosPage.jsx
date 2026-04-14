@@ -109,6 +109,12 @@ function EquipamentosPage() {
 
   const shouldShowState = isInitialLoading || hasError || isEmpty;
 
+  const aplicarFiltroStatus = (status) => {
+    page.clearAllFilters();
+    const statusFilter = page.selectFiltersConfig.find((f) => f.id === 'status');
+    statusFilter?.onChange(status);
+  };
+
   return (
     <PageLayout background="slate" padded fullHeight className="font-sans">
       <ModalConfirmacao
@@ -142,7 +148,7 @@ function EquipamentosPage() {
           title="Total"
           value={page.metricas.total}
           tone="slate"
-          onClick={() => page.clearAllFilters()}
+          onClick={page.clearAllFilters}
         />
 
         <KpiCard
@@ -150,7 +156,7 @@ function EquipamentosPage() {
           title="Operantes"
           value={page.metricas.operantes}
           tone="green"
-          onClick={() => page.clearAllFilters() || page.selectFiltersConfig.find(f => f.id === 'status')?.onChange('Operante')}
+          onClick={() => aplicarFiltroStatus('Operante')}
         />
 
         <KpiCard
@@ -158,7 +164,7 @@ function EquipamentosPage() {
           title="Em manutenção"
           value={page.metricas.emManutencao}
           tone="yellow"
-          onClick={() => page.clearAllFilters() || page.selectFiltersConfig.find(f => f.id === 'status')?.onChange('EmManutencao')}
+          onClick={() => aplicarFiltroStatus('EmManutencao')}
         />
 
         <KpiCard
@@ -166,7 +172,7 @@ function EquipamentosPage() {
           title="Inoperantes"
           value={page.metricas.inoperantes}
           tone="red"
-          onClick={() => page.clearAllFilters() || page.selectFiltersConfig.find(f => f.id === 'status')?.onChange('Inoperante')}
+          onClick={() => aplicarFiltroStatus('Inoperante')}
         />
 
         <KpiCard
@@ -174,7 +180,7 @@ function EquipamentosPage() {
           title="Uso limitado"
           value={page.metricas.usoLimitado}
           tone="blue"
-          onClick={() => page.clearAllFilters() || page.selectFiltersConfig.find(f => f.id === 'status')?.onChange('UsoLimitado')}
+          onClick={() => aplicarFiltroStatus('UsoLimitado')}
         />
       </div>
 
