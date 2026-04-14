@@ -1,94 +1,99 @@
-// simec/backend-simec/services/agent/agendaValidator.js
-import prisma from '../../prismaService.js';
-import { criarDateUTC, isDataValida } from '../../timeService.js';
+// Ficheiro: services/agent/workflow/agendaValidator.js
+// Versão: timezone-aware (padrão SIMEC novo)
+
+import {
+  criarIntervaloUTCFromLocal,
+  getTenantTimezone,
+  getAgora,
+  isDataValida,
+} from '../../../timeService.js';
 
 /**
- * Monta o intervalo de agendamento a partir do estado.
+ * Monta intervalo de agendamento corretamente usando timezone do tenant
  */
-function montarIntervaloAgendamento(estado) {
-  if (!estado?.data || !estado?.horaInicio || !estado?.horaFim) {
-    return null;
-  }
+export function montarIntervaloAgendamento(estado, tenant) {
+  const { data, horaInicio, horaFim } = estado;
 
-  const inicio = criarDateUTC(estado.data, estado.horaInicio);
-  const fim = criarDateUTC(estado.data, estado.horaFim);
+  if (!data || !horaInicio) return null;
 
-  if (!isDataValida(inicio) || !isDataValida(fim)) {
-    return null;
-  }
+  const timeZone = getTenantTimezone(tenant);
 
-  return { inicio, fim };
-}
+  const { inicio, fim } = criarIntervaloUTCFromLocal({
+    dataLocal: data,
+    horaInicioLocal: horaInicio,
+    horaFimLocal: horaFim,
+    timeZone,
+  });
 
-/**
- * Validação local do intervalo antes da consulta ao banco.
- */
-export function validarIntervaloBasico(estado) {
-  const intervalo = montarIntervaloAgendamento(estado);
-
-  if (!intervalo) {
-    return {
-      valido: false,
-      motivo: 'INTERVALO_INVALIDO',
-      mensagem: 'Não consegui validar a data e os horários informados.',
-    };
-  }
-
-  const { inicio, fim } = intervalo;
-
-  if (fim <= inicio) {
-    return {
-      valido: false,
-      motivo: 'FIM_ANTES_DO_INICIO',
-      mensagem: 'O horário de término deve ser maior que o horário de início.',
-    };
-  }
+  if (!isDataValida(inicio)) return null;
 
   return {
-    valido: true,
     inicio,
     fim,
   };
 }
 
 /**
- * Verifica se existe conflito de agenda para o mesmo equipamento
- * dentro do tenant informado.
- * Há conflito quando o intervalo solicitado se sobrepõe
- * a outra manutenção ativa.
+ * Validação básica de intervalo
  */
-export async function validarConflitoAgenda(estado, tenantId) {
-  if (!tenantId) {
-    throw new Error('TENANT_ID_OBRIGATORIO_PARA_VALIDAR_CONFLITO_AGENDA');
-  }
+export function validarIntervaloBasico(estado, tenant) {
+  const intervalo = montarIntervaloAgendamento(estado, tenant);
 
-  if (!estado?.equipamentoId) {
+  if (!intervalo || !intervalo.inicio) {
     return {
       valido: false,
-      motivo: 'EQUIPAMENTO_NAO_RESOLVIDO',
-      mensagem:
-        'Não consegui validar a agenda porque o equipamento ainda não foi resolvido.',
+      motivo: 'INTERVALO_INVALIDO',
+      mensagem: 'Data ou horário inválido.',
     };
   }
 
-  const intervalo = validarIntervaloBasico(estado);
-  if (!intervalo.valido) {
-    return intervalo;
+  if (intervalo.fim && intervalo.fim <= intervalo.inicio) {
+    return {
+      valido: false,
+      motivo: 'FIM_ANTES_DO_INICIO',
+      mensagem: 'A hora final deve ser maior que a inicial.',
+    };
+  }
+
+  return {
+    valido: true,
+    inicio: intervalo.inicio,
+    fim: intervalo.fim,
+  };
+}
+
+/**
+ * Validação de conflito de agenda
+ */
+export async function validarConflitoAgenda(
+  estado,
+  tenant,
+  prisma,
+  equipamentoId
+) {
+  const intervalo = montarIntervaloAgendamento(estado, tenant);
+
+  if (!intervalo || !intervalo.inicio) {
+    return {
+      valido: false,
+      motivo: 'INTERVALO_INVALIDO',
+      mensagem: 'Não foi possível montar o intervalo.',
+    };
   }
 
   const { inicio, fim } = intervalo;
 
-  const conflito = await prisma.manutencao.findFirst({
+  const conflitos = await prisma.manutencao.findMany({
     where: {
-      tenantId,
-      equipamentoId: estado.equipamentoId,
+      tenantId: tenant.id,
+      equipamentoId,
       status: {
         in: ['Agendada', 'EmAndamento', 'Pendente', 'AguardandoConfirmacao'],
       },
       AND: [
         {
           dataHoraAgendamentoInicio: {
-            lt: fim,
+            lt: fim || new Date('9999-12-31'),
           },
         },
         {
@@ -99,48 +104,32 @@ export async function validarConflitoAgenda(estado, tenantId) {
               },
             },
             {
-              AND: [
-                { dataHoraAgendamentoFim: null },
-                { dataHoraAgendamentoInicio: { lt: fim } },
-              ],
+              dataHoraAgendamentoFim: null,
+              dataHoraAgendamentoInicio: {
+                lt: fim || new Date('9999-12-31'),
+              },
             },
           ],
         },
       ],
     },
-    orderBy: {
-      dataHoraAgendamentoInicio: 'asc',
-    },
-    select: {
-      id: true,
-      numeroOS: true,
-      tipo: true,
-      status: true,
-      dataHoraAgendamentoInicio: true,
-      dataHoraAgendamentoFim: true,
-    },
+    take: 1,
   });
 
-  if (!conflito) {
+  if (conflitos.length > 0) {
+    const c = conflitos[0];
+
     return {
-      valido: true,
-      inicio,
-      fim,
+      valido: false,
+      motivo: 'CONFLITO_AGENDA',
+      conflito: c,
+      mensagem: `Já existe uma manutenção conflitante: OS ${c.numeroOS}`,
     };
   }
 
-  const inicioExistente = conflito.dataHoraAgendamentoInicio
-    ? conflito.dataHoraAgendamentoInicio.toISOString()
-    : 'sem início';
-
-  const fimExistente = conflito.dataHoraAgendamentoFim
-    ? conflito.dataHoraAgendamentoFim.toISOString()
-    : 'sem fim';
-
   return {
-    valido: false,
-    motivo: 'CONFLITO_AGENDA',
-    conflito,
-    mensagem: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}, ${conflito.tipo}, status ${conflito.status}, de ${inicioExistente} até ${fimExistente}.`,
+    valido: true,
+    inicio,
+    fim,
   };
 }
