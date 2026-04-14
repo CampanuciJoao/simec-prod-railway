@@ -32,8 +32,19 @@ const DURACAO_PADRAO_POR_TIPO = {
   Inspecao: 45,
 };
 
-function hojeISO() {
-  return new Date().toISOString().split('T')[0];
+function hojeLocalISO() {
+  const agora = new Date();
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, '0');
+  const dia = String(agora.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
+function horaLocalAtualHHmm() {
+  const agora = new Date();
+  const hora = String(agora.getHours()).padStart(2, '0');
+  const minuto = String(agora.getMinutes()).padStart(2, '0');
+  return `${hora}:${minuto}`;
 }
 
 function parseHoraParaMinutos(hora) {
@@ -72,6 +83,33 @@ function formatarTipoLabel(tipo) {
   return String(tipo || '').replace(/([A-Z])/g, ' $1').trim();
 }
 
+function extrairDataLocal(initialData) {
+  return (
+    initialData?.formulario?.agendamentoDataLocal ||
+    initialData?.agendamentoLocal?.data ||
+    initialData?.agendamentoDataLocal ||
+    ''
+  );
+}
+
+function extrairHoraInicioLocal(initialData) {
+  return (
+    initialData?.formulario?.agendamentoHoraInicioLocal ||
+    initialData?.agendamentoLocal?.horaInicio ||
+    initialData?.agendamentoHoraInicioLocal ||
+    ''
+  );
+}
+
+function extrairHoraFimLocal(initialData) {
+  return (
+    initialData?.formulario?.agendamentoHoraFimLocal ||
+    initialData?.agendamentoLocal?.horaFim ||
+    initialData?.agendamentoHoraFimLocal ||
+    ''
+  );
+}
+
 function FormField({ label, required = false, hint = '', children }) {
   return (
     <div>
@@ -97,7 +135,7 @@ function DateField({ name, value, onChange, required = false }) {
     onChange({
       target: {
         name,
-        value: hojeISO(),
+        value: hojeLocalISO(),
       },
     });
   };
@@ -237,26 +275,20 @@ function ManutencaoForm({
         setModeloSelecionado(equipamentoDaOs.modelo || '');
       }
 
-      const dataInicio = initialData.dataHoraAgendamentoInicio
-        ? new Date(initialData.dataHoraAgendamentoInicio)
-        : null;
-
-      const dataFim = initialData.dataHoraAgendamentoFim
-        ? new Date(initialData.dataHoraAgendamentoFim)
-        : null;
+      const horaFimLocal = extrairHoraFimLocal(initialData);
 
       setFormData({
         equipamentoId: initialData.equipamentoId || '',
         tipo: initialData.tipo || 'Preventiva',
         descricaoProblemaServico: initialData.descricaoProblemaServico || '',
         tecnicoResponsavel: initialData.tecnicoResponsavel || '',
-        dataLocal: dataInicio ? dataInicio.toISOString().split('T')[0] : '',
-        horaLocalInicio: dataInicio ? dataInicio.toTimeString().slice(0, 5) : '',
-        horaLocalFim: dataFim ? dataFim.toTimeString().slice(0, 5) : '',
+        dataLocal: extrairDataLocal(initialData),
+        horaLocalInicio: extrairHoraInicioLocal(initialData),
+        horaLocalFim: horaFimLocal,
         numeroChamado: initialData.numeroChamado || '',
       });
 
-      setFimFoiEditadoManualmente(!!dataFim);
+      setFimFoiEditadoManualmente(!!horaFimLocal);
     } else {
       setFormData(ESTADO_INICIAL_VAZIO);
       setUnidadeSelecionada('');
@@ -354,26 +386,24 @@ function ManutencaoForm({
     const { name, value } = e.target;
 
     if (name === 'tipo') {
-      setFormData((prev) => ({
-        ...prev,
-        tipo: value,
-      }));
-
       if (!fimFoiEditadoManualmente && formData.horaLocalInicio) {
         const horaCalculada = somarMinutosNaHora(
           formData.horaLocalInicio,
           getDuracaoPadrao(value)
         );
 
-        if (horaCalculada) {
-          setFormData((prev) => ({
-            ...prev,
-            tipo: value,
-            horaLocalFim: horaCalculada,
-          }));
-        }
+        setFormData((prev) => ({
+          ...prev,
+          tipo: value,
+          horaLocalFim: horaCalculada || prev.horaLocalFim,
+        }));
+        return;
       }
 
+      setFormData((prev) => ({
+        ...prev,
+        tipo: value,
+      }));
       return;
     }
 
@@ -405,11 +435,8 @@ function ManutencaoForm({
   };
 
   const handleAplicarAgoraHoje = () => {
-    const agora = new Date();
-    const data = agora.toISOString().split('T')[0];
-    const horaInicio = `${String(agora.getHours()).padStart(2, '0')}:${String(
-      agora.getMinutes()
-    ).padStart(2, '0')}`;
+    const data = hojeLocalISO();
+    const horaInicio = horaLocalAtualHHmm();
     const horaFim = somarMinutosNaHora(horaInicio, getDuracaoPadrao(formData.tipo));
 
     setFimFoiEditadoManualmente(false);
@@ -433,11 +460,14 @@ function ManutencaoForm({
 
     const isPreventiva = formData.tipo === 'Preventiva';
     const temDescricao = formData.descricaoProblemaServico.trim() !== '';
-    const horaInicioMin = parseHoraParaMinutos(formData.horaLocalInicio);
-    const horaFimMin = parseHoraParaMinutos(formData.horaLocalFim);
 
     if (!formData.equipamentoId || !formData.dataLocal) {
       setError('Seleção de equipamento e data são obrigatórios.');
+      return;
+    }
+
+    if (!formData.horaLocalInicio) {
+      setError('O horário de início é obrigatório.');
       return;
     }
 
@@ -446,38 +476,17 @@ function ManutencaoForm({
       return;
     }
 
-    if (formData.horaLocalInicio && horaInicioMin === null) {
-      setError('O horário de início está inválido.');
-      return;
-    }
-
-    if (formData.horaLocalFim && horaFimMin === null) {
-      setError('A previsão de fim está inválida.');
-      return;
-    }
-
     if (
-      formData.horaLocalInicio &&
-      formData.horaLocalFim &&
-      horaInicioMin !== null &&
-      horaFimMin !== null &&
-      horaFimMin <= horaInicioMin
+      formData.tipo === 'Corretiva' &&
+      !String(formData.numeroChamado || '').trim()
     ) {
-      setError('A previsão de fim deve ser maior que o horário de início.');
+      setError('O número do chamado é obrigatório para manutenção corretiva.');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      const dataHoraInicioLocal = new Date(
-        `${formData.dataLocal}T${formData.horaLocalInicio || '00:00'}:00`
-      );
-
-      const dataHoraFimLocal = formData.horaLocalFim
-        ? new Date(`${formData.dataLocal}T${formData.horaLocalFim}:00`)
-        : null;
-
       const dadosParaApi = {
         equipamentoId: formData.equipamentoId,
         tipo: formData.tipo,
@@ -487,11 +496,9 @@ function ManutencaoForm({
             : formData.descricaoProblemaServico,
         tecnicoResponsavel: formData.tecnicoResponsavel,
         numeroChamado: formData.numeroChamado,
-        dataHoraAgendamentoInicio: dataHoraInicioLocal.toISOString(),
-        dataHoraAgendamentoFim:
-          dataHoraFimLocal && !Number.isNaN(dataHoraFimLocal.getTime())
-            ? dataHoraFimLocal.toISOString()
-            : null,
+        agendamentoDataLocal: formData.dataLocal,
+        agendamentoHoraInicioLocal: formData.horaLocalInicio,
+        agendamentoHoraFimLocal: formData.horaLocalFim || null,
       };
 
       await onSubmit(dadosParaApi);
@@ -586,13 +593,10 @@ function ManutencaoForm({
               onChange={handleChange}
               required
             >
-              {['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'].map(
-                (tipoOpt) => (
-                  <option key={tipoOpt} value={tipoOpt}>
-                    {formatarTipoLabel(tipoOpt)}
-                  </option>
-                )
-              )}
+              <option value="Preventiva">Preventiva</option>
+              <option value="Corretiva">Corretiva</option>
+              <option value="Calibracao">Calibração</option>
+              <option value="Inspecao">Inspeção</option>
             </select>
           </FormField>
 
@@ -601,8 +605,7 @@ function ManutencaoForm({
             hint="Opcional. Você pode preencher manualmente."
           >
             <input
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              type="text"
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
               name="tecnicoResponsavel"
               value={formData.tecnicoResponsavel}
               onChange={handleChange}
@@ -611,31 +614,11 @@ function ManutencaoForm({
           </FormField>
         </div>
 
-        {formData.tipo === 'Corretiva' && (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <FormField
-              label="Nº do chamado"
-              hint="Obrigatório no processo operacional quando houver chamado vinculado."
-            >
-              <input
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                type="text"
-                name="numeroChamado"
-                value={formData.numeroChamado}
-                onChange={handleChange}
-                placeholder="Digite o número do chamado"
-              />
-            </FormField>
-          </div>
-        )}
-
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 md:p-5">
+          <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <p className="text-sm font-semibold text-slate-900">
-                Agendamento
-              </p>
-              <p className="text-xs text-slate-500">
+              <h4 className="text-sm font-semibold text-slate-800">Agendamento</h4>
+              <p className="text-sm text-slate-500">
                 Digite manualmente ou use os atalhos de apoio.
               </p>
             </div>
@@ -644,7 +627,7 @@ function ManutencaoForm({
               <button
                 type="button"
                 onClick={handleAplicarAgoraHoje}
-                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
+                className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 transition hover:bg-blue-100"
               >
                 <FontAwesomeIcon icon={faWandMagicSparkles} />
                 Usar agora
@@ -654,7 +637,7 @@ function ManutencaoForm({
                 type="button"
                 onClick={handleSugerirFim}
                 disabled={!formData.horaLocalInicio}
-                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <FontAwesomeIcon icon={faClock} />
                 Sugerir fim ({duracaoPadraoTexto})
@@ -678,6 +661,7 @@ function ManutencaoForm({
 
             <FormField
               label="Horário de início"
+              required
               hint="Aceita digitação e seleção no campo nativo."
             >
               <TimeField
@@ -691,7 +675,7 @@ function ManutencaoForm({
               label="Previsão de fim"
               hint={`Sugestão automática atual para ${formatarTipoLabel(
                 formData.tipo
-              )}: ${duracaoPadraoTexto}`}
+              )}: ${duracaoPadraoTexto}. Se for menor que o início, o sistema entende como dia seguinte.`}
             >
               <TimeField
                 name="horaLocalFim"
@@ -749,6 +733,22 @@ function ManutencaoForm({
             }
           />
         </FormField>
+
+        {formData.tipo === 'Corretiva' && (
+          <FormField
+            label="Número do chamado"
+            required
+            hint="Obrigatório para manutenção corretiva."
+          >
+            <input
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+              name="numeroChamado"
+              value={formData.numeroChamado}
+              onChange={handleChange}
+              placeholder="Ex.: CH-2026-001"
+            />
+          </FormField>
+        )}
       </div>
 
       <div className="flex items-center justify-end gap-3 border-t border-slate-200 pt-6">

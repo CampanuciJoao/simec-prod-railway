@@ -8,7 +8,7 @@ function toDateInputValue(value) {
   if (!value) return '';
 
   try {
-    const date = new Date(value);
+    const date = value instanceof Date ? value : new Date(value);
     const ano = date.getFullYear();
     const mes = String(date.getMonth() + 1).padStart(2, '0');
     const dia = String(date.getDate()).padStart(2, '0');
@@ -18,32 +18,16 @@ function toDateInputValue(value) {
   }
 }
 
-function toDateTimeLocalValue(value) {
-  if (!value) return '';
-
-  try {
-    const date = new Date(value);
-    const ano = date.getFullYear();
-    const mes = String(date.getMonth() + 1).padStart(2, '0');
-    const dia = String(date.getDate()).padStart(2, '0');
-    const hora = String(date.getHours()).padStart(2, '0');
-    const min = String(date.getMinutes()).padStart(2, '0');
-
-    return `${ano}-${mes}-${dia}T${hora}:${min}`;
-  } catch {
-    return '';
-  }
-}
-
-function montarFormDataInicial(manutencao) {
+function extrairFormInicial(manutencao) {
   if (!manutencao) {
     return {
       descricaoProblemaServico: '',
       tecnicoResponsavel: '',
       numeroChamado: '',
       status: '',
-      dataHoraAgendamentoInicio: '',
-      dataHoraAgendamentoFim: '',
+      agendamentoDataLocal: '',
+      agendamentoHoraInicioLocal: '',
+      agendamentoHoraFimLocal: '',
       observacoes: '',
     };
   }
@@ -53,10 +37,21 @@ function montarFormDataInicial(manutencao) {
     tecnicoResponsavel: manutencao.tecnicoResponsavel || '',
     numeroChamado: manutencao.numeroChamado || '',
     status: manutencao.status || '',
-    dataHoraAgendamentoInicio: toDateTimeLocalValue(
-      manutencao.dataHoraAgendamentoInicio
-    ),
-    dataHoraAgendamentoFim: toDateTimeLocalValue(manutencao.dataHoraAgendamentoFim),
+    agendamentoDataLocal:
+      manutencao?.formulario?.agendamentoDataLocal ||
+      manutencao?.agendamentoLocal?.data ||
+      manutencao?.agendamentoDataLocal ||
+      '',
+    agendamentoHoraInicioLocal:
+      manutencao?.formulario?.agendamentoHoraInicioLocal ||
+      manutencao?.agendamentoLocal?.horaInicio ||
+      manutencao?.agendamentoHoraInicioLocal ||
+      '',
+    agendamentoHoraFimLocal:
+      manutencao?.formulario?.agendamentoHoraFimLocal ||
+      manutencao?.agendamentoLocal?.horaFim ||
+      manutencao?.agendamentoHoraFimLocal ||
+      '',
     observacoes: manutencao.observacoes || '',
   };
 }
@@ -84,7 +79,7 @@ export function useDetalhesManutencaoPage() {
     refetch,
   } = useManutencaoDetalhes(manutencaoId);
 
-  const [formData, setFormData] = useState(montarFormDataInicial(null));
+  const [formData, setFormData] = useState(extrairFormInicial(null));
 
   const [confirmMode, setConfirmMode] = useState('concluir');
   const [dataTerminoReal, setDataTerminoReal] = useState('');
@@ -93,7 +88,7 @@ export function useDetalhesManutencaoPage() {
 
   useEffect(() => {
     if (manutencao) {
-      setFormData(montarFormDataInicial(manutencao));
+      setFormData(extrairFormInicial(manutencao));
     }
   }, [manutencao]);
 
@@ -135,29 +130,17 @@ export function useDetalhesManutencaoPage() {
 
   const handleSalvarAlteracoes = async () => {
     const payload = {
+      equipamentoId: manutencao?.equipamentoId,
+      tipo: manutencao?.tipo,
       descricaoProblemaServico: formData.descricaoProblemaServico,
       tecnicoResponsavel: formData.tecnicoResponsavel,
       numeroChamado: formData.numeroChamado,
+      status: formData.status || manutencao?.status || 'Agendada',
+      agendamentoDataLocal: formData.agendamentoDataLocal,
+      agendamentoHoraInicioLocal: formData.agendamentoHoraInicioLocal,
+      agendamentoHoraFimLocal: formData.agendamentoHoraFimLocal || null,
       observacoes: formData.observacoes,
     };
-
-    if (formData.status) {
-      payload.status = formData.status;
-    }
-
-    if (formData.dataHoraAgendamentoInicio) {
-      payload.dataHoraAgendamentoInicio = new Date(
-        formData.dataHoraAgendamentoInicio
-      ).toISOString();
-    }
-
-    if (formData.dataHoraAgendamentoFim) {
-      payload.dataHoraAgendamentoFim = new Date(
-        formData.dataHoraAgendamentoFim
-      ).toISOString();
-    } else {
-      payload.dataHoraAgendamentoFim = null;
-    }
 
     await salvarAtualizacoes(payload);
     await refetch();
@@ -210,21 +193,25 @@ export function useDetalhesManutencaoPage() {
 
     if (confirmMode === 'prorrogar') {
       await salvarAtualizacoes({
+        equipamentoId: manutencao?.equipamentoId,
+        tipo: manutencao?.tipo,
+        descricaoProblemaServico:
+          formData.descricaoProblemaServico || manutencao?.descricaoProblemaServico || '',
+        tecnicoResponsavel:
+          formData.tecnicoResponsavel || manutencao?.tecnicoResponsavel || '',
+        numeroChamado: formData.numeroChamado || manutencao?.numeroChamado || '',
         status: 'EmAndamento',
-        dataHoraAgendamentoFim: novaPrevisao
-          ? new Date(novaPrevisao).toISOString()
-          : null,
+        agendamentoDataLocal:
+          formData.agendamentoDataLocal || manutencao?.agendamentoLocal?.data || '',
+        agendamentoHoraInicioLocal:
+          formData.agendamentoHoraInicioLocal ||
+          manutencao?.agendamentoLocal?.horaInicio ||
+          '',
+        agendamentoHoraFimLocal: formData.agendamentoHoraFimLocal || null,
         observacoes: observacaoDecisao || manutencao?.observacoes || '',
       });
 
       await refetch();
-      return;
-    }
-
-    if (confirmMode === 'cancelar') {
-      await handleCancelarManutencao(
-        observacaoDecisao || 'Cancelada na etapa de confirmação final.'
-      );
     }
   };
 
@@ -233,26 +220,8 @@ export function useDetalhesManutencaoPage() {
     loading,
     error,
     submitting,
-
     formData,
-    handleFormChange,
-    handleSalvarAlteracoes,
-
-    goBack,
-    handlePrint,
-
-    cancelModal,
-    deleteAnexoModal,
-
-    camposPrincipaisBloqueados,
-    isCancelavel,
-
-    handleAdicionarNota,
-    handleUploadAnexos,
-    handleAskDeleteAnexo,
-    handleDeleteAnexo,
-    handleCancelarManutencao,
-
+    setFormData,
     confirmMode,
     setConfirmMode,
     dataTerminoReal,
@@ -261,6 +230,20 @@ export function useDetalhesManutencaoPage() {
     setNovaPrevisao,
     observacaoDecisao,
     setObservacaoDecisao,
+    camposPrincipaisBloqueados,
+    isCancelavel,
+    goBack,
+    handlePrint,
+    handleFormChange,
+    handleSalvarAlteracoes,
+    handleAdicionarNota,
+    handleUploadAnexos,
+    handleAskDeleteAnexo,
+    handleDeleteAnexo,
+    handleCancelarManutencao,
     handleConfirmacaoFinal,
+    cancelModal,
+    deleteAnexoModal,
+    refetch,
   };
 }
