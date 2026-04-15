@@ -2,8 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faPrint, faWrench } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '../ui/primitives/Button';
-import PageHeader from '../ui/PageHeader';
+import { Button, PageHeader } from '@/components/ui';
 
 function DetalhesManutencaoPageHeader({ numeroOS, onPrint, onBack }) {
   return (
