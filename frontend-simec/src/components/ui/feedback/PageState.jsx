@@ -1,5 +1,5 @@
 import React from 'react';
-import EmptyState from './EmptyState';
+import { EmptyState } from '@/components/ui/layout';
 import LoadingState from './LoadingState';
 
 function PageState({
