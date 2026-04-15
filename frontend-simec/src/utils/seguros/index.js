@@ -1,8 +1,8 @@
 export {
   TIPO_SEGURO,
+  TIPO_SEGURO_OPTIONS,
   COBERTURA_FIELDS,
-  COBERTURAS_POR_TIPO,
   getCoberturaFieldsByTipo,
-  getCoberturasAtivas,
   sanitizeCoberturasByTipo,
-} from './seguroCoverageCatalog';
+  getCoberturasAtivas,
+} from '../seguros.js';

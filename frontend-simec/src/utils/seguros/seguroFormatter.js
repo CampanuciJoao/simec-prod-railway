@@ -1,4 +1,4 @@
-import { TIPO_SEGURO_OPTIONS } from './seguros';
+import { TIPO_SEGURO_OPTIONS } from '@/utils/seguros';
 
 export function formatarMoeda(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', {
