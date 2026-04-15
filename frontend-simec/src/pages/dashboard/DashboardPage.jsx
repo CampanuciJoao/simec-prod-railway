@@ -10,19 +10,21 @@ import {
   faArrowRight,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { useDashboard } from '../../hooks/dashboard/useDashboard';
+import { useDashboard } from '@/hooks/dashboard/useDashboard';
 
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageHeader from '../../components/ui/layout/PageHeader';
-import PageSection from '../../components/ui/layout/PageSection';
-import PageState from '../../components/ui/layout/PageState';
-import ResponsiveGrid from '../../components/ui/layout/ResponsiveGrid';
+import {
+  PageLayout,
+  PageHeader,
+  PageSection,
+  PageState,
+  ResponsiveGrid,
+} from '@/components/ui/layout';
 
-import { DashboardStatCard } from '../../components/shared';
-import { AlertListItem } from '../../components/dashboard';
+import { DashboardStatCard } from '@/components/shared';
+import { AlertListItem } from '@/components/dashboard';
 
-import BarChart from '../../components/charts/BarChart';
-import DonutChart from '../../components/charts/DonutChart';
+import BarChart from '@/components/charts/BarChart';
+import DonutChart from '@/components/charts/DonutChart';
 
 function DashboardPage() {
   const { data, loading, error } = useDashboard();
