@@ -14,12 +14,12 @@ import { useEquipamentosPage } from '../../hooks/equipamentos/useEquipamentosPag
 import { useEquipamentosExpansion } from '../../hooks/equipamentos/useEquipamentosExpansion';
 
 import GlobalFilterBar from '../../components/ui/filters/GlobalFilterBar';
-import ModalConfirmacao from '../../components/ui/overlays/ModalConfirmacao';
+import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
 import EquipamentosList from '../../components/equipamentos/EquipamentosList';
 
 import PageLayout from '../../components/ui/layout/PageLayout';
 import PageHeader from '../../components/ui/layout/PageHeader';
-import PageState from '../../components/ui/layout/PageState';
+import PageState from '@/components/ui/feedback/PageState';
 import Card from '../../components/ui/primitives/Card';
 
 function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
