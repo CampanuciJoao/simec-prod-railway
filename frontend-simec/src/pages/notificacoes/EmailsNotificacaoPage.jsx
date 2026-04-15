@@ -1,25 +1,86 @@
-// Ficheiro: frontend-simec/src/pages/notificacoes/EmailsNotificacaoPage.jsx
-
-import React, { useState, useEffect, useCallback } from 'react';
-import { useToast } from '../../contexts/ToastContext';
-import {
-  getEmailsNotificacao,
-  addEmailNotificacao,
-  updateEmailNotificacao,
-  deleteEmailNotificacao,
-} from '../../services/api';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faEnvelope,
   faPlus,
   faEdit,
   faTrashAlt,
-  faSpinner,
   faCheckCircle,
   faTimesCircle,
+  faXmark,
 } from '@fortawesome/free-solid-svg-icons';
-import Modal from '../../components/ui/Modal';
-import EmailForm from '../../components/ui/EmailForm';
+
+import { useToast } from '@/contexts/ToastContext';
+import {
+  getEmailsNotificacao,
+  addEmailNotificacao,
+  updateEmailNotificacao,
+  deleteEmailNotificacao,
+} from '@/services/api';
+
+import PageLayout from '@/components/ui/layout/PageLayout';
+import PageHeader from '@/components/ui/layout/PageHeader';
+import PageSection from '@/components/ui/layout/PageSection';
+import PageState from '@/components/ui/feedback/PageState';
+import Button from '@/components/ui/primitives/Button';
+import Card from '@/components/ui/primitives/Card';
+import EmailForm from '@/components/emails/EmailForm';
+
+function FormModal({ open, title, onClose, children }) {
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
+          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            aria-label="Fechar modal"
+            title="Fechar"
+          >
+            <FontAwesomeIcon icon={faXmark} />
+          </button>
+        </div>
+
+        <div className="max-h-[80vh] overflow-y-auto px-5 py-5">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+FormModal.propTypes = {
+  open: PropTypes.bool.isRequired,
+  title: PropTypes.string.isRequired,
+  onClose: PropTypes.func.isRequired,
+  children: PropTypes.node.isRequired,
+};
+
+function StatusIcon({ ativo }) {
+  return (
+    <span
+      className={[
+        'inline-flex items-center justify-center rounded-full text-base',
+        ativo ? 'text-emerald-600' : 'text-red-500',
+      ].join(' ')}
+      title={ativo ? 'Sim' : 'Não'}
+    >
+      <FontAwesomeIcon icon={ativo ? faCheckCircle : faTimesCircle} />
+    </span>
+  );
+}
+
+StatusIcon.propTypes = {
+  ativo: PropTypes.bool,
+};
+
+StatusIcon.defaultProps = {
+  ativo: false,
+};
 
 function EmailsNotificacaoPage() {
   const [emails, setEmails] = useState([]);
@@ -27,15 +88,21 @@ function EmailsNotificacaoPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingEmail, setEditingEmail] = useState(null);
+
   const { addToast } = useToast();
 
   const fetchEmails = useCallback(async () => {
     setLoading(true);
+
     try {
       const data = await getEmailsNotificacao();
-      setEmails(data || []);
+      setEmails(Array.isArray(data) ? data : []);
     } catch (err) {
-      addToast('Erro ao carregar lista de e-mails.', 'error');
+      setEmails([]);
+      addToast(
+        err?.response?.data?.message || 'Erro ao carregar lista de e-mails.',
+        'error'
+      );
     } finally {
       setLoading(false);
     }
@@ -45,163 +112,189 @@ function EmailsNotificacaoPage() {
     fetchEmails();
   }, [fetchEmails]);
 
-  const handleOpenModal = (email = null) => {
+  const handleOpenModal = useCallback((email = null) => {
     setEditingEmail(email);
     setIsModalOpen(true);
-  };
+  }, []);
 
-  const handleCloseModal = () => {
+  const handleCloseModal = useCallback(() => {
+    if (isSubmitting) return;
+
     setIsModalOpen(false);
     setEditingEmail(null);
-  };
+  }, [isSubmitting]);
 
-  const handleSave = async (formData) => {
-    setIsSubmitting(true);
-    try {
-      if (editingEmail) {
-        await updateEmailNotificacao(editingEmail.id, formData);
-        addToast('Configurações de e-mail atualizadas!', 'success');
-      } else {
-        await addEmailNotificacao(formData);
-        addToast('E-mail adicionado com sucesso!', 'success');
+  const handleSave = useCallback(
+    async (formData) => {
+      setIsSubmitting(true);
+
+      try {
+        if (editingEmail?.id) {
+          await updateEmailNotificacao(editingEmail.id, formData);
+          addToast('Configurações de e-mail atualizadas!', 'success');
+        } else {
+          await addEmailNotificacao(formData);
+          addToast('E-mail adicionado com sucesso!', 'success');
+        }
+
+        await fetchEmails();
+        handleCloseModal();
+      } catch (err) {
+        addToast(
+          err?.response?.data?.message ||
+            'Ocorreu um erro ao salvar o e-mail.',
+          'error'
+        );
+      } finally {
+        setIsSubmitting(false);
       }
+    },
+    [editingEmail, addToast, fetchEmails, handleCloseModal]
+  );
 
-      await fetchEmails();
-      handleCloseModal();
-    } catch (err) {
-      addToast(err.response?.data?.message || 'Ocorreu um erro.', 'error');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const handleDelete = useCallback(
+    async (id, email) => {
+      const confirmed = window.confirm(
+        `Tem certeza que deseja remover o e-mail "${email}" da lista de notificações?`
+      );
 
-  const handleDelete = async (id, email) => {
-    if (window.confirm(`Tem certeza que deseja remover o e-mail "${email}" da lista de notificações?`)) {
+      if (!confirmed) return;
+
       try {
         await deleteEmailNotificacao(id);
         addToast('E-mail removido com sucesso!', 'success');
-        fetchEmails();
+        await fetchEmails();
       } catch (err) {
-        addToast(err.response?.data?.message || 'Erro ao remover e-mail.', 'error');
+        addToast(
+          err?.response?.data?.message || 'Erro ao remover e-mail.',
+          'error'
+        );
       }
-    }
-  };
+    },
+    [addToast, fetchEmails]
+  );
 
-  const IconeStatus = ({ ativo }) => (
-    <FontAwesomeIcon
-      icon={ativo ? faCheckCircle : faTimesCircle}
-      style={{
-        color: ativo ? 'var(--btn-success-bg-light)' : 'var(--btn-danger-bg-light)',
-      }}
-      title={ativo ? 'Sim' : 'Não'}
-    />
+  const isEmpty = !loading && emails.length === 0;
+
+  const headerTitle = useMemo(
+    () =>
+      editingEmail
+        ? 'Editar Configurações de E-mail'
+        : 'Adicionar Novo E-mail',
+    [editingEmail]
   );
 
   return (
-    <>
-      <Modal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        title={editingEmail ? 'Editar Configurações de E-mail' : 'Adicionar Novo E-mail'}
-        showConfirmButton={false}
-        showCancelButton={false}
-      >
-        <EmailForm
-          initialData={editingEmail}
-          onSubmit={handleSave}
-          onCancel={handleCloseModal}
-          isSubmitting={isSubmitting}
+    <PageLayout background="slate" padded fullHeight>
+      <div className="space-y-6">
+        <FormModal
+          open={isModalOpen}
+          onClose={handleCloseModal}
+          title={headerTitle}
+        >
+          <EmailForm
+            initialData={editingEmail}
+            onSubmit={handleSave}
+            onCancel={handleCloseModal}
+            isSubmitting={isSubmitting}
+          />
+        </FormModal>
+
+        <PageHeader
+          title="E-mails de Notificação"
+          subtitle="Gerencie os destinatários de alertas e suas preferências de envio"
+          icon={faEnvelope}
+          actions={
+            <Button type="button" onClick={() => handleOpenModal()}>
+              <FontAwesomeIcon icon={faPlus} />
+              Adicionar E-mail
+            </Button>
+          }
         />
-      </Modal>
 
-      <section className="page-section">
-        <div className="table-header-actions">
-          <h3>
-            <FontAwesomeIcon icon={faEnvelope} /> E-mails para Notificação de Alertas
-          </h3>
+        <PageSection
+          title="Lista de destinatários"
+          description="Configure antecedência e subscrições de contratos, manutenções e seguros."
+        >
+          {loading ? (
+            <PageState loading />
+          ) : isEmpty ? (
+            <PageState isEmpty emptyMessage="Nenhum e-mail cadastrado." />
+          ) : (
+            <Card padded={false} className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead className="bg-slate-50">
+                    <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                      <th className="px-4 py-3">Nome</th>
+                      <th className="px-4 py-3">E-mail</th>
+                      <th className="px-4 py-3 text-center">Dias Antec.</th>
+                      <th className="px-4 py-3 text-center">Contratos</th>
+                      <th className="px-4 py-3 text-center">Manutenções</th>
+                      <th className="px-4 py-3 text-center">Seguros</th>
+                      <th className="px-4 py-3 text-center">Ações</th>
+                    </tr>
+                  </thead>
 
-          <button className="btn btn-primary" onClick={() => handleOpenModal()}>
-            <FontAwesomeIcon icon={faPlus} /> Adicionar E-mail
-          </button>
-        </div>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {emails.map((email) => (
+                      <tr key={email.id} className="hover:bg-slate-50">
+                        <td className="px-4 py-3 text-sm text-slate-800">
+                          {email.nome || '-'}
+                        </td>
 
-        <p>
-          Gerencie a lista de e-mails que receberão alertas e configure suas subscrições e
-          antecedência individualmente.
-        </p>
+                        <td className="px-4 py-3 text-sm text-slate-800">
+                          {email.email}
+                        </td>
 
-        <div className="table-responsive-wrapper" style={{ marginTop: '20px' }}>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th className="text-left">Nome</th>
-                <th className="text-left">E-mail</th>
-                <th className="text-center">Dias Antec.</th>
-                <th className="text-center">Contratos</th>
-                <th className="text-center">Manutenções</th>
-                <th className="text-center">Seguros</th>
-                <th className="text-center">Ações</th>
-              </tr>
-            </thead>
+                        <td className="px-4 py-3 text-center text-sm text-slate-700">
+                          {email.diasAntecedencia}
+                        </td>
 
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan="7" className="text-center">
-                    <FontAwesomeIcon icon={faSpinner} spin /> Carregando...
-                  </td>
-                </tr>
-              ) : emails.length > 0 ? (
-                emails.map((email) => (
-                  <tr key={email.id}>
-                    <td data-label="Nome" className="text-left">
-                      {email.nome || '-'}
-                    </td>
-                    <td data-label="E-mail" className="text-left">
-                      {email.email}
-                    </td>
-                    <td data-label="Dias Antec." className="text-center">
-                      {email.diasAntecedencia}
-                    </td>
-                    <td data-label="Contratos" className="text-center">
-                      <IconeStatus ativo={email.recebeAlertasContrato} />
-                    </td>
-                    <td data-label="Manutenções" className="text-center">
-                      <IconeStatus ativo={email.recebeAlertasManutencao} />
-                    </td>
-                    <td data-label="Seguros" className="text-center">
-                      <IconeStatus ativo={email.recebeAlertasSeguro} />
-                    </td>
-                    <td data-label="Ações" className="actions-cell text-center">
-                      <button
-                        onClick={() => handleOpenModal(email)}
-                        className="btn-action edit"
-                        title="Editar Configurações"
-                      >
-                        <FontAwesomeIcon icon={faEdit} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(email.id, email.email)}
-                        className="btn-action delete"
-                        title="Remover E-mail"
-                      >
-                        <FontAwesomeIcon icon={faTrashAlt} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="7" className="text-center">
-                    Nenhum e-mail cadastrado.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </section>
-    </>
+                        <td className="px-4 py-3 text-center">
+                          <StatusIcon ativo={email.recebeAlertasContrato} />
+                        </td>
+
+                        <td className="px-4 py-3 text-center">
+                          <StatusIcon ativo={email.recebeAlertasManutencao} />
+                        </td>
+
+                        <td className="px-4 py-3 text-center">
+                          <StatusIcon ativo={email.recebeAlertasSeguro} />
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => handleOpenModal(email)}
+                              title="Editar configurações"
+                            >
+                              <FontAwesomeIcon icon={faEdit} />
+                            </Button>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDelete(email.id, email.email)}
+                              title="Remover e-mail"
+                            >
+                              <FontAwesomeIcon icon={faTrashAlt} />
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+        </PageSection>
+      </div>
+    </PageLayout>
   );
 }
 
