@@ -122,6 +122,10 @@ model Equipamento {
   seguros           Seguro[]
   contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
 
+  riskScore     Int?
+  riskLevel     String?
+  riskUpdatedAt DateTime?
+
   @@unique([tenantId, tag])
   @@unique([tenantId, id])
   @@index([tenantId, unidadeId, status])
