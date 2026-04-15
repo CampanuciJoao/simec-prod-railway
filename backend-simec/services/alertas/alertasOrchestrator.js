@@ -1,20 +1,34 @@
-import { gerarAlertasManutencao } from './manutencao/index.js';
-import { gerarAlertasSeguro } from './seguro/index.js';
-import { gerarAlertasContrato } from './contrato/index.js';
-import { gerarAlertasRecomendacao } from './recomendacao/index.js';
+import {
+  gerarAlertasManutencao,
+  gerarAlertasSeguro,
+  gerarAlertasContrato,
+  gerarAlertasRecomendacao,
+} from './index.js';
 
+import { onAlertasProcessados } from './alertasEventService.js';
+
+/**
+ * Executa uma etapa com tratamento de erro padronizado
+ */
 async function executarEtapa(nome, fn) {
   try {
     const result = await fn();
 
     const total =
-      typeof result === 'number' ? result : Number(result?.total || 0);
+      typeof result === 'number'
+        ? result
+        : Number(result?.total || 0);
+
+    const tenantsAfetados = Array.isArray(result?.tenantsAfetados)
+      ? result.tenantsAfetados
+      : [];
 
     console.log(`[ALERTAS] ${nome} concluído | total=${total}`);
 
     return {
       ok: true,
       total,
+      tenantsAfetados,
       erro: null,
     };
   } catch (error) {
@@ -23,11 +37,29 @@ async function executarEtapa(nome, fn) {
     return {
       ok: false,
       total: 0,
+      tenantsAfetados: [],
       erro: error,
     };
   }
 }
 
+function coletarTenantsUnicos(...results) {
+  const tenantsSet = new Set();
+
+  for (const result of results) {
+    if (Array.isArray(result?.tenantsAfetados)) {
+      result.tenantsAfetados.forEach((tenantId) =>
+        tenantsSet.add(String(tenantId))
+      );
+    }
+  }
+
+  return [...tenantsSet];
+}
+
+/**
+ * Orquestrador principal
+ */
 export async function processarAlertasEEnviarNotificacoes() {
   console.log('[ALERTAS] Iniciando processamento...');
 
@@ -65,13 +97,21 @@ export async function processarAlertasEEnviarNotificacoes() {
   const totalGeral =
     manutencoes + seguros + contratos + recomendacoes;
 
-  if (global.io && totalGeral > 0) {
-    global.io.emit('atualizar-alertas');
-    console.log('📢 WebSockets: Notificando navegadores em tempo real!');
+  const tenantsAfetados = coletarTenantsUnicos(
+    manutencoesResult,
+    segurosResult,
+    contratosResult,
+    recomendacoesResult
+  );
+
+  if (tenantsAfetados.length > 0) {
+    await onAlertasProcessados({
+      tenantsAfetados,
+    });
   }
 
   console.log(
-    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | total=${totalGeral} | ok=${ok}`
+    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
   );
 
   return {
@@ -81,6 +121,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     seguros,
     contratos,
     recomendacoes,
+    tenantsAfetados,
     detalhes: {
       manutencoes: {
         ok: manutencoesResult.ok,

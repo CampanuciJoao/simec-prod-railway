@@ -1,5 +1,11 @@
 export function buildSeguroAlertId(tenantId, tipo, seguroId, label = '') {
-  return `tenant-${tenantId}-${tipo}-${seguroId}${label ? `-${label}` : ''}`;
+  // 🔥 padroniza e evita problemas com caracteres
+  const safeTenant = String(tenantId).trim();
+  const safeTipo = String(tipo).trim().toLowerCase();
+  const safeId = String(seguroId).trim();
+  const safeLabel = label ? `-${String(label).trim().toLowerCase()}` : '';
+
+  return `tenant-${safeTenant}-${safeTipo}-${safeId}${safeLabel}`;
 }
 
 export function montarTituloSeguroVencido() {
@@ -7,7 +13,9 @@ export function montarTituloSeguroVencido() {
 }
 
 export function montarSubtituloSeguro(seguro) {
-  return `Apólice Nº ${seguro.apoliceNumero}`;
+  // 🔥 evita undefined quebrando UI
+  const apolice = seguro?.apoliceNumero || 'N/A';
+  return `Apólice Nº ${apolice}`;
 }
 
 export function montarTituloSeguroVence(texto) {

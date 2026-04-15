@@ -2,15 +2,15 @@
 
 import React from 'react';
 
-import Input from '../ui/primitives/Input';
-import Select from '../ui/primitives/Select';
-import DateInput from '../ui/primitives/DateInput';
-import TimeInput from '../ui/primitives/TimeInput';
-import Button from '../ui/primitives/Button';
-import PageSection from '../ui/PageSection';
-import ResponsiveGrid from '../ui/ResponsiveGrid';
+import Input from '@/components/ui/primitives/Input';
+import Select from '@/components/ui/primitives/Select';
+import DateInput from '@/components/ui/primitives/DateInput';
+import TimeInput from '@/components/ui/primitives/TimeInput';
+import Button from '@/components/ui/primitives/Button';
+import PageSection from '@/components/ui/layout/PageSection';
+import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
 
-import { useManutencaoForm } from '../../hooks/manutencoes/useManutencaoForm';
+import { useManutencaoForm } from '@/hooks/manutencoes/useManutencaoForm';
 
 function ManutencaoForm({
   initialData,
@@ -40,8 +40,6 @@ function ManutencaoForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      
-      {/* EQUIPAMENTO */}
       <PageSection title="Equipamento">
         <ResponsiveGrid cols={2}>
           <Select
@@ -66,7 +64,6 @@ function ManutencaoForm({
         </ResponsiveGrid>
       </PageSection>
 
-      {/* TIPO */}
       <PageSection title="Tipo de Manutenção">
         <Select
           value={formData.tipo}
@@ -80,7 +77,6 @@ function ManutencaoForm({
         />
       </PageSection>
 
-      {/* DESCRIÇÃO */}
       <PageSection title="Descrição">
         <Input
           value={formData.descricaoProblemaServico}
@@ -91,7 +87,6 @@ function ManutencaoForm({
         />
       </PageSection>
 
-      {/* AGENDAMENTO */}
       <PageSection title="Agendamento">
         <ResponsiveGrid cols={3}>
           <DateInput
@@ -117,30 +112,23 @@ function ManutencaoForm({
         </ResponsiveGrid>
       </PageSection>
 
-      {/* CAMPOS CONDICIONAIS */}
       {isCorretiva && (
         <PageSection title="Chamado">
           <Input
             label="Número do chamado"
             value={formData.numeroChamado}
-            onChange={(e) =>
-              handleChange('numeroChamado', e.target.value)
-            }
+            onChange={(e) => handleChange('numeroChamado', e.target.value)}
           />
         </PageSection>
       )}
 
-      {/* RESPONSÁVEL */}
       <PageSection title="Responsável">
         <Input
           value={formData.tecnicoResponsavel}
-          onChange={(e) =>
-            handleChange('tecnicoResponsavel', e.target.value)
-          }
+          onChange={(e) => handleChange('tecnicoResponsavel', e.target.value)}
         />
       </PageSection>
 
-      {/* ACTIONS */}
       <div className="flex justify-end">
         <Button type="submit" disabled={!isValid}>
           {isEditing ? 'Salvar alterações' : 'Agendar manutenção'}

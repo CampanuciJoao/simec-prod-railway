@@ -1,7 +1,7 @@
 const prisma = require('../lib/prisma');
 const { broadcastToUser } = require('../realtime/alertasRealtimeHub');
 
-async function contarNaoVistos({ tenantId, userId }) {
+async function contarNaoVistos({ tenantId }) {
   return prisma.alerta.count({
     where: {
       tenantId,
@@ -10,10 +10,8 @@ async function contarNaoVistos({ tenantId, userId }) {
   });
 }
 
-// 🔥 NOVO: publica para 1 usuário
-async function publicarContagemAlertas({ tenantId, userId }) {
-  const naoVistos = await contarNaoVistos({ tenantId, userId });
-
+// 🔥 publica para 1 usuário (reutiliza count já calculado)
+function publicarParaUsuario({ tenantId, userId, naoVistos }) {
   broadcastToUser({
     tenantId,
     userId,
@@ -25,19 +23,42 @@ async function publicarContagemAlertas({ tenantId, userId }) {
   });
 }
 
-// 🔥 NOVO: publica para TODOS do tenant
+// 🔥 publica para TODOS (otimizado)
 async function publicarContagemAlertasParaTenant({ tenantId }) {
-  const usuarios = await prisma.usuario.findMany({
-    where: { tenantId },
-    select: { id: true },
-  });
+  try {
+    const [usuarios, naoVistos] = await Promise.all([
+      prisma.usuario.findMany({
+        where: { tenantId },
+        select: { id: true },
+      }),
+      contarNaoVistos({ tenantId }),
+    ]);
 
-  for (const u of usuarios) {
-    await publicarContagemAlertas({
-      tenantId,
-      userId: u.id,
-    });
+    for (const u of usuarios) {
+      publicarParaUsuario({
+        tenantId,
+        userId: u.id,
+        naoVistos,
+      });
+    }
+
+    console.log(
+      `[REALTIME] Tenant ${tenantId} → ${naoVistos} não vistos (${usuarios.length} usuários)`
+    );
+  } catch (error) {
+    console.error('[REALTIME_PUBLISH_ERROR]', error);
   }
+}
+
+// 🔥 mantém compatibilidade com update individual
+async function publicarContagemAlertas({ tenantId, userId }) {
+  const naoVistos = await contarNaoVistos({ tenantId });
+
+  publicarParaUsuario({
+    tenantId,
+    userId,
+    naoVistos,
+  });
 }
 
 module.exports = {

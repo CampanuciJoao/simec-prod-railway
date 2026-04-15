@@ -1,5 +1,4 @@
 // Ficheiro: services/alertas/manutencao/manutencaoAlertRules.js
-// Descrição: regras de geração dos alertas de manutenção
 
 import {
   montarTituloInicio,
@@ -15,9 +14,9 @@ import {
   buscarManutencoesParaInicioAutomatico,
   buscarManutencoesComFimProximo,
   buscarManutencoesParaConfirmacao,
-  criarAlertaSeNaoExistir,
-  iniciarManutencaoAutomaticamente,
-  moverManutencaoParaAguardandoConfirmacao,
+  upsertAlertaManutencao,
+  atualizarStatusParaEmAndamento,
+  moverParaAguardandoConfirmacao as moverStatusConfirmacao,
 } from './manutencaoAlertRepository.js';
 
 import {
@@ -27,8 +26,10 @@ import {
   ALERT_PRIORIDADES,
 } from '../alertPayloadFactory.js';
 
+import { onAlertasProcessados } from '../alertasEventService.js';
+
 export async function gerarAlertasAproximacaoInicio(tenantId, agora) {
-  const PONTOS_INICIO = [
+  const PONTOS = [
     { limiar: 10, prioridade: ALERT_PRIORIDADES.ALTA, label: '10min' },
     { limiar: 60, prioridade: ALERT_PRIORIDADES.MEDIA, label: '1h' },
     { limiar: 1440, prioridade: ALERT_PRIORIDADES.BAIXA, label: '24h' },
@@ -38,26 +39,23 @@ export async function gerarAlertasAproximacaoInicio(tenantId, agora) {
   let total = 0;
 
   for (const manut of manutencoes) {
-    const minRestantes = Math.floor(
-      (new Date(manut.dataHoraAgendamentoInicio).getTime() - agora.getTime()) /
-        60000
-    );
+    const minRestantes =
+      (new Date(manut.dataHoraAgendamentoInicio) - agora) / 60000;
 
-    console.log(
-      `[ALERTA_MANUT_INICIO][${tenantId}] OS ${manut.numeroOS} | faltam=${minRestantes} min`
-    );
-
-    for (const ponto of PONTOS_INICIO) {
+    for (const ponto of PONTOS) {
       if (minRestantes > 0 && minRestantes <= ponto.limiar) {
-        const criado = await criarAlertaSeNaoExistir(
+        const alertaId = buildAlertId(
           tenantId,
-          criarPayloadBaseAlerta({
-            id: buildAlertId(
-              tenantId,
-              'manut-prox-inicio',
-              manut.id,
-              ponto.label
-            ),
+          'manut-prox-inicio',
+          manut.id,
+          ponto.label
+        );
+
+        const result = await upsertAlertaManutencao(
+          tenantId,
+          alertaId,
+          await criarPayloadBaseAlerta({
+            id: alertaId,
             titulo: montarTituloInicio(manut),
             ...montarPayloadAlertaManutencaoBase(manut),
             data: manut.dataHoraAgendamentoInicio,
@@ -68,11 +66,9 @@ export async function gerarAlertasAproximacaoInicio(tenantId, agora) {
           })
         );
 
-        if (criado) {
-          total += 1;
-          console.log(
-            `[ALERTA_MANUT_INICIO][${tenantId}] Criado ${ponto.label} para OS ${manut.numeroOS}`
-          );
+        if (result.created || result.updated) {
+          await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+          total++;
         }
 
         break;
@@ -88,24 +84,21 @@ export async function iniciarManutencoesAutomaticamente(tenantId, agora) {
     tenantId,
     agora
   );
+
   let total = 0;
 
   for (const manut of manutencoes) {
-    const modelo = manut.equipamento?.modelo || 'Equipamento';
-    const tag = manut.equipamento?.tag || 'Sem TAG';
-    const unidade = manut.equipamento?.unidade?.nomeSistema || 'N/A';
+    await atualizarStatusParaEmAndamento(tenantId, manut, agora);
 
-    await iniciarManutencaoAutomaticamente(
+    const alertaId = buildAlertId(tenantId, 'manut-iniciada', manut.id);
+
+    const result = await upsertAlertaManutencao(
       tenantId,
-      manut,
-      agora,
-      criarPayloadBaseAlerta({
-        id: buildAlertId(tenantId, 'manut-iniciada', manut.id),
-        titulo: `Manutenção iniciada na unidade de ${unidade}, no equipamento ${modelo} (${tag})`,
-        subtituloBase: `OS ${manut.numeroOS} - Iniciada automaticamente.`,
-        numeroOS: manut.numeroOS || null,
-        dataHoraAgendamentoInicio: manut.dataHoraAgendamentoInicio || null,
-        dataHoraAgendamentoFim: manut.dataHoraAgendamentoFim || null,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
+        titulo: montarTituloInicio(manut),
+        ...montarPayloadAlertaManutencaoBase(manut),
         data: agora,
         prioridade: ALERT_PRIORIDADES.MEDIA,
         tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
@@ -114,17 +107,17 @@ export async function iniciarManutencoesAutomaticamente(tenantId, agora) {
       })
     );
 
-    total += 1;
-    console.log(
-      `[ALERTA_MANUT_INICIO_AUTO][${tenantId}] OS ${manut.numeroOS} iniciada automaticamente`
-    );
+    if (result.created || result.updated) {
+      await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+      total++;
+    }
   }
 
   return total;
 }
 
 export async function gerarAlertasAproximacaoFim(tenantId, agora) {
-  const PONTOS_FIM = [
+  const PONTOS = [
     { limiar: 10, prioridade: ALERT_PRIORIDADES.ALTA, label: '10min' },
     { limiar: 30, prioridade: ALERT_PRIORIDADES.MEDIA, label: '30min' },
   ];
@@ -133,21 +126,23 @@ export async function gerarAlertasAproximacaoFim(tenantId, agora) {
   let total = 0;
 
   for (const manut of manutencoes) {
-    const minRestantes = Math.floor(
-      (new Date(manut.dataHoraAgendamentoFim).getTime() - agora.getTime()) /
-        60000
-    );
+    const minRestantes =
+      (new Date(manut.dataHoraAgendamentoFim) - agora) / 60000;
 
-    console.log(
-      `[ALERTA_MANUT_FIM][${tenantId}] OS ${manut.numeroOS} | status=${manut.status} | faltam=${minRestantes} min`
-    );
-
-    for (const ponto of PONTOS_FIM) {
+    for (const ponto of PONTOS) {
       if (minRestantes > 0 && minRestantes <= ponto.limiar) {
-        const criado = await criarAlertaSeNaoExistir(
+        const alertaId = buildAlertId(
           tenantId,
-          criarPayloadBaseAlerta({
-            id: buildAlertId(tenantId, 'manut-prox-fim', manut.id, ponto.label),
+          'manut-prox-fim',
+          manut.id,
+          ponto.label
+        );
+
+        const result = await upsertAlertaManutencao(
+          tenantId,
+          alertaId,
+          await criarPayloadBaseAlerta({
+            id: alertaId,
             titulo: montarTituloFim(manut),
             ...montarPayloadAlertaManutencaoBase(manut),
             data: manut.dataHoraAgendamentoFim,
@@ -158,11 +153,9 @@ export async function gerarAlertasAproximacaoFim(tenantId, agora) {
           })
         );
 
-        if (criado) {
-          total += 1;
-          console.log(
-            `[ALERTA_MANUT_FIM][${tenantId}] Criado ${ponto.label} para OS ${manut.numeroOS}`
-          );
+        if (result.created || result.updated) {
+          await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+          total++;
         }
 
         break;
@@ -175,20 +168,26 @@ export async function gerarAlertasAproximacaoFim(tenantId, agora) {
 
 export async function moverParaAguardandoConfirmacao(tenantId, agora) {
   const manutencoes = await buscarManutencoesParaConfirmacao(tenantId, agora);
+
   let total = 0;
 
   for (const manut of manutencoes) {
-    await moverManutencaoParaAguardandoConfirmacao(
+    await moverStatusConfirmacao(tenantId, manut);
+
+    const alertaId = buildAlertId(
       tenantId,
-      manut,
-      agora,
-      criarPayloadBaseAlerta({
-        id: buildAlertId(tenantId, 'manut-confirm', manut.id),
+      'manut-confirm',
+      manut.id
+    );
+
+    const result = await upsertAlertaManutencao(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
         titulo: montarTituloConfirmacao(manut),
         subtituloBase: montarSubtituloConfirmacaoFallback(manut),
-        numeroOS: manut.numeroOS || null,
-        dataHoraAgendamentoInicio: manut.dataHoraAgendamentoInicio || null,
-        dataHoraAgendamentoFim: manut.dataHoraAgendamentoFim || null,
+        ...montarPayloadAlertaManutencaoBase(manut),
         data: agora,
         prioridade: ALERT_PRIORIDADES.ALTA,
         tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
@@ -197,10 +196,10 @@ export async function moverParaAguardandoConfirmacao(tenantId, agora) {
       })
     );
 
-    total += 1;
-    console.log(
-      `[ALERTA_MANUT_CONFIRMACAO][${tenantId}] OS ${manut.numeroOS} movida para AguardandoConfirmacao`
-    );
+    if (result.created || result.updated) {
+      await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+      total++;
+    }
   }
 
   return total;

@@ -6,17 +6,22 @@ import {
   montarTituloSeguroVence,
   montarSubtituloSeguro,
 } from './seguroAlertFormatter.js';
+
 import { upsertAlertaSeguro } from './seguroAlertRepository.js';
+
 import {
   criarPayloadBaseAlerta,
   ALERT_CATEGORIAS,
   ALERT_EVENTOS,
   ALERT_PRIORIDADES,
 } from '../alertPayloadFactory.js';
+
 import {
   extractLocalDateFromIso,
   diffLocalDateInDays,
 } from '../../time/index.js';
+
+import { onAlertasProcessados } from '../alertasEventService.js';
 
 export async function gerarAlertaVencimentoSeguro(
   tenantId,
@@ -34,11 +39,14 @@ export async function gerarAlertaVencimentoSeguro(
     timezone
   );
 
-  const vencimentoLocal = extractLocalDateFromIso(dataFimIso, timezone);
+  const vencimentoLocal = extractLocalDateFromIso(
+    dataFimIso,
+    timezone
+  );
 
   if (!hojeLocal || !vencimentoLocal) {
     console.warn(
-      `[ALERTA_SEGURO][${tenantId}] Não foi possível resolver datas locais`
+      `[ALERTA_SEGURO][${tenantId}] Falha ao resolver datas`
     );
     return 0;
   }
@@ -48,16 +56,23 @@ export async function gerarAlertaVencimentoSeguro(
     toDateLocal: vencimentoLocal,
   });
 
-  if (diasRestantes === null) {
-    return 0;
-  }
+  if (diasRestantes === null) return 0;
 
+  /**
+   * 🔴 VENCIDO
+   */
   if (diasRestantes <= 0) {
-    await upsertAlertaSeguro(
+    const alertaId = buildSeguroAlertId(
       tenantId,
-      buildSeguroAlertId(tenantId, 'seguro-vencido', seguro.id),
-      criarPayloadBaseAlerta({
-        id: buildSeguroAlertId(tenantId, 'seguro-vencido', seguro.id),
+      'seguro-vencido',
+      seguro.id
+    );
+
+    const result = await upsertAlertaSeguro(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
         titulo: montarTituloSeguroVencido(),
         subtitulo: montarSubtituloSeguro(seguro),
         data: seguro.dataFim,
@@ -65,12 +80,32 @@ export async function gerarAlertaVencimentoSeguro(
         tipoCategoria: ALERT_CATEGORIAS.SEGURO,
         tipoEvento: ALERT_EVENTOS.SEGURO_VENCIDO,
         link: '/seguros',
+
+        contexto: {
+          seguroId: seguro.id,
+          tenantId,
+        },
+
+        metadata: {
+          diasRestantes,
+          tipo: 'seguro',
+          criticidade: 'Critico',
+        },
       })
     );
+
+    if (result.created || result.updated) {
+      await onAlertasProcessados({
+        tenantsAfetados: [tenantId],
+      });
+    }
 
     return 1;
   }
 
+  /**
+   * 🟡 VENCENDO
+   */
   const PONTOS = [
     { limiar: 1, prioridade: ALERT_PRIORIDADES.ALTA, label: '1d', texto: 'amanhã' },
     { limiar: 7, prioridade: ALERT_PRIORIDADES.ALTA, label: '7d', texto: 'em 7 dias' },
@@ -80,11 +115,18 @@ export async function gerarAlertaVencimentoSeguro(
 
   for (const ponto of PONTOS) {
     if (diasRestantes > 0 && diasRestantes <= ponto.limiar) {
-      await upsertAlertaSeguro(
+      const alertaId = buildSeguroAlertId(
         tenantId,
-        buildSeguroAlertId(tenantId, 'seguro-vence', seguro.id, ponto.label),
-        criarPayloadBaseAlerta({
-          id: buildSeguroAlertId(tenantId, 'seguro-vence', seguro.id, ponto.label),
+        'seguro-vence',
+        seguro.id,
+        ponto.label
+      );
+
+      const result = await upsertAlertaSeguro(
+        tenantId,
+        alertaId,
+        await criarPayloadBaseAlerta({
+          id: alertaId,
           titulo: montarTituloSeguroVence(ponto.texto),
           subtitulo: montarSubtituloSeguro(seguro),
           data: seguro.dataFim,
@@ -92,8 +134,32 @@ export async function gerarAlertaVencimentoSeguro(
           tipoCategoria: ALERT_CATEGORIAS.SEGURO,
           tipoEvento: ALERT_EVENTOS.SEGURO_VENCE,
           link: '/seguros',
+
+          contexto: {
+            seguroId: seguro.id,
+            tenantId,
+          },
+
+          metadata: {
+            diasRestantes,
+            tipo: 'seguro',
+            criticidade:
+              diasRestantes <= 1
+                ? 'Critico'
+                : diasRestantes <= 7
+                ? 'Alto'
+                : diasRestantes <= 15
+                ? 'Moderado'
+                : 'Baixo',
+          },
         })
       );
+
+      if (result.created || result.updated) {
+        await onAlertasProcessados({
+          tenantsAfetados: [tenantId],
+        });
+      }
 
       return 1;
     }

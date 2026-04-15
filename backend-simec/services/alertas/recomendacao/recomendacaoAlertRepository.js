@@ -42,25 +42,49 @@ export async function buscarEquipamentosComHistorico(tenantId, dataCorte) {
   });
 }
 
-export async function existeAlerta(tenantId, id) {
-  const alerta = await prisma.alerta.findFirst({
-    where: {
-      tenantId,
-      id,
-    },
+export async function upsertAlertaRecomendacao(tenantId, alertaId, data) {
+  const existente = await prisma.alerta.findUnique({
+    where: { id: alertaId },
     select: {
-      id: true,
+      titulo: true,
+      subtitulo: true,
+      prioridade: true,
+      data: true,
+      metadata: true,
     },
   });
 
-  return !!alerta;
-}
+  if (!existente) {
+    await prisma.alerta.create({
+      data: {
+        tenantId,
+        id: alertaId,
+        ...data,
+      },
+    });
 
-export async function criarAlertaRecomendacao(tenantId, payload) {
-  return prisma.alerta.create({
+    return { created: true, updated: false };
+  }
+
+  const mudou =
+    existente.titulo !== data.titulo ||
+    existente.subtitulo !== data.subtitulo ||
+    existente.prioridade !== data.prioridade ||
+    String(existente.data) !== String(data.data) ||
+    JSON.stringify(existente.metadata || {}) !==
+      JSON.stringify(data.metadata || {});
+
+  if (!mudou) {
+    return { created: false, updated: false };
+  }
+
+  await prisma.alerta.update({
+    where: { id: alertaId },
     data: {
       tenantId,
-      ...payload,
+      ...data,
     },
   });
+
+  return { created: false, updated: true };
 }

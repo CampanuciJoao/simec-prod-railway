@@ -1,10 +1,8 @@
-// Ficheiro: backend-simec/services/alertas/alertTypes.js
-
 export const ALERT_CATEGORIAS = {
-  MANUTENCAO: 'Manutenção',
-  RECOMENDACAO: 'Recomendação',
-  SEGURO: 'Seguro',
-  CONTRATO: 'Contrato',
+  MANUTENCAO: 'MANUTENCAO',
+  RECOMENDACAO: 'RECOMENDACAO',
+  SEGURO: 'SEGURO',
+  CONTRATO: 'CONTRATO',
 };
 
 export const ALERT_EVENTOS = {
@@ -22,8 +20,16 @@ export const ALERT_EVENTOS = {
   CONTRATO_VENCIDO: 'CONTRATO_VENCIDO',
 };
 
+// 🔥 PRIORIDADE TÉCNICA (ordenável)
 export const ALERT_PRIORIDADES = {
-  BAIXA: 'Baixa',
-  MEDIA: 'Media',
-  ALTA: 'Alta',
+  BAIXA: 1,
+  MEDIA: 2,
+  ALTA: 3,
+};
+
+// 🔥 LABELS (para UI)
+export const ALERT_PRIORIDADE_LABEL = {
+  1: 'Baixa',
+  2: 'Média',
+  3: 'Alta',
 };

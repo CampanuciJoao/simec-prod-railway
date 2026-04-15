@@ -4,17 +4,22 @@ import {
   montarTituloContratoVence,
   montarSubtituloContrato,
 } from './contratoAlertFormatter.js';
+
 import { upsertAlertaContrato } from './contratoAlertRepository.js';
+
 import {
   criarPayloadBaseAlerta,
   ALERT_CATEGORIAS,
   ALERT_EVENTOS,
   ALERT_PRIORIDADES,
 } from '../alertPayloadFactory.js';
+
 import {
   extractLocalDateFromIso,
   diffLocalDateInDays,
 } from '../../time/index.js';
+
+import { onAlertasProcessados } from '../alertasEventService.js';
 
 export async function gerarAlertaVencimentoContrato(
   tenantId,
@@ -32,7 +37,10 @@ export async function gerarAlertaVencimentoContrato(
     timezone
   );
 
-  const vencimentoLocal = extractLocalDateFromIso(dataFimIso, timezone);
+  const vencimentoLocal = extractLocalDateFromIso(
+    dataFimIso,
+    timezone
+  );
 
   if (!hojeLocal || !vencimentoLocal) {
     console.warn(
@@ -46,16 +54,23 @@ export async function gerarAlertaVencimentoContrato(
     toDateLocal: vencimentoLocal,
   });
 
-  if (diasRestantes === null) {
-    return 0;
-  }
+  if (diasRestantes === null) return 0;
 
+  /**
+   * 🔴 VENCIDO
+   */
   if (diasRestantes <= 0) {
-    await upsertAlertaContrato(
+    const alertaId = buildContratoAlertId(
       tenantId,
-      buildContratoAlertId(tenantId, 'contrato-vencido', contrato.id),
-      criarPayloadBaseAlerta({
-        id: buildContratoAlertId(tenantId, 'contrato-vencido', contrato.id),
+      'contrato-vencido',
+      contrato.id
+    );
+
+    const result = await upsertAlertaContrato(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
         titulo: montarTituloContratoVencido(),
         subtitulo: montarSubtituloContrato(contrato),
         data: contrato.dataFim,
@@ -63,12 +78,32 @@ export async function gerarAlertaVencimentoContrato(
         tipoCategoria: ALERT_CATEGORIAS.CONTRATO,
         tipoEvento: ALERT_EVENTOS.CONTRATO_VENCIDO,
         link: '/contratos',
+
+        contexto: {
+          contratoId: contrato.id,
+          tenantId,
+        },
+
+        metadata: {
+          diasRestantes,
+          tipo: 'contrato',
+          criticidade: 'Critico',
+        },
       })
     );
+
+    if (result.created || result.updated) {
+      await onAlertasProcessados({
+        tenantsAfetados: [tenantId],
+      });
+    }
 
     return 1;
   }
 
+  /**
+   * 🟡 VENCENDO
+   */
   const PONTOS = [
     { limiar: 1, prioridade: ALERT_PRIORIDADES.ALTA, label: '1d', texto: 'amanhã' },
     { limiar: 7, prioridade: ALERT_PRIORIDADES.ALTA, label: '7d', texto: 'em 7 dias' },
@@ -78,21 +113,18 @@ export async function gerarAlertaVencimentoContrato(
 
   for (const ponto of PONTOS) {
     if (diasRestantes > 0 && diasRestantes <= ponto.limiar) {
-      await upsertAlertaContrato(
+      const alertaId = buildContratoAlertId(
         tenantId,
-        buildContratoAlertId(
-          tenantId,
-          'contrato-vence',
-          contrato.id,
-          ponto.label
-        ),
-        criarPayloadBaseAlerta({
-          id: buildContratoAlertId(
-            tenantId,
-            'contrato-vence',
-            contrato.id,
-            ponto.label
-          ),
+        'contrato-vence',
+        contrato.id,
+        ponto.label
+      );
+
+      const result = await upsertAlertaContrato(
+        tenantId,
+        alertaId,
+        await criarPayloadBaseAlerta({
+          id: alertaId,
           titulo: montarTituloContratoVence(ponto.texto),
           subtitulo: montarSubtituloContrato(contrato),
           data: contrato.dataFim,
@@ -100,8 +132,32 @@ export async function gerarAlertaVencimentoContrato(
           tipoCategoria: ALERT_CATEGORIAS.CONTRATO,
           tipoEvento: ALERT_EVENTOS.CONTRATO_VENCE,
           link: '/contratos',
+
+          contexto: {
+            contratoId: contrato.id,
+            tenantId,
+          },
+
+          metadata: {
+            diasRestantes,
+            tipo: 'contrato',
+            criticidade:
+              diasRestantes <= 1
+                ? 'Critico'
+                : diasRestantes <= 7
+                ? 'Alto'
+                : diasRestantes <= 15
+                ? 'Moderado'
+                : 'Baixo',
+          },
         })
       );
+
+      if (result.created || result.updated) {
+        await onAlertasProcessados({
+          tenantsAfetados: [tenantId],
+        });
+      }
 
       return 1;
     }

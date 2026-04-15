@@ -1,49 +1,59 @@
 export function normalizarTexto(texto = '') {
-  return String(texto)
+  return String(texto || '')
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .trim();
 }
 
+function contemPalavra(textoNormalizado, termo) {
+  return textoNormalizado.includes(termo);
+}
+
+function contemAlgum(textoNormalizado, termos = []) {
+  return termos.some((termo) => contemPalavra(textoNormalizado, termo));
+}
+
 export function obterPesoTipoEquipamento(tipo = '', modelo = '') {
-  const texto = `${tipo} ${modelo}`;
-  const t = normalizarTexto(texto);
+  const texto = normalizarTexto(`${tipo} ${modelo}`);
 
   if (
-    t.includes('tomografia') ||
-    t.includes('ct') ||
-    t.includes('tc') ||
-    t.includes('aquilion') ||
-    t.includes('act revolution') ||
-    t.includes('pet-ct')
+    contemAlgum(texto, [
+      'tomografia',
+      'aquilion',
+      'act revolution',
+      'pet-ct',
+      'pet ct',
+    ]) ||
+    /\bct\b/.test(texto) ||
+    /\btc\b/.test(texto)
   ) {
     return 1.5;
   }
 
-  if (t.includes('ressonancia') || t.includes('rnm') || t.includes('rm')) {
+  if (
+    contemAlgum(texto, ['ressonancia', 'rnm']) ||
+    /\brm\b/.test(texto)
+  ) {
     return 1.45;
   }
 
-  if (t.includes('mamografia') || t.includes('mamografo')) {
+  if (contemAlgum(texto, ['mamografia', 'mamografo'])) {
     return 1.3;
   }
 
   if (
-    t.includes('raio x') ||
-    t.includes('raio-x') ||
-    t.includes('rx') ||
-    t.includes('dr') ||
-    t.includes('cr')
+    contemAlgum(texto, ['raio x', 'raio-x']) ||
+    /\brx\b/.test(texto) ||
+    /\bdr\b/.test(texto) ||
+    /\bcr\b/.test(texto)
   ) {
     return 1.25;
   }
 
   if (
-    t.includes('ultrassom') ||
-    t.includes('ultrasonografia') ||
-    t.includes('ultra') ||
-    t.includes('us')
+    contemAlgum(texto, ['ultrassom', 'ultrasonografia']) ||
+    /\bus\b/.test(texto)
   ) {
     return 1.15;
   }
@@ -57,17 +67,21 @@ export function obterPesoCriticidadeUnidade(unidadeNome = '') {
   if (!nome) return 1;
 
   if (
-    nome.includes('sede') ||
-    nome.includes('hospital regional') ||
-    nome.includes('referencia')
+    contemAlgum(nome, [
+      'sede',
+      'hospital regional',
+      'referencia',
+    ])
   ) {
     return 1.3;
   }
 
   if (
-    nome.includes('coxim') ||
-    nome.includes('dourados') ||
-    nome.includes('campo grande')
+    contemAlgum(nome, [
+      'coxim',
+      'dourados',
+      'campo grande',
+    ])
   ) {
     return 1.15;
   }
@@ -130,7 +144,7 @@ export function calcularScoreRisco({
   const calibracoes = manutencoes.filter((m) => m.tipo === 'Calibracao');
   const inspecoes = manutencoes.filter((m) => m.tipo === 'Inspecao');
 
-  const { maiorGrupo } = calcularReincidencia(ocorrencias);
+  const { maiorGrupo, grupos } = calcularReincidencia(ocorrencias);
 
   let scoreBase = 0;
 
@@ -140,7 +154,9 @@ export function calcularScoreRisco({
   scoreBase += calibracoes.length * 1.2;
   scoreBase += inspecoes.length * 1.0;
 
-  if (maiorGrupo >= 2) scoreBase += maiorGrupo * 2.5;
+  if (maiorGrupo >= 2) {
+    scoreBase += maiorGrupo * 2.5;
+  }
 
   if (equipamento?.status === 'Inoperante') scoreBase += 8;
   if (equipamento?.status === 'EmManutencao') scoreBase += 4;
@@ -153,7 +169,10 @@ export function calcularScoreRisco({
 
   const pesoUnidade = obterPesoCriticidadeUnidade(unidadeNome);
 
-  const scoreFinal = Math.round(scoreBase * pesoTipo * pesoUnidade);
+  const scoreFinal = Math.max(
+    0,
+    Math.round(scoreBase * pesoTipo * pesoUnidade)
+  );
 
   return {
     scoreBase,
@@ -163,6 +182,7 @@ export function calcularScoreRisco({
     preventivas: preventivas.length,
     calibracoes: calibracoes.length,
     inspecoes: inspecoes.length,
+    gruposReincidencia: grupos,
     maiorReincidencia: maiorGrupo,
     pesoTipo,
     pesoUnidade,
@@ -173,6 +193,13 @@ export function definirPrioridade(scoreFinal) {
   if (scoreFinal >= 22) return 'Alta';
   if (scoreFinal >= 12) return 'Media';
   return 'Baixa';
+}
+
+export function definirNivelRisco(scoreFinal) {
+  if (scoreFinal >= 35) return 'Critico';
+  if (scoreFinal >= 22) return 'Alto';
+  if (scoreFinal >= 12) return 'Moderado';
+  return 'Baixo';
 }
 
 export function deveRecomendar({ metricas }) {

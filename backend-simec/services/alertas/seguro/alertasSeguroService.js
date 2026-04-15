@@ -3,6 +3,9 @@ import { getAgora } from '../../timeService.js';
 import { buscarSegurosAtivosPorTenant } from './seguroAlertRepository.js';
 import { gerarAlertaVencimentoSeguro } from './seguroAlertRules.js';
 
+/**
+ * Processa um tenant
+ */
 async function processarTenant(tenant, agoraUtc) {
   const timezone = tenant.timezone || 'America/Campo_Grande';
 
@@ -10,20 +13,33 @@ async function processarTenant(tenant, agoraUtc) {
 
   let total = 0;
 
-  for (const seguro of segurosAtivos) {
-    total += await gerarAlertaVencimentoSeguro(
-      tenant.id,
-      seguro,
-      agoraUtc,
-      timezone
-    );
-  }
+  // 🔥 roda em paralelo (melhor performance)
+  const results = await Promise.all(
+    segurosAtivos.map((seguro) =>
+      gerarAlertaVencimentoSeguro(
+        tenant.id,
+        seguro,
+        agoraUtc,
+        timezone
+      )
+    )
+  );
 
-  console.log(`[ALERTA_SEGURO][${tenant.id}] Total=${total} | tz=${timezone}`);
+  total = results.reduce((acc, val) => acc + val, 0);
 
-  return total;
+  console.log(
+    `[ALERTA_SEGURO][${tenant.id}] Total=${total} | tz=${timezone}`
+  );
+
+  return {
+    total,
+    afetou: total > 0, // 🔥 importante
+  };
 }
 
+/**
+ * Orquestra todos os tenants
+ */
 export async function gerarAlertasSeguro() {
   const agoraUtc = getAgora();
 
@@ -36,14 +52,32 @@ export async function gerarAlertasSeguro() {
   });
 
   let totalGlobal = 0;
+  const tenantsAfetados = [];
 
-  for (const tenant of tenants) {
-    totalGlobal += await processarTenant(tenant, agoraUtc);
+  // 🔥 roda tenants em paralelo também
+  const results = await Promise.all(
+    tenants.map((tenant) =>
+      processarTenant(tenant, agoraUtc).then((res) => ({
+        tenantId: tenant.id,
+        ...res,
+      }))
+    )
+  );
+
+  for (const result of results) {
+    totalGlobal += result.total;
+
+    if (result.afetou) {
+      tenantsAfetados.push(result.tenantId);
+    }
   }
 
   console.log(`[ALERTA_SEGURO] TOTAL GLOBAL: ${totalGlobal}`);
 
-  return totalGlobal;
+  return {
+    total: totalGlobal,
+    tenantsAfetados,
+  };
 }
 
 export default gerarAlertasSeguro;

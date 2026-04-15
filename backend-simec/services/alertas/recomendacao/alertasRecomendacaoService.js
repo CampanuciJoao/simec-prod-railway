@@ -17,8 +17,7 @@ import {
 
 import {
   buscarEquipamentosComHistorico,
-  existeAlerta,
-  criarAlertaRecomendacao,
+  upsertAlertaRecomendacao,
 } from './recomendacaoAlertRepository.js';
 
 import {
@@ -33,6 +32,11 @@ import {
   localDateToUtcStartOfDay,
 } from '../../time/index.js';
 
+import { onAlertasProcessados } from '../alertasEventService.js';
+
+/**
+ * 🔧 Processa tenant
+ */
 async function processarTenant(tenant, agoraUtc) {
   const timezone = tenant.timezone || 'America/Campo_Grande';
 
@@ -41,12 +45,7 @@ async function processarTenant(tenant, agoraUtc) {
     now: agoraUtc,
   });
 
-  if (!hojeLocal) {
-    console.warn(
-      `[ALERTA_RECOMENDACAO][${tenant.id}] Não foi possível calcular hojeLocal`
-    );
-    return 0;
-  }
+  if (!hojeLocal) return { total: 0, afetou: false };
 
   const dataCorteLocal = addDaysToLocalDate(hojeLocal, -JANELA_DIAS);
   const dataCorteUtc = localDateToUtcStartOfDay({
@@ -54,12 +53,7 @@ async function processarTenant(tenant, agoraUtc) {
     timezone,
   });
 
-  if (!dataCorteUtc) {
-    console.warn(
-      `[ALERTA_RECOMENDACAO][${tenant.id}] Não foi possível calcular dataCorteUtc`
-    );
-    return 0;
-  }
+  if (!dataCorteUtc) return { total: 0, afetou: false };
 
   const equipamentos = await buscarEquipamentosComHistorico(
     tenant.id,
@@ -68,71 +62,101 @@ async function processarTenant(tenant, agoraUtc) {
 
   let total = 0;
 
-  for (const equipamento of equipamentos) {
-    const unidadeNome = equipamento.unidade?.nomeSistema || 'N/A';
-    const ocorrenciasRecentes = equipamento.ocorrencias || [];
-    const manutencoesRecentes = equipamento.manutencoes || [];
+  const results = await Promise.all(
+    equipamentos.map(async (equipamento) => {
+      const unidadeNome = equipamento.unidade?.nomeSistema || 'N/A';
 
-    const metricas = calcularScoreRisco({
-      equipamento,
-      unidadeNome,
-      ocorrencias: ocorrenciasRecentes,
-      manutencoes: manutencoesRecentes,
-    });
+      const metricas = calcularScoreRisco({
+        equipamento,
+        unidadeNome,
+        ocorrencias: equipamento.ocorrencias || [],
+        manutencoes: equipamento.manutencoes || [],
+      });
 
-    if (!deveRecomendar({ metricas })) {
-      continue;
-    }
+      if (!deveRecomendar({ metricas })) {
+        return 0;
+      }
 
-    const alertaId = buildRecomendacaoAlertId(
-      tenant.id,
-      equipamento.id,
-      agoraUtc
-    );
+      const alertaId = buildRecomendacaoAlertId(
+        tenant.id,
+        equipamento.id,
+        agoraUtc
+      );
 
-    const jaExiste = await existeAlerta(tenant.id, alertaId);
-    if (jaExiste) {
-      continue;
-    }
+      const titulo = montarTituloRecomendacao(unidadeNome);
 
-    const titulo = montarTituloRecomendacao(unidadeNome);
+      const subtitulo = montarSubtituloRecomendacao({
+        equipamento,
+        unidadeNome,
+        metricas,
+      });
 
-    const subtitulo = montarSubtituloRecomendacao({
-      equipamento,
-      unidadeNome,
-      metricas,
-    });
+      const descricaoAnalitica = montarResumoAnalitico({
+        equipamento,
+        unidadeNome,
+        metricas,
+      });
 
-    const descricaoAnalitica = montarResumoAnalitico({
-      equipamento,
-      unidadeNome,
-      metricas,
-    });
+      const result = await upsertAlertaRecomendacao(
+        tenant.id,
+        alertaId,
+        await criarPayloadBaseAlerta({
+          id: alertaId,
+          titulo,
+          subtitulo: `${subtitulo}. ${descricaoAnalitica}`,
+          data: agoraUtc,
+          prioridade: definirPrioridade(metricas.scoreFinal),
+          tipoCategoria: ALERT_CATEGORIAS.RECOMENDACAO,
+          tipoEvento: ALERT_EVENTOS.RECOM_PREVENTIVA,
+          link: `/equipamentos/ficha-tecnica/${equipamento.id}`,
 
-    await criarAlertaRecomendacao(
-      tenant.id,
-      criarPayloadBaseAlerta({
-        id: alertaId,
-        titulo,
-        subtitulo: `${subtitulo}. ${descricaoAnalitica}`,
-        data: agoraUtc,
-        prioridade: definirPrioridade(metricas.scoreFinal),
-        tipoCategoria: ALERT_CATEGORIAS.RECOMENDACAO,
-        tipoEvento: ALERT_EVENTOS.RECOM_PREVENTIVA,
-        link: `/equipamentos/ficha-tecnica/${equipamento.id}`,
-      })
-    );
+          contexto: {
+            equipamentoId: equipamento.id,
+            tenantId: tenant.id,
+          },
 
-    total += 1;
+          metadata: {
+            score: metricas.scoreFinal,
+            tipo: 'recomendacao',
+            criticidade:
+              metricas.scoreFinal > 80
+                ? 'Critico'
+                : metricas.scoreFinal > 60
+                ? 'Alto'
+                : metricas.scoreFinal > 40
+                ? 'Moderado'
+                : 'Baixo',
+          },
+        })
+      );
 
-    console.log(
-      `[ALERTA_RECOMENDACAO][${tenant.id}] Criado para ${equipamento.modelo} (${equipamento.id}) | score=${metricas.scoreFinal} | unidade=${unidadeNome} | timezone=${timezone}`
-    );
-  }
+      if (result.created || result.updated) {
+        await onAlertasProcessados({
+          tenantsAfetados: [tenant.id],
+        });
 
-  return total;
+        console.log(
+          `[ALERTA_RECOMENDACAO][${tenant.id}] ${equipamento.modelo} | score=${metricas.scoreFinal}`
+        );
+
+        return 1;
+      }
+
+      return 0;
+    })
+  );
+
+  total = results.reduce((acc, val) => acc + val, 0);
+
+  return {
+    total,
+    afetou: total > 0,
+  };
 }
 
+/**
+ * 🌍 Orquestrador global
+ */
 export async function gerarAlertasRecomendacao() {
   const agoraUtc = getAgora();
 
@@ -145,15 +169,33 @@ export async function gerarAlertasRecomendacao() {
   });
 
   let totalGlobal = 0;
+  const tenantsAfetados = [];
 
-  for (const tenant of tenants) {
-    const totalTenant = await processarTenant(tenant, agoraUtc);
-    totalGlobal += totalTenant;
+  const results = await Promise.all(
+    tenants.map((tenant) =>
+      processarTenant(tenant, agoraUtc).then((res) => ({
+        tenantId: tenant.id,
+        ...res,
+      }))
+    )
+  );
+
+  for (const result of results) {
+    totalGlobal += result.total;
+
+    if (result.afetou) {
+      tenantsAfetados.push(result.tenantId);
+    }
   }
 
-  console.log(`[ALERTA_RECOMENDACAO] TOTAL GLOBAL: ${totalGlobal}`);
+  console.log(
+    `[ALERTA_RECOMENDACAO] TOTAL=${totalGlobal} | tenantsAfetados=${tenantsAfetados.length}`
+  );
 
-  return totalGlobal;
+  return {
+    total: totalGlobal,
+    tenantsAfetados,
+  };
 }
 
 export default gerarAlertasRecomendacao;

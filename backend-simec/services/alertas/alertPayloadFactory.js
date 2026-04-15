@@ -6,7 +6,7 @@ import {
   ALERT_PRIORIDADES,
 } from './alertTypes.js';
 
-export function criarPayloadBaseAlerta({
+export async function criarPayloadBaseAlerta({
   id,
   titulo,
   subtitulo = null,
@@ -19,6 +19,8 @@ export function criarPayloadBaseAlerta({
   tipoCategoria,
   tipoEvento,
   link = null,
+  contexto = {},
+  metadata = {},
 }) {
   return {
     id,
@@ -33,6 +35,9 @@ export function criarPayloadBaseAlerta({
     tipo: tipoCategoria,
     tipoEvento,
     link,
+    contexto,
+    metadata,
+    createdAt: new Date(),
   };
 }
 

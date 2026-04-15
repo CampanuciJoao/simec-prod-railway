@@ -4,6 +4,9 @@ function buildUserKey(tenantId, userId) {
   return `${tenantId}:${userId}`;
 }
 
+/**
+ * 🔌 Adiciona cliente SSE
+ */
 function addClient({ tenantId, userId, res }) {
   const key = buildUserKey(tenantId, userId);
 
@@ -11,9 +14,13 @@ function addClient({ tenantId, userId, res }) {
     clientsByUserKey.set(key, new Set());
   }
 
-  clientsByUserKey.get(key).add(res);
+  const bucket = clientsByUserKey.get(key);
+  bucket.add(res);
 
-  return () => {
+  /**
+   * 🔥 limpeza automática ao fechar conexão
+   */
+  const cleanup = () => {
     const bucket = clientsByUserKey.get(key);
     if (!bucket) return;
 
@@ -23,13 +30,31 @@ function addClient({ tenantId, userId, res }) {
       clientsByUserKey.delete(key);
     }
   };
+
+  res.on('close', cleanup);
+  res.on('error', cleanup);
+
+  return cleanup;
 }
 
+/**
+ * 📡 Envia evento SSE
+ */
 function sendEvent(res, event, data) {
-  res.write(`event: ${event}\n`);
-  res.write(`data: ${JSON.stringify(data)}\n\n`);
+  try {
+    res.write(`event: ${event}\n`);
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  } catch (err) {
+    // evita crash silencioso
+    try {
+      res.end();
+    } catch {}
+  }
 }
 
+/**
+ * 📢 Broadcast para um usuário
+ */
 function broadcastToUser({ tenantId, userId, event, data }) {
   const key = buildUserKey(tenantId, userId);
   const bucket = clientsByUserKey.get(key);
@@ -41,8 +66,38 @@ function broadcastToUser({ tenantId, userId, event, data }) {
   }
 }
 
+/**
+ * 🔥 Broadcast para todos do tenant
+ */
+function broadcastToTenant({ tenantId, event, data }) {
+  for (const [key, bucket] of clientsByUserKey.entries()) {
+    if (!key.startsWith(`${tenantId}:`)) continue;
+
+    for (const res of bucket) {
+      sendEvent(res, event, data);
+    }
+  }
+}
+
+/**
+ * 💓 KeepAlive (evita timeout de proxy)
+ */
+function startHeartbeat(intervalMs = 25000) {
+  setInterval(() => {
+    for (const bucket of clientsByUserKey.values()) {
+      for (const res of bucket) {
+        try {
+          res.write(`event: ping\ndata: {}\n\n`);
+        } catch {}
+      }
+    }
+  }, intervalMs);
+}
+
 module.exports = {
   addClient,
   sendEvent,
   broadcastToUser,
+  broadcastToTenant,
+  startHeartbeat,
 };
