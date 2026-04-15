@@ -15,8 +15,9 @@ function ChatMessageBubble({ role = 'assistant', content = '', createdAt }) {
         isUser ? 'justify-end' : 'justify-start',
       ].join(' ')}
     >
+      {/* Avatar IA */}
       {!isUser && (
-        <div className="mt-1 hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-blue-100 text-blue-600 sm:inline-flex">
+        <div className="mt-1 hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-100 to-blue-200 text-blue-700 sm:inline-flex">
           <FontAwesomeIcon icon={faRobot} />
         </div>
       )}
@@ -36,7 +37,9 @@ function ChatMessageBubble({ role = 'assistant', content = '', createdAt }) {
           ].join(' ')}
         >
           {isUser ? (
-            <p className="whitespace-pre-wrap text-sm leading-6">{content}</p>
+            <p className="whitespace-pre-wrap text-sm leading-6">
+              {content}
+            </p>
           ) : (
             <div className="chat-markdown text-sm leading-6">
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -46,13 +49,14 @@ function ChatMessageBubble({ role = 'assistant', content = '', createdAt }) {
           )}
         </div>
 
-        {createdAt ? (
+        {createdAt && (
           <span className="mt-1 px-1 text-[11px] text-slate-400">
             {createdAt}
           </span>
-        ) : null}
+        )}
       </div>
 
+      {/* Avatar usuário */}
       {isUser && (
         <div className="mt-1 hidden h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-slate-200 text-slate-600 sm:inline-flex">
           <FontAwesomeIcon icon={faUser} />
