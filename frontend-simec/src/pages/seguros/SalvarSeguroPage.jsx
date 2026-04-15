@@ -1,5 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faArrowLeft,
+  faShieldAlt,
+  faPaperclip,
+  faUpload,
+  faTrashAlt,
+  faFilePdf,
+} from '@fortawesome/free-solid-svg-icons';
+
 import { useToast } from '../../contexts/ToastContext';
 import SeguroForm from '../../components/seguros/SeguroForm';
 import {
@@ -12,21 +22,11 @@ import {
   deleteAnexoSeguro,
 } from '../../services/api';
 
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowLeft,
-  faShieldAlt,
-  faPaperclip,
-  faUpload,
-  faTrashAlt,
-  faFilePdf,
-  faSpinner,
-} from '@fortawesome/free-solid-svg-icons';
-
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageSection from '../../components/ui/layout/PageSection';
 import PageState from '../../components/ui/feedback/PageState';
-import PageSection from '../../components/ui/PageSection';
+import Button from '../../components/ui/primitives/Button';
 
 function getAnexoNome(anexo) {
   return (
@@ -34,6 +34,7 @@ function getAnexoNome(anexo) {
     anexo?.nomeArquivo ||
     anexo?.filename ||
     anexo?.fileName ||
+    anexo?.nomeOriginal ||
     `Anexo #${anexo?.id ?? ''}`
   );
 }
@@ -44,6 +45,7 @@ function getAnexoUrl(anexo) {
     anexo?.arquivoUrl ||
     anexo?.downloadUrl ||
     anexo?.caminhoArquivo ||
+    anexo?.path ||
     null
   );
 }
@@ -90,10 +92,11 @@ function SalvarSeguroPage() {
         setAnexos([]);
       }
     } catch (err) {
-      setError(
-        err?.response?.data?.message || err?.message || 'Erro ao carregar dados.'
-      );
-      addToast('Falha ao carregar dados.', 'error');
+      const message =
+        err?.response?.data?.message || err?.message || 'Erro ao carregar dados.';
+
+      setError(message);
+      addToast(message, 'error');
     } finally {
       setLoading(false);
     }
@@ -112,9 +115,11 @@ function SalvarSeguroPage() {
       } else {
         await addSeguro(formData);
         addToast(
-          'Seguro cadastrado com sucesso! Agora você já pode editar e anexar o PDF da apólice.',
+          'Seguro cadastrado com sucesso! Depois você poderá anexar a apólice.',
           'success'
         );
+        navigate('/seguros');
+        return;
       }
 
       navigate('/seguros');
@@ -141,7 +146,7 @@ function SalvarSeguroPage() {
       setUploadingAnexo(true);
 
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append('file', arquivoSelecionado);
 
       await uploadAnexoSeguro(id, formData);
       addToast('Anexo enviado com sucesso!', 'success');
@@ -185,7 +190,7 @@ function SalvarSeguroPage() {
 
   if (loading) {
     return (
-      <PageLayout background="slate" padded fullHeight contentClassName="page-stack">
+      <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
           subtitle="Cadastro e gestão de apólices"
@@ -198,28 +203,22 @@ function SalvarSeguroPage() {
 
   if (error) {
     return (
-      <PageLayout background="slate" padded fullHeight contentClassName="page-stack">
+      <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Erro"
           subtitle="Não foi possível carregar o formulário"
           icon={faShieldAlt}
           actions={
             <div className="flex flex-wrap gap-2">
-              <button
-                className="btn btn-secondary"
-                onClick={() => navigate('/cadastros')}
-              >
+              <Button variant="secondary" onClick={() => navigate('/cadastros')}>
                 <FontAwesomeIcon icon={faArrowLeft} />
                 Cadastros
-              </button>
+              </Button>
 
-              <button
-                className="btn btn-secondary"
-                onClick={() => navigate('/seguros')}
-              >
+              <Button variant="secondary" onClick={() => navigate('/seguros')}>
                 <FontAwesomeIcon icon={faArrowLeft} />
                 Seguros
-              </button>
+              </Button>
             </div>
           }
         />
@@ -229,156 +228,123 @@ function SalvarSeguroPage() {
   }
 
   return (
-    <PageLayout
-      background="slate"
-      padded
-      fullHeight
-      contentClassName="page-stack content-fade-in"
-    >
-      <PageHeader
-        title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
-        subtitle="Cadastro e gestão de apólices"
-        icon={faShieldAlt}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <button
-              className="btn btn-secondary"
-              onClick={() => navigate('/cadastros')}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Cadastros
-            </button>
+    <PageLayout background="slate" padded fullHeight>
+      <div className="space-y-6">
+        <PageHeader
+          title={isEditing ? 'Editar Seguro' : 'Novo Seguro'}
+          subtitle="Cadastro e gestão de apólices"
+          icon={faShieldAlt}
+          actions={
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => navigate('/cadastros')}>
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Cadastros
+              </Button>
 
-            <button
-              className="btn btn-secondary"
-              onClick={() => navigate('/seguros')}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Seguros
-            </button>
-          </div>
-        }
-      />
+              <Button variant="secondary" onClick={() => navigate('/seguros')}>
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Seguros
+              </Button>
+            </div>
+          }
+        />
 
-      <SeguroForm
-        onSubmit={handleSave}
-        initialData={initialData}
-        isEditing={isEditing}
-        equipamentosDisponiveis={equipamentosDisponiveis}
-        unidadesDisponiveis={unidadesDisponiveis}
-        onCancel={() => navigate('/seguros')}
-      />
+        <SeguroForm
+          onSubmit={handleSave}
+          initialData={initialData}
+          isEditing={isEditing}
+          equipamentosDisponiveis={equipamentosDisponiveis}
+          unidadesDisponiveis={unidadesDisponiveis}
+          onCancel={() => navigate('/seguros')}
+        />
 
-      <PageSection
-        title="Anexos da apólice"
-        description="Envie PDF da apólice e outros documentos relacionados ao seguro."
-      >
-        {!isEditing ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            Primeiro salve o seguro. Depois disso, você poderá editar o registro e anexar o PDF da apólice.
-          </div>
-        ) : (
-          <div className="space-y-5">
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end">
-                <div className="flex-1">
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Selecionar arquivo
-                  </label>
+        {isEditing ? (
+          <PageSection
+            title="Anexos da apólice"
+            description="Envie e gerencie documentos vinculados ao seguro."
+          >
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 lg:flex-row lg:items-center">
+                <input
+                  id="seguro-anexo-input"
+                  type="file"
+                  onChange={(e) => setArquivoSelecionado(e.target.files?.[0] || null)}
+                  className="block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
+                />
 
-                  <input
-                    id="seguro-anexo-input"
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
-                    onChange={(e) => setArquivoSelecionado(e.target.files?.[0] || null)}
-                    className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-700 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-blue-700 hover:file:bg-blue-100"
-                  />
-                </div>
-
-                <button
+                <Button
                   type="button"
-                  className="btn btn-primary"
                   onClick={handleUploadAnexo}
-                  disabled={uploadingAnexo}
+                  disabled={!arquivoSelecionado || uploadingAnexo}
                 >
-                  <FontAwesomeIcon
-                    icon={uploadingAnexo ? faSpinner : faUpload}
-                    spin={uploadingAnexo}
-                  />
+                  <FontAwesomeIcon icon={faUpload} />
                   {uploadingAnexo ? 'Enviando...' : 'Enviar anexo'}
-                </button>
+                </Button>
               </div>
 
-              {arquivoSelecionado ? (
-                <p className="mt-3 text-sm text-slate-500">
-                  Arquivo selecionado: <strong>{arquivoSelecionado.name}</strong>
-                </p>
-              ) : null}
-            </div>
+              {anexos.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3">
+                  {anexos.map((anexo) => {
+                    const url = getAnexoUrl(anexo);
 
-            <div className="space-y-3">
-              {anexos.length === 0 ? (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-4 py-6 text-center text-sm text-slate-500">
-                  Nenhum anexo enviado para esta apólice.
-                </div>
-              ) : (
-                anexos.map((anexo) => {
-                  const anexoUrl = getAnexoUrl(anexo);
+                    return (
+                      <div
+                        key={anexo.id}
+                        className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 text-slate-800">
+                            <FontAwesomeIcon
+                              icon={faPaperclip}
+                              className="text-slate-500"
+                            />
+                            <span className="truncate font-medium">
+                              {getAnexoNome(anexo)}
+                            </span>
+                          </div>
 
-                  return (
-                    <div
-                      key={anexo.id}
-                      className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 md:flex-row md:items-center md:justify-between"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-red-600">
-                          <FontAwesomeIcon icon={faFilePdf} />
-                        </span>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {anexo.tipoMime || 'Documento'}
+                          </div>
+                        </div>
 
-                        <div>
-                          <p className="text-sm font-semibold text-slate-900">
-                            {getAnexoNome(anexo)}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            ID do anexo: {anexo.id}
-                          </p>
+                        <div className="flex flex-wrap gap-2">
+                          {url ? (
+                            <a
+                              href={url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                            >
+                              <FontAwesomeIcon icon={faFilePdf} />
+                              Abrir
+                            </a>
+                          ) : null}
+
+                          <Button
+                            type="button"
+                            variant="danger"
+                            disabled={deletingAnexoId === anexo.id}
+                            onClick={() => handleDeleteAnexo(anexo.id)}
+                          >
+                            <FontAwesomeIcon icon={faTrashAlt} />
+                            {deletingAnexoId === anexo.id ? 'Removendo...' : 'Excluir'}
+                          </Button>
                         </div>
                       </div>
-
-                      <div className="flex flex-wrap gap-2">
-                        {anexoUrl ? (
-                          <a
-                            href={anexoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="btn btn-secondary"
-                          >
-                            <FontAwesomeIcon icon={faPaperclip} />
-                            Abrir
-                          </a>
-                        ) : null}
-
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          onClick={() => handleDeleteAnexo(anexo.id)}
-                          disabled={deletingAnexoId === anexo.id}
-                        >
-                          <FontAwesomeIcon
-                            icon={deletingAnexoId === anexo.id ? faSpinner : faTrashAlt}
-                            spin={deletingAnexoId === anexo.id}
-                          />
-                          {deletingAnexoId === anexo.id ? 'Removendo...' : 'Excluir'}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })
+                    );
+                  })}
+                </div>
+              ) : (
+                <PageState
+                  isEmpty
+                  emptyMessage="Nenhum anexo enviado para este seguro."
+                />
               )}
             </div>
-          </div>
-        )}
-      </PageSection>
+          </PageSection>
+        ) : null}
+      </div>
     </PageLayout>
   );
 }

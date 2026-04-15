@@ -1,17 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSpinner,
   faSave,
   faShieldAlt,
   faHospital,
   faCoins,
   faTimes,
-  faCalendarDays,
+  faFileShield,
 } from '@fortawesome/free-solid-svg-icons';
 
-import PageSection from '../ui/PageSection';
+import PageSection from '../ui/layout/PageSection';
+import ResponsiveGrid from '../ui/layout/ResponsiveGrid';
+import Input from '../ui/primitives/Input';
+import Select from '../ui/primitives/Select';
+import DateInput from '../ui/primitives/DateInput';
+import Button from '../ui/primitives/Button';
+
+import {
+  TIPO_SEGURO,
+  TIPO_SEGURO_OPTIONS,
+  COBERTURA_FIELDS,
+  getCoberturaFieldsByTipo,
+  sanitizeCoberturasByTipo,
+} from '../../utils/seguros';
 
 const TIPOS_VINCULO = {
   GERAL: 'geral',
@@ -22,6 +34,7 @@ const TIPOS_VINCULO = {
 const ESTADO_INICIAL_VAZIO = {
   apoliceNumero: '',
   seguradora: '',
+  tipoSeguro: TIPO_SEGURO.EQUIPAMENTO,
   dataInicio: '',
   dataFim: '',
   tipoVinculo: TIPOS_VINCULO.GERAL,
@@ -29,6 +42,7 @@ const ESTADO_INICIAL_VAZIO = {
   unidadeId: '',
   cobertura: '',
   premioTotal: 0,
+  lmiColisao: 0,
   lmiIncendio: 0,
   lmiDanosEletricos: 0,
   lmiRoubo: 0,
@@ -39,11 +53,9 @@ const ESTADO_INICIAL_VAZIO = {
   lmiDanosMorais: 0,
   lmiAPP: 0,
   lmiVendaval: 0,
+  lmiDanosCausaExterna: 0,
+  lmiPerdaLucroBruto: 0,
 };
-
-function hojeISO() {
-  return new Date().toISOString().split('T')[0];
-}
 
 function FormField({ label, required = false, hint = '', children }) {
   return (
@@ -58,50 +70,6 @@ function FormField({ label, required = false, hint = '', children }) {
   );
 }
 
-FormField.propTypes = {
-  label: PropTypes.string.isRequired,
-  required: PropTypes.bool,
-  hint: PropTypes.string,
-  children: PropTypes.node.isRequired,
-};
-
-function TextInput({ className = '', ...props }) {
-  return (
-    <input
-      {...props}
-      className={[
-        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
-        'disabled:cursor-not-allowed disabled:bg-slate-100',
-        className,
-      ].join(' ')}
-    />
-  );
-}
-
-TextInput.propTypes = {
-  className: PropTypes.string,
-};
-
-function SelectInput({ children, className = '', ...props }) {
-  return (
-    <select
-      {...props}
-      className={[
-        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
-        'disabled:cursor-not-allowed disabled:bg-slate-100',
-        className,
-      ].join(' ')}
-    >
-      {children}
-    </select>
-  );
-}
-
-SelectInput.propTypes = {
-  children: PropTypes.node.isRequired,
-  className: PropTypes.string,
-};
-
 function TextareaInput({ className = '', ...props }) {
   return (
     <textarea
@@ -115,100 +83,19 @@ function TextareaInput({ className = '', ...props }) {
   );
 }
 
-TextareaInput.propTypes = {
-  className: PropTypes.string,
-};
-
-function NumberInput({ className = '', ...props }) {
+function MoneyInput({ name, value, onChange }) {
   return (
-    <input
+    <Input
       type="number"
       step="0.01"
       min="0"
-      {...props}
-      className={[
-        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
-        'disabled:cursor-not-allowed disabled:bg-slate-100',
-        className,
-      ].join(' ')}
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder="0,00"
     />
   );
 }
-
-NumberInput.propTypes = {
-  className: PropTypes.string,
-};
-
-function DateField({ name, value, onChange, required = false, min }) {
-  const handleHoje = () => {
-    onChange({
-      target: {
-        name,
-        value: hojeISO(),
-      },
-    });
-  };
-
-  const handleLimpar = () => {
-    onChange({
-      target: {
-        name,
-        value: '',
-      },
-    });
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="relative">
-        <FontAwesomeIcon
-          icon={faCalendarDays}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-        />
-
-        <input
-          type="date"
-          name={name}
-          value={value || ''}
-          onChange={onChange}
-          required={required}
-          min={min}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={handleHoje}
-          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
-        >
-          <FontAwesomeIcon icon={faCalendarDays} />
-          Hoje
-        </button>
-
-        {!!value && (
-          <button
-            type="button"
-            onClick={handleLimpar}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-            Limpar
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-DateField.propTypes = {
-  name: PropTypes.string.isRequired,
-  value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-  required: PropTypes.bool,
-  min: PropTypes.string,
-};
 
 function SeguroForm({
   onSubmit,
@@ -235,12 +122,14 @@ function SeguroForm({
       setFormData({
         ...ESTADO_INICIAL_VAZIO,
         ...initialData,
+        tipoSeguro: initialData.tipoSeguro || TIPO_SEGURO.EQUIPAMENTO,
         tipoVinculo: tipoVinculoInicial,
         dataInicio: initialData.dataInicio
           ? initialData.dataInicio.split('T')[0]
           : '',
         dataFim: initialData.dataFim ? initialData.dataFim.split('T')[0] : '',
         premioTotal: Number(initialData.premioTotal || 0),
+        lmiColisao: Number(initialData.lmiColisao || 0),
         lmiIncendio: Number(initialData.lmiIncendio || 0),
         lmiDanosEletricos: Number(initialData.lmiDanosEletricos || 0),
         lmiRoubo: Number(initialData.lmiRoubo || 0),
@@ -251,11 +140,31 @@ function SeguroForm({
         lmiDanosMorais: Number(initialData.lmiDanosMorais || 0),
         lmiAPP: Number(initialData.lmiAPP || 0),
         lmiVendaval: Number(initialData.lmiVendaval || 0),
+        lmiDanosCausaExterna: Number(initialData.lmiDanosCausaExterna || 0),
+        lmiPerdaLucroBruto: Number(initialData.lmiPerdaLucroBruto || 0),
       });
     } else {
       setFormData(ESTADO_INICIAL_VAZIO);
     }
   }, [isEditing, initialData]);
+
+  const coberturaFields = useMemo(() => {
+    return getCoberturaFieldsByTipo(formData.tipoSeguro);
+  }, [formData.tipoSeguro]);
+
+  const equipamentosFiltrados = useMemo(() => {
+    if (formData.tipoVinculo !== TIPOS_VINCULO.EQUIPAMENTO) {
+      return [];
+    }
+
+    if (!formData.unidadeId) {
+      return equipamentosDisponiveis;
+    }
+
+    return equipamentosDisponiveis.filter(
+      (eq) => String(eq.unidadeId) === String(formData.unidadeId)
+    );
+  }, [formData.tipoVinculo, formData.unidadeId, equipamentosDisponiveis]);
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -286,18 +195,20 @@ function SeguroForm({
     }
   };
 
-  const equipamentosFiltradosPorUnidade = useMemo(() => {
-    if (
-      formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO &&
-      formData.unidadeId
-    ) {
-      return equipamentosDisponiveis.filter(
-        (eq) => String(eq.unidadeId) === String(formData.unidadeId)
-      );
-    }
+  const handleTipoSeguroChange = (e) => {
+    const novoTipoSeguro = e.target.value;
 
-    return [];
-  }, [formData.tipoVinculo, formData.unidadeId, equipamentosDisponiveis]);
+    setFormData((prev) =>
+      sanitizeCoberturasByTipo({
+        ...prev,
+        tipoSeguro: novoTipoSeguro,
+      })
+    );
+
+    if (error) {
+      setError('');
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -338,7 +249,7 @@ function SeguroForm({
     setIsSubmitting(true);
 
     try {
-      const payload = {
+      const payload = sanitizeCoberturasByTipo({
         ...formData,
         apoliceNumero: formData.apoliceNumero.trim(),
         seguradora: formData.seguradora.trim(),
@@ -348,18 +259,17 @@ function SeguroForm({
             ? formData.equipamentoId
             : null,
         unidadeId:
-          formData.tipoVinculo === TIPOS_VINCULO.UNIDADE
+          formData.tipoVinculo === TIPOS_VINCULO.UNIDADE ||
+          formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO
             ? formData.unidadeId
-            : formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO
-              ? formData.unidadeId
-              : null,
-      };
+            : null,
+      });
 
       await onSubmit(payload);
-    } catch (err) {
+    } catch (apiError) {
       setError(
-        err?.response?.data?.message ||
-          err?.message ||
+        apiError?.response?.data?.message ||
+          apiError?.message ||
           'Ocorreu um erro ao salvar o seguro.'
       );
     } finally {
@@ -376,317 +286,200 @@ function SeguroForm({
       ) : null}
 
       <PageSection
-        title="Detalhes da apólice"
-        description="Informações principais de identificação e vigência do seguro."
+        title="Informações da apólice"
+        description="Dados principais de identificação, vigência e enquadramento."
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <FontAwesomeIcon icon={faShieldAlt} />
-          </span>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Cadastro principal da apólice
-            </p>
-            <p className="text-sm text-slate-500">
-              Preencha os dados básicos do contrato de seguro.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
           <FormField label="Número da apólice" required>
-            <TextInput
-              type="text"
+            <Input
               name="apoliceNumero"
               value={formData.apoliceNumero}
               onChange={handleChange}
               placeholder="Digite o número da apólice"
-              required
             />
           </FormField>
 
           <FormField label="Seguradora" required>
-            <TextInput
-              type="text"
+            <Input
               name="seguradora"
               value={formData.seguradora}
               onChange={handleChange}
               placeholder="Digite a seguradora"
-              required
             />
           </FormField>
 
           <FormField
-            label="Início da vigência"
+            label="Tipo de seguro"
             required
-            hint="Você pode selecionar no calendário ou digitar."
+            hint="Esse campo controla quais coberturas são coerentes para a apólice."
           >
-            <DateField
+            <Select
+              name="tipoSeguro"
+              value={formData.tipoSeguro}
+              onChange={handleTipoSeguroChange}
+            >
+              {TIPO_SEGURO_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </FormField>
+
+          <FormField label="Data de início" required>
+            <DateInput
               name="dataInicio"
               value={formData.dataInicio}
               onChange={handleChange}
-              required
             />
           </FormField>
 
-          <FormField
-            label="Fim da vigência"
-            required
-            hint="A vigência final não pode ser anterior ao início."
-          >
-            <DateField
+          <FormField label="Data de fim" required>
+            <DateInput
               name="dataFim"
               value={formData.dataFim}
-              onChange={handleChange}
-              required
               min={formData.dataInicio || undefined}
+              onChange={handleChange}
             />
           </FormField>
-        </div>
+
+          <FormField label="Prêmio total">
+            <MoneyInput
+              name="premioTotal"
+              value={formData.premioTotal}
+              onChange={handleChange}
+            />
+          </FormField>
+        </ResponsiveGrid>
       </PageSection>
 
       <PageSection
-        title="Objeto segurado"
-        description="Defina se a apólice é geral, vinculada à unidade ou a um equipamento."
+        title="Vínculo do seguro"
+        description="Defina se a apólice cobre um equipamento, uma unidade ou uso geral."
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-600">
-            <FontAwesomeIcon icon={faHospital} />
-          </span>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Vínculo da cobertura
-            </p>
-            <p className="text-sm text-slate-500">
-              Escolha o alvo segurado para manter o controle correto da apólice.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <FormField label="Tipo de vínculo">
-            <SelectInput
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
+          <FormField label="Tipo de vínculo" required>
+            <Select
               name="tipoVinculo"
               value={formData.tipoVinculo}
               onChange={handleTipoVinculoChange}
             >
-              <option value={TIPOS_VINCULO.GERAL}>
-                Geral (sem vínculo específico)
-              </option>
-              <option value={TIPOS_VINCULO.UNIDADE}>
-                Vincular à unidade
-              </option>
-              <option value={TIPOS_VINCULO.EQUIPAMENTO}>
-                Vincular ao equipamento
-              </option>
-            </SelectInput>
+              <option value={TIPOS_VINCULO.GERAL}>Geral</option>
+              <option value={TIPOS_VINCULO.UNIDADE}>Unidade</option>
+              <option value={TIPOS_VINCULO.EQUIPAMENTO}>Equipamento</option>
+            </Select>
           </FormField>
 
-          {(formData.tipoVinculo === TIPOS_VINCULO.UNIDADE ||
-            formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO) && (
+          {formData.tipoVinculo !== TIPOS_VINCULO.GERAL && (
             <FormField label="Unidade" required>
-              <SelectInput
+              <Select
                 name="unidadeId"
                 value={formData.unidadeId}
                 onChange={handleChange}
-                required
               >
-                <option value="">Selecione a unidade</option>
-                {unidadesDisponiveis.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.nomeSistema}
+                <option value="">Selecione</option>
+                {unidadesDisponiveis.map((unidade) => (
+                  <option key={unidade.id} value={unidade.id}>
+                    {unidade.nomeSistema || unidade.nomeFantasia || unidade.nome}
                   </option>
                 ))}
-              </SelectInput>
+              </Select>
             </FormField>
           )}
 
           {formData.tipoVinculo === TIPOS_VINCULO.EQUIPAMENTO && (
             <FormField label="Equipamento" required>
-              <SelectInput
+              <Select
                 name="equipamentoId"
                 value={formData.equipamentoId}
                 onChange={handleChange}
-                required
-                disabled={!formData.unidadeId}
               >
-                <option value="">Selecione o equipamento</option>
-                {equipamentosFiltradosPorUnidade.map((eq) => (
-                  <option key={eq.id} value={eq.id}>
-                    {eq.modelo} (Tag: {eq.tag})
+                <option value="">Selecione</option>
+                {equipamentosFiltrados.map((equipamento) => (
+                  <option key={equipamento.id} value={equipamento.id}>
+                    {equipamento.modelo} {equipamento.tag ? `(${equipamento.tag})` : ''}
                   </option>
                 ))}
-              </SelectInput>
+              </Select>
             </FormField>
           )}
+        </ResponsiveGrid>
+
+        <div className="mt-5">
+          <FormField
+            label="Descrição complementar"
+            hint="Use para observações operacionais, cláusulas especiais ou resumo livre da cobertura."
+          >
+            <TextareaInput
+              rows={4}
+              name="cobertura"
+              value={formData.cobertura}
+              onChange={handleChange}
+              placeholder="Descreva observações relevantes da apólice..."
+            />
+          </FormField>
         </div>
       </PageSection>
 
       <PageSection
-        title="Coberturas e valores"
-        description="Informe os valores segurados por categoria para controle detalhado da apólice."
+        title="Coberturas"
+        description="A lista abaixo muda conforme o tipo de seguro selecionado."
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 text-amber-600">
-            <FontAwesomeIcon icon={faCoins} />
-          </span>
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
+          {coberturaFields.map((fieldKey) => {
+            const config = COBERTURA_FIELDS[fieldKey];
 
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Limites máximos de indenização
-            </p>
-            <p className="text-sm text-slate-500">
-              Preencha os valores conforme a cobertura contratada.
-            </p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <FormField label="Prêmio total (custo)">
-            <NumberInput
-              name="premioTotal"
-              value={formData.premioTotal}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Incêndio / explosão">
-            <NumberInput
-              name="lmiIncendio"
-              value={formData.lmiIncendio}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Danos elétricos">
-            <NumberInput
-              name="lmiDanosEletricos"
-              value={formData.lmiDanosEletricos}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Roubo / furto">
-            <NumberInput
-              name="lmiRoubo"
-              value={formData.lmiRoubo}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Quebra de vidros">
-            <NumberInput
-              name="lmiVidros"
-              value={formData.lmiVidros}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Vendaval">
-            <NumberInput
-              name="lmiVendaval"
-              value={formData.lmiVendaval}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Responsabilidade civil">
-            <NumberInput
-              name="lmiResponsabilidadeCivil"
-              value={formData.lmiResponsabilidadeCivil}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Danos materiais">
-            <NumberInput
-              name="lmiDanosMateriais"
-              value={formData.lmiDanosMateriais}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Danos corporais">
-            <NumberInput
-              name="lmiDanosCorporais"
-              value={formData.lmiDanosCorporais}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="Danos morais">
-            <NumberInput
-              name="lmiDanosMorais"
-              value={formData.lmiDanosMorais}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-
-          <FormField label="APP (passageiros)">
-            <NumberInput
-              name="lmiAPP"
-              value={formData.lmiAPP}
-              onChange={handleChange}
-              placeholder="0,00"
-            />
-          </FormField>
-        </div>
-
-        <div className="mt-4">
-          <FormField label="Observações da cobertura">
-            <TextareaInput
-              name="cobertura"
-              rows={4}
-              value={formData.cobertura}
-              onChange={handleChange}
-              placeholder="Detalhes adicionais sobre cláusulas, franquias, exclusões ou observações relevantes"
-            />
-          </FormField>
-        </div>
+            return (
+              <FormField key={fieldKey} label={config.label}>
+                <MoneyInput
+                  name={fieldKey}
+                  value={formData[fieldKey]}
+                  onChange={handleChange}
+                />
+              </FormField>
+            );
+          })}
+        </ResponsiveGrid>
       </PageSection>
 
       <div className="flex flex-wrap justify-end gap-3">
-        <button
-          type="button"
-          className="btn btn-secondary"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          <FontAwesomeIcon icon={faTimes} />
-          Cancelar
-        </button>
+        {onCancel ? (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onCancel}
+            disabled={isSubmitting}
+          >
+            <FontAwesomeIcon icon={faTimes} />
+            Cancelar
+          </Button>
+        ) : null}
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-        >
-          <FontAwesomeIcon
-            icon={isSubmitting ? faSpinner : faSave}
-            spin={isSubmitting}
-          />
-          {isSubmitting
-            ? 'Salvando...'
-            : isEditing
-              ? 'Salvar alterações'
-              : 'Salvar seguro'}
-        </button>
+        <Button type="submit" disabled={isSubmitting}>
+          <FontAwesomeIcon icon={faSave} />
+          {isSubmitting ? 'Salvando...' : 'Salvar seguro'}
+        </Button>
       </div>
     </form>
   );
 }
+
+FormField.propTypes = {
+  label: PropTypes.string.isRequired,
+  required: PropTypes.bool,
+  hint: PropTypes.string,
+  children: PropTypes.node.isRequired,
+};
+
+TextareaInput.propTypes = {
+  className: PropTypes.string,
+};
+
+MoneyInput.propTypes = {
+  name: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onChange: PropTypes.func.isRequired,
+};
 
 SeguroForm.propTypes = {
   onSubmit: PropTypes.func.isRequired,

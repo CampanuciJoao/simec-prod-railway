@@ -4,9 +4,9 @@ import { faArrowLeft, faFileContract } from '@fortawesome/free-solid-svg-icons';
 
 import { useDetalhesContratoPage } from '../../hooks/contratos/useDetalhesContratoPage';
 
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageState from '../../components/ui/feedback/PageState';
 import Button from '../../components/ui/primitives/Button';
 
 import ContratoDetalhesSection from '../../components/contratos/ContratoDetalhesSection';

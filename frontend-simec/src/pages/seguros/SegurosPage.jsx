@@ -1,5 +1,6 @@
 import React from 'react';
 import { formatarData } from '../../utils/timeUtils';
+import { getCoberturasAtivas, TIPO_SEGURO_OPTIONS } from '../../utils/seguros';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faEdit,
@@ -16,12 +17,13 @@ import {
 
 import { useSegurosPage } from '../../hooks/seguros/useSegurosPage';
 
-import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
-import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
-import Card from '../../components/ui/Card';
+import GlobalFilterBar from '../../components/ui/filters/GlobalFilterBar';
+import ModalConfirmacao from '../../components/ui/feedback/ModalConfirmacao';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageState from '../../components/ui/feedback/PageState';
+import Card from '../../components/ui/primitives/Card';
+import Button from '../../components/ui/primitives/Button';
 
 const getStatusBadgeClass = (statusText) => {
   const normalized = String(statusText || '').toLowerCase();
@@ -55,6 +57,18 @@ const getRowHighlightClass = (statusText) => {
 
   return 'border-l-slate-300';
 };
+
+function getTipoSeguroLabel(tipoSeguro) {
+  const option = TIPO_SEGURO_OPTIONS.find((item) => item.value === tipoSeguro);
+  return option?.label || tipoSeguro || 'Não informado';
+}
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+}
 
 function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {
@@ -130,17 +144,7 @@ function ActiveFiltersBar({ filters = [], onRemove, onClearAll }) {
 }
 
 function renderCoberturas(seguro) {
-  const coberturas = [
-    { label: 'Incêndio', value: seguro.lmiIncendio },
-    { label: 'Danos Elétricos', value: seguro.lmiDanosEletricos },
-    { label: 'Roubo/Furto', value: seguro.lmiRoubo },
-    { label: 'Vidros', value: seguro.lmiVidros },
-    { label: 'Resp. Civil', value: seguro.lmiResponsabilidadeCivil },
-    { label: 'Danos Materiais', value: seguro.lmiDanosMateriais },
-    { label: 'Danos Corporais', value: seguro.lmiDanosCorporais },
-    { label: 'Danos Morais', value: seguro.lmiDanosMorais },
-    { label: 'APP', value: seguro.lmiAPP },
-  ].filter((item) => Number(item.value) > 0);
+  const coberturas = getCoberturasAtivas(seguro);
 
   if (!coberturas.length) {
     return (
@@ -154,10 +158,10 @@ function renderCoberturas(seguro) {
     <div className="flex flex-wrap gap-2">
       {coberturas.map((item) => (
         <span
-          key={item.label}
+          key={item.key}
           className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
         >
-          {item.label}: {Number(item.value).toLocaleString('pt-BR')}
+          {item.label}: {formatarMoeda(item.value)}
         </span>
       ))}
     </div>
@@ -182,200 +186,191 @@ function SegurosPage() {
         isDestructive
       />
 
-      <PageLayout
-        background="slate"
-        padded
-        fullHeight
-        contentClassName="page-stack content-fade-in"
-      >
-        <PageHeader
-          title="Gestão de Seguros"
-          subtitle="Acompanhe, filtre e gerencie as apólices cadastradas"
-          icon={faShieldAlt}
-          actions={
-            <button type="button" className="btn btn-primary" onClick={page.goToCreate}>
-              <FontAwesomeIcon icon={faPlus} /> Novo Seguro
-            </button>
-          }
-        />
-
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <KpiCard
-            icon={faFileShield}
-            title="Total"
-            value={page.metricas.total}
-            tone="blue"
-            onClick={page.clearAllFilters}
-          />
-
-          <KpiCard
+      <PageLayout background="slate" padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title="Gestão de Seguros"
+            subtitle="Acompanhe, filtre e gerencie as apólices cadastradas"
             icon={faShieldAlt}
-            title="Ativos"
-            value={page.metricas.ativos}
-            tone="green"
-            onClick={() => page.filtrarPorStatus('Ativo')}
+            actions={
+              <Button type="button" onClick={page.goToCreate}>
+                <FontAwesomeIcon icon={faPlus} />
+                Novo Seguro
+              </Button>
+            }
           />
 
-          <KpiCard
-            icon={faClockRotateLeft}
-            title="Vencendo"
-            value={page.metricas.vencendo}
-            tone="yellow"
-            onClick={() => page.filtrarPorStatus('Vence em breve')}
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+            <KpiCard
+              icon={faFileShield}
+              title="Total"
+              value={page.metricas.total}
+              tone="blue"
+              onClick={page.clearAllFilters}
+            />
+
+            <KpiCard
+              icon={faShieldAlt}
+              title="Ativos"
+              value={page.metricas.ativos}
+              tone="green"
+              onClick={() => page.filtrarPorStatus('Ativo')}
+            />
+
+            <KpiCard
+              icon={faClockRotateLeft}
+              title="Vencendo"
+              value={page.metricas.vencendo}
+              tone="yellow"
+              onClick={() => page.filtrarPorStatus('Vence em breve')}
+            />
+
+            <KpiCard
+              icon={faTriangleExclamation}
+              title="Vencidos"
+              value={page.metricas.vencidos}
+              tone="red"
+              onClick={() => page.filtrarPorStatus('Expirado')}
+            />
+          </div>
+
+          <GlobalFilterBar
+            searchTerm={page.searchTerm}
+            onSearchChange={page.onSearchChange}
+            searchPlaceholder="Buscar por apólice, seguradora, vínculo ou unidade..."
+            selectFilters={page.selectFiltersConfig}
           />
 
-          <KpiCard
-            icon={faTriangleExclamation}
-            title="Vencidos"
-            value={page.metricas.vencidos}
-            tone="red"
-            onClick={() => page.filtrarPorStatus('Expirado')}
+          <ActiveFiltersBar
+            filters={page.activeFilters}
+            onRemove={page.clearFilter}
+            onClearAll={page.clearAllFilters}
           />
-        </div>
 
-        <GlobalFilterBar
-          className="w-full"
-          searchTerm={page.searchTerm}
-          onSearchChange={page.onSearchChange}
-          searchPlaceholder="Buscar por apólice, vínculo ou seguradora..."
-          selectFilters={page.selectFiltersConfig}
-        />
+          {isInitialLoading || hasError || isEmpty ? (
+            <PageState
+              loading={isInitialLoading}
+              error={page.error || ''}
+              isEmpty={isEmpty}
+              emptyMessage="Nenhum seguro encontrado."
+            />
+          ) : (
+            <div className="grid grid-cols-1 gap-4">
+              {page.seguros.map((seguro) => {
+                const statusDinamico = page.getStatusDinamico(seguro);
 
-        <ActiveFiltersBar
-          filters={page.activeFilters}
-          onRemove={page.clearFilter}
-          onClearAll={page.clearAllFilters}
-        />
+                return (
+                  <Card
+                    key={seguro.id}
+                    className={[
+                      'border-l-4',
+                      getRowHighlightClass(statusDinamico),
+                    ].join(' ')}
+                  >
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-lg font-semibold text-slate-900">
+                              Apólice {seguro.apoliceNumero}
+                            </h3>
 
-        {isInitialLoading || hasError || isEmpty ? (
-          <PageState
-            loading={isInitialLoading}
-            error={page.error?.message || page.error || ''}
-            isEmpty={isEmpty}
-            emptyMessage="Nenhum seguro encontrado."
-          />
-        ) : (
-          <div className="flex flex-col gap-4">
-            {page.seguros.map((seguro) => {
-              const statusDinamico = page.getStatusDinamico(seguro);
+                            <span
+                              className={[
+                                'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold',
+                                getStatusBadgeClass(statusDinamico),
+                              ].join(' ')}
+                            >
+                              {statusDinamico}
+                            </span>
+                          </div>
 
-              return (
-                <div
-                  key={seguro.id}
-                  className={`overflow-hidden rounded-xl border-y border-r border-slate-200 border-l-[8px] bg-white shadow-sm transition-all hover:shadow-md ${getRowHighlightClass(
-                    statusDinamico
-                  )}`}
-                >
-                  <div className="flex flex-col gap-5 p-5">
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="flex min-w-0 flex-1 items-start gap-4">
-                        <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
-                          <FontAwesomeIcon icon={faShieldAlt} />
+                          <p className="mt-1 text-sm text-slate-500">
+                            {seguro.seguradora}
+                          </p>
                         </div>
 
-                        <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                              Apólice
-                            </span>
-                            <div className="mt-1 text-base font-bold text-slate-900">
-                              {seguro.apoliceNumero}
-                            </div>
-                          </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => page.goToDetails(seguro.id)}
+                          >
+                            <FontAwesomeIcon icon={faEye} />
+                            Ver
+                          </Button>
 
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                              Seguradora
-                            </span>
-                            <div className="mt-1 text-sm font-semibold text-slate-800">
-                              {seguro.seguradora}
-                            </div>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => page.goToEdit(seguro.id)}
+                          >
+                            <FontAwesomeIcon icon={faEdit} />
+                            Editar
+                          </Button>
 
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                              Vínculo
-                            </span>
-                            <div className="mt-1 text-sm font-semibold text-slate-800">
-                              {seguro.nomeVinculo || '—'}
-                            </div>
-                          </div>
-
-                          <div>
-                            <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                              Vigência final
-                            </span>
-                            <div className="mt-1 text-sm font-semibold text-slate-800">
-                              {formatarData(seguro.dataFim)}
-                            </div>
-                          </div>
+                          <Button
+                            type="button"
+                            variant="danger"
+                            onClick={() => page.deleteModal.openModal(seguro)}
+                          >
+                            <FontAwesomeIcon icon={faTrashAlt} />
+                            Excluir
+                          </Button>
                         </div>
                       </div>
 
-                      <div className="shrink-0">
-                        <span
-                          className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${getStatusBadgeClass(
-                            statusDinamico
-                          )}`}
-                        >
-                          {statusDinamico}
-                        </span>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Tipo de seguro
+                          </p>
+                          <p className="mt-1 font-medium text-slate-800">
+                            {getTipoSeguroLabel(seguro.tipoSeguro)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Vínculo
+                          </p>
+                          <p className="mt-1 font-medium text-slate-800">
+                            {seguro.nomeVinculo || page.getNomeUnidade(seguro) || 'Geral'}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Vigência
+                          </p>
+                          <p className="mt-1 font-medium text-slate-800">
+                            {formatarData(seguro.dataInicio)} até {formatarData(seguro.dataFim)}
+                          </p>
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Prêmio total
+                          </p>
+                          <p className="mt-1 font-medium text-slate-800">
+                            {formatarMoeda(seguro.premioTotal)}
+                          </p>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[260px_1fr_auto]">
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-                          <FontAwesomeIcon icon={faBuilding} className="text-slate-500" />
-                          Unidade
-                        </h5>
-
-                        <span className="inline-flex rounded-full bg-white px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200">
-                          {page.getNomeUnidadeSeguro(seguro) || 'Não informada'}
-                        </span>
-                      </div>
-
-                      <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
-                        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-                          <FontAwesomeIcon icon={faShieldAlt} className="text-slate-500" />
+                      <div>
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                           Coberturas
-                        </h5>
-
+                        </p>
                         {renderCoberturas(seguro)}
                       </div>
-
-                      <div className="flex flex-col justify-end gap-2 xl:min-w-[160px]">
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => page.goToDetails(seguro.id)}
-                        >
-                          <FontAwesomeIcon icon={faEye} /> Detalhes
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn btn-secondary"
-                          onClick={() => page.goToEdit(seguro.id)}
-                        >
-                          <FontAwesomeIcon icon={faEdit} /> Editar
-                        </button>
-
-                        <button
-                          type="button"
-                          className="btn btn-danger"
-                          onClick={() => page.deleteModal.openModal(seguro)}
-                        >
-                          <FontAwesomeIcon icon={faTrashAlt} /> Excluir
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </PageLayout>
     </>
   );

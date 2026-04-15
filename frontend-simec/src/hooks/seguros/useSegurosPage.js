@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSeguros } from './useSeguros';
 import { useModal } from '../shared/useModal';
 import { useToast } from '../../contexts/ToastContext';
+import { TIPO_SEGURO_OPTIONS } from '../../utils/seguros';
 
 export function useSegurosPage() {
   const navigate = useNavigate();
@@ -26,13 +27,18 @@ export function useSegurosPage() {
   const deleteModal = useModal();
 
   const confirmarExclusao = async () => {
-    if (!deleteModal.modalData) return;
+    if (!deleteModal.modalData?.id) return;
 
     try {
       await removerSeguro(deleteModal.modalData.id);
       addToast('Seguro excluído com sucesso!', 'success');
     } catch (err) {
-      addToast('Erro ao excluir seguro.', 'error');
+      addToast(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Erro ao excluir seguro.',
+        'error'
+      );
     } finally {
       deleteModal.closeModal();
     }
@@ -41,7 +47,7 @@ export function useSegurosPage() {
   const seguradorasOptions = useMemo(
     () =>
       [...new Set((seguros || []).map((s) => s.seguradora).filter(Boolean))]
-        .sort()
+        .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'))
         .map((seguradora) => ({
           value: seguradora,
           label: seguradora,
@@ -58,12 +64,23 @@ export function useSegurosPage() {
     []
   );
 
+  const tipoSeguroOptions = useMemo(
+    () =>
+      TIPO_SEGURO_OPTIONS.map((item) => ({
+        value: item.value,
+        label: item.label,
+      })),
+    []
+  );
+
   const unidadesOptions = useMemo(
     () =>
-      (unidadesDisponiveis || []).map((unidade) => ({
-        value: unidade.nomeSistema || unidade.nome,
-        label: unidade.nomeSistema || unidade.nome,
-      })),
+      (unidadesDisponiveis || [])
+        .map((unidade) => ({
+          value: unidade.nomeSistema || unidade.nome,
+          label: unidade.nomeSistema || unidade.nome,
+        }))
+        .filter((item) => item.value),
     [unidadesDisponiveis]
   );
 
@@ -73,7 +90,8 @@ export function useSegurosPage() {
         id: 'seguradora',
         label: 'Seguradora',
         value: filtros.seguradora,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, seguradora: value })),
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, seguradora: value })),
         options: seguradorasOptions,
         defaultLabel: 'Todas seguradoras',
       },
@@ -81,7 +99,8 @@ export function useSegurosPage() {
         id: 'status',
         label: 'Status',
         value: filtros.status,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, status: value })),
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, status: value })),
         options: statusOptions,
         defaultLabel: 'Todos os status',
       },
@@ -89,19 +108,40 @@ export function useSegurosPage() {
         id: 'unidade',
         label: 'Unidade',
         value: filtros.unidade,
-        onChange: (value) => setFiltros((prev) => ({ ...prev, unidade: value })),
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, unidade: value })),
         options: unidadesOptions,
         defaultLabel: 'Todas as unidades',
       },
+      {
+        id: 'tipoSeguro',
+        label: 'Tipo de seguro',
+        value: filtros.tipoSeguro || '',
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, tipoSeguro: value })),
+        options: tipoSeguroOptions,
+        defaultLabel: 'Todos os tipos',
+      },
     ],
-    [filtros, setFiltros, seguradorasOptions, statusOptions, unidadesOptions]
+    [
+      filtros,
+      setFiltros,
+      seguradorasOptions,
+      statusOptions,
+      unidadesOptions,
+      tipoSeguroOptions,
+    ]
   );
 
   const metricas = useMemo(() => {
     const total = seguros.length;
     const ativos = seguros.filter((s) => getStatusDinamico(s) === 'Ativo').length;
-    const vencendo = seguros.filter((s) => getStatusDinamico(s) === 'Vence em breve').length;
-    const vencidos = seguros.filter((s) => getStatusDinamico(s) === 'Expirado').length;
+    const vencendo = seguros.filter(
+      (s) => getStatusDinamico(s) === 'Vence em breve'
+    ).length;
+    const vencidos = seguros.filter(
+      (s) => getStatusDinamico(s) === 'Expirado'
+    ).length;
 
     return {
       total,
@@ -141,8 +181,18 @@ export function useSegurosPage() {
             value: filtros.unidade,
           }
         : null,
+      filtros.tipoSeguro
+        ? {
+            key: 'tipoSeguro',
+            label: `Tipo: ${
+              tipoSeguroOptions.find((item) => item.value === filtros.tipoSeguro)
+                ?.label || filtros.tipoSeguro
+            }`,
+            value: filtros.tipoSeguro,
+          }
+        : null,
     ].filter(Boolean);
-  }, [searchTerm, filtros]);
+  }, [searchTerm, filtros, tipoSeguroOptions]);
 
   const clearFilter = (key) => {
     if (key === 'searchTerm') {
@@ -159,6 +209,7 @@ export function useSegurosPage() {
       seguradora: '',
       status: '',
       unidade: '',
+      tipoSeguro: '',
     });
   };
 
@@ -175,18 +226,18 @@ export function useSegurosPage() {
     seguros,
     loading,
     error,
+    metricas,
     searchTerm,
     onSearchChange,
     selectFiltersConfig,
-    deleteModal,
-    confirmarExclusao,
-    metricas,
     activeFilters,
     clearFilter,
     clearAllFilters,
-    getNomeUnidadeSeguro: getNomeUnidade,
-    getStatusDinamico,
     filtrarPorStatus,
+    deleteModal,
+    confirmarExclusao,
+    getNomeUnidade,
+    getStatusDinamico,
     goToCreate: () => navigate('/seguros/adicionar'),
     goToEdit: (id) => navigate(`/seguros/editar/${id}`),
     goToDetails: (id) => navigate(`/seguros/detalhes/${id}`),
