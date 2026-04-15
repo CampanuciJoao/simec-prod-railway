@@ -10,8 +10,8 @@ import {
   faFileShield,
 } from '@fortawesome/free-solid-svg-icons';
 
-import PageSection from '../ui/layout/PageSection';
-import ResponsiveGrid from '../ui/layout/ResponsiveGrid';
+import PageSection from '@/components/ui/layout/PageSection';
+import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
 import Input from '../ui/primitives/Input';
 import Select from '../ui/primitives/Select';
 import DateInput from '../ui/primitives/DateInput';

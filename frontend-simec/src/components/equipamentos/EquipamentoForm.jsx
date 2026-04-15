@@ -10,7 +10,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import PageSection from '../ui/PageSection';
-import { ResponsiveGrid, FormActions } from '../ui/layout';
+import { ResponsiveGrid, FormActions } from '@/components/ui/layout';
 import { getUnidades } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { getErrorMessage } from '../../utils/getErrorMessage';

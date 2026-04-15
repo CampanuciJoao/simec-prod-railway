@@ -1,172 +1,253 @@
-import { useMemo, useState } from 'react';
-import { useAlertas } from '../../contexts/AlertasContext';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+
+import {
+  getAlertas,
+  updateStatusAlerta,
+  dismissAlerta,
+} from '@/services/api';
+
+import { useToast } from '@/contexts/ToastContext';
+
+function normalizarArray(data) {
+  return Array.isArray(data) ? data : [];
+}
+
+function calcularMetricas(alertas) {
+  return {
+    total: alertas.length,
+    naoVistos: alertas.filter((a) => a.status === 'NaoVisto').length,
+    vistos: alertas.filter((a) => a.status === 'Visto').length,
+    criticos: alertas.filter((a) => a.prioridade === 'Alta').length,
+  };
+}
 
 export function useAlertasPage() {
-  const { alertas = [], loading, updateStatus, dismissAlerta } = useAlertas();
+  const { addToast } = useToast();
+
+  const [alertas, setAlertas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filtros, setFiltros] = useState({
+    status: '',
     tipo: '',
-    status: 'NaoVisto',
     prioridade: '',
   });
 
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
+  /**
+   * =========================
+   * FETCH
+   * =========================
+   */
+  const fetchAlertas = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  const handleFilterChange = (key, value) => {
-    setFiltros((prev) => ({ ...prev, [key]: value }));
-  };
+      const data = await getAlertas();
+      setAlertas(normalizarArray(data));
+    } catch (err) {
+      setError(err);
+      setAlertas([]);
+      addToast('Erro ao carregar alertas.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
 
+  useEffect(() => {
+    fetchAlertas();
+  }, [fetchAlertas]);
+
+  /**
+   * =========================
+   * FILTROS
+   * =========================
+   */
+  const clearFilter = useCallback((key) => {
+    setFiltros((prev) => ({
+      ...prev,
+      [key]: '',
+    }));
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    setFiltros({
+      status: '',
+      tipo: '',
+      prioridade: '',
+    });
+    setSearchTerm('');
+  }, []);
+
+  const selectFiltersConfig = useMemo(
+    () => [
+      {
+        id: 'status',
+        label: 'Status',
+        value: filtros.status,
+        options: [
+          { label: 'Não visto', value: 'NaoVisto' },
+          { label: 'Visto', value: 'Visto' },
+        ],
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, status: value })),
+      },
+      {
+        id: 'tipo',
+        label: 'Tipo',
+        value: filtros.tipo,
+        options: [
+          { label: 'Alerta', value: 'Alerta' },
+          { label: 'Recomendação', value: 'Recomendação' },
+        ],
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, tipo: value })),
+      },
+      {
+        id: 'prioridade',
+        label: 'Prioridade',
+        value: filtros.prioridade,
+        options: [
+          { label: 'Alta', value: 'Alta' },
+          { label: 'Média', value: 'Media' },
+          { label: 'Baixa', value: 'Baixa' },
+        ],
+        onChange: (value) =>
+          setFiltros((prev) => ({ ...prev, prioridade: value })),
+      },
+    ],
+    [filtros]
+  );
+
+  /**
+   * =========================
+   * FILTRAGEM
+   * =========================
+   */
   const alertasFiltrados = useMemo(() => {
-    return alertas.filter((alerta) => {
+    let items = [...alertas];
+
+    if (searchTerm) {
       const termo = searchTerm.toLowerCase();
 
-      const matchSearch =
-        !termo ||
-        alerta.titulo?.toLowerCase().includes(termo) ||
-        alerta.subtitulo?.toLowerCase().includes(termo) ||
-        alerta.tipo?.toLowerCase().includes(termo);
+      items = items.filter(
+        (a) =>
+          a.titulo?.toLowerCase().includes(termo) ||
+          a.subtitulo?.toLowerCase().includes(termo)
+      );
+    }
 
-      const matchTipo = !filtros.tipo || alerta.tipo === filtros.tipo;
-      const matchStatus = !filtros.status || alerta.status === filtros.status;
-      const matchPrioridade =
-        !filtros.prioridade || alerta.prioridade === filtros.prioridade;
+    if (filtros.status) {
+      items = items.filter((a) => a.status === filtros.status);
+    }
 
-      return matchSearch && matchTipo && matchStatus && matchPrioridade;
-    });
+    if (filtros.tipo) {
+      items = items.filter((a) => a.tipo === filtros.tipo);
+    }
+
+    if (filtros.prioridade) {
+      items = items.filter((a) => a.prioridade === filtros.prioridade);
+    }
+
+    return items;
   }, [alertas, searchTerm, filtros]);
 
-  const tiposOptions = useMemo(() => {
-    return [...new Set(alertas.map((a) => a.tipo).filter(Boolean))].map((tipo) => ({
-      value: tipo,
-      label: tipo,
-    }));
-  }, [alertas]);
-
-  const prioridadesOptions = useMemo(() => {
-    return [...new Set(alertas.map((a) => a.prioridade).filter(Boolean))].map(
-      (prioridade) => ({
-        value: prioridade,
-        label: prioridade,
-      })
-    );
-  }, [alertas]);
-
-  const statusOptions = [
-    { value: 'NaoVisto', label: 'Não visto' },
-    { value: 'Visto', label: 'Visto' },
-  ];
-
-  const selectFiltersConfig = [
-    {
-      id: 'tipo',
-      label: 'Tipo',
-      value: filtros.tipo,
-      onChange: (value) => handleFilterChange('tipo', value),
-      options: tiposOptions,
-      defaultLabel: 'Todos os tipos',
-    },
-    {
-      id: 'status',
-      label: 'Status',
-      value: filtros.status,
-      onChange: (value) => handleFilterChange('status', value),
-      options: statusOptions,
-      defaultLabel: 'Todos os status',
-    },
-    {
-      id: 'prioridade',
-      label: 'Prioridade',
-      value: filtros.prioridade,
-      onChange: (value) => handleFilterChange('prioridade', value),
-      options: prioridadesOptions,
-      defaultLabel: 'Todas as prioridades',
-    },
-  ];
-
+  /**
+   * =========================
+   * MÉTRICAS
+   * =========================
+   */
   const metricas = useMemo(() => {
-    const total = alertas.length;
-    const naoVistos = alertas.filter((a) => a.status === 'NaoVisto').length;
-    const vistos = alertas.filter((a) => a.status === 'Visto').length;
-    const criticos = alertas.filter((a) => a.prioridade === 'Alta').length;
-
-    return {
-      total,
-      naoVistos,
-      vistos,
-      criticos,
-    };
+    return calcularMetricas(alertas);
   }, [alertas]);
 
   const activeFilters = useMemo(() => {
-    return [
-      searchTerm
-        ? {
-            key: 'searchTerm',
-            label: `Busca: ${searchTerm}`,
-            value: searchTerm,
-          }
-        : null,
-      filtros.tipo
-        ? {
-            key: 'tipo',
-            label: `Tipo: ${filtros.tipo}`,
-            value: filtros.tipo,
-          }
-        : null,
-      filtros.status
-        ? {
-            key: 'status',
-            label:
-              filtros.status === 'NaoVisto'
-                ? 'Status: Não visto'
-                : `Status: ${filtros.status}`,
-            value: filtros.status,
-          }
-        : null,
-      filtros.prioridade
-        ? {
-            key: 'prioridade',
-            label: `Prioridade: ${filtros.prioridade}`,
-            value: filtros.prioridade,
-          }
-        : null,
-    ].filter(Boolean);
-  }, [searchTerm, filtros]);
+    const result = [];
 
-  const clearFilter = (key) => {
-    if (key === 'searchTerm') {
-      setSearchTerm('');
-      return;
-    }
+    if (filtros.status)
+      result.push({
+        key: 'status',
+        label: `Status: ${filtros.status}`,
+      });
 
-    setFiltros((prev) => ({ ...prev, [key]: '' }));
-  };
+    if (filtros.tipo)
+      result.push({
+        key: 'tipo',
+        label: `Tipo: ${filtros.tipo}`,
+      });
 
-  const clearAllFilters = () => {
-    setSearchTerm('');
-    setFiltros({
-      tipo: '',
-      status: '',
-      prioridade: '',
-    });
-  };
+    if (filtros.prioridade)
+      result.push({
+        key: 'prioridade',
+        label: `Prioridade: ${filtros.prioridade}`,
+      });
+
+    return result;
+  }, [filtros]);
+
+  /**
+   * =========================
+   * AÇÕES
+   * =========================
+   */
+  const updateStatus = useCallback(
+    async (id, status) => {
+      try {
+        await updateStatusAlerta(id, status);
+
+        setAlertas((prev) =>
+          prev.map((a) =>
+            a.id === id ? { ...a, status } : a
+          )
+        );
+      } catch {
+        addToast('Erro ao atualizar status.', 'error');
+      }
+    },
+    [addToast]
+  );
+
+  const dismissAlerta = useCallback(
+    async (id) => {
+      try {
+        await dismissAlerta(id);
+
+        setAlertas((prev) =>
+          prev.filter((a) => a.id !== id)
+        );
+
+        addToast('Alerta dispensado.', 'success');
+      } catch {
+        addToast('Erro ao dispensar alerta.', 'error');
+      }
+    },
+    [addToast]
+  );
 
   return {
     alertas,
     alertasFiltrados,
     loading,
+    error,
+
     searchTerm,
-    onSearchChange: handleSearchChange,
+    setSearchTerm,
+
     filtros,
+    setFiltros,
     selectFiltersConfig,
-    metricas,
     activeFilters,
+
     clearFilter,
     clearAllFilters,
+
+    metricas,
+
     updateStatus,
     dismissAlerta,
+
+    refetch: fetchAlertas,
   };
 }

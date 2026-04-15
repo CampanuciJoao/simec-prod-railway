@@ -12,7 +12,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import PageSection from '../../ui/PageSection';
-import { ActionBar, EmptyState, LoadingState } from '../../ui/layout';
+import { ActionBar, EmptyState, LoadingState } from '../@/components/ui/layout';
 
 function TabAcessorios({ equipamentoId }) {
   const {

@@ -15,7 +15,7 @@ import {
 
 import ModalConfirmacao from '../../ui/feedback/ModalConfirmacao';
 import PageSection from '../../ui/PageSection';
-import { ActionBar, EmptyState } from '../../ui/layout';
+import { ActionBar, EmptyState } from '../@/components/ui/layout';
 import { formatarData } from '../../../utils/timeUtils';
 import { useResourceAnexos } from '../../../hooks/shared/useResourceAnexos';
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { ResponsiveTabs } from '../ui/layout';
+import { ResponsiveTabs } from '@/components/ui/layout';
 
 function DetalhesEquipamentoTabs({ abas, abaAtiva, onChange }) {
   const tabs = abas.map((aba) => ({

@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faShieldAlt } from '@fortawesome/free-solid-svg-icons';
 
-import PageHeader from '../ui/layout/PageHeader';
+import PageHeader from '@/components/ui/layout/PageHeader';
 import Button from '../ui/primitives/Button';
 
 function SegurosPageHeader({ onCreate }) {

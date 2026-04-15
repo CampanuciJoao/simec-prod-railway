@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle, faEdit } from '@fortawesome/free-solid-svg-icons';
 
-import { EntityInfoGrid, ActionBar } from '../../ui/layout';
+import { EntityInfoGrid, ActionBar } from '../@/components/ui/layout';
 import PageSection from '../../ui/PageSection';
 import { formatarData } from '../../../utils/timeUtils';
 
