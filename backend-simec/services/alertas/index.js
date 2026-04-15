@@ -1,9 +1,9 @@
-export * from './manutencao';
-export * from './seguro';
-export * from './contrato';
-export * from './recomendacao';
+export * from './manutencao/index.js';
+export * from './seguro/index.js';
+export * from './contrato/index.js';
+export * from './recomendacao/index.js';
 
-export { default as gerarAlertasManutencao } from './manutencao';
-export { default as gerarAlertasSeguro } from './seguro';
-export { default as gerarAlertasContrato } from './contrato';
-export { default as gerarAlertasRecomendacao } from './recomendacao';
+export { default as gerarAlertasManutencao } from './manutencao/index.js';
+export { default as gerarAlertasSeguro } from './seguro/index.js';
+export { default as gerarAlertasContrato } from './contrato/index.js';
+export { default as gerarAlertasRecomendacao } from './recomendacao/index.js';

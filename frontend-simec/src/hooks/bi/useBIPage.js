@@ -4,19 +4,68 @@ import { useNavigate } from 'react-router-dom';
 import { getIndicadoresBI } from '@/services/api';
 import { exportarBIPDF } from '@/utils/pdfUtils';
 import { formatarDowntime, somarDowntimeHoras } from '@/utils/bi';
+import { buildDrawerContent } from '@/utils/bi/biDrawerBuilder';
 
-function getDrawerDefaultContent() {
+function toArray(value) {
+  return Array.isArray(value) ? value : [];
+}
+
+function toNumber(value) {
+  return Number(value || 0);
+}
+
+function mapRankingUnidadesToChartData(rankingUnidades = []) {
+  return rankingUnidades.map((item) => ({
+    name: item.nome,
+    value: toNumber(item.horasParado),
+  }));
+}
+
+function mapRankingFrequencia(ranking = []) {
+  return ranking.map((item) => ({
+    ...item,
+    corretivas: toNumber(item.corretivas),
+  }));
+}
+
+function mapRankingDowntime(ranking = []) {
+  return ranking.map((item) => {
+    const horasParado = toNumber(item.horasParado);
+
+    return {
+      ...item,
+      horasParado,
+      downtimeFormatado: formatarDowntime(horasParado),
+    };
+  });
+}
+
+function buildResumoCards(dados, rankingDowntime, rankingUnidades) {
+  const totalAtivos = toNumber(dados?.resumoGeral?.totalAtivos);
+  const preventivas = toNumber(dados?.resumoGeral?.preventivas);
+  const corretivas = toNumber(dados?.resumoGeral?.corretivas);
+
+  const totalDowntimeHoras = somarDowntimeHoras(rankingDowntime, 'horasParado');
+
+  const unidadeCritica = rankingUnidades.length > 0 ? rankingUnidades[0] : null;
+
   return {
-    title: '',
-    subtitle: '',
-    actionLabel: '',
-    onAction: null,
-    items: [],
-    stats: [],
+    totalAtivos,
+    preventivas,
+    corretivas,
+    downtimeAcumulado: formatarDowntime(totalDowntimeHoras),
+    unidadeCritica: unidadeCritica
+      ? {
+          nome: unidadeCritica.nome,
+          downtime: formatarDowntime(unidadeCritica.horasParado),
+        }
+      : null,
   };
 }
 
 export function useBIPage() {
+  const navigate = useNavigate();
+
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -24,8 +73,6 @@ export function useBIPage() {
     open: false,
     type: null,
   });
-
-  const navigate = useNavigate();
 
   const carregarBI = useCallback(async () => {
     setLoading(true);
@@ -50,69 +97,25 @@ export function useBIPage() {
     carregarBI();
   }, [carregarBI]);
 
-  const downtimePorUnidadeChartData = useMemo(() => {
-    const ranking = Array.isArray(dados?.rankingUnidades)
-      ? dados.rankingUnidades
-      : [];
-
-    return ranking.map((item) => ({
-      name: item.nome,
-      value: Number(item.horasParado || 0),
-    }));
+  const rankingUnidades = useMemo(() => {
+    return toArray(dados?.rankingUnidades);
   }, [dados]);
 
-  const rankingFrequencia = useMemo(() => {
-    const ranking = Array.isArray(dados?.rankingFrequencia)
-      ? dados.rankingFrequencia
-      : [];
+  const downtimePorUnidadeChartData = useMemo(() => {
+    return mapRankingUnidadesToChartData(rankingUnidades);
+  }, [rankingUnidades]);
 
-    return ranking.map((item) => ({
-      ...item,
-      corretivas: Number(item.corretivas || 0),
-    }));
+  const rankingFrequencia = useMemo(() => {
+    return mapRankingFrequencia(toArray(dados?.rankingFrequencia));
   }, [dados]);
 
   const rankingDowntime = useMemo(() => {
-    const ranking = Array.isArray(dados?.rankingDowntime)
-      ? dados.rankingDowntime
-      : [];
-
-    return ranking.map((item) => {
-      const horasParado = Number(item.horasParado || 0);
-
-      return {
-        ...item,
-        horasParado,
-        downtimeFormatado: formatarDowntime(horasParado),
-      };
-    });
+    return mapRankingDowntime(toArray(dados?.rankingDowntime));
   }, [dados]);
 
   const resumoCards = useMemo(() => {
-    const totalAtivos = Number(dados?.resumoGeral?.totalAtivos || 0);
-    const preventivas = Number(dados?.resumoGeral?.preventivas || 0);
-    const corretivas = Number(dados?.resumoGeral?.corretivas || 0);
-
-    const totalDowntimeHoras = somarDowntimeHoras(rankingDowntime, 'horasParado');
-
-    const unidadeCritica =
-      Array.isArray(dados?.rankingUnidades) && dados.rankingUnidades.length > 0
-        ? dados.rankingUnidades[0]
-        : null;
-
-    return {
-      totalAtivos,
-      preventivas,
-      corretivas,
-      downtimeAcumulado: formatarDowntime(totalDowntimeHoras),
-      unidadeCritica: unidadeCritica
-        ? {
-            nome: unidadeCritica.nome,
-            downtime: formatarDowntime(unidadeCritica.horasParado),
-          }
-        : null,
-    };
-  }, [dados, rankingDowntime]);
+    return buildResumoCards(dados, rankingDowntime, rankingUnidades);
+  }, [dados, rankingDowntime, rankingUnidades]);
 
   const openDrawer = useCallback((type) => {
     setDrawer({ open: true, type });
@@ -122,54 +125,53 @@ export function useBIPage() {
     setDrawer({ open: false, type: null });
   }, []);
 
-  const handleDrillDownEquipamento = useCallback(
-    (equipamentoId) => {
-      if (!equipamentoId) return;
-
-      navigate('/manutencoes', {
-        state: {
-          filtroEquipamentoId: equipamentoId,
-          filtroTipoInicial: 'Corretiva',
-        },
-      });
+  const goToRoute = useCallback(
+    (pathname, state = undefined) => {
+      navigate(pathname, state ? { state } : undefined);
     },
     [navigate]
   );
 
+  const handleDrillDownEquipamento = useCallback(
+    (equipamentoId) => {
+      if (!equipamentoId) return;
+
+      goToRoute('/manutencoes', {
+        filtroEquipamentoId: equipamentoId,
+        filtroTipoInicial: 'Corretiva',
+      });
+    },
+    [goToRoute]
+  );
+
   const handleGoToAtivos = useCallback(() => {
-    navigate('/equipamentos');
-  }, [navigate]);
+    goToRoute('/equipamentos');
+  }, [goToRoute]);
 
   const handleGoToPreventivas = useCallback(() => {
-    navigate('/manutencoes', {
-      state: {
-        filtroTipoInicial: 'Preventiva',
-      },
+    goToRoute('/manutencoes', {
+      filtroTipoInicial: 'Preventiva',
     });
-  }, [navigate]);
+  }, [goToRoute]);
 
   const handleGoToCorretivas = useCallback(() => {
-    navigate('/manutencoes', {
-      state: {
-        filtroTipoInicial: 'Corretiva',
-      },
+    goToRoute('/manutencoes', {
+      filtroTipoInicial: 'Corretiva',
     });
-  }, [navigate]);
-
-  const handleGoToUnidadeCritica = useCallback(() => {
-    const unidadeNome = dados?.rankingUnidades?.[0]?.nome;
-    if (!unidadeNome) return;
-
-    navigate('/equipamentos', {
-      state: {
-        filtroUnidadeNomeInicial: unidadeNome,
-      },
-    });
-  }, [dados, navigate]);
+  }, [goToRoute]);
 
   const handleGoToDowntime = useCallback(() => {
-    navigate('/manutencoes');
-  }, [navigate]);
+    goToRoute('/manutencoes');
+  }, [goToRoute]);
+
+  const handleGoToUnidadeCritica = useCallback(() => {
+    const unidadeNome = rankingUnidades[0]?.nome;
+    if (!unidadeNome) return;
+
+    goToRoute('/equipamentos', {
+      filtroUnidadeNomeInicial: unidadeNome,
+    });
+  }, [goToRoute, rankingUnidades]);
 
   const handlePrint = useCallback(() => {
     if (!dados) return;
@@ -177,111 +179,51 @@ export function useBIPage() {
   }, [dados]);
 
   const drawerContent = useMemo(() => {
-    if (!drawer.type) {
-      return getDrawerDefaultContent();
-    }
-
-    const contentMap = {
-      ativos: {
-        title: 'Ativos no sistema',
-        subtitle: 'Resumo do parque cadastrado',
-        actionLabel: 'Abrir equipamentos',
-        onAction: handleGoToAtivos,
-        items: [],
-        stats: [{ label: 'Total de ativos', value: resumoCards.totalAtivos }],
+    return buildDrawerContent({
+      type: drawer.type,
+      resumoCards,
+      rankingFrequencia,
+      rankingDowntime,
+      rankingUnidades,
+      handlers: {
+        goToAtivos: handleGoToAtivos,
+        goToPreventivas: handleGoToPreventivas,
+        goToCorretivas: handleGoToCorretivas,
+        goToDowntime: handleGoToDowntime,
+        goToUnidadeCritica: handleGoToUnidadeCritica,
+        drillDown: handleDrillDownEquipamento,
       },
-
-      preventivas: {
-        title: 'Preventivas realizadas',
-        subtitle: 'Indicador consolidado do período',
-        actionLabel: 'Abrir manutenções preventivas',
-        onAction: handleGoToPreventivas,
-        items: [],
-        stats: [{ label: 'Total de preventivas', value: resumoCards.preventivas }],
-      },
-
-      corretivas: {
-        title: 'Falhas corretivas',
-        subtitle: 'Equipamentos com reincidência no período',
-        actionLabel: 'Abrir corretivas filtradas',
-        onAction: handleGoToCorretivas,
-        items: rankingFrequencia.slice(0, 10).map((item) => ({
-          title: item.modelo,
-          subtitle: `Tag: ${item.tag || '—'}`,
-          value: `${item.corretivas}`,
-          onClick: () => handleDrillDownEquipamento(item.id),
-        })),
-        stats: [{ label: 'Total de corretivas', value: resumoCards.corretivas }],
-      },
-
-      downtime: {
-        title: 'Downtime acumulado',
-        subtitle: 'Tempo total de indisponibilidade do período',
-        actionLabel: 'Abrir visão de manutenção',
-        onAction: handleGoToDowntime,
-        items: rankingDowntime.slice(0, 10).map((item) => ({
-          title: item.modelo,
-          subtitle: `${item.unidade} • Tag: ${item.tag || '—'}`,
-          value: item.downtimeFormatado,
-        })),
-        stats: [
-          {
-            label: 'Downtime acumulado',
-            value: resumoCards.downtimeAcumulado,
-          },
-        ],
-      },
-
-      unidadeCritica: {
-        title: 'Unidade mais crítica',
-        subtitle: 'Unidade com maior downtime acumulado',
-        actionLabel: 'Abrir equipamentos da unidade',
-        onAction: handleGoToUnidadeCritica,
-        items: (dados?.rankingUnidades || []).slice(0, 10).map((item) => ({
-          title: item.nome,
-          subtitle: 'Tempo acumulado parado',
-          value: formatarDowntime(item.horasParado),
-        })),
-        stats: [
-          {
-            label: 'Unidade crítica',
-            value: resumoCards.unidadeCritica?.nome || '—',
-          },
-          {
-            label: 'Downtime',
-            value: resumoCards.unidadeCritica?.downtime || '—',
-          },
-        ],
-      },
-    };
-
-    return contentMap[drawer.type] || getDrawerDefaultContent();
+    });
   }, [
-    dados,
     drawer.type,
-    handleDrillDownEquipamento,
+    resumoCards,
+    rankingFrequencia,
+    rankingDowntime,
+    rankingUnidades,
     handleGoToAtivos,
+    handleGoToPreventivas,
     handleGoToCorretivas,
     handleGoToDowntime,
-    handleGoToPreventivas,
     handleGoToUnidadeCritica,
-    rankingDowntime,
-    rankingFrequencia,
-    resumoCards,
+    handleDrillDownEquipamento,
   ]);
 
   return {
     dados,
     loading,
     error,
+
     drawer,
     drawerContent,
     openDrawer,
     closeDrawer,
+
     resumoCards,
     downtimePorUnidadeChartData,
     rankingFrequencia,
     rankingDowntime,
+    rankingUnidades,
+
     handleDrillDownEquipamento,
     handleGoToAtivos,
     handleGoToPreventivas,
@@ -289,6 +231,7 @@ export function useBIPage() {
     handleGoToDowntime,
     handleGoToUnidadeCritica,
     handlePrint,
+
     recarregar: carregarBI,
   };
 }
