@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -11,23 +11,10 @@ import {
   faMicrochip,
 } from '@fortawesome/free-solid-svg-icons';
 
-import PageSection from '../ui/PageSection';
-import Input from '../ui/Input';
-import Select from '../ui/Select';
-import DateInput from '../ui/DateInput';
-import Button from '../ui/primitives/Button';
-import ResponsiveGrid from '../ui/ResponsiveGrid';
+import { useContratoForm } from '@/hooks/contratos/useContratoForm';
 
-const ESTADO_INICIAL_VAZIO = {
-  numeroContrato: '',
-  categoria: '',
-  fornecedor: '',
-  dataInicio: '',
-  dataFim: '',
-  status: 'Ativo',
-  unidadesCobertasIds: [],
-  equipamentosCobertosIds: [],
-};
+import { PageSection, ResponsiveGrid } from '@/components/ui/layout';
+import { Input, Select, DateInput, Button } from '@/components/ui/primitives';
 
 const OPCOES_CATEGORIA = [
   'Manutenção Corretiva',
@@ -131,139 +118,31 @@ function ContratoForm({
   unidadesDisponiveis = [],
   onCancel,
 }) {
-  const [formData, setFormData] = useState(ESTADO_INICIAL_VAZIO);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
   const navigate = useNavigate();
 
-  useEffect(() => {
-    if (isEditing && initialData) {
-      setFormData({
-        numeroContrato: initialData.numeroContrato || '',
-        categoria: initialData.categoria || '',
-        fornecedor: initialData.fornecedor || '',
-        dataInicio: initialData.dataInicio
-          ? initialData.dataInicio.split('T')[0]
-          : '',
-        dataFim: initialData.dataFim ? initialData.dataFim.split('T')[0] : '',
-        status: initialData.status || 'Ativo',
-        unidadesCobertasIds:
-          initialData.unidadesCobertas?.map((u) => u.id) || [],
-        equipamentosCobertosIds:
-          initialData.equipamentosCobertos?.map((e) => e.id) || [],
-      });
-    } else {
-      setFormData(ESTADO_INICIAL_VAZIO);
-    }
-  }, [isEditing, initialData]);
-
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-
-    if (error) {
-      setError('');
-    }
-  };
-
-  const handleToggleUnidade = (id) => {
-    setFormData((prev) => {
-      const jaExiste = prev.unidadesCobertasIds.includes(id);
-
-      const novasUnidades = jaExiste
-        ? prev.unidadesCobertasIds.filter((itemId) => itemId !== id)
-        : [...prev.unidadesCobertasIds, id];
-
-      let novosEquipamentos = prev.equipamentosCobertosIds;
-
-      if (jaExiste) {
-        const equipamentosParaRemover = todosEquipamentos
-          .filter((e) => e.unidadeId === id)
-          .map((e) => e.id);
-
-        novosEquipamentos = prev.equipamentosCobertosIds.filter(
-          (equipId) => !equipamentosParaRemover.includes(equipId)
-        );
-      }
-
-      return {
-        ...prev,
-        unidadesCobertasIds: novasUnidades,
-        equipamentosCobertosIds: novosEquipamentos,
-      };
-    });
-  };
-
-  const handleToggleEquipamento = (id) => {
-    setFormData((prev) => {
-      const jaExiste = prev.equipamentosCobertosIds.includes(id);
-
-      return {
-        ...prev,
-        equipamentosCobertosIds: jaExiste
-          ? prev.equipamentosCobertosIds.filter((itemId) => itemId !== id)
-          : [...prev.equipamentosCobertosIds, id],
-      };
-    });
-  };
-
-  const equipamentosFiltrados = useMemo(() => {
-    if (formData.unidadesCobertasIds.length === 0) return [];
-
-    return todosEquipamentos.filter((eq) =>
-      formData.unidadesCobertasIds.includes(eq.unidadeId)
-    );
-  }, [formData.unidadesCobertasIds, todosEquipamentos]);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError('');
-
-    if (
-      !formData.numeroContrato.trim() ||
-      !formData.categoria ||
-      !formData.fornecedor.trim() ||
-      !formData.dataInicio ||
-      !formData.dataFim
-    ) {
-      setError(
-        'Número do contrato, categoria, fornecedor, data de início e data de fim são obrigatórios.'
-      );
-      return;
-    }
-
-    if (formData.dataFim < formData.dataInicio) {
-      setError('A data de fim não pode ser menor que a data de início.');
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    try {
-      await onSubmit({
-        ...formData,
-        numeroContrato: formData.numeroContrato.trim(),
-        fornecedor: formData.fornecedor.trim(),
-      });
-    } catch (apiError) {
-      setError(
-        apiError?.response?.data?.message ||
-          apiError?.message ||
-          'Ocorreu um erro ao salvar o contrato.'
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+  const {
+    formData,
+    error,
+    isSubmitting,
+    equipamentosFiltrados,
+    handleChange,
+    handleToggleUnidade,
+    handleToggleEquipamento,
+    handleSubmit,
+  } = useContratoForm({
+    initialData,
+    isEditing,
+    todosEquipamentos,
+    onSubmit,
+  });
 
   const handleCancelClick = () => {
-    if (onCancel) onCancel();
-    else navigate('/contratos');
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+
+    navigate('/contratos');
   };
 
   return (
@@ -409,11 +288,11 @@ function ContratoForm({
                 ? 'Selecione uma ou mais unidades para listar os equipamentos.'
                 : 'Nenhum equipamento encontrado para a(s) unidade(s) selecionada(s).'
             }
-            renderLabel={(equip) => (
+            renderLabel={(equipamento) => (
               <div>
-                <div className="font-medium">{equip.modelo}</div>
+                <div className="font-medium">{equipamento.modelo}</div>
                 <div className="mt-1 text-xs text-slate-500">
-                  Tag: {equip.tag || 'N/A'}
+                  Tag: {equipamento.tag || 'N/A'}
                 </div>
               </div>
             )}
