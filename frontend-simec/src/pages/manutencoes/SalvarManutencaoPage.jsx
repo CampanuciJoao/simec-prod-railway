@@ -9,9 +9,9 @@ import { useSalvarManutencaoPage } from '../../hooks/manutencoes/useSalvarManute
 import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
 
 import Button from '../../components/ui/primitives/Button';
-import PageHeader from '../../components/ui/PageHeader';
-import PageLayout from '../../components/ui/PageLayout';
-import PageSection from '../../components/ui/PageSection';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageSection from '../../components/ui/layout/PageSection';
 import PageState from '../../components/ui/feedback/PageState';
 
 function SalvarManutencaoPage() {
@@ -25,11 +25,6 @@ function SalvarManutencaoPage() {
     ? 'Atualize os dados da ordem de serviço'
     : 'Preencha os dados para criar uma nova ordem de serviço';
 
-  /**
-   * =========================
-   * LOADING
-   * =========================
-   */
   if (page.loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
@@ -38,11 +33,6 @@ function SalvarManutencaoPage() {
     );
   }
 
-  /**
-   * =========================
-   * ERROR
-   * =========================
-   */
   if (page.error) {
     return (
       <PageLayout background="slate" padded fullHeight>
@@ -62,11 +52,6 @@ function SalvarManutencaoPage() {
     );
   }
 
-  /**
-   * =========================
-   * NOT FOUND (edit)
-   * =========================
-   */
   if (page.isEditing && !page.initialData) {
     return (
       <PageLayout background="slate" padded fullHeight>
@@ -86,11 +71,6 @@ function SalvarManutencaoPage() {
     );
   }
 
-  /**
-   * =========================
-   * SUCCESS STATE (FORM)
-   * =========================
-   */
   return (
     <PageLayout background="slate" padded fullHeight>
       <PageHeader
