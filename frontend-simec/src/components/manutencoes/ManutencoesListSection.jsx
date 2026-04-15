@@ -16,13 +16,12 @@ import {
   Button,
   ResponsiveGrid,
   PageSection,
-} from '../ui';
+} from '@/components/ui';
+import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
 
-import GlobalFilterBar from '../ui/GlobalFilterBar';
+import { formatarData } from '@/utils/timeUtils';
 
-import { formatarData } from '../../utils/timeUtils';
-
-// 🔥 helpers simples (NÃO duplicar lógica complexa)
+// Helpers simples
 const getStatusVariant = (status) => {
   const s = String(status || '').toLowerCase();
 
@@ -45,14 +44,16 @@ function ActiveFilters({ filters, onRemove, onClearAll }) {
       {filters.map((f) => (
         <button
           key={`${f.key}-${f.value}`}
+          type="button"
           onClick={() => onRemove(f.key)}
-          className="rounded-full border px-3 py-1 text-xs bg-white hover:bg-slate-50"
+          className="rounded-full border bg-white px-3 py-1 text-xs hover:bg-slate-50"
         >
           {f.label} ✕
         </button>
       ))}
 
       <button
+        type="button"
         onClick={onClearAll}
         className="text-xs text-blue-600 hover:underline"
       >
@@ -64,7 +65,7 @@ function ActiveFilters({ filters, onRemove, onClearAll }) {
 
 function KPI({ icon, label, value, onClick }) {
   return (
-    <button onClick={onClick} className="text-left w-full">
+    <button type="button" onClick={onClick} className="w-full text-left">
       <Card>
         <div className="flex items-center gap-3">
           <FontAwesomeIcon icon={icon} />
@@ -81,11 +82,11 @@ function KPI({ icon, label, value, onClick }) {
 function ManutencaoCard({ manutencao, isAdmin, onDelete }) {
   return (
     <Card className="space-y-3">
-      <div className="flex justify-between items-start">
+      <div className="flex items-start justify-between">
         <div>
           <h3 className="font-bold">{manutencao.numeroOS}</h3>
 
-          <div className="flex gap-2 mt-1">
+          <div className="mt-1 flex gap-2">
             <Badge variant={getStatusVariant(manutencao.status)}>
               {formatarLabel(manutencao.status)}
             </Badge>
@@ -120,17 +121,11 @@ function ManutencaoCard({ manutencao, isAdmin, onDelete }) {
       </p>
 
       <div className="text-sm text-slate-500">
+        <div>Equipamento: {manutencao.equipamento?.modelo || '---'}</div>
         <div>
-          Equipamento: {manutencao.equipamento?.modelo || '---'}
+          Unidade: {manutencao.equipamento?.unidade?.nomeSistema || '---'}
         </div>
-        <div>
-          Unidade:{' '}
-          {manutencao.equipamento?.unidade?.nomeSistema || '---'}
-        </div>
-        <div>
-          Data:{' '}
-          {formatarData(manutencao.dataHoraAgendamentoInicio)}
-        </div>
+        <div>Data: {formatarData(manutencao.dataHoraAgendamentoInicio)}</div>
       </div>
     </Card>
   );
@@ -138,7 +133,6 @@ function ManutencaoCard({ manutencao, isAdmin, onDelete }) {
 
 function ManutencoesListSection({
   manutencoes,
-  filtros,
   searchTerm,
   onSearchChange,
   selectFilters,
@@ -152,7 +146,6 @@ function ManutencoesListSection({
   return (
     <PageSection>
       <div className="space-y-6">
-        {/* 🔥 KPIs */}
         <ResponsiveGrid preset="compact">
           <KPI
             icon={faClock}
@@ -180,7 +173,6 @@ function ManutencoesListSection({
           />
         </ResponsiveGrid>
 
-        {/* 🔥 Filtros */}
         <GlobalFilterBar
           searchTerm={searchTerm}
           onSearchChange={onSearchChange}
@@ -193,7 +185,6 @@ function ManutencoesListSection({
           onClearAll={onClearAll}
         />
 
-        {/* 🔥 Lista */}
         <div className="space-y-4">
           {manutencoes.map((m) => (
             <ManutencaoCard
