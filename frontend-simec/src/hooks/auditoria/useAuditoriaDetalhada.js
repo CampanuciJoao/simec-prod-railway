@@ -1,23 +1,35 @@
-// Ficheiro: src/hooks/useAuditoriaDetalhada.js
-
 import { useState, useEffect, useCallback } from 'react';
-import { getLogAuditoria } from '../../services/api';
-import { useToast } from '../../contexts/ToastContext';
+
+import { getLogAuditoria } from '@/services/api';
+import { useToast } from '@/contexts/ToastContext';
 
 export function useAuditoriaDetalhada(entidade, entidadeId) {
   const [logs, setLogs] = useState([]);
   const [loading, setLoading] = useState(true);
+
   const { addToast } = useToast();
 
   const fetchLogs = useCallback(async () => {
-    if (!entidade || !entidadeId) return;
+    if (!entidade || !entidadeId) {
+      setLogs([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
+
     try {
-      // A API já espera um objeto com a propriedade 'params'
-      const data = await getLogAuditoria({ entidade, entidadeId });
-      setLogs(data || []);
+      const data = await getLogAuditoria({
+        entidade,
+        entidadeId,
+        page: 1,
+        limit: 100,
+      });
+
+      setLogs(Array.isArray(data?.logs) ? data.logs : []);
     } catch (err) {
       addToast('Erro ao carregar log de auditoria.', 'error');
+      setLogs([]);
     } finally {
       setLoading(false);
     }
@@ -27,5 +39,9 @@ export function useAuditoriaDetalhada(entidade, entidadeId) {
     fetchLogs();
   }, [fetchLogs]);
 
-  return { logs, loading, refetch: fetchLogs };
+  return {
+    logs,
+    loading,
+    refetch: fetchLogs,
+  };
 }

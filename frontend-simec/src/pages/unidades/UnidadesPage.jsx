@@ -12,14 +12,15 @@ import {
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { useUnidadesPage } from '../../hooks/unidades/useUnidadesPage';
+import { useUnidadesPage } from '@/hooks/unidades/useUnidadesPage';
 
 import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
-import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
-import Card from '../../components/ui/Card';
+import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
+import PageLayout from '@/components/ui/layout/PageLayout';
+import PageHeader from '@/components/ui/layout/PageHeader';
+import PageState from '@/components/ui/feedback/PageState';
+import Card from '@/components/ui/primitives/Card';
+import Button from '@/components/ui/primitives/Button';
 
 const formatarEndereco = (unidade) => {
   if (!unidade || !unidade.logradouro) return 'Endereço não cadastrado';
@@ -130,10 +131,10 @@ function UnidadesPage() {
         subtitle="Acompanhe e gerencie as unidades cadastradas"
         icon={faBuilding}
         actions={
-          <button className="btn btn-primary" onClick={page.goToCreate}>
+          <Button type="button" onClick={page.goToCreate}>
             <FontAwesomeIcon icon={faPlus} />
             Nova Unidade
-          </button>
+          </Button>
         }
       />
 
@@ -205,21 +206,24 @@ function UnidadesPage() {
                 </div>
 
                 <div className="flex gap-2">
-                  <button
-                    className="btn btn-ghost"
+                  <Button
+                    type="button"
+                    variant="ghost"
                     onClick={() => page.goToEdit(unidade.id)}
                     title="Editar unidade"
                   >
                     <FontAwesomeIcon icon={faEdit} />
-                  </button>
+                  </Button>
 
-                  <button
-                    className="btn btn-ghost text-red-600 hover:text-red-700"
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="text-red-600 hover:text-red-700"
                     onClick={() => page.deleteModal.openModal(unidade)}
                     title="Excluir unidade"
                   >
                     <FontAwesomeIcon icon={faTrashAlt} />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
