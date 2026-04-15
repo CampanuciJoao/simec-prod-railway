@@ -4,9 +4,9 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
 import { useRelatoriosPage } from '../../hooks/relatorios/useRelatoriosPage';
 
-import PageLayout from '../../components/ui/PageLayout';
-import PageState from '../../components/ui/PageState';
-import PageSection from '../../components/ui/PageSection';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageSection from '../../components/ui/layout/PageSection';
+import PageState from '../../components/ui/feedback/PageState';
 
 import {
   RelatoriosPageHeader,
