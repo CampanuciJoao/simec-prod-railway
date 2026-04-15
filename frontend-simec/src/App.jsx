@@ -5,7 +5,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import ProtectedRoute from '@/components/routes/ProtectedRoute';
 import AdminRoute from '@/components/routes/AdminRoute';
 import AppLayout from '@/components/layouts/AppLayout';
-import ToastContainer from '@/components/ui/ToastContainer';
 
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
@@ -14,10 +13,7 @@ import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 import BIPage from '@/pages/bi/BIPage';
 
 const PageLoader = () => (
-  <div
-    className="page-content-wrapper centered-loader"
-    style={{ height: 'calc(100vh - 80px)' }}
-  >
+  <div className="flex min-h-[calc(100vh-80px)] items-center justify-center bg-slate-100">
     <FontAwesomeIcon icon={faSpinner} spin size="2x" color="#3b82f6" />
   </div>
 );
@@ -107,7 +103,7 @@ function App() {
 
   if (loading) {
     return (
-      <div className="page-content-wrapper centered-loader">
+      <div className="flex min-h-screen items-center justify-center bg-slate-100">
         <FontAwesomeIcon icon={faSpinner} spin size="3x" color="#3b82f6" />
       </div>
     );
@@ -115,8 +111,6 @@ function App() {
 
   return (
     <>
-      <ToastContainer />
-
       <Suspense fallback={<PageLoader />}>
         <Routes>
           <Route
