@@ -7,93 +7,22 @@ import {
   faFileContract,
   faBell,
   faChartPie,
-  faExclamationTriangle,
   faArrowRight,
-  faChartColumn,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useDashboard } from '../../hooks/dashboard/useDashboard';
 
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageSection from '../../components/ui/PageSection';
-import PageState from '../../components/ui/PageState';
-import Card from '../../components/ui/Card';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageSection from '../../components/ui/layout/PageSection';
+import PageState from '../../components/ui/layout/PageState';
+import ResponsiveGrid from '../../components/ui/layout/ResponsiveGrid';
+
+import { DashboardStatCard } from '../../components/shared';
+import { AlertListItem } from '../../components/dashboard';
 
 import BarChart from '../../components/charts/BarChart';
 import DonutChart from '../../components/charts/DonutChart';
-
-function ActionCard({ to, icon, title, value, subtitle, tone = 'blue' }) {
-  const toneMap = {
-    blue: 'bg-blue-100 text-blue-600',
-    emerald: 'bg-emerald-100 text-emerald-600',
-    amber: 'bg-amber-100 text-amber-600',
-    red: 'bg-red-100 text-red-600',
-  };
-
-  return (
-    <Link to={to} className="block h-full">
-      <Card className="h-full transition hover:-translate-y-0.5 hover:shadow-md">
-        <div className="flex items-center gap-4">
-          <div
-            className={[
-              'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
-              toneMap[tone] || toneMap.blue,
-            ].join(' ')}
-          >
-            <FontAwesomeIcon icon={icon} />
-          </div>
-
-          <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {title}
-            </p>
-            <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-              {value}
-            </p>
-            <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-          </div>
-        </div>
-      </Card>
-    </Link>
-  );
-}
-
-function SectionHeader({ title, subtitle, action }) {
-  return (
-    <div className="mb-4 flex items-start justify-between gap-4">
-      <div>
-        <h2 className="text-base font-semibold text-slate-900">{title}</h2>
-        {subtitle ? (
-          <p className="mt-1 text-sm text-slate-500">{subtitle}</p>
-        ) : null}
-      </div>
-
-      {action ? <div className="shrink-0">{action}</div> : null}
-    </div>
-  );
-}
-
-function AlertListItem({ alerta }) {
-  const prioridadeCor =
-    alerta.prioridade === 'Alta'
-      ? 'bg-red-500'
-      : alerta.prioridade === 'Media'
-        ? 'bg-amber-400'
-        : 'bg-slate-400';
-
-  return (
-    <Link
-      to={alerta.link || '/alertas'}
-      className="flex items-center gap-3 border-b border-slate-200 py-3 last:border-b-0 hover:bg-slate-50"
-    >
-      <span className={`inline-block h-2.5 w-2.5 rounded-full ${prioridadeCor}`} />
-      <span className="line-clamp-1 text-sm text-slate-700 hover:text-blue-600">
-        {alerta.titulo}
-      </span>
-    </Link>
-  );
-}
 
 function DashboardPage() {
   const { data, loading, error } = useDashboard();
@@ -117,6 +46,7 @@ function DashboardPage() {
           subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
           icon={faChartPie}
         />
+
         <PageState
           loading={loading}
           error={error}
@@ -136,9 +66,8 @@ function DashboardPage() {
           icon={faChartPie}
         />
 
-        {/* Cards do topo */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 2xl:grid-cols-4">
-          <ActionCard
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
+          <DashboardStatCard
             to="/equipamentos"
             icon={faHeartbeat}
             title="Equipamentos"
@@ -147,7 +76,7 @@ function DashboardPage() {
             tone="emerald"
           />
 
-          <ActionCard
+          <DashboardStatCard
             to="/manutencoes"
             icon={faWrench}
             title="Manutenções abertas"
@@ -156,7 +85,7 @@ function DashboardPage() {
             tone="amber"
           />
 
-          <ActionCard
+          <DashboardStatCard
             to="/contratos"
             icon={faFileContract}
             title="Contratos vencendo"
@@ -165,7 +94,7 @@ function DashboardPage() {
             tone="red"
           />
 
-          <ActionCard
+          <DashboardStatCard
             to="/alertas"
             icon={faBell}
             title="Alertas ativos"
@@ -173,28 +102,25 @@ function DashboardPage() {
             subtitle="Não visualizados"
             tone="blue"
           />
-        </div>
+        </ResponsiveGrid>
 
-        {/* Conteúdo principal */}
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_1.2fr]">
-          {/* Avisos à esquerda */}
-          <PageSection className="h-full">
-            <SectionHeader
-              title="Últimos avisos"
-              subtitle="10 alertas mais recentes do sistema"
-              action={
-                <Link
-                  to="/alertas"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
-                >
-                  Ver todos
-                  <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
-                </Link>
-              }
-            />
-
+          <PageSection
+            className="h-full"
+            title="Últimos avisos"
+            description="10 alertas mais recentes do sistema"
+            headerRight={
+              <Link
+                to="/alertas"
+                className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
+              >
+                Ver todos
+                <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+              </Link>
+            }
+          >
             {data.alertas.length > 0 ? (
-              <div className="space-y-0">
+              <div>
                 {data.alertas.slice(0, 10).map((alerta) => (
                   <AlertListItem key={alerta.id} alerta={alerta} />
                 ))}
@@ -206,23 +132,20 @@ function DashboardPage() {
             )}
           </PageSection>
 
-          {/* Gráficos à direita */}
           <div className="grid grid-cols-1 gap-6">
-            <PageSection>
-              <SectionHeader
-                title="Status dos equipamentos"
-                subtitle="Distribuição atual por condição operacional"
-              />
+            <PageSection
+              title="Status dos equipamentos"
+              description="Distribuição atual por condição operacional"
+            >
               <div className="h-[220px]">
                 <DonutChart data={data.statusEquipamentos} />
               </div>
             </PageSection>
 
-            <PageSection>
-              <SectionHeader
-                title="Manutenções nos últimos meses"
-                subtitle="Volume total de ordens registradas no período"
-              />
+            <PageSection
+              title="Manutenções nos últimos meses"
+              description="Volume total de ordens registradas no período"
+            >
               <div className="h-[220px]">
                 <BarChart data={data.manutencoesPorTipo} />
               </div>

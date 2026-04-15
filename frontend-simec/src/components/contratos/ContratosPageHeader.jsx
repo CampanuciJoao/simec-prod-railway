@@ -1,19 +1,29 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faFileContract } from '@fortawesome/free-solid-svg-icons';
 
+import PageHeader from '../ui/PageHeader';
+import Button from '../ui/primitives/Button';
+
 function ContratosPageHeader({ onCreate }) {
   return (
-    <div className="page-title-card">
-      <h1 className="page-title-internal">
-        <FontAwesomeIcon icon={faFileContract} /> Gestão de Contratos de Manutenção
-      </h1>
-
-      <button type="button" className="btn btn-primary" onClick={onCreate}>
-        <FontAwesomeIcon icon={faPlus} /> Novo Contrato
-      </button>
-    </div>
+    <PageHeader
+      title="Gestão de Contratos de Manutenção"
+      subtitle="Acompanhe, filtre e gerencie os contratos cadastrados"
+      icon={faFileContract}
+      actions={
+        <Button type="button" onClick={onCreate}>
+          <FontAwesomeIcon icon={faPlus} />
+          Novo Contrato
+        </Button>
+      }
+    />
   );
 }
+
+ContratosPageHeader.propTypes = {
+  onCreate: PropTypes.func.isRequired,
+};
 
 export default ContratosPageHeader;

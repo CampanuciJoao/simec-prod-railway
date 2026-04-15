@@ -1,18 +1,7 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { formatarDataHora } from '../../utils/timeUtils';
-
-const formatarHorasParaHumanos = (totalHoras) => {
-  if (typeof totalHoras !== 'number' || totalHoras < 0) return 'N/A';
-
-  const horas = Math.floor(totalHoras);
-  const minutos = Math.round((totalHoras - horas) * 60);
-
-  const partes = [];
-  if (horas > 0) partes.push(`${horas}h`);
-  if (minutos > 0) partes.push(`${minutos}min`);
-
-  return partes.join(' ') || '0min';
-};
+import { formatarDowntime } from '../../utils/bi/downtimeUtils';
 
 function EmptyState() {
   return (
@@ -45,6 +34,10 @@ function StatusBadge({ status }) {
   );
 }
 
+StatusBadge.propTypes = {
+  status: PropTypes.string,
+};
+
 function TableShell({ headers, rows }) {
   return (
     <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -73,8 +66,19 @@ function TableShell({ headers, rows }) {
   );
 }
 
+TableShell.propTypes = {
+  headers: PropTypes.arrayOf(
+    PropTypes.shape({
+      key: PropTypes.string.isRequired,
+      label: PropTypes.string.isRequired,
+      align: PropTypes.oneOf(['left', 'center']),
+    })
+  ).isRequired,
+  rows: PropTypes.node.isRequired,
+};
+
 function RelatorioResultado({ resultado }) {
-  if (!resultado || !resultado.dados || resultado.dados.length === 0) {
+  if (!resultado || !Array.isArray(resultado.dados) || resultado.dados.length === 0) {
     return <EmptyState />;
   }
 
@@ -91,7 +95,10 @@ function RelatorioResultado({ resultado }) {
     ];
 
     const rows = dados.map((item, index) => (
-      <tr key={`${item.id || item.tag || item.modelo}-${index}`} className="hover:bg-slate-50">
+      <tr
+        key={`${item.id || item.tag || item.modelo}-${index}`}
+        className="hover:bg-slate-50"
+      >
         <td className="px-4 py-3 text-left font-medium text-slate-900">
           {item.modelo || 'N/A'}
         </td>
@@ -126,9 +133,14 @@ function RelatorioResultado({ resultado }) {
     ];
 
     const rows = dados.map((item, index) => (
-      <tr key={`${item.id || item.numeroOS}-${index}`} className="hover:bg-slate-50">
+      <tr
+        key={`${item.id || item.numeroOS}-${index}`}
+        className="hover:bg-slate-50"
+      >
         <td className="px-4 py-3 text-center">
-          <div className="font-semibold text-slate-900">{item.numeroOS || '—'}</div>
+          <div className="font-semibold text-slate-900">
+            {item.numeroOS || '—'}
+          </div>
           <div className="mt-1 text-xs text-slate-500">
             {item.numeroChamado ? `Chamado: ${item.numeroChamado}` : '-'}
           </div>
@@ -170,7 +182,10 @@ function RelatorioResultado({ resultado }) {
     ];
 
     const rows = dados.map((item, index) => (
-      <tr key={`${item.numeroOS || item.equipamentoId}-${index}`} className="hover:bg-slate-50">
+      <tr
+        key={`${item.numeroOS || item.equipamentoId}-${index}`}
+        className="hover:bg-slate-50"
+      >
         <td className="px-4 py-3 text-left font-medium text-slate-900">
           {item.equipamentoNome || 'N/A'} ({item.equipamentoId || 'N/A'})
         </td>
@@ -184,7 +199,7 @@ function RelatorioResultado({ resultado }) {
           {formatarDataHora(item.dataFim)}
         </td>
         <td className="px-4 py-3 text-center font-bold text-red-600">
-          {formatarHorasParaHumanos(item.tempoParadaHoras)}
+          {formatarDowntime(item.tempoParadaHoras)}
         </td>
       </tr>
     ));
@@ -198,5 +213,12 @@ function RelatorioResultado({ resultado }) {
     </div>
   );
 }
+
+RelatorioResultado.propTypes = {
+  resultado: PropTypes.shape({
+    tipoRelatorio: PropTypes.string,
+    dados: PropTypes.array,
+  }),
+};
 
 export default RelatorioResultado;

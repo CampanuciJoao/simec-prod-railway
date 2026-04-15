@@ -1,11 +1,73 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getContratos, getUnidades, deleteContrato } from '../../services/api';
+import { getDynamicStatus } from '../../utils/contratos';
+
+function normalizarTexto(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function compareValues(a, b, direction = 'ascending') {
+  const dir = direction === 'descending' ? -1 : 1;
+
+  const valorA = a ?? '';
+  const valorB = b ?? '';
+
+  if (typeof valorA === 'number' && typeof valorB === 'number') {
+    return valorA > valorB ? dir : valorA < valorB ? -dir : 0;
+  }
+
+  const dataA =
+    valorA instanceof Date
+      ? valorA.getTime()
+      : typeof valorA === 'string' && !Number.isNaN(Date.parse(valorA))
+        ? new Date(valorA).getTime()
+        : null;
+
+  const dataB =
+    valorB instanceof Date
+      ? valorB.getTime()
+      : typeof valorB === 'string' && !Number.isNaN(Date.parse(valorB))
+        ? new Date(valorB).getTime()
+        : null;
+
+  if (dataA !== null && dataB !== null) {
+    return dataA > dataB ? dir : dataA < dataB ? -dir : 0;
+  }
+
+  const textoA = normalizarTexto(valorA);
+  const textoB = normalizarTexto(valorB);
+
+  return textoA > textoB ? dir : textoA < textoB ? -dir : 0;
+}
+
+function getSortValue(contrato, key) {
+  switch (key) {
+    case 'numeroContrato':
+      return contrato?.numeroContrato;
+    case 'fornecedor':
+      return contrato?.fornecedor;
+    case 'categoria':
+      return contrato?.categoria;
+    case 'status':
+      return getDynamicStatus(contrato);
+    case 'dataInicio':
+      return contrato?.dataInicio;
+    case 'dataFim':
+      return contrato?.dataFim;
+    default:
+      return contrato?.[key];
+  }
+}
 
 export function useContratos() {
-  const [contratos, setContratos] = useState([]);
+  const [contratosOriginais, setContratosOriginais] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [filtros, setFiltros] = useState({
     categoria: '',
@@ -20,17 +82,23 @@ export function useContratos() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      setError(null);
+      setError('');
 
       const [contratosData, unidadesData] = await Promise.all([
         getContratos(),
         getUnidades(),
       ]);
 
-      setContratos(Array.isArray(contratosData) ? contratosData : []);
+      setContratosOriginais(Array.isArray(contratosData) ? contratosData : []);
       setUnidades(Array.isArray(unidadesData) ? unidadesData : []);
     } catch (err) {
-      setError(err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          'Falha ao carregar contratos.'
+      );
+      setContratosOriginais([]);
+      setUnidades([]);
     } finally {
       setLoading(false);
     }
@@ -40,65 +108,72 @@ export function useContratos() {
     fetchData();
   }, [fetchData]);
 
-  const contratosFiltradosEOrdenados = useMemo(() => {
-    let items = [...contratos];
+  const contratosFiltrados = useMemo(() => {
+    const termo = normalizarTexto(searchTerm);
 
-    if (searchTerm) {
-      const termo = searchTerm.toLowerCase();
+    return contratosOriginais.filter((contrato) => {
+      if (termo) {
+        const camposBusca = [
+          contrato?.numeroContrato,
+          contrato?.fornecedor,
+          contrato?.categoria,
+          getDynamicStatus(contrato),
+          ...(contrato?.unidadesCobertas || []).map((u) => u?.nomeSistema),
+        ];
 
-      items = items.filter(
-        (c) =>
-          c.numeroContrato?.toLowerCase().includes(termo) ||
-          c.fornecedor?.toLowerCase().includes(termo)
-      );
-    }
+        const textoBusca = normalizarTexto(camposBusca.filter(Boolean).join(' '));
 
-    if (filtros.categoria) {
-      items = items.filter((c) => c.categoria === filtros.categoria);
-    }
-
-    if (filtros.status) {
-      items = items.filter((c) => c.status === filtros.status);
-    }
-
-    if (filtros.unidade) {
-      items = items.filter((c) =>
-        c.unidadesCobertas?.some(
-          (u) => String(u.id) === String(filtros.unidade)
-        )
-      );
-    }
-
-    if (sortConfig.key) {
-      items.sort((a, b) => {
-        const valA = a[sortConfig.key];
-        const valB = b[sortConfig.key];
-
-        if (sortConfig.key.toLowerCase().includes('data')) {
-          return sortConfig.direction === 'ascending'
-            ? new Date(valA) - new Date(valB)
-            : new Date(valB) - new Date(valA);
+        if (!textoBusca.includes(termo)) {
+          return false;
         }
+      }
 
-        return sortConfig.direction === 'ascending'
-          ? String(valA || '').localeCompare(String(valB || ''))
-          : String(valB || '').localeCompare(String(valA || ''));
-      });
+      if (filtros.categoria && contrato?.categoria !== filtros.categoria) {
+        return false;
+      }
+
+      if (filtros.status && getDynamicStatus(contrato) !== filtros.status) {
+        return false;
+      }
+
+      if (filtros.unidade) {
+        const possuiUnidade = contrato?.unidadesCobertas?.some(
+          (u) => String(u.id) === String(filtros.unidade)
+        );
+
+        if (!possuiUnidade) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [contratosOriginais, searchTerm, filtros]);
+
+  const contratos = useMemo(() => {
+    const items = [...contratosFiltrados];
+
+    if (!sortConfig?.key) {
+      return items;
     }
 
-    return items;
-  }, [contratos, searchTerm, filtros, sortConfig]);
+    return items.sort((a, b) => {
+      const valA = getSortValue(a, sortConfig.key);
+      const valB = getSortValue(b, sortConfig.key);
 
-  const removerContrato = useCallback(
-    async (id) => {
-      await deleteContrato(id);
-      await fetchData();
-    },
-    [fetchData]
-  );
+      return compareValues(valA, valB, sortConfig.direction);
+    });
+  }, [contratosFiltrados, sortConfig]);
+
+  const removerContrato = useCallback(async (id) => {
+    await deleteContrato(id);
+
+    setContratosOriginais((prev) => prev.filter((item) => item.id !== id));
+  }, []);
 
   return {
-    contratos: contratosFiltradosEOrdenados,
+    contratos,
+    contratosOriginais,
     unidadesDisponiveis: unidades,
     loading,
     error,

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -9,10 +9,14 @@ import {
   faFileContract,
   faHospital,
   faMicrochip,
-  faCalendarDays,
 } from '@fortawesome/free-solid-svg-icons';
 
 import PageSection from '../ui/PageSection';
+import Input from '../ui/Input';
+import Select from '../ui/Select';
+import DateInput from '../ui/DateInput';
+import Button from '../ui/primitives/Button';
+import ResponsiveGrid from '../ui/ResponsiveGrid';
 
 const ESTADO_INICIAL_VAZIO = {
   numeroContrato: '',
@@ -33,10 +37,6 @@ const OPCOES_CATEGORIA = [
 
 const OPCOES_STATUS = ['Ativo', 'Expirado', 'Cancelado'];
 
-function hojeISO() {
-  return new Date().toISOString().split('T')[0];
-}
-
 function FormField({ label, required = false, hint = '', children }) {
   return (
     <div className="flex flex-col gap-1.5">
@@ -55,112 +55,6 @@ FormField.propTypes = {
   required: PropTypes.bool,
   hint: PropTypes.string,
   children: PropTypes.node.isRequired,
-};
-
-function TextInput({ className = '', ...props }) {
-  return (
-    <input
-      {...props}
-      className={[
-        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
-        'disabled:cursor-not-allowed disabled:bg-slate-100',
-        className,
-      ].join(' ')}
-    />
-  );
-}
-
-TextInput.propTypes = {
-  className: PropTypes.string,
-};
-
-function SelectInput({ children, className = '', ...props }) {
-  return (
-    <select
-      {...props}
-      className={[
-        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
-        'disabled:cursor-not-allowed disabled:bg-slate-100',
-        className,
-      ].join(' ')}
-    >
-      {children}
-    </select>
-  );
-}
-
-SelectInput.propTypes = {
-  children: PropTypes.node.isRequired,
-  className: PropTypes.string,
-};
-
-function DateField({ name, value, onChange, min }) {
-  const handleHoje = () => {
-    onChange({
-      target: {
-        name,
-        value: hojeISO(),
-      },
-    });
-  };
-
-  const handleLimpar = () => {
-    onChange({
-      target: {
-        name,
-        value: '',
-      },
-    });
-  };
-
-  return (
-    <div className="space-y-2">
-      <div className="relative">
-        <FontAwesomeIcon
-          icon={faCalendarDays}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-        />
-
-        <input
-          type="date"
-          name={name}
-          value={value || ''}
-          onChange={onChange}
-          min={min}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 pl-10 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-        />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={handleHoje}
-          className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100"
-        >
-          <FontAwesomeIcon icon={faCalendarDays} />
-          Hoje
-        </button>
-
-        {!!value && (
-          <button
-            type="button"
-            onClick={handleLimpar}
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-          >
-            <FontAwesomeIcon icon={faTimes} />
-            Limpar
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-DateField.propTypes = {
-  name: PropTypes.string.isRequired,
-  value: PropTypes.string,
-  onChange: PropTypes.func.isRequired,
-  min: PropTypes.string,
 };
 
 function SelectionCard({
@@ -399,9 +293,9 @@ function ContratoForm({
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ResponsiveGrid preset="form">
           <FormField label="Número do contrato" required>
-            <TextInput
+            <Input
               type="text"
               name="numeroContrato"
               value={formData.numeroContrato}
@@ -412,7 +306,7 @@ function ContratoForm({
           </FormField>
 
           <FormField label="Categoria" required>
-            <SelectInput
+            <Select
               name="categoria"
               value={formData.categoria}
               onChange={handleChange}
@@ -424,11 +318,11 @@ function ContratoForm({
                   {categoria}
                 </option>
               ))}
-            </SelectInput>
+            </Select>
           </FormField>
 
           <FormField label="Fornecedor" required>
-            <TextInput
+            <Input
               type="text"
               name="fornecedor"
               value={formData.fornecedor}
@@ -443,7 +337,7 @@ function ContratoForm({
             required
             hint="Você pode selecionar no calendário ou digitar."
           >
-            <DateField
+            <DateInput
               name="dataInicio"
               value={formData.dataInicio}
               onChange={handleChange}
@@ -455,7 +349,7 @@ function ContratoForm({
             required
             hint="A vigência final não pode ser anterior ao início."
           >
-            <DateField
+            <DateInput
               name="dataFim"
               value={formData.dataFim}
               onChange={handleChange}
@@ -464,7 +358,7 @@ function ContratoForm({
           </FormField>
 
           <FormField label="Status" required>
-            <SelectInput
+            <Select
               name="status"
               value={formData.status}
               onChange={handleChange}
@@ -475,16 +369,16 @@ function ContratoForm({
                   {status}
                 </option>
               ))}
-            </SelectInput>
+            </Select>
           </FormField>
-        </div>
+        </ResponsiveGrid>
       </PageSection>
 
       <PageSection
         title="Cobertura"
         description="Selecione unidades e equipamentos cobertos pelo contrato."
       >
-        <div className="mb-5 grid grid-cols-1 gap-5 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <SelectionCard
             title="Unidades cobertas"
             icon={faHospital}
@@ -528,21 +422,17 @@ function ContratoForm({
       </PageSection>
 
       <div className="flex flex-wrap justify-end gap-3">
-        <button
+        <Button
           type="button"
-          className="btn btn-secondary"
+          variant="secondary"
           onClick={handleCancelClick}
           disabled={isSubmitting}
         >
           <FontAwesomeIcon icon={faTimes} />
           Cancelar
-        </button>
+        </Button>
 
-        <button
-          type="submit"
-          className="btn btn-primary"
-          disabled={isSubmitting}
-        >
+        <Button type="submit" disabled={isSubmitting}>
           <FontAwesomeIcon
             icon={isSubmitting ? faSpinner : faSave}
             spin={isSubmitting}
@@ -552,7 +442,7 @@ function ContratoForm({
             : isEditing
               ? 'Salvar alterações'
               : 'Salvar contrato'}
-        </button>
+        </Button>
       </div>
     </form>
   );

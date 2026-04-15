@@ -1,21 +1,32 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilePdf, faChartColumn } from '@fortawesome/free-solid-svg-icons';
 
-function RelatoriosPageHeader({ canExport, onExport }) {
-  return (
-    <div className="page-title-card">
-      <h1 className="page-title-internal">
-        <FontAwesomeIcon icon={faChartColumn} /> Geração de Relatórios
-      </h1>
+import PageHeader from '../ui/PageHeader';
+import Button from '../ui/Button';
 
-      {canExport && (
-        <button type="button" className="btn btn-danger" onClick={onExport}>
-          <FontAwesomeIcon icon={faFilePdf} /> Exportar para PDF
-        </button>
-      )}
-    </div>
+function RelatoriosPageHeader({ canExport = false, onExport }) {
+  return (
+    <PageHeader
+      title="Geração de Relatórios"
+      subtitle="Monte filtros, gere resultados e exporte para PDF"
+      icon={faChartColumn}
+      actions={
+        canExport ? (
+          <Button type="button" variant="danger" onClick={onExport}>
+            <FontAwesomeIcon icon={faFilePdf} />
+            Exportar para PDF
+          </Button>
+        ) : null
+      }
+    />
   );
 }
+
+RelatoriosPageHeader.propTypes = {
+  canExport: PropTypes.bool,
+  onExport: PropTypes.func,
+};
 
 export default RelatoriosPageHeader;

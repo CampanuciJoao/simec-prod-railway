@@ -1,0 +1,1 @@
+export { adaptDashboardResponse, INITIAL_DASHBOARD_STATE } from './dashboardAdapter';

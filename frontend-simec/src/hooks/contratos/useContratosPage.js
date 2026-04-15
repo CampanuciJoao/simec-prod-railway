@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useContratos } from './useContratos';
@@ -8,21 +8,7 @@ import {
   uploadAnexoContrato,
   deleteAnexoContrato,
 } from '../../services/api';
-
-const getDynamicStatus = (contrato) => {
-  if (contrato.status !== 'Ativo') return contrato.status;
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  const dataFim = new Date(contrato.dataFim);
-  if (dataFim < hoje) return 'Expirado';
-
-  const diffDays = Math.ceil((dataFim - hoje) / (1000 * 60 * 60 * 24));
-  if (diffDays <= 30) return 'Vence em breve';
-
-  return 'Ativo';
-};
+import { getDynamicStatus } from '../../utils/contratos';
 
 export function useContratosPage() {
   const navigate = useNavigate();
@@ -30,6 +16,7 @@ export function useContratosPage() {
 
   const {
     contratos,
+    contratosOriginais,
     unidadesDisponiveis,
     loading,
     error,
@@ -45,14 +32,14 @@ export function useContratosPage() {
   const [expandidos, setExpandidos] = useState({});
   const [uploadingId, setUploadingId] = useState(null);
 
-  const toggleExpandir = (contratoId) => {
+  const toggleExpandir = useCallback((contratoId) => {
     setExpandidos((prev) => ({
       ...prev,
       [contratoId]: !prev[contratoId],
     }));
-  };
+  }, []);
 
-  const confirmarExclusao = async () => {
+  const confirmarExclusao = useCallback(async () => {
     if (!deleteModal.modalData?.id) return;
 
     try {
@@ -66,64 +53,70 @@ export function useContratosPage() {
     } finally {
       deleteModal.closeModal();
     }
-  };
+  }, [deleteModal, removerContrato, addToast]);
 
-  const handleUploadArquivo = async (contratoId, event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
+  const handleUploadArquivo = useCallback(
+    async (contratoId, event) => {
+      const file = event.target.files?.[0];
+      if (!file) return;
 
-    const formData = new FormData();
-    formData.append('arquivo', file);
+      const formData = new FormData();
+      formData.append('file', file);
 
-    setUploadingId(contratoId);
+      setUploadingId(contratoId);
 
-    try {
-      await uploadAnexoContrato(contratoId, formData);
-      addToast('Documento enviado com sucesso!', 'success');
-      await refetch();
-    } catch (err) {
-      addToast(
-        err?.response?.data?.message || 'Erro ao enviar documento.',
-        'error'
-      );
-    } finally {
-      setUploadingId(null);
-      event.target.value = '';
-    }
-  };
+      try {
+        await uploadAnexoContrato(contratoId, formData);
+        addToast('Documento enviado com sucesso!', 'success');
+        await refetch();
+      } catch (err) {
+        addToast(
+          err?.response?.data?.message || 'Erro ao enviar documento.',
+          'error'
+        );
+      } finally {
+        setUploadingId(null);
+        event.target.value = '';
+      }
+    },
+    [addToast, refetch]
+  );
 
-  const handleDeleteAnexo = async (contratoId, anexoId) => {
-    try {
-      await deleteAnexoContrato(contratoId, anexoId);
-      addToast('Documento removido com sucesso!', 'success');
-      await refetch();
-    } catch (err) {
-      addToast(
-        err?.response?.data?.message || 'Erro ao remover documento.',
-        'error'
-      );
-    }
-  };
+  const handleDeleteAnexo = useCallback(
+    async (contratoId, anexoId) => {
+      try {
+        await deleteAnexoContrato(contratoId, anexoId);
+        addToast('Documento removido com sucesso!', 'success');
+        await refetch();
+      } catch (err) {
+        addToast(
+          err?.response?.data?.message || 'Erro ao remover documento.',
+          'error'
+        );
+      }
+    },
+    [addToast, refetch]
+  );
 
   const categoriaOptions = useMemo(() => {
     const categoriasUnicas = [
-      ...new Set((contratos || []).map((c) => c.categoria).filter(Boolean)),
+      ...new Set(
+        (contratosOriginais || []).map((c) => c.categoria).filter(Boolean)
+      ),
     ];
 
-    return categoriasUnicas
-      .sort()
-      .map((categoria) => ({
-        value: categoria,
-        label: categoria,
-      }));
-  }, [contratos]);
+    return categoriasUnicas.sort().map((categoria) => ({
+      value: categoria,
+      label: categoria,
+    }));
+  }, [contratosOriginais]);
 
   const statusOptions = useMemo(
     () => [
       { value: 'Ativo', label: 'Ativo' },
+      { value: 'Vence em breve', label: 'Vence em breve' },
       { value: 'Expirado', label: 'Expirado' },
       { value: 'Cancelado', label: 'Cancelado' },
-      { value: 'Vence em breve', label: 'Vence em breve' },
     ],
     []
   );
@@ -171,12 +164,14 @@ export function useContratosPage() {
   );
 
   const metricas = useMemo(() => {
-    const total = contratos.length;
-    const ativos = contratos.filter((c) => getDynamicStatus(c) === 'Ativo').length;
-    const vencendo = contratos.filter(
+    const total = contratosOriginais.length;
+    const ativos = contratosOriginais.filter(
+      (c) => getDynamicStatus(c) === 'Ativo'
+    ).length;
+    const vencendo = contratosOriginais.filter(
       (c) => getDynamicStatus(c) === 'Vence em breve'
     ).length;
-    const expirados = contratos.filter(
+    const expirados = contratosOriginais.filter(
       (c) => getDynamicStatus(c) === 'Expirado'
     ).length;
 
@@ -186,7 +181,7 @@ export function useContratosPage() {
       vencendo,
       expirados,
     };
-  }, [contratos]);
+  }, [contratosOriginais]);
 
   const activeFilters = useMemo(() => {
     const unidadeSelecionada = (unidadesDisponiveis || []).find(
@@ -229,32 +224,45 @@ export function useContratosPage() {
     ].filter(Boolean);
   }, [searchTerm, filtros, unidadesDisponiveis]);
 
-  const clearFilter = (key) => {
-    if (key === 'searchTerm') {
-      setSearchTerm('');
-      return;
-    }
+  const clearFilter = useCallback(
+    (key) => {
+      if (key === 'searchTerm') {
+        setSearchTerm('');
+        return;
+      }
 
-    setFiltros((prev) => ({ ...prev, [key]: '' }));
-  };
+      setFiltros((prev) => ({ ...prev, [key]: '' }));
+    },
+    [setSearchTerm, setFiltros]
+  );
 
-  const clearAllFilters = () => {
+  const clearAllFilters = useCallback(() => {
     setSearchTerm('');
     setFiltros({
       categoria: '',
       status: '',
       unidade: '',
     });
-  };
+  }, [setSearchTerm, setFiltros]);
 
-  const onSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-  };
+  const onSearchChange = useCallback(
+    (event) => {
+      setSearchTerm(event.target.value);
+    },
+    [setSearchTerm]
+  );
 
-  const filtrarPorStatus = (status) => {
-    clearAllFilters();
-    setFiltros((prev) => ({ ...prev, status }));
-  };
+  const filtrarPorStatus = useCallback(
+    (status) => {
+      setSearchTerm('');
+      setFiltros({
+        categoria: '',
+        status,
+        unidade: '',
+      });
+    },
+    [setSearchTerm, setFiltros]
+  );
 
   return {
     contratos,
