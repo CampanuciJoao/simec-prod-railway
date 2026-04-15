@@ -1,7 +1,26 @@
-export * from './layout';
-export * from './primitives';
-export * from './overlays';
-export * from './navigation';
+import React from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faPlus,
+  faMicrochip,
+  faCircleCheck,
+  faTriangleExclamation,
+  faCircleXmark,
+  faScrewdriverWrench,
+  faXmark,
+} from '@fortawesome/free-solid-svg-icons';
+
+import { useEquipamentosPage } from '../../hooks/equipamentos/useEquipamentosPage';
+import { useEquipamentosExpansion } from '../../hooks/equipamentos/useEquipamentosExpansion';
+
+import GlobalFilterBar from '../../components/ui/filters/GlobalFilterBar';
+import ModalConfirmacao from '../../components/ui/overlays/ModalConfirmacao';
+import EquipamentosList from '../../components/equipamentos/EquipamentosList';
+
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageState from '../../components/ui/layout/PageState';
+import Card from '../../components/ui/primitives/Card';
 
 function KpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {
