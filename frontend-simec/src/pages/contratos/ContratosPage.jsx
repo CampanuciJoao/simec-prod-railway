@@ -4,10 +4,10 @@ import { faPlusCircle, faFileContract } from '@fortawesome/free-solid-svg-icons'
 
 import { useContratosPage } from '../../hooks/contratos/useContratosPage';
 
-import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
+import ModalConfirmacao from '../../components/ui/feedback/ModalConfirmacao';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageState from '../../components/ui/feedback/PageState';
 import Button from '../../components/ui/primitives/Button';
 
 import ContratosListSection from '../../components/contratos/ContratosListSection';
