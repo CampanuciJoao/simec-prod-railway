@@ -3,9 +3,9 @@ import { faFileContract } from '@fortawesome/free-solid-svg-icons';
 
 import { useSalvarContratoPage } from '../../hooks/contratos/useSalvarContratoPage';
 
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageSection from '../../components/ui/PageSection';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageSection from '../../components/ui/layout/PageSection';
 import PageState from '../../components/ui/feedback/PageState';
 import Button from '../../components/ui/primitives/Button';
 
