@@ -14,7 +14,7 @@ import {
 
 import { useUnidadesPage } from '../../hooks/unidades/useUnidadesPage';
 
-import ModalConfirmacao from '../../components/ui/ModalConfirmacao';
+import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
 import GlobalFilterBar from '../../components/ui/GlobalFilterBar';
 import PageLayout from '../../components/ui/PageLayout';
 import PageHeader from '../../components/ui/PageHeader';
