@@ -3,7 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faWrench } from '@fortawesome/free-solid-svg-icons';
 
 import Button from '../ui/primitives/Button';
-import PageHeader from '../ui/PageHeader';
+import { PageHeader } from '@/components/ui/layout';
 
 function ManutencoesPageHeader({ onCreate }) {
   return (
