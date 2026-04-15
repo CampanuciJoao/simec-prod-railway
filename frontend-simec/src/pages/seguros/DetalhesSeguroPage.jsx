@@ -13,9 +13,7 @@ import {
   Button,
 } from '@/components/ui';
 
-import {
-  getCoberturasAtivas,
-} from '@/utils/seguros/seguros';
+import { getCoberturasAtivas } from '@/utils/seguros';
 
 import {
   formatarMoeda,
@@ -37,10 +35,7 @@ function DetalhesSeguroPage() {
   if (loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title="Detalhes do Seguro"
-          icon={faShieldAlt}
-        />
+        <PageHeader title="Detalhes do Seguro" icon={faShieldAlt} />
         <PageState loading />
       </PageLayout>
     );
@@ -97,9 +92,9 @@ function DetalhesSeguroPage() {
       <PageSection title="Coberturas">
         {coberturas.length > 0 ? (
           <ResponsiveGrid cols={{ base: 1, md: 2 }}>
-            {coberturas.map((c) => (
-              <div key={c.key}>
-                {c.label} - {formatarMoeda(c.value)}
+            {coberturas.map((cobertura) => (
+              <div key={cobertura.key}>
+                {cobertura.label} - {formatarMoeda(cobertura.value)}
               </div>
             ))}
           </ResponsiveGrid>
