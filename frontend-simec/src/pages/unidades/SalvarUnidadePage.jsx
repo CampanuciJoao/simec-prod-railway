@@ -3,9 +3,10 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faBuilding } from '@fortawesome/free-solid-svg-icons';
 
-import PageLayout from '../../components/ui/PageLayout';
-import PageHeader from '../../components/ui/PageHeader';
-import PageState from '../../components/ui/PageState';
+import PageLayout from '../../components/ui/layout/PageLayout';
+import PageHeader from '../../components/ui/layout/PageHeader';
+import PageState from '../../components/ui/feedback/PageState';
+import Button from '../../components/ui/primitives/Button';
 import UnidadeForm from '../../components/unidades/UnidadeForm';
 
 import { addUnidade, getUnidadeById, updateUnidade } from '../../services/api';
@@ -62,6 +63,28 @@ function SalvarUnidadePage() {
     }
   };
 
+  const headerActions = (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => navigate('/cadastros')}
+      >
+        <FontAwesomeIcon icon={faArrowLeft} />
+        Voltar ao menu de cadastros
+      </Button>
+
+      <Button
+        type="button"
+        variant="secondary"
+        onClick={() => navigate('/cadastros/unidades')}
+      >
+        <FontAwesomeIcon icon={faArrowLeft} />
+        Voltar para unidades
+      </Button>
+    </div>
+  );
+
   if (loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
@@ -82,27 +105,7 @@ function SalvarUnidadePage() {
           title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
           subtitle="Cadastre e gerencie informações da unidade"
           icon={faBuilding}
-          actions={
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => navigate('/cadastros')}
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
-                Voltar ao menu de cadastros
-              </button>
-
-              <button
-                type="button"
-                className="btn btn-secondary"
-                onClick={() => navigate('/cadastros/unidades')}
-              >
-                <FontAwesomeIcon icon={faArrowLeft} />
-                Voltar para unidades
-              </button>
-            </div>
-          }
+          actions={headerActions}
         />
         <PageState error={error} />
       </PageLayout>
@@ -115,27 +118,7 @@ function SalvarUnidadePage() {
         title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
         subtitle="Cadastre e gerencie informações da unidade"
         icon={faBuilding}
-        actions={
-          <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/cadastros')}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Voltar ao menu de cadastros
-            </button>
-
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => navigate('/cadastros/unidades')}
-            >
-              <FontAwesomeIcon icon={faArrowLeft} />
-              Voltar para unidades
-            </button>
-          </div>
-        }
+        actions={headerActions}
       />
 
       <UnidadeForm
