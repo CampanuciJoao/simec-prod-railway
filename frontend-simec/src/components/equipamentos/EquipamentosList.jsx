@@ -1,6 +1,8 @@
-import React, { useCallback } from 'react';
-import EquipamentoCard from './EquipamentoCard';
-import { EmptyState } from '../ui/layout';
+import React, { useCallback, memo } from 'react';
+import PropTypes from 'prop-types';
+
+import EquipamentoCard from '@/components/equipamentos/EquipamentoCard';
+import { EmptyState } from '@/components/ui/layout';
 
 function EquipamentosList({
   equipamentos = [],
@@ -25,23 +27,17 @@ function EquipamentosList({
 
   const handleGoToFichaTecnica = useCallback(
     (id) => {
-      if (typeof onGoToFichaTecnica === 'function') {
-        onGoToFichaTecnica(id);
-      }
+      onGoToFichaTecnica?.(id);
     },
     [onGoToFichaTecnica]
   );
 
   const handleStatusUpdated = useCallback(() => {
-    if (typeof onStatusUpdated === 'function') {
-      onStatusUpdated();
-    }
+    onStatusUpdated?.();
   }, [onStatusUpdated]);
 
   const handleRefresh = useCallback(() => {
-    if (typeof onRefresh === 'function') {
-      onRefresh();
-    }
+    onRefresh?.();
   }, [onRefresh]);
 
   if (!Array.isArray(equipamentos) || equipamentos.length === 0) {
@@ -72,4 +68,17 @@ function EquipamentosList({
   );
 }
 
-export default React.memo(EquipamentosList);
+EquipamentosList.propTypes = {
+  equipamentos: PropTypes.arrayOf(PropTypes.object),
+  expansion: PropTypes.shape({
+    toggleExpandir: PropTypes.func.isRequired,
+    trocarAba: PropTypes.func.isRequired,
+    isExpandido: PropTypes.func.isRequired,
+    getAbaAtiva: PropTypes.func.isRequired,
+  }).isRequired,
+  onGoToFichaTecnica: PropTypes.func,
+  onStatusUpdated: PropTypes.func,
+  onRefresh: PropTypes.func,
+};
+
+export default memo(EquipamentosList);
