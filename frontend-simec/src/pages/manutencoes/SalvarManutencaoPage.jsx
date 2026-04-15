@@ -1,18 +1,21 @@
-// src/pages/manutencoes/SalvarManutencaoPage.jsx
-
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faWrench } from '@fortawesome/free-solid-svg-icons';
 
-import { useSalvarManutencaoPage } from '../../hooks/manutencoes/useSalvarManutencaoPage';
+// HOOK
+import { useSalvarManutencaoPage } from '@/hooks/manutencoes/useSalvarManutencaoPage';
 
-import ManutencaoForm from '../../components/manutencoes/ManutencaoForm';
+// DOMAIN
+import ManutencaoForm from '@/components/manutencoes/ManutencaoForm';
 
-import Button from '../../components/ui/primitives/Button';
-import PageHeader from '../../components/ui/layout/PageHeader';
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageSection from '../../components/ui/layout/PageSection';
-import PageState from '../../components/ui/feedback/PageState';
+// UI
+import {
+  Button,
+  PageHeader,
+  PageLayout,
+  PageSection,
+  PageState,
+} from '@/components/ui';
 
 function SalvarManutencaoPage() {
   const page = useSalvarManutencaoPage();
@@ -66,7 +69,10 @@ function SalvarManutencaoPage() {
           }
         />
 
-        <PageState isEmpty emptyMessage="Manutenção não encontrada." />
+        <PageState
+          isEmpty
+          emptyMessage="Manutenção não encontrada."
+        />
       </PageLayout>
     );
   }

@@ -1,113 +1,58 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowLeft, faBuilding } from '@fortawesome/free-solid-svg-icons';
 
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageHeader from '../../components/ui/layout/PageHeader';
-import PageState from '../../components/ui/feedback/PageState';
-import Button from '../../components/ui/primitives/Button';
-import UnidadeForm from '../../components/unidades/UnidadeForm';
+import { useSalvarUnidadePage } from '@/hooks/unidades/useSalvarUnidadePage';
 
-import { addUnidade, getUnidadeById, updateUnidade } from '../../services/api';
-import { useToast } from '../../contexts/ToastContext';
+import PageLayout from '@/components/ui/layout/PageLayout';
+import PageHeader from '@/components/ui/layout/PageHeader';
+import PageState from '@/components/ui/feedback/PageState';
+import Button from '@/components/ui/primitives/Button';
+
+import UnidadeForm from '@/components/unidades/UnidadeForm';
 
 function SalvarUnidadePage() {
-  const navigate = useNavigate();
-  const { id } = useParams();
-  const { addToast } = useToast();
+  const page = useSalvarUnidadePage();
 
-  const isEditing = Boolean(id);
+  const title = page.isEditing
+    ? 'Editar Unidade'
+    : 'Nova Unidade';
 
-  const [initialData, setInitialData] = useState(null);
-  const [loading, setLoading] = useState(isEditing);
-  const [error, setError] = useState('');
-
-  const carregarUnidade = useCallback(async () => {
-    if (!isEditing) return;
-
-    setLoading(true);
-    setError('');
-
-    try {
-      const data = await getUnidadeById(id);
-      setInitialData(data || null);
-    } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Erro ao carregar unidade.'
-      );
-    } finally {
-      setLoading(false);
-    }
-  }, [id, isEditing]);
-
-  useEffect(() => {
-    carregarUnidade();
-  }, [carregarUnidade]);
-
-  const handleSubmit = async (formData) => {
-    try {
-      if (isEditing) {
-        await updateUnidade(id, formData);
-        addToast('Unidade atualizada com sucesso!', 'success');
-      } else {
-        await addUnidade(formData);
-        addToast('Unidade cadastrada com sucesso!', 'success');
-      }
-
-      navigate('/cadastros/unidades');
-    } catch (err) {
-      throw err;
-    }
-  };
+  const subtitle =
+    'Cadastre e gerencie informações da unidade';
 
   const headerActions = (
     <div className="flex flex-wrap gap-2">
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={() => navigate('/cadastros')}
-      >
+      <Button variant="secondary" onClick={page.goBackToMenu}>
         <FontAwesomeIcon icon={faArrowLeft} />
-        Voltar ao menu de cadastros
+        Voltar ao menu
       </Button>
 
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={() => navigate('/cadastros/unidades')}
-      >
+      <Button variant="secondary" onClick={page.goBackToList}>
         <FontAwesomeIcon icon={faArrowLeft} />
         Voltar para unidades
       </Button>
     </div>
   );
 
-  if (loading) {
+  if (page.loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
-          subtitle="Cadastre e gerencie informações da unidade"
-          icon={faBuilding}
-        />
+        <PageHeader title={title} subtitle={subtitle} icon={faBuilding} />
         <PageState loading />
       </PageLayout>
     );
   }
 
-  if (error) {
+  if (page.error) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
-          title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
-          subtitle="Cadastre e gerencie informações da unidade"
+          title={title}
+          subtitle={subtitle}
           icon={faBuilding}
           actions={headerActions}
         />
-        <PageState error={error} />
+        <PageState error={page.error} />
       </PageLayout>
     );
   }
@@ -115,17 +60,17 @@ function SalvarUnidadePage() {
   return (
     <PageLayout background="slate" padded fullHeight>
       <PageHeader
-        title={isEditing ? 'Editar Unidade' : 'Nova Unidade'}
-        subtitle="Cadastre e gerencie informações da unidade"
+        title={title}
+        subtitle={subtitle}
         icon={faBuilding}
         actions={headerActions}
       />
 
       <UnidadeForm
-        onSubmit={handleSubmit}
-        initialData={initialData}
-        isEditing={isEditing}
-        onCancel={() => navigate('/cadastros/unidades')}
+        onSubmit={page.handleSubmit}
+        initialData={page.initialData}
+        isEditing={page.isEditing}
+        onCancel={page.goBackToList}
       />
     </PageLayout>
   );

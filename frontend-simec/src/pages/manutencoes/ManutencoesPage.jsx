@@ -1,16 +1,16 @@
 import React from 'react';
-import { useAuth } from '../../contexts/AuthContext';
-import { useManutencoesPage } from '../../hooks/manutencoes/useManutencoesPage';
 
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageState from '../../components/ui/layout/LoadingState';
+// CONTEXT / HOOKS
+import { useAuth } from '@/contexts/AuthContext';
+import { useManutencoesPage } from '@/hooks/manutencoes/useManutencoesPage';
 
-// ✅ DOMÍNIO
-import ManutencoesPageHeader from '../../components/manutencoes/ManutencoesPageHeader';
-import ModalConfirmacaoManutencao from '../../components/manutencoes/ModalConfirmacaoManutencao';
+// DOMAIN
+import ManutencoesPageHeader from '@/components/manutencoes/ManutencoesPageHeader';
+import ModalConfirmacaoManutencao from '@/components/manutencoes/ModalConfirmacaoManutencao';
+import ManutencoesListSection from '@/components/manutencoes/ManutencoesListSection';
 
-// 👉 você precisa ter UMA section de lista (se não tiver, esse é o único ponto a criar)
-import ManutencoesListSection from '../../components/manutencoes/ManutencoesListSection';
+// UI
+import { PageLayout, PageState } from '@/components/ui';
 
 function ManutencoesPage() {
   const { usuario } = useAuth();

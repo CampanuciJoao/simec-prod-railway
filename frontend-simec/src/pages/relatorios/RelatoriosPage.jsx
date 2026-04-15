@@ -2,31 +2,40 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
-import { useRelatoriosPage } from '../../hooks/relatorios/useRelatoriosPage';
+// HOOK
+import { useRelatoriosPage } from '@/hooks/relatorios/useRelatoriosPage';
 
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageSection from '../../components/ui/layout/PageSection';
-import PageState from '../../components/ui/feedback/PageState';
-
+// DOMAIN
 import {
   RelatoriosPageHeader,
   RelatoriosMetricsSection,
   RelatoriosFiltersSection,
   RelatoriosActiveFiltersBar,
   RelatorioResultado,
-} from '../../components/relatorios';
+} from '@/components/relatorios';
+
+// UI
+import {
+  PageLayout,
+  PageSection,
+  PageState,
+} from '@/components/ui';
 
 function RelatoriosPage() {
   const page = useRelatoriosPage();
 
   const isInitialLoading = page.loadingFiltros;
   const hasError = !!page.error && !page.loading;
+
   const hasResultado =
-    !page.loading && Array.isArray(page.resultadoRelatorio?.dados);
+    !page.loading &&
+    Array.isArray(page.resultadoRelatorio?.dados) &&
+    page.resultadoRelatorio.dados.length > 0;
 
   return (
     <PageLayout background="slate" padded fullHeight>
       <div className="space-y-6">
+
         <RelatoriosPageHeader
           canExport={!!page.resultadoRelatorio?.dados?.length}
           onExport={page.handleExportarPDF}
@@ -68,11 +77,14 @@ function RelatoriosPage() {
 
             {hasResultado && (
               <PageSection title="Resultado">
-                <RelatorioResultado resultado={page.resultadoRelatorio} />
+                <RelatorioResultado
+                  resultado={page.resultadoRelatorio}
+                />
               </PageSection>
             )}
           </>
         )}
+
       </div>
     </PageLayout>
   );

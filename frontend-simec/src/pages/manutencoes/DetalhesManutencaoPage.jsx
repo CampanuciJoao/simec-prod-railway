@@ -1,20 +1,23 @@
 import React from 'react';
 import { faWrench } from '@fortawesome/free-solid-svg-icons';
 
-import { useDetalhesManutencaoPage } from '../../hooks/manutencoes/useDetalhesManutencaoPage';
+// HOOK
+import { useDetalhesManutencaoPage } from '@/hooks/manutencoes/useDetalhesManutencaoPage';
 
-import ConfirmacaoFinalManutencao from '../../components/manutencoes/ConfirmacaoFinalManutencao';
-import DetalhesManutencaoPageHeader from '../../components/manutencoes/DetalhesManutencaoPageHeader';
-import HistoricoEAnexosManutencaoSection from '../../components/manutencoes/HistoricoEAnexosManutencaoSection';
-import InformacoesManutencaoSection from '../../components/manutencoes/InformacoesManutencaoSection';
+// DOMAIN
+import ConfirmacaoFinalManutencao from '@/components/manutencoes/ConfirmacaoFinalManutencao';
+import DetalhesManutencaoPageHeader from '@/components/manutencoes/DetalhesManutencaoPageHeader';
+import HistoricoEAnexosManutencaoSection from '@/components/manutencoes/HistoricoEAnexosManutencaoSection';
+import InformacoesManutencaoSection from '@/components/manutencoes/InformacoesManutencaoSection';
 
+// UI
 import {
   Button,
   ModalConfirmacao,
   PageHeader,
   PageLayout,
   PageState,
-} from '../../components/ui';
+} from '@/components/ui';
 
 function DetalhesManutencaoPage() {
   const page = useDetalhesManutencaoPage();
@@ -74,7 +77,12 @@ function DetalhesManutencaoPage() {
         isDestructive
       />
 
-      <PageLayout background="slate" padded fullHeight contentClassName="space-y-6">
+      <PageLayout
+        background="slate"
+        padded
+        fullHeight
+        contentClassName="space-y-6"
+      >
         <DetalhesManutencaoPageHeader
           numeroOS={page.manutencao.numeroOS}
           onPrint={page.handlePrint}
