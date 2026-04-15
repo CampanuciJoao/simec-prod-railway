@@ -1,4 +1,5 @@
 import React, { useMemo, useRef } from 'react';
+import PropTypes from 'prop-types';
 import { Bar, getElementAtEvent } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -14,12 +15,22 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 function normalizarDados(input) {
   if (!Array.isArray(input) || input.length === 0) return null;
 
+  const itemsValidos = input
+    .filter((item) => item && typeof item === 'object')
+    .map((item) => ({
+      name: String(item.name || '').trim(),
+      value: Number(item.value || 0),
+    }))
+    .filter((item) => item.name && Number.isFinite(item.value) && item.value >= 0);
+
+  if (itemsValidos.length === 0) return null;
+
   return {
-    labels: input.map((item) => item.name),
+    labels: itemsValidos.map((item) => item.name),
     datasets: [
       {
         label: 'Manutenções',
-        data: input.map((item) => item.value),
+        data: itemsValidos.map((item) => item.value),
         backgroundColor: 'rgba(59, 130, 246, 0.9)',
         borderRadius: 8,
         borderSkipped: false,
@@ -28,26 +39,94 @@ function normalizarDados(input) {
   };
 }
 
-function BarChart({ data = [], onBarClick }) {
+function EmptyChartState({ message }) {
+  return (
+    <div className="flex h-full items-center justify-center text-center text-sm italic text-slate-400">
+      {message}
+    </div>
+  );
+}
+
+EmptyChartState.propTypes = {
+  message: PropTypes.string.isRequired,
+};
+
+function BarChart({
+  data = [],
+  onBarClick,
+  datasetLabel = 'Manutenções',
+  emptyMessage = 'Sem dados válidos para o gráfico.',
+}) {
   const chartRef = useRef(null);
-  const chartData = useMemo(() => normalizarDados(data), [data]);
+
+  const chartData = useMemo(() => {
+    const normalizado = normalizarDados(data);
+
+    if (!normalizado) return null;
+
+    return {
+      ...normalizado,
+      datasets: normalizado.datasets.map((dataset) => ({
+        ...dataset,
+        label: datasetLabel,
+      })),
+    };
+  }, [data, datasetLabel]);
 
   const handleClick = (event) => {
     if (!chartRef.current || !onBarClick || !chartData) return;
 
     const element = getElementAtEvent(chartRef.current, event);
+
     if (element.length > 0) {
       const { index } = element[0];
       onBarClick(data[index]);
     }
   };
 
+  const options = useMemo(
+    () => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#0f172a',
+          titleColor: '#ffffff',
+          bodyColor: '#e2e8f0',
+          padding: 12,
+          borderColor: '#1e293b',
+          borderWidth: 1,
+        },
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: {
+            color: '#64748b',
+            font: {
+              size: 11,
+              weight: '600',
+            },
+          },
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            precision: 0,
+            color: '#64748b',
+          },
+          grid: {
+            color: 'rgba(148, 163, 184, 0.18)',
+          },
+        },
+      },
+    }),
+    []
+  );
+
   if (!chartData) {
-    return (
-      <div className="flex h-full items-center justify-center text-center text-sm italic text-slate-400">
-        Sem dados válidos para o gráfico.
-      </div>
-    );
+    return <EmptyChartState message={emptyMessage} />;
   }
 
   return (
@@ -55,45 +134,21 @@ function BarChart({ data = [], onBarClick }) {
       ref={chartRef}
       data={chartData}
       onClick={handleClick}
-      options={{
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            backgroundColor: '#0f172a',
-            titleColor: '#ffffff',
-            bodyColor: '#e2e8f0',
-            padding: 12,
-            borderColor: '#1e293b',
-            borderWidth: 1,
-          },
-        },
-        scales: {
-          x: {
-            grid: { display: false },
-            ticks: {
-              color: '#64748b',
-              font: {
-                size: 11,
-                weight: '600',
-              },
-            },
-          },
-          y: {
-            beginAtZero: true,
-            ticks: {
-              precision: 0,
-              color: '#64748b',
-            },
-            grid: {
-              color: 'rgba(148, 163, 184, 0.18)',
-            },
-          },
-        },
-      }}
+      options={options}
     />
   );
 }
+
+BarChart.propTypes = {
+  data: PropTypes.arrayOf(
+    PropTypes.shape({
+      name: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+    })
+  ),
+  onBarClick: PropTypes.func,
+  datasetLabel: PropTypes.string,
+  emptyMessage: PropTypes.string,
+};
 
 export default BarChart;

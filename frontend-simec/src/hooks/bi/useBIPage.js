@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getIndicadoresBI } from '../../services/api';
-import { exportarBIPDF } from '../../utils/pdfUtils';
-import { formatarDowntime, somarDowntimeHoras } from '../../utils/downtimeUtils';
+
+import { getIndicadoresBI } from '@/services/api';
+import { exportarBIPDF } from '@/utils/pdfUtils';
+import { formatarDowntime, somarDowntimeHoras } from '@/utils/bi';
+
+function getDrawerDefaultContent() {
+  return {
+    title: '',
+    subtitle: '',
+    actionLabel: '',
+    onAction: null,
+    items: [],
+    stats: [],
+  };
+}
 
 export function useBIPage() {
   const [dados, setDados] = useState(null);
@@ -23,7 +35,6 @@ export function useBIPage() {
       const response = await getIndicadoresBI();
       setDados(response || null);
     } catch (err) {
-      console.error('Erro ao carregar BI:', err);
       setError(
         err?.response?.data?.message ||
           err?.message ||
@@ -66,11 +77,15 @@ export function useBIPage() {
       ? dados.rankingDowntime
       : [];
 
-    return ranking.map((item) => ({
-      ...item,
-      horasParado: Number(item.horasParado || 0),
-      downtimeFormatado: formatarDowntime(item.horasParado),
-    }));
+    return ranking.map((item) => {
+      const horasParado = Number(item.horasParado || 0);
+
+      return {
+        ...item,
+        horasParado,
+        downtimeFormatado: formatarDowntime(horasParado),
+      };
+    });
   }, [dados]);
 
   const resumoCards = useMemo(() => {
@@ -162,34 +177,30 @@ export function useBIPage() {
   }, [dados]);
 
   const drawerContent = useMemo(() => {
-    if (drawer.type === 'ativos') {
-      return {
+    if (!drawer.type) {
+      return getDrawerDefaultContent();
+    }
+
+    const contentMap = {
+      ativos: {
         title: 'Ativos no sistema',
         subtitle: 'Resumo do parque cadastrado',
         actionLabel: 'Abrir equipamentos',
         onAction: handleGoToAtivos,
         items: [],
-        stats: [
-          { label: 'Total de ativos', value: resumoCards.totalAtivos },
-        ],
-      };
-    }
+        stats: [{ label: 'Total de ativos', value: resumoCards.totalAtivos }],
+      },
 
-    if (drawer.type === 'preventivas') {
-      return {
+      preventivas: {
         title: 'Preventivas realizadas',
         subtitle: 'Indicador consolidado do período',
         actionLabel: 'Abrir manutenções preventivas',
         onAction: handleGoToPreventivas,
         items: [],
-        stats: [
-          { label: 'Total de preventivas', value: resumoCards.preventivas },
-        ],
-      };
-    }
+        stats: [{ label: 'Total de preventivas', value: resumoCards.preventivas }],
+      },
 
-    if (drawer.type === 'corretivas') {
-      return {
+      corretivas: {
         title: 'Falhas corretivas',
         subtitle: 'Equipamentos com reincidência no período',
         actionLabel: 'Abrir corretivas filtradas',
@@ -200,14 +211,10 @@ export function useBIPage() {
           value: `${item.corretivas}`,
           onClick: () => handleDrillDownEquipamento(item.id),
         })),
-        stats: [
-          { label: 'Total de corretivas', value: resumoCards.corretivas },
-        ],
-      };
-    }
+        stats: [{ label: 'Total de corretivas', value: resumoCards.corretivas }],
+      },
 
-    if (drawer.type === 'downtime') {
-      return {
+      downtime: {
         title: 'Downtime acumulado',
         subtitle: 'Tempo total de indisponibilidade do período',
         actionLabel: 'Abrir visão de manutenção',
@@ -218,13 +225,14 @@ export function useBIPage() {
           value: item.downtimeFormatado,
         })),
         stats: [
-          { label: 'Downtime acumulado', value: resumoCards.downtimeAcumulado },
+          {
+            label: 'Downtime acumulado',
+            value: resumoCards.downtimeAcumulado,
+          },
         ],
-      };
-    }
+      },
 
-    if (drawer.type === 'unidadeCritica') {
-      return {
+      unidadeCritica: {
         title: 'Unidade mais crítica',
         subtitle: 'Unidade com maior downtime acumulado',
         actionLabel: 'Abrir equipamentos da unidade',
@@ -244,17 +252,10 @@ export function useBIPage() {
             value: resumoCards.unidadeCritica?.downtime || '—',
           },
         ],
-      };
-    }
-
-    return {
-      title: '',
-      subtitle: '',
-      actionLabel: '',
-      onAction: null,
-      items: [],
-      stats: [],
+      },
     };
+
+    return contentMap[drawer.type] || getDrawerDefaultContent();
   }, [
     dados,
     drawer.type,
