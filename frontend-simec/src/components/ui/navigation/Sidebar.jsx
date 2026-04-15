@@ -23,7 +23,8 @@ function Sidebar({
   isMobileOpen = false,
   onClose = () => {},
 }) {
-  const { user } = useAuth();
+  const auth = useAuth?.();
+  const user = auth?.user || auth?.usuario || null;
 
   const navLinkClass = ({ isActive }) =>
     [
