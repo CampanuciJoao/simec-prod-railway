@@ -5,4 +5,16 @@ export {
   getCoberturaFieldsByTipo,
   sanitizeCoberturasByTipo,
   getCoberturasAtivas,
-} from '../seguros.js';
+} from './seguroCoverageCatalog';
+
+export {
+  formatarMoeda,
+  getNomeUnidade,
+  getTipoVinculo,
+  getTipoSeguroLabel,
+} from './seguroFormatter';
+
+export {
+  getAnexoNome,
+  getAnexoUrl,
+} from './seguroAnexoUtils';
