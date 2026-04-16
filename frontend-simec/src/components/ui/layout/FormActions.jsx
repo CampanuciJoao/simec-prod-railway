@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import Button from './Button';
+
+import { Button } from '@/components/ui/primitives';
 
 function FormActions({
   onSubmit,
@@ -38,10 +39,10 @@ function FormActions({
       ) : null}
 
       <Button
-        type="button"
+        type="submit" // 🔥 importante para forms
         variant="primary"
         className="w-full sm:w-auto"
-        onClick={onSubmit}
+        onClick={onSubmit} // mantém compatível se não estiver dentro de form
         disabled={loading}
       >
         {loading ? 'Salvando...' : submitLabel}
@@ -51,7 +52,7 @@ function FormActions({
 }
 
 FormActions.propTypes = {
-  onSubmit: PropTypes.func.isRequired,
+  onSubmit: PropTypes.func, // 🔥 agora opcional (form pode controlar)
   onCancel: PropTypes.func,
   loading: PropTypes.bool,
   submitLabel: PropTypes.string,
