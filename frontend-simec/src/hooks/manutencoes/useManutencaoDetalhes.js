@@ -1,6 +1,3 @@
-// Ficheiro: src/hooks/manutencoes/useManutencaoDetalhes.js
-// VERSÃO FINAL SÊNIOR - LÓGICA DE NEGÓCIO COMPLETA E ENCAPSULADA
-
 import { useState, useEffect, useCallback } from 'react';
 import {
   getManutencaoById,
@@ -8,16 +5,10 @@ import {
   uploadAnexoManutencao,
   deleteAnexoManutencao,
   addNotaAndamento,
-  cancelarManutencao,
   concluirManutencao,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
-/**
- * Hook customizado para gerenciar o estado e as ações de uma única Ordem de Serviço (OS).
- * Encapsula toda a lógica de busca, atualização, adição de notas, uploads e mudanças de status.
- * @param {string} manutencaoId - O ID da manutenção a ser gerenciada.
- */
 export function useManutencaoDetalhes(manutencaoId) {
   const { addToast } = useToast();
 
@@ -117,35 +108,17 @@ export function useManutencaoDetalhes(manutencaoId) {
     }
   };
 
-  const cancelarOS = async (motivo) => {
-    setSubmitting(true);
-
-    try {
-      await cancelarManutencao(manutencaoId, { motivo });
-      addToast('Manutenção cancelada com sucesso.', 'success');
-      await fetchManutencao();
-      return true;
-    } catch (err) {
-      addToast(
-        err.response?.data?.message || 'Erro ao cancelar manutenção.',
-        'error'
-      );
-      return false;
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   const concluirOS = async (dadosConclusao) => {
     setSubmitting(true);
 
     try {
       await concluirManutencao(manutencaoId, dadosConclusao);
-      addToast('Manutenção concluída com sucesso!', 'success');
+      addToast('Manutenção atualizada com sucesso!', 'success');
       await fetchManutencao();
+      return true;
     } catch (err) {
       addToast(
-        err.response?.data?.message || 'Erro ao confirmar conclusão.',
+        err.response?.data?.message || 'Erro ao processar manutenção.',
         'error'
       );
       throw err;
@@ -163,7 +136,6 @@ export function useManutencaoDetalhes(manutencaoId) {
     adicionarNota,
     fazerUploadAnexo,
     removerAnexo,
-    cancelarOS,
     concluirOS,
     refetch: fetchManutencao,
   };

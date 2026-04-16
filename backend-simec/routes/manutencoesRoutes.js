@@ -1,24 +1,9 @@
-// Ficheiro: backend-simec/routes/manutencoesRoutes.js
-// Versão: profissional, multi-tenant hardened, timezone-aware, local-first,
-// com criação, leitura, edição e anexos centralizados.
-
 import express from 'express';
 
-import prisma from '../services/prismaService.js';
-import { registrarLog } from '../services/logService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
 import validate from '../middleware/validate.js';
 import { manutencaoSchema } from '../validators/manutencaoValidator.js';
-import {
-  resolveOperationalTimezone,
-  validateSchedulingWindow,
-  MANUTENCAO_STATUSS_CONFLITANTES,
-  FAR_FUTURE_UTC_DATE,
-} from '../services/time/index.js';
-import {
-  adaptarListaManutencoesResponse,
-  adaptarManutencaoResponse,
-} from '../services/manutencaoResponseAdapter.js';
+
 import { uploadFor } from '../middleware/uploadMiddleware.js';
 import {
   adicionarAnexos,
@@ -26,266 +11,32 @@ import {
 } from '../services/uploads/anexoService.js';
 import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
 
+import {
+  listarManutencoesService,
+  obterManutencaoDetalhadaService,
+  criarManutencaoService,
+  atualizarManutencaoService,
+  adicionarNotaManutencaoService,
+  concluirManutencaoComAcaoService,
+  excluirManutencaoService,
+} from '../services/manutencao/index.js';
+
+import { buscarManutencaoPorId, deletarManutencao } from '../services/manutencao/manutencaoRepository.js';
+import { adaptarManutencaoResponse } from '../services/manutencaoResponseAdapter.js';
+import { registrarLog } from '../services/logService.js';
+
 const router = express.Router();
 
 router.use(proteger);
 
-function montarMensagemErroAgendamento(code) {
-  switch (code) {
-    case 'INVALID_LOCAL_DATE':
-      return 'A data do agendamento é inválida.';
-    case 'INVALID_LOCAL_START_TIME':
-      return 'A hora inicial do agendamento é inválida.';
-    case 'INVALID_LOCAL_END_TIME':
-      return 'A hora final do agendamento é inválida.';
-    case 'PAST_LOCAL_DATETIME':
-      return 'A data/hora informada está no passado.';
-    case 'END_BEFORE_OR_EQUAL_START':
-      return 'A hora final deve ser maior que a hora inicial.';
-    default:
-      return 'Data/hora de agendamento inválida.';
-  }
-}
-
-async function buscarTenantAtivo(tenantId) {
-  return prisma.tenant.findFirst({
-    where: {
-      id: tenantId,
-      ativo: true,
-    },
-    select: {
-      id: true,
-      timezone: true,
-      locale: true,
-    },
-  });
-}
-
-async function buscarContextoOperacional({ tenantId, equipamentoId }) {
-  const tenant = await buscarTenantAtivo(tenantId);
-
-  if (!tenant) {
-    return {
-      ok: false,
-      status: 401,
-      message: 'Tenant inválido ou inativo.',
-    };
-  }
-
-  const equipamento = await prisma.equipamento.findFirst({
-    where: {
-      id: equipamentoId,
-      tenantId,
-    },
-    select: {
-      id: true,
-      tag: true,
-      modelo: true,
-      unidadeId: true,
-      unidade: {
-        select: {
-          id: true,
-          timezone: true,
-          nomeSistema: true,
-          nomeFantasia: true,
-        },
-      },
-    },
-  });
-
-  if (!equipamento) {
-    return {
-      ok: false,
-      status: 404,
-      message: 'Equipamento não encontrado.',
-    };
-  }
-
-  const timezone = resolveOperationalTimezone({
-    tenantTimezone: tenant.timezone,
-    unidadeTimezone: equipamento.unidade?.timezone,
-  });
-
-  return {
-    ok: true,
-    tenant,
-    equipamento,
-    timezone,
-  };
-}
-
-async function buscarManutencaoPorId({ tenantId, manutencaoId }) {
-  return prisma.manutencao.findFirst({
-    where: {
-      id: manutencaoId,
-      tenantId,
-    },
-    include: {
-      anexos: {
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      equipamento: {
-        include: {
-          unidade: true,
-        },
-      },
-      notasAndamento: {
-        where: {
-          tenantId,
-        },
-        orderBy: {
-          data: 'desc',
-        },
-        include: {
-          autor: {
-            select: { nome: true },
-          },
-        },
-      },
-    },
-  });
-}
-
-function montarPayloadPersistencia({
-  dados,
-  agendamento,
-  tenantId,
-  equipamentoId,
-  numeroOS,
-  numeroOSExistente = null,
-}) {
-  return {
-    tenant: {
-      connect: { id: tenantId },
-    },
-
-    equipamento: {
-      connect: {
-        tenantId_id: {
-          tenantId,
-          id: equipamentoId,
-        },
-      },
-    },
-
-    numeroOS: numeroOS || numeroOSExistente,
-    tipo: dados.tipo,
-    descricaoProblemaServico: dados.descricaoProblemaServico,
-    tecnicoResponsavel: dados.tecnicoResponsavel?.trim() || null,
-    numeroChamado:
-      dados.tipo === 'Corretiva' ? dados.numeroChamado?.trim() || null : null,
-    custoTotal:
-      typeof dados.custoTotal === 'number' ? dados.custoTotal : null,
-    status: dados.status || 'Agendada',
-
-    agendamentoDataLocal: dados.agendamentoDataLocal,
-    agendamentoHoraInicioLocal: dados.agendamentoHoraInicioLocal,
-    agendamentoHoraFimLocal: dados.agendamentoHoraFimLocal || null,
-    agendamentoTimezone: agendamento.timezone,
-
-    dataHoraAgendamentoInicio: agendamento.startUtc,
-    dataHoraAgendamentoFim: agendamento.endUtc,
-  };
-}
-
-async function existeConflitoAgendamento({
-  tenantId,
-  equipamentoId,
-  startUtc,
-  endUtc,
-  manutencaoIdIgnorar = null,
-}) {
-  const conflito = await prisma.manutencao.findFirst({
-    where: {
-      tenantId,
-      equipamentoId,
-      ...(manutencaoIdIgnorar
-        ? {
-            id: {
-              not: manutencaoIdIgnorar,
-            },
-          }
-        : {}),
-      status: {
-        in: MANUTENCAO_STATUSS_CONFLITANTES,
-      },
-      AND: [
-        {
-          dataHoraAgendamentoInicio: {
-            lt: endUtc || FAR_FUTURE_UTC_DATE,
-          },
-        },
-        {
-          OR: [
-            {
-              dataHoraAgendamentoFim: {
-                gt: startUtc,
-              },
-            },
-            {
-              dataHoraAgendamentoFim: null,
-              dataHoraAgendamentoInicio: {
-                lt: endUtc || FAR_FUTURE_UTC_DATE,
-              },
-            },
-          ],
-        },
-      ],
-    },
-    select: {
-      id: true,
-      numeroOS: true,
-      tipo: true,
-      status: true,
-      agendamentoDataLocal: true,
-      agendamentoHoraInicioLocal: true,
-      agendamentoHoraFimLocal: true,
-    },
-  });
-
-  return conflito;
-}
-
 router.get('/', async (req, res) => {
-  const { equipamentoId, unidadeId, tipo, status } = req.query;
-
   try {
-    const tenantId = req.usuario.tenantId;
-    const whereClause = { tenantId };
-
-    if (equipamentoId) whereClause.equipamentoId = equipamentoId;
-    if (tipo) whereClause.tipo = tipo;
-    if (status) whereClause.status = status;
-
-    if (unidadeId) {
-      whereClause.equipamento = {
-        tenantId,
-        unidadeId,
-      };
-    }
-
-    const manutencoes = await prisma.manutencao.findMany({
-      where: whereClause,
-      include: {
-        equipamento: {
-          include: {
-            unidade: true,
-          },
-        },
-        anexos: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-      },
-      orderBy: {
-        dataHoraAgendamentoInicio: 'desc',
-      },
+    const data = await listarManutencoesService({
+      tenantId: req.usuario.tenantId,
+      filters: req.query,
     });
 
-    return res.json(adaptarListaManutencoesResponse(manutencoes));
+    return res.json(data);
   } catch (error) {
     console.error('[MANUTENCAO_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar manutenções.' });
@@ -294,18 +45,18 @@ router.get('/', async (req, res) => {
 
 router.get('/:id', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
-
-    const manutencao = await buscarManutencaoPorId({
-      tenantId,
+    const resultado = await obterManutencaoDetalhadaService({
+      tenantId: req.usuario.tenantId,
       manutencaoId: req.params.id,
     });
 
-    if (!manutencao) {
-      return res.status(404).json({ message: 'Manutenção não encontrada.' });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+      });
     }
 
-    return res.json(adaptarManutencaoResponse(manutencao));
+    return res.json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_GET_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar detalhes.' });
@@ -313,91 +64,21 @@ router.get('/:id', async (req, res) => {
 });
 
 router.post('/', validate(manutencaoSchema), async (req, res) => {
-  const dados = req.validatedData || req.body;
-
   try {
-    const tenantId = req.usuario.tenantId;
-
-    const contexto = await buscarContextoOperacional({
-      tenantId,
-      equipamentoId: dados.equipamentoId,
-    });
-
-    if (!contexto.ok) {
-      return res.status(contexto.status).json({ message: contexto.message });
-    }
-
-    const agendamento = validateSchedulingWindow({
-      dateLocal: dados.agendamentoDataLocal,
-      startTimeLocal: dados.agendamentoHoraInicioLocal,
-      endTimeLocal: dados.agendamentoHoraFimLocal || null,
-      timezone: contexto.timezone,
-    });
-
-    if (!agendamento.valid) {
-      return res.status(400).json({
-        message: montarMensagemErroAgendamento(agendamento.code),
-      });
-    }
-
-    const conflito = await existeConflitoAgendamento({
-      tenantId,
-      equipamentoId: dados.equipamentoId,
-      startUtc: agendamento.startUtc,
-      endUtc: agendamento.endUtc,
-    });
-
-    if (conflito) {
-      return res.status(409).json({
-        message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
-        conflito,
-      });
-    }
-
-    const totalTenant = await prisma.manutencao.count({
-      where: { tenantId },
-    });
-
-    const osNumber = String(totalTenant + 1).padStart(4, '0');
-    const tagPrefix = (contexto.equipamento.tag || 'MAN')
-      .substring(0, 3)
-      .toUpperCase();
-    const numeroOS = `${dados.tipo.substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
-
-    const payload = montarPayloadPersistencia({
-      dados,
-      agendamento,
-      tenantId,
-      equipamentoId: dados.equipamentoId,
-      numeroOS,
-    });
-
-    const nova = await prisma.manutencao.create({
-      data: payload,
-      include: {
-        equipamento: {
-          include: {
-            unidade: true,
-          },
-        },
-        anexos: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-      },
-    });
-
-    await registrarLog({
-      tenantId,
+    const resultado = await criarManutencaoService({
+      tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'CRIAÇÃO',
-      entidade: 'Manutenção',
-      entidadeId: nova.id,
-      detalhes: `OS ${numeroOS} criada.`,
+      dados: req.validatedData || req.body,
     });
 
-    return res.status(201).json(adaptarManutencaoResponse(nova));
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+        ...(resultado.conflito ? { conflito: resultado.conflito } : {}),
+      });
+    }
+
+    return res.status(resultado.status).json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_CREATE_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao agendar manutenção.' });
@@ -405,119 +86,22 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
 });
 
 router.put('/:id', validate(manutencaoSchema), async (req, res) => {
-  const dados = req.validatedData || req.body;
-
   try {
-    const tenantId = req.usuario.tenantId;
-    const manutencaoId = req.params.id;
-
-    const manutencaoAtual = await prisma.manutencao.findFirst({
-      where: {
-        id: manutencaoId,
-        tenantId,
-      },
-      select: {
-        id: true,
-        numeroOS: true,
-        equipamentoId: true,
-        status: true,
-      },
-    });
-
-    if (!manutencaoAtual) {
-      return res.status(404).json({ message: 'Manutenção não encontrada.' });
-    }
-
-    const contexto = await buscarContextoOperacional({
-      tenantId,
-      equipamentoId: dados.equipamentoId,
-    });
-
-    if (!contexto.ok) {
-      return res.status(contexto.status).json({ message: contexto.message });
-    }
-
-    const agendamento = validateSchedulingWindow({
-      dateLocal: dados.agendamentoDataLocal,
-      startTimeLocal: dados.agendamentoHoraInicioLocal,
-      endTimeLocal: dados.agendamentoHoraFimLocal || null,
-      timezone: contexto.timezone,
-    });
-
-    if (!agendamento.valid) {
-      return res.status(400).json({
-        message: montarMensagemErroAgendamento(agendamento.code),
-      });
-    }
-
-    const conflito = await existeConflitoAgendamento({
-      tenantId,
-      equipamentoId: dados.equipamentoId,
-      startUtc: agendamento.startUtc,
-      endUtc: agendamento.endUtc,
-      manutencaoIdIgnorar: manutencaoId,
-    });
-
-    if (conflito) {
-      return res.status(409).json({
-        message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
-        conflito,
-      });
-    }
-
-    const payload = montarPayloadPersistencia({
-      dados,
-      agendamento,
-      tenantId,
-      equipamentoId: dados.equipamentoId,
-      numeroOSExistente: manutencaoAtual.numeroOS,
-    });
-
-    const atualizada = await prisma.manutencao.update({
-      where: {
-        tenantId_id: {
-          tenantId,
-          id: manutencaoId,
-        },
-      },
-      data: payload,
-      include: {
-        equipamento: {
-          include: {
-            unidade: true,
-          },
-        },
-        anexos: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        notasAndamento: {
-          where: {
-            tenantId,
-          },
-          orderBy: {
-            data: 'desc',
-          },
-          include: {
-            autor: {
-              select: { nome: true },
-            },
-          },
-        },
-      },
-    });
-
-    await registrarLog({
-      tenantId,
+    const resultado = await atualizarManutencaoService({
+      tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
-      entidade: 'Manutenção',
-      entidadeId: atualizada.id,
-      detalhes: `OS ${atualizada.numeroOS} atualizada.`,
+      manutencaoId: req.params.id,
+      dados: req.validatedData || req.body,
     });
 
-    return res.json(adaptarManutencaoResponse(atualizada));
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+        ...(resultado.conflito ? { conflito: resultado.conflito } : {}),
+      });
+    }
+
+    return res.json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_UPDATE_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao atualizar manutenção.' });
@@ -525,77 +109,54 @@ router.put('/:id', validate(manutencaoSchema), async (req, res) => {
 });
 
 router.post('/:id/notas', async (req, res) => {
-  const { nota } = req.body;
-
-  if (!nota) {
-    return res.status(400).json({
-      message: 'A nota é obrigatória.',
-    });
-  }
-
   try {
-    const tenantId = req.usuario.tenantId;
-
-    const manutencao = await prisma.manutencao.findFirst({
-      where: {
-        id: req.params.id,
-        tenantId,
-      },
-      select: {
-        id: true,
-        numeroOS: true,
-      },
+    const resultado = await adicionarNotaManutencaoService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      manutencaoId: req.params.id,
+      nota: req.body?.nota,
     });
 
-    if (!manutencao) {
-      return res.status(404).json({ message: 'Manutenção não encontrada.' });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+      });
     }
 
-    const nova = await prisma.notaAndamento.create({
-      data: {
-        tenant: {
-          connect: { id: tenantId },
-        },
-        nota,
-        autor: {
-          connect: {
-            tenantId_id: {
-              tenantId,
-              id: req.usuario.id,
-            },
-          },
-        },
-        manutencao: {
-          connect: {
-            tenantId_id: {
-              tenantId,
-              id: req.params.id,
-            },
-          },
-        },
-      },
-    });
-
-    await registrarLog({
-      tenantId,
-      usuarioId: req.usuario.id,
-      acao: 'CRIAÇÃO',
-      entidade: 'NotaAndamento',
-      entidadeId: nova.id,
-      detalhes: `Nota adicionada à OS ${manutencao.numeroOS}.`,
-    });
-
-    return res.status(201).json(nova);
+    return res.status(resultado.status).json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_NOTA_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao adicionar nota.' });
   }
 });
 
-// ==============================
-// UPLOAD ANEXOS
-// Campo multipart oficial do SIMEC: "file"
-// ==============================
+router.post('/:id/concluir', async (req, res) => {
+  try {
+    const resultado = await concluirManutencaoComAcaoService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      manutencaoId: req.params.id,
+      acao: req.body?.acao,
+      dataTerminoReal: req.body?.dataTerminoReal,
+      novaPrevisao: req.body?.novaPrevisao,
+      observacao: req.body?.observacao,
+    });
+
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+      });
+    }
+
+    return res.json(resultado.data);
+  } catch (error) {
+    console.error('[MANUTENCAO_CONCLUIR_ERROR]', error);
+    return res.status(500).json({
+      message: 'Erro ao processar o desfecho da manutenção.',
+    });
+  }
+});
+
 router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
   try {
     const tenantId = req.usuario.tenantId;
@@ -622,9 +183,6 @@ router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
   }
 });
 
-// ==============================
-// DELETE ANEXO
-// ==============================
 router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
     await removerAnexo({
@@ -650,50 +208,43 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
 });
 
 router.delete('/:id', admin, async (req, res) => {
-  const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
-
   try {
-    const manut = await prisma.manutencao.findFirst({
-      where: {
-        id,
-        tenantId,
-      },
-      include: {
-        anexos: true,
-      },
+    const resultado = await excluirManutencaoService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      manutencaoId: req.params.id,
     });
 
-    if (!manut) {
-      return res.status(404).json({ message: 'Manutenção não encontrada.' });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+      });
     }
+
+    const { manut } = resultado;
 
     for (const anexo of manut.anexos || []) {
       try {
         deleteStoredFile(anexo.path);
       } catch (fileError) {
         console.error(
-          `[MANUTENCAO_DELETE_FILE_ERROR] manutencaoId=${id} anexoId=${anexo.id}`,
+          `[MANUTENCAO_DELETE_FILE_ERROR] manutencaoId=${req.params.id} anexoId=${anexo.id}`,
           fileError
         );
       }
     }
 
-    await prisma.manutencao.delete({
-      where: {
-        tenantId_id: {
-          tenantId,
-          id,
-        },
-      },
+    await deletarManutencao({
+      tenantId: req.usuario.tenantId,
+      manutencaoId: req.params.id,
     });
 
     await registrarLog({
-      tenantId,
+      tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃO',
       entidade: 'Manutenção',
-      entidadeId: id,
+      entidadeId: req.params.id,
       detalhes: `Manutenção "${manut.numeroOS}" excluída.`,
     });
 

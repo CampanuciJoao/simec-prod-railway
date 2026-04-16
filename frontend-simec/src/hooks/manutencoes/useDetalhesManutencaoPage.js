@@ -4,9 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useModal } from '../shared/useModal';
 import { useManutencaoDetalhes } from './useManutencaoDetalhes';
 
-function toDateTimeLocalValue(value) {
-  if (!value) return '';
-
+function toDateTimeLocalValue(value = new Date()) {
   try {
     const date = value instanceof Date ? value : new Date(value);
     if (Number.isNaN(date.getTime())) return '';
@@ -62,10 +60,10 @@ function extrairFormInicial(manutencao) {
 function parseDateTimeLocalToIso(value) {
   if (!value) return null;
 
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
 
-  return date.toISOString();
+  return parsed.toISOString();
 }
 
 export function useDetalhesManutencaoPage() {
@@ -86,7 +84,6 @@ export function useDetalhesManutencaoPage() {
     adicionarNota,
     fazerUploadAnexo,
     removerAnexo,
-    cancelarOS,
     concluirOS,
     refetch,
   } = useManutencaoDetalhes(manutencaoId);
@@ -177,10 +174,12 @@ export function useDetalhesManutencaoPage() {
   };
 
   const handleCancelarManutencao = async (motivo = '') => {
-    const ok = await cancelarOS(motivo);
-    if (ok) {
-      cancelModal.closeModal();
-    }
+    await concluirOS({
+      acao: 'cancelar',
+      observacao: motivo || 'Cancelada manualmente.',
+    });
+
+    cancelModal.closeModal();
   };
 
   const handleConfirmacaoFinal = async () => {
@@ -204,9 +203,11 @@ export function useDetalhesManutencaoPage() {
     }
 
     if (confirmMode === 'cancelar') {
-      await handleCancelarManutencao(
-        observacaoDecisao || 'Cancelada na etapa de confirmação final.'
-      );
+      await concluirOS({
+        acao: 'cancelar',
+        observacao:
+          observacaoDecisao || 'Cancelada na etapa de confirmação final.',
+      });
     }
   };
 

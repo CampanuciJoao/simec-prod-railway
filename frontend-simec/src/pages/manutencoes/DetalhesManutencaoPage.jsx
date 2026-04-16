@@ -1,16 +1,13 @@
 import React from 'react';
 import { faWrench } from '@fortawesome/free-solid-svg-icons';
 
-// HOOK
 import { useDetalhesManutencaoPage } from '@/hooks/manutencoes/useDetalhesManutencaoPage';
 
-// DOMAIN
 import ConfirmacaoFinalManutencao from '@/components/manutencoes/ConfirmacaoFinalManutencao';
 import DetalhesManutencaoPageHeader from '@/components/manutencoes/DetalhesManutencaoPageHeader';
 import HistoricoEAnexosManutencaoSection from '@/components/manutencoes/HistoricoEAnexosManutencaoSection';
 import InformacoesManutencaoSection from '@/components/manutencoes/InformacoesManutencaoSection';
 
-// UI
 import {
   Button,
   ModalConfirmacao,
@@ -89,6 +86,20 @@ function DetalhesManutencaoPage() {
           onBack={page.goBack}
         />
 
+        <ConfirmacaoFinalManutencao
+          visible={page.manutencao.status === 'AguardandoConfirmacao'}
+          confirmMode={page.confirmMode}
+          setConfirmMode={page.setConfirmMode}
+          dataTerminoReal={page.dataTerminoReal}
+          setDataTerminoReal={page.setDataTerminoReal}
+          novaPrevisao={page.novaPrevisao}
+          setNovaPrevisao={page.setNovaPrevisao}
+          observacaoDecisao={page.observacaoDecisao}
+          setObservacaoDecisao={page.setObservacaoDecisao}
+          onConfirm={page.handleConfirmacaoFinal}
+          submitting={page.submitting}
+        />
+
         <InformacoesManutencaoSection
           manutencao={page.manutencao}
           formData={page.formData}
@@ -105,20 +116,6 @@ function DetalhesManutencaoPage() {
           onAdicionarNota={page.handleAdicionarNota}
           onUploadAnexos={page.handleUploadAnexos}
           onRemoverAnexo={page.handleAskDeleteAnexo}
-          submitting={page.submitting}
-        />
-
-        <ConfirmacaoFinalManutencao
-          visible={page.manutencao.status === 'AguardandoConfirmacao'}
-          confirmMode={page.confirmMode}
-          setConfirmMode={page.setConfirmMode}
-          dataTerminoReal={page.dataTerminoReal}
-          setDataTerminoReal={page.setDataTerminoReal}
-          novaPrevisao={page.novaPrevisao}
-          setNovaPrevisao={page.setNovaPrevisao}
-          observacaoDecisao={page.observacaoDecisao}
-          setObservacaoDecisao={page.setObservacaoDecisao}
-          onConfirm={page.handleConfirmacaoFinal}
           submitting={page.submitting}
         />
       </PageLayout>
