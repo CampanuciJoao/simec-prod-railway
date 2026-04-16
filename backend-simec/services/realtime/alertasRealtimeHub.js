@@ -4,10 +4,7 @@ function buildUserKey(tenantId, userId) {
   return `${tenantId}:${userId}`;
 }
 
-/**
- * 🔌 Adiciona cliente SSE
- */
-function addClient({ tenantId, userId, res }) {
+export function addClient({ tenantId, userId, res }) {
   const key = buildUserKey(tenantId, userId);
 
   if (!clientsByUserKey.has(key)) {
@@ -17,16 +14,13 @@ function addClient({ tenantId, userId, res }) {
   const bucket = clientsByUserKey.get(key);
   bucket.add(res);
 
-  /**
-   * 🔥 limpeza automática ao fechar conexão
-   */
   const cleanup = () => {
-    const bucket = clientsByUserKey.get(key);
-    if (!bucket) return;
+    const currentBucket = clientsByUserKey.get(key);
+    if (!currentBucket) return;
 
-    bucket.delete(res);
+    currentBucket.delete(res);
 
-    if (bucket.size === 0) {
+    if (currentBucket.size === 0) {
       clientsByUserKey.delete(key);
     }
   };
@@ -37,25 +31,18 @@ function addClient({ tenantId, userId, res }) {
   return cleanup;
 }
 
-/**
- * 📡 Envia evento SSE
- */
-function sendEvent(res, event, data) {
+export function sendEvent(res, event, data) {
   try {
     res.write(`event: ${event}\n`);
     res.write(`data: ${JSON.stringify(data)}\n\n`);
-  } catch (err) {
-    // evita crash silencioso
+  } catch (error) {
     try {
       res.end();
     } catch {}
   }
 }
 
-/**
- * 📢 Broadcast para um usuário
- */
-function broadcastToUser({ tenantId, userId, event, data }) {
+export function broadcastToUser({ tenantId, userId, event, data }) {
   const key = buildUserKey(tenantId, userId);
   const bucket = clientsByUserKey.get(key);
 
@@ -66,10 +53,7 @@ function broadcastToUser({ tenantId, userId, event, data }) {
   }
 }
 
-/**
- * 🔥 Broadcast para todos do tenant
- */
-function broadcastToTenant({ tenantId, event, data }) {
+export function broadcastToTenant({ tenantId, event, data }) {
   for (const [key, bucket] of clientsByUserKey.entries()) {
     if (!key.startsWith(`${tenantId}:`)) continue;
 
@@ -79,25 +63,14 @@ function broadcastToTenant({ tenantId, event, data }) {
   }
 }
 
-/**
- * 💓 KeepAlive (evita timeout de proxy)
- */
-function startHeartbeat(intervalMs = 25000) {
-  setInterval(() => {
+export function startHeartbeat(intervalMs = 25000) {
+  return setInterval(() => {
     for (const bucket of clientsByUserKey.values()) {
       for (const res of bucket) {
         try {
-          res.write(`event: ping\ndata: {}\n\n`);
+          res.write('event: ping\ndata: {}\n\n');
         } catch {}
       }
     }
   }, intervalMs);
 }
-
-module.exports = {
-  addClient,
-  sendEvent,
-  broadcastToUser,
-  broadcastToTenant,
-  startHeartbeat,
-};

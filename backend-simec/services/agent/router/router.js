@@ -192,7 +192,7 @@ export const RoteadorAgente = async ({
     }
 
     return respostaAgente(
-      'Olá! Sou a SIMEC-IA. Posso ajudar com agendamentos, relatórios e seguros. Como posso ajudar?'
+      'Olá! Sou a T.H.I.A.G.O. Posso ajudar com agendamentos, relatórios e seguros. Como posso ajudar?'
     );
   } catch (error) {
     console.error('[AGENT_ROUTER_ERROR]', error);

@@ -1,4 +1,4 @@
-const { publicarContagemAlertasParaTenant } = require('./alertasRealtimePublisher');
+import { publicarContagemAlertasParaTenant } from './alertasRealtimePublisher.js';
 
 const debounceMap = new Map();
 const DEBOUNCE_MS = 300;
@@ -20,12 +20,10 @@ function clearTenantDebounce(tenantId) {
 async function processarTenant(tenantId) {
   await publicarContagemAlertasParaTenant({ tenantId });
 
-  console.log(
-    `[ALERTAS_EVENT] Tenant ${tenantId} atualizado em realtime`
-  );
+  console.log(`[ALERTAS_EVENT] Tenant ${tenantId} atualizado em realtime`);
 }
 
-async function onAlertasProcessados({ tenantsAfetados }) {
+export async function onAlertasProcessados({ tenantsAfetados }) {
   if (!Array.isArray(tenantsAfetados) || tenantsAfetados.length === 0) {
     return;
   }
@@ -39,10 +37,7 @@ async function onAlertasProcessados({ tenantsAfetados }) {
       try {
         await processarTenant(tenantId);
       } catch (error) {
-        console.error(
-          `[ALERTAS_EVENT_ERROR][tenant=${tenantId}]`,
-          error
-        );
+        console.error(`[ALERTAS_EVENT_ERROR][tenant=${tenantId}]`, error);
       } finally {
         debounceMap.delete(getTenantKey(tenantId));
       }
@@ -52,7 +47,7 @@ async function onAlertasProcessados({ tenantsAfetados }) {
   }
 }
 
-async function flushAlertasProcessados({ tenantsAfetados }) {
+export async function flushAlertasProcessados({ tenantsAfetados }) {
   if (!Array.isArray(tenantsAfetados) || tenantsAfetados.length === 0) {
     return;
   }
@@ -65,15 +60,7 @@ async function flushAlertasProcessados({ tenantsAfetados }) {
     try {
       await processarTenant(tenantId);
     } catch (error) {
-      console.error(
-        `[ALERTAS_EVENT_FLUSH_ERROR][tenant=${tenantId}]`,
-        error
-      );
+      console.error(`[ALERTAS_EVENT_FLUSH_ERROR][tenant=${tenantId}]`, error);
     }
   }
 }
-
-module.exports = {
-  onAlertasProcessados,
-  flushAlertasProcessados,
-};
