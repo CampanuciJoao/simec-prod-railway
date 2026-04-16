@@ -1,182 +1,55 @@
-export function getBreadcrumbItems(pathname = '') {
-  const path = String(pathname || '');
+import React from 'react';
+import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
 
-  if (path === '/dashboard') {
-    return [{ label: 'Dashboard', to: '/dashboard' }];
-  }
+function AppBreadcrumb({ items = [] }) {
+  if (!items.length) return null;
 
-  if (path === '/cadastros') {
-    return [{ label: 'Cadastros Gerais', to: '/cadastros' }];
-  }
+  return (
+    <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
+      <nav className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
+        {items.map((item, index) => {
+          const isLast = index === items.length - 1;
 
-  if (path.startsWith('/cadastros/unidades/adicionar')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'Unidades', to: '/cadastros/unidades' },
-      { label: 'Nova Unidade' },
-    ];
-  }
+          return (
+            <React.Fragment key={`${item.label}-${index}`}>
+              {item.to && !isLast ? (
+                <Link
+                  to={item.to}
+                  className="font-medium text-slate-600 transition hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400"
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <span
+                  className={
+                    isLast
+                      ? 'font-semibold text-slate-900 dark:text-slate-100'
+                      : ''
+                  }
+                >
+                  {item.label}
+                </span>
+              )}
 
-  if (path.startsWith('/cadastros/unidades/editar')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'Unidades', to: '/cadastros/unidades' },
-      { label: 'Editar Unidade' },
-    ];
-  }
-
-  if (path.startsWith('/cadastros/unidades')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'Unidades' },
-    ];
-  }
-
-  if (path.startsWith('/cadastros/equipamentos/adicionar')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'Equipamentos', to: '/equipamentos' },
-      { label: 'Novo Equipamento' },
-    ];
-  }
-
-  if (path.startsWith('/cadastros/equipamentos/editar')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'Equipamentos', to: '/equipamentos' },
-      { label: 'Editar Equipamento' },
-    ];
-  }
-
-  if (path.startsWith('/cadastros/emails')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'E-mails de Notificação' },
-    ];
-  }
-
-  if (path.startsWith('/gerenciamento/usuarios')) {
-    return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
-      { label: 'Usuários' },
-    ];
-  }
-
-  if (path === '/equipamentos') {
-    return [{ label: 'Equipamentos' }];
-  }
-
-  if (path.startsWith('/equipamentos/detalhes/')) {
-    return [
-      { label: 'Equipamentos', to: '/equipamentos' },
-      { label: 'Detalhes do Equipamento' },
-    ];
-  }
-
-  if (path.startsWith('/equipamentos/ficha-tecnica/')) {
-    return [
-      { label: 'Equipamentos', to: '/equipamentos' },
-      { label: 'Ficha Técnica' },
-    ];
-  }
-
-  if (path === '/manutencoes') {
-    return [{ label: 'Manutenções' }];
-  }
-
-  if (path.startsWith('/manutencoes/agendar')) {
-    return [
-      { label: 'Manutenções', to: '/manutencoes' },
-      { label: 'Nova Manutenção' },
-    ];
-  }
-
-  if (path.startsWith('/manutencoes/editar/')) {
-    return [
-      { label: 'Manutenções', to: '/manutencoes' },
-      { label: 'Editar Manutenção' },
-    ];
-  }
-
-  if (path.startsWith('/manutencoes/detalhes/')) {
-    return [
-      { label: 'Manutenções', to: '/manutencoes' },
-      { label: 'Detalhes da OS' },
-    ];
-  }
-
-  if (path === '/contratos') {
-    return [{ label: 'Contratos' }];
-  }
-
-  if (path.startsWith('/contratos/adicionar')) {
-    return [
-      { label: 'Contratos', to: '/contratos' },
-      { label: 'Novo Contrato' },
-    ];
-  }
-
-  if (path.startsWith('/contratos/editar/')) {
-    return [
-      { label: 'Contratos', to: '/contratos' },
-      { label: 'Editar Contrato' },
-    ];
-  }
-
-  if (path.startsWith('/contratos/detalhes/')) {
-    return [
-      { label: 'Contratos', to: '/contratos' },
-      { label: 'Detalhes do Contrato' },
-    ];
-  }
-
-  if (path === '/seguros') {
-    return [{ label: 'Seguros' }];
-  }
-
-  if (path.startsWith('/seguros/adicionar')) {
-    return [
-      { label: 'Seguros', to: '/seguros' },
-      { label: 'Novo Seguro' },
-    ];
-  }
-
-  if (path.startsWith('/seguros/editar/')) {
-    return [
-      { label: 'Seguros', to: '/seguros' },
-      { label: 'Editar Seguro' },
-    ];
-  }
-
-  if (path.startsWith('/seguros/detalhes/')) {
-    return [
-      { label: 'Seguros', to: '/seguros' },
-      { label: 'Detalhes do Seguro' },
-    ];
-  }
-
-  if (path === '/alertas') {
-    return [{ label: 'Alertas' }];
-  }
-
-  if (path === '/bi') {
-    return [{ label: 'Business Intelligence' }];
-  }
-
-  if (path === '/relatorios') {
-    return [{ label: 'Relatórios' }];
-  }
-
-  if (path === '/gerenciamento') {
-    return [{ label: 'Gerenciamento' }];
-  }
-
-  if (path.startsWith('/gerenciamento/auditoria')) {
-    return [
-      { label: 'Gerenciamento', to: '/gerenciamento' },
-      { label: 'Auditoria' },
-    ];
-  }
-
-  return [];
+              {!isLast && (
+                <span className="mx-1 text-slate-400">/</span>
+              )}
+            </React.Fragment>
+          );
+        })}
+      </nav>
+    </div>
+  );
 }
+
+AppBreadcrumb.propTypes = {
+  items: PropTypes.arrayOf(
+    PropTypes.shape({
+      label: PropTypes.string.isRequired,
+      to: PropTypes.string,
+    })
+  ),
+};
+
+export default AppBreadcrumb;

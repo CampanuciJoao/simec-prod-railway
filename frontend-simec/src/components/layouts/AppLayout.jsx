@@ -1,21 +1,27 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useCallback,
+} from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-import Sidebar from '../ui/navigation/Sidebar';
-import ChatBot from '../ui/chat/ChatBot';
-import AppBreadcrumb from './AppBreadcrumb';
-import AppTopbar from './AppTopbar';
+import Sidebar from '@/components/ui/navigation/Sidebar';
+import ChatBot from '@/components/ui/chat/ChatBot';
+import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
+import AppTopbar from '@/components/layouts/AppTopbar';
 
-import { useAuth } from '../../contexts/AuthContext';
-import { useAlertas } from '../../contexts/AlertasContext';
-import { getBreadcrumbItems } from '../../utils/breadcrumbConfig';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAlertas } from '@/contexts/AlertasContext';
+import { getBreadcrumbItems } from '@/utils/breadcrumbConfig';
 
 function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
   const auth = useAuth?.();
-  const user = auth?.user || auth?.usuario || null;
+  const usuario = auth?.usuario || auth?.user || null;
   const logout = auth?.logout || auth?.signOut || null;
 
   const {
@@ -32,6 +38,7 @@ function AppLayout() {
 
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
   const alertsRef = useRef(null);
 
   useEffect(() => {
@@ -40,10 +47,11 @@ function AppLayout() {
     if (isDarkMode) {
       root.classList.add('dark');
       localStorage.setItem('simec-theme', 'dark');
-    } else {
-      root.classList.remove('dark');
-      localStorage.setItem('simec-theme', 'light');
+      return;
     }
+
+    root.classList.remove('dark');
+    localStorage.setItem('simec-theme', 'light');
   }, [isDarkMode]);
 
   useEffect(() => {
@@ -74,42 +82,41 @@ function AppLayout() {
     setIsMobileSidebarOpen(false);
   }, [location.pathname]);
 
-  const breadcrumbItems = useMemo(
-    () => getBreadcrumbItems(location.pathname),
-    [location.pathname]
-  );
+  const breadcrumbItems = useMemo(() => {
+    return getBreadcrumbItems(location.pathname);
+  }, [location.pathname]);
 
   const nomeUsuario =
-    user?.nome || user?.name || user?.username || 'Administrador do Sistema';
+    usuario?.nome ||
+    usuario?.name ||
+    usuario?.username ||
+    'Administrador do Sistema';
 
-  const alertasNaoVistos = useMemo(
-    () => alertas.filter((alerta) => alerta.status === 'NaoVisto'),
-    [alertas]
-  );
+  const contadorNaoVistos = useMemo(() => {
+    return alertas.filter((alerta) => alerta.status === 'NaoVisto').length;
+  }, [alertas]);
 
-  const contadorNaoVistos = alertasNaoVistos.length;
-
-  const handleToggleDarkMode = () => {
+  const handleToggleDarkMode = useCallback(() => {
     setIsDarkMode((prev) => !prev);
-  };
+  }, []);
 
-  const handleToggleAlerts = () => {
+  const handleToggleAlerts = useCallback(() => {
     setAlertsOpen((prev) => !prev);
-  };
+  }, []);
 
-  const handleCloseAlerts = () => {
+  const handleCloseAlerts = useCallback(() => {
     setAlertsOpen(false);
-  };
+  }, []);
 
-  const handleOpenMobileMenu = () => {
+  const handleOpenMobileMenu = useCallback(() => {
     setIsMobileSidebarOpen(true);
-  };
+  }, []);
 
-  const handleCloseMobileMenu = () => {
+  const handleCloseMobileMenu = useCallback(() => {
     setIsMobileSidebarOpen(false);
-  };
+  }, []);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       if (typeof logout === 'function') {
         await logout();
@@ -119,36 +126,45 @@ function AppLayout() {
     } finally {
       navigate('/login');
     }
-  };
+  }, [logout, navigate]);
 
-  const handleOpenAlertDetails = async (alerta) => {
-    try {
-      if (alerta.status === 'NaoVisto') {
-        await updateStatus(alerta.id, 'Visto');
+  const handleOpenAlertDetails = useCallback(
+    async (alerta) => {
+      try {
+        if (alerta?.status === 'NaoVisto') {
+          await updateStatus(alerta.id, 'Visto');
+        }
+      } catch (error) {
+        console.error('[APP_LAYOUT_ALERT_STATUS_ERROR]', error);
+      } finally {
+        setAlertsOpen(false);
+        navigate(alerta?.link || '/alertas');
       }
-    } catch (error) {
-      console.error('[APP_LAYOUT_ALERT_STATUS_ERROR]', error);
-    } finally {
-      setAlertsOpen(false);
-      navigate(alerta.link || '/alertas');
-    }
-  };
+    },
+    [navigate, updateStatus]
+  );
 
-  const handleMarkAsRead = async (alertaId) => {
-    try {
-      await updateStatus(alertaId, 'Visto');
-    } catch (error) {
-      console.error('[APP_LAYOUT_MARK_READ_ERROR]', error);
-    }
-  };
+  const handleMarkAsRead = useCallback(
+    async (alertaId) => {
+      try {
+        await updateStatus(alertaId, 'Visto');
+      } catch (error) {
+        console.error('[APP_LAYOUT_MARK_READ_ERROR]', error);
+      }
+    },
+    [updateStatus]
+  );
 
-  const handleDismiss = async (alertaId) => {
-    try {
-      await dismissAlerta(alertaId);
-    } catch (error) {
-      console.error('[APP_LAYOUT_DISMISS_ERROR]', error);
-    }
-  };
+  const handleDismiss = useCallback(
+    async (alertaId) => {
+      try {
+        await dismissAlerta(alertaId);
+      } catch (error) {
+        console.error('[APP_LAYOUT_DISMISS_ERROR]', error);
+      }
+    },
+    [dismissAlerta]
+  );
 
   return (
     <>
@@ -180,7 +196,7 @@ function AppLayout() {
 
           <AppBreadcrumb items={breadcrumbItems} />
 
-          <main className="flex-1 min-w-0">
+          <main className="min-w-0 flex-1">
             <Outlet />
           </main>
         </div>

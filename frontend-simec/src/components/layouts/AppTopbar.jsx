@@ -8,7 +8,7 @@ import {
   faSun,
 } from '@fortawesome/free-solid-svg-icons';
 
-import NotificationsPanel from '../ui/overlays/NotificationsPanel';
+import NotificationsPanel from '@/components/ui/overlays/NotificationsPanel';
 
 function AppTopbar({
   nomeUsuario,
@@ -94,7 +94,10 @@ AppTopbar.propTypes = {
   alertas: PropTypes.array,
   alertasLoading: PropTypes.bool,
   contadorNaoVistos: PropTypes.number,
-  alertsRef: PropTypes.object,
+  alertsRef: PropTypes.oneOfType([
+    PropTypes.func,
+    PropTypes.shape({ current: PropTypes.any }),
+  ]),
   onOpenMenu: PropTypes.func.isRequired,
   onToggleAlerts: PropTypes.func.isRequired,
   onCloseAlerts: PropTypes.func.isRequired,
