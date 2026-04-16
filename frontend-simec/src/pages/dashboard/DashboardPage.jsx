@@ -16,9 +16,10 @@ import {
   PageLayout,
   PageHeader,
   PageSection,
-  PageState,
   ResponsiveGrid,
 } from '@/components/ui/layout';
+
+import PageState from '@/components/ui/feedback/PageState';
 
 import { DashboardStatCard } from '@/components/shared';
 import { AlertListItem } from '@/components/dashboard';
