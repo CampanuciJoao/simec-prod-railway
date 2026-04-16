@@ -47,13 +47,13 @@ function getTipoAccentClass(tipo) {
   return 'border-l-slate-300';
 }
 
-function getTipoBgClass(tipo) {
+function getTipoSurfaceClass(tipo) {
   const normalized = String(tipo || '').toLowerCase();
 
-  if (normalized.includes('preventiva')) return 'bg-blue-50/60';
-  if (normalized.includes('corretiva')) return 'bg-orange-50/60';
-  if (normalized.includes('calibracao')) return 'bg-purple-50/60';
-  if (normalized.includes('inspecao')) return 'bg-emerald-50/60';
+  if (normalized.includes('preventiva')) return 'bg-blue-50';
+  if (normalized.includes('corretiva')) return 'bg-orange-50';
+  if (normalized.includes('calibracao')) return 'bg-purple-50';
+  if (normalized.includes('inspecao')) return 'bg-emerald-50';
 
   return 'bg-white';
 }
@@ -64,7 +64,7 @@ function formatarLabel(value) {
 
 function InfoPill({ icon, label, value }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white/70 px-3 py-2 backdrop-blur-sm">
+    <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
       <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
         <FontAwesomeIcon icon={icon} />
         <span>{label}</span>
@@ -86,10 +86,10 @@ InfoPill.propTypes = {
 function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
   return (
     <Card
+      surfaceClassName={getTipoSurfaceClass(manutencao.tipo)}
       className={[
         'rounded-3xl border border-slate-200 border-l-4 p-5 shadow-sm',
         getTipoAccentClass(manutencao.tipo),
-        getTipoBgClass(manutencao.tipo),
       ].join(' ')}
     >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
