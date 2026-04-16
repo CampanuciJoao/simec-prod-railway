@@ -1,16 +1,19 @@
 import React from 'react';
 import { faMicrochip } from '@fortawesome/free-solid-svg-icons';
 
-import { useDetalhesEquipamentoPage } from '../../hooks/equipamentos/useDetalhesEquipamentoPage';
-import DetalhesEquipamentoTabs from '../../components/equipamentos/DetalhesEquipamentoTabs';
-import DetalhesEquipamentoTabContent from '../../components/equipamentos/DetalhesEquipamentoTabContent';
+import { useDetalhesEquipamentoPage } from '@/hooks/equipamentos/useDetalhesEquipamentoPage';
+import DetalhesEquipamentoTabs from '@/components/equipamentos/DetalhesEquipamentoTabs';
+import DetalhesEquipamentoTabContent from '@/components/equipamentos/DetalhesEquipamentoTabContent';
+
 import {
   PageLayout,
   PageHeader,
   PageSection,
   EmptyState,
-  LoadingState,
-} from '../../components/ui/layout';
+} from '@/components/ui/layout';
+
+import LoadingState from '@/components/ui/feedback/LoadingState';
+import { Button } from '@/components/ui/primitives';
 
 function DetalhesEquipamentoPage() {
   const {
@@ -24,17 +27,23 @@ function DetalhesEquipamentoPage() {
     abas,
   } = useDetalhesEquipamentoPage();
 
+  const handleBack = () => {
+    window.history.back();
+  };
+
+  const backAction = (
+    <Button type="button" variant="secondary" onClick={handleBack}>
+      Voltar
+    </Button>
+  );
+
   if (loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Detalhes do Equipamento"
           icon={faMicrochip}
-          actions={
-            <button className="btn btn-secondary" onClick={() => window.history.back()}>
-              Voltar
-            </button>
-          }
+          actions={backAction}
         />
 
         <LoadingState message="Carregando equipamento..." />
@@ -48,11 +57,7 @@ function DetalhesEquipamentoPage() {
         <PageHeader
           title="Detalhes do Equipamento"
           icon={faMicrochip}
-          actions={
-            <button className="btn btn-secondary" onClick={() => window.history.back()}>
-              Voltar
-            </button>
-          }
+          actions={backAction}
         />
 
         <EmptyState
@@ -67,11 +72,7 @@ function DetalhesEquipamentoPage() {
       <PageHeader
         title={`Detalhes do Equipamento: ${equipamento.modelo}`}
         icon={faMicrochip}
-        actions={
-          <button className="btn btn-secondary" onClick={() => window.history.back()}>
-            Voltar
-          </button>
-        }
+        actions={backAction}
       />
 
       <PageSection>
