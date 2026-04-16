@@ -3,9 +3,17 @@ import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faInfoCircle, faEdit } from '@fortawesome/free-solid-svg-icons';
 
-import { EntityInfoGrid, ActionBar } from '../@/components/ui/layout';
-import PageSection from '../../ui/PageSection';
-import { formatarData } from '../../../utils/timeUtils';
+import { formatarData } from '@/utils/timeUtils';
+
+import {
+  PageSection,
+  Button,
+} from '@/components/ui';
+
+import {
+  EntityInfoGrid,
+  ActionBar,
+} from '@/components/ui/layout';
 
 function getStatusBadgeClass(status) {
   const normalized = String(status || '').toLowerCase();
@@ -96,16 +104,15 @@ function TabCadastro({ equipamentoInicial }) {
       <ActionBar
         className="mb-5"
         right={
-          <button
+          <Button
             type="button"
-            className="btn btn-primary w-full sm:w-auto"
             onClick={() =>
               navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
             }
           >
             <FontAwesomeIcon icon={faEdit} />
-            <span>Editar</span>
-          </button>
+            Editar
+          </Button>
         }
       />
 

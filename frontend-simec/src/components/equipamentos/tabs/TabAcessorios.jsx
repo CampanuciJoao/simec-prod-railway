@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { useAcessorios } from '../../../hooks/equipamentos/useAcessorios';
-import { useModal } from '../../../hooks/shared/useModal';
-import AcessorioForm from '../AcessorioForm';
-import ModalConfirmacao from '../../ui/feedback/ModalConfirmacao';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faHdd,
   faPlus,
-  faEdit,
-  faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
-import PageSection from '../../ui/PageSection';
-import { ActionBar, EmptyState, LoadingState } from '../@/components/ui/layout';
+import { useAcessorios } from '@/hooks/equipamentos/useAcessorios';
+import { useModal } from '@/hooks/shared/useModal';
+
+import AcessorioForm from '@/components/equipamentos/AcessorioForm';
+import AcessoriosList from '@/components/equipamentos/AcessoriosList';
+
+import {
+  ModalConfirmacao,
+  PageSection,
+} from '@/components/ui';
 
 function TabAcessorios({ equipamentoId }) {
   const {
@@ -93,22 +95,19 @@ function TabAcessorios({ equipamentoId }) {
           </div>
         </div>
 
-        <ActionBar
-          className="mb-5"
-          right={
-            !showForm ? (
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={handleAddNewClick}
-                disabled={submitting}
-              >
-                <FontAwesomeIcon icon={faPlus} />
-                <span>Adicionar</span>
-              </button>
-            ) : null
-          }
-        />
+        {!showForm && (
+          <div className="mb-5">
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={handleAddNewClick}
+              disabled={submitting}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              <span>Adicionar</span>
+            </button>
+          </div>
+        )}
 
         {showForm && (
           <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -124,56 +123,14 @@ function TabAcessorios({ equipamentoId }) {
           </div>
         )}
 
-        {loading ? (
-          <LoadingState message="Carregando acessórios..." />
-        ) : acessorios.length === 0 && !showForm ? (
-          <EmptyState message="Nenhum acessório cadastrado." />
-        ) : (
-          <div className="flex flex-col gap-3">
-            {acessorios.map((acessorio) => (
-              <div
-                key={acessorio.id}
-                className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition hover:shadow-md"
-              >
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                  <div className="space-y-1">
-                    <div className="text-sm font-semibold text-slate-800">
-                      {acessorio.nome}
-                    </div>
-
-                    <div className="text-xs text-slate-500">
-                      Nº Série: {acessorio.numeroSerie || 'N/A'}
-                    </div>
-
-                    <div className="text-xs text-slate-500">
-                      {acessorio.descricao || 'Sem descrição'}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleEditClick(acessorio)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-600 transition hover:bg-blue-600 hover:text-white"
-                      disabled={submitting}
-                    >
-                      <FontAwesomeIcon icon={faEdit} />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => openModal(acessorio)}
-                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-red-50 text-red-600 transition hover:bg-red-600 hover:text-white"
-                      disabled={submitting}
-                    >
-                      <FontAwesomeIcon icon={faTrashAlt} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        <AcessoriosList
+          acessorios={acessorios}
+          loading={loading}
+          submitting={submitting}
+          showForm={showForm}
+          onEdit={handleEditClick}
+          onDelete={openModal}
+        />
       </PageSection>
     </>
   );
