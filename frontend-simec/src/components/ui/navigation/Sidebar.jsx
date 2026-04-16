@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useAlertasRealtime } from '@/hooks/alertas/useAlertasRealtime';
+
 import logoSimec from '@/assets/images/logo-simec.png';
 
 import SidebarItem from './SidebarItem';
@@ -15,37 +16,44 @@ function Sidebar({
   isMobileOpen = false,
   onClose = () => {},
 }) {
-  const { user } = useAuth();
+  const { usuario } = useAuth();
   const { naoVistos } = useAlertasRealtime({ enabled: true });
 
   const badgeCountFinal = naoVistos || notificacoesCount || 0;
 
-  const isAllowed = (item) => {
-    if (!item.roles) return true;
-    return item.roles.includes(user?.role);
-  };
+  const { mainItems, adminItems } = useMemo(() => {
+    const isAllowed = (item) => {
+      if (!item.roles?.length) return true;
+      return item.roles.includes(usuario?.role);
+    };
 
-  const mainItems = sidebarConfig.filter(
-    (item) => !item.section && isAllowed(item)
-  );
-
-  const adminItems = sidebarConfig.filter(
-    (item) => item.section === 'admin' && isAllowed(item)
-  );
+    return {
+      mainItems: sidebarConfig.filter(
+        (item) => !item.section && isAllowed(item)
+      ),
+      adminItems: sidebarConfig.filter(
+        (item) => item.section === 'admin' && isAllowed(item)
+      ),
+    };
+  }, [usuario?.role]);
 
   return (
     <>
       {isMobileOpen && (
         <button
+          type="button"
           className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
           onClick={onClose}
+          aria-label="Fechar menu"
         />
       )}
 
       <aside
         className={[
           'fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-slate-800 bg-slate-900 transition-transform duration-300 lg:sticky lg:z-20',
-          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+          isMobileOpen
+            ? 'translate-x-0'
+            : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
       >
         <div className="flex items-center justify-between px-3 pt-4 lg:justify-center">
@@ -62,8 +70,10 @@ function Sidebar({
           </Link>
 
           <button
+            type="button"
             onClick={onClose}
             className="ml-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 lg:hidden"
+            aria-label="Fechar menu lateral"
           >
             <FontAwesomeIcon icon={faXmark} />
           </button>

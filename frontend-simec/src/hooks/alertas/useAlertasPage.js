@@ -3,23 +3,24 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   getAlertas,
   updateStatusAlerta,
-  dismissAlerta,
+  dismissAlerta as dismissAlertaApi,
 } from '@/services/api';
 
 import { useToast } from '@/contexts/ToastContext';
 
-function normalizarArray(data) {
-  return Array.isArray(data) ? data : [];
-}
+import {
+  normalizarArrayAlertas,
+  calcularMetricasAlertas,
+  buildSelectFiltersConfig,
+  filtrarAlertas,
+  buildActiveFiltersAlertas,
+} from '@/utils/alertas/alertasPageUtils';
 
-function calcularMetricas(alertas) {
-  return {
-    total: alertas.length,
-    naoVistos: alertas.filter((a) => a.status === 'NaoVisto').length,
-    vistos: alertas.filter((a) => a.status === 'Visto').length,
-    criticos: alertas.filter((a) => a.prioridade === 'Alta').length,
-  };
-}
+const FILTROS_INICIAIS = {
+  status: '',
+  tipo: '',
+  prioridade: '',
+};
 
 export function useAlertasPage() {
   const { addToast } = useToast();
@@ -29,24 +30,15 @@ export function useAlertasPage() {
   const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtros, setFiltros] = useState({
-    status: '',
-    tipo: '',
-    prioridade: '',
-  });
+  const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
 
-  /**
-   * =========================
-   * FETCH
-   * =========================
-   */
   const fetchAlertas = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
 
       const data = await getAlertas();
-      setAlertas(normalizarArray(data));
+      setAlertas(normalizarArrayAlertas(data));
     } catch (err) {
       setError(err);
       setAlertas([]);
@@ -60,11 +52,6 @@ export function useAlertasPage() {
     fetchAlertas();
   }, [fetchAlertas]);
 
-  /**
-   * =========================
-   * FILTROS
-   * =========================
-   */
   const clearFilter = useCallback((key) => {
     setFiltros((prev) => ({
       ...prev,
@@ -73,133 +60,34 @@ export function useAlertasPage() {
   }, []);
 
   const clearAllFilters = useCallback(() => {
-    setFiltros({
-      status: '',
-      tipo: '',
-      prioridade: '',
-    });
+    setFiltros(FILTROS_INICIAIS);
     setSearchTerm('');
   }, []);
 
-  const selectFiltersConfig = useMemo(
-    () => [
-      {
-        id: 'status',
-        label: 'Status',
-        value: filtros.status,
-        options: [
-          { label: 'Não visto', value: 'NaoVisto' },
-          { label: 'Visto', value: 'Visto' },
-        ],
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, status: value })),
-      },
-      {
-        id: 'tipo',
-        label: 'Tipo',
-        value: filtros.tipo,
-        options: [
-          { label: 'Alerta', value: 'Alerta' },
-          { label: 'Recomendação', value: 'Recomendação' },
-        ],
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, tipo: value })),
-      },
-      {
-        id: 'prioridade',
-        label: 'Prioridade',
-        value: filtros.prioridade,
-        options: [
-          { label: 'Alta', value: 'Alta' },
-          { label: 'Média', value: 'Media' },
-          { label: 'Baixa', value: 'Baixa' },
-        ],
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, prioridade: value })),
-      },
-    ],
-    [filtros]
-  );
+  const selectFiltersConfig = useMemo(() => {
+    return buildSelectFiltersConfig(filtros, setFiltros);
+  }, [filtros]);
 
-  /**
-   * =========================
-   * FILTRAGEM
-   * =========================
-   */
   const alertasFiltrados = useMemo(() => {
-    let items = [...alertas];
-
-    if (searchTerm) {
-      const termo = searchTerm.toLowerCase();
-
-      items = items.filter(
-        (a) =>
-          a.titulo?.toLowerCase().includes(termo) ||
-          a.subtitulo?.toLowerCase().includes(termo)
-      );
-    }
-
-    if (filtros.status) {
-      items = items.filter((a) => a.status === filtros.status);
-    }
-
-    if (filtros.tipo) {
-      items = items.filter((a) => a.tipo === filtros.tipo);
-    }
-
-    if (filtros.prioridade) {
-      items = items.filter((a) => a.prioridade === filtros.prioridade);
-    }
-
-    return items;
+    return filtrarAlertas(alertas, searchTerm, filtros);
   }, [alertas, searchTerm, filtros]);
 
-  /**
-   * =========================
-   * MÉTRICAS
-   * =========================
-   */
   const metricas = useMemo(() => {
-    return calcularMetricas(alertas);
+    return calcularMetricasAlertas(alertas);
   }, [alertas]);
 
   const activeFilters = useMemo(() => {
-    const result = [];
-
-    if (filtros.status)
-      result.push({
-        key: 'status',
-        label: `Status: ${filtros.status}`,
-      });
-
-    if (filtros.tipo)
-      result.push({
-        key: 'tipo',
-        label: `Tipo: ${filtros.tipo}`,
-      });
-
-    if (filtros.prioridade)
-      result.push({
-        key: 'prioridade',
-        label: `Prioridade: ${filtros.prioridade}`,
-      });
-
-    return result;
+    return buildActiveFiltersAlertas(filtros);
   }, [filtros]);
 
-  /**
-   * =========================
-   * AÇÕES
-   * =========================
-   */
   const updateStatus = useCallback(
     async (id, status) => {
       try {
         await updateStatusAlerta(id, status);
 
         setAlertas((prev) =>
-          prev.map((a) =>
-            a.id === id ? { ...a, status } : a
+          prev.map((alerta) =>
+            alerta.id === id ? { ...alerta, status } : alerta
           )
         );
       } catch {
@@ -209,14 +97,12 @@ export function useAlertasPage() {
     [addToast]
   );
 
-  const dismissAlerta = useCallback(
+  const dismissItem = useCallback(
     async (id) => {
       try {
-        await dismissAlerta(id);
+        await dismissAlertaApi(id);
 
-        setAlertas((prev) =>
-          prev.filter((a) => a.id !== id)
-        );
+        setAlertas((prev) => prev.filter((alerta) => alerta.id !== id));
 
         addToast('Alerta dispensado.', 'success');
       } catch {
@@ -246,7 +132,7 @@ export function useAlertasPage() {
     metricas,
 
     updateStatus,
-    dismissAlerta,
+    dismissAlerta: dismissItem,
 
     refetch: fetchAlertas,
   };
