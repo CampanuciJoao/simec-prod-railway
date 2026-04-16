@@ -1,39 +1,20 @@
-// layout (explícito)
-export {
-  PageLayout,
-  PageHeader,
-  PageSection,
-  ResponsiveTabs,
-  ResponsiveGrid,
-  EmptyState,
-} from './layout';
+export { default as ModalConfirmacao } from './feedback/ModalConfirmacao';
+export { default as PageState } from './feedback/PageState';
+export { default as LoadingState } from './feedback/LoadingState';
 
-// primitives (explícito — ajuste conforme existir)
-export {
-  Button,
-  Card,
-  Input,
-} from './primitives';
+export { default as Drawer } from './overlays/Drawer';
+export { default as DrawerList } from './overlays/DrawerList';
+export { default as NotificationsPanel } from './overlays/NotificationsPanel';
 
-// feedback
-export {
-  PageState,
-  Toast,
-} from './feedback';
+export { default as PageHeader } from './layout/PageHeader';
+export { default as PageLayout } from './layout/PageLayout';
+export { default as PageSection } from './layout/PageSection';
+export { default as ResponsiveGrid } from './layout/ResponsiveGrid';
 
-// overlays
-export {
-  Modal,
-  ModalConfirmacao,
-} from './overlays';
-
-// filters
-export {
-  GlobalFilterBar,
-  StatusSelector,
-} from './filters';
-
-// navigation
-export {
-  Tabs,
-} from './navigation';
+export { default as Button } from './primitives/Button';
+export { default as Card } from './primitives/Card';
+export { default as Input } from './primitives/Input';
+export { default as Select } from './primitives/Select';
+export { default as DateInput } from './primitives/DateInput';
+export { default as TimeInput } from './primitives/TimeInput';
+export { default as Badge } from './primitives/Badge';
