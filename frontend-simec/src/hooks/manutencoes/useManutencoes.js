@@ -1,199 +1,279 @@
-import React from 'react';
-import PropTypes from 'prop-types';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { deleteManutencao, getManutencoes } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
 
-import Input from '@/components/ui/primitives/Input';
-import Select from '@/components/ui/primitives/Select';
-import DateInput from '@/components/ui/primitives/DateInput';
-import TimeInput from '@/components/ui/primitives/TimeInput';
-import Button from '@/components/ui/primitives/Button';
-import PageSection from '@/components/ui/layout/PageSection';
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
-
-import { useManutencaoForm } from '@/hooks/manutencoes/useManutencaoForm';
-
-function ManutencaoForm({
-  initialData,
-  onSubmit,
-  isEditing,
-  todosEquipamentos,
-  unidadesDisponiveis,
-}) {
-  const {
-    formData,
-    handleChange,
-    equipamentosFiltrados,
-    unidades,
-    unidadeSelecionada,
-    isCorretiva,
-    isValid,
-  } = useManutencaoForm({
-    initialData,
-    equipamentos: todosEquipamentos,
-    unidades: unidadesDisponiveis,
-  });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    if (!isValid) return;
-    onSubmit(formData);
-  };
-
-  const unidadesOptions = (unidades || []).map((unidade) => ({
-    value: unidade.id,
-    label: unidade.nomeSistema,
-  }));
-
-  const equipamentosOptions = (equipamentosFiltrados || []).map((equipamento) => ({
-    value: equipamento.id,
-    label: `${equipamento.modelo} (${equipamento.tag || 'Sem TAG'})`,
-  }));
-
-  return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <PageSection
-        title="Equipamento"
-        description="Selecione primeiro a unidade e depois o equipamento que receberá a ordem de serviço."
-      >
-        <ResponsiveGrid cols={{ base: 1, md: 2 }}>
-          <Select
-            label="Unidade"
-            value={formData.unidadeId}
-            onChange={(e) => handleChange('unidadeId', e.target.value)}
-            options={unidadesOptions}
-            placeholder="Selecione a unidade"
-          />
-
-          <Select
-            label="Equipamento"
-            value={formData.equipamentoId}
-            onChange={(e) => handleChange('equipamentoId', e.target.value)}
-            options={equipamentosOptions}
-            placeholder={
-              formData.unidadeId
-                ? 'Selecione o equipamento'
-                : 'Selecione uma unidade primeiro'
-            }
-            disabled={!formData.unidadeId}
-          />
-        </ResponsiveGrid>
-
-        {formData.unidadeId && equipamentosOptions.length === 0 ? (
-          <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-            Nenhum equipamento encontrado para a unidade selecionada.
-          </div>
-        ) : null}
-
-        {unidadeSelecionada ? (
-          <div className="mt-4 text-sm text-slate-500">
-            Unidade selecionada: <span className="font-medium text-slate-700">{unidadeSelecionada.nomeSistema}</span>
-          </div>
-        ) : null}
-      </PageSection>
-
-      <PageSection
-        title="Tipo de Manutenção"
-        description="Defina o tipo da ordem de serviço."
-      >
-        <Select
-          label="Tipo"
-          value={formData.tipo}
-          onChange={(e) => handleChange('tipo', e.target.value)}
-          options={[
-            { value: 'Preventiva', label: 'Preventiva' },
-            { value: 'Corretiva', label: 'Corretiva' },
-            { value: 'Calibracao', label: 'Calibração' },
-            { value: 'Inspecao', label: 'Inspeção' },
-          ]}
-          placeholder="Selecione o tipo"
-        />
-      </PageSection>
-
-      <PageSection
-        title="Descrição"
-        description="Descreva de forma objetiva o serviço ou problema a ser tratado."
-      >
-        <Input
-          label="Descrição do serviço"
-          value={formData.descricaoProblemaServico}
-          onChange={(e) =>
-            handleChange('descricaoProblemaServico', e.target.value)
-          }
-          placeholder="Descreva o serviço..."
-        />
-      </PageSection>
-
-      <PageSection
-        title="Agendamento"
-        description="Informe a data e a janela prevista para execução da manutenção."
-      >
-        <ResponsiveGrid cols={{ base: 1, md: 3 }}>
-          <DateInput
-            label="Data"
-            value={formData.agendamentoDataLocal}
-            onChange={(e) =>
-              handleChange('agendamentoDataLocal', e.target.value)
-            }
-          />
-
-          <TimeInput
-            label="Hora inicial"
-            value={formData.agendamentoHoraInicioLocal}
-            onChange={(e) =>
-              handleChange('agendamentoHoraInicioLocal', e.target.value)
-            }
-          />
-
-          <TimeInput
-            label="Hora final"
-            value={formData.agendamentoHoraFimLocal}
-            onChange={(e) =>
-              handleChange('agendamentoHoraFimLocal', e.target.value)
-            }
-          />
-        </ResponsiveGrid>
-      </PageSection>
-
-      {isCorretiva && (
-        <PageSection
-          title="Chamado"
-          description="Para manutenção corretiva, o número do chamado é obrigatório."
-        >
-          <Input
-            label="Número do chamado"
-            value={formData.numeroChamado}
-            onChange={(e) => handleChange('numeroChamado', e.target.value)}
-            placeholder="Informe o número do chamado"
-          />
-        </PageSection>
-      )}
-
-      <PageSection
-        title="Responsável"
-        description="Informe o técnico ou responsável previsto para o atendimento."
-      >
-        <Input
-          label="Técnico responsável"
-          value={formData.tecnicoResponsavel}
-          onChange={(e) => handleChange('tecnicoResponsavel', e.target.value)}
-          placeholder="Nome do responsável"
-        />
-      </PageSection>
-
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-        <Button type="submit" disabled={!isValid}>
-          {isEditing ? 'Salvar alterações' : 'Agendar manutenção'}
-        </Button>
-      </div>
-    </form>
-  );
+function normalizarTexto(valor) {
+  return String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 }
 
-ManutencaoForm.propTypes = {
-  initialData: PropTypes.object,
-  onSubmit: PropTypes.func.isRequired,
-  isEditing: PropTypes.bool,
-  todosEquipamentos: PropTypes.array,
-  unidadesDisponiveis: PropTypes.array,
-};
+function formatarCampoBusca(manutencao) {
+  const partes = [
+    manutencao?.numeroOS,
+    manutencao?.descricaoProblemaServico,
+    manutencao?.tipo,
+    manutencao?.status,
+    manutencao?.numeroChamado,
+    manutencao?.equipamento?.modelo,
+    manutencao?.equipamento?.tag,
+    manutencao?.equipamento?.unidade?.nomeSistema,
+    manutencao?.equipamento?.unidade?.nome,
+    manutencao?.tecnicoResponsavel,
+  ];
 
-export default ManutencaoForm;
+  return normalizarTexto(partes.filter(Boolean).join(' '));
+}
+
+function compareValues(a, b, direction = 'ascending') {
+  const dir = direction === 'descending' ? -1 : 1;
+
+  const valorA = a ?? '';
+  const valorB = b ?? '';
+
+  if (typeof valorA === 'number' && typeof valorB === 'number') {
+    return valorA > valorB ? dir : valorA < valorB ? -dir : 0;
+  }
+
+  const dataA =
+    valorA instanceof Date
+      ? valorA.getTime()
+      : typeof valorA === 'string' && !Number.isNaN(Date.parse(valorA))
+        ? new Date(valorA).getTime()
+        : null;
+
+  const dataB =
+    valorB instanceof Date
+      ? valorB.getTime()
+      : typeof valorB === 'string' && !Number.isNaN(Date.parse(valorB))
+        ? new Date(valorB).getTime()
+        : null;
+
+  if (dataA !== null && dataB !== null) {
+    return dataA > dataB ? dir : dataA < dataB ? -dir : 0;
+  }
+
+  const textoA = normalizarTexto(valorA);
+  const textoB = normalizarTexto(valorB);
+
+  return textoA > textoB ? dir : textoA < textoB ? -dir : 0;
+}
+
+function getSortValue(item, key) {
+  switch (key) {
+    case 'numeroOS':
+      return item?.numeroOS;
+    case 'tipo':
+      return item?.tipo;
+    case 'status':
+      return item?.status;
+    case 'numeroChamado':
+      return item?.numeroChamado;
+    case 'descricaoProblemaServico':
+      return item?.descricaoProblemaServico;
+    case 'equipamento':
+      return item?.equipamento?.modelo;
+    case 'tag':
+      return item?.equipamento?.tag;
+    case 'unidade':
+      return item?.equipamento?.unidade?.nomeSistema || item?.equipamento?.unidade?.nome;
+    case 'dataHoraAgendamentoInicio':
+      return item?.dataHoraAgendamentoInicio;
+    case 'dataHoraAgendamentoFim':
+      return item?.dataHoraAgendamentoFim;
+    case 'tecnicoResponsavel':
+      return item?.tecnicoResponsavel;
+    default:
+      return item?.[key];
+  }
+}
+
+function calcularMetricas(lista = []) {
+  const metricas = {
+    total: lista.length,
+    emAndamento: 0,
+    aguardando: 0,
+    concluidas: 0,
+    canceladas: 0,
+  };
+
+  for (const item of lista) {
+    const status = String(item?.status || '');
+
+    if (status === 'EmAndamento') metricas.emAndamento += 1;
+    if (status === 'AguardandoConfirmacao') metricas.aguardando += 1;
+    if (status === 'Concluida') metricas.concluidas += 1;
+    if (status === 'Cancelada') metricas.canceladas += 1;
+  }
+
+  return metricas;
+}
+
+export function useManutencoes() {
+  const { addToast } = useToast();
+
+  const [manutencoesOriginais, setManutencoesOriginais] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filtros, setFiltros] = useState({
+    status: '',
+    tipo: '',
+    unidade: '',
+  });
+
+  const [sortConfig, setSortConfig] = useState({
+    key: 'dataHoraAgendamentoInicio',
+    direction: 'descending',
+  });
+
+  const fetchManutencoes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+
+      const data = await getManutencoes();
+      setManutencoesOriginais(Array.isArray(data) ? data : []);
+    } catch (err) {
+      const mensagem =
+        err?.response?.data?.message || 'Não foi possível carregar as manutenções.';
+      setError(mensagem);
+      addToast(mensagem, 'error');
+      setManutencoesOriginais([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  useEffect(() => {
+    fetchManutencoes();
+  }, [fetchManutencoes]);
+
+  const manutencoesFiltradas = useMemo(() => {
+    const termoBusca = normalizarTexto(searchTerm);
+
+    return manutencoesOriginais.filter((manutencao) => {
+      if (filtros.status && manutencao?.status !== filtros.status) {
+        return false;
+      }
+
+      if (filtros.tipo && manutencao?.tipo !== filtros.tipo) {
+        return false;
+      }
+
+      if (filtros.unidade) {
+        const unidade =
+          manutencao?.equipamento?.unidade?.nomeSistema ||
+          manutencao?.equipamento?.unidade?.nome ||
+          '';
+
+        if (unidade !== filtros.unidade) {
+          return false;
+        }
+      }
+
+      if (termoBusca) {
+        const campoBusca = formatarCampoBusca(manutencao);
+        if (!campoBusca.includes(termoBusca)) {
+          return false;
+        }
+      }
+
+      return true;
+    });
+  }, [manutencoesOriginais, filtros, searchTerm]);
+
+  const manutencoes = useMemo(() => {
+    const lista = [...manutencoesFiltradas];
+
+    if (!sortConfig?.key) {
+      return lista;
+    }
+
+    return lista.sort((a, b) => {
+      const valorA = getSortValue(a, sortConfig.key);
+      const valorB = getSortValue(b, sortConfig.key);
+
+      return compareValues(valorA, valorB, sortConfig.direction);
+    });
+  }, [manutencoesFiltradas, sortConfig]);
+
+  const metricas = useMemo(() => calcularMetricas(manutencoesFiltradas), [manutencoesFiltradas]);
+
+  const handleSearchChange = useCallback((eventOrValue) => {
+    const value =
+      typeof eventOrValue === 'string'
+        ? eventOrValue
+        : eventOrValue?.target?.value || '';
+
+    setSearchTerm(value);
+  }, []);
+
+  const handleFilterChange = useCallback((campo, valor) => {
+    setFiltros((prev) => ({
+      ...prev,
+      [campo]: valor,
+    }));
+  }, []);
+
+  const requestSort = useCallback((key) => {
+    setSortConfig((prev) => {
+      if (prev?.key === key) {
+        return {
+          key,
+          direction: prev.direction === 'ascending' ? 'descending' : 'ascending',
+        };
+      }
+
+      return {
+        key,
+        direction: 'ascending',
+      };
+    });
+  }, []);
+
+  const removerManutencao = useCallback(
+    async (id) => {
+      if (!id) return;
+
+      try {
+        await deleteManutencao(id);
+
+        setManutencoesOriginais((prev) => prev.filter((item) => item.id !== id));
+        addToast('Ordem de serviço excluída com sucesso.', 'success');
+      } catch (err) {
+        const mensagem =
+          err?.response?.data?.message || 'Erro ao excluir a ordem de serviço.';
+        addToast(mensagem, 'error');
+        throw err;
+      }
+    },
+    [addToast]
+  );
+
+  const controles = useMemo(
+    () => ({
+      handleSearchChange,
+      handleFilterChange,
+      sortConfig,
+      requestSort,
+    }),
+    [handleSearchChange, handleFilterChange, sortConfig, requestSort]
+  );
+
+  return {
+    manutencoes,
+    manutencoesOriginais,
+    loading,
+    error,
+    searchTerm,
+    filtros,
+    metricas,
+    removerManutencao,
+    refetch: fetchManutencoes,
+    controles,
+  };
+}
