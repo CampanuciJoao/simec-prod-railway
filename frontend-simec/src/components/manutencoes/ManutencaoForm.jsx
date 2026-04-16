@@ -7,7 +7,6 @@ import DateInput from '@/components/ui/primitives/DateInput';
 import TimeInput from '@/components/ui/primitives/TimeInput';
 import Button from '@/components/ui/primitives/Button';
 import PageSection from '@/components/ui/layout/PageSection';
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
 
 import { useManutencaoForm } from '@/hooks/manutencoes/useManutencaoForm';
 
@@ -54,7 +53,7 @@ function ManutencaoForm({
         title="Equipamento"
         description="Selecione primeiro a unidade e depois o equipamento que receberá a ordem de serviço."
       >
-        <ResponsiveGrid cols={{ base: 1, md: 2 }}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <Select
             label="Unidade"
             value={formData.unidadeId}
@@ -75,7 +74,7 @@ function ManutencaoForm({
             }
             disabled={!formData.unidadeId}
           />
-        </ResponsiveGrid>
+        </div>
 
         {formData.unidadeId && equipamentosOptions.length === 0 ? (
           <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
@@ -85,7 +84,10 @@ function ManutencaoForm({
 
         {unidadeSelecionada ? (
           <div className="mt-4 text-sm text-slate-500">
-            Unidade selecionada: <span className="font-medium text-slate-700">{unidadeSelecionada.nomeSistema}</span>
+            Unidade selecionada:{' '}
+            <span className="font-medium text-slate-700">
+              {unidadeSelecionada.nomeSistema}
+            </span>
           </div>
         ) : null}
       </PageSection>
@@ -110,7 +112,11 @@ function ManutencaoForm({
 
       <PageSection
         title="Descrição"
-        description="Descreva de forma objetiva o serviço ou problema a ser tratado."
+        description={
+          isCorretiva
+            ? 'Para manutenção corretiva, a descrição do serviço é obrigatória.'
+            : 'Na preventiva, a descrição é opcional. Se ficar vazia, o sistema preencherá automaticamente.'
+        }
       >
         <Input
           label="Descrição do serviço"
@@ -118,7 +124,11 @@ function ManutencaoForm({
           onChange={(e) =>
             handleChange('descricaoProblemaServico', e.target.value)
           }
-          placeholder="Descreva o serviço..."
+          placeholder={
+            isCorretiva
+              ? 'Descreva o problema ou serviço executado'
+              : 'Opcional para preventiva'
+          }
         />
       </PageSection>
 
@@ -126,31 +136,40 @@ function ManutencaoForm({
         title="Agendamento"
         description="Informe a data e a janela prevista para execução da manutenção."
       >
-        <ResponsiveGrid cols={{ base: 1, md: 3 }}>
-          <DateInput
-            label="Data"
-            value={formData.agendamentoDataLocal}
-            onChange={(e) =>
-              handleChange('agendamentoDataLocal', e.target.value)
-            }
-          />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className="md:col-span-1">
+            <DateInput
+              label="Data"
+              value={formData.agendamentoDataLocal}
+              onChange={(e) =>
+                handleChange('agendamentoDataLocal', e.target.value)
+              }
+            />
+          </div>
 
-          <TimeInput
-            label="Hora inicial"
-            value={formData.agendamentoHoraInicioLocal}
-            onChange={(e) =>
-              handleChange('agendamentoHoraInicioLocal', e.target.value)
-            }
-          />
+          <div className="md:col-span-2 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <TimeInput
+              label="Hora inicial"
+              value={formData.agendamentoHoraInicioLocal}
+              onChange={(e) =>
+                handleChange('agendamentoHoraInicioLocal', e.target.value)
+              }
+            />
 
-          <TimeInput
-            label="Hora final"
-            value={formData.agendamentoHoraFimLocal}
-            onChange={(e) =>
-              handleChange('agendamentoHoraFimLocal', e.target.value)
-            }
-          />
-        </ResponsiveGrid>
+            <TimeInput
+              label="Hora final"
+              value={formData.agendamentoHoraFimLocal}
+              onChange={(e) =>
+                handleChange('agendamentoHoraFimLocal', e.target.value)
+              }
+            />
+          </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+          O modelo atual suporta agendamento em um único dia. Para manutenção com mais de um dia,
+          o contrato de dados do backend precisa ser expandido.
+        </div>
       </PageSection>
 
       {isCorretiva && (

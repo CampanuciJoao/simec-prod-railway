@@ -44,6 +44,28 @@ export function gerarNumeroOS({
   return `${String(tipo).substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
 }
 
+function montarDescricaoPadrao(tipo, descricaoInformada) {
+  const descricao = String(descricaoInformada || '').trim();
+
+  if (descricao) {
+    return descricao;
+  }
+
+  if (tipo === 'Preventiva') {
+    return 'Manutenção preventiva de rotina';
+  }
+
+  if (tipo === 'Calibracao') {
+    return 'Calibração programada';
+  }
+
+  if (tipo === 'Inspecao') {
+    return 'Inspeção programada';
+  }
+
+  return descricao;
+}
+
 export function montarPayloadPersistencia({
   dados,
   agendamento,
@@ -68,7 +90,10 @@ export function montarPayloadPersistencia({
 
     numeroOS: numeroOS || numeroOSExistente,
     tipo: dados.tipo,
-    descricaoProblemaServico: dados.descricaoProblemaServico,
+    descricaoProblemaServico: montarDescricaoPadrao(
+      dados.tipo,
+      dados.descricaoProblemaServico
+    ),
     tecnicoResponsavel: dados.tecnicoResponsavel?.trim() || null,
     numeroChamado:
       dados.tipo === 'Corretiva' ? dados.numeroChamado?.trim() || null : null,

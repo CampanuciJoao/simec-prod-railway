@@ -1,5 +1,3 @@
-// Ficheiro: backend-simec/validators/manutencaoValidator.js
-
 import { z } from 'zod';
 
 const localDateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,10 +16,10 @@ export const manutencaoSchema = z
     }),
 
     descricaoProblemaServico: z
-      .string({
-        required_error: 'A descrição do serviço é obrigatória.',
-      })
-      .min(3, 'A descrição deve ter pelo menos 3 caracteres.'),
+      .string()
+      .trim()
+      .nullable()
+      .optional(),
 
     agendamentoDataLocal: z
       .string({
@@ -67,11 +65,21 @@ export const manutencaoSchema = z
       });
     }
 
-    if (data.tipo === 'Corretiva' && !data.numeroChamado) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['numeroChamado'],
-        message: 'O número do chamado é obrigatório para manutenção corretiva.',
-      });
+    if (data.tipo === 'Corretiva') {
+      if (!data.numeroChamado?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['numeroChamado'],
+          message: 'O número do chamado é obrigatório para manutenção corretiva.',
+        });
+      }
+
+      if (!data.descricaoProblemaServico?.trim()) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['descricaoProblemaServico'],
+          message: 'A descrição do serviço é obrigatória para manutenção corretiva.',
+        });
+      }
     }
   });

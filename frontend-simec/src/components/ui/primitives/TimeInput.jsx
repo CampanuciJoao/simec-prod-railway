@@ -8,37 +8,23 @@ function TimeInput({
   name,
   className = '',
   disabled = false,
+  step = 300,
+  min,
+  max,
   ...props
 }) {
-  const handleTimeChange = (e) => {
-    const rawValue = e.target.value;
-    const digits = rawValue.replace(/\D/g, '').substring(0, 4);
-
-    let formattedValue = digits;
-
-    if (digits.length > 2) {
-      formattedValue = `${digits.substring(0, 2)}:${digits.substring(2)}`;
-    }
-
-    onChange?.({
-      target: {
-        name,
-        value: formattedValue,
-      },
-    });
-  };
-
   const inputElement = (
     <input
-      type="text"
+      type="time"
       name={name}
       value={value || ''}
-      onChange={handleTimeChange}
-      placeholder="HH:mm"
-      maxLength={5}
+      onChange={onChange}
       disabled={disabled}
+      step={step}
+      min={min}
+      max={max}
       className={[
-        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition placeholder:text-slate-400',
+        'w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 outline-none transition',
         'focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
         'disabled:cursor-not-allowed disabled:opacity-60',
         className,
@@ -66,6 +52,9 @@ TimeInput.propTypes = {
   name: PropTypes.string,
   className: PropTypes.string,
   disabled: PropTypes.bool,
+  step: PropTypes.number,
+  min: PropTypes.string,
+  max: PropTypes.string,
 };
 
 export default TimeInput;
