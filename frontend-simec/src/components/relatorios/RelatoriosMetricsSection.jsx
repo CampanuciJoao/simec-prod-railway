@@ -4,36 +4,23 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChartColumn,
   faFileLines,
-  faIndustry,
+  faCalendarCheck,
   faBuilding,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Card from '../ui/Card';
-import ResponsiveGrid from '../ui/ResponsiveGrid';
+import Card from '@/components/ui/primitives/Card';
 
-function MetricCard({ icon, title, value, tone = 'slate' }) {
-  const toneMap = {
-    slate: 'bg-slate-100 text-slate-600',
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-emerald-100 text-emerald-600',
-    yellow: 'bg-amber-100 text-amber-600',
-  };
-
+function MetricCard({ icon, label, value }) {
   return (
     <Card className="h-full">
       <div className="flex items-center gap-4">
-        <div
-          className={[
-            'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
-            toneMap[tone] || toneMap.slate,
-          ].join(' ')}
-        >
+        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
           <FontAwesomeIcon icon={icon} />
         </div>
 
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {title}
+            {label}
           </p>
           <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
             {value}
@@ -46,52 +33,42 @@ function MetricCard({ icon, title, value, tone = 'slate' }) {
 
 MetricCard.propTypes = {
   icon: PropTypes.object.isRequired,
-  title: PropTypes.string.isRequired,
+  label: PropTypes.string.isRequired,
   value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  tone: PropTypes.oneOf(['slate', 'blue', 'green', 'yellow']),
 };
 
 function RelatoriosMetricsSection({ metricas }) {
   return (
-    <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <MetricCard
+        icon={faChartColumn}
+        label="Relatórios gerados"
+        value={metricas?.totalRelatorios || 0}
+      />
+
       <MetricCard
         icon={faFileLines}
-        title="Tipo atual"
-        value={metricas.tipoAtual}
-        tone="blue"
+        label="Itens retornados"
+        value={metricas?.totalItens || 0}
+      />
+
+      <MetricCard
+        icon={faCalendarCheck}
+        label="Períodos filtrados"
+        value={metricas?.periodosAplicados || 0}
       />
 
       <MetricCard
         icon={faBuilding}
-        title="Unidades"
-        value={metricas.unidades}
-        tone="green"
+        label="Unidades filtradas"
+        value={metricas?.unidadesFiltradas || 0}
       />
-
-      <MetricCard
-        icon={faIndustry}
-        title="Fabricantes"
-        value={metricas.fabricantes}
-        tone="yellow"
-      />
-
-      <MetricCard
-        icon={faChartColumn}
-        title="Registros"
-        value={metricas.registros}
-        tone="slate"
-      />
-    </ResponsiveGrid>
+    </div>
   );
 }
 
 RelatoriosMetricsSection.propTypes = {
-  metricas: PropTypes.shape({
-    tipoAtual: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-    unidades: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-    fabricantes: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-    registros: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  }).isRequired,
+  metricas: PropTypes.object,
 };
 
 export default RelatoriosMetricsSection;
