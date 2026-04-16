@@ -1,29 +1,66 @@
-// src/contexts/ToastContext.jsx
-import React, { createContext, useState, useContext, useCallback } from 'react';
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useCallback,
+  useMemo,
+} from 'react';
 
-const ToastContext = createContext();
+const ToastContext = createContext(null);
 
-export const useToast = () => {
-  return useContext(ToastContext);
-};
+function generateId() {
+  return crypto.randomUUID();
+}
 
-export const ToastProvider = ({ children }) => {
+export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
 
-  const addToast = useCallback((message, type = 'info') => {
-    const id = Date.now() + Math.random();
-    setToasts(currentToasts => [...currentToasts, { id, message, type }]);
-  }, []);
-
   const removeToast = useCallback((id) => {
-    setToasts(currentToasts => currentToasts.filter(toast => toast.id !== id));
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);
 
-  const value = { addToast, removeToast, toasts };
+  const addToast = useCallback((message, type = 'info', options = {}) => {
+    const id = generateId();
+
+    const toast = {
+      id,
+      message,
+      type, // 'success' | 'error' | 'info' | 'warning'
+      duration: options.duration ?? 4000,
+    };
+
+    setToasts((prev) => [...prev, toast]);
+
+    // auto-dismiss
+    if (toast.duration > 0) {
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, toast.duration);
+    }
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      toasts,
+      addToast,
+      removeToast,
+    }),
+    [toasts, addToast, removeToast]
+  );
 
   return (
     <ToastContext.Provider value={value}>
       {children}
     </ToastContext.Provider>
   );
-};
+}
+
+export function useToast() {
+  const context = useContext(ToastContext);
+
+  if (!context) {
+    throw new Error('useToast deve ser usado dentro de um ToastProvider');
+  }
+
+  return context;
+}
