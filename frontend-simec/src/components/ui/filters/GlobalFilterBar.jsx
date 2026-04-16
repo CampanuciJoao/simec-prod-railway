@@ -21,8 +21,8 @@ function GlobalFilterBar({
         className,
       ].join(' ')}
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="md:col-span-2 xl:col-span-1">
+      <div className="flex flex-nowrap items-end gap-4 overflow-x-auto">
+        <div className="min-w-[280px] flex-[1.4]">
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Busca
           </label>
@@ -45,7 +45,7 @@ function GlobalFilterBar({
         {selectFilters.map((filter) => (
           <div
             key={filter.id || filter.name}
-            className="min-w-0"
+            className="min-w-[190px] flex-1"
           >
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
               {filter.label || filter.defaultLabel || 'Filtro'}
