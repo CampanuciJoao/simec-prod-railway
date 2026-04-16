@@ -21,7 +21,7 @@ function GlobalFilterBar({
         className,
       ].join(' ')}
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(280px,1.4fr)_repeat(auto-fit,minmax(190px,1fr))]">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:[grid-template-columns:minmax(320px,1.5fr)_repeat(auto-fit,minmax(190px,1fr))]">
         <div className="min-w-0">
           <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Busca
