@@ -1,5 +1,9 @@
 import prisma from '../prismaService.js';
-import { MANUTENCAO_STATUSS_CONFLITANTES, FAR_FUTURE_UTC_DATE } from '../time/index.js';
+import {
+  MANUTENCAO_STATUSS_CONFLITANTES,
+  FAR_FUTURE_UTC_DATE,
+  resolveOperationalTimezone,
+} from '../time/index.js';
 
 function getEquipamentoComUnidadeInclude() {
   return {
@@ -114,6 +118,48 @@ export async function buscarEquipamentoDoTenant({
       },
     },
   });
+}
+
+/**
+ * Mantido para compatibilidade com services/manutencao/index.js
+ * Essa função compõe tenant + equipamento + timezone operacional.
+ */
+export async function buscarContextoOperacional({
+  tenantId,
+  equipamentoId,
+}) {
+  const [tenant, equipamento] = await Promise.all([
+    buscarTenantAtivo(tenantId),
+    buscarEquipamentoDoTenant({ tenantId, equipamentoId }),
+  ]);
+
+  if (!tenant) {
+    return {
+      ok: false,
+      status: 403,
+      message: 'Tenant não encontrado ou inativo.',
+    };
+  }
+
+  if (!equipamento) {
+    return {
+      ok: false,
+      status: 404,
+      message: 'Equipamento não encontrado para este tenant.',
+    };
+  }
+
+  const timezone = resolveOperationalTimezone({
+    tenantTimezone: tenant.timezone,
+    unidadeTimezone: equipamento.unidade?.timezone,
+  });
+
+  return {
+    ok: true,
+    tenant,
+    equipamento,
+    timezone,
+  };
 }
 
 export async function buscarManutencaoPorId({

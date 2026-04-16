@@ -24,3 +24,4 @@ export { default as ResponsiveTabs } from './layout/ResponsiveTabs';
 export { default as Drawer } from './overlays/Drawer';
 export { default as DrawerList } from './overlays/DrawerList';
 export { default as NotificationsPanel } from './overlays/NotificationsPanel';
+export { default as CompactAttachmentList } from './feedback/CompactAttachmentList';
