@@ -25,6 +25,28 @@ function getStatusVariant(status) {
   return 'blue';
 }
 
+function getTipoVariant(tipo) {
+  const normalized = String(tipo || '').toLowerCase();
+
+  if (normalized.includes('preventiva')) return 'blue';
+  if (normalized.includes('corretiva')) return 'orange';
+  if (normalized.includes('calibracao')) return 'purple';
+  if (normalized.includes('inspecao')) return 'green';
+
+  return 'outline';
+}
+
+function getTipoAccentClass(tipo) {
+  const normalized = String(tipo || '').toLowerCase();
+
+  if (normalized.includes('preventiva')) return 'border-l-blue-400';
+  if (normalized.includes('corretiva')) return 'border-l-orange-400';
+  if (normalized.includes('calibracao')) return 'border-l-purple-400';
+  if (normalized.includes('inspecao')) return 'border-l-emerald-400';
+
+  return 'border-l-slate-300';
+}
+
 function formatarLabel(value) {
   return value ? String(value).replace(/([A-Z])/g, ' $1').trim() : '-';
 }
@@ -52,7 +74,12 @@ InfoPill.propTypes = {
 
 function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
   return (
-    <Card className="rounded-3xl border border-slate-200 p-5 shadow-sm">
+    <Card
+      className={[
+        'rounded-3xl border border-slate-200 border-l-4 p-5 shadow-sm',
+        getTipoAccentClass(manutencao.tipo),
+      ].join(' ')}
+    >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -66,7 +93,7 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
                   {formatarLabel(manutencao.status)}
                 </Badge>
 
-                <Badge variant="outline">
+                <Badge variant={getTipoVariant(manutencao.tipo)}>
                   {formatarLabel(manutencao.tipo)}
                 </Badge>
               </div>
