@@ -16,11 +16,13 @@ import {
   buildActiveFiltersAlertas,
 } from '@/utils/alertas/alertasPageUtils';
 
-const FILTROS_INICIAIS = {
-  status: '',
-  tipo: '',
-  prioridade: '',
-};
+function getFiltrosIniciais() {
+  return {
+    status: '',
+    tipo: '',
+    prioridade: '',
+  };
+}
 
 export function useAlertasPage() {
   const { addToast } = useToast();
@@ -30,7 +32,7 @@ export function useAlertasPage() {
   const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtros, setFiltros] = useState(FILTROS_INICIAIS);
+  const [filtros, setFiltros] = useState(getFiltrosIniciais);
 
   const fetchAlertas = useCallback(async () => {
     try {
@@ -60,7 +62,7 @@ export function useAlertasPage() {
   }, []);
 
   const clearAllFilters = useCallback(() => {
-    setFiltros(FILTROS_INICIAIS);
+    setFiltros(getFiltrosIniciais());
     setSearchTerm('');
   }, []);
 

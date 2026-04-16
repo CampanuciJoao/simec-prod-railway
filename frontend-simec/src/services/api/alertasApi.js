@@ -3,5 +3,8 @@ import api from '../http/apiClient';
 export const getAlertas = () =>
   api.get('/alertas').then((res) => res.data);
 
-export const updateAlertaStatus = (alertaId, status) =>
+export const updateStatusAlerta = (alertaId, status) =>
   api.put(`/alertas/${alertaId}/status`, { status }).then((res) => res.data);
+
+export const dismissAlerta = (alertaId) =>
+  api.delete(`/alertas/${alertaId}`).then((res) => res.data);
