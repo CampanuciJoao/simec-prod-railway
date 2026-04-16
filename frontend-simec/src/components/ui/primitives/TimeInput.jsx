@@ -1,6 +1,8 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 
 function TimeInput({
+  label,
   value,
   onChange,
   name,
@@ -26,7 +28,7 @@ function TimeInput({
     });
   };
 
-  return (
+  const inputElement = (
     <input
       type="text"
       name={name}
@@ -44,6 +46,26 @@ function TimeInput({
       {...props}
     />
   );
+
+  if (!label) {
+    return inputElement;
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-slate-700">{label}</label>
+      {inputElement}
+    </div>
+  );
 }
+
+TimeInput.propTypes = {
+  label: PropTypes.string,
+  value: PropTypes.string,
+  onChange: PropTypes.func,
+  name: PropTypes.string,
+  className: PropTypes.string,
+  disabled: PropTypes.bool,
+};
 
 export default TimeInput;
