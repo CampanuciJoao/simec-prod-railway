@@ -9,28 +9,30 @@ function formatTime(date = new Date()) {
   }).format(date);
 }
 
-export function useChat() {
-  const [messages, setMessages] = useState([
-    {
-      id: crypto.randomUUID(),
-      role: 'assistant',
-      content: 'Olá. Eu sou o **T.H.I.A.G.O**.\n\nComo posso ajudar você?',
-      createdAt: formatTime(),
-    },
-  ]);
+function createMessage(role, content) {
+  return {
+    id: crypto.randomUUID(),
+    role,
+    content,
+    createdAt: formatTime(),
+  };
+}
 
+function getInitialMessages() {
+  return [
+    createMessage(
+      'assistant',
+      'Olá. Eu sou o **T.H.I.A.G.O**.\n\nComo posso ajudar você?'
+    ),
+  ];
+}
+
+export function useChat() {
+  const [messages, setMessages] = useState(getInitialMessages);
   const [isTyping, setIsTyping] = useState(false);
 
   const appendMessage = useCallback((role, content) => {
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: crypto.randomUUID(),
-        role,
-        content,
-        createdAt: formatTime(),
-      },
-    ]);
+    setMessages((prev) => [...prev, createMessage(role, content)]);
   }, []);
 
   const sendMessage = useCallback(
@@ -38,25 +40,28 @@ export function useChat() {
       const mensagem = text.trim();
       if (!mensagem || isTyping) return;
 
-      appendMessage('user', mensagem);
+      const userMessage = createMessage('user', mensagem);
+      const nextMessages = [...messages, userMessage];
+
+      setMessages(nextMessages);
       setIsTyping(true);
 
       try {
         const response = await sendMessageToAgent({
           mensagem,
-          messages,
+          messages: nextMessages,
         });
 
         const parsed = interpretarRespostaAgente(response);
 
-        appendMessage('assistant', parsed.mensagem);
+        appendMessage(
+          'assistant',
+          parsed.mensagem || 'Não recebi resposta válida.'
+        );
 
-        // 🔥 aqui começa o diferencial da sua arquitetura
         if (parsed.acao) {
           console.log('[CHAT_ACTION]', parsed.acao, parsed.contexto);
-          // futuramente: router de ações (abrir OS, gerar PDF, etc)
         }
-
       } catch {
         appendMessage('assistant', 'Erro ao responder. Tente novamente.');
       } finally {
@@ -66,9 +71,19 @@ export function useChat() {
     [messages, isTyping, appendMessage]
   );
 
+  const resetChat = useCallback(() => {
+    setMessages([
+      createMessage(
+        'assistant',
+        'Conversa reiniciada.\n\nComo posso ajudar você?'
+      ),
+    ]);
+  }, []);
+
   return {
     messages,
     isTyping,
     sendMessage,
+    resetChat,
   };
 }

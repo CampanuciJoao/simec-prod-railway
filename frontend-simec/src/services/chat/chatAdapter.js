@@ -1,43 +1,20 @@
-function formatTime(date = new Date()) {
-  return new Intl.DateTimeFormat('pt-BR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date);
-}
+import {
+  enviarMensagemAoAgente,
+  mapearHistoricoParaAPI,
+} from '@/services/api/agentApi';
 
-function createMessage({ role, content, createdAt = formatTime() }) {
-  return {
-    id: crypto.randomUUID(),
-    role,
-    content,
-    createdAt,
-  };
-}
+export async function sendMessageToAgent({
+  mensagem,
+  messages = [],
+  contexto = null,
+}) {
+  const historico = mapearHistoricoParaAPI(messages);
 
-export function createAssistantMessage(content) {
-  return createMessage({
-    role: 'assistant',
-    content,
+  return enviarMensagemAoAgente({
+    mensagem,
+    historico,
+    contextoExtra: contexto,
   });
 }
 
-export function createUserMessage(content) {
-  return createMessage({
-    role: 'user',
-    content,
-  });
-}
-
-export function createWelcomeMessage() {
-  return createAssistantMessage(
-    'Olá. Eu sou o **T.H.I.A.G.O**.\n\nComo posso ajudar você?'
-  );
-}
-
-export function createResetMessage() {
-  return createAssistantMessage(
-    'Conversa reiniciada.\n\nComo posso ajudar?'
-  );
-}
-
-export { formatTime };
+export { mapearHistoricoParaAPI };
