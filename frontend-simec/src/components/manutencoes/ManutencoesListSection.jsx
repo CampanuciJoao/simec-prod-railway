@@ -1,61 +1,42 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faClock,
   faCircleCheck,
   faCircleXmark,
   faTriangleExclamation,
-  faEye,
-  faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
   Card,
-  Badge,
-  Button,
-  ResponsiveGrid,
   PageSection,
+  ResponsiveGrid,
 } from '@/components/ui';
+
 import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
-
-import { formatarData } from '@/utils/timeUtils';
-
-// Helpers simples
-const getStatusVariant = (status) => {
-  const s = String(status || '').toLowerCase();
-
-  if (s === 'concluida') return 'green';
-  if (s === 'cancelada') return 'red';
-  if (s === 'emandamento') return 'yellow';
-  if (s === 'aguardandoconfirmacao') return 'yellow';
-
-  return 'blue';
-};
-
-const formatarLabel = (v) =>
-  v ? String(v).replace(/([A-Z])/g, ' $1').trim() : '';
+import ManutencaoCard from '@/components/manutencoes/ManutencaoCard';
 
 function ActiveFilters({ filters, onRemove, onClearAll }) {
   if (!filters?.length) return null;
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {filters.map((f) => (
+    <div className="flex flex-wrap items-center gap-2">
+      {filters.map((filter) => (
         <button
-          key={`${f.key}-${f.value}`}
+          key={`${filter.key}-${filter.value || filter.label}`}
           type="button"
-          onClick={() => onRemove(f.key)}
-          className="rounded-full border bg-white px-3 py-1 text-xs hover:bg-slate-50"
+          onClick={() => onRemove(filter.key)}
+          className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
         >
-          {f.label} ✕
+          {filter.label} ✕
         </button>
       ))}
 
       <button
         type="button"
         onClick={onClearAll}
-        className="text-xs text-blue-600 hover:underline"
+        className="text-xs font-medium text-blue-600 hover:underline"
       >
         Limpar tudo
       </button>
@@ -63,73 +44,47 @@ function ActiveFilters({ filters, onRemove, onClearAll }) {
   );
 }
 
+ActiveFilters.propTypes = {
+  filters: PropTypes.array,
+  onRemove: PropTypes.func.isRequired,
+  onClearAll: PropTypes.func.isRequired,
+};
+
 function KPI({ icon, label, value, onClick }) {
+  const content = (
+    <Card className="rounded-2xl border border-slate-200 p-5 shadow-sm">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
+          <FontAwesomeIcon icon={icon} />
+        </span>
+
+        <div>
+          <p className="text-xs font-medium text-slate-500">{label}</p>
+          <p className="text-2xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+
+  if (!onClick) {
+    return content;
+  }
+
   return (
     <button type="button" onClick={onClick} className="w-full text-left">
-      <Card>
-        <div className="flex items-center gap-3">
-          <FontAwesomeIcon icon={icon} />
-          <div>
-            <p className="text-xs text-slate-500">{label}</p>
-            <p className="text-xl font-bold">{value}</p>
-          </div>
-        </div>
-      </Card>
+      {content}
     </button>
   );
 }
 
-function ManutencaoCard({ manutencao, isAdmin, onDelete }) {
-  return (
-    <Card className="space-y-3">
-      <div className="flex items-start justify-between">
-        <div>
-          <h3 className="font-bold">{manutencao.numeroOS}</h3>
-
-          <div className="mt-1 flex gap-2">
-            <Badge variant={getStatusVariant(manutencao.status)}>
-              {formatarLabel(manutencao.status)}
-            </Badge>
-
-            <Badge variant="outline">
-              {formatarLabel(manutencao.tipo)}
-            </Badge>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <Link to={`/manutencoes/detalhes/${manutencao.id}`}>
-            <Button size="icon">
-              <FontAwesomeIcon icon={faEye} />
-            </Button>
-          </Link>
-
-          {isAdmin && (
-            <Button
-              size="icon"
-              variant="destructive"
-              onClick={() => onDelete(manutencao)}
-            >
-              <FontAwesomeIcon icon={faTrashAlt} />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      <p className="text-sm text-slate-600">
-        {manutencao.descricaoProblemaServico || 'Sem descrição'}
-      </p>
-
-      <div className="text-sm text-slate-500">
-        <div>Equipamento: {manutencao.equipamento?.modelo || '---'}</div>
-        <div>
-          Unidade: {manutencao.equipamento?.unidade?.nomeSistema || '---'}
-        </div>
-        <div>Data: {formatarData(manutencao.dataHoraAgendamentoInicio)}</div>
-      </div>
-    </Card>
-  );
-}
+KPI.propTypes = {
+  icon: PropTypes.object.isRequired,
+  label: PropTypes.string.isRequired,
+  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+  onClick: PropTypes.func,
+};
 
 function ManutencoesListSection({
   manutencoes,
@@ -146,7 +101,7 @@ function ManutencoesListSection({
   return (
     <PageSection>
       <div className="space-y-6">
-        <ResponsiveGrid preset="compact">
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
           <KPI
             icon={faClock}
             label="Total"
@@ -173,11 +128,14 @@ function ManutencoesListSection({
           />
         </ResponsiveGrid>
 
-        <GlobalFilterBar
-          searchTerm={searchTerm}
-          onSearchChange={onSearchChange}
-          selectFilters={selectFilters}
-        />
+        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <GlobalFilterBar
+            searchTerm={searchTerm}
+            onSearchChange={onSearchChange}
+            searchPlaceholder="Buscar por OS, equipamento, unidade ou descrição..."
+            selectFilters={selectFilters}
+          />
+        </div>
 
         <ActiveFilters
           filters={activeFilters}
@@ -186,10 +144,10 @@ function ManutencoesListSection({
         />
 
         <div className="space-y-4">
-          {manutencoes.map((m) => (
+          {manutencoes.map((manutencao) => (
             <ManutencaoCard
-              key={m.id}
-              manutencao={m}
+              key={manutencao.id}
+              manutencao={manutencao}
               isAdmin={isAdmin}
               onDelete={onDelete}
             />
@@ -199,5 +157,18 @@ function ManutencoesListSection({
     </PageSection>
   );
 }
+
+ManutencoesListSection.propTypes = {
+  manutencoes: PropTypes.array.isRequired,
+  searchTerm: PropTypes.string,
+  onSearchChange: PropTypes.func.isRequired,
+  selectFilters: PropTypes.array,
+  activeFilters: PropTypes.array,
+  onRemoveFilter: PropTypes.func.isRequired,
+  onClearAll: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+  isAdmin: PropTypes.bool,
+  metricas: PropTypes.object,
+};
 
 export default ManutencoesListSection;
