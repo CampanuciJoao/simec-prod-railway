@@ -1,12 +1,14 @@
 import React from 'react';
-import { EmptyState } from '@/components/ui/layout';
+import PropTypes from 'prop-types';
+
+import EmptyState from '@/components/ui/layout/EmptyState';
 import LoadingState from './LoadingState';
 
 function PageState({
   loading = false,
   error = '',
   isEmpty = false,
-  emptyMessage = 'Nenhum dado encontrado.',
+  emptyMessage = 'Nenhum dado disponível.',
 }) {
   if (loading) {
     return <LoadingState />;
@@ -14,7 +16,7 @@ function PageState({
 
   if (error) {
     return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700 shadow-sm">
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
         {error}
       </div>
     );
@@ -26,5 +28,12 @@ function PageState({
 
   return null;
 }
+
+PageState.propTypes = {
+  loading: PropTypes.bool,
+  error: PropTypes.oneOfType([PropTypes.string, PropTypes.node]),
+  isEmpty: PropTypes.bool,
+  emptyMessage: PropTypes.string,
+};
 
 export default PageState;
