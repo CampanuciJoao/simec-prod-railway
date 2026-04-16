@@ -1,72 +1,62 @@
-import React, { useState } from 'react';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faUpload,
-  faTrashAlt,
-  faFilePdf,
-  faPaperclip,
-} from '@fortawesome/free-solid-svg-icons';
-
-import { PageSection, Button } from '@/components/ui';
-import PageState from '@/components/ui/feedback/PageState';
+import Card from '@/components/ui/primitives/Card';
+import Button from '@/components/ui/primitives/Button';
 
 import {
-  getAnexoNome,
-  getAnexoUrl,
-} from '@/utils/seguros/seguroAnexoUtils';
+  getStatusBadgeClass,
+  getRowHighlightClass,
+  formatarMoeda,
+} from '@/utils/seguros/seguro.utils';
 
-function SeguroAnexosSection({ anexos, onUpload, onDelete }) {
-  const [file, setFile] = useState(null);
-
+function SeguroCard({ seguro, status, onView, onEdit, onDelete }) {
   return (
-    <PageSection title="Anexos">
-      <div className="space-y-4">
+    <Card className={`border-l-4 ${getRowHighlightClass(status)}`}>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div className="min-w-0">
+            <h3 className="break-words text-lg font-semibold text-slate-900">
+              Apólice {seguro.apoliceNumero}
+            </h3>
 
-        <div className="flex gap-2">
-          <input
-            type="file"
-            onChange={(e) => setFile(e.target.files?.[0])}
-          />
+            <p className="mt-1 text-sm text-slate-600">
+              {seguro.seguradora}
+            </p>
+          </div>
 
-          <Button onClick={() => onUpload(file)} disabled={!file}>
-            <FontAwesomeIcon icon={faUpload} />
-            Enviar
-          </Button>
+          <span className={getStatusBadgeClass(status)}>
+            {status}
+          </span>
         </div>
 
-        {anexos.length > 0 ? (
-          anexos.map((a) => {
-            const url = getAnexoUrl(a);
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="rounded-xl bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Seguradora
+            </p>
+            <p className="mt-1 text-sm font-medium text-slate-800">
+              {seguro.seguradora || 'N/A'}
+            </p>
+          </div>
 
-            return (
-              <div key={a.id} className="flex justify-between">
-                <span>
-                  <FontAwesomeIcon icon={faPaperclip} /> {getAnexoNome(a)}
-                </span>
+          <div className="rounded-xl bg-slate-50 px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              Prêmio total
+            </p>
+            <p className="mt-1 text-sm font-medium text-slate-800">
+              {formatarMoeda(seguro.premioTotal)}
+            </p>
+          </div>
+        </div>
 
-                <div className="flex gap-2">
-                  {url && (
-                    <a href={url} target="_blank">
-                      <FontAwesomeIcon icon={faFilePdf} />
-                    </a>
-                  )}
-
-                  <Button
-                    variant="danger"
-                    onClick={() => onDelete(a.id)}
-                  >
-                    <FontAwesomeIcon icon={faTrashAlt} />
-                  </Button>
-                </div>
-              </div>
-            );
-          })
-        ) : (
-          <PageState isEmpty emptyMessage="Sem anexos." />
-        )}
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <Button onClick={onView}>Ver</Button>
+          <Button onClick={onEdit}>Editar</Button>
+          <Button variant="danger" onClick={onDelete}>
+            Excluir
+          </Button>
+        </div>
       </div>
-    </PageSection>
+    </Card>
   );
 }
 
-export default SeguroAnexosSection;
+export default SeguroCard;

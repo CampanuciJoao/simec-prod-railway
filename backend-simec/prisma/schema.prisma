@@ -199,9 +199,10 @@ model Manutencao {
   tecnicoResponsavel       String?          @map("tecnico_responsavel")
   numeroChamado            String?          @map("numero_chamado")
 
-  agendamentoDataLocal       String  @map("agendamento_data_local")
+  agendamentoDataInicioLocal String  @map("agendamento_data_inicio_local")
   agendamentoHoraInicioLocal String  @map("agendamento_hora_inicio_local")
-  agendamentoHoraFimLocal    String? @map("agendamento_hora_fim_local")
+  agendamentoDataFimLocal    String  @map("agendamento_data_fim_local")
+  agendamentoHoraFimLocal    String  @map("agendamento_hora_fim_local")
   agendamentoTimezone        String  @map("agendamento_timezone")
 
   dataHoraAgendamentoInicio DateTime  @map("data_hora_agendamento_inicio")
@@ -227,7 +228,8 @@ model Manutencao {
   @@index([tenantId, status, dataHoraAgendamentoInicio])
   @@index([tenantId, status, dataHoraAgendamentoFim])
   @@index([tenantId, tipo, createdAt])
-  @@index([tenantId, agendamentoDataLocal])
+  @@index([tenantId, agendamentoDataInicioLocal])
+  @@index([tenantId, agendamentoDataFimLocal])
   @@index([tenantId, agendamentoTimezone])
   @@map("manutencoes")
 }

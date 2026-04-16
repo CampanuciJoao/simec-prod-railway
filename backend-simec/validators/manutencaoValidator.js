@@ -21,11 +21,11 @@ export const manutencaoSchema = z
       .nullable()
       .optional(),
 
-    agendamentoDataLocal: z
+    agendamentoDataInicioLocal: z
       .string({
-        required_error: 'A data do agendamento é obrigatória.',
+        required_error: 'A data inicial é obrigatória.',
       })
-      .regex(localDateRegex, 'A data deve estar no formato YYYY-MM-DD.'),
+      .regex(localDateRegex, 'A data inicial deve estar no formato YYYY-MM-DD.'),
 
     agendamentoHoraInicioLocal: z
       .string({
@@ -33,11 +33,17 @@ export const manutencaoSchema = z
       })
       .regex(localTimeRegex, 'A hora inicial deve estar no formato HH:mm.'),
 
+    agendamentoDataFimLocal: z
+      .string({
+        required_error: 'A data final é obrigatória.',
+      })
+      .regex(localDateRegex, 'A data final deve estar no formato YYYY-MM-DD.'),
+
     agendamentoHoraFimLocal: z
-      .string()
-      .regex(localTimeRegex, 'A hora final deve estar no formato HH:mm.')
-      .nullable()
-      .optional(),
+      .string({
+        required_error: 'A hora final é obrigatória.',
+      })
+      .regex(localTimeRegex, 'A hora final deve estar no formato HH:mm.'),
 
     tecnicoResponsavel: z.string().trim().nullable().optional(),
     numeroChamado: z.string().trim().nullable().optional(),
@@ -54,14 +60,38 @@ export const manutencaoSchema = z
       .optional(),
   })
   .superRefine((data, ctx) => {
+    const inicio = new Date(
+      `${data.agendamentoDataInicioLocal}T${data.agendamentoHoraInicioLocal}:00`
+    );
+    const fim = new Date(
+      `${data.agendamentoDataFimLocal}T${data.agendamentoHoraFimLocal}:00`
+    );
+
+    if (Number.isNaN(inicio.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['agendamentoDataInicioLocal'],
+        message: 'Data/hora inicial inválida.',
+      });
+    }
+
+    if (Number.isNaN(fim.getTime())) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['agendamentoDataFimLocal'],
+        message: 'Data/hora final inválida.',
+      });
+    }
+
     if (
-      data.agendamentoHoraFimLocal &&
-      data.agendamentoHoraFimLocal <= data.agendamentoHoraInicioLocal
+      !Number.isNaN(inicio.getTime()) &&
+      !Number.isNaN(fim.getTime()) &&
+      fim.getTime() <= inicio.getTime()
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['agendamentoHoraFimLocal'],
-        message: 'A hora final deve ser maior que a hora inicial.',
+        message: 'O término deve ser posterior ao início.',
       });
     }
 

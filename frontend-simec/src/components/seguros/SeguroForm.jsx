@@ -3,8 +3,6 @@ import React from 'react';
 import PageSection from '@/components/ui/layout/PageSection';
 import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
 import Input from '@/components/ui/primitives/Input';
-import Select from '@/components/ui/primitives/Select';
-import DateInput from '@/components/ui/primitives/DateInput';
 import Button from '@/components/ui/primitives/Button';
 
 import { useSeguroForm } from '@/hooks/seguros/useSeguroForm';
@@ -52,17 +50,23 @@ function SeguroForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {error && <div className="text-red-500">{error}</div>}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
 
       <PageSection title="Informações">
-        <ResponsiveGrid cols={2}>
+        <ResponsiveGrid cols={{ base: 1, md: 2 }}>
           <Input
+            label="Número da apólice"
             name="apoliceNumero"
             value={formData.apoliceNumero || ''}
             onChange={handleChange}
           />
 
           <Input
+            label="Seguradora"
             name="seguradora"
             value={formData.seguradora || ''}
             onChange={handleChange}
@@ -71,10 +75,11 @@ function SeguroForm({
       </PageSection>
 
       <PageSection title="Coberturas">
-        <ResponsiveGrid cols={3}>
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
           {coberturaFields.map((field) => (
             <Input
               key={field}
+              label={field}
               name={field}
               value={formData[field] || 0}
               onChange={handleChange}
@@ -83,9 +88,9 @@ function SeguroForm({
         </ResponsiveGrid>
       </PageSection>
 
-      <div className="flex justify-end gap-2">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
         {onCancel && (
-          <Button variant="secondary" onClick={onCancel}>
+          <Button type="button" variant="secondary" onClick={onCancel}>
             Cancelar
           </Button>
         )}

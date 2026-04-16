@@ -181,7 +181,7 @@ export function montarWorkflowPayload({
     }
 
     updateData.status = 'EmAndamento';
-    updateData.agendamentoDataLocal = localPrevisao.dateLocal;
+    updateData.agendamentoDataFimLocal = localPrevisao.dateLocal;
     updateData.agendamentoHoraFimLocal = localPrevisao.timeLocal;
     updateData.dataHoraAgendamentoFim = localPrevisao.utcDate;
 

@@ -1,9 +1,80 @@
 import prisma from '../prismaService.js';
-import {
-  resolveOperationalTimezone,
-  MANUTENCAO_STATUSS_CONFLITANTES,
-  FAR_FUTURE_UTC_DATE,
-} from '../time/index.js';
+import { MANUTENCAO_STATUSS_CONFLITANTES, FAR_FUTURE_UTC_DATE } from '../time/index.js';
+
+function getEquipamentoComUnidadeInclude() {
+  return {
+    equipamento: {
+      include: {
+        unidade: true,
+      },
+    },
+  };
+}
+
+function getAnexosOrderBy() {
+  return {
+    anexos: {
+      orderBy: {
+        createdAt: 'desc',
+      },
+    },
+  };
+}
+
+function getNotasAndamentoInclude(tenantId) {
+  return {
+    notasAndamento: {
+      where: {
+        tenantId,
+      },
+      orderBy: {
+        data: 'desc',
+      },
+      include: {
+        autor: {
+          select: {
+            nome: true,
+          },
+        },
+      },
+    },
+  };
+}
+
+function getManutencaoDetalhesInclude(tenantId) {
+  return {
+    ...getEquipamentoComUnidadeInclude(),
+    ...getAnexosOrderBy(),
+    ...getNotasAndamentoInclude(tenantId),
+  };
+}
+
+function getManutencaoBaseInclude() {
+  return {
+    ...getEquipamentoComUnidadeInclude(),
+    ...getAnexosOrderBy(),
+  };
+}
+
+function getManutencaoResumoSelect() {
+  return {
+    id: true,
+    tenantId: true,
+    numeroOS: true,
+    equipamentoId: true,
+    tipo: true,
+    status: true,
+    dataHoraAgendamentoInicio: true,
+    dataHoraAgendamentoFim: true,
+    dataInicioReal: true,
+    dataConclusao: true,
+    agendamentoDataInicioLocal: true,
+    agendamentoHoraInicioLocal: true,
+    agendamentoDataFimLocal: true,
+    agendamentoHoraFimLocal: true,
+    agendamentoTimezone: true,
+  };
+}
 
 export async function buscarTenantAtivo(tenantId) {
   return prisma.tenant.findFirst({
@@ -45,46 +116,6 @@ export async function buscarEquipamentoDoTenant({
   });
 }
 
-export async function buscarContextoOperacional({
-  tenantId,
-  equipamentoId,
-}) {
-  const tenant = await buscarTenantAtivo(tenantId);
-
-  if (!tenant) {
-    return {
-      ok: false,
-      status: 401,
-      message: 'Tenant inválido ou inativo.',
-    };
-  }
-
-  const equipamento = await buscarEquipamentoDoTenant({
-    tenantId,
-    equipamentoId,
-  });
-
-  if (!equipamento) {
-    return {
-      ok: false,
-      status: 404,
-      message: 'Equipamento não encontrado.',
-    };
-  }
-
-  const timezone = resolveOperationalTimezone({
-    tenantTimezone: tenant.timezone,
-    unidadeTimezone: equipamento.unidade?.timezone,
-  });
-
-  return {
-    ok: true,
-    tenant,
-    equipamento,
-    timezone,
-  };
-}
-
 export async function buscarManutencaoPorId({
   tenantId,
   manutencaoId,
@@ -94,31 +125,7 @@ export async function buscarManutencaoPorId({
       id: manutencaoId,
       tenantId,
     },
-    include: {
-      anexos: {
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      equipamento: {
-        include: {
-          unidade: true,
-        },
-      },
-      notasAndamento: {
-        where: {
-          tenantId,
-        },
-        orderBy: {
-          data: 'desc',
-        },
-        include: {
-          autor: {
-            select: { nome: true },
-          },
-        },
-      },
-    },
+    include: getManutencaoDetalhesInclude(tenantId),
   });
 }
 
@@ -131,22 +138,7 @@ export async function buscarManutencaoResumo({
       id: manutencaoId,
       tenantId,
     },
-    select: {
-      id: true,
-      tenantId: true,
-      numeroOS: true,
-      equipamentoId: true,
-      tipo: true,
-      status: true,
-      dataHoraAgendamentoInicio: true,
-      dataHoraAgendamentoFim: true,
-      dataInicioReal: true,
-      dataConclusao: true,
-      agendamentoDataLocal: true,
-      agendamentoHoraInicioLocal: true,
-      agendamentoHoraFimLocal: true,
-      agendamentoTimezone: true,
-    },
+    select: getManutencaoResumoSelect(),
   });
 }
 
@@ -159,9 +151,17 @@ export async function listarManutencoes({
 }) {
   const whereClause = { tenantId };
 
-  if (equipamentoId) whereClause.equipamentoId = equipamentoId;
-  if (tipo) whereClause.tipo = tipo;
-  if (status) whereClause.status = status;
+  if (equipamentoId) {
+    whereClause.equipamentoId = equipamentoId;
+  }
+
+  if (tipo) {
+    whereClause.tipo = tipo;
+  }
+
+  if (status) {
+    whereClause.status = status;
+  }
 
   if (unidadeId) {
     whereClause.equipamento = {
@@ -172,18 +172,7 @@ export async function listarManutencoes({
 
   return prisma.manutencao.findMany({
     where: whereClause,
-    include: {
-      equipamento: {
-        include: {
-          unidade: true,
-        },
-      },
-      anexos: {
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-    },
+    include: getManutencaoBaseInclude(),
     orderBy: {
       dataHoraAgendamentoInicio: 'desc',
     },
@@ -192,7 +181,9 @@ export async function listarManutencoes({
 
 export async function contarManutencoesDoTenant(tenantId) {
   return prisma.manutencao.count({
-    where: { tenantId },
+    where: {
+      tenantId,
+    },
   });
 }
 
@@ -245,8 +236,9 @@ export async function existeConflitoAgendamento({
       numeroOS: true,
       tipo: true,
       status: true,
-      agendamentoDataLocal: true,
+      agendamentoDataInicioLocal: true,
       agendamentoHoraInicioLocal: true,
+      agendamentoDataFimLocal: true,
       agendamentoHoraFimLocal: true,
     },
   });
@@ -255,18 +247,7 @@ export async function existeConflitoAgendamento({
 export async function criarManutencao(payload) {
   return prisma.manutencao.create({
     data: payload,
-    include: {
-      equipamento: {
-        include: {
-          unidade: true,
-        },
-      },
-      anexos: {
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-    },
+    include: getManutencaoBaseInclude(),
   });
 }
 
@@ -283,31 +264,7 @@ export async function atualizarManutencao({
       },
     },
     data: payload,
-    include: {
-      equipamento: {
-        include: {
-          unidade: true,
-        },
-      },
-      anexos: {
-        orderBy: {
-          createdAt: 'desc',
-        },
-      },
-      notasAndamento: {
-        where: {
-          tenantId,
-        },
-        orderBy: {
-          data: 'desc',
-        },
-        include: {
-          autor: {
-            select: { nome: true },
-          },
-        },
-      },
-    },
+    include: getManutencaoDetalhesInclude(tenantId),
   });
 }
 

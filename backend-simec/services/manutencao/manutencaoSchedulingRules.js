@@ -1,34 +1,66 @@
-import { validateSchedulingWindow } from '../time/index.js';
+import { localDateTimeToUtc } from '../time/index.js';
 
 export function montarMensagemErroAgendamento(code) {
   switch (code) {
-    case 'INVALID_LOCAL_DATE':
-      return 'A data do agendamento é inválida.';
-    case 'INVALID_LOCAL_START_TIME':
-      return 'A hora inicial do agendamento é inválida.';
-    case 'INVALID_LOCAL_END_TIME':
-      return 'A hora final do agendamento é inválida.';
+    case 'INVALID_LOCAL_START':
+      return 'A data/hora inicial do agendamento é inválida.';
+    case 'INVALID_LOCAL_END':
+      return 'A data/hora final do agendamento é inválida.';
     case 'PAST_LOCAL_DATETIME':
-      return 'A data/hora informada está no passado.';
+      return 'O início do agendamento não pode estar no passado.';
     case 'END_BEFORE_OR_EQUAL_START':
-      return 'A hora final deve ser maior que a hora inicial.';
+      return 'O término precisa ser posterior ao início.';
     default:
       return 'Data/hora de agendamento inválida.';
   }
 }
 
 export function validarAgendamento({
-  dateLocal,
+  startDateLocal,
   startTimeLocal,
+  endDateLocal,
   endTimeLocal,
   timezone,
 }) {
-  return validateSchedulingWindow({
-    dateLocal,
-    startTimeLocal,
-    endTimeLocal: endTimeLocal || null,
+  const startUtc = localDateTimeToUtc({
+    dateLocal: startDateLocal,
+    timeLocal: startTimeLocal,
     timezone,
   });
+
+  const endUtc = localDateTimeToUtc({
+    dateLocal: endDateLocal,
+    timeLocal: endTimeLocal,
+    timezone,
+  });
+
+  if (!(startUtc instanceof Date) || Number.isNaN(startUtc.getTime())) {
+    return {
+      valid: false,
+      code: 'INVALID_LOCAL_START',
+    };
+  }
+
+  if (!(endUtc instanceof Date) || Number.isNaN(endUtc.getTime())) {
+    return {
+      valid: false,
+      code: 'INVALID_LOCAL_END',
+    };
+  }
+
+  if (endUtc.getTime() <= startUtc.getTime()) {
+    return {
+      valid: false,
+      code: 'END_BEFORE_OR_EQUAL_START',
+    };
+  }
+
+  return {
+    valid: true,
+    timezone,
+    startUtc,
+    endUtc,
+  };
 }
 
 export function gerarNumeroOS({
@@ -47,21 +79,10 @@ export function gerarNumeroOS({
 function montarDescricaoPadrao(tipo, descricaoInformada) {
   const descricao = String(descricaoInformada || '').trim();
 
-  if (descricao) {
-    return descricao;
-  }
-
-  if (tipo === 'Preventiva') {
-    return 'Manutenção preventiva de rotina';
-  }
-
-  if (tipo === 'Calibracao') {
-    return 'Calibração programada';
-  }
-
-  if (tipo === 'Inspecao') {
-    return 'Inspeção programada';
-  }
+  if (descricao) return descricao;
+  if (tipo === 'Preventiva') return 'Manutenção preventiva de rotina';
+  if (tipo === 'Calibracao') return 'Calibração programada';
+  if (tipo === 'Inspecao') return 'Inspeção programada';
 
   return descricao;
 }
@@ -101,9 +122,10 @@ export function montarPayloadPersistencia({
       typeof dados.custoTotal === 'number' ? dados.custoTotal : null,
     status: dados.status || 'Agendada',
 
-    agendamentoDataLocal: dados.agendamentoDataLocal,
+    agendamentoDataInicioLocal: dados.agendamentoDataInicioLocal,
     agendamentoHoraInicioLocal: dados.agendamentoHoraInicioLocal,
-    agendamentoHoraFimLocal: dados.agendamentoHoraFimLocal || null,
+    agendamentoDataFimLocal: dados.agendamentoDataFimLocal,
+    agendamentoHoraFimLocal: dados.agendamentoHoraFimLocal,
     agendamentoTimezone: agendamento.timezone,
 
     dataHoraAgendamentoInicio: agendamento.startUtc,
