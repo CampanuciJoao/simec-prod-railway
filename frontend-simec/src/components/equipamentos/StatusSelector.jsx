@@ -2,14 +2,14 @@ import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSpinner,
   faChevronDown,
+  faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useToast } from '@/contexts/ToastContext';
 import { updateEquipamento } from '@/services/api';
 import { Select } from '@/components/ui';
-import { getStatusBadgeVariant } from '@/components/ui/uistyles/statusStyles';
+import { getStatusVariant } from '@/components/ui/uistyles/statusStyles';
 
 const STATUS_OPTIONS = [
   'Operante',
@@ -69,7 +69,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
   const { addToast } = useToast();
 
   const variant = useMemo(
-    () => getStatusBadgeVariant(currentStatus),
+    () => getStatusVariant(currentStatus),
     [currentStatus]
   );
 
