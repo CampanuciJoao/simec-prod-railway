@@ -17,11 +17,11 @@ import {
   PageHeader,
   PageSection,
   ResponsiveGrid,
-} from '@/components/ui/layout';
+  PageState,
+  InlineEmptyState,
+  KpiCard,
+} from '@/components/ui';
 
-import PageState from '@/components/ui/feedback/PageState';
-
-import { DashboardStatCard } from '@/components/shared';
 import { AlertListItem } from '@/components/dashboard';
 
 import BarChart from '@/components/charts/BarChart';
@@ -62,33 +62,33 @@ function DashboardPage() {
 
   return (
     <PageLayout background="slate" padded fullHeight>
-      <div className="space-y-5">
+      <div className="space-y-6">
         <PageHeader
           title="Dashboard"
           subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
           icon={faChartPie}
         />
 
-        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
-          <DashboardStatCard
+        <ResponsiveGrid cols={{ base: 1, sm: 2, xl: 4 }}>
+          <KpiCard
             to="/equipamentos"
             icon={faHeartbeat}
             title="Equipamentos"
             value={data.totalEquipamentos}
             subtitle="Parque total"
-            tone="emerald"
+            tone="green"
           />
 
-          <DashboardStatCard
+          <KpiCard
             to="/manutencoes"
             icon={faWrench}
             title="Manutenções abertas"
             value={data.emManutencao}
             subtitle="Ordens em andamento"
-            tone="amber"
+            tone="yellow"
           />
 
-          <DashboardStatCard
+          <KpiCard
             to="/contratos"
             icon={faFileContract}
             title="Contratos vencendo"
@@ -97,7 +97,7 @@ function DashboardPage() {
             tone="red"
           />
 
-          <DashboardStatCard
+          <KpiCard
             to="/alertas"
             icon={faBell}
             title="Alertas ativos"
@@ -115,7 +115,8 @@ function DashboardPage() {
             headerRight={
               <Link
                 to="/alertas"
-                className="inline-flex items-center gap-2 text-sm font-medium text-blue-600 hover:underline"
+                className="inline-flex items-center gap-2 text-sm font-medium transition hover:underline"
+                style={{ color: 'var(--brand-primary)' }}
               >
                 Ver todos
                 <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
@@ -123,15 +124,13 @@ function DashboardPage() {
             }
           >
             {data.alertas.length > 0 ? (
-              <div>
+              <div className="space-y-1">
                 {data.alertas.slice(0, 10).map((alerta) => (
                   <AlertListItem key={alerta.id} alerta={alerta} />
                 ))}
               </div>
             ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
-                Nenhum aviso recente.
-              </div>
+              <InlineEmptyState message="Nenhum aviso recente." />
             )}
           </PageSection>
 
@@ -140,7 +139,7 @@ function DashboardPage() {
               title="Status dos equipamentos"
               description="Distribuição atual por condição operacional"
             >
-              <div className="h-[220px]">
+              <div className="h-[240px]">
                 <DonutChart data={data.statusEquipamentos} />
               </div>
             </PageSection>
@@ -149,7 +148,7 @@ function DashboardPage() {
               title="Manutenções nos últimos meses"
               description="Volume total de ordens registradas no período"
             >
-              <div className="h-[220px]">
+              <div className="h-[240px]">
                 <BarChart data={data.manutencoesPorTipo} />
               </div>
             </PageSection>
