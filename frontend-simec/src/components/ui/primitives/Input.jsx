@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import FormFieldShell from './FormFieldShell';
+
+import FormFieldShell from '@/components/ui/primitives/FormFieldShell';
 
 function Input({
   id,
@@ -24,27 +25,20 @@ function Input({
       <input
         id={inputId}
         className={[
-          'ui-transition w-full rounded-xl border px-3 py-2.5 text-sm outline-none placeholder:opacity-70',
-          'ui-text-primary',
+          'ui-input ui-transition w-full rounded-xl border px-3 py-2.5 text-sm',
           'disabled:cursor-not-allowed disabled:opacity-70',
           className,
         ].join(' ')}
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          borderColor: error ? 'var(--color-danger)' : 'var(--border-default)',
-          color: 'var(--text-primary)',
-          boxShadow: 'none',
-        }}
-        onFocus={(e) => {
-          e.currentTarget.style.boxShadow = error
-            ? '0 0 0 4px var(--color-danger-soft)'
-            : '0 0 0 4px var(--brand-primary-soft)';
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.boxShadow = 'none';
-          props.onBlur?.(e);
-        }}
+        style={
+          error
+            ? {
+                '--input-border': 'var(--color-danger)',
+                '--input-border-hover': 'var(--color-danger)',
+                '--input-border-focus': 'var(--color-danger)',
+                '--input-ring': 'var(--color-danger-soft)',
+              }
+            : undefined
+        }
         {...props}
       />
     </FormFieldShell>
