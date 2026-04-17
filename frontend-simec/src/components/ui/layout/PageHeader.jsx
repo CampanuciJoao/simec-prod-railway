@@ -13,11 +13,15 @@ function PageHeader({
 }) {
   return (
     <Card
-      className={['rounded-3xl px-5 py-5 sm:px-6 sm:py-6', className].join(' ')}
+      className={[
+        'rounded-3xl px-5 py-5 sm:px-6 sm:py-6',
+        className,
+      ].join(' ')}
       surface="default"
       padded={false}
       styleOverride={{
-        backgroundColor: 'var(--header-surface)',
+        background: 'var(--header-surface)',
+        borderColor: 'var(--brand-primary-soft)',
       }}
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -26,7 +30,7 @@ function PageHeader({
             <div
               className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
               style={{
-                backgroundColor: 'var(--brand-primary-soft)',
+                backgroundColor: 'var(--brand-primary-surface-strong)',
                 color: 'var(--brand-primary)',
               }}
             >
@@ -45,7 +49,7 @@ function PageHeader({
             {subtitle ? (
               <p
                 className="mt-1 text-sm sm:text-base"
-                style={{ color: 'var(--text-muted)' }}
+                style={{ color: 'var(--text-secondary)' }}
               >
                 {subtitle}
               </p>

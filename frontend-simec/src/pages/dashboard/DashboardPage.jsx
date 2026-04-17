@@ -128,7 +128,7 @@ function DashboardPage() {
             }
           >
             {data.alertas.length > 0 ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {data.alertas.slice(0, 10).map((alerta) => (
                   <AlertListItem key={alerta.id} alerta={alerta} />
                 ))}

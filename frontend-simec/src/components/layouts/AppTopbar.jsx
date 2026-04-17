@@ -28,9 +28,9 @@ function AppTopbar({
     <header
       className="border-b px-4 py-4 sm:px-6"
       style={{
-        borderColor: 'var(--border-soft)',
+        borderColor: 'var(--brand-topbar-border)',
         backgroundColor: 'var(--bg-topbar)',
-        color: 'var(--text-primary)',
+        color: 'var(--text-topbar)',
       }}
     >
       <ActionBar
@@ -52,13 +52,13 @@ function AppTopbar({
             <div className="min-w-0">
               <p
                 className="text-sm"
-                style={{ color: 'var(--text-muted)' }}
+                style={{ color: 'var(--text-topbar-muted)' }}
               >
                 Olá,
               </p>
               <h2
                 className="truncate font-semibold"
-                style={{ color: 'var(--text-primary)' }}
+                style={{ color: 'var(--text-topbar)' }}
               >
                 {nomeUsuario}
               </h2>

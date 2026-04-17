@@ -5,34 +5,34 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import Card from '@/components/ui/primitives/Card';
 
-const toneMap = {
+const toneStyleMap = {
   slate: {
-    iconBg: 'bg-slate-100 dark:bg-slate-800/80',
-    iconText: 'text-slate-600 dark:text-slate-200',
+    iconBg: 'var(--bg-surface-subtle)',
+    iconText: '#64748b',
   },
   blue: {
-    iconBg: 'bg-blue-100 dark:bg-blue-950/50',
-    iconText: 'text-blue-600 dark:text-blue-300',
+    iconBg: 'rgba(37, 99, 235, 0.14)',
+    iconText: '#3b82f6',
   },
   green: {
-    iconBg: 'bg-emerald-100 dark:bg-emerald-950/50',
-    iconText: 'text-emerald-600 dark:text-emerald-300',
+    iconBg: 'rgba(5, 150, 105, 0.14)',
+    iconText: '#34d399',
   },
   yellow: {
-    iconBg: 'bg-amber-100 dark:bg-amber-950/50',
-    iconText: 'text-amber-600 dark:text-amber-300',
+    iconBg: 'rgba(217, 119, 6, 0.16)',
+    iconText: '#fbbf24',
   },
   orange: {
-    iconBg: 'bg-amber-100 dark:bg-amber-950/50',
-    iconText: 'text-amber-700 dark:text-amber-300',
+    iconBg: 'rgba(234, 88, 12, 0.16)',
+    iconText: '#fb923c',
   },
   red: {
-    iconBg: 'bg-red-100 dark:bg-red-950/50',
-    iconText: 'text-red-600 dark:text-red-300',
+    iconBg: 'rgba(220, 38, 38, 0.14)',
+    iconText: '#f87171',
   },
   purple: {
-    iconBg: 'bg-violet-100 dark:bg-violet-950/50',
-    iconText: 'text-violet-600 dark:text-violet-300',
+    iconBg: 'rgba(139, 92, 246, 0.14)',
+    iconText: '#a78bfa',
   },
 };
 
@@ -46,7 +46,7 @@ function KpiCard({
   to,
   className = '',
 }) {
-  const toneClasses = toneMap[tone] || toneMap.slate;
+  const toneStyle = toneStyleMap[tone] || toneStyleMap.slate;
   const isInteractive = Boolean(onClick || to);
 
   const content = (
@@ -62,26 +62,35 @@ function KpiCard({
     >
       <div className="flex h-full items-start gap-4">
         <div
-          className={[
-            'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
-            toneClasses.iconBg,
-            toneClasses.iconText,
-          ].join(' ')}
+          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: toneStyle.iconBg,
+            color: toneStyle.iconText,
+          }}
         >
           <FontAwesomeIcon icon={icon} className="text-base" />
         </div>
 
         <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: 'var(--text-muted)' }}
+          >
             {title}
           </p>
 
-          <p className="mt-2 text-3xl font-bold leading-none tracking-tight text-slate-900 dark:text-slate-50">
+          <p
+            className="mt-2 text-3xl font-bold leading-none tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
             {value}
           </p>
 
           {subtitle ? (
-            <p className="mt-2 line-clamp-2 text-sm text-slate-500 dark:text-slate-400">
+            <p
+              className="mt-2 line-clamp-2 text-sm"
+              style={{ color: 'var(--text-secondary)' }}
+            >
               {subtitle}
             </p>
           ) : null}

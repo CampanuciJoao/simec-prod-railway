@@ -9,13 +9,13 @@ function AppBreadcrumb({ items = [] }) {
     <div
       className="border-b px-4 py-3 sm:px-6"
       style={{
-        borderColor: 'var(--border-soft)',
+        borderColor: 'var(--brand-topbar-border)',
         backgroundColor: 'var(--bg-breadcrumb)',
       }}
     >
       <nav
         className="flex flex-wrap items-center gap-1 text-sm"
-        style={{ color: 'var(--text-muted)' }}
+        style={{ color: 'var(--text-secondary)' }}
       >
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
@@ -25,8 +25,8 @@ function AppBreadcrumb({ items = [] }) {
               {item.to && !isLast ? (
                 <Link
                   to={item.to}
-                  className="font-medium transition"
-                  style={{ color: 'var(--text-secondary)' }}
+                  className="font-medium transition hover:opacity-80"
+                  style={{ color: 'var(--brand-primary)' }}
                 >
                   {item.label}
                 </Link>

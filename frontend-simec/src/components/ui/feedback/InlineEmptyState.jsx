@@ -4,14 +4,18 @@ import PropTypes from 'prop-types';
 function InlineEmptyState({ message = 'Nenhum item encontrado.' }) {
   return (
     <div
-      className="rounded-xl border border-dashed px-4 py-6 text-center text-sm"
+      className="rounded-2xl border border-dashed px-4 py-8 text-center"
       style={{
         borderColor: 'var(--border-default)',
         backgroundColor: 'var(--bg-surface-soft)',
-        color: 'var(--text-muted)',
       }}
     >
-      {message}
+      <p
+        className="text-sm font-medium"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {message}
+      </p>
     </div>
   );
 }

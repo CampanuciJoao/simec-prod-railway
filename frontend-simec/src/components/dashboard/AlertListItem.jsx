@@ -20,14 +20,18 @@ function AlertListItem({ alerta }) {
     >
       <Card
         padded={false}
-        className={[
-          'border-b border-slate-200/70 px-4 py-3 transition-all',
-          'hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900/60',
-        ].join(' ')}
+        className="px-4 py-3 transition-all hover:-translate-y-[1px]"
+        styleOverride={{
+          backgroundColor: 'var(--bg-surface-soft)',
+          borderColor: 'var(--border-soft)',
+        }}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
-            <p className="line-clamp-1 text-sm font-medium text-slate-800 transition dark:text-slate-100">
+            <p
+              className="line-clamp-1 text-sm font-medium"
+              style={{ color: 'var(--text-primary)' }}
+            >
               {alerta?.titulo || 'Alerta sem título'}
             </p>
           </div>
