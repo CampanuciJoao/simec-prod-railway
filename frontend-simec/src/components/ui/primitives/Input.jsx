@@ -24,22 +24,35 @@ function Input({
     >
       <input
         id={inputId}
+        {...props}
         className={[
-          'ui-input ui-transition w-full rounded-xl border px-3 py-2.5 text-sm',
-          'disabled:cursor-not-allowed disabled:opacity-70',
+          'w-full rounded-xl px-3 py-2.5 text-sm transition-all outline-none',
+          'disabled:cursor-not-allowed disabled:opacity-60',
+
+          // 🎯 BASE (alinhado com Dashboard)
+          'border',
+          
+          // 🎯 LIGHT / DARK via tokens
+          'bg-[var(--bg-surface)]',
+          'text-[var(--text-primary)]',
+          'placeholder:text-[var(--text-muted)]',
+          'border-[var(--border-default)]',
+
+          // 🎯 HOVER
+          'hover:border-[var(--border-strong)]',
+
+          // 🎯 FOCUS (cara do Simec)
+          'focus:border-[var(--color-primary)]',
+          'focus:ring-4',
+          'focus:ring-[var(--color-primary-soft)]',
+
+          // 🎯 ERROR override
+          error
+            ? '!border-[var(--color-danger)] focus:!border-[var(--color-danger)] focus:!ring-[var(--color-danger-soft)]'
+            : '',
+
           className,
         ].join(' ')}
-        style={
-          error
-            ? {
-                '--input-border': 'var(--color-danger)',
-                '--input-border-hover': 'var(--color-danger)',
-                '--input-border-focus': 'var(--color-danger)',
-                '--input-ring': 'var(--color-danger-soft)',
-              }
-            : undefined
-        }
-        {...props}
       />
     </FormFieldShell>
   );
