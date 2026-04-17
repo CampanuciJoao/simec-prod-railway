@@ -1,53 +1,54 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import Card from '@/components/ui/primitives/Card';
 
 function PageSection({
-  title = '',
-  description = '',
+  title,
+  description,
+  headerRight,
   children,
   className = '',
-  contentClassName = '',
-  headerRight = null,
 }) {
+  const hasHeader = title || description || headerRight;
+
   return (
-    <section
-      className={[
-        'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 lg:p-6',
-        className,
-      ].join(' ')}
-    >
-      {(title || description || headerRight) && (
-        <div className="mb-5 flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+    <Card className={className} surface="default">
+      {hasHeader ? (
+        <div
+          className="mb-5 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between"
+          style={{ borderColor: 'var(--section-header-border)' }}
+        >
           <div className="min-w-0">
             {title ? (
-              <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+              <h2 className="ui-text-primary text-base font-semibold">
+                {title}
+              </h2>
             ) : null}
 
             {description ? (
-              <p className="mt-1 text-sm text-slate-500">{description}</p>
+              <p className="ui-text-muted mt-1 text-sm">
+                {description}
+              </p>
             ) : null}
           </div>
 
           {headerRight ? (
-            <div className="flex shrink-0 flex-wrap items-center gap-2">
-              {headerRight}
-            </div>
+            <div className="shrink-0">{headerRight}</div>
           ) : null}
         </div>
-      )}
+      ) : null}
 
-      <div className={contentClassName}>{children}</div>
-    </section>
+      <div>{children}</div>
+    </Card>
   );
 }
 
 PageSection.propTypes = {
   title: PropTypes.string,
   description: PropTypes.string,
-  children: PropTypes.node.isRequired,
-  className: PropTypes.string,
-  contentClassName: PropTypes.string,
   headerRight: PropTypes.node,
+  children: PropTypes.node,
+  className: PropTypes.string,
 };
 
 export default PageSection;

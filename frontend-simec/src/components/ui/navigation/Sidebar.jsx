@@ -19,7 +19,7 @@ function Sidebar({
   const { usuario } = useAuth();
   const { naoVistos } = useAlertasRealtime({ enabled: true });
 
-  const badgeCountFinal = naoVistos || notificacoesCount || 0;
+  const badgeCountFinal = naoVistos ?? notificacoesCount ?? 0;
 
   const { mainItems, adminItems } = useMemo(() => {
     const isAllowed = (item) => {
@@ -42,25 +42,36 @@ function Sidebar({
       {isMobileOpen && (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-slate-950/50 lg:hidden"
+          className="fixed inset-0 z-40 lg:hidden"
           onClick={onClose}
           aria-label="Fechar menu"
+          style={{ backgroundColor: 'var(--overlay-bg)' }}
         />
       )}
 
       <aside
         className={[
-          'fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r border-slate-800 bg-slate-900 transition-transform duration-300 lg:sticky lg:z-20',
+          'fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col border-r transition-transform duration-300 lg:sticky lg:z-20',
           isMobileOpen
             ? 'translate-x-0'
             : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
+        style={{
+          backgroundColor: 'var(--bg-elevated)',
+          borderColor: 'var(--border-soft)',
+          color: 'var(--text-primary)',
+          boxShadow: 'var(--shadow-md)',
+        }}
       >
         <div className="flex items-center justify-between px-3 pt-4 lg:justify-center">
           <Link
             to="/dashboard"
-            className="flex w-full items-center justify-center rounded-2xl bg-slate-950 px-2 py-4"
+            className="flex w-full items-center justify-center rounded-2xl border px-3 py-4 transition"
             onClick={onClose}
+            style={{
+              backgroundColor: 'var(--bg-app)',
+              borderColor: 'var(--border-soft)',
+            }}
           >
             <img
               src={logoSimec}
@@ -72,8 +83,13 @@ function Sidebar({
           <button
             type="button"
             onClick={onClose}
-            className="ml-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 lg:hidden"
+            className="ml-3 inline-flex h-10 w-10 items-center justify-center rounded-xl border transition lg:hidden"
             aria-label="Fechar menu lateral"
+            style={{
+              borderColor: 'var(--border-default)',
+              backgroundColor: 'var(--bg-surface-soft)',
+              color: 'var(--text-secondary)',
+            }}
           >
             <FontAwesomeIcon icon={faXmark} />
           </button>
@@ -94,7 +110,10 @@ function Sidebar({
             </ul>
 
             {adminItems.length > 0 && (
-              <div className="mt-6 border-t border-slate-800 pt-6">
+              <div
+                className="mt-6 border-t pt-6"
+                style={{ borderColor: 'var(--border-soft)' }}
+              >
                 <ul className="space-y-2">
                   {adminItems.map((item) => (
                     <li key={item.path}>

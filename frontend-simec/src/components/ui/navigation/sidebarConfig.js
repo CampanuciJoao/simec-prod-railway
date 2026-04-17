@@ -58,8 +58,6 @@ export const sidebarConfig = [
     path: '/relatorios',
     icon: faChartLine,
   },
-
-  // 🔒 Área admin
   {
     label: 'Gerenciamento',
     path: '/gerenciamento',

@@ -6,8 +6,17 @@ function AppBreadcrumb({ items = [] }) {
   if (!items.length) return null;
 
   return (
-    <div className="border-b border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-950">
-      <nav className="flex flex-wrap items-center gap-1 text-sm text-slate-500">
+    <div
+      className="border-b px-4 py-3 sm:px-6"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface-soft)',
+      }}
+    >
+      <nav
+        className="flex flex-wrap items-center gap-1 text-sm"
+        style={{ color: 'var(--text-muted)' }}
+      >
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
 
@@ -16,24 +25,31 @@ function AppBreadcrumb({ items = [] }) {
               {item.to && !isLast ? (
                 <Link
                   to={item.to}
-                  className="font-medium text-slate-600 transition hover:text-blue-600 dark:text-slate-300 dark:hover:text-blue-400"
+                  className="font-medium transition"
+                  style={{ color: 'var(--text-secondary)' }}
                 >
                   {item.label}
                 </Link>
               ) : (
                 <span
-                  className={
-                    isLast
-                      ? 'font-semibold text-slate-900 dark:text-slate-100'
-                      : ''
-                  }
+                  className={isLast ? 'font-semibold' : ''}
+                  style={{
+                    color: isLast
+                      ? 'var(--text-primary)'
+                      : 'var(--text-muted)',
+                  }}
                 >
                   {item.label}
                 </span>
               )}
 
               {!isLast && (
-                <span className="mx-1 text-slate-400">/</span>
+                <span
+                  className="mx-1"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  /
+                </span>
               )}
             </React.Fragment>
           );

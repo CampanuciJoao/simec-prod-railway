@@ -16,9 +16,10 @@ function ActionBar({
     <div
       className={[
         layoutClass,
-        divider ? 'border-b border-slate-200 pb-4' : '',
+        divider ? 'border-b pb-4' : '',
         className,
       ].join(' ')}
+      style={divider ? { borderColor: 'var(--border-soft)' } : undefined}
     >
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
         {left}

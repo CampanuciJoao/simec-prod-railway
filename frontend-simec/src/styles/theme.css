@@ -1,0 +1,104 @@
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  transition:
+    background-color var(--transition-default),
+    color var(--transition-default);
+}
+
+.app-theme-bg {
+  background: var(--bg-app);
+}
+
+.app-theme-bg-muted {
+  background: var(--bg-app-muted);
+}
+
+.ui-surface {
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.ui-surface-soft {
+  background: var(--bg-surface-soft);
+  color: var(--text-primary);
+  border-color: var(--border-soft);
+}
+
+.ui-surface-subtle {
+  background: var(--bg-surface-subtle);
+  color: var(--text-primary);
+  border-color: var(--border-soft);
+}
+
+.ui-elevated {
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border-color: var(--border-default);
+}
+
+.ui-text-primary {
+  color: var(--text-primary);
+}
+
+.ui-text-secondary {
+  color: var(--text-secondary);
+}
+
+.ui-text-muted {
+  color: var(--text-muted);
+}
+
+.ui-border {
+  border-color: var(--border-default);
+}
+
+.ui-border-soft {
+  border-color: var(--border-soft);
+}
+
+.ui-border-strong {
+  border-color: var(--border-strong);
+}
+
+.ui-shadow-sm {
+  box-shadow: var(--shadow-sm);
+}
+
+.ui-shadow-md {
+  box-shadow: var(--shadow-md);
+}
+
+.ui-shadow-lg {
+  box-shadow: var(--shadow-lg);
+}
+
+.ui-overlay {
+  background: var(--overlay-bg);
+}
+
+.ui-brand-ring:focus {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--brand-primary-soft);
+}
+
+.ui-transition {
+  transition:
+    background-color var(--transition-default),
+    color var(--transition-default),
+    border-color var(--transition-default),
+    box-shadow var(--transition-default),
+    opacity var(--transition-default),
+    transform var(--transition-default);
+}

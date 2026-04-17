@@ -31,28 +31,10 @@ function AppLayout() {
     dismissAlerta,
   } = useAlertas();
 
-  const [isDarkMode, setIsDarkMode] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem('simec-theme') === 'dark';
-  });
-
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
   const alertsRef = useRef(null);
-
-  useEffect(() => {
-    const root = document.documentElement;
-
-    if (isDarkMode) {
-      root.classList.add('dark');
-      localStorage.setItem('simec-theme', 'dark');
-      return;
-    }
-
-    root.classList.remove('dark');
-    localStorage.setItem('simec-theme', 'light');
-  }, [isDarkMode]);
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -95,10 +77,6 @@ function AppLayout() {
   const contadorNaoVistos = useMemo(() => {
     return alertas.filter((alerta) => alerta.status === 'NaoVisto').length;
   }, [alertas]);
-
-  const handleToggleDarkMode = useCallback(() => {
-    setIsDarkMode((prev) => !prev);
-  }, []);
 
   const handleToggleAlerts = useCallback(() => {
     setAlertsOpen((prev) => !prev);
@@ -168,7 +146,10 @@ function AppLayout() {
 
   return (
     <>
-      <div className="flex min-h-screen bg-slate-100 dark:bg-slate-950">
+      <div
+        className="flex min-h-screen"
+        style={{ backgroundColor: 'var(--bg-app)' }}
+      >
         <Sidebar
           notificacoesCount={contadorNaoVistos}
           isMobileOpen={isMobileSidebarOpen}
@@ -178,7 +159,6 @@ function AppLayout() {
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           <AppTopbar
             nomeUsuario={nomeUsuario}
-            isDarkMode={isDarkMode}
             alertsOpen={alertsOpen}
             alertas={alertas}
             alertasLoading={alertasLoading}
@@ -187,7 +167,6 @@ function AppLayout() {
             onOpenMenu={handleOpenMobileMenu}
             onToggleAlerts={handleToggleAlerts}
             onCloseAlerts={handleCloseAlerts}
-            onToggleDarkMode={handleToggleDarkMode}
             onLogout={handleLogout}
             onOpenAlert={handleOpenAlertDetails}
             onMarkAsRead={handleMarkAsRead}
@@ -202,7 +181,9 @@ function AppLayout() {
         </div>
       </div>
 
-      <ChatBot />
+      <div className="fixed bottom-4 right-4 z-50">
+        <ChatBot />
+      </div>
     </>
   );
 }
