@@ -56,7 +56,7 @@ function getVariantStyle(variant) {
     return {
       '--button-bg': 'transparent',
       '--button-bg-hover': 'var(--button-ghost-hover)',
-      '--button-text': 'var(--text-secondary)',
+      '--button-text': 'var(--text-primary)',
       '--button-border': 'transparent',
     };
   }
@@ -70,6 +70,7 @@ function Button({
   variant = 'primary',
   size = 'md',
   className = '',
+  fullWidth = false,
   ...props
 }) {
   return (
@@ -77,11 +78,12 @@ function Button({
       type={type}
       style={getVariantStyle(variant)}
       className={[
-        'ui-button inline-flex items-center justify-center gap-2 rounded-xl font-semibold',
+        'ui-button inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold',
         'ui-transition ui-brand-ring disabled:cursor-not-allowed disabled:opacity-60',
         'hover:-translate-y-[1px]',
         sizes[size],
         variants[variant],
+        fullWidth ? 'w-full' : '',
         className,
       ].join(' ')}
       {...props}
@@ -103,6 +105,7 @@ Button.propTypes = {
   ]),
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   className: PropTypes.string,
+  fullWidth: PropTypes.bool,
 };
 
 export default Button;

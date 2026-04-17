@@ -8,31 +8,31 @@ import Card from '@/components/ui/primitives/Card';
 const toneStyleMap = {
   slate: {
     iconBg: 'var(--bg-surface-subtle)',
-    iconText: '#64748b',
+    iconText: 'var(--text-secondary)',
   },
   blue: {
-    iconBg: 'rgba(37, 99, 235, 0.10)',
-    iconText: '#3b82f6',
+    iconBg: 'var(--brand-primary-soft)',
+    iconText: 'var(--brand-primary)',
   },
   green: {
-    iconBg: 'rgba(5, 150, 105, 0.12)',
-    iconText: '#10b981',
+    iconBg: 'var(--color-success-soft)',
+    iconText: 'var(--color-success)',
   },
   yellow: {
-    iconBg: 'rgba(217, 119, 6, 0.12)',
-    iconText: '#f59e0b',
+    iconBg: 'var(--color-warning-soft)',
+    iconText: 'var(--color-warning)',
   },
   orange: {
-    iconBg: 'rgba(234, 88, 12, 0.12)',
-    iconText: '#f97316',
+    iconBg: 'var(--color-warning-soft)',
+    iconText: 'var(--color-warning)',
   },
   red: {
-    iconBg: 'rgba(220, 38, 38, 0.10)',
-    iconText: '#ef4444',
+    iconBg: 'var(--color-danger-soft)',
+    iconText: 'var(--color-danger)',
   },
   purple: {
-    iconBg: 'rgba(139, 92, 246, 0.12)',
-    iconText: '#8b5cf6',
+    iconBg: 'var(--color-info-soft)',
+    iconText: 'var(--color-info)',
   },
 };
 
@@ -49,13 +49,11 @@ function KpiCard({
   const toneStyle = toneStyleMap[tone] || toneStyleMap.slate;
   const isInteractive = Boolean(onClick || to);
 
-  const content = (
+  const cardContent = (
     <Card
-      className={[
-        'h-full rounded-3xl border transition-all',
-        isInteractive ? 'hover:-translate-y-0.5 hover:shadow-lg' : '',
-      ].join(' ')}
-      styleOverride={{
+      className={['h-full rounded-3xl', className].join(' ')}
+      interactive={isInteractive}
+      style={{
         backgroundColor: 'var(--kpi-surface)',
         borderColor: 'var(--border-soft)',
       }}
@@ -101,28 +99,21 @@ function KpiCard({
 
   if (to) {
     return (
-      <Link
-        to={to}
-        className={['block w-full text-left', className].join(' ')}
-      >
-        {content}
+      <Link to={to} className="block w-full text-left">
+        {cardContent}
       </Link>
     );
   }
 
   if (onClick) {
     return (
-      <button
-        type="button"
-        onClick={onClick}
-        className={['w-full text-left', className].join(' ')}
-      >
-        {content}
+      <button type="button" onClick={onClick} className="w-full text-left">
+        {cardContent}
       </button>
     );
   }
 
-  return <div className={className}>{content}</div>;
+  return cardContent;
 }
 
 KpiCard.propTypes = {

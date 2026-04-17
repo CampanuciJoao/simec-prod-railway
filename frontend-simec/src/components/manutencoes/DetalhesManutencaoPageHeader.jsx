@@ -1,6 +1,11 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faPrint, faWrench } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft,
+  faPrint,
+  faWrench,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { Button, PageHeader } from '@/components/ui';
 
@@ -12,12 +17,12 @@ function DetalhesManutencaoPageHeader({ numeroOS, onPrint, onBack }) {
       icon={faWrench}
       actions={
         <>
-          <Button onClick={onPrint}>
+          <Button type="button" onClick={onPrint}>
             <FontAwesomeIcon icon={faPrint} />
             Imprimir PDF
           </Button>
 
-          <Button variant="secondary" onClick={onBack}>
+          <Button type="button" variant="secondary" onClick={onBack}>
             <FontAwesomeIcon icon={faArrowLeft} />
             Voltar
           </Button>
@@ -26,5 +31,11 @@ function DetalhesManutencaoPageHeader({ numeroOS, onPrint, onBack }) {
     />
   );
 }
+
+DetalhesManutencaoPageHeader.propTypes = {
+  numeroOS: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onPrint: PropTypes.func.isRequired,
+  onBack: PropTypes.func.isRequired,
+};
 
 export default DetalhesManutencaoPageHeader;

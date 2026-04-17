@@ -11,12 +11,11 @@ import { useEquipamentosExpansion } from '@/hooks/equipamentos/useEquipamentosEx
 import {
   Button,
   GlobalFilterBar,
+  ModalConfirmacao,
   PageHeader,
   PageLayout,
   PageState,
 } from '@/components/ui';
-
-import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
 
 import {
   EquipamentosList,

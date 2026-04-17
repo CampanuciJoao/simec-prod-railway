@@ -10,9 +10,24 @@ function Input({
   error,
   required = false,
   className = '',
+  onFocus,
+  onBlur,
   ...props
 }) {
   const inputId = id || props.name;
+
+  const handleFocus = (event) => {
+    event.currentTarget.style.boxShadow = error
+      ? '0 0 0 4px var(--color-danger-soft)'
+      : '0 0 0 4px var(--brand-primary-soft)';
+
+    onFocus?.(event);
+  };
+
+  const handleBlur = (event) => {
+    event.currentTarget.style.boxShadow = 'none';
+    onBlur?.(event);
+  };
 
   return (
     <FormFieldShell
@@ -24,35 +39,20 @@ function Input({
     >
       <input
         id={inputId}
-        {...props}
         className={[
-          'w-full rounded-xl px-3 py-2.5 text-sm transition-all outline-none',
-          'disabled:cursor-not-allowed disabled:opacity-60',
-
-          // 🎯 BASE (alinhado com Dashboard)
-          'border',
-          
-          // 🎯 LIGHT / DARK via tokens
-          'bg-[var(--bg-surface)]',
-          'text-[var(--text-primary)]',
-          'placeholder:text-[var(--text-muted)]',
-          'border-[var(--border-default)]',
-
-          // 🎯 HOVER
-          'hover:border-[var(--border-strong)]',
-
-          // 🎯 FOCUS (cara do Simec)
-          'focus:border-[var(--color-primary)]',
-          'focus:ring-4',
-          'focus:ring-[var(--color-primary-soft)]',
-
-          // 🎯 ERROR override
-          error
-            ? '!border-[var(--color-danger)] focus:!border-[var(--color-danger)] focus:!ring-[var(--color-danger-soft)]'
-            : '',
-
+          'ui-transition w-full rounded-xl border px-3 py-2.5 text-sm outline-none placeholder:opacity-70',
+          'disabled:cursor-not-allowed disabled:opacity-70',
           className,
         ].join(' ')}
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: error ? 'var(--color-danger)' : 'var(--border-default)',
+          color: 'var(--text-primary)',
+          boxShadow: 'none',
+        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
+        {...props}
       />
     </FormFieldShell>
   );
@@ -65,6 +65,8 @@ Input.propTypes = {
   error: PropTypes.string,
   required: PropTypes.bool,
   className: PropTypes.string,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
 };
 
 export default Input;

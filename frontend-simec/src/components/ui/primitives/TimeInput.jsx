@@ -21,6 +21,8 @@ function TimeInput({
   name,
   className = '',
   disabled = false,
+  onFocus,
+  onBlur,
   ...props
 }) {
   const inputId = id || name;
@@ -34,6 +36,19 @@ function TimeInput({
         value: formattedValue,
       },
     });
+  };
+
+  const handleFocus = (event) => {
+    event.currentTarget.style.boxShadow = error
+      ? '0 0 0 4px var(--color-danger-soft)'
+      : '0 0 0 4px var(--brand-primary-soft)';
+
+    onFocus?.(event);
+  };
+
+  const handleBlur = (event) => {
+    event.currentTarget.style.boxShadow = 'none';
+    onBlur?.(event);
   };
 
   return (
@@ -66,16 +81,8 @@ function TimeInput({
           color: 'var(--text-primary)',
           boxShadow: 'none',
         }}
-        onFocus={(e) => {
-          e.currentTarget.style.boxShadow = error
-            ? '0 0 0 4px var(--color-danger-soft)'
-            : '0 0 0 4px var(--brand-primary-soft)';
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.boxShadow = 'none';
-          props.onBlur?.(e);
-        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         {...props}
       />
     </FormFieldShell>
@@ -93,6 +100,8 @@ TimeInput.propTypes = {
   name: PropTypes.string,
   className: PropTypes.string,
   disabled: PropTypes.bool,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
 };
 
 export default TimeInput;

@@ -1,9 +1,9 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faWrench } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '../ui/primitives/Button';
-import { PageHeader } from '@/components/ui/layout';
+import { Button, PageHeader } from '@/components/ui';
 
 function ManutencoesPageHeader({ onCreate }) {
   return (
@@ -12,7 +12,7 @@ function ManutencoesPageHeader({ onCreate }) {
       subtitle="Acompanhe e gerencie ordens de serviço do sistema"
       icon={faWrench}
       actions={
-        <Button onClick={onCreate}>
+        <Button type="button" onClick={onCreate}>
           <FontAwesomeIcon icon={faPlus} />
           Agendar nova
         </Button>
@@ -20,5 +20,9 @@ function ManutencoesPageHeader({ onCreate }) {
     />
   );
 }
+
+ManutencoesPageHeader.propTypes = {
+  onCreate: PropTypes.func.isRequired,
+};
 
 export default ManutencoesPageHeader;

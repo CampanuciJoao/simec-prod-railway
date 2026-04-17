@@ -74,31 +74,27 @@ function TabHistorico({ equipamento }) {
 
   const toggleExpandir = (id) => {
     setItensExpandidos((prev) => {
-      const novos = new Set(prev);
-
-      if (novos.has(id)) {
-        novos.delete(id);
-      } else {
-        novos.add(id);
-      }
-
-      return novos;
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   };
 
   const { linhaDoTempo, totalFiltrado, totalSemFiltro, temFiltroAtivo } =
-    useMemo(() => {
-      return buildHistoricoTimeline({
-        historicoBruto,
-        dataInicio,
-        dataFim,
-        filtroTipo,
-      });
-    }, [historicoBruto, dataInicio, dataFim, filtroTipo]);
+    useMemo(
+      () =>
+        buildHistoricoTimeline({
+          historicoBruto,
+          dataInicio,
+          dataFim,
+          filtroTipo,
+        }),
+      [historicoBruto, dataInicio, dataFim, filtroTipo]
+    );
 
   const handleSetHoje = (campo) => {
     const hoje = new Date().toISOString().split('T')[0];
-
     if (campo === 'inicio') setDataInicio(hoje);
     if (campo === 'fim') setDataFim(hoje);
   };
@@ -166,106 +162,98 @@ function TabHistorico({ equipamento }) {
         </div>
 
         <Card surface="soft" className="rounded-2xl">
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="min-w-0">
-                <Select
-                  label="Tipo de registro"
-                  value={filtroTipo}
-                  onChange={(e) => setFiltroTipo(e.target.value)}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <Select
+              label="Tipo de registro"
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+            >
+              <option value="Todos">Todos os registros</option>
+              <option value="Preventiva">Apenas preventivas</option>
+              <option value="Corretiva">Apenas corretivas</option>
+              <option value="Evento">Apenas ocorrências</option>
+            </Select>
+
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <DateInput
+                  label="Início"
+                  value={dataInicio}
+                  onChange={(e) => setDataInicio(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="px-3"
+                  onClick={() => handleSetHoje('inicio')}
+                  title="Definir hoje"
                 >
-                  <option value="Todos">Todos os registros</option>
-                  <option value="Preventiva">Apenas preventivas</option>
-                  <option value="Corretiva">Apenas corretivas</option>
-                  <option value="Evento">Apenas ocorrências</option>
-                </Select>
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <DateInput
-                      label="Início"
-                      value={dataInicio}
-                      onChange={(e) => setDataInicio(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="px-3"
-                      onClick={() => handleSetHoje('inicio')}
-                      title="Definir hoje"
-                    >
-                      <FontAwesomeIcon icon={faCalendarDay} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="min-w-0">
-                <div className="flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <DateInput
-                      label="Fim"
-                      value={dataFim}
-                      onChange={(e) => setDataFim(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="flex items-end">
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      className="px-3"
-                      onClick={() => handleSetHoje('fim')}
-                      title="Definir hoje"
-                    >
-                      <FontAwesomeIcon icon={faCalendarDay} />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-end justify-end">
-                {temFiltroAtivo ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleLimparFiltros}
-                  >
-                    <FontAwesomeIcon icon={faRotateLeft} />
-                    Limpar filtros
-                  </Button>
-                ) : null}
+                  <FontAwesomeIcon icon={faCalendarDay} />
+                </Button>
               </div>
             </div>
 
-            {!temFiltroAtivo && totalSemFiltro > 20 ? (
-              <div
-                className="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
-                style={{
-                  borderColor: 'var(--brand-primary-soft)',
-                  backgroundColor: 'var(--brand-primary-soft)',
-                  color: 'var(--text-primary)',
-                }}
-              >
-                <FontAwesomeIcon
-                  icon={faFilter}
-                  className="mt-0.5 shrink-0"
-                  style={{ color: 'var(--brand-primary)' }}
+            <div className="flex gap-2">
+              <div className="flex-1">
+                <DateInput
+                  label="Fim"
+                  value={dataFim}
+                  onChange={(e) => setDataFim(e.target.value)}
                 />
-
-                <div>
-                  Exibindo os <strong>20 registros mais recentes</strong> de um
-                  total de <strong>{` ${totalSemFiltro}`}</strong>. Use os filtros
-                  para visualizar todo o histórico.
-                </div>
               </div>
-            ) : null}
+
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="px-3"
+                  onClick={() => handleSetHoje('fim')}
+                  title="Definir hoje"
+                >
+                  <FontAwesomeIcon icon={faCalendarDay} />
+                </Button>
+              </div>
+            </div>
+
+            <div className="flex items-end justify-end">
+              {temFiltroAtivo ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleLimparFiltros}
+                >
+                  <FontAwesomeIcon icon={faRotateLeft} />
+                  Limpar filtros
+                </Button>
+              ) : null}
+            </div>
           </div>
+
+          {!temFiltroAtivo && totalSemFiltro > 20 ? (
+            <div
+              className="mt-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'var(--brand-primary-soft)',
+                backgroundColor: 'var(--brand-primary-soft)',
+                color: 'var(--text-primary)',
+              }}
+            >
+              <FontAwesomeIcon
+                icon={faFilter}
+                className="mt-0.5 shrink-0"
+                style={{ color: 'var(--brand-primary)' }}
+              />
+
+              <div>
+                Exibindo os <strong>20 registros mais recentes</strong> de um
+                total de <strong>{` ${totalSemFiltro}`}</strong>. Use os filtros
+                para visualizar todo o histórico.
+              </div>
+            </div>
+          ) : null}
         </Card>
 
         {loading ? (

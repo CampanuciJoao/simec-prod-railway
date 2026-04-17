@@ -1,35 +1,24 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import Badge from '@/components/ui/primitives/Badge';
 
-const statusVariantMap = {
-  Operante: 'green',
-  EmManutencao: 'yellow',
-  Inoperante: 'red',
-  UsoLimitado: 'blue',
-  Agendada: 'blue',
-  EmAndamento: 'yellow',
-  AguardandoConfirmacao: 'orange',
-  Concluida: 'green',
-  Cancelada: 'slate',
-  Ativo: 'green',
-  Expirado: 'red',
-  Vigente: 'green',
-  'Vence em breve': 'yellow',
-  NaoVisto: 'blue',
-  Visto: 'slate',
-  Preventiva: 'blue',
-  Corretiva: 'orange',
-  Calibracao: 'purple',
-  Inspecao: 'green',
-};
+import Badge from '@/components/ui/primitives/Badge';
+import { getStatusVariant } from '@/components/ui/uistyles/statusStyles';
+
+function formatLabel(value) {
+  if (!value) return 'N/A';
+
+  return String(value)
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .trim();
+}
 
 function StatusBadge({ value, className = '' }) {
-  const variant = statusVariantMap[value] || 'slate';
+  const variant = getStatusVariant(value);
 
   return (
     <Badge variant={variant} className={className}>
-      {value || 'N/A'}
+      {formatLabel(value)}
     </Badge>
   );
 }

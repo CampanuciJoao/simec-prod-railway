@@ -25,20 +25,25 @@ function Card({
   className = '',
   padded = true,
   surface = 'default',
-  styleOverride = {},
+  interactive = false,
+  style = {},
 }) {
   const surfaceStyle = surfaceStyleMap[surface] || surfaceStyleMap.default;
 
   return (
     <div
       className={[
-        'rounded-2xl border shadow-sm transition-colors',
+        'rounded-2xl border transition-all',
         padded ? 'p-4 md:p-5' : '',
+        interactive
+          ? 'cursor-pointer hover:shadow-md hover:border-[var(--border-strong)]'
+          : '',
         className,
       ].join(' ')}
       style={{
         ...surfaceStyle,
-        ...styleOverride,
+        boxShadow: 'var(--shadow-sm)',
+        ...style,
       }}
     >
       {children}
@@ -51,7 +56,8 @@ Card.propTypes = {
   className: PropTypes.string,
   padded: PropTypes.bool,
   surface: PropTypes.oneOf(['default', 'soft', 'subtle', 'elevated']),
-  styleOverride: PropTypes.object,
+  interactive: PropTypes.bool,
+  style: PropTypes.object,
 };
 
 export default Card;

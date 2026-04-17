@@ -1,9 +1,11 @@
 import React from 'react';
 
-import TabCadastro from '@/components/equipamentos/tabs/TabCadastro';
-import TabAcessorios from '@/components/equipamentos/tabs/TabAcessorios';
-import TabAnexos from '@/components/equipamentos/tabs/TabAnexos';
-import TabHistorico from '@/components/equipamentos/tabs/TabHistorico';
+import {
+  TabAcessorios,
+  TabAnexos,
+  TabCadastro,
+  TabHistorico,
+} from '@/components/equipamentos/tabs';
 
 function DetalhesEquipamentoTabContent({
   abaAtiva,
@@ -29,7 +31,7 @@ function DetalhesEquipamentoTabContent({
     historico: <TabHistorico equipamento={equipamento} />,
   };
 
-  return <>{tabContentMap[abaAtiva] || null}</>;
+  return tabContentMap[abaAtiva] || null;
 }
 
 export default DetalhesEquipamentoTabContent;

@@ -5,6 +5,7 @@ export {
   PageLayout,
   PageHeader,
   PageSection,
+  FormSection,
   ResponsiveGrid,
   ResponsiveTabs,
   ActionBar,

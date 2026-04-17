@@ -1,7 +1,7 @@
-import React, { useCallback, memo } from 'react';
+import React, { memo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 
-import EquipamentoCard from '@/components/equipamentos/EquipamentoCard';
+import { EquipamentoCard } from '@/components/equipamentos';
 import { EmptyState } from '@/components/ui';
 
 function EquipamentosList({
@@ -32,9 +32,12 @@ function EquipamentosList({
     [onGoToFichaTecnica]
   );
 
-  const handleStatusUpdated = useCallback(() => {
-    onStatusUpdated?.();
-  }, [onStatusUpdated]);
+  const handleStatusUpdated = useCallback(
+    (...args) => {
+      onStatusUpdated?.(...args);
+    },
+    [onStatusUpdated]
+  );
 
   const handleRefresh = useCallback(() => {
     onRefresh?.();

@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import FormFieldShell from './FormFieldShell';
+
+import FormFieldShell from '@/components/ui/primitives/FormFieldShell';
 
 function Select({
   id,
@@ -12,10 +13,25 @@ function Select({
   options = [],
   placeholder = 'Selecione',
   children,
+  onFocus,
+  onBlur,
   ...props
 }) {
   const selectId = id || props.name;
   const hasOptionsProp = Array.isArray(options) && options.length > 0;
+
+  const handleFocus = (event) => {
+    event.currentTarget.style.boxShadow = error
+      ? '0 0 0 4px var(--color-danger-soft)'
+      : '0 0 0 4px var(--brand-primary-soft)';
+
+    onFocus?.(event);
+  };
+
+  const handleBlur = (event) => {
+    event.currentTarget.style.boxShadow = 'none';
+    onBlur?.(event);
+  };
 
   return (
     <FormFieldShell
@@ -38,19 +54,15 @@ function Select({
           color: 'var(--text-primary)',
           boxShadow: 'none',
         }}
-        onFocus={(e) => {
-          e.currentTarget.style.boxShadow = error
-            ? '0 0 0 4px var(--color-danger-soft)'
-            : '0 0 0 4px var(--brand-primary-soft)';
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.boxShadow = 'none';
-          props.onBlur?.(e);
-        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         {...props}
       >
-        {placeholder ? <option value="">{placeholder}</option> : null}
+        {placeholder ? (
+          <option value="">
+            {placeholder}
+          </option>
+        ) : null}
 
         {hasOptionsProp
           ? options.map((option) => (
@@ -71,9 +83,20 @@ Select.propTypes = {
   error: PropTypes.string,
   required: PropTypes.bool,
   className: PropTypes.string,
-  options: PropTypes.array,
+  options: PropTypes.arrayOf(
+    PropTypes.shape({
+      value: PropTypes.oneOfType([
+        PropTypes.string,
+        PropTypes.number,
+        PropTypes.bool,
+      ]).isRequired,
+      label: PropTypes.string.isRequired,
+    })
+  ),
   placeholder: PropTypes.string,
   children: PropTypes.node,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
 };
 
 export default Select;

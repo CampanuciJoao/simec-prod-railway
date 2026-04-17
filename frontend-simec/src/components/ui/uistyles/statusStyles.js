@@ -1,47 +1,37 @@
-export function getStatusBadgeVariant(status) {
-  const s = String(status || '').toLowerCase();
+import { normalizeStatus } from '@/utils/status/statusUtils';
 
-  if (s === 'operante') return 'green';
-  if (s === 'inoperante') return 'red';
-  if (s === 'emmanutencao') return 'yellow';
-  if (s === 'usolimitado') return 'blue';
+const STATUS_VARIANT_MAP = {
+  // EQUIPAMENTO
+  operante: 'green',
+  emmanutencao: 'yellow',
+  inoperante: 'red',
+  usolimitado: 'orange',
 
-  return 'slate';
-}
+  // MANUTENÇÃO
+  agendada: 'blue',
+  emandamento: 'yellow',
+  aguardandoconfirmacao: 'orange',
+  concluida: 'green',
+  cancelada: 'slate',
 
-export function getStatusCardStyles(status) {
-  const s = String(status || '').toLowerCase();
+  // STATUS GERAL
+  ativo: 'green',
+  expirado: 'red',
+  vigente: 'green',
+  venceembreve: 'yellow',
 
-  if (s === 'operante') {
-    return {
-      border: 'border-l-emerald-500',
-      bg: 'bg-emerald-50',
-    };
-  }
+  // VISUALIZAÇÃO
+  naovisto: 'blue',
+  visto: 'slate',
 
-  if (s === 'inoperante') {
-    return {
-      border: 'border-l-red-500',
-      bg: 'bg-red-50',
-    };
-  }
+  // TIPOS DE MANUTENÇÃO
+  preventiva: 'blue',
+  corretiva: 'orange',
+  calibracao: 'purple',
+  inspecao: 'green',
+};
 
-  if (s === 'emmanutencao') {
-    return {
-      border: 'border-l-amber-500',
-      bg: 'bg-amber-50',
-    };
-  }
-
-  if (s === 'usolimitado') {
-    return {
-      border: 'border-l-blue-500',
-      bg: 'bg-blue-50',
-    };
-  }
-
-  return {
-    border: 'border-l-slate-400',
-    bg: 'bg-white',
-  };
+export function getStatusVariant(value) {
+  const normalized = normalizeStatus(value);
+  return STATUS_VARIANT_MAP[normalized] || 'slate';
 }

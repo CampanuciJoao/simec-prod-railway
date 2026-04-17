@@ -2,18 +2,18 @@ import React from 'react';
 import { faMicrochip } from '@fortawesome/free-solid-svg-icons';
 
 import { useDetalhesEquipamentoPage } from '@/hooks/equipamentos/useDetalhesEquipamentoPage';
-import DetalhesEquipamentoTabs from '@/components/equipamentos/DetalhesEquipamentoTabs';
-import DetalhesEquipamentoTabContent from '@/components/equipamentos/DetalhesEquipamentoTabContent';
+import {
+  DetalhesEquipamentoTabContent,
+  DetalhesEquipamentoTabs,
+} from '@/components/equipamentos';
 
 import {
-  PageLayout,
-  PageHeader,
-  PageSection,
+  Button,
   EmptyState,
-} from '@/components/ui/layout';
-
-import LoadingState from '@/components/ui/feedback/LoadingState';
-import { Button } from '@/components/ui/primitives';
+  LoadingState,
+  PageHeader,
+  PageLayout,
+} from '@/components/ui';
 
 function DetalhesEquipamentoPage() {
   const {
@@ -39,58 +39,61 @@ function DetalhesEquipamentoPage() {
 
   if (loading) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title="Detalhes do Equipamento"
-          icon={faMicrochip}
-          actions={backAction}
-        />
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title="Detalhes do Equipamento"
+            icon={faMicrochip}
+            actions={backAction}
+          />
 
-        <LoadingState message="Carregando equipamento..." />
+          <LoadingState message="Carregando equipamento..." />
+        </div>
       </PageLayout>
     );
   }
 
   if (error || !equipamento) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title="Detalhes do Equipamento"
-          icon={faMicrochip}
-          actions={backAction}
-        />
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title="Detalhes do Equipamento"
+            icon={faMicrochip}
+            actions={backAction}
+          />
 
-        <EmptyState
-          message={error || 'O equipamento solicitado não foi encontrado.'}
-        />
+          <EmptyState
+            message={error || 'O equipamento solicitado não foi encontrado.'}
+          />
+        </div>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout background="slate" padded fullHeight>
-      <PageHeader
-        title={`Detalhes do Equipamento: ${equipamento.modelo}`}
-        icon={faMicrochip}
-        actions={backAction}
-      />
+    <PageLayout padded fullHeight>
+      <div className="space-y-6">
+        <PageHeader
+          title={`Detalhes do Equipamento: ${equipamento.modelo}`}
+          subtitle={`Tag: ${equipamento.tag || 'N/A'}`}
+          icon={faMicrochip}
+          actions={backAction}
+        />
 
-      <PageSection>
         <DetalhesEquipamentoTabs
           abas={abas}
           abaAtiva={abaAtiva}
           onChange={setAbaAtiva}
         />
 
-        <div className="mt-5">
-          <DetalhesEquipamentoTabContent
-            abaAtiva={abaAtiva}
-            equipamento={equipamento}
-            equipamentoId={equipamentoId}
-            onRefresh={refetchEquipamento}
-          />
-        </div>
-      </PageSection>
+        <DetalhesEquipamentoTabContent
+          abaAtiva={abaAtiva}
+          equipamento={equipamento}
+          equipamentoId={equipamentoId}
+          onRefresh={refetchEquipamento}
+        />
+      </div>
     </PageLayout>
   );
 }

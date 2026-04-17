@@ -11,9 +11,24 @@ function Textarea({
   required = false,
   className = '',
   rows = 4,
+  onFocus,
+  onBlur,
   ...props
 }) {
   const textareaId = id || props.name;
+
+  const handleFocus = (event) => {
+    event.currentTarget.style.boxShadow = error
+      ? '0 0 0 4px var(--color-danger-soft)'
+      : '0 0 0 4px var(--brand-primary-soft)';
+
+    onFocus?.(event);
+  };
+
+  const handleBlur = (event) => {
+    event.currentTarget.style.boxShadow = 'none';
+    onBlur?.(event);
+  };
 
   return (
     <FormFieldShell
@@ -37,16 +52,8 @@ function Textarea({
           color: 'var(--text-primary)',
           boxShadow: 'none',
         }}
-        onFocus={(e) => {
-          e.currentTarget.style.boxShadow = error
-            ? '0 0 0 4px var(--color-danger-soft)'
-            : '0 0 0 4px var(--brand-primary-soft)';
-          props.onFocus?.(e);
-        }}
-        onBlur={(e) => {
-          e.currentTarget.style.boxShadow = 'none';
-          props.onBlur?.(e);
-        }}
+        onFocus={handleFocus}
+        onBlur={handleBlur}
         {...props}
       />
     </FormFieldShell>
@@ -61,6 +68,8 @@ Textarea.propTypes = {
   required: PropTypes.bool,
   className: PropTypes.string,
   rows: PropTypes.number,
+  onFocus: PropTypes.func,
+  onBlur: PropTypes.func,
 };
 
 export default Textarea;

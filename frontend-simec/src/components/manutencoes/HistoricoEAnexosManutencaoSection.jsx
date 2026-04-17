@@ -10,6 +10,8 @@ import {
   PageSection,
   CompactAttachmentList,
   EmptyState,
+  Textarea,
+  Button,
 } from '@/components/ui';
 
 function HistoricoEAnexosManutencaoSection({
@@ -31,7 +33,6 @@ function HistoricoEAnexosManutencaoSection({
 
   const handleAdicionarNota = async () => {
     const valor = nota.trim();
-
     if (!valor) return;
 
     await onAdicionarNota(valor);
@@ -53,46 +54,53 @@ function HistoricoEAnexosManutencaoSection({
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-      <PageSection
-        title="Histórico de andamento"
-        description="Registre acontecimentos, observações técnicas e evolução da ordem de serviço."
-      >
+      {/* HISTÓRICO */}
+      <PageSection title="Histórico de andamento">
         <div className="space-y-4">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-600">
+            <span
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: 'var(--brand-primary-soft)',
+                color: 'var(--brand-primary)',
+              }}
+            >
               <FontAwesomeIcon icon={faTimeline} />
             </span>
 
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">
+            <div>
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 Acontecimentos da manutenção
               </p>
-              <p className="text-sm text-slate-500">
-                Registre visitas, testes, peças trocadas, diagnósticos e observações de campo.
+
+              <p
+                className="text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Registre visitas, testes, peças trocadas e observações.
               </p>
             </div>
           </div>
 
-          <div className="space-y-3">
-            <textarea
-              rows={4}
-              value={nota}
-              onChange={(e) => setNota(e.target.value)}
-              disabled={submitting}
-              placeholder="Ex.: Equipamento reiniciado, testes executados, aguardando peça, visita técnica realizada..."
-              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-            />
+          <Textarea
+            rows={4}
+            value={nota}
+            onChange={(e) => setNota(e.target.value)}
+            disabled={submitting}
+            placeholder="Ex.: Equipamento reiniciado, testes executados..."
+          />
 
-            <div className="flex justify-end">
-              <button
-                type="button"
-                onClick={handleAdicionarNota}
-                disabled={submitting || !nota.trim()}
-                className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Registrar acontecimento
-              </button>
-            </div>
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              onClick={handleAdicionarNota}
+              disabled={submitting || !nota.trim()}
+            >
+              Registrar acontecimento
+            </Button>
           </div>
 
           {notas.length > 0 ? (
@@ -100,11 +108,23 @@ function HistoricoEAnexosManutencaoSection({
               {notas.map((item) => (
                 <div
                   key={item.id}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  className="rounded-xl border px-4 py-3"
+                  style={{
+                    backgroundColor: 'var(--bg-surface-soft)',
+                    borderColor: 'var(--border-soft)',
+                  }}
                 >
-                  <div className="text-sm text-slate-800">{item.nota}</div>
+                  <div
+                    className="text-sm"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {item.nota}
+                  </div>
 
-                  <div className="mt-2 text-xs text-slate-500">
+                  <div
+                    className="mt-2 text-xs"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
                     {item.autor?.nome || 'Sistema'}
                   </div>
                 </div>
@@ -116,21 +136,32 @@ function HistoricoEAnexosManutencaoSection({
         </div>
       </PageSection>
 
-      <PageSection
-        title="Anexos da OS"
-        description="Arquivos vinculados à ordem de serviço."
-      >
+      {/* ANEXOS */}
+      <PageSection title="Anexos da OS">
         <div className="space-y-3">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-500">
+            <span
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+              style={{
+                backgroundColor: 'var(--color-danger-soft)',
+                color: 'var(--color-danger)',
+              }}
+            >
               <FontAwesomeIcon icon={faPaperclip} />
             </span>
 
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-slate-900">
-                Anexar OS
+            <div>
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Anexar documentos
               </p>
-              <p className="text-sm text-slate-500">
+
+              <p
+                className="text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 PDFs, imagens e laudos da manutenção.
               </p>
             </div>
@@ -153,13 +184,5 @@ function HistoricoEAnexosManutencaoSection({
     </div>
   );
 }
-
-HistoricoEAnexosManutencaoSection.propTypes = {
-  manutencao: PropTypes.object,
-  onAdicionarNota: PropTypes.func.isRequired,
-  onUploadAnexos: PropTypes.func.isRequired,
-  onRemoverAnexo: PropTypes.func.isRequired,
-  submitting: PropTypes.bool,
-};
 
 export default HistoricoEAnexosManutencaoSection;

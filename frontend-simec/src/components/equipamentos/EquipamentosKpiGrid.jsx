@@ -58,7 +58,7 @@ function EquipamentosKpiGrid({
         title="Uso limitado"
         value={metricas.usoLimitado ?? 0}
         subtitle="Operação restrita"
-        tone="blue"
+        tone="orange"
         onClick={() => onFilterStatus('UsoLimitado')}
       />
     </KpiGrid>

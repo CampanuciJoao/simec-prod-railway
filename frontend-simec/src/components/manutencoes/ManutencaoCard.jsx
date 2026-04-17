@@ -11,106 +11,41 @@ import {
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { Badge, Button, Card } from '@/components/ui';
+import {
+  Button,
+  Card,
+  InfoCard,
+  StatusBadge,
+} from '@/components/ui';
 import { formatarData } from '@/utils/timeUtils';
 
-function getStatusVariant(status) {
-  const s = String(status || '').toLowerCase();
-
-  if (s === 'concluida') return 'green';
-  if (s === 'cancelada') return 'red';
-  if (s === 'emandamento') return 'yellow';
-  if (s === 'aguardandoconfirmacao') return 'yellow';
-
-  return 'blue';
+function getTipoLabel(tipo) {
+  return tipo ? String(tipo).replace(/([A-Z])/g, ' $1').trim() : '-';
 }
-
-function getTipoVariant(tipo) {
-  const normalized = String(tipo || '').toLowerCase();
-
-  if (normalized.includes('preventiva')) return 'blue';
-  if (normalized.includes('corretiva')) return 'orange';
-  if (normalized.includes('calibracao')) return 'purple';
-  if (normalized.includes('inspecao')) return 'green';
-
-  return 'outline';
-}
-
-function getTipoAccentClass(tipo) {
-  const normalized = String(tipo || '').toLowerCase();
-
-  if (normalized.includes('preventiva')) return 'border-l-blue-400';
-  if (normalized.includes('corretiva')) return 'border-l-orange-400';
-  if (normalized.includes('calibracao')) return 'border-l-purple-400';
-  if (normalized.includes('inspecao')) return 'border-l-emerald-400';
-
-  return 'border-l-slate-300';
-}
-
-function getTipoSurfaceClass(tipo) {
-  const normalized = String(tipo || '').toLowerCase();
-
-  if (normalized.includes('preventiva')) return 'bg-blue-50';
-  if (normalized.includes('corretiva')) return 'bg-orange-50';
-  if (normalized.includes('calibracao')) return 'bg-purple-50';
-  if (normalized.includes('inspecao')) return 'bg-emerald-50';
-
-  return 'bg-white';
-}
-
-function formatarLabel(value) {
-  return value ? String(value).replace(/([A-Z])/g, ' $1').trim() : '-';
-}
-
-function InfoPill({ icon, label, value }) {
-  return (
-    <div className="rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-        <FontAwesomeIcon icon={icon} />
-        <span>{label}</span>
-      </div>
-
-      <div className="mt-1 text-sm font-medium text-slate-800">
-        {value || '---'}
-      </div>
-    </div>
-  );
-}
-
-InfoPill.propTypes = {
-  icon: PropTypes.object.isRequired,
-  label: PropTypes.string.isRequired,
-  value: PropTypes.node,
-};
 
 function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
   return (
-    <Card
-      surfaceClassName={getTipoSurfaceClass(manutencao.tipo)}
-      className={[
-        'rounded-3xl border border-slate-200 border-l-4 p-5 shadow-sm',
-        getTipoAccentClass(manutencao.tipo),
-      ].join(' ')}
-    >
+    <Card className="rounded-3xl p-5">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-xl font-bold tracking-tight text-slate-900">
+                <h3
+                  className="text-xl font-bold tracking-tight"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {manutencao.numeroOS}
                 </h3>
 
-                <Badge variant={getStatusVariant(manutencao.status)}>
-                  {formatarLabel(manutencao.status)}
-                </Badge>
-
-                <Badge variant={getTipoVariant(manutencao.tipo)}>
-                  {formatarLabel(manutencao.tipo)}
-                </Badge>
+                <StatusBadge value={manutencao.status} />
+                <StatusBadge value={getTipoLabel(manutencao.tipo)} />
               </div>
 
-              <p className="mt-3 text-sm leading-6 text-slate-600">
+              <p
+                className="mt-3 text-sm leading-6"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 {manutencao.descricaoProblemaServico || 'Sem descrição informada.'}
               </p>
             </div>
@@ -137,25 +72,25 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
           </div>
 
           <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <InfoPill
+            <InfoCard
               icon={faWrench}
               label="Equipamento"
               value={manutencao.equipamento?.modelo || '---'}
             />
 
-            <InfoPill
+            <InfoCard
               icon={faHospital}
               label="Unidade"
               value={manutencao.equipamento?.unidade?.nomeSistema || '---'}
             />
 
-            <InfoPill
+            <InfoCard
               icon={faCalendarDays}
               label="Data"
               value={formatarData(manutencao.dataHoraAgendamentoInicio)}
             />
 
-            <InfoPill
+            <InfoCard
               icon={faHashtag}
               label="Chamado"
               value={manutencao.numeroChamado || '---'}

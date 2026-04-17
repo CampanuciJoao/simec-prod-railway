@@ -18,10 +18,10 @@ const STATUS_OPTIONS = [
   'EmManutencao',
 ];
 
-const formatarStatusParaDisplay = (status) => {
+function formatarStatusParaDisplay(status) {
   if (!status) return '';
   return String(status).replace(/([A-Z])/g, ' $1').trim();
-};
+}
 
 function getStatusSelectStyle(variant) {
   switch (variant) {
@@ -74,7 +74,10 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
   );
 
   const selectStyle = useMemo(
-    () => getStatusSelectStyle(variant),
+    () => ({
+      ...getStatusSelectStyle(variant),
+      boxShadow: 'none',
+    }),
     [variant]
   );
 
@@ -88,9 +91,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     try {
       await updateEquipamento(equipamento.id, { status: novoStatus });
 
-      if (typeof onSuccessUpdate === 'function') {
-        onSuccessUpdate(equipamento.id, novoStatus);
-      }
+      onSuccessUpdate?.(equipamento.id, novoStatus);
 
       addToast(`Status de "${equipamento.modelo}" atualizado!`, 'success');
     } catch (error) {
@@ -107,12 +108,12 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
 
   return (
     <div
-      className="relative inline-flex w-full min-w-[140px] max-w-[220px] items-center"
+      className="relative inline-flex w-full min-w-[160px] max-w-[240px] items-center"
       onClick={(event) => event.stopPropagation()}
     >
       {isUpdating ? (
         <span
-          className="pointer-events-none absolute right-8 z-[2] text-[11px]"
+          className="pointer-events-none absolute right-9 z-[2] text-[11px]"
           style={{ color: 'var(--text-muted)' }}
         >
           <FontAwesomeIcon icon={faSpinner} spin />
@@ -130,11 +131,8 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
         value={currentStatus}
         onChange={handleSelectChange}
         disabled={isUpdating}
-        className="pr-8"
-        style={{
-          ...selectStyle,
-          boxShadow: 'none',
-        }}
+        className="pr-12 text-sm font-semibold"
+        style={selectStyle}
         aria-label={`Alterar status de ${equipamento.modelo}`}
       >
         {STATUS_OPTIONS.map((statusValue) => (

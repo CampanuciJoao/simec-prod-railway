@@ -1,13 +1,18 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFileMedical } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft,
+  faFileMedical,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { useFichaTecnicaPage } from '@/hooks/equipamentos/useFichaTecnicaPage';
 
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageHeader from '@/components/ui/layout/PageHeader';
-import PageState from '@/components/ui/feedback/PageState';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Button,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
 
 import {
   FichaTecnicaEventForm,
@@ -19,24 +24,39 @@ function FichaTecnicaPage() {
 
   if (page.loading) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader title="Ficha Técnica" icon={faFileMedical} />
-        <PageState loading />
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title="Ficha Técnica"
+            icon={faFileMedical}
+          />
+
+          <PageState loading />
+        </div>
       </PageLayout>
     );
   }
 
   if (!page.equipamento) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader title="Ficha Técnica" icon={faFileMedical} />
-        <PageState isEmpty emptyMessage="Equipamento não encontrado." />
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title="Ficha Técnica"
+            icon={faFileMedical}
+          />
+
+          <PageState
+            isEmpty
+            emptyMessage="Equipamento não encontrado."
+          />
+        </div>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout background="slate" padded fullHeight>
+    <PageLayout padded fullHeight>
       <div className="space-y-6">
         <PageHeader
           title={`Ficha Técnica: ${page.equipamento.modelo}`}

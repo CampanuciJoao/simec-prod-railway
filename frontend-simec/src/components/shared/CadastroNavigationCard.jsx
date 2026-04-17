@@ -41,15 +41,13 @@ function CadastroNavigationCard({
     <button
       type="button"
       onClick={onClick}
-      className={[
-        'w-full text-left transition hover:-translate-y-0.5',
-        className,
-      ].join(' ')}
+      className="w-full text-left"
     >
       <Card
-        className="h-full rounded-3xl"
+        className={['h-full rounded-3xl', className].join(' ')}
         surface="default"
-        styleOverride={{
+        interactive
+        style={{
           backgroundColor: 'var(--section-surface)',
           borderColor: 'var(--border-soft)',
         }}

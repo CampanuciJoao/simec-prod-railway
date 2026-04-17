@@ -2,11 +2,12 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 import { ResponsiveTabs } from '@/components/ui';
-
-import TabCadastro from '@/components/equipamentos/tabs/TabCadastro';
-import TabAcessorios from '@/components/equipamentos/tabs/TabAcessorios';
-import TabAnexos from '@/components/equipamentos/tabs/TabAnexos';
-import TabHistorico from '@/components/equipamentos/tabs/TabHistorico';
+import {
+  TabAcessorios,
+  TabAnexos,
+  TabCadastro,
+  TabHistorico,
+} from '@/components/equipamentos/tabs';
 
 const TABS = [
   { id: 'cadastro', label: 'Cadastro' },
@@ -36,9 +37,9 @@ function EquipamentoCardExpanded({
 
   return (
     <div
-      className="px-4 py-5 md:px-6 md:py-6"
+      className="border-t px-4 py-5 md:px-6 md:py-6"
       style={{
-        borderTop: '1px solid var(--section-header-border)',
+        borderColor: 'var(--section-header-border)',
         backgroundColor: 'var(--bg-surface)',
       }}
     >

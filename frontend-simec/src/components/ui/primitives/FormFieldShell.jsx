@@ -16,27 +16,29 @@ function FormFieldShell({
     <div className={['space-y-1.5', className].join(' ')}>
       {hasHeader ? (
         <div className="flex items-start justify-between gap-3">
-          {label ? (
-            <label
-              htmlFor={htmlFor}
-              className="ui-text-primary text-sm font-semibold"
-            >
-              {label}
-              {required ? (
-                <span
-                  className="ml-1"
-                  style={{ color: 'var(--color-danger)' }}
-                >
-                  *
-                </span>
-              ) : null}
-            </label>
-          ) : (
-            <span />
-          )}
+          <div className="min-w-0">
+            {label ? (
+              <label
+                htmlFor={htmlFor}
+                className="ui-text-primary text-sm font-semibold"
+              >
+                {label}
+                {required ? (
+                  <span
+                    className="ml-1"
+                    style={{ color: 'var(--color-danger)' }}
+                  >
+                    *
+                  </span>
+                ) : null}
+              </label>
+            ) : null}
+          </div>
 
           {hint ? (
-            <span className="ui-text-muted text-xs">{hint}</span>
+            <span className="ui-text-muted shrink-0 text-xs">
+              {hint}
+            </span>
           ) : null}
         </div>
       ) : null}

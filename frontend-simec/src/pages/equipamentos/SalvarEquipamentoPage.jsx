@@ -1,14 +1,20 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faMicrochip } from '@fortawesome/free-solid-svg-icons';
+import {
+  faArrowLeft,
+  faMicrochip,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { useSalvarEquipamentoPage } from '@/hooks/equipamentos/useSalvarEquipamentoPage';
 
-import EquipamentoForm from '@/components/equipamentos/EquipamentoForm';
-
-import { PageLayout, PageHeader, EmptyState } from '@/components/ui/layout';
-import LoadingState from '@/components/ui/feedback/LoadingState';
-import { Button } from '@/components/ui/primitives';
+import { EquipamentoForm } from '@/components/equipamentos';
+import {
+  Button,
+  EmptyState,
+  LoadingState,
+  PageHeader,
+  PageLayout,
+} from '@/components/ui';
 
 function SalvarEquipamentoPage() {
   const {
@@ -51,22 +57,41 @@ function SalvarEquipamentoPage() {
 
   if (loading) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title={title}
-          subtitle={subtitle}
-          icon={faMicrochip}
-          actions={actions}
-        />
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title={title}
+            subtitle={subtitle}
+            icon={faMicrochip}
+            actions={actions}
+          />
 
-        <LoadingState message="Carregando equipamento..." />
+          <LoadingState message="Carregando equipamento..." />
+        </div>
       </PageLayout>
     );
   }
 
   if (error && isEditing && !initialData) {
     return (
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title={title}
+            subtitle={subtitle}
+            icon={faMicrochip}
+            actions={actions}
+          />
+
+          <EmptyState message={error} />
+        </div>
+      </PageLayout>
+    );
+  }
+
+  return (
+    <PageLayout padded fullHeight>
+      <div className="space-y-6">
         <PageHeader
           title={title}
           subtitle={subtitle}
@@ -74,26 +99,13 @@ function SalvarEquipamentoPage() {
           actions={actions}
         />
 
-        <EmptyState message={error} />
-      </PageLayout>
-    );
-  }
-
-  return (
-    <PageLayout background="slate" padded fullHeight>
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        icon={faMicrochip}
-        actions={actions}
-      />
-
-      <EquipamentoForm
-        onSubmit={handleSave}
-        onCancel={goBackToEquipamentos}
-        initialData={initialData}
-        isEditing={isEditing}
-      />
+        <EquipamentoForm
+          onSubmit={handleSave}
+          onCancel={goBackToEquipamentos}
+          initialData={initialData}
+          isEditing={isEditing}
+        />
+      </div>
     </PageLayout>
   );
 }
