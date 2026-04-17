@@ -16,7 +16,7 @@ function PageSection({
     <Card
       className={className}
       surface="default"
-      styleOverride={{ backgroundColor: 'var(--section-surface)' }}
+      style={{ backgroundColor: 'var(--section-surface)' }}
     >
       {hasHeader ? (
         <div
