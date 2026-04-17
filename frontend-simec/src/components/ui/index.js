@@ -55,12 +55,33 @@ export {
 // =========================
 // DATA DISPLAY
 // =========================
-export * from './chat';
-export * from './data-display';
-export * from './feedback';
-export * from './filters';
-export * from './layout';
-export * from './navigation';
-export * from './overlays';
-export * from './primitives';
-export * from './uistyles';
+export {
+  ExpandableTimelineItem,
+  StatusBadge,
+  KpiCard,
+  KpiGrid,
+  InfoCard,
+  EntityCard,
+} from './data-display';
+
+// =========================
+// NAVIGATION
+// =========================
+export {
+  Breadcrumb,
+} from './navigation';
+
+// =========================
+// OVERLAYS
+// =========================
+export {
+  Drawer,
+  Modal,
+} from './overlays';
+
+// =========================
+// UI STYLES
+// =========================
+export {
+  getStatusVariant,
+} from './uistyles';
