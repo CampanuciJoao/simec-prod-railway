@@ -5,30 +5,37 @@ const variantStyles = {
   blue: {
     backgroundColor: 'var(--brand-primary-soft)',
     color: 'var(--brand-primary)',
+    border: '1px solid transparent',
   },
   orange: {
     backgroundColor: 'var(--color-warning-soft)',
     color: 'var(--color-warning)',
+    border: '1px solid transparent',
   },
   green: {
     backgroundColor: 'var(--color-success-soft)',
     color: 'var(--color-success)',
+    border: '1px solid transparent',
   },
   yellow: {
     backgroundColor: 'var(--color-warning-soft)',
     color: 'var(--color-warning)',
+    border: '1px solid transparent',
   },
   red: {
     backgroundColor: 'var(--color-danger-soft)',
     color: 'var(--color-danger)',
+    border: '1px solid transparent',
   },
   slate: {
     backgroundColor: 'var(--bg-surface-subtle)',
     color: 'var(--text-secondary)',
+    border: '1px solid transparent',
   },
   purple: {
-    backgroundColor: 'rgba(124, 58, 237, 0.14)',
-    color: '#7c3aed',
+    backgroundColor: 'var(--color-info-soft)',
+    color: 'var(--color-info)',
+    border: '1px solid transparent',
   },
   outline: {
     backgroundColor: 'transparent',
@@ -53,7 +60,16 @@ function Badge({ children, variant = 'slate', className = '' }) {
 
 Badge.propTypes = {
   children: PropTypes.node,
-  variant: PropTypes.string,
+  variant: PropTypes.oneOf([
+    'blue',
+    'orange',
+    'green',
+    'yellow',
+    'red',
+    'slate',
+    'purple',
+    'outline',
+  ]),
   className: PropTypes.string,
 };
 

@@ -1,6 +1,5 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBuilding,
   faMicrochip,
@@ -9,11 +8,12 @@ import {
   faPlus,
 } from '@fortawesome/free-solid-svg-icons';
 
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageHeader from '../../components/ui/layout/PageHeader';
-import ResponsiveGrid from '../../components/ui/layout/ResponsiveGrid';
-
-import { CadastroNavigationCard } from '../../components/shared';
+import {
+  PageHeader,
+  PageLayout,
+  ResponsiveGrid,
+} from '@/components/ui';
+import { CadastroNavigationCard } from '@/components/shared';
 
 function CadastrosGeraisPage() {
   const navigate = useNavigate();
@@ -50,25 +50,27 @@ function CadastrosGeraisPage() {
   ];
 
   return (
-    <PageLayout background="slate" padded fullHeight>
-      <PageHeader
-        title="Cadastros Gerais"
-        subtitle="Centralize os cadastros administrativos do sistema"
-        icon={faPlus}
-      />
+    <PageLayout padded fullHeight>
+      <div className="space-y-6">
+        <PageHeader
+          title="Cadastros Gerais"
+          subtitle="Centralize os cadastros administrativos do sistema"
+          icon={faPlus}
+        />
 
-      <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
-        {cadastros.map((item) => (
-          <CadastroNavigationCard
-            key={item.title}
-            icon={item.icon}
-            title={item.title}
-            description={item.description}
-            tone={item.tone}
-            onClick={() => navigate(item.path)}
-          />
-        ))}
-      </ResponsiveGrid>
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
+          {cadastros.map((item) => (
+            <CadastroNavigationCard
+              key={item.title}
+              icon={item.icon}
+              title={item.title}
+              description={item.description}
+              tone={item.tone}
+              onClick={() => navigate(item.path)}
+            />
+          ))}
+        </ResponsiveGrid>
+      </div>
     </PageLayout>
   );
 }

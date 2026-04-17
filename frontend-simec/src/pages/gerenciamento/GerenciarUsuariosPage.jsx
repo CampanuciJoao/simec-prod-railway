@@ -2,9 +2,11 @@ import React from 'react';
 
 import { useGerenciarUsuariosPage } from '@/hooks/gerenciamento/useGerenciarUsuariosPage';
 
-import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
-import PageSection from '@/components/ui/layout/PageSection';
-import PageState from '@/components/ui/feedback/PageState';
+import {
+  ModalConfirmacao,
+  PageSection,
+  PageState,
+} from '@/components/ui';
 
 import {
   UsuarioForm,
@@ -24,7 +26,7 @@ function GerenciarUsuariosPage() {
         isOpen={page.isDeleteModalOpen}
         onClose={page.closeDeleteModal}
         onConfirm={page.handleConfirmDelete}
-        title="Confirmar Exclusão"
+        title="Confirmar exclusão"
         message={`Tem certeza que deseja excluir o usuário "${page.userToDelete?.nome}"?`}
         isDestructive
       />
@@ -42,7 +44,10 @@ function GerenciarUsuariosPage() {
             initialData={page.editingUser}
           />
         ) : page.isEmpty ? (
-          <PageState isEmpty emptyMessage="Nenhum usuário encontrado." />
+          <PageState
+            isEmpty
+            emptyMessage="Nenhum usuário encontrado."
+          />
         ) : (
           <UsuariosTable
             usuarios={page.usuarios}

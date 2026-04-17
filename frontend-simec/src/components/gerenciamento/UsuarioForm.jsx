@@ -11,11 +11,16 @@ import {
 
 import { useToast } from '@/contexts/ToastContext';
 
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
-import Button from '@/components/ui/primitives/Button';
-import Card from '@/components/ui/primitives/Card';
-import Input from '@/components/ui/primitives/Input';
-import Select from '@/components/ui/primitives/Select';
+import {
+  PageSection,
+  ResponsiveGrid,
+} from '@/components/ui/layout';
+
+import {
+  Button,
+  Input,
+  Select,
+} from '@/components/ui';
 
 function UsuarioForm({
   onSubmit,
@@ -88,127 +93,91 @@ function UsuarioForm({
   };
 
   return (
-    <Card>
-      <form onSubmit={handleSubmit} className="space-y-5">
-        <div>
-          <h3 className="text-lg font-semibold text-slate-900">
-            {isEditing
-              ? `Editando Usuário: ${initialData?.nome || ''}`
-              : 'Adicionar Novo Usuário'}
-          </h3>
-
-          <p className="mt-1 text-sm text-slate-500">
-            {isEditing
-              ? 'Atualize os dados do usuário e, se quiser, defina uma nova senha.'
-              : 'Cadastre um novo usuário e defina o perfil de acesso.'}
-          </p>
-        </div>
+    <PageSection
+      title={isEditing ? 'Editar usuário' : 'Novo usuário'}
+      description="Gerencie os dados de acesso e permissões do sistema"
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
 
         <ResponsiveGrid cols={{ base: 1, md: 2 }}>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              Nome Completo *
-            </label>
-            <Input
-              type="text"
-              name="nome"
-              value={formData.nome}
-              onChange={handleChange}
-              required
-              disabled={isSubmitting}
-            />
-          </div>
+          <Input
+            label="Nome completo"
+            name="nome"
+            value={formData.nome}
+            onChange={handleChange}
+            required
+            disabled={isSubmitting}
+          />
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              Nome de Usuário (login) *
-            </label>
-            <Input
-              type="text"
-              name="username"
-              value={formData.username}
-              onChange={handleChange}
-              required
-              disabled={isSubmitting || isEditing}
-            />
-          </div>
+          <Input
+            label="Usuário (login)"
+            name="username"
+            value={formData.username}
+            onChange={handleChange}
+            required
+            disabled={isSubmitting || isEditing}
+          />
         </ResponsiveGrid>
 
         <ResponsiveGrid cols={{ base: 1, md: 2 }}>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              {isEditing ? 'Nova Senha (Opcional)' : 'Senha Inicial *'}
-            </label>
+          <div className="relative">
+            <Input
+              label={isEditing ? 'Nova senha (opcional)' : 'Senha'}
+              type={senhaVisivel ? 'text' : 'password'}
+              name="senha"
+              value={formData.senha}
+              onChange={handleChange}
+              required={!isEditing}
+              minLength={6}
+              disabled={isSubmitting}
+              className="pr-10"
+            />
 
-            <div className="relative">
-              <Input
-                type={senhaVisivel ? 'text' : 'password'}
-                name="senha"
-                value={formData.senha}
-                onChange={handleChange}
-                required={!isEditing}
-                minLength={6}
-                disabled={isSubmitting}
-                placeholder={isEditing ? 'Deixe em branco para não alterar' : ''}
-                className="pr-10"
-              />
-
-              <button
-                type="button"
-                onClick={() => setSenhaVisivel((prev) => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-700"
-                tabIndex={-1}
-              >
-                <FontAwesomeIcon icon={senhaVisivel ? faEyeSlash : faEye} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setSenhaVisivel((prev) => !prev)}
+              className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700"
+              tabIndex={-1}
+            >
+              <FontAwesomeIcon icon={senhaVisivel ? faEyeSlash : faEye} />
+            </button>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              Confirmar Senha
-            </label>
+          <div className="relative">
+            <Input
+              label="Confirmar senha"
+              type={confirmaSenhaVisivel ? 'text' : 'password'}
+              name="confirmaSenha"
+              value={formData.confirmaSenha}
+              onChange={handleChange}
+              required={!isEditing && !!formData.senha}
+              minLength={6}
+              disabled={isSubmitting}
+              className="pr-10"
+            />
 
-            <div className="relative">
-              <Input
-                type={confirmaSenhaVisivel ? 'text' : 'password'}
-                name="confirmaSenha"
-                value={formData.confirmaSenha}
-                onChange={handleChange}
-                required={!isEditing && !!formData.senha}
-                minLength={6}
-                disabled={isSubmitting}
-                className="pr-10"
-              />
-
-              <button
-                type="button"
-                onClick={() => setConfirmaSenhaVisivel((prev) => !prev)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 transition hover:text-slate-700"
-                tabIndex={-1}
-              >
-                <FontAwesomeIcon icon={confirmaSenhaVisivel ? faEyeSlash : faEye} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => setConfirmaSenhaVisivel((prev) => !prev)}
+              className="absolute right-3 top-[38px] text-slate-500 hover:text-slate-700"
+              tabIndex={-1}
+            >
+              <FontAwesomeIcon icon={confirmaSenhaVisivel ? faEyeSlash : faEye} />
+            </button>
           </div>
         </ResponsiveGrid>
 
         <div className="max-w-md">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">
-              Função (Role)
-            </label>
-
-            <Select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              disabled={isSubmitting}
-            >
-              <option value="user">Usuário Padrão</option>
-              <option value="admin">Administrador</option>
-            </Select>
-          </div>
+          <Select
+            label="Perfil de acesso"
+            name="role"
+            value={formData.role}
+            onChange={handleChange}
+            disabled={isSubmitting}
+          >
+            <option value="user">Usuário padrão</option>
+            <option value="admin">Administrador</option>
+          </Select>
         </div>
 
         <div className="flex flex-wrap gap-3">
@@ -217,8 +186,8 @@ function UsuarioForm({
             {isSubmitting
               ? 'Salvando...'
               : isEditing
-                ? 'Salvar Alterações'
-                : 'Salvar Usuário'}
+                ? 'Salvar alterações'
+                : 'Criar usuário'}
           </Button>
 
           <Button
@@ -231,8 +200,9 @@ function UsuarioForm({
             Cancelar
           </Button>
         </div>
+
       </form>
-    </Card>
+    </PageSection>
   );
 }
 

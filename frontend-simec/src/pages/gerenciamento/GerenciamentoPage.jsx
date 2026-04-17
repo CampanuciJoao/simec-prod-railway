@@ -1,38 +1,72 @@
-// src/pages/gerenciamento/GerenciamentoPage.jsx
-// CÓDIGO ATUALIZADO E MAIS SIMPLES
-
 import React from 'react';
-import { NavLink, Outlet } from 'react-router-dom';
+import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faUsersCog, faScroll } from '@fortawesome/free-solid-svg-icons';
+import {
+  faUsersCog,
+  faScroll,
+  faCogs,
+} from '@fortawesome/free-solid-svg-icons';
+
+import {
+  PageLayout,
+  PageHeader,
+  ResponsiveTabs,
+} from '@/components/ui';
 
 function GerenciamentoPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const tabs = [
+    {
+      id: 'usuarios',
+      label: 'Usuários',
+      icon: <FontAwesomeIcon icon={faUsersCog} />,
+      path: '/gerenciamento/usuarios',
+    },
+    {
+      id: 'auditoria',
+      label: 'Log de Auditoria',
+      icon: <FontAwesomeIcon icon={faScroll} />,
+      path: '/gerenciamento/auditoria',
+    },
+  ];
+
+  const activeTab =
+    tabs.find((tab) => location.pathname.startsWith(tab.path))?.id || 'usuarios';
+
+  const handleChangeTab = (tabId) => {
+    const selectedTab = tabs.find((tab) => tab.id === tabId);
+
+    if (selectedTab) {
+      navigate(selectedTab.path);
+    }
+  };
+
   return (
-    <div className="page-content-wrapper">
-      <div className="page-title-card">
-        <h1 className="page-title-internal">Gerenciamento</h1>
-      </div>
+    <PageLayout padded fullHeight>
+      <div className="space-y-6">
+        <PageHeader
+          title="Gerenciamento"
+          subtitle="Administre usuários e acompanhe os registros de auditoria do sistema"
+          icon={faCogs}
+        />
 
-      <div className="tabs-navigation">
-        <NavLink
-          to="/gerenciamento/usuarios"
-          className={({ isActive }) => `tab-button ${isActive ? 'active' : ''}`}
-        >
-          <FontAwesomeIcon icon={faUsersCog} /> Usuários
-        </NavLink>
+        <ResponsiveTabs
+          tabs={tabs.map((tab) => ({
+            id: tab.id,
+            label: tab.label,
+            icon: tab.icon,
+          }))}
+          activeTab={activeTab}
+          onChange={handleChangeTab}
+        />
 
-        <NavLink
-          to="/gerenciamento/auditoria"
-          className={({ isActive }) => `tab-button ${isActive ? 'active' : ''}`}
-        >
-          <FontAwesomeIcon icon={faScroll} /> Log de Auditoria
-        </NavLink>
+        <div className="min-w-0">
+          <Outlet />
+        </div>
       </div>
-
-      <div className="tab-content-container">
-        <Outlet />
-      </div>
-    </div>
+    </PageLayout>
   );
 }
 

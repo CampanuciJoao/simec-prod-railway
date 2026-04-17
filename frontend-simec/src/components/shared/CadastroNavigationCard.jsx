@@ -1,7 +1,31 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import Card from '../ui/primitives/Card';
+
+import { Card } from '@/components/ui';
+
+const toneStyleMap = {
+  blue: {
+    iconBg: 'var(--brand-primary-soft)',
+    iconText: 'var(--brand-primary)',
+  },
+  green: {
+    iconBg: 'var(--color-success-soft)',
+    iconText: 'var(--color-success)',
+  },
+  yellow: {
+    iconBg: 'var(--color-warning-soft)',
+    iconText: 'var(--color-warning)',
+  },
+  slate: {
+    iconBg: 'var(--bg-surface-subtle)',
+    iconText: 'var(--text-secondary)',
+  },
+  red: {
+    iconBg: 'var(--color-danger-soft)',
+    iconText: 'var(--color-danger)',
+  },
+};
 
 function CadastroNavigationCard({
   icon,
@@ -11,37 +35,48 @@ function CadastroNavigationCard({
   tone = 'blue',
   className = '',
 }) {
-  const toneMap = {
-    blue: 'bg-blue-100 text-blue-600',
-    green: 'bg-emerald-100 text-emerald-600',
-    yellow: 'bg-amber-100 text-amber-600',
-    slate: 'bg-slate-100 text-slate-600',
-    red: 'bg-red-100 text-red-600',
-  };
+  const toneStyle = toneStyleMap[tone] || toneStyleMap.blue;
 
   return (
     <button
       type="button"
       onClick={onClick}
       className={[
-        'w-full text-left transition hover:-translate-y-0.5 hover:shadow-md',
+        'w-full text-left transition hover:-translate-y-0.5',
         className,
       ].join(' ')}
     >
-      <Card className="h-full">
-        <div className="flex flex-col gap-4">
+      <Card
+        className="h-full rounded-3xl"
+        surface="default"
+        styleOverride={{
+          backgroundColor: 'var(--section-surface)',
+          borderColor: 'var(--border-soft)',
+        }}
+      >
+        <div className="flex h-full flex-col gap-4">
           <div
-            className={[
-              'inline-flex h-12 w-12 items-center justify-center rounded-2xl',
-              toneMap[tone] || toneMap.blue,
-            ].join(' ')}
+            className="inline-flex h-12 w-12 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: toneStyle.iconBg,
+              color: toneStyle.iconText,
+            }}
           >
             <FontAwesomeIcon icon={icon} />
           </div>
 
-          <div>
-            <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
-            <p className="mt-1 text-sm leading-6 text-slate-500">
+          <div className="min-w-0">
+            <h3
+              className="text-lg font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {title}
+            </h3>
+
+            <p
+              className="mt-1 text-sm leading-6"
+              style={{ color: 'var(--text-muted)' }}
+            >
               {description}
             </p>
           </div>

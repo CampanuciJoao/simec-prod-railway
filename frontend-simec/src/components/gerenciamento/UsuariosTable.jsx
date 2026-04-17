@@ -7,9 +7,12 @@ import {
   faEdit,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '@/components/ui/primitives/Button';
-import Card from '@/components/ui/primitives/Card';
-import RoleBadge from '@/components/gerenciamento/RoleBadge';
+import {
+  Button,
+  Card,
+  ListToolbar,
+} from '@/components/ui';
+import { RoleBadge } from '@/components/shared';
 
 function UsuariosTable({
   usuarios,
@@ -20,40 +23,60 @@ function UsuariosTable({
 }) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-sm font-medium text-slate-600">
-          {usuarios.length} usuário(s) encontrado(s)
-        </span>
+      <ListToolbar
+        countLabel={`${usuarios.length} usuário(s) encontrado(s)`}
+        actions={
+          <Button type="button" onClick={onCreate}>
+            <FontAwesomeIcon icon={faPlus} />
+            Novo Usuário
+          </Button>
+        }
+      />
 
-        <Button type="button" onClick={onCreate}>
-          <FontAwesomeIcon icon={faPlus} />
-          Novo Usuário
-        </Button>
-      </div>
-
-      <Card padded={false} className="overflow-hidden">
+      <Card padded={false} className="overflow-hidden rounded-3xl">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                <th className="px-4 py-3">Nome Completo</th>
-                <th className="px-4 py-3">Nome de Usuário (Login)</th>
-                <th className="px-4 py-3">Função (Role)</th>
+          <table className="min-w-full">
+            <thead
+              style={{
+                backgroundColor: 'var(--bg-surface-soft)',
+                borderBottom: '1px solid var(--border-soft)',
+              }}
+            >
+              <tr
+                className="text-left text-xs font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                <th className="px-4 py-3">Nome completo</th>
+                <th className="px-4 py-3">Nome de usuário</th>
+                <th className="px-4 py-3">Função</th>
                 <th className="px-4 py-3 text-center">Ações</th>
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody
+              style={{ backgroundColor: 'var(--bg-surface)' }}
+            >
               {usuarios.map((user) => {
                 const isSelf = usuarioLogadoId === user.id;
 
                 return (
-                  <tr key={user.id} className="hover:bg-slate-50">
-                    <td className="px-4 py-3 text-sm font-medium text-slate-800">
+                  <tr
+                    key={user.id}
+                    style={{
+                      borderBottom: '1px solid var(--border-soft)',
+                    }}
+                  >
+                    <td
+                      className="px-4 py-3 text-sm font-medium"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
                       {user.nome}
                     </td>
 
-                    <td className="px-4 py-3 text-sm text-slate-700">
+                    <td
+                      className="px-4 py-3 text-sm"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
                       {user.username}
                     </td>
 
@@ -65,24 +88,25 @@ function UsuariosTable({
                       <div className="flex items-center justify-center gap-2">
                         <Button
                           type="button"
-                          variant="ghost"
-                          title="Editar Usuário"
+                          variant="secondary"
+                          title="Editar usuário"
                           onClick={() => onEdit(user)}
+                          className="px-3"
                         >
                           <FontAwesomeIcon icon={faEdit} />
                         </Button>
 
                         <Button
                           type="button"
-                          variant="ghost"
-                          className="text-red-600 hover:text-red-700"
+                          variant="danger"
                           title={
                             isSelf
                               ? 'Não é possível excluir a si mesmo'
-                              : 'Excluir Usuário'
+                              : 'Excluir usuário'
                           }
                           onClick={() => onAskDelete(user)}
                           disabled={isSelf}
+                          className="px-3"
                         >
                           <FontAwesomeIcon icon={faTrashAlt} />
                         </Button>
