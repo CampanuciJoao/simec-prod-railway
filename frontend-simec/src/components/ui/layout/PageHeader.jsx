@@ -2,6 +2,8 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
+import Card from '@/components/ui/primitives/Card';
+
 function PageHeader({
   title,
   subtitle,
@@ -10,11 +12,10 @@ function PageHeader({
   className = '',
 }) {
   return (
-    <div
-      className={[
-        'ui-surface ui-shadow-sm ui-transition rounded-3xl border px-5 py-5 sm:px-6 sm:py-6',
-        className,
-      ].join(' ')}
+    <Card
+      className={['rounded-3xl px-5 py-5 sm:px-6 sm:py-6', className].join(' ')}
+      surface="default"
+      padded={false}
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 items-start gap-4">
@@ -31,12 +32,18 @@ function PageHeader({
           ) : null}
 
           <div className="min-w-0">
-            <h1 className="ui-text-primary text-2xl font-bold tracking-tight sm:text-3xl">
+            <h1
+              className="text-2xl font-bold tracking-tight sm:text-3xl"
+              style={{ color: 'var(--text-primary)' }}
+            >
               {title}
             </h1>
 
             {subtitle ? (
-              <p className="ui-text-muted mt-1 text-sm sm:text-base">
+              <p
+                className="mt-1 text-sm sm:text-base"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {subtitle}
               </p>
             ) : null}
@@ -49,7 +56,7 @@ function PageHeader({
           </div>
         ) : null}
       </div>
-    </div>
+    </Card>
   );
 }
 

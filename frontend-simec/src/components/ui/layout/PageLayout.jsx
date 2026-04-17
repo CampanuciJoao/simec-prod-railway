@@ -11,10 +11,11 @@ function PageLayout({
   return (
     <div
       className={[
-        'app-theme-bg ui-transition min-w-0',
+        'min-w-0 transition-colors',
         fullHeight ? 'min-h-screen' : '',
         className,
       ].join(' ')}
+      style={{ backgroundColor: 'var(--bg-app)' }}
     >
       <div
         className={[

@@ -1,5 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+
 import Card from '@/components/ui/primitives/Card';
 
 function PageSection({
@@ -16,17 +17,23 @@ function PageSection({
       {hasHeader ? (
         <div
           className="mb-5 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between"
-          style={{ borderColor: 'var(--section-header-border)' }}
+          style={{ borderColor: 'var(--section-header-border, var(--border-soft))' }}
         >
           <div className="min-w-0">
             {title ? (
-              <h2 className="ui-text-primary text-base font-semibold">
+              <h2
+                className="text-base font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {title}
               </h2>
             ) : null}
 
             {description ? (
-              <p className="ui-text-muted mt-1 text-sm">
+              <p
+                className="mt-1 text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {description}
               </p>
             ) : null}

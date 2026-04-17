@@ -1,27 +1,41 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+const surfaceStyleMap = {
+  default: {
+    backgroundColor: 'var(--bg-surface)',
+    borderColor: 'var(--border-soft)',
+  },
+  soft: {
+    backgroundColor: 'var(--bg-surface-soft)',
+    borderColor: 'var(--border-soft)',
+  },
+  subtle: {
+    backgroundColor: 'var(--bg-surface-subtle)',
+    borderColor: 'var(--border-soft)',
+  },
+  elevated: {
+    backgroundColor: 'var(--bg-elevated)',
+    borderColor: 'var(--border-soft)',
+  },
+};
+
 function Card({
   children,
   className = '',
   padded = true,
   surface = 'default',
 }) {
-  const surfaceClassMap = {
-    default: 'ui-surface',
-    soft: 'ui-surface-soft',
-    subtle: 'ui-surface-subtle',
-    elevated: 'ui-elevated',
-  };
+  const surfaceStyle = surfaceStyleMap[surface] || surfaceStyleMap.default;
 
   return (
     <div
       className={[
-        'ui-shadow-sm ui-transition rounded-2xl border',
-        surfaceClassMap[surface] || surfaceClassMap.default,
+        'rounded-2xl border shadow-sm transition-colors',
         padded ? 'p-4 md:p-5' : '',
         className,
       ].join(' ')}
+      style={surfaceStyle}
     >
       {children}
     </div>
