@@ -9,7 +9,7 @@ function StickyFooterActions({ children, className = '' }) {
         className,
       ].join(' ')}
       style={{
-        backgroundColor: 'color-mix(in srgb, var(--bg-surface) 92%, transparent)',
+        backgroundColor: 'var(--bg-elevated)',
         borderColor: 'var(--border-soft)',
       }}
     >

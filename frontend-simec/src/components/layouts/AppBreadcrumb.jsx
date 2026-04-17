@@ -10,7 +10,7 @@ function AppBreadcrumb({ items = [] }) {
       className="border-b px-4 py-3 sm:px-6"
       style={{
         borderColor: 'var(--border-soft)',
-        backgroundColor: 'var(--bg-surface-soft)',
+        backgroundColor: 'var(--bg-breadcrumb)',
       }}
     >
       <nav

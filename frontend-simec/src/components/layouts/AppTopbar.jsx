@@ -29,7 +29,7 @@ function AppTopbar({
       className="border-b px-4 py-4 sm:px-6"
       style={{
         borderColor: 'var(--border-soft)',
-        backgroundColor: 'var(--bg-surface)',
+        backgroundColor: 'var(--bg-topbar)',
         color: 'var(--text-primary)',
       }}
     >

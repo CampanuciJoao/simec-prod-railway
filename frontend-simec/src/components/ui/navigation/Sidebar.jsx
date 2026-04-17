@@ -57,9 +57,9 @@ function Sidebar({
             : '-translate-x-full lg:translate-x-0',
         ].join(' ')}
         style={{
-          backgroundColor: 'var(--bg-elevated)',
+          backgroundColor: 'var(--bg-sidebar)',
           borderColor: 'var(--border-soft)',
-          color: 'var(--text-primary)',
+          color: 'var(--text-sidebar)',
           boxShadow: 'var(--shadow-md)',
         }}
       >
@@ -69,7 +69,7 @@ function Sidebar({
             className="flex w-full items-center justify-center rounded-2xl border px-3 py-4 transition"
             onClick={onClose}
             style={{
-              backgroundColor: 'var(--bg-app)',
+              backgroundColor: 'var(--bg-sidebar-soft)',
               borderColor: 'var(--border-soft)',
             }}
           >
@@ -87,8 +87,8 @@ function Sidebar({
             aria-label="Fechar menu lateral"
             style={{
               borderColor: 'var(--border-default)',
-              backgroundColor: 'var(--bg-surface-soft)',
-              color: 'var(--text-secondary)',
+              backgroundColor: 'var(--bg-sidebar-soft)',
+              color: 'var(--text-sidebar-muted)',
             }}
           >
             <FontAwesomeIcon icon={faXmark} />

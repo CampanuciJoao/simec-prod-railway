@@ -62,10 +62,14 @@
 
   --overlay-bg: rgba(15, 23, 42, 0.44);
 
+  --button-primary-hover: #1d4ed8;
   --button-secondary-bg: #f8fafc;
   --button-secondary-hover: #e2e8f0;
   --button-secondary-text: #334155;
   --button-secondary-border: #cbd5e1;
+  --button-danger-hover: #b91c1c;
+  --button-success-hover: #047857;
+  --button-ghost-hover: rgba(15, 23, 42, 0.06);
 
   --section-header-border: #e2e8f0;
 
@@ -109,10 +113,14 @@
 
   --overlay-bg: rgba(2, 6, 23, 0.72);
 
+  --button-primary-hover: #3b82f6;
   --button-secondary-bg: #182338;
   --button-secondary-hover: #223149;
   --button-secondary-text: #d7e0ef;
   --button-secondary-border: #31445f;
+  --button-danger-hover: #ef4444;
+  --button-success-hover: #10b981;
+  --button-ghost-hover: rgba(255, 255, 255, 0.06);
 
   --section-header-border: #223149;
 

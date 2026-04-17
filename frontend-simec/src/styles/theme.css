@@ -107,3 +107,25 @@ body {
     opacity var(--transition-default),
     transform var(--transition-default);
 }
+
+.ui-button {
+  background-color: var(--button-bg);
+  color: var(--button-text);
+  border-color: var(--button-border);
+}
+
+.ui-button:hover:not(:disabled) {
+  background-color: var(--button-bg-hover);
+}
+
+.ui-button-danger:focus,
+.ui-button-danger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-ring-danger);
+}
+
+.ui-button-success:focus,
+.ui-button-success:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-ring-success);
+}

@@ -2,16 +2,11 @@ import React from 'react';
 import PropTypes from 'prop-types';
 
 const variants = {
-  primary:
-    'text-white border border-transparent',
-  secondary:
-    'border ui-transition',
-  danger:
-    'text-white border border-transparent',
-  success:
-    'text-white border border-transparent',
-  ghost:
-    'border border-transparent bg-transparent',
+  primary: 'text-white border border-transparent',
+  secondary: 'border',
+  danger: 'text-white border border-transparent ui-button-danger',
+  success: 'text-white border border-transparent ui-button-success',
+  ghost: 'border border-transparent bg-transparent',
 };
 
 const sizes = {
@@ -20,36 +15,49 @@ const sizes = {
   lg: 'h-11 px-5 text-sm',
 };
 
-function getInlineStyle(variant) {
+function getVariantStyle(variant) {
   if (variant === 'primary') {
     return {
-      backgroundColor: 'var(--brand-primary)',
+      '--button-bg': 'var(--brand-primary)',
+      '--button-bg-hover': 'var(--button-primary-hover)',
+      '--button-text': 'var(--text-inverse)',
+      '--button-border': 'transparent',
     };
   }
 
   if (variant === 'danger') {
     return {
-      backgroundColor: 'var(--color-danger)',
+      '--button-bg': 'var(--color-danger)',
+      '--button-bg-hover': 'var(--button-danger-hover)',
+      '--button-text': 'var(--text-inverse)',
+      '--button-border': 'transparent',
     };
   }
 
   if (variant === 'success') {
     return {
-      backgroundColor: 'var(--color-success)',
+      '--button-bg': 'var(--color-success)',
+      '--button-bg-hover': 'var(--button-success-hover)',
+      '--button-text': 'var(--text-inverse)',
+      '--button-border': 'transparent',
     };
   }
 
   if (variant === 'secondary') {
     return {
-      backgroundColor: 'var(--button-secondary-bg)',
-      color: 'var(--button-secondary-text)',
-      borderColor: 'var(--button-secondary-border)',
+      '--button-bg': 'var(--button-secondary-bg)',
+      '--button-bg-hover': 'var(--button-secondary-hover)',
+      '--button-text': 'var(--button-secondary-text)',
+      '--button-border': 'var(--button-secondary-border)',
     };
   }
 
   if (variant === 'ghost') {
     return {
-      color: 'var(--text-secondary)',
+      '--button-bg': 'transparent',
+      '--button-bg-hover': 'var(--button-ghost-hover)',
+      '--button-text': 'var(--text-secondary)',
+      '--button-border': 'transparent',
     };
   }
 
@@ -67,37 +75,16 @@ function Button({
   return (
     <button
       type={type}
-      style={getInlineStyle(variant)}
+      style={getVariantStyle(variant)}
       className={[
-        'inline-flex items-center justify-center gap-2 rounded-xl font-semibold',
-        'ui-transition focus:outline-none disabled:cursor-not-allowed disabled:opacity-60',
-        'hover:translate-y-[-1px]',
-        variant === 'ghost' ? 'hover:bg-black/5 dark:hover:bg-white/5' : '',
+        'ui-button inline-flex items-center justify-center gap-2 rounded-xl font-semibold',
+        'ui-transition ui-brand-ring disabled:cursor-not-allowed disabled:opacity-60',
+        'hover:-translate-y-[1px]',
         sizes[size],
         variants[variant],
         className,
       ].join(' ')}
       {...props}
-      onMouseEnter={(e) => {
-        if (variant === 'primary') {
-          e.currentTarget.style.backgroundColor = 'var(--brand-primary-hover)';
-        }
-        if (variant === 'secondary') {
-          e.currentTarget.style.backgroundColor = 'var(--button-secondary-hover)';
-        }
-        if (variant === 'danger') {
-          e.currentTarget.style.filter = 'brightness(0.95)';
-        }
-        if (variant === 'success') {
-          e.currentTarget.style.filter = 'brightness(0.95)';
-        }
-        props.onMouseEnter?.(e);
-      }}
-      onMouseLeave={(e) => {
-        Object.assign(e.currentTarget.style, getInlineStyle(variant));
-        e.currentTarget.style.filter = '';
-        props.onMouseLeave?.(e);
-      }}
     >
       {children}
     </button>
@@ -107,7 +94,13 @@ function Button({
 Button.propTypes = {
   children: PropTypes.node,
   type: PropTypes.oneOf(['button', 'submit', 'reset']),
-  variant: PropTypes.oneOf(['primary', 'secondary', 'danger', 'success', 'ghost']),
+  variant: PropTypes.oneOf([
+    'primary',
+    'secondary',
+    'danger',
+    'success',
+    'ghost',
+  ]),
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   className: PropTypes.string,
 };
