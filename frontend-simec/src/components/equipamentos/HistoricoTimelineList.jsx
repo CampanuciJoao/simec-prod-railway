@@ -1,4 +1,5 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -11,6 +12,11 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
+  Button,
+  Card,
+} from '@/components/ui';
+
+import {
   getCategoriaBadgeClass,
   getTimelineBorderClass,
   getTimelineIconClass,
@@ -21,7 +27,7 @@ const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
 
 function HistoricoTimelineList({
-  linhaDoTempo,
+  linhaDoTempo = [],
   itensExpandidos,
   onToggleExpandir,
 }) {
@@ -31,23 +37,28 @@ function HistoricoTimelineList({
         const expandido = itensExpandidos.has(item.uniqueId);
 
         return (
-          <div
+          <Card
             key={item.uniqueId}
+            padded={false}
             className={[
-              'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm',
-              'border-l-[8px]',
+              'overflow-hidden rounded-3xl border border-l-[8px] shadow-sm',
               getTimelineBorderClass(item),
             ].join(' ')}
+            surface="default"
+            styleOverride={{
+              backgroundColor: 'var(--section-surface)',
+              borderColor: 'var(--border-soft)',
+            }}
           >
             <button
               type="button"
               onClick={() => onToggleExpandir(item.uniqueId)}
-              className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left hover:bg-slate-50"
+              className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition-colors hover:bg-black/0"
             >
               <div className="flex min-w-0 items-start gap-4">
                 <span
                   className={[
-                    'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                    'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl',
                     getTimelineIconClass(item),
                   ].join(' ')}
                 >
@@ -56,7 +67,10 @@ function HistoricoTimelineList({
 
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h4 className="text-sm font-bold text-slate-900">
+                    <h4
+                      className="text-sm font-bold"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
                       {item.chamado
                         ? `${item.titulo} • Chamado: ${item.chamado}`
                         : item.titulo}
@@ -67,7 +81,10 @@ function HistoricoTimelineList({
                     </span>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                  <div
+                    className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
                     <span>{formatarDataHora(item.data)}</span>
                     <span>Responsável: {item.responsavel}</span>
                     <span>Status: {item.status}</span>
@@ -75,7 +92,10 @@ function HistoricoTimelineList({
                 </div>
               </div>
 
-              <span className="shrink-0 pt-1 text-slate-400">
+              <span
+                className="shrink-0 pt-1"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 <FontAwesomeIcon
                   icon={expandido ? faChevronUp : faChevronDown}
                 />
@@ -83,57 +103,103 @@ function HistoricoTimelineList({
             </button>
 
             {expandido ? (
-              <div className="border-t border-slate-100 bg-slate-50/40 px-5 py-5">
+              <div
+                className="px-5 py-5"
+                style={{
+                  borderTop: '1px solid var(--section-header-border)',
+                  backgroundColor: 'var(--bg-surface-soft)',
+                }}
+              >
                 <div className="space-y-4">
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                  <Card
+                    className="rounded-2xl"
+                    surface="default"
+                  >
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
                       Descrição
                     </span>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                    <p
+                      className="mt-2 text-sm leading-6"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
                       {item.descricao || 'Sem detalhes informados.'}
                     </p>
-                  </div>
+                  </Card>
 
-                  <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                  <Card
+                    className="rounded-2xl"
+                    surface="default"
+                  >
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
                       Responsável
                     </span>
-                    <p className="mt-2 text-sm font-medium text-slate-800">
+                    <p
+                      className="mt-2 text-sm font-medium"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
                       {item.responsavel}
                     </p>
-                  </div>
+                  </Card>
 
                   {item.solucao ? (
-                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+                    <Card
+                      className="rounded-2xl"
+                      surface="soft"
+                      styleOverride={{
+                        borderColor: 'var(--color-success-soft)',
+                        backgroundColor: 'var(--color-success-soft)',
+                      }}
+                    >
+                      <span
+                        className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                        style={{ color: 'var(--color-success)' }}
+                      >
                         Solução técnica
                       </span>
-                      <p className="mt-2 text-sm font-medium leading-6 text-emerald-800">
+                      <p
+                        className="mt-2 text-sm font-medium leading-6"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
                         {item.solucao}
                       </p>
-                    </div>
+                    </Card>
                   ) : null}
 
                   {item.isOS ? (
                     <div className="flex flex-wrap gap-2">
-                      <Link
-                        to={`/manutencoes/${item.idOriginal}`}
-                        className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => {
+                          window.location.href = `/manutencoes/${item.idOriginal}`;
+                        }}
                       >
                         <FontAwesomeIcon icon={faExternalLinkAlt} />
                         <span>Abrir manutenção</span>
-                      </Link>
+                      </Button>
                     </div>
                   ) : null}
 
                   {item.isOS && item.anexos?.length > 0 ? (
-                    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                    <Card
+                      className="rounded-2xl"
+                      surface="default"
+                    >
                       <div className="mb-3 flex items-center gap-2">
                         <FontAwesomeIcon
                           icon={faPaperclip}
-                          className="text-slate-400"
+                          style={{ color: 'var(--text-muted)' }}
                         />
-                        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+                        <span
+                          className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
                           Documentos
                         </span>
                       </div>
@@ -145,23 +211,55 @@ function HistoricoTimelineList({
                             href={`${API_BASE_URL}/${file.path}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="inline-flex w-fit items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-blue-600 no-underline transition hover:bg-slate-100 hover:underline"
+                            className="inline-flex w-fit items-center gap-2 rounded-xl border px-3 py-2 text-xs font-semibold no-underline transition hover:underline"
+                            style={{
+                              borderColor: 'var(--border-soft)',
+                              backgroundColor: 'var(--bg-surface-soft)',
+                              color: 'var(--brand-primary)',
+                            }}
                           >
                             <FontAwesomeIcon icon={faFileDownload} />
                             <span>{file.nomeOriginal}</span>
                           </a>
                         ))}
                       </div>
-                    </div>
+                    </Card>
                   ) : null}
                 </div>
               </div>
             ) : null}
-          </div>
+          </Card>
         );
       })}
     </div>
   );
 }
+
+HistoricoTimelineList.propTypes = {
+  linhaDoTempo: PropTypes.arrayOf(
+    PropTypes.shape({
+      uniqueId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+      titulo: PropTypes.string,
+      chamado: PropTypes.string,
+      categoria: PropTypes.string,
+      data: PropTypes.any,
+      responsavel: PropTypes.string,
+      status: PropTypes.string,
+      descricao: PropTypes.string,
+      solucao: PropTypes.string,
+      isOS: PropTypes.bool,
+      idOriginal: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+      anexos: PropTypes.arrayOf(
+        PropTypes.shape({
+          id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+          path: PropTypes.string,
+          nomeOriginal: PropTypes.string,
+        })
+      ),
+    })
+  ),
+  itensExpandidos: PropTypes.instanceOf(Set).isRequired,
+  onToggleExpandir: PropTypes.func.isRequired,
+};
 
 export default HistoricoTimelineList;

@@ -9,30 +9,34 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { formatarDataHora } from '@/utils/timeUtils';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Badge,
+  Button,
+  Card,
+} from '@/components/ui';
 import FichaTecnicaResolveForm from '@/components/equipamentos/ficha-tecnica/FichaTecnicaResolveForm';
 
-function getGravidadeBadgeClass(gravidade) {
+function getGravidadeBadgeVariant(gravidade) {
   const valor = String(gravidade || '').toLowerCase();
 
-  if (valor === 'alta') return 'border-red-200 bg-red-100 text-red-700';
-  if (valor === 'media') return 'border-amber-200 bg-amber-100 text-amber-700';
-  if (valor === 'baixa') return 'border-emerald-200 bg-emerald-100 text-emerald-700';
+  if (valor === 'alta') return 'red';
+  if (valor === 'media') return 'yellow';
+  if (valor === 'baixa') return 'green';
 
-  return 'border-slate-200 bg-slate-100 text-slate-700';
+  return 'slate';
 }
 
-function Badge({ children, className = '' }) {
-  return (
-    <span
-      className={[
-        'inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold',
-        className,
-      ].join(' ')}
-    >
-      {children}
-    </span>
-  );
+function getOrigemBadgeVariant(origem) {
+  const valor = String(origem || '').toLowerCase();
+
+  if (valor === 'agente') return 'purple';
+  if (valor === 'sistema') return 'blue';
+
+  return 'slate';
+}
+
+function getStatusBadgeVariant(resolvido) {
+  return resolvido ? 'green' : 'red';
 }
 
 function FichaTecnicaTimelineItem({
@@ -48,19 +52,27 @@ function FichaTecnicaTimelineItem({
   onSalvarSolucao,
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card
+      padded={false}
+      className="overflow-hidden rounded-2xl"
+      surface="default"
+    >
       <button
         type="button"
-        className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left hover:bg-slate-50"
+        className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
         onClick={onToggle}
       >
         <div className="flex min-w-0 items-start gap-3">
           <span
-            className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-              item.resolvido
-                ? 'bg-emerald-100 text-emerald-600'
-                : 'bg-red-100 text-red-600'
-            }`}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+            style={{
+              backgroundColor: item.resolvido
+                ? 'var(--color-success-soft)'
+                : 'var(--color-danger-soft)',
+              color: item.resolvido
+                ? 'var(--color-success)'
+                : 'var(--color-danger)',
+            }}
           >
             <FontAwesomeIcon
               icon={item.resolvido ? faCheckCircle : faExclamationTriangle}
@@ -69,71 +81,123 @@ function FichaTecnicaTimelineItem({
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-slate-900">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {item.titulo}
               </p>
 
-              <Badge className="border-slate-200 bg-slate-100 text-slate-700">
+              <Badge variant="slate">
                 {item.tipo}
               </Badge>
 
-              <Badge className={getGravidadeBadgeClass(item.gravidade)}>
+              <Badge variant={getGravidadeBadgeVariant(item.gravidade)}>
                 {item.gravidade || 'media'}
               </Badge>
 
-              <Badge className="border-blue-200 bg-blue-100 text-blue-700">
+              <Badge variant={getOrigemBadgeVariant(item.origem)}>
                 {item.origem || 'usuario'}
+              </Badge>
+
+              <Badge variant={getStatusBadgeVariant(item.resolvido)}>
+                {item.resolvido ? 'Resolvido' : 'Pendente'}
               </Badge>
             </div>
 
-            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+            <div
+              className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs"
+              style={{ color: 'var(--text-muted)' }}
+            >
               <span>{formatarDataHora(item.data)}</span>
               <span>Técnico: {item.tecnico || 'N/A'}</span>
-              <span>Status: {item.resolvido ? 'Resolvido' : 'Pendente'}</span>
             </div>
           </div>
         </div>
 
-        <span className="pt-1 text-slate-400">
+        <span
+          className="pt-1"
+          style={{ color: 'var(--text-muted)' }}
+        >
           <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} />
         </span>
       </button>
 
       {expandido ? (
-        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-4">
+        <div
+          className="px-4 py-4"
+          style={{
+            borderTop: '1px solid var(--section-header-border)',
+            backgroundColor: 'var(--bg-surface-soft)',
+          }}
+        >
           <div className="space-y-4">
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+            <Card className="rounded-xl" surface="default">
+              <span
+                className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Descrição
               </span>
-              <p className="mt-2 text-sm text-slate-700">
+              <p
+                className="mt-2 text-sm"
+                style={{ color: 'var(--text-secondary)' }}
+              >
                 {item.descricao || 'Sem descrição.'}
               </p>
-            </div>
+            </Card>
 
             {item.metadata ? (
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+              <Card className="rounded-xl" surface="default">
+                <span
+                  className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   Metadata
                 </span>
-                <pre className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
+
+                <pre
+                  className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg p-3 text-xs"
+                  style={{
+                    backgroundColor: 'var(--bg-surface-soft)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
 {JSON.stringify(item.metadata, null, 2)}
                 </pre>
-              </div>
+              </Card>
             ) : null}
 
             {item.resolvido ? (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 shadow-sm">
-                <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-emerald-700">
+              <Card
+                className="rounded-xl"
+                surface="soft"
+                styleOverride={{
+                  borderColor: 'var(--color-success-soft)',
+                  backgroundColor: 'var(--color-success-soft)',
+                }}
+              >
+                <span
+                  className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                  style={{ color: 'var(--color-success)' }}
+                >
                   Solução
                 </span>
-                <p className="mt-2 text-sm text-emerald-800">
+
+                <p
+                  className="mt-2 text-sm"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {item.solucao}
                 </p>
-                <p className="mt-2 text-xs text-emerald-700">
+
+                <p
+                  className="mt-2 text-xs"
+                  style={{ color: 'var(--color-success)' }}
+                >
                   Técnico de resolução: {item.tecnicoResolucao || 'N/A'}
                 </p>
-              </div>
+              </Card>
             ) : isResolvendo ? (
               <FichaTecnicaResolveForm
                 payload={payloadSolucao}
@@ -152,7 +216,7 @@ function FichaTecnicaTimelineItem({
           </div>
         </div>
       ) : null}
-    </div>
+    </Card>
   );
 }
 

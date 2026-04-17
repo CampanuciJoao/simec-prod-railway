@@ -6,25 +6,12 @@ import { faInfoCircle, faEdit } from '@fortawesome/free-solid-svg-icons';
 import { formatarData } from '@/utils/timeUtils';
 
 import {
-  PageSection,
-  Button,
-} from '@/components/ui';
-
-import {
-  EntityInfoGrid,
   ActionBar,
-} from '@/components/ui/layout';
-
-function getStatusBadgeClass(status) {
-  const normalized = String(status || '').toLowerCase();
-
-  if (normalized === 'operante') return 'badge badge-green';
-  if (normalized === 'inoperante') return 'badge badge-red';
-  if (normalized === 'emmanutencao') return 'badge badge-yellow';
-  if (normalized === 'usolimitado') return 'badge badge-blue';
-
-  return 'badge badge-slate';
-}
+  Button,
+  EntityInfoGrid,
+  PageSection,
+  StatusBadge,
+} from '@/components/ui';
 
 function TabCadastro({ equipamentoInicial }) {
   const navigate = useNavigate();
@@ -42,11 +29,7 @@ function TabCadastro({ equipamentoInicial }) {
     {
       key: 'status',
       label: 'Status',
-      value: (
-        <span className={getStatusBadgeClass(equipamentoInicial.status)}>
-          {equipamentoInicial.status || 'N/A'}
-        </span>
-      ),
+      value: <StatusBadge value={equipamentoInicial.status || 'N/A'} />,
     },
     {
       key: 'fabricante',
@@ -84,39 +67,52 @@ function TabCadastro({ equipamentoInicial }) {
   return (
     <PageSection
       title="Informações do Cadastro"
-      description="Dados principais do equipamento cadastrado no sistema"
+      description="Dados principais do equipamento cadastrado no sistema."
     >
-      <div className="mb-5 flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-          <FontAwesomeIcon icon={faInfoCircle} />
-        </span>
-
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            Cadastro principal do ativo
-          </p>
-          <p className="text-sm text-slate-500">
-            Informações administrativas e técnicas do equipamento
-          </p>
-        </div>
-      </div>
-
-      <ActionBar
-        className="mb-5"
-        right={
-          <Button
-            type="button"
-            onClick={() =>
-              navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
-            }
+      <div className="space-y-5">
+        <div className="flex items-start gap-3">
+          <span
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: 'var(--brand-primary-soft)',
+              color: 'var(--brand-primary)',
+            }}
           >
-            <FontAwesomeIcon icon={faEdit} />
-            Editar
-          </Button>
-        }
-      />
+            <FontAwesomeIcon icon={faInfoCircle} />
+          </span>
 
-      <EntityInfoGrid items={items} />
+          <div className="min-w-0">
+            <p
+              className="text-sm font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Cadastro principal do ativo
+            </p>
+            <p
+              className="text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Informações administrativas e técnicas do equipamento.
+            </p>
+          </div>
+        </div>
+
+        <ActionBar
+          right={
+            <Button
+              type="button"
+              onClick={() =>
+                navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
+              }
+            >
+              <FontAwesomeIcon icon={faEdit} />
+              Editar
+            </Button>
+          }
+        />
+
+        <EntityInfoGrid items={items} />
+      </div>
     </PageSection>
   );
 }

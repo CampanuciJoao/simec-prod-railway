@@ -12,6 +12,8 @@ import AcessorioForm from '@/components/equipamentos/AcessorioForm';
 import AcessoriosList from '@/components/equipamentos/AcessoriosList';
 
 import {
+  Button,
+  Card,
   ModalConfirmacao,
   PageSection,
 } from '@/components/ui';
@@ -78,59 +80,75 @@ function TabAcessorios({ equipamentoId }) {
 
       <PageSection
         title="Acessórios"
-        description="Gerencie os acessórios vinculados ao equipamento"
+        description="Gerencie os acessórios vinculados ao equipamento."
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <FontAwesomeIcon icon={faHdd} />
-          </span>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Acessórios associados
-            </p>
-            <p className="text-sm text-slate-500">
-              Inclua e mantenha os itens complementares do equipamento
-            </p>
-          </div>
-        </div>
-
-        {!showForm && (
-          <div className="mb-5">
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleAddNewClick}
-              disabled={submitting}
+        <div className="space-y-5">
+          <div className="flex items-start gap-3">
+            <span
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: 'var(--brand-primary-soft)',
+                color: 'var(--brand-primary)',
+              }}
             >
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Adicionar</span>
-            </button>
-          </div>
-        )}
+              <FontAwesomeIcon icon={faHdd} />
+            </span>
 
-        {showForm && (
-          <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-            <AcessorioForm
-              key={editingAcessorio ? editingAcessorio.id : 'novo'}
-              initialData={editingAcessorio}
-              isEditing={!!editingAcessorio}
-              isSubmitting={submitting}
-              onSubmit={handleFormSubmit}
-              onCancel={handleCancelForm}
-              error={error}
-            />
+            <div className="min-w-0">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Acessórios associados
+              </p>
+              <p
+                className="text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Inclua e mantenha os itens complementares do equipamento.
+              </p>
+            </div>
           </div>
-        )}
 
-        <AcessoriosList
-          acessorios={acessorios}
-          loading={loading}
-          submitting={submitting}
-          showForm={showForm}
-          onEdit={handleEditClick}
-          onDelete={openModal}
-        />
+          {!showForm ? (
+            <div>
+              <Button
+                type="button"
+                onClick={handleAddNewClick}
+                disabled={submitting}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+                <span>Adicionar acessório</span>
+              </Button>
+            </div>
+          ) : null}
+
+          {showForm ? (
+            <Card
+              surface="soft"
+              className="rounded-2xl"
+            >
+              <AcessorioForm
+                key={editingAcessorio ? editingAcessorio.id : 'novo'}
+                initialData={editingAcessorio}
+                isEditing={!!editingAcessorio}
+                isSubmitting={submitting}
+                onSubmit={handleFormSubmit}
+                onCancel={handleCancelForm}
+                error={error}
+              />
+            </Card>
+          ) : null}
+
+          <AcessoriosList
+            acessorios={acessorios}
+            loading={loading}
+            submitting={submitting}
+            showForm={showForm}
+            onEdit={handleEditClick}
+            onDelete={openModal}
+          />
+        </div>
       </PageSection>
     </>
   );

@@ -20,11 +20,13 @@ import { buildHistoricoTimeline } from '@/utils/equipamentos/historicoTimelineUt
 import HistoricoTimelineList from '@/components/equipamentos/HistoricoTimelineList';
 
 import {
-  PageSection,
   Button,
+  Card,
   DateInput,
-  LoadingState,
   EmptyState,
+  LoadingState,
+  PageSection,
+  Select,
 } from '@/components/ui';
 
 function TabHistorico({ equipamento }) {
@@ -121,139 +123,173 @@ function TabHistorico({ equipamento }) {
   return (
     <PageSection
       title="Histórico do equipamento"
-      description="Auditoria consolidada de manutenções e ocorrências"
+      description="Auditoria consolidada de manutenções e ocorrências."
     >
-      <div className="mb-5 flex items-center gap-3">
-        <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-          <FontAwesomeIcon icon={faHistory} />
-        </span>
+      <div className="space-y-5">
+        <div className="flex items-start gap-3">
+          <span
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: 'var(--brand-primary-soft)',
+              color: 'var(--brand-primary)',
+            }}
+          >
+            <FontAwesomeIcon icon={faHistory} />
+          </span>
 
-        <div>
-          <p className="text-sm font-semibold text-slate-900">
-            Linha do tempo operacional
-          </p>
-          <p className="text-sm text-slate-500">
-            Consulte eventos, ordens de serviço e registros associados
-          </p>
-        </div>
-      </div>
-
-      <div className="mb-5 flex justify-end">
-        <Button
-          type="button"
-          variant="danger"
-          onClick={handleExportarPDF}
-          disabled={linhaDoTempo.length === 0}
-        >
-          <FontAwesomeIcon icon={faFilePdf} />
-          Exportar PDF filtrado
-        </Button>
-      </div>
-
-      <div className="mb-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-              Tipo de registro
-            </label>
-            <select
-              value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className="select"
+          <div className="min-w-0">
+            <p
+              className="text-sm font-semibold"
+              style={{ color: 'var(--text-primary)' }}
             >
-              <option value="Todos">Todos os registros</option>
-              <option value="Preventiva">Apenas preventivas</option>
-              <option value="Corretiva">Apenas corretivas</option>
-              <option value="Evento">Apenas ocorrências</option>
-            </select>
+              Linha do tempo operacional
+            </p>
+            <p
+              className="text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Consulte eventos, ordens de serviço e registros associados.
+            </p>
           </div>
+        </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-              Início
-            </label>
-            <div className="flex gap-2">
-              <DateInput
-                value={dataInicio}
-                onChange={(e) => setDataInicio(e.target.value)}
-                className="input"
-              />
-              <button
-                type="button"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                onClick={() => handleSetHoje('inicio')}
-                title="Definir hoje"
-              >
-                <FontAwesomeIcon icon={faCalendarDay} />
-              </button>
+        <div className="flex justify-end">
+          <Button
+            type="button"
+            variant="danger"
+            onClick={handleExportarPDF}
+            disabled={linhaDoTempo.length === 0}
+          >
+            <FontAwesomeIcon icon={faFilePdf} />
+            Exportar PDF filtrado
+          </Button>
+        </div>
+
+        <Card surface="soft" className="rounded-2xl">
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="min-w-0">
+                <Select
+                  label="Tipo de registro"
+                  value={filtroTipo}
+                  onChange={(e) => setFiltroTipo(e.target.value)}
+                >
+                  <option value="Todos">Todos os registros</option>
+                  <option value="Preventiva">Apenas preventivas</option>
+                  <option value="Corretiva">Apenas corretivas</option>
+                  <option value="Evento">Apenas ocorrências</option>
+                </Select>
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <DateInput
+                      label="Início"
+                      value={dataInicio}
+                      onChange={(e) => setDataInicio(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="px-3"
+                      onClick={() => handleSetHoje('inicio')}
+                      title="Definir hoje"
+                    >
+                      <FontAwesomeIcon icon={faCalendarDay} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex gap-2">
+                  <div className="min-w-0 flex-1">
+                    <DateInput
+                      label="Fim"
+                      value={dataFim}
+                      onChange={(e) => setDataFim(e.target.value)}
+                    />
+                  </div>
+
+                  <div className="flex items-end">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="px-3"
+                      onClick={() => handleSetHoje('fim')}
+                      title="Definir hoje"
+                    >
+                      <FontAwesomeIcon icon={faCalendarDay} />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-end justify-end">
+                {temFiltroAtivo ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleLimparFiltros}
+                  >
+                    <FontAwesomeIcon icon={faRotateLeft} />
+                    Limpar filtros
+                  </Button>
+                ) : null}
+              </div>
             </div>
-          </div>
 
-          <div className="flex flex-col gap-1">
-            <label className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
-              Fim
-            </label>
-            <div className="flex gap-2">
-              <DateInput
-                value={dataFim}
-                onChange={(e) => setDataFim(e.target.value)}
-                className="input"
-              />
-              <button
-                type="button"
-                className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 hover:bg-slate-100"
-                onClick={() => handleSetHoje('fim')}
-                title="Definir hoje"
+            {!temFiltroAtivo && totalSemFiltro > 20 ? (
+              <div
+                className="flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
+                style={{
+                  borderColor: 'var(--brand-primary-soft)',
+                  backgroundColor: 'var(--brand-primary-soft)',
+                  color: 'var(--text-primary)',
+                }}
               >
-                <FontAwesomeIcon icon={faCalendarDay} />
-              </button>
-            </div>
-          </div>
+                <FontAwesomeIcon
+                  icon={faFilter}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: 'var(--brand-primary)' }}
+                />
 
-          <div className="flex items-end justify-end">
-            {temFiltroAtivo ? (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleLimparFiltros}
-              >
-                <FontAwesomeIcon icon={faRotateLeft} />
-                Limpar filtros
-              </Button>
+                <div>
+                  Exibindo os <strong>20 registros mais recentes</strong> de um
+                  total de <strong>{` ${totalSemFiltro}`}</strong>. Use os filtros
+                  para visualizar todo o histórico.
+                </div>
+              </div>
             ) : null}
           </div>
-        </div>
+        </Card>
 
-        {!temFiltroAtivo && totalSemFiltro > 20 ? (
-          <div className="mt-4 flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
-            <FontAwesomeIcon icon={faFilter} className="mt-0.5" />
-            <div>
-              Exibindo os <strong>20 registros mais recentes</strong> de um total
-              de <strong> {totalSemFiltro}</strong>. Use os filtros para
-              visualizar todo o histórico.
-            </div>
+        {loading ? (
+          <LoadingState message="Carregando histórico..." />
+        ) : linhaDoTempo.length === 0 ? (
+          <EmptyState message="Nenhum registro encontrado para os filtros selecionados." />
+        ) : (
+          <HistoricoTimelineList
+            linhaDoTempo={linhaDoTempo}
+            itensExpandidos={itensExpandidos}
+            onToggleExpandir={toggleExpandir}
+          />
+        )}
+
+        {!loading && linhaDoTempo.length > 0 ? (
+          <div
+            className="text-right text-xs"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Exibindo <strong>{linhaDoTempo.length}</strong> de{' '}
+            <strong>{totalFiltrado}</strong> registro(s) filtrado(s).
           </div>
         ) : null}
       </div>
-
-      {loading ? (
-        <LoadingState message="Carregando histórico..." />
-      ) : linhaDoTempo.length === 0 ? (
-        <EmptyState message="Nenhum registro encontrado para os filtros selecionados." />
-      ) : (
-        <HistoricoTimelineList
-          linhaDoTempo={linhaDoTempo}
-          itensExpandidos={itensExpandidos}
-          onToggleExpandir={toggleExpandir}
-        />
-      )}
-
-      {!loading && linhaDoTempo.length > 0 ? (
-        <div className="mt-4 text-right text-xs text-slate-500">
-          Exibindo <strong>{linhaDoTempo.length}</strong> de{' '}
-          <strong>{totalFiltrado}</strong> registro(s) filtrado(s).
-        </div>
-      ) : null}
     </PageSection>
   );
 }

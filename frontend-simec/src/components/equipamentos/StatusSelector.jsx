@@ -1,10 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faChevronDown } from '@fortawesome/free-solid-svg-icons';
+import {
+  faSpinner,
+  faChevronDown,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { useToast } from '@/contexts/ToastContext';
 import { updateEquipamento } from '@/services/api';
+import { Select } from '@/components/ui';
 import { getStatusBadgeVariant } from '@/components/ui/uistyles/statusStyles';
 
 const STATUS_OPTIONS = [
@@ -14,23 +18,50 @@ const STATUS_OPTIONS = [
   'EmManutencao',
 ];
 
-const STATUS_SELECT_STYLES = {
-  green:
-    'border-emerald-200 bg-emerald-50 text-emerald-700 focus:border-emerald-400 focus:ring-emerald-100',
-  red:
-    'border-red-200 bg-red-50 text-red-700 focus:border-red-400 focus:ring-red-100',
-  yellow:
-    'border-amber-200 bg-amber-50 text-amber-700 focus:border-amber-400 focus:ring-amber-100',
-  blue:
-    'border-blue-200 bg-blue-50 text-blue-700 focus:border-blue-400 focus:ring-blue-100',
-  slate:
-    'border-slate-200 bg-slate-50 text-slate-700 focus:border-slate-400 focus:ring-slate-100',
-};
-
 const formatarStatusParaDisplay = (status) => {
   if (!status) return '';
   return String(status).replace(/([A-Z])/g, ' $1').trim();
 };
+
+function getStatusSelectStyle(variant) {
+  switch (variant) {
+    case 'green':
+      return {
+        backgroundColor: 'var(--color-success-soft)',
+        borderColor: 'var(--color-success-soft)',
+        color: 'var(--color-success)',
+      };
+
+    case 'red':
+      return {
+        backgroundColor: 'var(--color-danger-soft)',
+        borderColor: 'var(--color-danger-soft)',
+        color: 'var(--color-danger)',
+      };
+
+    case 'yellow':
+    case 'orange':
+      return {
+        backgroundColor: 'var(--color-warning-soft)',
+        borderColor: 'var(--color-warning-soft)',
+        color: 'var(--color-warning)',
+      };
+
+    case 'blue':
+      return {
+        backgroundColor: 'var(--brand-primary-soft)',
+        borderColor: 'var(--brand-primary-soft)',
+        color: 'var(--brand-primary)',
+      };
+
+    default:
+      return {
+        backgroundColor: 'var(--bg-surface-soft)',
+        borderColor: 'var(--border-soft)',
+        color: 'var(--text-secondary)',
+      };
+  }
+}
 
 function StatusSelector({ equipamento, onSuccessUpdate }) {
   const [currentStatus, setCurrentStatus] = useState(equipamento.status);
@@ -42,11 +73,13 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     [currentStatus]
   );
 
-  const colorClass =
-    STATUS_SELECT_STYLES[variant] || STATUS_SELECT_STYLES.slate;
+  const selectStyle = useMemo(
+    () => getStatusSelectStyle(variant),
+    [variant]
+  );
 
-  const handleSelectChange = async (e) => {
-    const novoStatus = e.target.value;
+  const handleSelectChange = async (event) => {
+    const novoStatus = event.target.value;
     const statusAnterior = currentStatus;
 
     setIsUpdating(true);
@@ -62,6 +95,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
       addToast(`Status de "${equipamento.modelo}" atualizado!`, 'success');
     } catch (error) {
       setCurrentStatus(statusAnterior);
+
       addToast(
         error?.response?.data?.message || 'Erro ao atualizar status.',
         'error'
@@ -73,24 +107,34 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
 
   return (
     <div
-      className="relative inline-flex w-full min-w-[140px] max-w-[200px] items-center"
-      onClick={(e) => e.stopPropagation()}
+      className="relative inline-flex w-full min-w-[140px] max-w-[220px] items-center"
+      onClick={(event) => event.stopPropagation()}
     >
-      {isUpdating && (
-        <span className="pointer-events-none absolute right-8 z-10 text-[11px] text-slate-400">
+      {isUpdating ? (
+        <span
+          className="pointer-events-none absolute right-8 z-[2] text-[11px]"
+          style={{ color: 'var(--text-muted)' }}
+        >
           <FontAwesomeIcon icon={faSpinner} spin />
         </span>
-      )}
+      ) : null}
 
-      <select
+      <span
+        className="pointer-events-none absolute right-3 z-[1] text-[10px] opacity-70"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        <FontAwesomeIcon icon={faChevronDown} />
+      </span>
+
+      <Select
         value={currentStatus}
         onChange={handleSelectChange}
         disabled={isUpdating}
-        className={[
-          'w-full appearance-none rounded-xl border px-3 py-2 pr-8 text-sm font-semibold leading-none outline-none transition',
-          'focus:ring-4 disabled:cursor-not-allowed disabled:opacity-60',
-          colorClass,
-        ].join(' ')}
+        className="pr-8"
+        style={{
+          ...selectStyle,
+          boxShadow: 'none',
+        }}
         aria-label={`Alterar status de ${equipamento.modelo}`}
       >
         {STATUS_OPTIONS.map((statusValue) => (
@@ -98,11 +142,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
             {formatarStatusParaDisplay(statusValue)}
           </option>
         ))}
-      </select>
-
-      <span className="pointer-events-none absolute right-2.5 text-[10px] opacity-70">
-        <FontAwesomeIcon icon={faChevronDown} />
-      </span>
+      </Select>
     </div>
   );
 }

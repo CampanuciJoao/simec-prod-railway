@@ -1,8 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import PageSection from '@/components/ui/layout/PageSection';
-import PageState from '@/components/ui/feedback/PageState';
+import {
+  PageSection,
+  PageState,
+} from '@/components/ui';
 import FichaTecnicaTimelineItem from '@/components/equipamentos/ficha-tecnica/FichaTecnicaTimelineItem';
 
 function FichaTecnicaTimeline({

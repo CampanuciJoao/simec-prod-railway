@@ -102,59 +102,80 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
 
       <PageSection
         title={`Anexos (${anexos.length})`}
-        description="Documentos vinculados ao equipamento"
+        description="Documentos vinculados ao equipamento."
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <FontAwesomeIcon icon={faPaperclip} />
-          </span>
+        <div className="space-y-5">
+          <div className="flex items-start gap-3">
+            <span
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: 'var(--brand-primary-soft)',
+                color: 'var(--brand-primary)',
+              }}
+            >
+              <FontAwesomeIcon icon={faPaperclip} />
+            </span>
 
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Arquivos do equipamento
-            </p>
-            <p className="text-sm text-slate-500">
-              Faça upload e mantenha documentos técnicos ou administrativos
-            </p>
+            <div className="min-w-0">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Arquivos do equipamento
+              </p>
+              <p
+                className="text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Faça upload e mantenha documentos técnicos ou administrativos.
+              </p>
+            </div>
           </div>
-        </div>
 
-        <div className="mb-5 flex justify-end">
-          <Button
-            type="button"
-            onClick={openFileDialog}
+          <div className="flex justify-end">
+            <Button
+              type="button"
+              onClick={openFileDialog}
+              disabled={isSubmitting}
+            >
+              <FontAwesomeIcon
+                icon={isSubmitting ? faSpinner : faUpload}
+                spin={isSubmitting}
+              />
+              {isSubmitting ? 'Enviando...' : 'Enviar'}
+            </Button>
+          </div>
+
+          <input
+            type="file"
+            multiple
+            ref={inputRef}
+            className="hidden"
+            onChange={handleInputChange}
             disabled={isSubmitting}
-          >
-            <FontAwesomeIcon
-              icon={isSubmitting ? faSpinner : faUpload}
-              spin={isSubmitting}
-            />
-            {isSubmitting ? 'Enviando...' : 'Enviar'}
-          </Button>
+          />
+
+          {error ? (
+            <div
+              className="rounded-2xl border px-4 py-3 text-sm"
+              style={{
+                borderColor: 'var(--color-danger-soft)',
+                backgroundColor: 'var(--color-danger-soft)',
+                color: 'var(--color-danger)',
+              }}
+            >
+              {error}
+            </div>
+          ) : null}
+
+          <AnexosList
+            anexos={anexos}
+            isSubmitting={isSubmitting}
+            onDelete={openDeleteModal}
+            getIconePorTipoArquivo={getIconePorTipoArquivo}
+            montarUrlDownload={montarUrlDownload}
+          />
         </div>
-
-        <input
-          type="file"
-          multiple
-          ref={inputRef}
-          className="hidden"
-          onChange={handleInputChange}
-          disabled={isSubmitting}
-        />
-
-        {error ? (
-          <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
-
-        <AnexosList
-          anexos={anexos}
-          isSubmitting={isSubmitting}
-          onDelete={openDeleteModal}
-          getIconePorTipoArquivo={getIconePorTipoArquivo}
-          montarUrlDownload={montarUrlDownload}
-        />
       </PageSection>
     </>
   );

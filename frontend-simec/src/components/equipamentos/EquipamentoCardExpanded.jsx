@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import { ResponsiveTabs } from '@/components/ui/layout';
+import { ResponsiveTabs } from '@/components/ui';
 
 import TabCadastro from '@/components/equipamentos/tabs/TabCadastro';
 import TabAcessorios from '@/components/equipamentos/tabs/TabAcessorios';
@@ -35,7 +35,13 @@ function EquipamentoCardExpanded({
   };
 
   return (
-    <div className="border-t border-slate-200 bg-white px-4 py-5 md:px-6 md:py-6">
+    <div
+      className="px-4 py-5 md:px-6 md:py-6"
+      style={{
+        borderTop: '1px solid var(--section-header-border)',
+        backgroundColor: 'var(--bg-surface)',
+      }}
+    >
       <div className="mb-6">
         <ResponsiveTabs
           tabs={TABS}
@@ -44,7 +50,14 @@ function EquipamentoCardExpanded({
         />
       </div>
 
-      <div className="min-h-[220px] rounded-2xl border border-slate-100 bg-slate-50/40 p-4 text-slate-900 md:p-5">
+      <div
+        className="min-h-[220px] rounded-2xl border p-4 md:p-5"
+        style={{
+          backgroundColor: 'var(--bg-surface-soft)',
+          borderColor: 'var(--border-soft)',
+          color: 'var(--text-primary)',
+        }}
+      >
         {tabContentMap[abaAtiva] || null}
       </div>
     </div>

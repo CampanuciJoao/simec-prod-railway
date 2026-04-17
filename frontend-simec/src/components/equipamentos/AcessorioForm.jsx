@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
-
-import Input from '@/components/ui/primitives/Input';
-import Button from '@/components/ui/primitives/Button';
+import {
+  FormActions,
+  Input,
+  ResponsiveGrid,
+} from '@/components/ui';
 
 const INITIAL_STATE = {
   nome: '',
@@ -50,7 +51,14 @@ function AcessorioForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          className="rounded-2xl border px-4 py-3 text-sm"
+          style={{
+            borderColor: 'var(--color-danger-soft)',
+            backgroundColor: 'var(--color-danger-soft)',
+            color: 'var(--color-danger)',
+          }}
+        >
           {error}
         </div>
       ) : null}
@@ -71,33 +79,19 @@ function AcessorioForm({
         />
       </ResponsiveGrid>
 
-      <div>
-        <Input
-          label="Descrição"
-          value={formData.descricao}
-          onChange={(e) => handleChange('descricao', e.target.value)}
-          placeholder="Descreva o acessório"
-        />
-      </div>
+      <Input
+        label="Descrição"
+        value={formData.descricao}
+        onChange={(e) => handleChange('descricao', e.target.value)}
+        placeholder="Descreva o acessório"
+      />
 
-      <div className="flex flex-wrap justify-end gap-3">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={onCancel}
-          disabled={isSubmitting}
-        >
-          Cancelar
-        </Button>
-
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting
-            ? 'Salvando...'
-            : isEditing
-              ? 'Salvar alterações'
-              : 'Adicionar acessório'}
-        </Button>
-      </div>
+      <FormActions
+        onCancel={onCancel}
+        loading={isSubmitting}
+        cancelLabel="Cancelar"
+        submitLabel={isEditing ? 'Salvar alterações' : 'Adicionar acessório'}
+      />
     </form>
   );
 }

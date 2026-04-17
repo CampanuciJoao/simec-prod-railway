@@ -6,22 +6,38 @@ import {
   faMinus,
   faFileMedical,
 } from '@fortawesome/free-solid-svg-icons';
+
 import { StatusSelector } from '@/components/equipamentos';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Button,
+  Card,
+  ResponsiveGrid,
+} from '@/components/ui';
 import EquipamentoCardExpanded from '@/components/equipamentos/EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '@/utils/equipamentoCardStyles';
 
 function InfoField({ label, value, valueClassName = '' }) {
   return (
-    <div className="flex min-w-0 flex-col">
-      <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
+    <div
+      className="rounded-xl border px-4 py-3"
+      style={{
+        backgroundColor: 'var(--bg-surface-soft)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <span
+        className="block text-[11px] font-semibold uppercase tracking-[0.14em]"
+        style={{ color: 'var(--text-muted)' }}
+      >
         {label}
       </span>
+
       <span
         className={[
-          'mt-1 truncate text-sm text-slate-800',
+          'mt-2 block min-w-0 break-words text-sm',
           valueClassName,
         ].join(' ')}
+        style={{ color: 'var(--text-primary)' }}
       >
         {value || '—'}
       </span>
@@ -57,83 +73,141 @@ function EquipamentoCard({
   };
 
   return (
-    <div
+    <Card
+      padded={false}
       className={[
-        'overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition-all',
-        'border-l-[10px]',
+        'overflow-hidden rounded-3xl border border-l-[8px] shadow-sm transition-all',
         borderClass,
       ].join(' ')}
+      surface="default"
+      styleOverride={{
+        backgroundColor: 'var(--section-surface)',
+        borderColor: 'var(--border-soft)',
+      }}
     >
       <button
         type="button"
         onClick={handleToggle}
         className={[
-          'flex w-full flex-col gap-4 p-4 text-left transition-colors md:flex-row md:items-center md:justify-between',
-          'hover:bg-slate-50',
+          'flex w-full flex-col gap-5 px-5 py-5 text-left transition-colors',
+          'lg:flex-row lg:items-start lg:justify-between',
           backgroundClass,
         ].join(' ')}
+        style={{
+          color: 'inherit',
+        }}
       >
-        <div className="flex min-w-0 flex-1 items-start gap-4 md:items-center md:gap-6">
-          <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-white text-blue-600 shadow-sm">
+        <div className="flex min-w-0 flex-1 items-start gap-4">
+          <div
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
+            style={{
+              backgroundColor: 'var(--bg-surface-soft)',
+              borderColor: 'var(--border-soft)',
+              color: 'var(--brand-primary)',
+            }}
+          >
             <FontAwesomeIcon icon={isAberto ? faMinus : faPlus} />
           </div>
 
-          <div className="grid flex-1 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-            <InfoField
-              label="Modelo"
-              value={equipamento.modelo}
-              valueClassName="font-bold uppercase"
-            />
+          <div className="min-w-0 flex-1 space-y-4">
+            <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div
+                  className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Equipamento
+                </div>
 
-            <InfoField
-              label="Nº Série / Tag"
-              value={equipamento.tag}
-              valueClassName="font-bold italic"
-            />
+                <h3
+                  className="mt-1 break-words text-lg font-bold sm:text-xl"
+                  style={{ color: 'var(--text-primary)' }}
+                >
+                  {equipamento.modelo || 'Equipamento sem modelo'}
+                </h3>
 
-            <InfoField
-              label="Tipo"
-              value={equipamento.tipo}
-              valueClassName="font-semibold"
-            />
+                <p
+                  className="mt-1 text-sm"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
+                  Clique para {isAberto ? 'recolher' : 'expandir'} os detalhes
+                </p>
+              </div>
 
-            <InfoField
-              label="Unidade"
-              value={equipamento.unidade?.nomeSistema}
-              valueClassName="font-semibold"
-            />
-
-            <div className="flex min-w-0 flex-col" onClick={stopPropagation}>
-              <span className="mb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-slate-500">
-                Status Atual
-              </span>
-
-              <StatusSelector
-                equipamento={equipamento}
-                onSuccessUpdate={onStatusUpdated}
-              />
+              <div
+                className="flex shrink-0 items-center gap-2"
+                onClick={stopPropagation}
+              >
+                <Button
+                  type="button"
+                  variant="secondary"
+                  title="Abrir ficha técnica"
+                  onClick={handleGoToFicha}
+                >
+                  <FontAwesomeIcon icon={faFileMedical} />
+                  <span className="hidden sm:inline">Ficha técnica</span>
+                </Button>
+              </div>
             </div>
-          </div>
-        </div>
 
-        <div
-          className="flex shrink-0 items-center gap-2"
-          onClick={stopPropagation}
-        >
-          <Button
-            type="button"
-            variant="ghost"
-            className="border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white"
-            title="Abrir ficha técnica"
-            onClick={handleGoToFicha}
-          >
-            <FontAwesomeIcon icon={faFileMedical} />
-          </Button>
+            <ResponsiveGrid preset="details" className="gap-3">
+              <InfoField
+                label="Modelo"
+                value={equipamento.modelo}
+                valueClassName="font-semibold"
+              />
+
+              <InfoField
+                label="Nº Série / Tag"
+                value={equipamento.tag}
+                valueClassName="font-semibold"
+              />
+
+              <InfoField
+                label="Tipo"
+                value={equipamento.tipo}
+              />
+
+              <InfoField
+                label="Unidade"
+                value={equipamento.unidade?.nomeSistema}
+              />
+
+              <div
+                className="rounded-xl border px-4 py-3"
+                style={{
+                  backgroundColor: 'var(--bg-surface-soft)',
+                  borderColor: 'var(--border-soft)',
+                }}
+                onClick={stopPropagation}
+              >
+                <span
+                  className="block text-[11px] font-semibold uppercase tracking-[0.14em]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  Status atual
+                </span>
+
+                <div className="mt-2">
+                  <StatusSelector
+                    equipamento={equipamento}
+                    onSuccessUpdate={onStatusUpdated}
+                  />
+                </div>
+              </div>
+            </ResponsiveGrid>
+          </div>
         </div>
       </button>
 
       {isAberto ? (
-        <div className="border-t border-slate-200 bg-white">
+        <div
+          className="border-t"
+          style={{
+            borderColor: 'var(--section-header-border)',
+            backgroundColor: 'var(--bg-surface)',
+          }}
+        >
           <EquipamentoCardExpanded
             equipamento={equipamento}
             abaAtiva={abaAtiva}
@@ -142,7 +216,7 @@ function EquipamentoCard({
           />
         </div>
       ) : null}
-    </div>
+    </Card>
   );
 }
 

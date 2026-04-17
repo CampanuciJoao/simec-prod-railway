@@ -1,8 +1,9 @@
 import React from 'react';
-import TabCadastro from './tabs/TabCadastro';
-import TabAcessorios from './tabs/TabAcessorios';
-import TabAnexos from './tabs/TabAnexos';
-import TabHistorico from './tabs/TabHistorico';
+
+import TabCadastro from '@/components/equipamentos/tabs/TabCadastro';
+import TabAcessorios from '@/components/equipamentos/tabs/TabAcessorios';
+import TabAnexos from '@/components/equipamentos/tabs/TabAnexos';
+import TabHistorico from '@/components/equipamentos/tabs/TabHistorico';
 
 function DetalhesEquipamentoTabContent({
   abaAtiva,
@@ -10,32 +11,25 @@ function DetalhesEquipamentoTabContent({
   equipamentoId,
   onRefresh,
 }) {
-  return (
-    <div className="tab-content">
-      {abaAtiva === 'detalhes' && (
-        <TabCadastro
-          equipamentoInicial={equipamento}
-          onUpdate={onRefresh}
-        />
-      )}
+  const tabContentMap = {
+    cadastro: (
+      <TabCadastro
+        equipamentoInicial={equipamento}
+        onUpdate={onRefresh}
+      />
+    ),
+    acessorios: <TabAcessorios equipamentoId={equipamentoId} />,
+    anexos: (
+      <TabAnexos
+        equipamentoId={equipamentoId}
+        anexosIniciais={equipamento?.anexos || []}
+        onUpdate={onRefresh}
+      />
+    ),
+    historico: <TabHistorico equipamento={equipamento} />,
+  };
 
-      {abaAtiva === 'acessorios' && (
-        <TabAcessorios equipamentoId={equipamentoId} />
-      )}
-
-      {abaAtiva === 'anexos' && (
-        <TabAnexos
-          equipamentoId={equipamentoId}
-          anexosIniciais={equipamento?.anexos || []}
-          onUpdate={onRefresh}
-        />
-      )}
-
-      {abaAtiva === 'historico' && (
-        <TabHistorico equipamento={equipamento} />
-      )}
-    </div>
-  );
+  return <>{tabContentMap[abaAtiva] || null}</>;
 }
 
 export default DetalhesEquipamentoTabContent;

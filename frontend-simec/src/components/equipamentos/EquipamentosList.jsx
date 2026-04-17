@@ -2,7 +2,7 @@ import React, { useCallback, memo } from 'react';
 import PropTypes from 'prop-types';
 
 import EquipamentoCard from '@/components/equipamentos/EquipamentoCard';
-import { EmptyState } from '@/components/ui/layout';
+import { EmptyState } from '@/components/ui';
 
 function EquipamentosList({
   equipamentos = [],

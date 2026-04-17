@@ -6,7 +6,11 @@ import {
   faDownload,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { EmptyState } from '@/components/ui';
+import {
+  Button,
+  Card,
+  EmptyState,
+} from '@/components/ui';
 
 import { formatarData } from '@/utils/timeUtils';
 
@@ -26,64 +30,77 @@ function AnexosList({
   return (
     <div className="flex flex-col gap-3">
       {anexos.map((anexo) => {
-        const { icon, colorClass } = getIconePorTipoArquivo(
-          anexo.tipoMime
-        );
-
+        const { icon, colorClass } = getIconePorTipoArquivo(anexo.tipoMime);
         const downloadUrl = montarUrlDownload(anexo.path);
 
         return (
-          <div
+          <Card
             key={anexo.id}
-            className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+            className="rounded-2xl"
+            surface="soft"
           >
-            <div className="flex min-w-0 items-start gap-3">
-              <span
-                className={[
-                  'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50',
-                  colorClass,
-                ].join(' ')}
-              >
-                <FontAwesomeIcon icon={icon} />
-              </span>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span
+                  className={[
+                    'mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                    colorClass,
+                  ].join(' ')}
+                  style={{
+                    backgroundColor: 'var(--bg-surface)',
+                    border: '1px solid var(--border-soft)',
+                  }}
+                >
+                  <FontAwesomeIcon icon={icon} />
+                </span>
 
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">
-                  {anexo.nomeOriginal || 'Arquivo sem nome'}
-                </p>
+                <div className="min-w-0">
+                  <p
+                    className="truncate text-sm font-semibold"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {anexo.nomeOriginal || 'Arquivo sem nome'}
+                  </p>
 
-                <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                  <span>{anexo.tipoMime || 'Tipo desconhecido'}</span>
-                  <span>
-                    Enviado em {formatarData(anexo.createdAt)}
-                  </span>
+                  <div
+                    className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <span>{anexo.tipoMime || 'Tipo desconhecido'}</span>
+                    <span>Enviado em {formatarData(anexo.createdAt)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex shrink-0 items-center gap-2">
-              <a
-                href={downloadUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50"
-              >
-                <FontAwesomeIcon icon={faDownload} />
-              </a>
+              <div className="flex shrink-0 items-center gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="px-3"
+                  title="Baixar arquivo"
+                  aria-label={`Baixar ${anexo.nomeOriginal || 'anexo'}`}
+                  onClick={() => window.open(downloadUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <FontAwesomeIcon icon={faDownload} />
+                </Button>
 
-              <button
-                type="button"
-                onClick={() => onDelete(anexo)}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 shadow-sm transition hover:bg-red-600 hover:text-white disabled:opacity-60"
-                disabled={isSubmitting}
-              >
-                <FontAwesomeIcon
-                  icon={isSubmitting ? faSpinner : faTrashAlt}
-                  spin={isSubmitting}
-                />
-              </button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  className="px-3"
+                  onClick={() => onDelete(anexo)}
+                  disabled={isSubmitting}
+                  title="Excluir arquivo"
+                  aria-label={`Excluir ${anexo.nomeOriginal || 'anexo'}`}
+                >
+                  <FontAwesomeIcon
+                    icon={isSubmitting ? faSpinner : faTrashAlt}
+                    spin={isSubmitting}
+                  />
+                </Button>
+              </div>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>
