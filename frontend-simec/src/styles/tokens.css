@@ -4,7 +4,7 @@
   --brand-primary-soft: rgba(37, 99, 235, 0.14);
   --brand-primary-surface: rgba(37, 99, 235, 0.08);
   --brand-primary-surface-strong: rgba(37, 99, 235, 0.14);
-  --brand-topbar: #0f3fae;
+  --brand-topbar: #0f203d;
   --brand-topbar-border: rgba(255, 255, 255, 0.12);
 
   --color-success: #059669;
@@ -108,7 +108,7 @@
   --bg-sidebar: #08111f;
   --bg-sidebar-soft: #0d1727;
   --bg-sidebar-hover: #182338;
-  --bg-sidebar-active: #182338;
+  --bg-sidebar-active: #2563eb;
 
   --bg-topbar: var(--brand-topbar);
   --bg-breadcrumb: #0f1d37;
