@@ -20,20 +20,32 @@
   --radius-lg: 1.25rem;
   --radius-xl: 1.5rem;
 
-  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
-  --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.1);
-  --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
-
   --transition-default: 180ms ease;
+
+  --focus-ring: rgba(37, 99, 235, 0.24);
+  --focus-ring-danger: rgba(220, 38, 38, 0.22);
+  --focus-ring-success: rgba(5, 150, 105, 0.22);
 }
 
 :root[data-theme='light'] {
   --bg-app: #e9eef5;
   --bg-app-muted: #dde6f1;
+
   --bg-surface: #ffffff;
   --bg-surface-soft: #f8fafc;
   --bg-surface-subtle: #f1f5f9;
   --bg-elevated: #ffffff;
+
+  --bg-hover: #eef4fb;
+  --bg-active: #e4edf9;
+
+  --bg-sidebar: #0f172a;
+  --bg-sidebar-soft: #111c31;
+  --bg-sidebar-hover: rgba(255, 255, 255, 0.08);
+  --bg-sidebar-active: #2563eb;
+
+  --bg-topbar: #ffffff;
+  --bg-breadcrumb: #f8fafc;
 
   --border-default: #cbd5e1;
   --border-soft: #e2e8f0;
@@ -44,6 +56,10 @@
   --text-muted: #64748b;
   --text-inverse: #ffffff;
 
+  --text-sidebar: #dbe7fb;
+  --text-sidebar-muted: #b7c7e6;
+  --text-sidebar-active: #ffffff;
+
   --overlay-bg: rgba(15, 23, 42, 0.44);
 
   --button-secondary-bg: #f8fafc;
@@ -52,15 +68,31 @@
   --button-secondary-border: #cbd5e1;
 
   --section-header-border: #e2e8f0;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-md: 0 10px 30px rgba(15, 23, 42, 0.1);
+  --shadow-lg: 0 18px 50px rgba(15, 23, 42, 0.14);
 }
 
 :root[data-theme='dark'] {
   --bg-app: #0b1220;
   --bg-app-muted: #111b2d;
+
   --bg-surface: #131d31;
   --bg-surface-soft: #182338;
   --bg-surface-subtle: #1d2a40;
   --bg-elevated: #1a2740;
+
+  --bg-hover: #1a2740;
+  --bg-active: #223149;
+
+  --bg-sidebar: #08111f;
+  --bg-sidebar-soft: #0d1727;
+  --bg-sidebar-hover: #182338;
+  --bg-sidebar-active: #2563eb;
+
+  --bg-topbar: #10192b;
+  --bg-breadcrumb: #111b2d;
 
   --border-default: #2a3a55;
   --border-soft: #223149;
@@ -71,6 +103,10 @@
   --text-muted: #93a4bf;
   --text-inverse: #ffffff;
 
+  --text-sidebar: #dbe7fb;
+  --text-sidebar-muted: #b7c7e6;
+  --text-sidebar-active: #ffffff;
+
   --overlay-bg: rgba(2, 6, 23, 0.72);
 
   --button-secondary-bg: #182338;
@@ -79,4 +115,8 @@
   --button-secondary-border: #31445f;
 
   --section-header-border: #223149;
+
+  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.32);
+  --shadow-md: 0 8px 24px rgba(2, 6, 23, 0.36);
+  --shadow-lg: 0 16px 40px rgba(2, 6, 23, 0.42);
 }

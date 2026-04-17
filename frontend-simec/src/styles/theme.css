@@ -4,8 +4,12 @@ body,
   min-height: 100%;
 }
 
-html {
-  color-scheme: light dark;
+:root[data-theme='light'] {
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
 }
 
 body {
@@ -88,9 +92,10 @@ body {
   background: var(--overlay-bg);
 }
 
-.ui-brand-ring:focus {
+.ui-brand-ring:focus,
+.ui-brand-ring:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 4px var(--brand-primary-soft);
+  box-shadow: 0 0 0 4px var(--focus-ring);
 }
 
 .ui-transition {
