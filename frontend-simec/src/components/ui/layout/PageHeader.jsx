@@ -21,7 +21,7 @@ function PageHeader({
       padded={false}
       styleOverride={{
         background: 'var(--header-surface)',
-        borderColor: 'var(--brand-primary-soft)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
       }}
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
@@ -41,7 +41,7 @@ function PageHeader({
           <div className="min-w-0">
             <h1
               className="text-2xl font-bold tracking-tight sm:text-3xl"
-              style={{ color: 'var(--text-primary)' }}
+              style={{ color: 'var(--text-brand-surface)' }}
             >
               {title}
             </h1>
@@ -49,7 +49,7 @@ function PageHeader({
             {subtitle ? (
               <p
                 className="mt-1 text-sm sm:text-base"
-                style={{ color: 'var(--text-secondary)' }}
+                style={{ color: 'var(--text-brand-surface-muted)' }}
               >
                 {subtitle}
               </p>

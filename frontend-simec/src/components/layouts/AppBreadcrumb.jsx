@@ -15,7 +15,7 @@ function AppBreadcrumb({ items = [] }) {
     >
       <nav
         className="flex flex-wrap items-center gap-1 text-sm"
-        style={{ color: 'var(--text-secondary)' }}
+        style={{ color: 'var(--text-brand-surface-muted)' }}
       >
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
@@ -26,7 +26,7 @@ function AppBreadcrumb({ items = [] }) {
                 <Link
                   to={item.to}
                   className="font-medium transition hover:opacity-80"
-                  style={{ color: 'var(--brand-primary)' }}
+                  style={{ color: 'var(--text-brand-surface-muted)' }}
                 >
                   {item.label}
                 </Link>
@@ -35,8 +35,8 @@ function AppBreadcrumb({ items = [] }) {
                   className={isLast ? 'font-semibold' : ''}
                   style={{
                     color: isLast
-                      ? 'var(--text-primary)'
-                      : 'var(--text-muted)',
+                      ? 'var(--text-brand-surface)'
+                      : 'var(--text-brand-surface-muted)',
                   }}
                 >
                   {item.label}
@@ -46,7 +46,7 @@ function AppBreadcrumb({ items = [] }) {
               {!isLast && (
                 <span
                   className="mx-1"
-                  style={{ color: 'var(--text-muted)' }}
+                  style={{ color: 'var(--text-brand-surface-muted)' }}
                 >
                   /
                 </span>

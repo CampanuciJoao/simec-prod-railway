@@ -32,32 +32,32 @@
 }
 
 :root[data-theme='light'] {
-  --bg-app: #f3f7fc;
-  --bg-app-muted: #ebf1f8;
+  --bg-app: #f6f8fc;
+  --bg-app-muted: #eef3f8;
 
   --bg-surface: #ffffff;
-  --bg-surface-soft: #f8fbff;
-  --bg-surface-subtle: #f1f6fb;
+  --bg-surface-soft: #fbfcfe;
+  --bg-surface-subtle: #f3f7fc;
   --bg-elevated: #ffffff;
 
-  --bg-hover: #ebf3fb;
-  --bg-active: #dfeaf7;
+  --bg-hover: #eef4fb;
+  --bg-active: #e5edf8;
 
   --bg-sidebar: #08111f;
   --bg-sidebar-soft: #0d1727;
   --bg-sidebar-hover: #182338;
-  --bg-sidebar-active: #2563eb;
+  --bg-sidebar-active: #2f6df6;
 
-  --bg-topbar: #0f3fae;
-  --bg-breadcrumb: #0f1d37;
+  --bg-topbar: #1f4db8;
+  --bg-breadcrumb: #10284f;
 
-  --border-default: #d4deea;
-  --border-soft: #e3ebf4;
-  --border-strong: #a5b7cc;
+  --border-default: #d8e1eb;
+  --border-soft: #e7edf5;
+  --border-strong: #a8b7c9;
 
   --text-primary: #0f172a;
-  --text-secondary: #334155;
-  --text-muted: #64748b;
+  --text-secondary: #42546b;
+  --text-muted: #70839c;
   --text-inverse: #ffffff;
 
   --text-sidebar: #dbe7fb;
@@ -67,18 +67,21 @@
   --text-topbar: #ffffff;
   --text-topbar-muted: rgba(255, 255, 255, 0.78);
 
+  --text-brand-surface: #ffffff;
+  --text-brand-surface-muted: rgba(255, 255, 255, 0.78);
+
   --overlay-bg: rgba(15, 23, 42, 0.44);
 
   --button-primary-hover: #1d4ed8;
   --button-secondary-bg: rgba(255, 255, 255, 0.08);
   --button-secondary-hover: rgba(255, 255, 255, 0.14);
   --button-secondary-text: #ffffff;
-  --button-secondary-border: rgba(255, 255, 255, 0.16);
+  --button-secondary-border: rgba(255, 255, 255, 0.18);
   --button-danger-hover: #b91c1c;
   --button-success-hover: #047857;
   --button-ghost-hover: rgba(15, 23, 42, 0.06);
 
-  --section-header-border: #e3ebf4;
+  --section-header-border: #e6edf5;
 
   --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.08);
@@ -87,8 +90,8 @@
   --kpi-surface: #ffffff;
   --header-surface: linear-gradient(
     180deg,
-    rgba(15, 29, 55, 0.96) 0%,
-    rgba(17, 40, 82, 0.96) 100%
+    rgba(22, 49, 104, 0.98) 0%,
+    rgba(29, 64, 125, 0.98) 100%
   );
   --section-surface: #ffffff;
 }

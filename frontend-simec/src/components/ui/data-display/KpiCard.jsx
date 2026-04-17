@@ -11,28 +11,28 @@ const toneStyleMap = {
     iconText: '#64748b',
   },
   blue: {
-    iconBg: 'rgba(37, 99, 235, 0.14)',
+    iconBg: 'rgba(37, 99, 235, 0.10)',
     iconText: '#3b82f6',
   },
   green: {
-    iconBg: 'rgba(5, 150, 105, 0.14)',
-    iconText: '#34d399',
+    iconBg: 'rgba(5, 150, 105, 0.12)',
+    iconText: '#10b981',
   },
   yellow: {
-    iconBg: 'rgba(217, 119, 6, 0.16)',
-    iconText: '#fbbf24',
+    iconBg: 'rgba(217, 119, 6, 0.12)',
+    iconText: '#f59e0b',
   },
   orange: {
-    iconBg: 'rgba(234, 88, 12, 0.16)',
-    iconText: '#fb923c',
+    iconBg: 'rgba(234, 88, 12, 0.12)',
+    iconText: '#f97316',
   },
   red: {
-    iconBg: 'rgba(220, 38, 38, 0.14)',
-    iconText: '#f87171',
+    iconBg: 'rgba(220, 38, 38, 0.10)',
+    iconText: '#ef4444',
   },
   purple: {
-    iconBg: 'rgba(139, 92, 246, 0.14)',
-    iconText: '#a78bfa',
+    iconBg: 'rgba(139, 92, 246, 0.12)',
+    iconText: '#8b5cf6',
   },
 };
 
