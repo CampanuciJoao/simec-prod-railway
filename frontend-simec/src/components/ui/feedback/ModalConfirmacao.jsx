@@ -1,9 +1,12 @@
 import React from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faExclamationTriangle,
   faTimes,
 } from '@fortawesome/free-solid-svg-icons';
+
+import { Button, Card } from '@/components/ui';
 
 function ModalConfirmacao({
   isOpen,
@@ -19,57 +22,87 @@ function ModalConfirmacao({
 
   return (
     <div
-      className="fixed inset-0 z-[1100] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-[2px]"
+      className="fixed inset-0 z-[1100] flex items-center justify-center p-4 backdrop-blur-[2px]"
+      style={{ backgroundColor: 'rgba(2, 6, 23, 0.55)' }}
       onClick={onClose}
     >
-      <div
-        className="relative w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+      <Card
+        className="relative w-full max-w-md rounded-2xl p-6"
+        surface="default"
+        style={{
+          boxShadow: 'var(--shadow-lg)',
+        }}
+        onClick={(event) => event.stopPropagation()}
       >
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+          className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-xl transition"
+          style={{ color: 'var(--text-muted)' }}
           aria-label="Fechar modal"
         >
           <FontAwesomeIcon icon={faTimes} />
         </button>
 
         <div className="pr-10">
-          <h3 className="flex items-center gap-3 text-lg font-semibold text-slate-900">
-            {isDestructive && (
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
+          <h3
+            className="flex items-center gap-3 text-lg font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {isDestructive ? (
+              <span
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+                style={{
+                  backgroundColor: 'var(--color-danger-soft)',
+                  color: 'var(--color-danger)',
+                }}
+              >
                 <FontAwesomeIcon icon={faExclamationTriangle} />
               </span>
-            )}
+            ) : null}
+
             <span>{title}</span>
           </h3>
 
-          <div className="mt-4 text-sm leading-6 text-slate-600">
+          <div
+            className="mt-4 text-sm leading-6"
+            style={{ color: 'var(--text-secondary)' }}
+          >
             <p>{message}</p>
           </div>
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <button
+          <Button
             type="button"
-            className="btn btn-secondary"
+            variant="secondary"
             onClick={onClose}
           >
             {cancelText}
-          </button>
+          </Button>
 
-          <button
+          <Button
             type="button"
-            className={`btn ${isDestructive ? 'btn-danger' : 'btn-primary'}`}
+            variant={isDestructive ? 'danger' : 'primary'}
             onClick={onConfirm}
           >
             {confirmText}
-          </button>
+          </Button>
         </div>
-      </div>
+      </Card>
     </div>
   );
 }
+
+ModalConfirmacao.propTypes = {
+  isOpen: PropTypes.bool,
+  onClose: PropTypes.func.isRequired,
+  onConfirm: PropTypes.func.isRequired,
+  title: PropTypes.string,
+  message: PropTypes.string,
+  confirmText: PropTypes.string,
+  cancelText: PropTypes.string,
+  isDestructive: PropTypes.bool,
+};
 
 export default ModalConfirmacao;

@@ -76,7 +76,8 @@ export {
 // =========================
 export {
   Drawer,
-  Modal,
+  DrawerList,
+  NotificationsPanel,
 } from './overlays';
 
 // =========================
