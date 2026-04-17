@@ -1,145 +1,162 @@
-import React, {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useCallback,
-} from 'react';
-import { Outlet, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faHeartbeat,
+  faWrench,
+  faFileContract,
+  faBell,
+  faChartPie,
+  faArrowRight,
+} from '@fortawesome/free-solid-svg-icons';
 
-import Sidebar from '@/components/ui/navigation/Sidebar';
-import ChatBot from '@/components/ui/chat/ChatBot';
-import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
-import AppTopbar from '@/components/layouts/AppTopbar';
+import { useDashboard } from '@/hooks/dashboard/useDashboard';
 
-import { useAuth } from '@/contexts/AuthContext';
-import { getBreadcrumbItems } from '@/utils/breadcrumbConfig';
-import { useAppLayoutAlerts } from '@/hooks/layout/useAppLayoutAlerts';
+import {
+  PageLayout,
+  PageHeader,
+  PageSection,
+  ResponsiveGrid,
+  PageState,
+  InlineEmptyState,
+  KpiCard,
+} from '@/components/ui';
 
-function AppLayout() {
-  const location = useLocation();
-  const navigate = useNavigate();
+import { AlertListItem } from '@/components/dashboard';
 
-  const auth = useAuth?.();
-  const usuario = auth?.usuario || auth?.user || null;
-  const logout = auth?.logout || auth?.signOut || null;
+import BarChart from '@/components/charts/BarChart';
+import DonutChart from '@/components/charts/DonutChart';
 
-  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
-  const alertsRef = useRef(null);
+function DashboardPage() {
+  const { data, loading, error } = useDashboard();
 
-  const {
-    alertas,
-    alertasLoading,
-    alertsOpen,
-    contadorNaoVistos,
-    setAlertsOpen,
-    handleToggleAlerts,
-    handleCloseAlerts,
-    handleOpenAlertDetails,
-    handleMarkAsRead,
-    handleDismiss,
-  } = useAppLayoutAlerts({ navigate });
+  const isEmpty =
+    !loading &&
+    !error &&
+    data.totalEquipamentos === 0 &&
+    data.emManutencao === 0 &&
+    data.contratosVencendo === 0 &&
+    data.alertasAtivos === 0 &&
+    data.alertas.length === 0 &&
+    data.statusEquipamentos.length === 0 &&
+    data.manutencoesPorTipo.length === 0;
 
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (alertsRef.current && !alertsRef.current.contains(event.target)) {
-        setAlertsOpen(false);
-      }
-    }
-
-    function handleEscape(event) {
-      if (event.key === 'Escape') {
-        setAlertsOpen(false);
-        setIsMobileSidebarOpen(false);
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEscape);
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [setAlertsOpen]);
-
-  useEffect(() => {
-    setAlertsOpen(false);
-    setIsMobileSidebarOpen(false);
-  }, [location.pathname, setAlertsOpen]);
-
-  const breadcrumbItems = useMemo(() => {
-    return getBreadcrumbItems(location.pathname);
-  }, [location.pathname]);
-
-  const nomeUsuario =
-    usuario?.nome ||
-    usuario?.name ||
-    usuario?.username ||
-    'Administrador do Sistema';
-
-  const handleOpenMobileMenu = useCallback(() => {
-    setIsMobileSidebarOpen(true);
-  }, []);
-
-  const handleCloseMobileMenu = useCallback(() => {
-    setIsMobileSidebarOpen(false);
-  }, []);
-
-  const handleLogout = useCallback(async () => {
-    try {
-      if (typeof logout === 'function') {
-        await logout();
-      }
-    } catch (error) {
-      console.error('[APP_LAYOUT_LOGOUT_ERROR]', error);
-    } finally {
-      navigate('/login');
-    }
-  }, [logout, navigate]);
-
-  return (
-    <>
-      <div
-        className="flex min-h-screen"
-        style={{ backgroundColor: 'var(--bg-app)' }}
-      >
-        <Sidebar
-          notificacoesCount={contadorNaoVistos}
-          isMobileOpen={isMobileSidebarOpen}
-          onClose={handleCloseMobileMenu}
+  if (loading || error || isEmpty) {
+    return (
+      <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title="Dashboard"
+          subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
+          icon={faChartPie}
         />
 
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col">
-          <AppTopbar
-            nomeUsuario={nomeUsuario}
-            alertsOpen={alertsOpen}
-            alertas={alertas}
-            alertasLoading={alertasLoading}
-            contadorNaoVistos={contadorNaoVistos}
-            alertsRef={alertsRef}
-            onOpenMenu={handleOpenMobileMenu}
-            onToggleAlerts={handleToggleAlerts}
-            onCloseAlerts={handleCloseAlerts}
-            onLogout={handleLogout}
-            onOpenAlert={handleOpenAlertDetails}
-            onMarkAsRead={handleMarkAsRead}
-            onDismiss={handleDismiss}
+        <PageState
+          loading={loading}
+          error={error}
+          isEmpty={isEmpty}
+          emptyMessage="Nenhum dado disponível para o dashboard."
+        />
+      </PageLayout>
+    );
+  }
+
+  return (
+    <PageLayout background="slate" padded fullHeight>
+      <div className="space-y-6">
+        <PageHeader
+          title="Dashboard"
+          subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
+          icon={faChartPie}
+        />
+
+        <ResponsiveGrid cols={{ base: 1, sm: 2, xl: 4 }}>
+          <KpiCard
+            to="/equipamentos"
+            icon={faHeartbeat}
+            title="Equipamentos"
+            value={data.totalEquipamentos}
+            subtitle="Parque total"
+            tone="green"
           />
 
-          <AppBreadcrumb items={breadcrumbItems} />
+          <KpiCard
+            to="/manutencoes"
+            icon={faWrench}
+            title="Manutenções abertas"
+            value={data.emManutencao}
+            subtitle="Ordens em andamento"
+            tone="yellow"
+          />
 
-          <main className="min-w-0 flex-1">
-            <Outlet />
-          </main>
+          <KpiCard
+            to="/contratos"
+            icon={faFileContract}
+            title="Contratos vencendo"
+            value={data.contratosVencendo}
+            subtitle="Próximos 30 dias"
+            tone="red"
+          />
+
+          <KpiCard
+            to="/alertas"
+            icon={faBell}
+            title="Alertas ativos"
+            value={data.alertasAtivos}
+            subtitle="Não visualizados"
+            tone="blue"
+          />
+        </ResponsiveGrid>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_1.2fr]">
+          <PageSection
+            className="h-full"
+            title="Últimos avisos"
+            description="10 alertas mais recentes do sistema"
+            headerRight={
+              <Link
+                to="/alertas"
+                className="inline-flex items-center gap-2 text-sm font-medium transition hover:underline"
+                style={{ color: 'var(--brand-primary)' }}
+              >
+                Ver todos
+                <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+              </Link>
+            }
+          >
+            {data.alertas.length > 0 ? (
+              <div className="space-y-1">
+                {data.alertas.slice(0, 10).map((alerta) => (
+                  <AlertListItem key={alerta.id} alerta={alerta} />
+                ))}
+              </div>
+            ) : (
+              <InlineEmptyState message="Nenhum aviso recente." />
+            )}
+          </PageSection>
+
+          <div className="grid grid-cols-1 gap-6">
+            <PageSection
+              title="Status dos equipamentos"
+              description="Distribuição atual por condição operacional"
+            >
+              <div className="h-[240px]">
+                <DonutChart data={data.statusEquipamentos} />
+              </div>
+            </PageSection>
+
+            <PageSection
+              title="Manutenções nos últimos meses"
+              description="Volume total de ordens registradas no período"
+            >
+              <div className="h-[240px]">
+                <BarChart data={data.manutencoesPorTipo} />
+              </div>
+            </PageSection>
+          </div>
         </div>
       </div>
-
-      <div className="fixed bottom-4 right-4 z-50">
-        <ChatBot />
-      </div>
-    </>
+    </PageLayout>
   );
 }
 
-export default AppLayout;
+export default DashboardPage;
