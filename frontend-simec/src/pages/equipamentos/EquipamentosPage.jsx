@@ -8,12 +8,15 @@ import {
 import { useEquipamentosPage } from '@/hooks/equipamentos/useEquipamentosPage';
 import { useEquipamentosExpansion } from '@/hooks/equipamentos/useEquipamentosExpansion';
 
-import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
+import {
+  Button,
+  GlobalFilterBar,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
+
 import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageHeader from '@/components/ui/layout/PageHeader';
-import PageState from '@/components/ui/feedback/PageState';
-import Button from '@/components/ui/primitives/Button';
 
 import {
   EquipamentosList,
@@ -37,12 +40,16 @@ function EquipamentosPage() {
 
   const aplicarFiltroStatus = (status) => {
     page.clearAllFilters();
-    const statusFilter = page.selectFiltersConfig.find((f) => f.id === 'status');
+
+    const statusFilter = page.selectFiltersConfig.find(
+      (filter) => filter.id === 'status'
+    );
+
     statusFilter?.onChange(status);
   };
 
   return (
-    <PageLayout background="slate" padded fullHeight className="font-sans">
+    <PageLayout padded fullHeight>
       <div className="space-y-6">
         <ModalConfirmacao
           isOpen={page.deleteModal.isOpen}
@@ -71,14 +78,12 @@ function EquipamentosPage() {
           onFilterStatus={aplicarFiltroStatus}
         />
 
-        <div className="mb-6">
-          <GlobalFilterBar
-            searchTerm={page.searchTerm}
-            onSearchChange={page.onSearchChange}
-            searchPlaceholder="Buscar por modelo, tag ou unidade..."
-            selectFilters={page.selectFiltersConfig}
-          />
-        </div>
+        <GlobalFilterBar
+          searchTerm={page.searchTerm}
+          onSearchChange={page.onSearchChange}
+          searchPlaceholder="Buscar por modelo, tag ou unidade..."
+          selectFilters={page.selectFiltersConfig}
+        />
 
         <EquipamentosActiveFiltersBar
           filters={page.activeFilters}

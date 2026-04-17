@@ -11,7 +11,6 @@ import {
   Card,
   Input,
   Select,
-  FormFieldShell,
 } from '@/components/ui';
 
 function GlobalFilterBar({
@@ -27,67 +26,76 @@ function GlobalFilterBar({
         'rounded-2xl md:rounded-3xl',
         className,
       ].join(' ')}
+      surface="default"
     >
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-[minmax(320px,1.5fr)_repeat(auto-fit,minmax(190px,1fr))]">
-        <div className="min-w-0">
-          <FormFieldShell label="Busca">
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">
-                <FontAwesomeIcon icon={faSearch} />
-              </span>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end">
+        <div className="min-w-0 flex-1 xl:max-w-[420px]">
+          <div className="relative">
+            <span
+              className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <FontAwesomeIcon icon={faSearch} />
+            </span>
 
-              <Input
-                type="text"
-                value={searchTerm}
-                onChange={onSearchChange}
-                placeholder={searchPlaceholder}
-                className="pl-10"
-              />
-            </div>
-          </FormFieldShell>
+            <Input
+              type="text"
+              value={searchTerm}
+              onChange={onSearchChange}
+              placeholder={searchPlaceholder}
+              className="pl-10"
+            />
+          </div>
         </div>
 
-        {selectFilters.map((filter) => (
-          <div
-            key={filter.id || filter.name}
-            className="min-w-0"
-          >
-            <FormFieldShell
-              label={filter.label || filter.defaultLabel || 'Filtro'}
-            >
-              <div className="relative">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 z-[1] text-slate-400 dark:text-slate-500">
-                  <FontAwesomeIcon icon={faFilter} />
-                </span>
+        <div className="min-w-0 xl:flex-1">
+          <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap xl:flex-nowrap">
+            {selectFilters.map((filter) => (
+              <div
+                key={filter.id || filter.name}
+                className="min-w-0 sm:flex-1 xl:min-w-[180px]"
+              >
+                <div className="relative">
+                  <span
+                    className="pointer-events-none absolute left-3 top-1/2 z-[1] -translate-y-1/2"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <FontAwesomeIcon icon={faFilter} />
+                  </span>
 
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 z-[1] text-slate-400 dark:text-slate-500">
-                  <FontAwesomeIcon icon={faChevronDown} className="text-xs" />
-                </span>
+                  <span
+                    className="pointer-events-none absolute right-3 top-1/2 z-[1] -translate-y-1/2"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    <FontAwesomeIcon icon={faChevronDown} className="text-xs" />
+                  </span>
 
-                <Select
-                  value={filter.value ?? ''}
-                  onChange={(e) => filter.onChange(e.target.value)}
-                  className="pl-10 pr-10"
-                  title={
-                    filter.options?.find((opt) => opt.value === filter.value)?.label ||
-                    filter.defaultLabel ||
-                    ''
-                  }
-                >
-                  <option value="">
-                    {filter.defaultLabel || 'Todos'}
-                  </option>
-
-                  {(filter.options || []).map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+                  <Select
+                    value={filter.value ?? ''}
+                    onChange={(e) => filter.onChange(e.target.value)}
+                    className="pl-10 pr-10"
+                    title={
+                      filter.options?.find((opt) => opt.value === filter.value)?.label ||
+                      filter.defaultLabel ||
+                      filter.label ||
+                      ''
+                    }
+                  >
+                    <option value="">
+                      {filter.label || filter.defaultLabel || 'Todos'}
                     </option>
-                  ))}
-                </Select>
+
+                    {(filter.options || []).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
               </div>
-            </FormFieldShell>
+            ))}
           </div>
-        ))}
+        </div>
       </div>
     </Card>
   );
