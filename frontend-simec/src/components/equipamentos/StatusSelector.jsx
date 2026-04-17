@@ -1,9 +1,11 @@
 import React, { useMemo, useState } from 'react';
+import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner, faChevronDown } from '@fortawesome/free-solid-svg-icons';
-import { useToast } from '../../../contexts/ToastContext';
-import { updateEquipamento } from '../../../services/api';
-import { getStatusBadgeVariant } from '../uistyles/statusStyles';
+
+import { useToast } from '@/contexts/ToastContext';
+import { updateEquipamento } from '@/services/api';
+import { getStatusBadgeVariant } from '@/components/ui/uistyles/statusStyles';
 
 const STATUS_OPTIONS = [
   'Operante',
@@ -40,7 +42,8 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     [currentStatus]
   );
 
-  const colorClass = STATUS_SELECT_STYLES[variant] || STATUS_SELECT_STYLES.slate;
+  const colorClass =
+    STATUS_SELECT_STYLES[variant] || STATUS_SELECT_STYLES.slate;
 
   const handleSelectChange = async (e) => {
     const novoStatus = e.target.value;
@@ -60,7 +63,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     } catch (error) {
       setCurrentStatus(statusAnterior);
       addToast(
-        error.response?.data?.message || 'Erro ao atualizar status.',
+        error?.response?.data?.message || 'Erro ao atualizar status.',
         'error'
       );
     } finally {
@@ -103,5 +106,14 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     </div>
   );
 }
+
+StatusSelector.propTypes = {
+  equipamento: PropTypes.shape({
+    id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
+    modelo: PropTypes.string,
+    status: PropTypes.string,
+  }).isRequired,
+  onSuccessUpdate: PropTypes.func,
+};
 
 export default StatusSelector;
