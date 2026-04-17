@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import FormFieldShell from './FormFieldShell';
+
+import FormFieldShell from '@/components/ui/primitives/FormFieldShell';
 
 function Textarea({
   id,
@@ -26,13 +27,26 @@ function Textarea({
         id={textareaId}
         rows={rows}
         className={[
-          'w-full rounded-xl border bg-white px-3 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 resize-y',
-          error
-            ? 'border-red-300 focus:border-red-500 focus:ring-4 focus:ring-red-100'
-            : 'border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-100',
-          'disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-60',
+          'ui-transition w-full resize-y rounded-xl border px-3 py-3 text-sm outline-none placeholder:opacity-70',
+          'disabled:cursor-not-allowed disabled:opacity-70',
           className,
         ].join(' ')}
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: error ? 'var(--color-danger)' : 'var(--border-default)',
+          color: 'var(--text-primary)',
+          boxShadow: 'none',
+        }}
+        onFocus={(e) => {
+          e.currentTarget.style.boxShadow = error
+            ? '0 0 0 4px var(--color-danger-soft)'
+            : '0 0 0 4px var(--brand-primary-soft)';
+          props.onFocus?.(e);
+        }}
+        onBlur={(e) => {
+          e.currentTarget.style.boxShadow = 'none';
+          props.onBlur?.(e);
+        }}
         {...props}
       />
     </FormFieldShell>

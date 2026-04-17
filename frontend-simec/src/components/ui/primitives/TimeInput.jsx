@@ -1,6 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import FormFieldShell from './FormFieldShell';
+
+import FormFieldShell from '@/components/ui/primitives/FormFieldShell';
 
 function formatMaskedTime(raw = '') {
   const digits = String(raw).replace(/\D/g, '').slice(0, 4);
@@ -24,8 +25,8 @@ function TimeInput({
 }) {
   const inputId = id || name;
 
-  const handleTimeChange = (e) => {
-    const formattedValue = formatMaskedTime(e.target.value);
+  const handleTimeChange = (event) => {
+    const formattedValue = formatMaskedTime(event.target.value);
 
     onChange?.({
       target: {
@@ -56,7 +57,6 @@ function TimeInput({
         disabled={disabled}
         className={[
           'ui-transition w-full rounded-xl border px-3 py-2.5 text-sm outline-none placeholder:opacity-70',
-          'ui-text-primary',
           'disabled:cursor-not-allowed disabled:opacity-70',
           className,
         ].join(' ')}
