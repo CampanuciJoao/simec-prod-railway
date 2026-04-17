@@ -14,22 +14,19 @@ function PageSection({
 
   return (
     <Card
-      className={['rounded-3xl', className].join(' ')}
+      className={className}
       surface="default"
-      styleOverride={{
-        backgroundColor: 'var(--section-surface)',
-        borderColor: 'var(--border-soft)',
-      }}
+      styleOverride={{ backgroundColor: 'var(--section-surface)' }}
     >
       {hasHeader ? (
         <div
-          className="mb-6 flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-start sm:justify-between"
+          className="mb-5 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between"
           style={{ borderColor: 'var(--section-header-border)' }}
         >
           <div className="min-w-0">
             {title ? (
               <h2
-                className="text-lg font-semibold tracking-tight"
+                className="text-base font-semibold"
                 style={{ color: 'var(--text-primary)' }}
               >
                 {title}
@@ -38,7 +35,7 @@ function PageSection({
 
             {description ? (
               <p
-                className="mt-1.5 text-sm leading-6"
+                className="mt-1 text-sm"
                 style={{ color: 'var(--text-muted)' }}
               >
                 {description}
@@ -47,12 +44,12 @@ function PageSection({
           </div>
 
           {headerRight ? (
-            <div className="shrink-0 sm:pl-4">{headerRight}</div>
+            <div className="shrink-0">{headerRight}</div>
           ) : null}
         </div>
       ) : null}
 
-      <div className="min-w-0">{children}</div>
+      <div>{children}</div>
     </Card>
   );
 }

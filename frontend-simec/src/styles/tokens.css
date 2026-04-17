@@ -48,8 +48,8 @@
   --bg-sidebar-hover: #182338;
   --bg-sidebar-active: #2f6df6;
 
-  --bg-topbar: #1f4db8;
-  --bg-breadcrumb: #10284f;
+  --bg-topbar: #08111f;
+  --bg-breadcrumb: #08111f;
 
   --border-default: #d8e1eb;
   --border-soft: #e7edf5;
@@ -60,15 +60,15 @@
   --text-muted: #70839c;
   --text-inverse: #ffffff;
 
-  --text-sidebar: #dbe7fb;
-  --text-sidebar-muted: #b7c7e6;
+  --text-sidebar: #ffffff;
+  --text-sidebar-muted: #ffffff;
   --text-sidebar-active: #ffffff;
 
   --text-topbar: #ffffff;
-  --text-topbar-muted: rgba(255, 255, 255, 0.78);
+  --text-topbar-muted: rgba(255, 255, 255, 0.82);
 
   --text-brand-surface: #ffffff;
-  --text-brand-surface-muted: rgba(255, 255, 255, 0.78);
+  --text-brand-surface-muted: rgba(255, 255, 255, 0.82);
 
   --overlay-bg: rgba(15, 23, 42, 0.44);
 
@@ -90,8 +90,8 @@
   --kpi-surface: #ffffff;
   --header-surface: linear-gradient(
     180deg,
-    rgba(22, 49, 104, 0.98) 0%,
-    rgba(29, 64, 125, 0.98) 100%
+    rgba(8, 17, 31, 0.98) 0%,
+    rgba(13, 23, 39, 0.98) 100%
   );
   --section-surface: #ffffff;
 }
