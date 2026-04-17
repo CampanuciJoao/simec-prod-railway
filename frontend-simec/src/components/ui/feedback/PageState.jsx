@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import LoadingState from './LoadingState';
-import EmptyState from './EmptyState';
+import EmptyState from '../layout/EmptyState';
 
 function ErrorState({ message }) {
   return (
