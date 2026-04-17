@@ -16,6 +16,9 @@ function PageHeader({
       className={['rounded-3xl px-5 py-5 sm:px-6 sm:py-6', className].join(' ')}
       surface="default"
       padded={false}
+      styleOverride={{
+        backgroundColor: 'var(--header-surface)',
+      }}
     >
       <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
         <div className="flex min-w-0 items-start gap-4">

@@ -13,11 +13,15 @@ function PageSection({
   const hasHeader = title || description || headerRight;
 
   return (
-    <Card className={className} surface="default">
+    <Card
+      className={className}
+      surface="default"
+      styleOverride={{ backgroundColor: 'var(--section-surface)' }}
+    >
       {hasHeader ? (
         <div
           className="mb-5 flex flex-col gap-4 border-b pb-4 sm:flex-row sm:items-start sm:justify-between"
-          style={{ borderColor: 'var(--section-header-border, var(--border-soft))' }}
+          style={{ borderColor: 'var(--section-header-border)' }}
         >
           <div className="min-w-0">
             {title ? (

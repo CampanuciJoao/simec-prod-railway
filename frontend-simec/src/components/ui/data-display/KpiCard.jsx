@@ -52,12 +52,13 @@ function KpiCard({
   const content = (
     <Card
       className={[
-        'h-full rounded-3xl border border-slate-200/80 bg-white/95 shadow-sm transition-all',
-        'dark:border-slate-800 dark:bg-slate-950/80',
-        isInteractive
-          ? 'hover:-translate-y-0.5 hover:shadow-lg'
-          : '',
+        'h-full rounded-3xl border transition-all',
+        isInteractive ? 'hover:-translate-y-0.5 hover:shadow-lg' : '',
       ].join(' ')}
+      styleOverride={{
+        backgroundColor: 'var(--kpi-surface)',
+        borderColor: 'var(--border-soft)',
+      }}
     >
       <div className="flex h-full items-start gap-4">
         <div

@@ -25,6 +25,7 @@ function Card({
   className = '',
   padded = true,
   surface = 'default',
+  styleOverride = {},
 }) {
   const surfaceStyle = surfaceStyleMap[surface] || surfaceStyleMap.default;
 
@@ -35,7 +36,10 @@ function Card({
         padded ? 'p-4 md:p-5' : '',
         className,
       ].join(' ')}
-      style={surfaceStyle}
+      style={{
+        ...surfaceStyle,
+        ...styleOverride,
+      }}
     >
       {children}
     </div>
@@ -47,6 +51,7 @@ Card.propTypes = {
   className: PropTypes.string,
   padded: PropTypes.bool,
   surface: PropTypes.oneOf(['default', 'soft', 'subtle', 'elevated']),
+  styleOverride: PropTypes.object,
 };
 
 export default Card;

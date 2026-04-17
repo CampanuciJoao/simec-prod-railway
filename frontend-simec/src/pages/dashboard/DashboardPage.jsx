@@ -43,71 +43,75 @@ function DashboardPage() {
 
   if (loading || error || isEmpty) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title="Dashboard"
-          subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
-          icon={faChartPie}
-        />
+      <PageLayout padded fullHeight>
+        <div className="space-y-6">
+          <PageHeader
+            title="Dashboard"
+            subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
+            icon={faChartPie}
+          />
 
-        <PageState
-          loading={loading}
-          error={error}
-          isEmpty={isEmpty}
-          emptyMessage="Nenhum dado disponível para o dashboard."
-        />
+          <PageState
+            loading={loading}
+            error={error}
+            isEmpty={isEmpty}
+            emptyMessage="Nenhum dado disponível para o dashboard."
+          />
+        </div>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout background="slate" padded fullHeight>
-      <div className="space-y-6">
-        <PageHeader
-          title="Dashboard"
-          subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
-          icon={faChartPie}
-        />
-
-        <ResponsiveGrid cols={{ base: 1, sm: 2, xl: 4 }}>
-          <KpiCard
-            to="/equipamentos"
-            icon={faHeartbeat}
-            title="Equipamentos"
-            value={data.totalEquipamentos}
-            subtitle="Parque total"
-            tone="green"
+    <PageLayout padded fullHeight>
+      <div className="space-y-8">
+        <div className="space-y-6">
+          <PageHeader
+            title="Dashboard"
+            subtitle="Acompanhe equipamentos, manutenções e alertas em tempo real"
+            icon={faChartPie}
           />
 
-          <KpiCard
-            to="/manutencoes"
-            icon={faWrench}
-            title="Manutenções abertas"
-            value={data.emManutencao}
-            subtitle="Ordens em andamento"
-            tone="yellow"
-          />
+          <ResponsiveGrid cols={{ base: 1, sm: 2, xl: 4 }}>
+            <KpiCard
+              to="/equipamentos"
+              icon={faHeartbeat}
+              title="Equipamentos"
+              value={data.totalEquipamentos}
+              subtitle="Parque total"
+              tone="green"
+            />
 
-          <KpiCard
-            to="/contratos"
-            icon={faFileContract}
-            title="Contratos vencendo"
-            value={data.contratosVencendo}
-            subtitle="Próximos 30 dias"
-            tone="red"
-          />
+            <KpiCard
+              to="/manutencoes"
+              icon={faWrench}
+              title="Manutenções abertas"
+              value={data.emManutencao}
+              subtitle="Ordens em andamento"
+              tone="yellow"
+            />
 
-          <KpiCard
-            to="/alertas"
-            icon={faBell}
-            title="Alertas ativos"
-            value={data.alertasAtivos}
-            subtitle="Não visualizados"
-            tone="blue"
-          />
-        </ResponsiveGrid>
+            <KpiCard
+              to="/contratos"
+              icon={faFileContract}
+              title="Contratos vencendo"
+              value={data.contratosVencendo}
+              subtitle="Próximos 30 dias"
+              tone="red"
+            />
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.05fr_1.2fr]">
+            <KpiCard
+              to="/alertas"
+              icon={faBell}
+              title="Alertas ativos"
+              value={data.alertasAtivos}
+              subtitle="Não visualizados"
+              tone="blue"
+            />
+          </ResponsiveGrid>
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1.05fr)_minmax(0,1.15fr)]">
           <PageSection
             className="h-full"
             title="Últimos avisos"
@@ -115,7 +119,7 @@ function DashboardPage() {
             headerRight={
               <Link
                 to="/alertas"
-                className="inline-flex items-center gap-2 text-sm font-medium transition hover:underline"
+                className="inline-flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
                 style={{ color: 'var(--brand-primary)' }}
               >
                 Ver todos
@@ -124,7 +128,7 @@ function DashboardPage() {
             }
           >
             {data.alertas.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {data.alertas.slice(0, 10).map((alerta) => (
                   <AlertListItem key={alerta.id} alerta={alerta} />
                 ))}
@@ -134,13 +138,20 @@ function DashboardPage() {
             )}
           </PageSection>
 
-          <div className="grid grid-cols-1 gap-6">
+          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2 2xl:grid-cols-1">
             <PageSection
               title="Status dos equipamentos"
               description="Distribuição atual por condição operacional"
             >
-              <div className="h-[240px]">
-                <DonutChart data={data.statusEquipamentos} />
+              <div className="flex min-h-[280px] items-center justify-center rounded-2xl border"
+                style={{
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: 'var(--bg-surface-soft)',
+                }}
+              >
+                <div className="h-[240px] w-full max-w-[360px]">
+                  <DonutChart data={data.statusEquipamentos} />
+                </div>
               </div>
             </PageSection>
 
@@ -148,8 +159,16 @@ function DashboardPage() {
               title="Manutenções nos últimos meses"
               description="Volume total de ordens registradas no período"
             >
-              <div className="h-[240px]">
-                <BarChart data={data.manutencoesPorTipo} />
+              <div
+                className="rounded-2xl border p-3 sm:p-4"
+                style={{
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: 'var(--bg-surface-soft)',
+                }}
+              >
+                <div className="h-[240px]">
+                  <BarChart data={data.manutencoesPorTipo} />
+                </div>
               </div>
             </PageSection>
           </div>

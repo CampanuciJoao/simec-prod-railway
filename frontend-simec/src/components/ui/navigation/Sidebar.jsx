@@ -95,7 +95,7 @@ function Sidebar({
           </button>
         </div>
 
-        <div className="mt-5 flex-1 overflow-y-auto px-3 pb-6">
+        <div className="scrollbar-none mt-5 flex-1 overflow-y-auto px-3 pb-6">
           <nav>
             <ul className="space-y-2">
               {mainItems.map((item) => (
