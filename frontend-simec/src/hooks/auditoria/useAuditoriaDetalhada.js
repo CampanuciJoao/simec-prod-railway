@@ -27,7 +27,7 @@ export function useAuditoriaDetalhada(entidade, entidadeId) {
       });
 
       setLogs(Array.isArray(data?.logs) ? data.logs : []);
-    } catch (err) {
+    } catch {
       addToast('Erro ao carregar log de auditoria.', 'error');
       setLogs([]);
     } finally {

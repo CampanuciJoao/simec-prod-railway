@@ -14,14 +14,12 @@ function SeguroForm({
   initialData,
   isEditing,
   equipamentosDisponiveis,
-  unidadesDisponiveis,
   onCancel,
 }) {
   const {
     formData,
     handleChange,
     coberturaFields,
-    equipamentosFiltrados,
     isSubmitting,
     setIsSubmitting,
     error,
@@ -43,7 +41,7 @@ function SeguroForm({
       const payload = buildPayload();
 
       await onSubmit(payload);
-    } catch (err) {
+    } catch {
       setError('Erro ao salvar seguro');
     } finally {
       setIsSubmitting(false);

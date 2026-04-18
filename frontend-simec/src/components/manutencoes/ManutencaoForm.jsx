@@ -44,7 +44,6 @@ function ManutencaoForm({
     handleChange,
     equipamentosFiltrados,
     unidades,
-    unidadeSelecionada,
     isCorretiva,
     intervaloValido,
     isValid,

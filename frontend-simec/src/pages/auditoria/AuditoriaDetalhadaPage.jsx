@@ -2,7 +2,6 @@ import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSpinner,
   faArrowLeft,
   faScroll,
 } from '@fortawesome/free-solid-svg-icons';

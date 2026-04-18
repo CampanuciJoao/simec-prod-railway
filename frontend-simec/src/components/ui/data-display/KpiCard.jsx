@@ -118,9 +118,9 @@ function KpiCard({
 
 KpiCard.propTypes = {
   icon: PropTypes.object.isRequired,
-  title: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-  subtitle: PropTypes.string,
+  title: PropTypes.node.isRequired,
+  value: PropTypes.node.isRequired,
+  subtitle: PropTypes.node,
   tone: PropTypes.oneOf([
     'slate',
     'blue',

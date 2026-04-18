@@ -5,7 +5,7 @@ import {
   faCircleInfo,
 } from '@fortawesome/free-solid-svg-icons';
 
-function DrawerListItem({ item, index }) {
+function DrawerListItem({ item }) {
   const Wrapper = item.onClick ? 'button' : 'div';
 
   return (
@@ -82,7 +82,6 @@ function DrawerList({
           <DrawerListItem
             key={`${item.title}-${index}`}
             item={item}
-            index={index}
           />
         ))}
       </div>

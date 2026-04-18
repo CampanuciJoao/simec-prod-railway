@@ -1,17 +1,14 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faTimeline,
-  faPaperclip,
-} from '@fortawesome/free-solid-svg-icons';
+import { faTimeline } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  PageSection,
-  CompactAttachmentList,
-  EmptyState,
-  Textarea,
+  AttachmentSection,
   Button,
+  EmptyState,
+  PageSection,
+  Textarea,
 } from '@/components/ui';
 
 function HistoricoEAnexosManutencaoSection({
@@ -54,8 +51,7 @@ function HistoricoEAnexosManutencaoSection({
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.2fr_0.8fr]">
-      {/* HISTÓRICO */}
-      <PageSection title="Histórico de andamento">
+      <PageSection title="Historico de andamento">
         <div className="space-y-4">
           <div className="flex items-start gap-3">
             <span
@@ -73,14 +69,14 @@ function HistoricoEAnexosManutencaoSection({
                 className="text-sm font-semibold"
                 style={{ color: 'var(--text-primary)' }}
               >
-                Acontecimentos da manutenção
+                Acontecimentos da manutencao
               </p>
 
               <p
                 className="text-sm"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Registre visitas, testes, peças trocadas e observações.
+                Registre visitas, testes, pecas trocadas e observacoes.
               </p>
             </div>
           </div>
@@ -136,53 +132,32 @@ function HistoricoEAnexosManutencaoSection({
         </div>
       </PageSection>
 
-      {/* ANEXOS */}
-      <PageSection title="Anexos da OS">
-        <div className="space-y-3">
-          <div className="flex items-start gap-3">
-            <span
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full"
-              style={{
-                backgroundColor: 'var(--color-danger-soft)',
-                color: 'var(--color-danger)',
-              }}
-            >
-              <FontAwesomeIcon icon={faPaperclip} />
-            </span>
-
-            <div>
-              <p
-                className="text-sm font-semibold"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                Anexar documentos
-              </p>
-
-              <p
-                className="text-sm"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                PDFs, imagens e laudos da manutenção.
-              </p>
-            </div>
-          </div>
-
-          <CompactAttachmentList
-            attachments={anexos}
-            uploadLabel="Anexar OS"
-            emptyMessage="Nenhum anexo enviado para esta OS."
-            isUploading={submitting}
-            isDeleting={submitting}
-            multiple
-            onUpload={handleUpload}
-            onDelete={(attachment) => onRemoverAnexo(attachment.id)}
-            getAttachmentName={(attachment) => attachment.nomeOriginal}
-            getAttachmentUrl={(attachment) => attachment.path}
-          />
-        </div>
-      </PageSection>
+      <AttachmentSection
+        title="Anexos da OS"
+        summaryTitle="Anexar documentos"
+        summaryText="PDFs, imagens e laudos da manutencao."
+        iconTone="danger"
+        attachments={anexos}
+        uploadLabel="Anexar OS"
+        emptyMessage="Nenhum anexo enviado para esta OS."
+        isUploading={submitting}
+        isDeleting={submitting}
+        multiple
+        onUpload={handleUpload}
+        onDelete={(attachment) => onRemoverAnexo(attachment.id)}
+        getAttachmentName={(attachment) => attachment.nomeOriginal}
+        getAttachmentUrl={(attachment) => attachment.path}
+      />
     </div>
   );
 }
+
+HistoricoEAnexosManutencaoSection.propTypes = {
+  manutencao: PropTypes.object,
+  onAdicionarNota: PropTypes.func.isRequired,
+  onUploadAnexos: PropTypes.func.isRequired,
+  onRemoverAnexo: PropTypes.func.isRequired,
+  submitting: PropTypes.bool,
+};
 
 export default HistoricoEAnexosManutencaoSection;

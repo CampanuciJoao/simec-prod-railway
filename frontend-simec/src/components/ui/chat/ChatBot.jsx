@@ -13,7 +13,7 @@ import { useChat } from '@/hooks/chat/useChat';
 function ChatBot() {
   const [isOpen, setIsOpen] = useState(false);
 
-  const { messages, isTyping, sendMessage, resetChat } = useChat();
+  const { messages, sendMessage, resetChat } = useChat();
 
   return (
     <>

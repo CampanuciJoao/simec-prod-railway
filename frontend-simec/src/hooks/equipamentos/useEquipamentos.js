@@ -156,7 +156,7 @@ export const useEquipamentos = () => {
         await deleteEquipamento(id);
         addToast('Equipamento excluído!', 'success');
         fetchData();
-      } catch (err) {
+      } catch {
         addToast('Erro ao excluir.', 'error');
       }
     },

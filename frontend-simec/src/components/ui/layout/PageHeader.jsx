@@ -68,8 +68,8 @@ function PageHeader({
 }
 
 PageHeader.propTypes = {
-  title: PropTypes.string.isRequired,
-  subtitle: PropTypes.string,
+  title: PropTypes.node.isRequired,
+  subtitle: PropTypes.node,
   icon: PropTypes.object,
   actions: PropTypes.node,
   className: PropTypes.string,

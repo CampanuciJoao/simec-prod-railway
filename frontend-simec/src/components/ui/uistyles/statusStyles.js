@@ -78,3 +78,12 @@ export function getStatusTone(value) {
   const variant = getStatusVariant(value);
   return STATUS_TONE_MAP[variant] || STATUS_TONE_MAP.slate;
 }
+
+export function formatStatusLabel(value) {
+  if (!value) return 'N/A';
+
+  return String(value)
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .trim();
+}

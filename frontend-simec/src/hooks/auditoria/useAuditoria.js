@@ -5,6 +5,43 @@ import debounce from 'lodash/debounce';
 import { getLogAuditoria, getFiltrosAuditoria } from '@/services/api';
 import { useToast } from '@/contexts/ToastContext';
 
+function createFetchLogs(addToast, setLogs, setPagination, setLoading, setLoadingMore) {
+  return debounce(async (currentFilters, page = 1) => {
+    if (page === 1) {
+      setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const params = Object.fromEntries(
+        Object.entries(currentFilters).filter(
+          ([, value]) => value != null && value !== ''
+        )
+      );
+
+      params.page = page;
+      params.limit = 50;
+
+      const data = await getLogAuditoria(params);
+
+      setLogs((prevLogs) =>
+        page === 1 ? data.logs || [] : [...prevLogs, ...(data.logs || [])]
+      );
+
+      setPagination({
+        page: data?.pagination?.page || page,
+        hasNextPage: Boolean(data?.pagination?.hasNextPage),
+      });
+    } catch {
+      addToast('Erro ao carregar os logs de auditoria.', 'error');
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }, 300);
+}
+
 export function useAuditoria() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -35,40 +72,13 @@ export function useAuditoria() {
   const [loadingMore, setLoadingMore] = useState(false);
 
   const fetchLogs = useCallback(
-    debounce(async (currentFilters, page = 1) => {
-      if (page === 1) {
-        setLoading(true);
-      } else {
-        setLoadingMore(true);
-      }
-
-      try {
-        const params = Object.fromEntries(
-          Object.entries(currentFilters).filter(
-            ([, value]) => value != null && value !== ''
-          )
-        );
-
-        params.page = page;
-        params.limit = 50;
-
-        const data = await getLogAuditoria(params);
-
-        setLogs((prevLogs) =>
-          page === 1 ? data.logs || [] : [...prevLogs, ...(data.logs || [])]
-        );
-
-        setPagination({
-          page: data?.pagination?.page || page,
-          hasNextPage: Boolean(data?.pagination?.hasNextPage),
-        });
-      } catch (error) {
-        addToast('Erro ao carregar os logs de auditoria.', 'error');
-      } finally {
-        setLoading(false);
-        setLoadingMore(false);
-      }
-    }, 300),
+    createFetchLogs(
+      addToast,
+      setLogs,
+      setPagination,
+      setLoading,
+      setLoadingMore
+    ),
     [addToast]
   );
 
@@ -82,8 +92,8 @@ export function useAuditoria() {
           acoes: Array.isArray(data?.acoes) ? data.acoes : [],
           entidades: Array.isArray(data?.entidades) ? data.entidades : [],
         });
-      } catch (error) {
-        addToast('Erro ao carregar opções de filtro.', 'error');
+      } catch {
+        addToast('Erro ao carregar opcoes de filtro.', 'error');
       }
     };
 
@@ -110,6 +120,10 @@ export function useAuditoria() {
   useEffect(() => {
     setPagination({ page: 1, hasNextPage: false });
     fetchLogs(filtros, 1);
+
+    return () => {
+      fetchLogs.cancel?.();
+    };
   }, [filtros, fetchLogs]);
 
   const carregarMaisLogs = () => {

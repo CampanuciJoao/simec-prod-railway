@@ -1,5 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+
+import { StatusBadge } from '@/components/ui';
 import { formatarDataHora } from '../../utils/timeUtils';
 import { formatarDowntime } from '../../utils/bi/downtimeUtils';
 
@@ -10,33 +12,6 @@ function EmptyState() {
     </div>
   );
 }
-
-function StatusBadge({ status }) {
-  const normalized = String(status || '').toLowerCase();
-
-  const tone =
-    normalized === 'operante'
-      ? 'bg-emerald-100 text-emerald-700'
-      : normalized === 'inoperante'
-        ? 'bg-red-100 text-red-700'
-        : normalized === 'usolimitado'
-          ? 'bg-amber-100 text-amber-700'
-          : normalized === 'emmanutencao'
-            ? 'bg-blue-100 text-blue-700'
-            : 'bg-slate-100 text-slate-700';
-
-  return (
-    <span
-      className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}
-    >
-      {status || 'N/A'}
-    </span>
-  );
-}
-
-StatusBadge.propTypes = {
-  status: PropTypes.string,
-};
 
 function TableShell({ headers, rows }) {
   return (
@@ -87,7 +62,7 @@ function RelatorioResultado({ resultado }) {
   if (tipoRelatorio === 'inventarioEquipamentos') {
     const headers = [
       { key: 'modelo', label: 'Modelo', align: 'left' },
-      { key: 'tag', label: 'Nº Série / Tag', align: 'center' },
+      { key: 'tag', label: 'N Serie / Tag', align: 'center' },
       { key: 'fabricante', label: 'Fabricante', align: 'center' },
       { key: 'anvisa', label: 'Registro ANVISA', align: 'center' },
       { key: 'status', label: 'Status', align: 'center' },
@@ -112,7 +87,7 @@ function RelatorioResultado({ resultado }) {
           {item.registroAnvisa || 'N/A'}
         </td>
         <td className="px-4 py-3 text-center">
-          <StatusBadge status={item.status} />
+          <StatusBadge value={item.status} />
         </td>
         <td className="px-4 py-3 text-left text-slate-700">
           {item.unidade?.nomeSistema || 'N/A'}
@@ -125,11 +100,11 @@ function RelatorioResultado({ resultado }) {
 
   if (tipoRelatorio === 'manutencoesRealizadas') {
     const headers = [
-      { key: 'os', label: 'Nº OS / Chamado', align: 'center' },
-      { key: 'conclusao', label: 'Conclusão', align: 'center' },
+      { key: 'os', label: 'N OS / Chamado', align: 'center' },
+      { key: 'conclusao', label: 'Conclusao', align: 'center' },
       { key: 'equipamento', label: 'Equipamento / Unidade', align: 'left' },
-      { key: 'responsavel', label: 'Responsável', align: 'center' },
-      { key: 'descricao', label: 'Descrição do Serviço', align: 'left' },
+      { key: 'responsavel', label: 'Responsavel', align: 'center' },
+      { key: 'descricao', label: 'Descricao do Servico', align: 'left' },
     ];
 
     const rows = dados.map((item, index) => (
@@ -139,7 +114,7 @@ function RelatorioResultado({ resultado }) {
       >
         <td className="px-4 py-3 text-center">
           <div className="font-semibold text-slate-900">
-            {item.numeroOS || '—'}
+            {item.numeroOS || '-'}
           </div>
           <div className="mt-1 text-xs text-slate-500">
             {item.numeroChamado ? `Chamado: ${item.numeroChamado}` : '-'}
@@ -175,8 +150,8 @@ function RelatorioResultado({ resultado }) {
   if (tipoRelatorio === 'tempoParada') {
     const headers = [
       { key: 'equipamento', label: 'Equipamento', align: 'left' },
-      { key: 'os', label: 'Nº OS', align: 'center' },
-      { key: 'inicio', label: 'Início', align: 'center' },
+      { key: 'os', label: 'N OS', align: 'center' },
+      { key: 'inicio', label: 'Inicio', align: 'center' },
       { key: 'fim', label: 'Fim', align: 'center' },
       { key: 'total', label: 'Total parado', align: 'center' },
     ];
@@ -190,7 +165,7 @@ function RelatorioResultado({ resultado }) {
           {item.equipamentoNome || 'N/A'} ({item.equipamentoId || 'N/A'})
         </td>
         <td className="px-4 py-3 text-center text-slate-700">
-          {item.numeroOS || '—'}
+          {item.numeroOS || '-'}
         </td>
         <td className="px-4 py-3 text-center text-slate-700">
           {formatarDataHora(item.dataInicio)}
@@ -209,7 +184,7 @@ function RelatorioResultado({ resultado }) {
 
   return (
     <div className="rounded-2xl border border-red-200 bg-red-50 p-6 text-sm text-red-700">
-      Tipo de relatório não implementado.
+      Tipo de relatorio nao implementado.
     </div>
   );
 }

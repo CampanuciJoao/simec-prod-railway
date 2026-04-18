@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { faArrowLeft, faShieldAlt } from '@fortawesome/free-solid-svg-icons';
+import { faShieldAlt } from '@fortawesome/free-solid-svg-icons';
 
 import { useDetalhesSeguroPage } from '@/hooks/seguros/useDetalhesSeguroPage';
 

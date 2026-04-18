@@ -8,9 +8,6 @@ import {
   faEyeSlash,
   faBellSlash,
   faClock,
-  faInfoCircle,
-  faTriangleExclamation,
-  faCircleCheck,
   faWrench,
   faArrowUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';

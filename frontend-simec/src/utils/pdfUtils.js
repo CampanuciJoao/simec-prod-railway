@@ -1,14 +1,11 @@
 // Ficheiro: src/utils/pdfUtils.js
-// VERSÃO AJUSTADA - COMPATÍVEL COM CHAT, PDF-DATA E RELATÓRIOS
+// VERSAO AJUSTADA - COMPATIVEL COM CHAT, PDF-DATA E RELATORIOS
 
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { formatarDataHora } from './timeUtils';
 import logoSimec from '../assets/images/logo-simec-base64';
 
-/**
- * Helpers
- */
 const textoSeguro = (valor, fallback = 'N/A') => {
   if (valor === null || valor === undefined || valor === '') return fallback;
   return String(valor);
@@ -18,7 +15,7 @@ const dataSegura = (valor, fallback = 'N/A') => {
   if (!valor) return fallback;
   try {
     return formatarDataHora(valor);
-  } catch (error) {
+  } catch {
     return fallback;
   }
 };
@@ -26,12 +23,12 @@ const dataSegura = (valor, fallback = 'N/A') => {
 const adicionarRodapePaginas = (doc, prefixo = 'SIMEC') => {
   const totalPaginas = doc.internal.getNumberOfPages();
 
-  for (let i = 1; i <= totalPaginas; i++) {
+  for (let i = 1; i <= totalPaginas; i += 1) {
     doc.setPage(i);
     doc.setFontSize(8);
     doc.setTextColor(150);
     doc.text(
-      `${prefixo} - Página ${i} de ${totalPaginas}`,
+      `${prefixo} - Pagina ${i} de ${totalPaginas}`,
       doc.internal.pageSize.getWidth() / 2,
       doc.internal.pageSize.getHeight() - 10,
       { align: 'center' }
@@ -39,14 +36,11 @@ const adicionarRodapePaginas = (doc, prefixo = 'SIMEC') => {
   }
 };
 
-/**
- * 1. CABEÇALHO PADRÃO
- */
 const adicionarCabecalho = (doc, titulo) => {
   try {
     doc.addImage(logoSimec, 'PNG', 14, 10, 22, 22);
-  } catch (e) {
-    // ignora erro de imagem sem quebrar geração do PDF
+  } catch {
+    // ignora erro de imagem sem quebrar geracao do PDF
   }
 
   doc.setFontSize(8);
@@ -57,7 +51,7 @@ const adicionarCabecalho = (doc, titulo) => {
   doc.setTextColor(30, 41, 59);
   doc.setFont(undefined, 'bold');
   doc.text(
-    textoSeguro(titulo, 'RELATÓRIO').toUpperCase(),
+    textoSeguro(titulo, 'RELATORIO').toUpperCase(),
     doc.internal.pageSize.getWidth() / 2,
     45,
     { align: 'center' }
@@ -67,12 +61,9 @@ const adicionarCabecalho = (doc, titulo) => {
   doc.line(14, 52, 196, 52);
 };
 
-/**
- * 2. PDF DE AUDITORIA DO ATIVO
- */
 export const exportarHistoricoEquipamentoPDF = (dados = [], info = {}) => {
   const doc = new jsPDF();
-  adicionarCabecalho(doc, 'RELATÓRIO DE AUDITORIA DE ATIVO');
+  adicionarCabecalho(doc, 'RELATORIO DE AUDITORIA DE ATIVO');
 
   doc.setFillColor(248, 250, 252);
   doc.rect(14, 58, 182, 22, 'F');
@@ -83,7 +74,7 @@ export const exportarHistoricoEquipamentoPDF = (dados = [], info = {}) => {
   doc.setTextColor(30);
   doc.setFont(undefined, 'bold');
   doc.text('EQUIPAMENTO:', 18, 64);
-  doc.text('Nº SÉRIE (TAG):', 18, 70);
+  doc.text('N SERIE (TAG):', 18, 70);
   doc.text('UNIDADE:', 18, 76);
 
   doc.setFont(undefined, 'normal');
@@ -93,12 +84,12 @@ export const exportarHistoricoEquipamentoPDF = (dados = [], info = {}) => {
 
   const periodoTxt =
     info.inicio || info.fim
-      ? `Período: ${textoSeguro(info.inicio, 'Início')} até ${textoSeguro(info.fim, 'Hoje')}`
-      : 'Período: Histórico Completo';
+      ? `Periodo: ${textoSeguro(info.inicio, 'Inicio')} ate ${textoSeguro(info.fim, 'Hoje')}`
+      : 'Periodo: Historico Completo';
 
   doc.text(periodoTxt, 120, 64);
 
-  const headers = [['DATA EXECUÇÃO', 'CATEGORIA', 'EVENTO / OS', 'RESPONSÁVEL', 'STATUS']];
+  const headers = [['DATA EXECUCAO', 'CATEGORIA', 'EVENTO / OS', 'RESPONSAVEL', 'STATUS']];
   const body = (Array.isArray(dados) ? dados : []).map((item) => [
     dataSegura(item?.data),
     textoSeguro(item?.categoria),
@@ -106,7 +97,7 @@ export const exportarHistoricoEquipamentoPDF = (dados = [], info = {}) => {
       ? `${textoSeguro(item?.titulo)} (Chamado: ${textoSeguro(item?.chamado)})`
       : textoSeguro(item?.titulo),
     textoSeguro(item?.responsavel),
-    textoSeguro(item?.status)
+    textoSeguro(item?.status),
   ]);
 
   autoTable(doc, {
@@ -119,36 +110,33 @@ export const exportarHistoricoEquipamentoPDF = (dados = [], info = {}) => {
     columnStyles: {
       0: { halign: 'center', cellWidth: 30 },
       1: { halign: 'center', cellWidth: 25 },
-      4: { halign: 'center', cellWidth: 25 }
-    }
+      4: { halign: 'center', cellWidth: 25 },
+    },
   });
 
   adicionarRodapePaginas(doc, 'Auditoria SIMEC');
   doc.save(`auditoria_${textoSeguro(info.tag, 'Equipamento')}.pdf`);
 };
 
-/**
- * 3. PDF DE RELATÓRIOS GERAIS
- */
 export const exportarRelatorioPDF = (resultado = {}, nomeArquivo = 'relatorio') => {
   const doc = new jsPDF();
   let headers = [];
   let body = [];
-  let tituloRelatorio = 'RELATÓRIO';
+  let tituloRelatorio = 'RELATORIO';
   let configuracaoColunas = {};
 
   const dados = Array.isArray(resultado?.dados) ? resultado.dados : [];
 
   if (resultado?.tipoRelatorio === 'inventarioEquipamentos') {
-    tituloRelatorio = 'RELATÓRIO DE INVENTÁRIO DE ATIVOS';
-    headers = [['MODELO', 'SÉRIE / TAG', 'FABRICANTE', 'REGISTRO ANVISA', 'STATUS', 'UNIDADE']];
+    tituloRelatorio = 'RELATORIO DE INVENTARIO DE ATIVOS';
+    headers = [['MODELO', 'SERIE / TAG', 'FABRICANTE', 'REGISTRO ANVISA', 'STATUS', 'UNIDADE']];
     body = dados.map((item) => [
       textoSeguro(item?.modelo),
       textoSeguro(item?.tag),
       textoSeguro(item?.fabricante),
       textoSeguro(item?.registroAnvisa),
       textoSeguro(item?.status),
-      textoSeguro(item?.unidade?.nomeSistema)
+      textoSeguro(item?.unidade?.nomeSistema),
     ]);
 
     configuracaoColunas = {
@@ -156,18 +144,18 @@ export const exportarRelatorioPDF = (resultado = {}, nomeArquivo = 'relatorio') 
       1: { cellWidth: 30, halign: 'center' },
       2: { cellWidth: 30, halign: 'center' },
       3: { cellWidth: 30, halign: 'center' },
-      4: { cellWidth: 25, halign: 'center' }
+      4: { cellWidth: 25, halign: 'center' },
     };
   } else if (resultado?.tipoRelatorio === 'manutencoesRealizadas') {
-    tituloRelatorio = 'RELATÓRIO DE MANUTENÇÕES REALIZADAS';
-    headers = [['OS / CHAMADO', 'CONCLUSÃO', 'EQUIPAMENTO / UNIDADE', 'RESPONSÁVEL', 'DESCRIÇÃO DO SERVIÇO']];
+    tituloRelatorio = 'RELATORIO DE MANUTENCOES REALIZADAS';
+    headers = [['OS / CHAMADO', 'CONCLUSAO', 'EQUIPAMENTO / UNIDADE', 'RESPONSAVEL', 'DESCRICAO DO SERVICO']];
 
     body = dados.map((item) => [
-      `${textoSeguro(item?.numeroOS)}${item?.numeroChamado ? '\nChamado: ' + textoSeguro(item?.numeroChamado) : ''}`,
+      `${textoSeguro(item?.numeroOS)}${item?.numeroChamado ? `\nChamado: ${textoSeguro(item?.numeroChamado)}` : ''}`,
       dataSegura(item?.dataConclusao),
       `${textoSeguro(item?.equipamento?.modelo)} (${textoSeguro(item?.equipamento?.tag)})\nUnidade: ${textoSeguro(item?.equipamento?.unidade?.nomeSistema)}`,
       textoSeguro(item?.tecnicoResponsavel),
-      textoSeguro(item?.descricaoProblemaServico, '-')
+      textoSeguro(item?.descricaoProblemaServico, '-'),
     ]);
 
     configuracaoColunas = {
@@ -175,15 +163,15 @@ export const exportarRelatorioPDF = (resultado = {}, nomeArquivo = 'relatorio') 
       1: { cellWidth: 32, halign: 'center' },
       2: { cellWidth: 45 },
       3: { cellWidth: 30, halign: 'center' },
-      4: { cellWidth: 'auto' }
+      4: { cellWidth: 'auto' },
     };
   }
 
   adicionarCabecalho(doc, tituloRelatorio);
 
   autoTable(doc, {
-    head: headers.length ? headers : [['INFORMAÇÃO']],
-    body: body.length ? body : [['Nenhum dado encontrado para este relatório.']],
+    head: headers.length ? headers : [['INFORMACAO']],
+    body: body.length ? body : [['Nenhum dado encontrado para este relatorio.']],
     startY: 60,
     theme: 'grid',
     headStyles: {
@@ -191,41 +179,38 @@ export const exportarRelatorioPDF = (resultado = {}, nomeArquivo = 'relatorio') 
       fontSize: 8.5,
       halign: 'center',
       valign: 'middle',
-      cellPadding: 3
+      cellPadding: 3,
     },
     bodyStyles: {
       fontSize: 7.5,
       textColor: [40, 40, 40],
       valign: 'top',
-      cellPadding: 3
+      cellPadding: 3,
     },
     columnStyles: configuracaoColunas,
     styles: { overflow: 'linebreak' },
-    alternateRowStyles: { fillColor: [250, 250, 250] }
+    alternateRowStyles: { fillColor: [250, 250, 250] },
   });
 
-  adicionarRodapePaginas(doc, 'Relatórios SIMEC');
+  adicionarRodapePaginas(doc, 'Relatorios SIMEC');
   doc.save(`${nomeArquivo}.pdf`);
 };
 
-/**
- * 4. PDF DE INDICADORES BI
- */
 export const exportarBIPDF = (dados) => {
   const doc = new jsPDF();
-  adicionarCabecalho(doc, `RELATÓRIO EXECUTIVO DE PERFORMANCE - ${textoSeguro(dados?.ano)}`);
+  adicionarCabecalho(doc, `RELATORIO EXECUTIVO DE PERFORMANCE - ${textoSeguro(dados?.ano)}`);
 
   autoTable(doc, {
     head: [['INDICADOR OPERACIONAL', 'VALOR ACUMULADO']],
     body: [
       ['TOTAL DE ATIVOS NO SISTEMA', textoSeguro(dados?.resumoGeral?.totalAtivos, '0')],
-      ['MANUTENÇÕES PREVENTIVAS REALIZADAS', textoSeguro(dados?.resumoGeral?.preventivas, '0')],
-      ['MANUTENÇÕES CORRETIVAS (PARADAS)', textoSeguro(dados?.resumoGeral?.corretivas, '0')]
+      ['MANUTENCOES PREVENTIVAS REALIZADAS', textoSeguro(dados?.resumoGeral?.preventivas, '0')],
+      ['MANUTENCOES CORRETIVAS (PARADAS)', textoSeguro(dados?.resumoGeral?.corretivas, '0')],
     ],
     startY: 65,
     theme: 'grid',
     headStyles: { fillColor: [30, 41, 59], halign: 'center', fontSize: 10 },
-    bodyStyles: { fontStyle: 'bold', halign: 'center', fontSize: 9, cellPadding: 4 }
+    bodyStyles: { fontStyle: 'bold', halign: 'center', fontSize: 9, cellPadding: 4 },
   });
 
   doc.setFontSize(11);
@@ -233,30 +218,30 @@ export const exportarBIPDF = (dados) => {
   doc.text('1. TEMPO DE PARADA (DOWNTIME) POR UNIDADE', 14, doc.lastAutoTable.finalY + 15);
 
   autoTable(doc, {
-    head: [['UNIDADE / LOCAL', 'HORAS TOTAIS FORA DE OPERAÇÃO']],
+    head: [['UNIDADE / LOCAL', 'HORAS TOTAIS FORA DE OPERACAO']],
     body: (dados?.rankingUnidades || []).map((u) => [
       textoSeguro(u?.nome),
-      `${textoSeguro(u?.horasParado, '0')} Horas`
+      `${textoSeguro(u?.horasParado, '0')} Horas`,
     ]),
     startY: doc.lastAutoTable.finalY + 20,
     theme: 'grid',
     headStyles: { fillColor: [59, 130, 246] },
-    styles: { fontSize: 8.5 }
+    styles: { fontSize: 8.5 },
   });
 
-  doc.text('2. REINCIDÊNCIA DE FALHAS (CONTINGENTE DE CORRETIVAS)', 14, doc.lastAutoTable.finalY + 15);
+  doc.text('2. REINCIDENCIA DE FALHAS (CONTINGENTE DE CORRETIVAS)', 14, doc.lastAutoTable.finalY + 15);
 
   autoTable(doc, {
     head: [['EQUIPAMENTO / TAG', 'UNIDADE', 'QTD. FALHAS']],
     body: (dados?.rankingFrequencia || []).map((e) => [
       `${textoSeguro(e?.modelo)} (${textoSeguro(e?.tag)})`,
       textoSeguro(e?.unidade),
-      textoSeguro(e?.corretivas, '0')
+      textoSeguro(e?.corretivas, '0'),
     ]),
     startY: doc.lastAutoTable.finalY + 20,
     theme: 'grid',
     headStyles: { fillColor: [239, 68, 68] },
-    styles: { fontSize: 8.5 }
+    styles: { fontSize: 8.5 },
   });
 
   doc.text('3. TOP EQUIPAMENTOS COM MAIOR TEMPO PARADO (DOWNTIME)', 14, doc.lastAutoTable.finalY + 15);
@@ -266,34 +251,31 @@ export const exportarBIPDF = (dados) => {
     body: (dados?.rankingDowntime || []).map((e) => [
       `${textoSeguro(e?.modelo)} (${textoSeguro(e?.tag)})`,
       textoSeguro(e?.unidade),
-      `${textoSeguro(e?.horasParado, '0')}h`
+      `${textoSeguro(e?.horasParado, '0')}h`,
     ]),
     startY: doc.lastAutoTable.finalY + 20,
     theme: 'grid',
     headStyles: { fillColor: [245, 158, 11] },
-    styles: { fontSize: 8.5 }
+    styles: { fontSize: 8.5 },
   });
 
-  adicionarRodapePaginas(doc, 'Relatório BI SIMEC');
+  adicionarRodapePaginas(doc, 'Relatorio BI SIMEC');
   doc.save(`BI_ESTRATEGICO_SIMEC_${textoSeguro(dados?.ano, 'ANO')}.pdf`);
 };
 
-/**
- * 5. PDF DE ORDEM DE SERVIÇO DETALHADA
- */
 export const exportarOSManutencaoPDF = (m = {}) => {
   const doc = new jsPDF();
 
   try {
     doc.addImage(logoSimec, 'PNG', 14, 10, 22, 22);
-  } catch (e) {
+  } catch {
     // ignora erro de imagem
   }
 
   doc.setFontSize(18);
   doc.setTextColor(30, 41, 59);
   doc.setFont(undefined, 'bold');
-  doc.text(`ORDEM DE SERVIÇO: ${textoSeguro(m?.numeroOS)}`, 45, 20);
+  doc.text(`ORDEM DE SERVICO: ${textoSeguro(m?.numeroOS)}`, 45, 20);
 
   doc.setFontSize(9);
   doc.setFont(undefined, 'normal');
@@ -302,7 +284,7 @@ export const exportarOSManutencaoPDF = (m = {}) => {
   doc.setFillColor(241, 245, 249);
   doc.rect(14, 35, 182, 8, 'F');
   doc.setFont(undefined, 'bold');
-  doc.text('INFORMAÇÕES DO EQUIPAMENTO', 16, 40);
+  doc.text('INFORMACOES DO EQUIPAMENTO', 16, 40);
 
   const nomeUnidade =
     m?.equipamento?.unidade?.nomeSistema ||
@@ -313,21 +295,21 @@ export const exportarOSManutencaoPDF = (m = {}) => {
     startY: 45,
     theme: 'plain',
     body: [
-      ['MODELO:', textoSeguro(m?.equipamento?.modelo), 'Nº SÉRIE / TAG:', textoSeguro(m?.equipamento?.tag)],
+      ['MODELO:', textoSeguro(m?.equipamento?.modelo), 'N SERIE / TAG:', textoSeguro(m?.equipamento?.tag)],
       ['UNIDADE:', textoSeguro(nomeUnidade), 'TIPO:', textoSeguro(m?.tipo)],
-      ['Nº CHAMADO:', textoSeguro(m?.numeroChamado), 'STATUS ATUAL:', textoSeguro(m?.status).toUpperCase()]
+      ['N CHAMADO:', textoSeguro(m?.numeroChamado), 'STATUS ATUAL:', textoSeguro(m?.status).toUpperCase()],
     ],
     styles: { fontSize: 9, cellPadding: 2 },
     columnStyles: {
       0: { fontStyle: 'bold', cellWidth: 35 },
-      2: { fontStyle: 'bold', cellWidth: 35 }
-    }
+      2: { fontStyle: 'bold', cellWidth: 35 },
+    },
   });
 
   doc.setFillColor(241, 245, 249);
   doc.rect(14, doc.lastAutoTable.finalY + 5, 182, 8, 'F');
   doc.setFont(undefined, 'bold');
-  doc.text('CRONOGRAMA E EXECUÇÃO REAL', 16, doc.lastAutoTable.finalY + 10);
+  doc.text('CRONOGRAMA E EXECUCAO REAL', 16, doc.lastAutoTable.finalY + 10);
 
   autoTable(doc, {
     startY: doc.lastAutoTable.finalY + 15,
@@ -335,28 +317,28 @@ export const exportarOSManutencaoPDF = (m = {}) => {
     head: [['ETAPA', 'DATA/HORA PLANEJADA', 'DATA/HORA REAL']],
     body: [
       [
-        'INÍCIO:',
+        'INICIO:',
         dataSegura(m?.dataHoraAgendamentoInicio),
-        dataSegura(m?.dataInicioReal, 'Não iniciado')
+        dataSegura(m?.dataInicioReal, 'Nao iniciado'),
       ],
       [
-        'TÉRMINO:',
+        'TERMINO:',
         dataSegura(m?.dataHoraAgendamentoFim),
-        dataSegura(m?.dataFimReal, 'Em aberto')
-      ]
+        dataSegura(m?.dataFimReal, 'Em aberto'),
+      ],
     ],
     headStyles: { fillColor: [71, 85, 105], fontSize: 8 },
-    styles: { fontSize: 9 }
+    styles: { fontSize: 9 },
   });
 
   const yDescricao = doc.lastAutoTable.finalY + 12;
   const descricao = doc.splitTextToSize(
-    textoSeguro(m?.descricaoProblemaServico, 'Nenhuma descrição informada.'),
+    textoSeguro(m?.descricaoProblemaServico, 'Nenhuma descricao informada.'),
     180
   );
 
   doc.setFont(undefined, 'bold');
-  doc.text('DESCRIÇÃO DO PROBLEMA / SERVIÇO:', 14, yDescricao);
+  doc.text('DESCRICAO DO PROBLEMA / SERVICO:', 14, yDescricao);
   doc.setFont(undefined, 'normal');
   doc.text(descricao, 14, yDescricao + 6);
 
@@ -365,34 +347,34 @@ export const exportarOSManutencaoPDF = (m = {}) => {
   doc.setFillColor(241, 245, 249);
   doc.rect(14, yHistoricoTitulo, 182, 8, 'F');
   doc.setFont(undefined, 'bold');
-  doc.text('HISTÓRICO DO CHAMADO / NOTAS TÉCNICAS', 16, yHistoricoTitulo + 5);
+  doc.text('HISTORICO DO CHAMADO / NOTAS TECNICAS', 16, yHistoricoTitulo + 5);
 
   const historicoBody =
     Array.isArray(m?.notasAndamento) && m.notasAndamento.length > 0
       ? m.notasAndamento.map((n) => [
           dataSegura(n?.data),
           textoSeguro(n?.autor?.nome, 'Sistema'),
-          textoSeguro(n?.nota, '-')
+          textoSeguro(n?.nota, '-'),
         ])
       : [['-', '-', 'Nenhuma nota registrada']];
 
   autoTable(doc, {
     startY: yHistoricoTitulo + 10,
-    head: [['DATA/HORA', 'RESPONSÁVEL', 'NOTA/ANDAMENTO']],
+    head: [['DATA/HORA', 'RESPONSAVEL', 'NOTA/ANDAMENTO']],
     body: historicoBody,
     theme: 'striped',
     headStyles: { fillColor: [30, 41, 59], fontSize: 8 },
     styles: { fontSize: 8, overflow: 'linebreak' },
     columnStyles: {
       0: { cellWidth: 35 },
-      1: { cellWidth: 40 }
-    }
+      1: { cellWidth: 40 },
+    },
   });
 
   const finalY = doc.lastAutoTable.finalY + 30;
 
   doc.line(14, finalY, 90, finalY);
-  doc.text('Responsável Técnico', 14, finalY + 5);
+  doc.text('Responsavel Tecnico', 14, finalY + 5);
 
   doc.line(110, finalY, 196, finalY);
   doc.text('Assinatura Unidade / Cliente', 110, finalY + 5);

@@ -41,6 +41,7 @@ export {
   PageState,
   ModalConfirmacao,
   CompactAttachmentList,
+  AttachmentSection,
   InlineEmptyState,
 } from './feedback';
 

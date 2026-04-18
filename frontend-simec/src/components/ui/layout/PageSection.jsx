@@ -7,10 +7,12 @@ function PageSection({
   title,
   description,
   headerRight,
+  actions,
   children,
   className = '',
 }) {
-  const hasHeader = title || description || headerRight;
+  const resolvedHeaderRight = actions || headerRight;
+  const hasHeader = title || description || resolvedHeaderRight;
 
   return (
     <Card
@@ -43,8 +45,8 @@ function PageSection({
             ) : null}
           </div>
 
-          {headerRight ? (
-            <div className="shrink-0">{headerRight}</div>
+          {resolvedHeaderRight ? (
+            <div className="shrink-0">{resolvedHeaderRight}</div>
           ) : null}
         </div>
       ) : null}
@@ -55,9 +57,10 @@ function PageSection({
 }
 
 PageSection.propTypes = {
-  title: PropTypes.string,
-  description: PropTypes.string,
+  title: PropTypes.node,
+  description: PropTypes.node,
   headerRight: PropTypes.node,
+  actions: PropTypes.node,
   children: PropTypes.node,
   className: PropTypes.string,
 };

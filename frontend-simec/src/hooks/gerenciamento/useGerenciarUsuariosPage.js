@@ -33,9 +33,9 @@ export function useGerenciarUsuariosPage() {
       setLoading(true);
       const response = await getUsuarios();
       setUsuarios(Array.isArray(response) ? response : []);
-    } catch (err) {
+    } catch {
       setUsuarios([]);
-      addToast('Erro ao carregar usuários.', 'error');
+      addToast('Erro ao carregar usuarios.', 'error');
     } finally {
       setLoading(false);
     }
@@ -67,17 +67,17 @@ export function useGerenciarUsuariosPage() {
       try {
         if (editingUser?.id) {
           await updateUsuario(editingUser.id, formData);
-          addToast('Usuário atualizado com sucesso!', 'success');
+          addToast('Usuario atualizado com sucesso!', 'success');
         } else {
           await criarUsuario(formData);
-          addToast('Usuário criado com sucesso!', 'success');
+          addToast('Usuario criado com sucesso!', 'success');
         }
 
         await fetchUsuarios();
         handleCancelForm();
       } catch (err) {
         addToast(
-          err?.response?.data?.message || 'Erro ao salvar usuário.',
+          err?.response?.data?.message || 'Erro ao salvar usuario.',
           'error'
         );
       } finally {
@@ -92,11 +92,11 @@ export function useGerenciarUsuariosPage() {
 
     try {
       await deletarUsuario(userToDelete.id);
-      addToast('Usuário excluído com sucesso!', 'success');
+      addToast('Usuario excluido com sucesso!', 'success');
       await fetchUsuarios();
     } catch (err) {
       addToast(
-        err?.response?.data?.message || 'Erro ao excluir usuário.',
+        err?.response?.data?.message || 'Erro ao excluir usuario.',
         'error'
       );
     } finally {
@@ -110,20 +110,16 @@ export function useGerenciarUsuariosPage() {
     usuarios,
     loading,
     isEmpty,
-
     showForm,
     isSubmittingForm,
     editingUser,
-
     isDeleteModalOpen,
     userToDelete,
     usuarioLogadoId: usuarioLogado?.id,
-
     handleCreate,
     handleEdit,
     handleCancelForm,
     handleSave,
-
     openDeleteModal,
     closeDeleteModal,
     handleConfirmDelete,
