@@ -86,4 +86,5 @@ export {
 // =========================
 export {
   getStatusVariant,
+  getStatusTone,
 } from './uistyles';
