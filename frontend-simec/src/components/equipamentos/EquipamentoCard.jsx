@@ -87,7 +87,7 @@ function EquipamentoCard({
           <span className="hidden sm:inline">Ficha técnica</span>
         </Button>
       }
-      summary={<EntityInfoGrid items={summaryItems} />}
+      summary={<EntityInfoGrid items={summaryItems} compact />}
       expandedContent={
         <EquipamentoCardExpanded
           equipamento={equipamento}
