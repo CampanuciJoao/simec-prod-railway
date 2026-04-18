@@ -70,9 +70,10 @@ function EquipamentoCard({
 
   return (
     <EntityCard
-      title={equipamento.modelo || 'Equipamento sem modelo'}
-      eyebrow="Equipamento"
-      subtitle={`Clique para ${isAberto ? 'recolher' : 'expandir'} os detalhes`}
+      eyebrow={null}
+      title={null}
+      subtitle={null}
+      compact
       expanded={isAberto}
       onToggle={handleToggle}
       borderClassName={borderClass}
@@ -82,9 +83,10 @@ function EquipamentoCard({
           variant="secondary"
           title="Abrir ficha técnica"
           onClick={handleGoToFicha}
+          className="px-3 sm:px-4"
         >
           <FontAwesomeIcon icon={faFileMedical} />
-          <span className="hidden sm:inline">Ficha técnica</span>
+          <span className="hidden lg:inline">Ficha técnica</span>
         </Button>
       }
       summary={<EntityInfoGrid items={summaryItems} compact />}

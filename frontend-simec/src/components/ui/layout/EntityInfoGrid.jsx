@@ -15,34 +15,31 @@ function EntityInfoItem({
       surface="soft"
       className={[
         'min-w-0 rounded-xl',
-        compact ? 'h-full' : '',
         fullWidth ? 'md:col-span-2 xl:col-span-3' : '',
       ].join(' ')}
       padded={false}
       style={{
-        padding: compact ? '12px 14px' : '16px',
+        padding: compact ? '10px 12px' : '16px',
       }}
     >
-      <div className="min-w-0">
-        <span
-          className={[
-            'block uppercase tracking-[0.14em]',
-            compact ? 'text-[10px] font-bold' : 'text-[11px] font-bold',
-          ].join(' ')}
-          style={{ color: 'var(--text-muted)' }}
-        >
-          {label}
-        </span>
+      <span
+        className={[
+          'block uppercase tracking-[0.14em]',
+          compact ? 'text-[10px] font-bold' : 'text-[11px] font-bold',
+        ].join(' ')}
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {label}
+      </span>
 
-        <div
-          className={[
-            'min-w-0 break-words font-medium',
-            compact ? 'mt-1 text-sm leading-5' : 'mt-2 text-sm',
-          ].join(' ')}
-          style={{ color: 'var(--text-primary)' }}
-        >
-          {value || 'N/A'}
-        </div>
+      <div
+        className={[
+          'min-w-0 break-words font-medium',
+          compact ? 'mt-1 text-sm leading-5' : 'mt-2 text-sm',
+        ].join(' ')}
+        style={{ color: 'var(--text-primary)' }}
+      >
+        {value || 'N/A'}
       </div>
     </Card>
   );
@@ -55,15 +52,6 @@ EntityInfoItem.propTypes = {
   compact: PropTypes.bool,
 };
 
-function getCompactGridClassName() {
-  return [
-    'grid-cols-1',
-    'sm:grid-cols-2',
-    'lg:grid-cols-3',
-    'xl:grid-cols-5',
-  ].join(' ');
-}
-
 function EntityInfoGrid({
   items = [],
   className = '',
@@ -74,7 +62,7 @@ function EntityInfoGrid({
       preset="details"
       className={[
         'min-w-0',
-        compact ? getCompactGridClassName() : '',
+        compact ? 'gap-3 xl:grid-cols-5' : '',
         className,
       ].join(' ')}
     >

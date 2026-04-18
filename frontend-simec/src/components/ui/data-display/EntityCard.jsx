@@ -9,7 +9,7 @@ import {
 import Card from '@/components/ui/primitives/Card';
 
 function EntityCard({
-  title,
+  title = null,
   eyebrow = null,
   subtitle = null,
   expanded = false,
@@ -21,9 +21,13 @@ function EntityCard({
   className = '',
   collapseIcon = null,
   expandIcon = null,
+  compact = false,
 }) {
   const resolvedExpandIcon = expandIcon || <FontAwesomeIcon icon={faPlus} />;
   const resolvedCollapseIcon = collapseIcon || <FontAwesomeIcon icon={faMinus} />;
+
+  const hasTextHeader = Boolean(title || eyebrow || subtitle);
+  const hasTopRow = hasTextHeader || actions;
 
   return (
     <Card
@@ -38,32 +42,69 @@ function EntityCard({
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full flex-col gap-5 px-5 py-5 text-left lg:flex-row lg:items-start lg:justify-between"
+        className={[
+          'flex w-full text-left',
+          compact
+            ? 'items-center gap-4 px-4 py-4 md:px-5'
+            : 'flex-col gap-5 px-5 py-5 lg:flex-row lg:items-start lg:justify-between',
+        ].join(' ')}
       >
-        <div className="flex min-w-0 flex-1 items-start gap-4">
-          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-blue-600">
-            {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
-          </div>
+        <div
+          className={[
+            'inline-flex shrink-0 items-center justify-center rounded-2xl border',
+            compact ? 'h-10 w-10 self-center' : 'h-11 w-11',
+          ].join(' ')}
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-soft)',
+            color: 'var(--brand-primary)',
+          }}
+        >
+          {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
+        </div>
 
-          <div className="min-w-0 flex-1 space-y-4">
-            <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                {eyebrow ? (
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    {eyebrow}
-                  </div>
-                ) : null}
+        <div className="min-w-0 flex-1">
+          {hasTopRow ? (
+            <div
+              className={[
+                'min-w-0',
+                compact
+                  ? 'mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'
+                  : 'flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between',
+              ].join(' ')}
+            >
+              {hasTextHeader ? (
+                <div className="min-w-0">
+                  {eyebrow ? (
+                    <div
+                      className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      {eyebrow}
+                    </div>
+                  ) : null}
 
-                <h3 className="mt-1 break-words text-lg font-bold text-slate-900 sm:text-xl">
-                  {title}
-                </h3>
+                  {title ? (
+                    <h3
+                      className="mt-1 break-words text-lg font-bold sm:text-xl"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {title}
+                    </h3>
+                  ) : null}
 
-                {subtitle ? (
-                  <p className="mt-1 text-sm text-slate-500">
-                    {subtitle}
-                  </p>
-                ) : null}
-              </div>
+                  {subtitle ? (
+                    <p
+                      className="mt-1 text-sm"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      {subtitle}
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div />
+              )}
 
               {actions ? (
                 <div
@@ -74,14 +115,19 @@ function EntityCard({
                 </div>
               ) : null}
             </div>
+          ) : null}
 
-            {summary}
-          </div>
+          {summary}
         </div>
       </button>
 
       {expanded ? (
-        <div className="border-t border-slate-200 bg-slate-50">
+        <div
+          style={{
+            borderTop: '1px solid var(--border-soft)',
+            backgroundColor: 'var(--bg-surface-soft)',
+          }}
+        >
           {expandedContent}
         </div>
       ) : null}
@@ -90,7 +136,7 @@ function EntityCard({
 }
 
 EntityCard.propTypes = {
-  title: PropTypes.node.isRequired,
+  title: PropTypes.node,
   eyebrow: PropTypes.node,
   subtitle: PropTypes.node,
   expanded: PropTypes.bool,
@@ -102,6 +148,7 @@ EntityCard.propTypes = {
   className: PropTypes.string,
   collapseIcon: PropTypes.node,
   expandIcon: PropTypes.node,
+  compact: PropTypes.bool,
 };
 
 export default EntityCard;
