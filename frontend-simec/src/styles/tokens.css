@@ -56,7 +56,7 @@
   --border-strong: #a8b7c9;
 
   --text-primary: #0f172a;
-  --text-secondary: #ffffff;
+  --text-secondary: #41556f;
   --text-muted: #70839c;
   --text-inverse: #ffffff;
 
@@ -73,10 +73,10 @@
   --overlay-bg: rgba(15, 23, 42, 0.44);
 
   --button-primary-hover: #1d4ed8;
-  --button-secondary-bg: rgba(255, 255, 255, 0.08);
-  --button-secondary-hover: rgba(255, 255, 255, 0.14);
-  --button-secondary-text: #ffffff;
-  --button-secondary-border: rgba(255, 255, 255, 0.18);
+  --button-secondary-bg: #ffffff;
+  --button-secondary-hover: #f3f7fc;
+  --button-secondary-text: #0f172a;
+  --button-secondary-border: #d8e1eb;
   --button-danger-hover: #b91c1c;
   --button-success-hover: #047857;
   --button-ghost-hover: rgba(15, 23, 42, 0.06);

@@ -26,7 +26,7 @@ function SidebarItem({
 
     return {
       backgroundColor: 'transparent',
-      color: 'var(--text-secondary)',
+      color: 'var(--text-sidebar-muted)',
       borderColor: 'transparent',
     };
   };
@@ -53,7 +53,7 @@ function SidebarItem({
 
         if (!isActive) {
           e.currentTarget.style.backgroundColor = 'transparent';
-          e.currentTarget.style.color = 'var(--text-secondary)';
+          e.currentTarget.style.color = 'var(--text-sidebar-muted)';
           e.currentTarget.style.borderColor = 'transparent';
         }
       }}
