@@ -145,21 +145,20 @@ function EntityCard({
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={expanded}
-          className="flex w-full flex-col gap-5 px-5 py-5 text-left lg:flex-row lg:items-start lg:justify-between"
-        >
-          <div
-            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
+        <div className="flex w-full flex-col gap-5 px-5 py-5 text-left lg:flex-row lg:items-start lg:justify-between">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-label={expanded ? 'Recolher card' : 'Expandir card'}
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border transition-all"
             style={{
               ...defaultToggleStyle,
               ...toggleStyle,
             }}
           >
             {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
-          </div>
+          </button>
 
           <div className="min-w-0 flex-1">
             {hasTopRow ? (
@@ -167,10 +166,7 @@ function EntityCard({
                 {renderHeaderText()}
 
                 {actions ? (
-                  <div
-                    className="flex shrink-0 items-center gap-2"
-                    onClick={(event) => event.stopPropagation()}
-                  >
+                  <div className="flex shrink-0 items-center gap-2">
                     {actions}
                   </div>
                 ) : null}
@@ -179,7 +175,7 @@ function EntityCard({
 
             {summary}
           </div>
-        </button>
+        </div>
       )}
 
       {expanded ? (

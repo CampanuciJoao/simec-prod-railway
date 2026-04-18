@@ -1,69 +1,41 @@
-import React from 'react';
 import PropTypes from 'prop-types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faBuilding,
+  faCalendarCheck,
   faChartColumn,
   faFileLines,
-  faCalendarCheck,
-  faBuilding,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Card from '@/components/ui/primitives/Card';
-
-function MetricCard({ icon, label, value }) {
-  return (
-    <Card className="h-full">
-      <div className="flex items-center gap-4">
-        <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
-          <FontAwesomeIcon icon={icon} />
-        </div>
-
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {label}
-          </p>
-          <p className="mt-1 text-3xl font-bold tracking-tight text-slate-900">
-            {value}
-          </p>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
-MetricCard.propTypes = {
-  icon: PropTypes.object.isRequired,
-  label: PropTypes.string.isRequired,
-  value: PropTypes.oneOfType([PropTypes.string, PropTypes.number]).isRequired,
-};
+import { KpiCard, KpiGrid } from '@/components/ui';
 
 function RelatoriosMetricsSection({ metricas }) {
   return (
-    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <MetricCard
+    <KpiGrid className="md:grid-cols-2 xl:grid-cols-4">
+      <KpiCard
         icon={faChartColumn}
-        label="Relatórios gerados"
+        title="Relatorios gerados"
         value={metricas?.totalRelatorios || 0}
+        tone="blue"
       />
-
-      <MetricCard
+      <KpiCard
         icon={faFileLines}
-        label="Itens retornados"
+        title="Itens retornados"
         value={metricas?.totalItens || 0}
+        tone="green"
       />
-
-      <MetricCard
+      <KpiCard
         icon={faCalendarCheck}
-        label="Períodos filtrados"
+        title="Periodos filtrados"
         value={metricas?.periodosAplicados || 0}
+        tone="yellow"
       />
-
-      <MetricCard
+      <KpiCard
         icon={faBuilding}
-        label="Unidades filtradas"
+        title="Unidades filtradas"
         value={metricas?.unidadesFiltradas || 0}
+        tone="purple"
       />
-    </div>
+    </KpiGrid>
   );
 }
 
