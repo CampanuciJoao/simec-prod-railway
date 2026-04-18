@@ -7,8 +7,8 @@ import React, {
 } from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
-import Sidebar from '@/components/ui/navigation/Sidebar';
 import ChatBot from '@/components/ui/chat/ChatBot';
+import { Sidebar } from '@/components/ui';
 import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
 import AppTopbar from '@/components/layouts/AppTopbar';
 

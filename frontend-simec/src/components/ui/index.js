@@ -70,6 +70,7 @@ export {
 // =========================
 export {
   Breadcrumb,
+  Sidebar,
 } from './navigation';
 
 // =========================

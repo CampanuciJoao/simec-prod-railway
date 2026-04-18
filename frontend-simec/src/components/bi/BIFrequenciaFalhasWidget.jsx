@@ -2,7 +2,7 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faExternalLinkAlt } from '@fortawesome/free-solid-svg-icons';
 
-import EmptyState from '@/components/ui/layout/EmptyState';
+import { EmptyState } from '@/components/ui';
 
 function BIFrequenciaFalhasWidget({ items, onSelectEquipamento }) {
   if (!items?.length) {

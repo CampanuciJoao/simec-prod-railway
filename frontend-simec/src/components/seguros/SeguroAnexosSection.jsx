@@ -1,62 +1,75 @@
-import Card from '@/components/ui/primitives/Card';
-import Button from '@/components/ui/primitives/Button';
+import PropTypes from 'prop-types';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPaperclip } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  getStatusBadgeClass,
-  getRowHighlightClass,
-  formatarMoeda,
-} from '@/utils/seguros/seguro.utils';
+  CompactAttachmentList,
+  PageSection,
+} from '@/components/ui';
 
-function SeguroCard({ seguro, status, onView, onEdit, onDelete }) {
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
+function buildAttachmentUrl(path) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API_BASE_URL}/${String(path).replace(/^\/+/, '')}`;
+}
+
+function SeguroAnexosSection({ anexos = [], onUpload, onDelete }) {
   return (
-    <Card className={`border-l-4 ${getRowHighlightClass(status)}`}>
-      <div className="flex flex-col gap-4">
-        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-          <div className="min-w-0">
-            <h3 className="break-words text-lg font-semibold text-slate-900">
-              Apólice {seguro.apoliceNumero}
-            </h3>
-
-            <p className="mt-1 text-sm text-slate-600">
-              {seguro.seguradora}
-            </p>
-          </div>
-
-          <span className={getStatusBadgeClass(status)}>
-            {status}
+    <PageSection
+      title="Anexos do seguro"
+      description="Envie apolices, comprovantes e documentos complementares."
+    >
+      <div className="space-y-3">
+        <div className="flex items-start gap-3">
+          <span
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full"
+            style={{
+              backgroundColor: 'var(--brand-primary-soft)',
+              color: 'var(--brand-primary)',
+            }}
+          >
+            <FontAwesomeIcon icon={faPaperclip} />
           </span>
-        </div>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-xl bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Seguradora
+          <div>
+            <p
+              className="text-sm font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Documentos vinculados ao seguro
             </p>
-            <p className="mt-1 text-sm font-medium text-slate-800">
-              {seguro.seguradora || 'N/A'}
-            </p>
-          </div>
-
-          <div className="rounded-xl bg-slate-50 px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              Prêmio total
-            </p>
-            <p className="mt-1 text-sm font-medium text-slate-800">
-              {formatarMoeda(seguro.premioTotal)}
+            <p
+              className="text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Mantenha os anexos centralizados no cadastro para consulta rapida.
             </p>
           </div>
         </div>
 
-        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-          <Button onClick={onView}>Ver</Button>
-          <Button onClick={onEdit}>Editar</Button>
-          <Button variant="danger" onClick={onDelete}>
-            Excluir
-          </Button>
-        </div>
+        <CompactAttachmentList
+          attachments={anexos}
+          uploadLabel="Anexar documento"
+          emptyMessage="Nenhum anexo enviado para este seguro."
+          onUpload={onUpload}
+          onDelete={(attachment) => onDelete(attachment.id)}
+          getAttachmentName={(attachment) =>
+            attachment.nomeOriginal || attachment.name || 'Arquivo'
+          }
+          getAttachmentUrl={(attachment) => buildAttachmentUrl(attachment.path)}
+        />
       </div>
-    </Card>
+    </PageSection>
   );
 }
 
-export default SeguroCard;
+SeguroAnexosSection.propTypes = {
+  anexos: PropTypes.array,
+  onUpload: PropTypes.func.isRequired,
+  onDelete: PropTypes.func.isRequired,
+};
+
+export default SeguroAnexosSection;

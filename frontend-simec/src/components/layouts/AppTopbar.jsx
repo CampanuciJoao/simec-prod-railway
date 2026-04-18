@@ -6,8 +6,12 @@ import {
   faRightFromBracket,
 } from '@fortawesome/free-solid-svg-icons';
 
-import NotificationsPanel from '@/components/ui/overlays/NotificationsPanel';
-import { ActionBar, Button, ThemeModeToggle } from '@/components/ui';
+import {
+  ActionBar,
+  Button,
+  NotificationsPanel,
+  ThemeModeToggle,
+} from '@/components/ui';
 
 function AppTopbar({
   nomeUsuario,

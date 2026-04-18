@@ -1,6 +1,6 @@
 import React from 'react';
 
-import EmptyState from '@/components/ui/layout/EmptyState';
+import { EmptyState } from '@/components/ui';
 import BarChart from '@/components/charts/BarChart';
 
 function BIDowntimeChartWidget({ data, expanded = false }) {

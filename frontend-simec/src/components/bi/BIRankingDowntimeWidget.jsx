@@ -1,6 +1,6 @@
 import React from 'react';
 
-import EmptyState from '@/components/ui/layout/EmptyState';
+import { EmptyState } from '@/components/ui';
 
 function BIRankingDowntimeWidget({ items, expanded = false }) {
   if (!items?.length) {

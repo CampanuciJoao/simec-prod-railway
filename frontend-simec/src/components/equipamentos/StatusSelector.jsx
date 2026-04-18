@@ -8,8 +8,7 @@ import {
 
 import { useToast } from '@/contexts/ToastContext';
 import { updateEquipamento } from '@/services/api';
-import { Select } from '@/components/ui';
-import { getStatusVariant } from '@/components/ui/uistyles/statusStyles';
+import { Select, getStatusVariant } from '@/components/ui';
 
 const STATUS_OPTIONS = [
   'Operante',
