@@ -27,6 +27,7 @@ function Card({
   surface = 'default',
   interactive = false,
   style = {},
+  ...props
 }) {
   const surfaceStyle = surfaceStyleMap[surface] || surfaceStyleMap.default;
 
@@ -36,7 +37,7 @@ function Card({
         'rounded-2xl border transition-all',
         padded ? 'p-4 md:p-5' : '',
         interactive
-          ? 'cursor-pointer hover:shadow-md hover:border-[var(--border-strong)]'
+          ? 'cursor-pointer hover:shadow-md'
           : '',
         className,
       ].join(' ')}
@@ -45,6 +46,7 @@ function Card({
         boxShadow: 'var(--shadow-sm)',
         ...style,
       }}
+      {...props}
     >
       {children}
     </div>

@@ -49,7 +49,7 @@ function KpiCard({
   const toneStyle = toneStyleMap[tone] || toneStyleMap.slate;
   const isInteractive = Boolean(onClick || to);
 
-  const cardContent = (
+  const content = (
     <Card
       className={['h-full rounded-3xl', className].join(' ')}
       interactive={isInteractive}
@@ -100,7 +100,7 @@ function KpiCard({
   if (to) {
     return (
       <Link to={to} className="block w-full text-left">
-        {cardContent}
+        {content}
       </Link>
     );
   }
@@ -108,12 +108,12 @@ function KpiCard({
   if (onClick) {
     return (
       <button type="button" onClick={onClick} className="w-full text-left">
-        {cardContent}
+        {content}
       </button>
     );
   }
 
-  return cardContent;
+  return content;
 }
 
 KpiCard.propTypes = {
