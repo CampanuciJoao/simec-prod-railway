@@ -77,6 +77,11 @@ function getManutencaoResumoSelect() {
     agendamentoDataFimLocal: true,
     agendamentoHoraFimLocal: true,
     agendamentoTimezone: true,
+    equipamento: {
+      select: {
+        status: true,
+      },
+    },
   };
 }
 
@@ -107,6 +112,7 @@ export async function buscarEquipamentoDoTenant({
       id: true,
       tag: true,
       modelo: true,
+      status: true,
       unidadeId: true,
       unidade: {
         select: {
@@ -344,6 +350,78 @@ export async function criarNotaAndamento({
       },
     },
   });
+}
+
+export async function registrarEventoManutencao({
+  tenantId,
+  manutencaoId,
+  autorId = null,
+  tipo,
+  descricao = null,
+  metadata = null,
+}) {
+  return prisma.manutencaoEvento.create({
+    data: {
+      tenant: {
+        connect: { id: tenantId },
+      },
+      manutencao: {
+        connect: {
+          tenantId_id: {
+            tenantId,
+            id: manutencaoId,
+          },
+        },
+      },
+      ...(autorId
+        ? {
+            autor: {
+              connect: {
+                tenantId_id: {
+                  tenantId,
+                  id: autorId,
+                },
+              },
+            },
+          }
+        : {}),
+      tipo,
+      descricao,
+      metadataJson: metadata ? JSON.stringify(metadata) : null,
+    },
+  });
+}
+
+export async function buscarStatusAnteriorEquipamento({
+  tenantId,
+  manutencaoId,
+}) {
+  const evento = await prisma.manutencaoEvento.findFirst({
+    where: {
+      tenantId,
+      manutencaoId,
+      tipo: 'STATUS_BASE_EQUIPAMENTO',
+    },
+    orderBy: {
+      dataEvento: 'asc',
+    },
+    select: {
+      metadataJson: true,
+    },
+  });
+
+  if (!evento?.metadataJson) return null;
+
+  try {
+    const metadata = JSON.parse(evento.metadataJson);
+    return metadata?.statusAnterior || null;
+  } catch (error) {
+    console.error(
+      `[MANUTENCAO_EVENTO_PARSE_ERROR] tenant=${tenantId} manutencao=${manutencaoId}`,
+      error
+    );
+    return null;
+  }
 }
 
 export async function deletarManutencao({

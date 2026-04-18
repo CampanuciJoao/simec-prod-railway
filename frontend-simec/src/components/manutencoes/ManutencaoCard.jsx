@@ -3,8 +3,9 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faCalendarDays,
   faEye,
+  faHourglassEnd,
+  faHourglassStart,
   faHospital,
   faHashtag,
   faTrashAlt,
@@ -17,7 +18,7 @@ import {
   InfoCard,
   StatusBadge,
 } from '@/components/ui';
-import { formatarData } from '@/utils/timeUtils';
+import { formatarDataHora } from '@/utils/timeUtils';
 
 function getTipoLabel(tipo) {
   return tipo ? String(tipo).replace(/([A-Z])/g, ' $1').trim() : '-';
@@ -52,9 +53,9 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
 
             <div className="flex shrink-0 items-center gap-2">
               <Link to={`/manutencoes/detalhes/${manutencao.id}`}>
-                <Button type="button" variant="secondary">
+                <Button type="button" variant="primary">
                   <FontAwesomeIcon icon={faEye} />
-                  Visualizar
+                  Ver detalhes
                 </Button>
               </Link>
 
@@ -71,7 +72,7 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
             <InfoCard
               icon={faWrench}
               label="Equipamento"
@@ -85,9 +86,15 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
             />
 
             <InfoCard
-              icon={faCalendarDays}
-              label="Data"
-              value={formatarData(manutencao.dataHoraAgendamentoInicio)}
+              icon={faHourglassStart}
+              label="Inicio agendado"
+              value={formatarDataHora(manutencao.dataHoraAgendamentoInicio)}
+            />
+
+            <InfoCard
+              icon={faHourglassEnd}
+              label="Fim agendado"
+              value={formatarDataHora(manutencao.dataHoraAgendamentoFim)}
             />
 
             <InfoCard

@@ -2,6 +2,43 @@
 
 import prisma from '../../prismaService.js';
 
+async function garantirStatusBaseDoEquipamento(tx, tenantId, manut) {
+  const eventoExistente = await tx.manutencaoEvento.findFirst({
+    where: {
+      tenantId,
+      manutencaoId: manut.id,
+      tipo: 'STATUS_BASE_EQUIPAMENTO',
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (eventoExistente) return;
+
+  await tx.manutencaoEvento.create({
+    data: {
+      tenant: {
+        connect: { id: tenantId },
+      },
+      manutencao: {
+        connect: {
+          tenantId_id: {
+            tenantId,
+            id: manut.id,
+          },
+        },
+      },
+      tipo: 'STATUS_BASE_EQUIPAMENTO',
+      descricao: `Status base do equipamento registrado automaticamente para a OS ${manut.numeroOS}.`,
+      metadataJson: JSON.stringify({
+        statusAnterior: manut.equipamento?.status || null,
+        origem: 'inicio_automatico',
+      }),
+    },
+  });
+}
+
 /**
  * 🔍 BUSCAS (mantidas)
  */
@@ -123,6 +160,8 @@ export async function atualizarStatusParaEmAndamento(
   agora
 ) {
   await prisma.$transaction(async (tx) => {
+    await garantirStatusBaseDoEquipamento(tx, tenantId, manut);
+
     await tx.equipamento.update({
       where: {
         tenantId_id: {

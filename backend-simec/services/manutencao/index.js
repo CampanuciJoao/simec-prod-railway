@@ -15,6 +15,8 @@ import {
   criarManutencao,
   atualizarManutencao,
   criarNotaAndamento,
+  registrarEventoManutencao,
+  buscarStatusAnteriorEquipamento,
   buscarManutencaoComAnexos,
   deletarManutencao,
 } from './manutencaoRepository.js';
@@ -132,6 +134,18 @@ export async function criarManutencaoService({
   });
 
   const nova = await criarManutencao(payload);
+
+  await registrarEventoManutencao({
+    tenantId,
+    manutencaoId: nova.id,
+    autorId: usuarioId,
+    tipo: 'STATUS_BASE_EQUIPAMENTO',
+    descricao: `Status base do equipamento registrado para a OS ${numeroOS}.`,
+    metadata: {
+      statusAnterior: contexto.equipamento.status,
+      origem: 'criacao_os',
+    },
+  });
 
   await registrarLog({
     tenantId,
@@ -339,6 +353,14 @@ export async function concluirManutencaoComAcaoService({
     timezone: contexto.timezone,
     manutencaoRealizada,
     equipamentoOperante,
+    statusEquipamentoAnterior:
+      (await buscarStatusAnteriorEquipamento({
+        tenantId,
+        manutencaoId,
+      })) ||
+      (manutencaoAtual.status === 'Agendada'
+        ? manutencaoAtual.equipamento?.status || null
+        : null),
   });
 
   if (!workflow.ok) {

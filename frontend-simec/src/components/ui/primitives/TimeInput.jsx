@@ -19,7 +19,6 @@ function formatLooseTime(raw = '') {
 
   if (digits.length <= 2) return digits;
   if (digits.length === 3) return `${digits.slice(0, 1)}:${digits.slice(1)}`;
-
   return `${digits.slice(0, 2)}:${digits.slice(2)}`;
 }
 

@@ -135,6 +135,7 @@ function ManutencaoForm({
               handleChange('agendamentoHoraInicioLocal', event.target.value)
             }
             error={fieldErrors.agendamentoHoraInicioLocal}
+            required
           />
 
           <TimeInput
@@ -145,6 +146,7 @@ function ManutencaoForm({
               handleChange('agendamentoHoraFimLocal', event.target.value)
             }
             error={fieldErrors.agendamentoHoraFimLocal}
+            required
           />
         </div>
       </PageSection>
@@ -158,6 +160,7 @@ function ManutencaoForm({
               onChange={(event) =>
                 handleChange('numeroChamado', event.target.value)
               }
+              required
             />
           ) : null}
 
@@ -169,6 +172,7 @@ function ManutencaoForm({
                 handleChange('descricaoProblemaServico', event.target.value)
               }
               rows={5}
+              required={isCorretiva}
             />
           </div>
         </div>

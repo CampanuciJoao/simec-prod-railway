@@ -94,6 +94,7 @@ export function montarWorkflowPayload({
   timezone,
   manutencaoRealizada,
   equipamentoOperante,
+  statusEquipamentoAnterior,
 }) {
   if (!validarAcaoWorkflow(acao)) {
     return {
@@ -143,10 +144,18 @@ export function montarWorkflowPayload({
     }
 
     updateData.status = 'Cancelada';
+    equipamentoStatus = statusEquipamentoAnterior || null;
     detalheLog = `OS ${manutencaoAtual.numeroOS} cancelada.`;
     notaOperacional = `Cancelamento registrado. Motivo: ${String(observacao).trim()}`;
     historicoTitulo = `OS ${manutencaoAtual.numeroOS} cancelada`;
-    historicoDescricao = notaOperacional;
+    historicoDescricao = [
+      notaOperacional,
+      equipamentoStatus
+        ? `Equipamento retornado para o status ${equipamentoStatus}.`
+        : null,
+    ]
+      .filter(Boolean)
+      .join(' ');
 
     return {
       ok: true,

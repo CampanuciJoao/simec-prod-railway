@@ -1,28 +1,33 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBan,
-  faCalendarDays,
-  faClock,
-  faHashtag,
-  faHospital,
   faSave,
-  faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
   Button,
   DateInput,
-  InfoCard,
   Input,
   PageSection,
   ResponsiveGrid,
-  StatusBadge,
   Textarea,
   TimeInput,
 } from '@/components/ui';
+
+function montarAgendamentoResumo(formData) {
+  const inicio = [formData?.agendamentoDataInicioLocal, formData?.agendamentoHoraInicioLocal]
+    .filter(Boolean)
+    .join(' ');
+  const fim = [formData?.agendamentoDataFimLocal, formData?.agendamentoHoraFimLocal]
+    .filter(Boolean)
+    .join(' ');
+
+  if (!inicio && !fim) return null;
+  if (inicio && fim) return `${inicio} ate ${fim}`;
+  return inicio || fim;
+}
 
 function InformacoesManutencaoSection({
   manutencao,
@@ -34,56 +39,47 @@ function InformacoesManutencaoSection({
   isCancelavel,
   submitting,
 }) {
+  const resumoEquipamento = [
+    manutencao?.equipamento?.modelo,
+    manutencao?.equipamento?.tag ? `TAG ${manutencao.equipamento.tag}` : null,
+    manutencao?.equipamento?.unidade?.nomeSistema,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+
+  const resumoAgendamento = montarAgendamentoResumo(formData);
+  const mostrarResumo = Boolean(resumoEquipamento || resumoAgendamento);
+  const isCorretiva = manutencao?.tipo === 'Corretiva';
+
   return (
     <PageSection
       title="Informacoes da manutencao"
-      description="Edite os dados operacionais da OS sem quebrar o fluxo oficial de execucao."
+      description="Edite os dados operacionais da OS sem repetir informacoes que ja aparecem no cabecalho."
     >
-      <div className="mb-6">
-        <ResponsiveGrid preset="cards">
-          <InfoCard icon={faWrench} label="OS / Status">
-            <div className="flex flex-wrap items-center gap-3">
-              <span style={{ fontWeight: 700 }}>
-                {manutencao?.numeroOS || '-'}
-              </span>
+      {mostrarResumo ? (
+        <div
+          className="mb-6 rounded-2xl border px-4 py-3 text-sm"
+          style={{
+            backgroundColor: 'var(--bg-surface-soft)',
+            borderColor: 'var(--border-soft)',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          {resumoEquipamento ? (
+            <p>
+              <strong style={{ color: 'var(--text-primary)' }}>Equipamento:</strong>{' '}
+              {resumoEquipamento}
+            </p>
+          ) : null}
 
-              <StatusBadge value={manutencao?.status} />
-            </div>
-          </InfoCard>
-
-          <InfoCard icon={faHospital} label="Unidade">
-            {manutencao?.equipamento?.unidade?.nomeSistema || '-'}
-          </InfoCard>
-
-          <InfoCard icon={faHashtag} label="Equipamento">
-            <div className="flex flex-col gap-1">
-              <Link to={`/equipamentos/${manutencao?.equipamentoId || ''}`}>
-                {manutencao?.equipamento?.modelo || '-'}
-              </Link>
-
-              <span>Tag: {manutencao?.equipamento?.tag || '-'}</span>
-            </div>
-          </InfoCard>
-
-          <InfoCard icon={faCalendarDays} label="Inicio programado">
-            <div className="flex flex-col gap-1">
-              <span>{manutencao?.agendamentoLocal?.dataInicio || '-'}</span>
-              <span>{manutencao?.agendamentoLocal?.horaInicio || '--:--'}</span>
-            </div>
-          </InfoCard>
-
-          <InfoCard icon={faClock} label="Fim programado">
-            <div className="flex flex-col gap-1">
-              <span>{manutencao?.agendamentoLocal?.dataFim || '-'}</span>
-              <span>{manutencao?.agendamentoLocal?.horaFim || '--:--'}</span>
-            </div>
-          </InfoCard>
-
-          <InfoCard icon={faHashtag} label="Numero do chamado">
-            {manutencao?.numeroChamado || '---'}
-          </InfoCard>
-        </ResponsiveGrid>
-      </div>
+          {resumoAgendamento ? (
+            <p className={resumoEquipamento ? 'mt-1' : ''}>
+              <strong style={{ color: 'var(--text-primary)' }}>Agendamento:</strong>{' '}
+              {resumoAgendamento}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="space-y-6">
         <Textarea
@@ -93,6 +89,7 @@ function InformacoesManutencaoSection({
           onChange={onFormChange}
           disabled={camposPrincipaisBloqueados || submitting}
           rows={4}
+          required={isCorretiva}
         />
 
         <ResponsiveGrid preset="form">
@@ -110,6 +107,7 @@ function InformacoesManutencaoSection({
             value={formData.numeroChamado}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
+            required={isCorretiva}
           />
         </ResponsiveGrid>
 
@@ -128,6 +126,7 @@ function InformacoesManutencaoSection({
             value={formData.agendamentoHoraInicioLocal}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
+            required
           />
 
           <DateInput
@@ -144,6 +143,7 @@ function InformacoesManutencaoSection({
             value={formData.agendamentoHoraFimLocal}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
+            required
           />
         </ResponsiveGrid>
 
