@@ -16,6 +16,7 @@ import { useResourceAnexos } from '@/hooks/shared/useResourceAnexos';
 import AnexosList from '@/components/equipamentos/AnexosList';
 
 import {
+  ActionBar,
   ModalConfirmacao,
   PageSection,
   Button,
@@ -103,20 +104,6 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
       <PageSection
         title={`Anexos (${anexos.length})`}
         description="Documentos vinculados ao equipamento."
-        headerRight={(
-          <Button
-            type="button"
-            size="sm"
-            onClick={openFileDialog}
-            disabled={isSubmitting}
-          >
-            <FontAwesomeIcon
-              icon={isSubmitting ? faSpinner : faUpload}
-              spin={isSubmitting}
-            />
-            {isSubmitting ? 'Enviando...' : 'Anexar arquivo'}
-          </Button>
-        )}
       >
         <div className="space-y-5">
           <div className="flex items-start gap-3">
@@ -145,6 +132,23 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
               </p>
             </div>
           </div>
+
+          <ActionBar
+            right={(
+              <Button
+                type="button"
+                size="sm"
+                onClick={openFileDialog}
+                disabled={isSubmitting}
+              >
+                <FontAwesomeIcon
+                  icon={isSubmitting ? faSpinner : faUpload}
+                  spin={isSubmitting}
+                />
+                {isSubmitting ? 'Enviando...' : 'Anexar arquivo'}
+              </Button>
+            )}
+          />
 
           <input
             type="file"

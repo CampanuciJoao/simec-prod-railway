@@ -6,6 +6,7 @@ import { faInfoCircle, faEdit } from '@fortawesome/free-solid-svg-icons';
 import { formatarData } from '@/utils/timeUtils';
 
 import {
+  ActionBar,
   Button,
   EntityInfoGrid,
   PageSection,
@@ -67,18 +68,6 @@ function TabCadastro({ equipamentoInicial }) {
     <PageSection
       title="Informacoes do Cadastro"
       description="Dados principais do equipamento cadastrado no sistema."
-      headerRight={(
-        <Button
-          type="button"
-          size="sm"
-          onClick={() =>
-            navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
-          }
-        >
-          <FontAwesomeIcon icon={faEdit} />
-          Editar cadastro
-        </Button>
-      )}
     >
       <div className="space-y-5">
         <div className="flex items-start gap-3">
@@ -107,6 +96,21 @@ function TabCadastro({ equipamentoInicial }) {
             </p>
           </div>
         </div>
+
+        <ActionBar
+          right={(
+            <Button
+              type="button"
+              size="sm"
+              onClick={() =>
+                navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
+              }
+            >
+              <FontAwesomeIcon icon={faEdit} />
+              Editar cadastro
+            </Button>
+          )}
+        />
 
         <EntityInfoGrid items={items} />
       </div>

@@ -12,6 +12,7 @@ import AcessorioForm from '@/components/equipamentos/AcessorioForm';
 import AcessoriosList from '@/components/equipamentos/AcessoriosList';
 
 import {
+  ActionBar,
   Button,
   Card,
   ModalConfirmacao,
@@ -81,19 +82,6 @@ function TabAcessorios({ equipamentoId }) {
       <PageSection
         title="Acessorios"
         description="Gerencie os acessorios vinculados ao equipamento."
-        headerRight={
-          !showForm ? (
-            <Button
-              type="button"
-              size="sm"
-              onClick={handleAddNewClick}
-              disabled={submitting}
-            >
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Cadastrar acessorio</span>
-            </Button>
-          ) : null
-        }
       >
         <div className="space-y-5">
           <div className="flex items-start gap-3">
@@ -122,6 +110,22 @@ function TabAcessorios({ equipamentoId }) {
               </p>
             </div>
           </div>
+
+          {!showForm ? (
+            <ActionBar
+              right={(
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={handleAddNewClick}
+                  disabled={submitting}
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  <span>Cadastrar acessorio</span>
+                </Button>
+              )}
+            />
+          ) : null}
 
           {showForm ? (
             <Card
