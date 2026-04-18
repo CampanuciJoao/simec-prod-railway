@@ -77,6 +77,7 @@ function TimeInput({
   ...props
 }) {
   const inputId = id || name;
+  const datalistId = inputId ? `${inputId}-suggestions` : undefined;
 
   const handleTimeChange = (event) => {
     const formattedValue = formatLooseTime(event.target.value);
@@ -113,12 +114,10 @@ function TimeInput({
     onBlur?.(event);
   };
 
-  const datalistId = inputId ? `${inputId}-suggestions` : undefined;
-
   return (
     <FormFieldShell
       label={label}
-      hint={hint || 'Digite ou selecione um horário'}
+      hint={hint || 'Digite ou selecione um horario'}
       error={error}
       required={required}
       htmlFor={inputId}

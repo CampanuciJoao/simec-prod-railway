@@ -27,6 +27,7 @@ function ManutencaoForm({
     equipamentosFiltrados,
     unidades,
     isCorretiva,
+    intervaloValido,
     fieldErrors,
     isValid,
   } = useManutencaoForm({
@@ -109,48 +110,6 @@ function ManutencaoForm({
         ) : null}
       </PageSection>
 
-      <PageSection title="Agendamento">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <DateInput
-            label="Data de inicio"
-            value={formData.agendamentoDataInicioLocal}
-            onChange={(event) =>
-              handleChange('agendamentoDataInicioLocal', event.target.value)
-            }
-          />
-
-          <DateInput
-            label="Data de termino"
-            value={formData.agendamentoDataFimLocal}
-            onChange={(event) =>
-              handleChange('agendamentoDataFimLocal', event.target.value)
-            }
-          />
-
-          <TimeInput
-            label="Hora inicial"
-            name="agendamentoHoraInicioLocal"
-            value={formData.agendamentoHoraInicioLocal}
-            onChange={(event) =>
-              handleChange('agendamentoHoraInicioLocal', event.target.value)
-            }
-            error={fieldErrors.agendamentoHoraInicioLocal}
-            required
-          />
-
-          <TimeInput
-            label="Hora final"
-            name="agendamentoHoraFimLocal"
-            value={formData.agendamentoHoraFimLocal}
-            onChange={(event) =>
-              handleChange('agendamentoHoraFimLocal', event.target.value)
-            }
-            error={fieldErrors.agendamentoHoraFimLocal}
-            required
-          />
-        </div>
-      </PageSection>
-
       <PageSection title="Descricao e contexto">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {isCorretiva ? (
@@ -176,6 +135,71 @@ function ManutencaoForm({
             />
           </div>
         </div>
+      </PageSection>
+
+      <PageSection title="Agendamento">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
+            <DateInput
+              label="Data de inicio"
+              value={formData.agendamentoDataInicioLocal}
+              onChange={(event) =>
+                handleChange('agendamentoDataInicioLocal', event.target.value)
+              }
+            />
+
+            <TimeInput
+              label="Hora inicial"
+              name="agendamentoHoraInicioLocal"
+              value={formData.agendamentoHoraInicioLocal}
+              onChange={(event) =>
+                handleChange('agendamentoHoraInicioLocal', event.target.value)
+              }
+              error={fieldErrors.agendamentoHoraInicioLocal}
+              required
+            />
+          </div>
+
+          <div className="space-y-4">
+            <DateInput
+              label="Data de termino"
+              value={formData.agendamentoDataFimLocal}
+              onChange={(event) =>
+                handleChange('agendamentoDataFimLocal', event.target.value)
+              }
+            />
+
+            <TimeInput
+              label="Hora final"
+              name="agendamentoHoraFimLocal"
+              value={formData.agendamentoHoraFimLocal}
+              onChange={(event) =>
+                handleChange('agendamentoHoraFimLocal', event.target.value)
+              }
+              error={fieldErrors.agendamentoHoraFimLocal}
+              required
+            />
+          </div>
+        </div>
+
+        {!intervaloValido &&
+        formData.agendamentoDataInicioLocal &&
+        formData.agendamentoHoraInicioLocal &&
+        formData.agendamentoDataFimLocal &&
+        formData.agendamentoHoraFimLocal &&
+        !fieldErrors.agendamentoHoraInicioLocal &&
+        !fieldErrors.agendamentoHoraFimLocal ? (
+          <div
+            className="mt-4 rounded-xl border px-4 py-3 text-sm"
+            style={{
+              backgroundColor: 'var(--color-danger-soft)',
+              borderColor: 'var(--color-danger)',
+              color: 'var(--color-danger)',
+            }}
+          >
+            O termino precisa ser posterior ao inicio da manutencao.
+          </div>
+        ) : null}
       </PageSection>
 
       <div className="flex justify-end">
