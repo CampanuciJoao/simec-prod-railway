@@ -22,6 +22,9 @@ function getVariantStyle(variant) {
       '--button-bg-hover': 'var(--button-primary-hover)',
       '--button-text': 'var(--text-inverse)',
       '--button-border': 'transparent',
+      backgroundColor: 'var(--brand-primary)',
+      color: 'var(--text-inverse)',
+      borderColor: 'transparent',
     };
   }
 
@@ -31,6 +34,9 @@ function getVariantStyle(variant) {
       '--button-bg-hover': 'var(--button-danger-hover)',
       '--button-text': 'var(--text-inverse)',
       '--button-border': 'transparent',
+      backgroundColor: 'var(--color-danger)',
+      color: 'var(--text-inverse)',
+      borderColor: 'transparent',
     };
   }
 
@@ -40,6 +46,9 @@ function getVariantStyle(variant) {
       '--button-bg-hover': 'var(--button-success-hover)',
       '--button-text': 'var(--text-inverse)',
       '--button-border': 'transparent',
+      backgroundColor: 'var(--color-success)',
+      color: 'var(--text-inverse)',
+      borderColor: 'transparent',
     };
   }
 
@@ -49,6 +58,9 @@ function getVariantStyle(variant) {
       '--button-bg-hover': 'var(--button-secondary-hover)',
       '--button-text': 'var(--button-secondary-text)',
       '--button-border': 'var(--button-secondary-border)',
+      backgroundColor: 'var(--button-secondary-bg)',
+      color: 'var(--button-secondary-text)',
+      borderColor: 'var(--button-secondary-border)',
     };
   }
 
@@ -58,6 +70,9 @@ function getVariantStyle(variant) {
       '--button-bg-hover': 'var(--button-ghost-hover)',
       '--button-text': 'var(--text-primary)',
       '--button-border': 'transparent',
+      backgroundColor: 'transparent',
+      color: 'var(--text-primary)',
+      borderColor: 'transparent',
     };
   }
 
