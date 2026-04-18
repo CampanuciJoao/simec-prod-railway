@@ -1,23 +1,33 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import ResponsiveGrid from './ResponsiveGrid';
+
+import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
+import Card from '@/components/ui/primitives/Card';
 
 function EntityInfoItem({ label, value, fullWidth = false }) {
   return (
-    <div
+    <Card
+      surface="default"
       className={[
-        'rounded-xl border border-slate-200 bg-white p-4 shadow-sm',
+        'min-w-0 rounded-xl',
         fullWidth ? 'md:col-span-2 xl:col-span-3' : '',
       ].join(' ')}
+      padded
     >
-      <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-slate-500">
+      <span
+        className="block text-[11px] font-bold uppercase tracking-[0.14em]"
+        style={{ color: 'var(--text-muted)' }}
+      >
         {label}
       </span>
 
-      <div className="mt-2 break-words text-sm font-medium text-slate-800">
+      <div
+        className="mt-2 min-w-0 break-words text-sm font-medium"
+        style={{ color: 'var(--text-primary)' }}
+      >
         {value || 'N/A'}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -29,7 +39,7 @@ EntityInfoItem.propTypes = {
 
 function EntityInfoGrid({ items = [], className = '' }) {
   return (
-    <ResponsiveGrid preset="details" className={className}>
+    <ResponsiveGrid preset="details" className={['min-w-0', className].join(' ')}>
       {items.map((item) => (
         <EntityInfoItem
           key={item.key || item.label}

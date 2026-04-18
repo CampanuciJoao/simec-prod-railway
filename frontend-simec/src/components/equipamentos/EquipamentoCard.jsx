@@ -58,7 +58,7 @@ function EquipamentoCard({
       key: 'status',
       label: 'Status atual',
       value: (
-        <div onClick={(event) => event.stopPropagation()}>
+        <div className="min-w-0" onClick={(event) => event.stopPropagation()}>
           <StatusSelector
             equipamento={equipamento}
             onSuccessUpdate={onStatusUpdated}

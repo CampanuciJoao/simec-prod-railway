@@ -108,7 +108,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
 
   return (
     <div
-      className="relative inline-flex w-full min-w-[160px] max-w-[240px] items-center"
+      className="relative inline-flex w-full min-w-0 items-center sm:max-w-[220px]"
       onClick={(event) => event.stopPropagation()}
     >
       {isUpdating ? (
@@ -131,7 +131,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
         value={currentStatus}
         onChange={handleSelectChange}
         disabled={isUpdating}
-        className="pr-12 text-sm font-semibold"
+        className="w-full min-w-0 pr-12 text-sm font-semibold"
         style={selectStyle}
         aria-label={`Alterar status de ${equipamento.modelo}`}
       >
