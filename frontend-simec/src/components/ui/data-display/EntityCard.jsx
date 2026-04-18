@@ -22,12 +22,56 @@ function EntityCard({
   collapseIcon = null,
   expandIcon = null,
   compact = false,
+  cardStyle = {},
+  toggleStyle = {},
+  expandedStyle = {},
 }) {
   const resolvedExpandIcon = expandIcon || <FontAwesomeIcon icon={faPlus} />;
   const resolvedCollapseIcon = collapseIcon || <FontAwesomeIcon icon={faMinus} />;
 
   const hasTextHeader = Boolean(title || eyebrow || subtitle);
   const hasTopRow = hasTextHeader || actions;
+
+  const defaultToggleStyle = {
+    backgroundColor: 'var(--bg-surface)',
+    borderColor: 'var(--border-soft)',
+    color: 'var(--brand-primary)',
+  };
+
+  function renderHeaderText() {
+    if (!hasTextHeader) return null;
+
+    return (
+      <div className="min-w-0">
+        {eyebrow ? (
+          <div
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {eyebrow}
+          </div>
+        ) : null}
+
+        {title ? (
+          <h3
+            className="mt-1 break-words text-lg font-bold sm:text-xl"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {title}
+          </h3>
+        ) : null}
+
+        {subtitle ? (
+          <p
+            className="mt-1 text-sm"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {subtitle}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <Card
@@ -38,92 +82,85 @@ function EntityCard({
         className,
       ].join(' ')}
       surface="default"
+      style={cardStyle}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        className={[
-          'flex w-full text-left',
-          compact
-            ? 'items-center gap-4 px-4 py-3 md:px-5'
-            : 'flex-col gap-5 px-5 py-5 lg:flex-row lg:items-start lg:justify-between',
-        ].join(' ')}
-      >
-        <div
-          className={[
-            'inline-flex shrink-0 items-center justify-center rounded-2xl border',
-            compact ? 'h-10 w-10 self-center' : 'h-11 w-11',
-          ].join(' ')}
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-soft)',
-            color: 'var(--brand-primary)',
-          }}
-        >
-          {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
-        </div>
-
-        <div className="min-w-0 flex-1">
-          {hasTopRow ? (
-            <div
-              className={[
-                'min-w-0',
-                compact
-                  ? 'mb-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'
-                  : 'flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between',
-              ].join(' ')}
+      {compact ? (
+        <div className="px-4 py-4 md:px-5">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded={expanded}
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all"
+              style={{
+                ...defaultToggleStyle,
+                ...toggleStyle,
+              }}
             >
-              {hasTextHeader ? (
-                <div className="min-w-0">
-                  {eyebrow ? (
-                    <div
-                      className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      {eyebrow}
-                    </div>
-                  ) : null}
+              {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
+            </button>
 
-                  {title ? (
-                    <h3
-                      className="mt-1 break-words text-lg font-bold sm:text-xl"
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      {title}
-                    </h3>
-                  ) : null}
+            <div className="min-w-0 flex-1">
+              {renderHeaderText()}
+            </div>
 
-                  {subtitle ? (
-                    <p
-                      className="mt-1 text-sm"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      {subtitle}
-                    </p>
-                  ) : null}
-                </div>
-              ) : null}
+            {actions ? (
+              <div className="flex shrink-0 items-center gap-2">
+                {actions}
+              </div>
+            ) : null}
+          </div>
 
-              {actions ? (
-                <div
-                  className="flex shrink-0 items-center gap-2"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  {actions}
-                </div>
-              ) : null}
+          {summary ? (
+            <div className={hasTopRow ? 'mt-3' : 'mt-4'}>
+              {summary}
             </div>
           ) : null}
-
-          {summary}
         </div>
-      </button>
+      ) : (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={expanded}
+          className="flex w-full flex-col gap-5 px-5 py-5 text-left lg:flex-row lg:items-start lg:justify-between"
+        >
+          <div
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
+            style={{
+              ...defaultToggleStyle,
+              ...toggleStyle,
+            }}
+          >
+            {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
+          </div>
+
+          <div className="min-w-0 flex-1">
+            {hasTopRow ? (
+              <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                {renderHeaderText()}
+
+                {actions ? (
+                  <div
+                    className="flex shrink-0 items-center gap-2"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    {actions}
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {summary}
+          </div>
+        </button>
+      )}
 
       {expanded ? (
         <div
           style={{
             borderTop: '1px solid var(--border-soft)',
             backgroundColor: 'var(--bg-surface-soft)',
+            ...expandedStyle,
           }}
         >
           {expandedContent}
@@ -147,6 +184,9 @@ EntityCard.propTypes = {
   collapseIcon: PropTypes.node,
   expandIcon: PropTypes.node,
   compact: PropTypes.bool,
+  cardStyle: PropTypes.object,
+  toggleStyle: PropTypes.object,
+  expandedStyle: PropTypes.object,
 };
 
 export default EntityCard;

@@ -22,7 +22,12 @@ function EquipamentoCard({
   onStatusUpdated,
   onRefresh,
 }) {
-  const { borderClass } = getEquipamentoCardStyles(equipamento.status);
+  const {
+    cardStyle,
+    toggleStyle,
+    expandedStyle,
+    infoCardStyle,
+  } = getEquipamentoCardStyles(equipamento.status);
 
   const handleToggle = () => {
     onToggleExpandir(equipamento.id);
@@ -41,7 +46,7 @@ function EquipamentoCard({
     },
     {
       key: 'tag',
-      label: 'Nº Série / Tag',
+      label: 'Numero de serie / Tag',
       value: equipamento.tag,
     },
     {
@@ -70,26 +75,32 @@ function EquipamentoCard({
 
   return (
     <EntityCard
-      eyebrow={null}
-      title={null}
-      subtitle={null}
       compact
       expanded={isAberto}
       onToggle={handleToggle}
-      borderClassName={borderClass}
+      cardStyle={cardStyle}
+      toggleStyle={toggleStyle}
+      expandedStyle={expandedStyle}
       actions={
         <Button
           type="button"
           variant="secondary"
-          title="Abrir ficha técnica"
+          size="sm"
+          title="Abrir ficha tecnica"
           onClick={handleGoToFicha}
           className="px-3 sm:px-4"
         >
           <FontAwesomeIcon icon={faFileMedical} />
-          <span className="hidden lg:inline">Ficha técnica</span>
+          <span className="hidden sm:inline">Ficha tecnica</span>
         </Button>
       }
-      summary={<EntityInfoGrid items={summaryItems} compact />}
+      summary={(
+        <EntityInfoGrid
+          items={summaryItems}
+          compact
+          itemStyle={infoCardStyle}
+        />
+      )}
       expandedContent={
         <EquipamentoCardExpanded
           equipamento={equipamento}

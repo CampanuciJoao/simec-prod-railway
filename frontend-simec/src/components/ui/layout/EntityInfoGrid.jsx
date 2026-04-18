@@ -9,6 +9,7 @@ function EntityInfoItem({
   value,
   fullWidth = false,
   compact = false,
+  itemStyle = {},
 }) {
   return (
     <Card
@@ -20,6 +21,7 @@ function EntityInfoItem({
       padded={false}
       style={{
         padding: compact ? '9px 12px' : '16px',
+        ...itemStyle,
       }}
     >
       <span
@@ -50,19 +52,21 @@ EntityInfoItem.propTypes = {
   value: PropTypes.node,
   fullWidth: PropTypes.bool,
   compact: PropTypes.bool,
+  itemStyle: PropTypes.object,
 };
 
 function EntityInfoGrid({
   items = [],
   className = '',
   compact = false,
+  itemStyle = {},
 }) {
   return (
     <ResponsiveGrid
       preset="details"
       className={[
         'min-w-0',
-        compact ? 'gap-3 xl:grid-cols-5' : '',
+        compact ? 'gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5' : '',
         className,
       ].join(' ')}
     >
@@ -73,6 +77,7 @@ function EntityInfoGrid({
           value={item.value}
           fullWidth={item.fullWidth}
           compact={compact}
+          itemStyle={itemStyle}
         />
       ))}
     </ResponsiveGrid>
@@ -90,6 +95,7 @@ EntityInfoGrid.propTypes = {
   ),
   className: PropTypes.string,
   compact: PropTypes.bool,
+  itemStyle: PropTypes.object,
 };
 
 export default EntityInfoGrid;
