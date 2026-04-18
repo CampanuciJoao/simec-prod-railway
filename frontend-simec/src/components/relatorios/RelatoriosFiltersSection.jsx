@@ -3,12 +3,13 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 
-import PageSection from '@/components/ui/layout/PageSection';
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
-
-import Select from '@/components/ui/primitives/Select';
-import DateInput from '@/components/ui/primitives/DateInput';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Button,
+  DateInput,
+  PageSection,
+  ResponsiveGrid,
+  Select,
+} from '@/components/ui';
 
 function Field({ label, children }) {
   return (

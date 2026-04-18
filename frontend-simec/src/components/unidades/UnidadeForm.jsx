@@ -1,10 +1,12 @@
 import React from 'react';
 
-import Input from '@/components/ui/primitives/Input';
-import Select from '@/components/ui/primitives/Select';
-import Button from '@/components/ui/primitives/Button';
-import PageSection from '@/components/ui/layout/PageSection';
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
+import {
+  Button,
+  Input,
+  PageSection,
+  ResponsiveGrid,
+  Select,
+} from '@/components/ui';
 
 import { useUnidadeForm } from '@/hooks/unidades/useUnidadeForm';
 

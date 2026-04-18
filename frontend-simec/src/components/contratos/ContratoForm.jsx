@@ -13,12 +13,14 @@ import {
 
 import { useContratoForm } from '@/hooks/contratos/useContratoForm';
 
-import PageSection from '@/components/ui/layout/PageSection';
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
-import Input from '@/components/ui/primitives/Input';
-import Select from '@/components/ui/primitives/Select';
-import DateInput from '@/components/ui/primitives/DateInput';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Button,
+  DateInput,
+  Input,
+  PageSection,
+  ResponsiveGrid,
+  Select,
+} from '@/components/ui';
 
 import ContratoSelectionCard from '@/components/contratos/ContratoSelectionCard';
 

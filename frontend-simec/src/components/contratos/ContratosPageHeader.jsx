@@ -3,8 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faFileContract } from '@fortawesome/free-solid-svg-icons';
 
-import PageHeader from '@/components/ui/layout/PageHeader';
-import Button from '@/components/ui/primitives/Button';
+import { Button, PageHeader } from '@/components/ui';
 
 function ContratosPageHeader({ onCreate }) {
   return (

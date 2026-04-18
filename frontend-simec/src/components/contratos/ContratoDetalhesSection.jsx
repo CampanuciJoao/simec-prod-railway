@@ -7,8 +7,7 @@ import {
   faCircleInfo,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { PageSection, ResponsiveGrid } from '@/components/ui/layout';
-import { Badge } from '@/components/ui/primitives';
+import { Badge, PageSection, ResponsiveGrid } from '@/components/ui';
 
 import { formatarData } from '@/utils/timeUtils';
 import { getDynamicStatus, getStatusBadgeVariant } from '@/utils/contratos';

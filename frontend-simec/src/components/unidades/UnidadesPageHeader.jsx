@@ -1,8 +1,7 @@
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPlus, faBuilding } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '@/components/ui/primitives/Button';
-import { PageHeader } from '@/components/ui/layout';
+import { Button, PageHeader } from '@/components/ui';
 
 function UnidadesPageHeader({ onCreate }) {
   return (

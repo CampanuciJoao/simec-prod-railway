@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
+import { ModalConfirmacao } from '@/components/ui';
 
 function ConfirmDeleteEmailModal({ isOpen, email, onClose, onConfirm }) {
   return (

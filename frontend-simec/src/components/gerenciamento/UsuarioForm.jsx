@@ -12,13 +12,10 @@ import {
 import { useToast } from '@/contexts/ToastContext';
 
 import {
-  PageSection,
-  ResponsiveGrid,
-} from '@/components/ui/layout';
-
-import {
   Button,
   Input,
+  PageSection,
+  ResponsiveGrid,
   Select,
 } from '@/components/ui';
 

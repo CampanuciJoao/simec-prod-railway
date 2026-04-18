@@ -7,8 +7,7 @@ import {
   faMapMarkedAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Card from '@/components/ui/primitives/Card';
-import Button from '@/components/ui/primitives/Button';
+import { Button, Card } from '@/components/ui';
 
 import { formatarEndereco } from '@/utils/unidades/unidade.utils';
 

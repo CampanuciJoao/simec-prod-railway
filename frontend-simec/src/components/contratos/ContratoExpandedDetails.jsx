@@ -12,7 +12,7 @@ import {
   faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '@/components/ui/primitives/Button';
+import { Button } from '@/components/ui';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';

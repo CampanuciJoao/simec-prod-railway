@@ -2,8 +2,7 @@ import React, { useMemo, useState } from 'react';
 
 import { useBIPage } from '@/hooks/bi/useBIPage';
 
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageState from '@/components/ui/feedback/PageState';
+import { PageLayout, PageState } from '@/components/ui';
 
 import BIPageHeader from '@/components/bi/BIPageHeader';
 import BIResumoCardsSection from '@/components/bi/BIResumoCardsSection';

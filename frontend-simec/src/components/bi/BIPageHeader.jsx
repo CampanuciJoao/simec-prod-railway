@@ -2,8 +2,9 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faChartBar, faPrint } from '@fortawesome/free-solid-svg-icons';
 
-import PageHeader from '@/components/ui/layout/PageHeader';
-import Button from '@/components/ui/primitives/Button';
+import PropTypes from 'prop-types';
+
+import { Button, PageHeader } from '@/components/ui';
 
 function BIPageHeader({ ano, onPrint, canPrint = true }) {
   return (
@@ -20,5 +21,11 @@ function BIPageHeader({ ano, onPrint, canPrint = true }) {
     />
   );
 }
+
+BIPageHeader.propTypes = {
+  ano: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onPrint: PropTypes.func.isRequired,
+  canPrint: PropTypes.bool,
+};
 
 export default BIPageHeader;

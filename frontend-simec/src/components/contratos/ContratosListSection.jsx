@@ -1,8 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
-import PageSection from '@/components/ui/layout/PageSection';
+import { GlobalFilterBar, PageSection } from '@/components/ui';
 
 import ContratosKpiSection from '@/components/contratos/ContratosKpiSection';
 import ContratosActiveFiltersBar from '@/components/contratos/ContratosActiveFiltersBar';

@@ -10,9 +10,7 @@ import {
   faBell,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '@/components/ui/primitives/Button';
-import Card from '@/components/ui/primitives/Card';
-import Input from '@/components/ui/primitives/Input';
+import { Button, Card, Input } from '@/components/ui';
 
 const ESTADO_INICIAL = {
   nome: '',

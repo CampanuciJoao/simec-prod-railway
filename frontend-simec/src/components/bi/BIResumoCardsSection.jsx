@@ -7,7 +7,7 @@ import {
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
+import { ResponsiveGrid } from '@/components/ui';
 import { InteractiveKpiCard } from '@/components/bi';
 
 function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {

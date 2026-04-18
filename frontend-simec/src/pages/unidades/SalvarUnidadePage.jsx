@@ -3,10 +3,12 @@ import { faArrowLeft, faBuilding } from '@fortawesome/free-solid-svg-icons';
 
 import { useSalvarUnidadePage } from '@/hooks/unidades/useSalvarUnidadePage';
 
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageHeader from '@/components/ui/layout/PageHeader';
-import PageState from '@/components/ui/feedback/PageState';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Button,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
 
 import UnidadeForm from '@/components/unidades/UnidadeForm';
 

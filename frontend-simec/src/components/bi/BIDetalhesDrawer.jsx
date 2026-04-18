@@ -1,8 +1,6 @@
 import React from 'react';
 
-import Drawer from '@/components/ui/overlays/Drawer';
-import DrawerList from '@/components/ui/overlays/DrawerList';
-import Button from '@/components/ui/primitives/Button';
+import { Button, Drawer, DrawerList } from '@/components/ui';
 
 function BIDetalhesDrawer({
   open,

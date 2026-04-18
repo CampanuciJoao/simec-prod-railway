@@ -7,8 +7,7 @@ import {
   faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
-import Button from '@/components/ui/primitives/Button';
-import Card from '@/components/ui/primitives/Card';
+import { Button, Card } from '@/components/ui';
 import EmailStatusIcon from '@/components/emails/EmailStatusIcon';
 
 function EmailsTable({ emails, onCreate, onEdit, onDelete }) {

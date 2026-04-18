@@ -10,13 +10,14 @@ import {
 import { useAuditoria } from '@/hooks/auditoria/useAuditoria';
 import { formatarDataHora } from '@/utils/timeUtils';
 
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageHeader from '@/components/ui/layout/PageHeader';
-import PageSection from '@/components/ui/layout/PageSection';
-import PageState from '@/components/ui/feedback/PageState';
-import DateInput from '@/components/ui/primitives/DateInput';
-import Button from '@/components/ui/primitives/Button';
-import Card from '@/components/ui/primitives/Card';
+import {
+  Button,
+  DateInput,
+  PageHeader,
+  PageLayout,
+  PageSection,
+  PageState,
+} from '@/components/ui';
 
 function ActionBadge({ action }) {
   const normalized = String(action || '')

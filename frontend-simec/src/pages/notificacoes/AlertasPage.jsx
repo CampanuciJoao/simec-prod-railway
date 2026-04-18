@@ -3,10 +3,12 @@ import { faBell } from '@fortawesome/free-solid-svg-icons';
 
 import { useAlertasPage } from '@/hooks/alertas/useAlertasPage';
 
-import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageHeader from '@/components/ui/layout/PageHeader';
-import PageState from '@/components/ui/feedback/PageState';
+import {
+  GlobalFilterBar,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
 
 import {
   AlertasKpiGrid,

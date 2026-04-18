@@ -3,10 +3,12 @@ import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
 
 import { useEmailsNotificacaoPage } from '@/hooks/notificacoes/useEmailsNotificacaoPage';
 
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageHeader from '@/components/ui/layout/PageHeader';
-import PageSection from '@/components/ui/layout/PageSection';
-import PageState from '@/components/ui/feedback/PageState';
+import {
+  PageHeader,
+  PageLayout,
+  PageSection,
+  PageState,
+} from '@/components/ui';
 
 import {
   EmailForm,

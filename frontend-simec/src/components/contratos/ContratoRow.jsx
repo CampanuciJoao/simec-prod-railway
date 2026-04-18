@@ -14,7 +14,7 @@ import {
   getRowHighlightClass,
 } from '@/utils/contratos';
 
-import Badge from '@/components/ui/primitives/Badge';
+import { Badge } from '@/components/ui';
 
 import ContratoExpandedDetails from '@/components/contratos/ContratoExpandedDetails';
 

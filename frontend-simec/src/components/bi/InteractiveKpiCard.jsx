@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faArrowRight } from '@fortawesome/free-solid-svg-icons';
 
-import Card from '@/components/ui/primitives/Card';
+import { Card } from '@/components/ui';
 
 function InteractiveKpiCard({ icon, title, value, tone = 'slate', onClick }) {
   const toneMap = {

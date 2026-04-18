@@ -1,9 +1,11 @@
 import { useUnidadesPage } from '@/hooks/unidades/useUnidadesPage';
 
-import PageLayout from '@/components/ui/layout/PageLayout';
-import PageState from '@/components/ui/feedback/PageState';
-import GlobalFilterBar from '@/components/ui/filters/GlobalFilterBar';
-import ModalConfirmacao from '@/components/ui/feedback/ModalConfirmacao';
+import {
+  GlobalFilterBar,
+  ModalConfirmacao,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
 
 import {
   UnidadesPageHeader,

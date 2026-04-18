@@ -1,5 +1,4 @@
-import Card from '@/components/ui/primitives/Card';
-import Button from '@/components/ui/primitives/Button';
+import { Button, Card } from '@/components/ui';
 
 import {
   getStatusBadgeClass,

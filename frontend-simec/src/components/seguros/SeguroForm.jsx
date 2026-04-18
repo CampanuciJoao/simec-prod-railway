@@ -1,9 +1,11 @@
 import React from 'react';
 
-import PageSection from '@/components/ui/layout/PageSection';
-import ResponsiveGrid from '@/components/ui/layout/ResponsiveGrid';
-import Input from '@/components/ui/primitives/Input';
-import Button from '@/components/ui/primitives/Button';
+import {
+  Button,
+  Input,
+  PageSection,
+  ResponsiveGrid,
+} from '@/components/ui';
 
 import { useSeguroForm } from '@/hooks/seguros/useSeguroForm';
 
