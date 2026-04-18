@@ -12,11 +12,13 @@ function ModalConfirmacao({
   isOpen,
   onClose,
   onConfirm,
-  title = 'Confirmar ação',
-  message = 'Você tem certeza?',
+  title = 'Confirmar acao',
+  message = 'Voce tem certeza?',
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   isDestructive = false,
+  confirmDisabled = false,
+  children = null,
 }) {
   if (!isOpen) return null;
 
@@ -70,6 +72,8 @@ function ModalConfirmacao({
           >
             <p>{message}</p>
           </div>
+
+          {children ? <div className="mt-4">{children}</div> : null}
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
@@ -85,6 +89,7 @@ function ModalConfirmacao({
             type="button"
             variant={isDestructive ? 'danger' : 'primary'}
             onClick={onConfirm}
+            disabled={confirmDisabled}
           >
             {confirmText}
           </Button>
@@ -103,6 +108,8 @@ ModalConfirmacao.propTypes = {
   confirmText: PropTypes.string,
   cancelText: PropTypes.string,
   isDestructive: PropTypes.bool,
+  confirmDisabled: PropTypes.bool,
+  children: PropTypes.node,
 };
 
 export default ModalConfirmacao;

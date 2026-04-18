@@ -27,9 +27,9 @@ function extrairFormInicial(manutencao) {
       descricaoProblemaServico: '',
       tecnicoResponsavel: '',
       numeroChamado: '',
-      status: '',
-      agendamentoDataLocal: '',
+      agendamentoDataInicioLocal: '',
       agendamentoHoraInicioLocal: '',
+      agendamentoDataFimLocal: '',
       agendamentoHoraFimLocal: '',
     };
   }
@@ -38,16 +38,20 @@ function extrairFormInicial(manutencao) {
     descricaoProblemaServico: manutencao.descricaoProblemaServico || '',
     tecnicoResponsavel: manutencao.tecnicoResponsavel || '',
     numeroChamado: manutencao.numeroChamado || '',
-    status: manutencao.status || '',
-    agendamentoDataLocal:
-      manutencao?.formulario?.agendamentoDataLocal ||
-      manutencao?.agendamentoLocal?.data ||
-      manutencao?.agendamentoDataLocal ||
+    agendamentoDataInicioLocal:
+      manutencao?.formulario?.agendamentoDataInicioLocal ||
+      manutencao?.agendamentoLocal?.dataInicio ||
+      manutencao?.agendamentoDataInicioLocal ||
       '',
     agendamentoHoraInicioLocal:
       manutencao?.formulario?.agendamentoHoraInicioLocal ||
       manutencao?.agendamentoLocal?.horaInicio ||
       manutencao?.agendamentoHoraInicioLocal ||
+      '',
+    agendamentoDataFimLocal:
+      manutencao?.formulario?.agendamentoDataFimLocal ||
+      manutencao?.agendamentoLocal?.dataFim ||
+      manutencao?.agendamentoDataFimLocal ||
       '',
     agendamentoHoraFimLocal:
       manutencao?.formulario?.agendamentoHoraFimLocal ||
@@ -89,11 +93,12 @@ export function useDetalhesManutencaoPage() {
   } = useManutencaoDetalhes(manutencaoId);
 
   const [formData, setFormData] = useState(extrairFormInicial(null));
-
   const [confirmMode, setConfirmMode] = useState(null);
+  const [manutencaoRealizada, setManutencaoRealizada] = useState(null);
   const [dataTerminoReal, setDataTerminoReal] = useState('');
   const [novaPrevisao, setNovaPrevisao] = useState('');
   const [observacaoDecisao, setObservacaoDecisao] = useState('');
+  const [cancelReason, setCancelReason] = useState('');
 
   useEffect(() => {
     if (manutencao) {
@@ -104,6 +109,7 @@ export function useDetalhesManutencaoPage() {
   useEffect(() => {
     if (manutencao?.status === 'AguardandoConfirmacao') {
       setConfirmMode(null);
+      setManutencaoRealizada(null);
       setDataTerminoReal(toDateTimeLocalValue(new Date()));
       setNovaPrevisao('');
       setObservacaoDecisao('');
@@ -120,6 +126,31 @@ export function useDetalhesManutencaoPage() {
     return ['Agendada', 'EmAndamento', 'AguardandoConfirmacao'].includes(status);
   }, [manutencao]);
 
+  const canConfirmFinal = useMemo(() => {
+    if (confirmMode === 'cancelar') {
+      return Boolean(observacaoDecisao.trim());
+    }
+
+    if (confirmMode === 'concluir') {
+      if (manutencaoRealizada === null || !dataTerminoReal) return false;
+      if (!manutencaoRealizada && !observacaoDecisao.trim()) return false;
+      return true;
+    }
+
+    if (confirmMode === 'prorrogar') {
+      if (manutencaoRealizada === null || !novaPrevisao) return false;
+      return Boolean(observacaoDecisao.trim());
+    }
+
+    return false;
+  }, [
+    confirmMode,
+    dataTerminoReal,
+    manutencaoRealizada,
+    novaPrevisao,
+    observacaoDecisao,
+  ]);
+
   const goBack = () => {
     navigate('/manutencoes');
   };
@@ -128,8 +159,8 @@ export function useDetalhesManutencaoPage() {
     window.print();
   };
 
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
+  const handleFormChange = (event) => {
+    const { name, value } = event.target;
 
     setFormData((prev) => ({
       ...prev,
@@ -144,9 +175,9 @@ export function useDetalhesManutencaoPage() {
       descricaoProblemaServico: formData.descricaoProblemaServico,
       tecnicoResponsavel: formData.tecnicoResponsavel,
       numeroChamado: formData.numeroChamado,
-      status: formData.status || manutencao?.status || 'Agendada',
-      agendamentoDataLocal: formData.agendamentoDataLocal,
+      agendamentoDataInicioLocal: formData.agendamentoDataInicioLocal,
       agendamentoHoraInicioLocal: formData.agendamentoHoraInicioLocal,
+      agendamentoDataFimLocal: formData.agendamentoDataFimLocal,
       agendamentoHoraFimLocal: formData.agendamentoHoraFimLocal || null,
     };
 
@@ -173,22 +204,37 @@ export function useDetalhesManutencaoPage() {
     deleteAnexoModal.closeModal();
   };
 
-  const handleCancelarManutencao = async (motivo = '') => {
+  const handleCancelarManutencao = async () => {
     await concluirOS({
       acao: 'cancelar',
-      observacao: motivo || 'Cancelada manualmente.',
+      observacao: cancelReason.trim(),
     });
 
+    setCancelReason('');
     cancelModal.closeModal();
+  };
+
+  const handleSelectConfirmMode = (mode) => {
+    setConfirmMode(mode);
+    setObservacaoDecisao('');
+    setManutencaoRealizada(null);
+
+    if (mode === 'cancelar') {
+      setCancelReason('');
+      return;
+    }
+
+    setCancelReason('');
   };
 
   const handleConfirmacaoFinal = async () => {
     if (confirmMode === 'concluir') {
       await concluirOS({
         acao: 'concluir',
-        dataTerminoReal:
-          parseDateTimeLocalToIso(dataTerminoReal) || new Date().toISOString(),
-        observacao: observacaoDecisao || null,
+        manutencaoRealizada,
+        equipamentoOperante: true,
+        dataTerminoReal: parseDateTimeLocalToIso(dataTerminoReal),
+        observacao: observacaoDecisao.trim() || null,
       });
       return;
     }
@@ -196,8 +242,10 @@ export function useDetalhesManutencaoPage() {
     if (confirmMode === 'prorrogar') {
       await concluirOS({
         acao: 'prorrogar',
+        manutencaoRealizada,
+        equipamentoOperante: false,
         novaPrevisao: parseDateTimeLocalToIso(novaPrevisao),
-        observacao: observacaoDecisao || null,
+        observacao: observacaoDecisao.trim() || null,
       });
       return;
     }
@@ -205,8 +253,7 @@ export function useDetalhesManutencaoPage() {
     if (confirmMode === 'cancelar') {
       await concluirOS({
         acao: 'cancelar',
-        observacao:
-          observacaoDecisao || 'Cancelada na etapa de confirmação final.',
+        observacao: observacaoDecisao.trim(),
       });
     }
   };
@@ -216,34 +263,33 @@ export function useDetalhesManutencaoPage() {
     loading,
     error,
     submitting,
-
     formData,
     setFormData,
-
     confirmMode,
-    setConfirmMode,
+    setConfirmMode: handleSelectConfirmMode,
+    manutencaoRealizada,
+    setManutencaoRealizada,
     dataTerminoReal,
     setDataTerminoReal,
     novaPrevisao,
     setNovaPrevisao,
     observacaoDecisao,
     setObservacaoDecisao,
-
+    cancelReason,
+    setCancelReason,
+    canConfirmFinal,
     camposPrincipaisBloqueados,
     isCancelavel,
-
     goBack,
     handlePrint,
     handleFormChange,
     handleSalvarAlteracoes,
-
     handleAdicionarNota,
     handleUploadAnexos,
     handleAskDeleteAnexo,
     handleDeleteAnexo,
     handleCancelarManutencao,
     handleConfirmacaoFinal,
-
     cancelModal,
     deleteAnexoModal,
     refetch,

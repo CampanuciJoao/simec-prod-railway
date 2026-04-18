@@ -1,16 +1,14 @@
-// src/hooks/manutencoes/useSalvarManutencaoPage.js
-
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useToast } from '../../contexts/ToastContext';
 
+import { useToast } from '@/contexts/ToastContext';
 import {
-  getManutencaoById,
   addManutencao,
-  updateManutencao,
   getEquipamentos,
+  getManutencaoById,
   getUnidades,
-} from '../../services/api';
+  updateManutencao,
+} from '@/services/api';
 
 export function useSalvarManutencaoPage() {
   const { manutencaoId } = useParams();
@@ -22,15 +20,10 @@ export function useSalvarManutencaoPage() {
   const [initialData, setInitialData] = useState(null);
   const [equipamentos, setEquipamentos] = useState([]);
   const [unidades, setUnidades] = useState([]);
-
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
-  /**
-   * =========================
-   * FETCH DATA
-   * =========================
-   */
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
@@ -51,53 +44,46 @@ export function useSalvarManutencaoPage() {
     } catch (err) {
       const mensagem =
         err?.response?.data?.message ||
-        'Falha ao carregar dados necessários.';
+        'Falha ao carregar os dados necessarios.';
 
       setError(mensagem);
       addToast(mensagem, 'error');
     } finally {
       setLoading(false);
     }
-  }, [isEditing, manutencaoId, addToast]);
+  }, [addToast, isEditing, manutencaoId]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  /**
-   * =========================
-   * SAVE
-   * =========================
-   */
   const handleSave = useCallback(
     async (formData) => {
       try {
+        setSubmitting(true);
+
         if (isEditing) {
           await updateManutencao(manutencaoId, formData);
-          addToast('Manutenção atualizada com sucesso!', 'success');
+          addToast('Manutencao atualizada com sucesso!', 'success');
         } else {
           await addManutencao(formData);
-          addToast('Manutenção agendada com sucesso!', 'success');
+          addToast('Manutencao agendada com sucesso!', 'success');
         }
 
         navigate('/manutencoes', { state: { refresh: true } });
       } catch (err) {
         const mensagem =
-          err?.response?.data?.message ||
-          'Erro ao salvar a manutenção.';
+          err?.response?.data?.message || 'Erro ao salvar a manutencao.';
 
         addToast(mensagem, 'error');
         throw err;
+      } finally {
+        setSubmitting(false);
       }
     },
-    [isEditing, manutencaoId, navigate, addToast]
+    [addToast, isEditing, manutencaoId, navigate]
   );
 
-  /**
-   * =========================
-   * NAV
-   * =========================
-   */
   const goBack = useCallback(() => {
     navigate('/manutencoes');
   }, [navigate]);
@@ -108,6 +94,7 @@ export function useSalvarManutencaoPage() {
     equipamentos,
     unidades,
     loading,
+    submitting,
     error,
     handleSave,
     goBack,

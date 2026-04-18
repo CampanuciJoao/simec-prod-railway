@@ -140,6 +140,8 @@ router.post('/:id/concluir', async (req, res) => {
       dataTerminoReal: req.body?.dataTerminoReal,
       novaPrevisao: req.body?.novaPrevisao,
       observacao: req.body?.observacao,
+      manutencaoRealizada: req.body?.manutencaoRealizada,
+      equipamentoOperante: req.body?.equipamentoOperante,
     });
 
     if (!resultado.ok) {

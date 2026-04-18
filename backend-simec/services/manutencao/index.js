@@ -1,4 +1,5 @@
 import { registrarLog } from '../logService.js';
+import prisma from '../prismaService.js';
 import {
   adaptarListaManutencoesResponse,
   adaptarManutencaoResponse,
@@ -83,8 +84,9 @@ export async function criarManutencaoService({
   }
 
   const agendamento = validarAgendamento({
-    dateLocal: dados.agendamentoDataLocal,
+    startDateLocal: dados.agendamentoDataInicioLocal,
     startTimeLocal: dados.agendamentoHoraInicioLocal,
+    endDateLocal: dados.agendamentoDataFimLocal,
     endTimeLocal: dados.agendamentoHoraFimLocal || null,
     timezone: contexto.timezone,
   });
@@ -176,8 +178,9 @@ export async function atualizarManutencaoService({
   }
 
   const agendamento = validarAgendamento({
-    dateLocal: dados.agendamentoDataLocal,
+    startDateLocal: dados.agendamentoDataInicioLocal,
     startTimeLocal: dados.agendamentoHoraInicioLocal,
+    endDateLocal: dados.agendamentoDataFimLocal,
     endTimeLocal: dados.agendamentoHoraFimLocal || null,
     timezone: contexto.timezone,
   });
@@ -294,6 +297,8 @@ export async function concluirManutencaoComAcaoService({
   dataTerminoReal,
   novaPrevisao,
   observacao,
+  manutencaoRealizada,
+  equipamentoOperante,
 }) {
   if (!validarAcaoWorkflow(acao)) {
     return {
@@ -332,26 +337,90 @@ export async function concluirManutencaoComAcaoService({
     novaPrevisao,
     observacao,
     timezone: contexto.timezone,
+    manutencaoRealizada,
+    equipamentoOperante,
   });
 
   if (!workflow.ok) {
     return workflow;
   }
 
-  await atualizarManutencao({
-    tenantId,
-    manutencaoId,
-    payload: workflow.updateData,
-  });
-
-  if (workflow.notaOperacional) {
-    await criarNotaAndamento({
-      tenantId,
-      usuarioId,
-      manutencaoId,
-      nota: workflow.notaOperacional,
+  await prisma.$transaction(async (tx) => {
+    await tx.manutencao.update({
+      where: {
+        tenantId_id: {
+          tenantId,
+          id: manutencaoId,
+        },
+      },
+      data: workflow.updateData,
     });
-  }
+
+    if (workflow.equipamentoStatus) {
+      await tx.equipamento.update({
+        where: {
+          tenantId_id: {
+            tenantId,
+            id: manutencaoAtual.equipamentoId,
+          },
+        },
+        data: {
+          status: workflow.equipamentoStatus,
+        },
+      });
+    }
+
+    if (workflow.notaOperacional) {
+      await tx.notaAndamento.create({
+        data: {
+          tenant: {
+            connect: { id: tenantId },
+          },
+          nota: workflow.notaOperacional,
+          autor: {
+            connect: {
+              tenantId_id: {
+                tenantId,
+                id: usuarioId,
+              },
+            },
+          },
+          manutencao: {
+            connect: {
+              tenantId_id: {
+                tenantId,
+                id: manutencaoId,
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (workflow.historicoTitulo) {
+      await tx.ocorrencia.create({
+        data: {
+          tenant: {
+            connect: { id: tenantId },
+          },
+          equipamento: {
+            connect: {
+              tenantId_id: {
+                tenantId,
+                id: manutencaoAtual.equipamentoId,
+              },
+            },
+          },
+          titulo: workflow.historicoTitulo,
+          descricao: workflow.historicoDescricao || null,
+          tipo: 'Manutencao',
+          origem: 'usuario',
+          gravidade: workflow.equipamentoStatus === 'Operante' ? 'baixa' : 'media',
+          tecnico: null,
+        },
+      });
+    }
+  });
 
   await registrarLog({
     tenantId,

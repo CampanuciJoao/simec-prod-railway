@@ -1,5 +1,3 @@
-// Ficheiro: backend-simec/services/manutencaoResponseAdapter.js
-
 function normalizarTexto(value) {
   if (typeof value !== 'string') return value;
   const trimmed = value.trim();
@@ -8,8 +6,9 @@ function normalizarTexto(value) {
 
 function montarAgendamentoLocal(manutencao) {
   return {
-    data: manutencao.agendamentoDataLocal || null,
+    dataInicio: manutencao.agendamentoDataInicioLocal || null,
     horaInicio: manutencao.agendamentoHoraInicioLocal || null,
+    dataFim: manutencao.agendamentoDataFimLocal || null,
     horaFim: manutencao.agendamentoHoraFimLocal || null,
     timezone: manutencao.agendamentoTimezone || null,
   };
@@ -27,23 +26,21 @@ export function adaptarManutencaoResponse(manutencao) {
 
   return {
     ...manutencao,
-
     descricaoProblemaServico: normalizarTexto(
       manutencao.descricaoProblemaServico
     ),
     tecnicoResponsavel: normalizarTexto(manutencao.tecnicoResponsavel),
     numeroChamado: normalizarTexto(manutencao.numeroChamado),
-
     agendamentoLocal: montarAgendamentoLocal(manutencao),
     agendamentoUtc: montarAgendamentoUtc(manutencao),
-
     formulario: {
       equipamentoId: manutencao.equipamentoId,
       tipo: manutencao.tipo,
       descricaoProblemaServico: manutencao.descricaoProblemaServico || '',
-      agendamentoDataLocal: manutencao.agendamentoDataLocal || '',
+      agendamentoDataInicioLocal: manutencao.agendamentoDataInicioLocal || '',
       agendamentoHoraInicioLocal:
         manutencao.agendamentoHoraInicioLocal || '',
+      agendamentoDataFimLocal: manutencao.agendamentoDataFimLocal || '',
       agendamentoHoraFimLocal: manutencao.agendamentoHoraFimLocal || '',
       tecnicoResponsavel: manutencao.tecnicoResponsavel || '',
       numeroChamado: manutencao.numeroChamado || '',

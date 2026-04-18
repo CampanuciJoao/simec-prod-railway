@@ -18,6 +18,10 @@ function montarDateTimeLocal(data, hora) {
   return `${data}T${hora}:00`;
 }
 
+function validarHorario(valor = '') {
+  return /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(valor).trim());
+}
+
 export function useManutencaoForm({
   initialData,
   equipamentos = [],
@@ -97,6 +101,13 @@ export function useManutencaoForm({
   const isCorretiva = formData.tipo === 'Corretiva';
 
   const intervaloValido = useMemo(() => {
+    if (
+      !validarHorario(formData.agendamentoHoraInicioLocal) ||
+      !validarHorario(formData.agendamentoHoraFimLocal)
+    ) {
+      return false;
+    }
+
     const inicio = montarDateTimeLocal(
       formData.agendamentoDataInicioLocal,
       formData.agendamentoHoraInicioLocal
@@ -115,6 +126,44 @@ export function useManutencaoForm({
     formData.agendamentoHoraInicioLocal,
     formData.agendamentoDataFimLocal,
     formData.agendamentoHoraFimLocal,
+  ]);
+
+  const fieldErrors = useMemo(() => {
+    const errors = {};
+
+    if (
+      formData.agendamentoHoraInicioLocal &&
+      !validarHorario(formData.agendamentoHoraInicioLocal)
+    ) {
+      errors.agendamentoHoraInicioLocal = 'Informe a hora no formato HH:mm.';
+    }
+
+    if (
+      formData.agendamentoHoraFimLocal &&
+      !validarHorario(formData.agendamentoHoraFimLocal)
+    ) {
+      errors.agendamentoHoraFimLocal = 'Informe a hora no formato HH:mm.';
+    }
+
+    if (
+      !errors.agendamentoHoraFimLocal &&
+      formData.agendamentoDataInicioLocal &&
+      formData.agendamentoHoraInicioLocal &&
+      formData.agendamentoDataFimLocal &&
+      formData.agendamentoHoraFimLocal &&
+      !intervaloValido
+    ) {
+      errors.agendamentoHoraFimLocal =
+        'A hora final precisa ser posterior ao início.';
+    }
+
+    return errors;
+  }, [
+    formData.agendamentoDataInicioLocal,
+    formData.agendamentoHoraInicioLocal,
+    formData.agendamentoDataFimLocal,
+    formData.agendamentoHoraFimLocal,
+    intervaloValido,
   ]);
 
   const isValid = useMemo(() => {
@@ -148,6 +197,7 @@ export function useManutencaoForm({
     unidadeSelecionada,
     isCorretiva,
     intervaloValido,
+    fieldErrors,
     isValid,
   };
 }

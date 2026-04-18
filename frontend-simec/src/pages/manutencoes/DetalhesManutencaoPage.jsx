@@ -14,6 +14,7 @@ import {
   PageHeader,
   PageLayout,
   PageState,
+  Textarea,
 } from '@/components/ui';
 
 function DetalhesManutencaoPage() {
@@ -27,8 +28,8 @@ function DetalhesManutencaoPage() {
         <PageHeader
           title={
             page.manutencao?.numeroOS
-              ? `Detalhes da Ordem de Serviço: ${page.manutencao.numeroOS}`
-              : 'Detalhes da Ordem de Serviço'
+              ? `Detalhes da Ordem de Servico: ${page.manutencao.numeroOS}`
+              : 'Detalhes da Ordem de Servico'
           }
           icon={faWrench}
           actions={
@@ -42,7 +43,7 @@ function DetalhesManutencaoPage() {
           loading={page.loading}
           error={page.error?.message || page.error || ''}
           isEmpty={!page.loading && !page.error && !page.manutencao}
-          emptyMessage="Ordem de serviço não encontrada."
+          emptyMessage="Ordem de servico nao encontrada."
         />
       </PageLayout>
     );
@@ -62,17 +63,22 @@ function DetalhesManutencaoPage() {
       <ModalConfirmacao
         isOpen={page.cancelModal.isOpen}
         onClose={page.cancelModal.closeModal}
-        onConfirm={() =>
-          page.handleCancelarManutencao(
-            'Cancelada manualmente a partir da tela de detalhes.'
-          )
-        }
-        title="Cancelar manutenção"
-        message="Tem certeza que deseja cancelar esta ordem de serviço?"
+        onConfirm={page.handleCancelarManutencao}
+        title="Cancelar manutencao"
+        message="Informe a justificativa para cancelar esta ordem de servico."
         confirmText="Confirmar cancelamento"
         cancelText="Voltar"
         isDestructive
-      />
+        confirmDisabled={!page.cancelReason.trim()}
+      >
+        <Textarea
+          label="Justificativa"
+          rows={3}
+          value={page.cancelReason}
+          onChange={(event) => page.setCancelReason(event.target.value)}
+          placeholder="Explique por que a OS esta sendo cancelada."
+        />
+      </ModalConfirmacao>
 
       <PageLayout
         background="slate"
@@ -90,6 +96,8 @@ function DetalhesManutencaoPage() {
           visible={page.manutencao.status === 'AguardandoConfirmacao'}
           confirmMode={page.confirmMode}
           setConfirmMode={page.setConfirmMode}
+          manutencaoRealizada={page.manutencaoRealizada}
+          setManutencaoRealizada={page.setManutencaoRealizada}
           dataTerminoReal={page.dataTerminoReal}
           setDataTerminoReal={page.setDataTerminoReal}
           novaPrevisao={page.novaPrevisao}
@@ -97,6 +105,7 @@ function DetalhesManutencaoPage() {
           observacaoDecisao={page.observacaoDecisao}
           setObservacaoDecisao={page.setObservacaoDecisao}
           onConfirm={page.handleConfirmacaoFinal}
+          canConfirm={page.canConfirmFinal}
           submitting={page.submitting}
         />
 

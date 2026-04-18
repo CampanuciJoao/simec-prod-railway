@@ -3,39 +3,26 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faBan,
   faCalendarDays,
   faClock,
   faHashtag,
   faHospital,
   faSave,
-  faBan,
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
   Button,
   DateInput,
+  InfoCard,
   Input,
   PageSection,
   ResponsiveGrid,
-  Select,
-  TimeInput,
-  Textarea,
-  InfoCard,
   StatusBadge,
+  Textarea,
+  TimeInput,
 } from '@/components/ui';
-
-const STATUS_OPTIONS = [
-  'Agendada',
-  'EmAndamento',
-  'AguardandoConfirmacao',
-  'Concluida',
-  'Cancelada',
-];
-
-function formatarStatusLabel(status) {
-  return String(status || '').replace(/([A-Z])/g, ' $1').trim();
-}
 
 function InformacoesManutencaoSection({
   manutencao,
@@ -49,10 +36,9 @@ function InformacoesManutencaoSection({
 }) {
   return (
     <PageSection
-      title="Informações da manutenção"
-      description="Edite os dados operacionais da OS respeitando o contrato local-first do backend."
+      title="Informacoes da manutencao"
+      description="Edite os dados operacionais da OS sem quebrar o fluxo oficial de execucao."
     >
-      {/* HEADER INFO */}
       <div className="mb-6">
         <ResponsiveGrid preset="cards">
           <InfoCard icon={faWrench} label="OS / Status">
@@ -71,44 +57,37 @@ function InformacoesManutencaoSection({
 
           <InfoCard icon={faHashtag} label="Equipamento">
             <div className="flex flex-col gap-1">
-              <Link
-                to={`/equipamentos/${manutencao?.equipamentoId || ''}`}
-              >
+              <Link to={`/equipamentos/${manutencao?.equipamentoId || ''}`}>
                 {manutencao?.equipamento?.modelo || '-'}
               </Link>
 
-              <span>
-                Tag: {manutencao?.equipamento?.tag || '-'}
-              </span>
+              <span>Tag: {manutencao?.equipamento?.tag || '-'}</span>
             </div>
           </InfoCard>
 
-          <InfoCard icon={faCalendarDays} label="Agendamento local">
+          <InfoCard icon={faCalendarDays} label="Inicio programado">
             <div className="flex flex-col gap-1">
-              <span>{manutencao?.agendamentoLocal?.data || '-'}</span>
-              <span>
-                {manutencao?.agendamentoLocal?.horaInicio || '--:--'}
-                {manutencao?.agendamentoLocal?.horaFim
-                  ? ` até ${manutencao.agendamentoLocal.horaFim}`
-                  : ''}
-              </span>
+              <span>{manutencao?.agendamentoLocal?.dataInicio || '-'}</span>
+              <span>{manutencao?.agendamentoLocal?.horaInicio || '--:--'}</span>
             </div>
           </InfoCard>
 
-          <InfoCard icon={faClock} label="Timezone operacional">
-            {manutencao?.agendamentoLocal?.timezone || '-'}
+          <InfoCard icon={faClock} label="Fim programado">
+            <div className="flex flex-col gap-1">
+              <span>{manutencao?.agendamentoLocal?.dataFim || '-'}</span>
+              <span>{manutencao?.agendamentoLocal?.horaFim || '--:--'}</span>
+            </div>
           </InfoCard>
 
-          <InfoCard icon={faHashtag} label="Nº do chamado">
+          <InfoCard icon={faHashtag} label="Numero do chamado">
             {manutencao?.numeroChamado || '---'}
           </InfoCard>
         </ResponsiveGrid>
       </div>
 
-      {/* FORM */}
       <div className="space-y-6">
         <Textarea
-          label="Descrição do serviço"
+          label="Descricao do servico"
           name="descricaoProblemaServico"
           value={formData.descricaoProblemaServico}
           onChange={onFormChange}
@@ -118,7 +97,7 @@ function InformacoesManutencaoSection({
 
         <ResponsiveGrid preset="form">
           <Input
-            label="Técnico responsável"
+            label="Tecnico responsavel"
             name="tecnicoResponsavel"
             value={formData.tecnicoResponsavel}
             onChange={onFormChange}
@@ -126,33 +105,19 @@ function InformacoesManutencaoSection({
           />
 
           <Input
-            label="Número do chamado"
+            label="Numero do chamado"
             name="numeroChamado"
             value={formData.numeroChamado}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
           />
-
-          <Select
-            label="Status"
-            name="status"
-            value={formData.status}
-            onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados || submitting}
-          >
-            {STATUS_OPTIONS.map((status) => (
-              <option key={status} value={status}>
-                {formatarStatusLabel(status)}
-              </option>
-            ))}
-          </Select>
         </ResponsiveGrid>
 
         <ResponsiveGrid preset="form">
           <DateInput
-            label="Data do agendamento"
-            name="agendamentoDataLocal"
-            value={formData.agendamentoDataLocal}
+            label="Data de inicio"
+            name="agendamentoDataInicioLocal"
+            value={formData.agendamentoDataInicioLocal}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
           />
@@ -161,6 +126,14 @@ function InformacoesManutencaoSection({
             label="Hora inicial"
             name="agendamentoHoraInicioLocal"
             value={formData.agendamentoHoraInicioLocal}
+            onChange={onFormChange}
+            disabled={camposPrincipaisBloqueados || submitting}
+          />
+
+          <DateInput
+            label="Data de termino"
+            name="agendamentoDataFimLocal"
+            value={formData.agendamentoDataFimLocal}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
           />
@@ -174,7 +147,7 @@ function InformacoesManutencaoSection({
           />
         </ResponsiveGrid>
 
-        {!camposPrincipaisBloqueados && (
+        {!camposPrincipaisBloqueados ? (
           <div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
             <div>
               {isCancelavel ? (
@@ -197,14 +170,25 @@ function InformacoesManutencaoSection({
                 disabled={submitting}
               >
                 <FontAwesomeIcon icon={faSave} />
-                {submitting ? 'Salvando...' : 'Salvar alterações'}
+                {submitting ? 'Salvando...' : 'Salvar alteracoes'}
               </Button>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
     </PageSection>
   );
 }
+
+InformacoesManutencaoSection.propTypes = {
+  manutencao: PropTypes.object,
+  formData: PropTypes.object,
+  onFormChange: PropTypes.func.isRequired,
+  onSalvarAlteracoes: PropTypes.func.isRequired,
+  onAbrirCancelamento: PropTypes.func.isRequired,
+  camposPrincipaisBloqueados: PropTypes.bool,
+  isCancelavel: PropTypes.bool,
+  submitting: PropTypes.bool,
+};
 
 export default InformacoesManutencaoSection;

@@ -17,7 +17,7 @@ export function validarStatusParaAcao({
       return {
         ok: false,
         status: 409,
-        message: `Não é possível cancelar uma manutenção com status "${status}".`,
+        message: `Nao e possivel cancelar uma manutencao com status "${status}".`,
       };
     }
 
@@ -31,7 +31,7 @@ export function validarStatusParaAcao({
       return {
         ok: false,
         status: 409,
-        message: `Não é possível concluir uma manutenção com status "${status}".`,
+        message: `Nao e possivel concluir uma manutencao com status "${status}".`,
       };
     }
 
@@ -45,7 +45,7 @@ export function validarStatusParaAcao({
       return {
         ok: false,
         status: 409,
-        message: `Não é possível prorrogar uma manutenção com status "${status}".`,
+        message: `Nao e possivel prorrogar uma manutencao com status "${status}".`,
       };
     }
 
@@ -55,8 +55,34 @@ export function validarStatusParaAcao({
   return {
     ok: false,
     status: 400,
-    message: 'Ação operacional inválida.',
+    message: 'Acao operacional invalida.',
   };
+}
+
+function validarSelecaoOperacional({
+  acao,
+  manutencaoRealizada,
+  equipamentoOperante,
+}) {
+  if (acao === 'cancelar') return null;
+
+  if (typeof manutencaoRealizada !== 'boolean') {
+    return 'Informe se a manutencao ocorreu mesmo.';
+  }
+
+  if (typeof equipamentoOperante !== 'boolean') {
+    return 'Informe como o equipamento ficou ao final do prazo.';
+  }
+
+  if (acao === 'concluir' && !equipamentoOperante) {
+    return 'Se o equipamento continua inoperante, a OS deve ser prorrogada.';
+  }
+
+  if (acao === 'prorrogar' && equipamentoOperante) {
+    return 'Se o equipamento ficou operante, a OS deve ser concluida.';
+  }
+
+  return null;
 }
 
 export function montarWorkflowPayload({
@@ -66,12 +92,14 @@ export function montarWorkflowPayload({
   novaPrevisao,
   observacao,
   timezone,
+  manutencaoRealizada,
+  equipamentoOperante,
 }) {
   if (!validarAcaoWorkflow(acao)) {
     return {
       ok: false,
       status: 400,
-      message: 'Ação de conclusão inválida.',
+      message: 'Acao de conclusao invalida.',
     };
   }
 
@@ -84,28 +112,50 @@ export function montarWorkflowPayload({
     return validacaoStatus;
   }
 
+  const erroSelecao = validarSelecaoOperacional({
+    acao,
+    manutencaoRealizada,
+    equipamentoOperante,
+  });
+
+  if (erroSelecao) {
+    return {
+      ok: false,
+      status: 400,
+      message: erroSelecao,
+    };
+  }
+
   const updateData = {};
   let detalheLog = '';
   let notaOperacional = '';
+  let equipamentoStatus = null;
+  let historicoTitulo = '';
+  let historicoDescricao = '';
 
   if (acao === 'cancelar') {
     if (!String(observacao || '').trim()) {
       return {
         ok: false,
         status: 400,
-        message: 'O motivo do cancelamento é obrigatório.',
+        message: 'O motivo do cancelamento e obrigatorio.',
       };
     }
 
     updateData.status = 'Cancelada';
     detalheLog = `OS ${manutencaoAtual.numeroOS} cancelada.`;
     notaOperacional = `Cancelamento registrado. Motivo: ${String(observacao).trim()}`;
+    historicoTitulo = `OS ${manutencaoAtual.numeroOS} cancelada`;
+    historicoDescricao = notaOperacional;
 
     return {
       ok: true,
       updateData,
       detalheLog,
       notaOperacional,
+      equipamentoStatus,
+      historicoTitulo,
+      historicoDescricao,
     };
   }
 
@@ -114,7 +164,7 @@ export function montarWorkflowPayload({
       return {
         ok: false,
         status: 400,
-        message: 'A data/hora real da conclusão é obrigatória.',
+        message: 'A hora real do fim da manutencao e obrigatoria.',
       };
     }
 
@@ -124,87 +174,113 @@ export function montarWorkflowPayload({
       return {
         ok: false,
         status: 400,
-        message: 'Data/hora real da conclusão inválida.',
+        message: 'Hora real de termino invalida.',
+      };
+    }
+
+    if (!manutencaoRealizada && !String(observacao || '').trim()) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'Explique por que a manutencao nao ocorreu.',
       };
     }
 
     updateData.status = 'Concluida';
     updateData.dataConclusao = parsedConclusao;
-
-    detalheLog = `OS ${manutencaoAtual.numeroOS} concluída.`;
-
-    notaOperacional = [
-      `Conclusão registrada em ${dataTerminoReal}.`,
+    updateData.dataFimReal = parsedConclusao;
+    detalheLog = `OS ${manutencaoAtual.numeroOS} concluida.`;
+    equipamentoStatus = 'Operante';
+    historicoTitulo = `OS ${manutencaoAtual.numeroOS} concluida`;
+    historicoDescricao = [
+      `Fim real informado em ${dataTerminoReal}.`,
+      manutencaoRealizada
+        ? 'A manutencao foi executada e o equipamento ficou operante.'
+        : 'A manutencao nao ocorreu, mas o equipamento ficou operante.',
       String(observacao || '').trim(),
     ]
       .filter(Boolean)
       .join(' ');
+
+    notaOperacional = historicoDescricao;
 
     return {
       ok: true,
       updateData,
       detalheLog,
       notaOperacional,
+      equipamentoStatus,
+      historicoTitulo,
+      historicoDescricao,
     };
   }
 
-  if (acao === 'prorrogar') {
-    if (!novaPrevisao) {
-      return {
-        ok: false,
-        status: 400,
-        message: 'A nova previsão é obrigatória.',
-      };
-    }
-
-    const parsedPrevisao = new Date(novaPrevisao);
-
-    if (Number.isNaN(parsedPrevisao.getTime())) {
-      return {
-        ok: false,
-        status: 400,
-        message: 'Nova previsão inválida.',
-      };
-    }
-
-    const localPrevisao = extrairLocalDateTimeFromIso(
-      novaPrevisao,
-      timezone
-    );
-
-    if (!localPrevisao) {
-      return {
-        ok: false,
-        status: 400,
-        message: 'Não foi possível interpretar a nova previsão.',
-      };
-    }
-
-    updateData.status = 'EmAndamento';
-    updateData.agendamentoDataFimLocal = localPrevisao.dateLocal;
-    updateData.agendamentoHoraFimLocal = localPrevisao.timeLocal;
-    updateData.dataHoraAgendamentoFim = localPrevisao.utcDate;
-
-    detalheLog = `OS ${manutencaoAtual.numeroOS} prorrogada.`;
-
-    notaOperacional = [
-      `Prorrogação registrada. Nova previsão: ${localPrevisao.dateLocal} ${localPrevisao.timeLocal}.`,
-      String(observacao || '').trim(),
-    ]
-      .filter(Boolean)
-      .join(' ');
-
+  if (!novaPrevisao) {
     return {
-      ok: true,
-      updateData,
-      detalheLog,
-      notaOperacional,
+      ok: false,
+      status: 400,
+      message: 'A nova previsao e obrigatoria.',
     };
   }
+
+  if (!String(observacao || '').trim()) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'Informe a justificativa da prorrogacao.',
+    };
+  }
+
+  const parsedPrevisao = new Date(novaPrevisao);
+
+  if (Number.isNaN(parsedPrevisao.getTime())) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'Nova previsao invalida.',
+    };
+  }
+
+  const localPrevisao = extrairLocalDateTimeFromIso(
+    novaPrevisao,
+    timezone
+  );
+
+  if (!localPrevisao) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'Nao foi possivel interpretar a nova previsao.',
+    };
+  }
+
+  updateData.status = 'EmAndamento';
+  updateData.agendamentoDataFimLocal = localPrevisao.dateLocal;
+  updateData.agendamentoHoraFimLocal = localPrevisao.timeLocal;
+  updateData.dataHoraAgendamentoFim = localPrevisao.utcDate;
+
+  detalheLog = `OS ${manutencaoAtual.numeroOS} prorrogada.`;
+  equipamentoStatus = 'EmManutencao';
+  historicoTitulo = `OS ${manutencaoAtual.numeroOS} prorrogada`;
+  historicoDescricao = [
+    manutencaoRealizada
+      ? 'A manutencao ocorreu, mas o equipamento continua inoperante.'
+      : 'A manutencao nao ocorreu e o equipamento continua inoperante.',
+    `Nova previsao: ${localPrevisao.dateLocal} ${localPrevisao.timeLocal}.`,
+    String(observacao || '').trim(),
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  notaOperacional = historicoDescricao;
 
   return {
-    ok: false,
-    status: 400,
-    message: 'Ação operacional inválida.',
+    ok: true,
+    updateData,
+    detalheLog,
+    notaOperacional,
+    equipamentoStatus,
+    historicoTitulo,
+    historicoDescricao,
   };
 }
