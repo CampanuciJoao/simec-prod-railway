@@ -103,6 +103,20 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
       <PageSection
         title={`Anexos (${anexos.length})`}
         description="Documentos vinculados ao equipamento."
+        headerRight={(
+          <Button
+            type="button"
+            size="sm"
+            onClick={openFileDialog}
+            disabled={isSubmitting}
+          >
+            <FontAwesomeIcon
+              icon={isSubmitting ? faSpinner : faUpload}
+              spin={isSubmitting}
+            />
+            {isSubmitting ? 'Enviando...' : 'Anexar arquivo'}
+          </Button>
+        )}
       >
         <div className="space-y-5">
           <div className="flex items-start gap-3">
@@ -127,23 +141,9 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
                 className="text-sm"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Faça upload e mantenha documentos técnicos ou administrativos.
+                Faca upload e mantenha documentos tecnicos ou administrativos.
               </p>
             </div>
-          </div>
-
-          <div className="flex justify-end">
-            <Button
-              type="button"
-              onClick={openFileDialog}
-              disabled={isSubmitting}
-            >
-              <FontAwesomeIcon
-                icon={isSubmitting ? faSpinner : faUpload}
-                spin={isSubmitting}
-              />
-              {isSubmitting ? 'Enviando...' : 'Enviar'}
-            </Button>
           </div>
 
           <input

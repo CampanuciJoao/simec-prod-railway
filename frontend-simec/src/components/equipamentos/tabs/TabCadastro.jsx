@@ -6,7 +6,6 @@ import { faInfoCircle, faEdit } from '@fortawesome/free-solid-svg-icons';
 import { formatarData } from '@/utils/timeUtils';
 
 import {
-  ActionBar,
   Button,
   EntityInfoGrid,
   PageSection,
@@ -18,9 +17,9 @@ function TabCadastro({ equipamentoInicial }) {
 
   const items = [
     { key: 'modelo', label: 'Modelo', value: equipamentoInicial.modelo },
-    { key: 'tag', label: 'Nº Série (Tag)', value: equipamentoInicial.tag },
+    { key: 'tag', label: 'Numero de serie (Tag)', value: equipamentoInicial.tag },
     { key: 'tipo', label: 'Tipo', value: equipamentoInicial.tipo },
-    { key: 'setor', label: 'Localização', value: equipamentoInicial.setor },
+    { key: 'setor', label: 'Localizacao', value: equipamentoInicial.setor },
     {
       key: 'unidade',
       label: 'Unidade',
@@ -38,17 +37,17 @@ function TabCadastro({ equipamentoInicial }) {
     },
     {
       key: 'ano',
-      label: 'Ano Fabricação',
+      label: 'Ano fabricacao',
       value: equipamentoInicial.anoFabricacao,
     },
     {
       key: 'instalacao',
-      label: 'Data Instalação',
+      label: 'Data instalacao',
       value: formatarData(equipamentoInicial.dataInstalacao),
     },
     {
       key: 'patrimonio',
-      label: 'Nº de Patrimônio',
+      label: 'Numero de patrimonio',
       value: equipamentoInicial.numeroPatrimonio,
     },
     {
@@ -58,7 +57,7 @@ function TabCadastro({ equipamentoInicial }) {
     },
     {
       key: 'observacoes',
-      label: 'Observações',
+      label: 'Observacoes',
       value: equipamentoInicial.observacoes,
       fullWidth: true,
     },
@@ -66,8 +65,20 @@ function TabCadastro({ equipamentoInicial }) {
 
   return (
     <PageSection
-      title="Informações do Cadastro"
+      title="Informacoes do Cadastro"
       description="Dados principais do equipamento cadastrado no sistema."
+      headerRight={(
+        <Button
+          type="button"
+          size="sm"
+          onClick={() =>
+            navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
+          }
+        >
+          <FontAwesomeIcon icon={faEdit} />
+          Editar cadastro
+        </Button>
+      )}
     >
       <div className="space-y-5">
         <div className="flex items-start gap-3">
@@ -92,24 +103,10 @@ function TabCadastro({ equipamentoInicial }) {
               className="text-sm"
               style={{ color: 'var(--text-muted)' }}
             >
-              Informações administrativas e técnicas do equipamento.
+              Informacoes administrativas e tecnicas do equipamento.
             </p>
           </div>
         </div>
-
-        <ActionBar
-          right={
-            <Button
-              type="button"
-              onClick={() =>
-                navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
-              }
-            >
-              <FontAwesomeIcon icon={faEdit} />
-              Editar
-            </Button>
-          }
-        />
 
         <EntityInfoGrid items={items} />
       </div>

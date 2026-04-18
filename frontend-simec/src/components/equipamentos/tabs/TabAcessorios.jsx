@@ -73,14 +73,27 @@ function TabAcessorios({ equipamentoId }) {
         isOpen={isOpen}
         onClose={closeModal}
         onConfirm={handleConfirmarExclusao}
-        title="Excluir acessório"
+        title="Excluir acessorio"
         message={`Deseja excluir "${modalData?.nome}"?`}
         isDestructive
       />
 
       <PageSection
-        title="Acessórios"
-        description="Gerencie os acessórios vinculados ao equipamento."
+        title="Acessorios"
+        description="Gerencie os acessorios vinculados ao equipamento."
+        headerRight={
+          !showForm ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAddNewClick}
+              disabled={submitting}
+            >
+              <FontAwesomeIcon icon={faPlus} />
+              <span>Cadastrar acessorio</span>
+            </Button>
+          ) : null
+        }
       >
         <div className="space-y-5">
           <div className="flex items-start gap-3">
@@ -99,7 +112,7 @@ function TabAcessorios({ equipamentoId }) {
                 className="text-sm font-semibold"
                 style={{ color: 'var(--text-primary)' }}
               >
-                Acessórios associados
+                Acessorios associados
               </p>
               <p
                 className="text-sm"
@@ -109,19 +122,6 @@ function TabAcessorios({ equipamentoId }) {
               </p>
             </div>
           </div>
-
-          {!showForm ? (
-            <div>
-              <Button
-                type="button"
-                onClick={handleAddNewClick}
-                disabled={submitting}
-              >
-                <FontAwesomeIcon icon={faPlus} />
-                <span>Adicionar acessório</span>
-              </Button>
-            </div>
-          ) : null}
 
           {showForm ? (
             <Card
