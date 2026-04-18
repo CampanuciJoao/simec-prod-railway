@@ -1,46 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import debounce from 'lodash/debounce';
 
 import { getLogAuditoria, getFiltrosAuditoria } from '@/services/api';
 import { useToast } from '@/contexts/ToastContext';
-
-function createFetchLogs(addToast, setLogs, setPagination, setLoading, setLoadingMore) {
-  return debounce(async (currentFilters, page = 1) => {
-    if (page === 1) {
-      setLoading(true);
-    } else {
-      setLoadingMore(true);
-    }
-
-    try {
-      const params = Object.fromEntries(
-        Object.entries(currentFilters).filter(
-          ([, value]) => value != null && value !== ''
-        )
-      );
-
-      params.page = page;
-      params.limit = 50;
-
-      const data = await getLogAuditoria(params);
-
-      setLogs((prevLogs) =>
-        page === 1 ? data.logs || [] : [...prevLogs, ...(data.logs || [])]
-      );
-
-      setPagination({
-        page: data?.pagination?.page || page,
-        hasNextPage: Boolean(data?.pagination?.hasNextPage),
-      });
-    } catch {
-      addToast('Erro ao carregar os logs de auditoria.', 'error');
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  }, 300);
-}
 
 export function useAuditoria() {
   const location = useLocation();
@@ -71,14 +34,42 @@ export function useAuditoria() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  const fetchLogs = useCallback(
-    createFetchLogs(
-      addToast,
-      setLogs,
-      setPagination,
-      setLoading,
-      setLoadingMore
-    ),
+  const fetchLogs = useMemo(
+    () =>
+      debounce(async (currentFilters, page = 1) => {
+        if (page === 1) {
+          setLoading(true);
+        } else {
+          setLoadingMore(true);
+        }
+
+        try {
+          const params = Object.fromEntries(
+            Object.entries(currentFilters).filter(
+              ([, value]) => value != null && value !== ''
+            )
+          );
+
+          params.page = page;
+          params.limit = 50;
+
+          const data = await getLogAuditoria(params);
+
+          setLogs((prevLogs) =>
+            page === 1 ? data.logs || [] : [...prevLogs, ...(data.logs || [])]
+          );
+
+          setPagination({
+            page: data?.pagination?.page || page,
+            hasNextPage: Boolean(data?.pagination?.hasNextPage),
+          });
+        } catch {
+          addToast('Erro ao carregar os logs de auditoria.', 'error');
+        } finally {
+          setLoading(false);
+          setLoadingMore(false);
+        }
+      }, 300),
     [addToast]
   );
 
