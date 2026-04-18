@@ -45,7 +45,7 @@ function EntityCard({
         className={[
           'flex w-full text-left',
           compact
-            ? 'items-center gap-4 px-4 py-4 md:px-5'
+            ? 'items-center gap-4 px-4 py-3 md:px-5'
             : 'flex-col gap-5 px-5 py-5 lg:flex-row lg:items-start lg:justify-between',
         ].join(' ')}
       >
@@ -69,7 +69,7 @@ function EntityCard({
               className={[
                 'min-w-0',
                 compact
-                  ? 'mb-3 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'
+                  ? 'mb-2 flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between'
                   : 'flex min-w-0 flex-col gap-3 lg:flex-row lg:items-start lg:justify-between',
               ].join(' ')}
             >
@@ -102,9 +102,7 @@ function EntityCard({
                     </p>
                   ) : null}
                 </div>
-              ) : (
-                <div />
-              )}
+              ) : null}
 
               {actions ? (
                 <div

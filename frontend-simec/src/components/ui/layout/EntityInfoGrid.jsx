@@ -19,13 +19,13 @@ function EntityInfoItem({
       ].join(' ')}
       padded={false}
       style={{
-        padding: compact ? '10px 12px' : '16px',
+        padding: compact ? '9px 12px' : '16px',
       }}
     >
       <span
         className={[
           'block uppercase tracking-[0.14em]',
-          compact ? 'text-[10px] font-bold' : 'text-[11px] font-bold',
+          compact ? 'text-[11px] font-bold' : 'text-[11px] font-bold',
         ].join(' ')}
         style={{ color: 'var(--text-muted)' }}
       >
@@ -35,7 +35,7 @@ function EntityInfoItem({
       <div
         className={[
           'min-w-0 break-words font-medium',
-          compact ? 'mt-1 text-sm leading-5' : 'mt-2 text-sm',
+          compact ? 'mt-1 text-[15px] leading-5' : 'mt-2 text-sm',
         ].join(' ')}
         style={{ color: 'var(--text-primary)' }}
       >
