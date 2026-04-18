@@ -89,6 +89,12 @@ function EquipamentoCard({
           title="Abrir ficha tecnica"
           onClick={handleGoToFicha}
           className="px-3 sm:px-4"
+          style={{
+            '--button-bg': 'var(--bg-surface)',
+            '--button-bg-hover': 'var(--bg-hover)',
+            '--button-text': 'var(--text-primary)',
+            '--button-border': 'var(--border-soft)',
+          }}
         >
           <FontAwesomeIcon icon={faFileMedical} />
           <span className="hidden sm:inline">Ficha tecnica</span>

@@ -86,12 +86,12 @@ function EntityCard({
     >
       {compact ? (
         <div className="px-4 py-4 md:px-5">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between gap-3 md:hidden">
             <button
               type="button"
               onClick={onToggle}
               aria-expanded={expanded}
-              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border transition-all"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border text-sm transition-all"
               style={{
                 ...defaultToggleStyle,
                 ...toggleStyle,
@@ -100,10 +100,6 @@ function EntityCard({
               {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
             </button>
 
-            <div className="min-w-0 flex-1">
-              {renderHeaderText()}
-            </div>
-
             {actions ? (
               <div className="flex shrink-0 items-center gap-2">
                 {actions}
@@ -111,11 +107,42 @@ function EntityCard({
             ) : null}
           </div>
 
-          {summary ? (
-            <div className={hasTopRow ? 'mt-3' : 'mt-4'}>
+          <div className={summary ? 'mt-3 md:mt-0' : ''}>
+            <div className="hidden md:flex md:items-center md:gap-3">
+              <button
+                type="button"
+                onClick={onToggle}
+                aria-expanded={expanded}
+                className="inline-flex h-8 w-8 shrink-0 items-center justify-center self-center rounded-xl border text-sm transition-all"
+                style={{
+                  ...defaultToggleStyle,
+                  ...toggleStyle,
+                }}
+              >
+                {expanded ? resolvedCollapseIcon : resolvedExpandIcon}
+              </button>
+
+              <div className="min-w-0 flex-1">
+                {summary}
+              </div>
+
+              {actions ? (
+                <div className="flex shrink-0 items-center gap-2 self-center">
+                  {actions}
+                </div>
+              ) : null}
+            </div>
+
+            <div className="md:hidden">
+              {hasTextHeader ? (
+                <div className="mb-3 min-w-0">
+                  {renderHeaderText()}
+                </div>
+              ) : null}
+
               {summary}
             </div>
-          ) : null}
+          </div>
         </div>
       ) : (
         <button
