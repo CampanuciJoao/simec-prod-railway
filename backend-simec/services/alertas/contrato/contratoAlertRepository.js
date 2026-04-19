@@ -1,8 +1,24 @@
 import prisma from '../../prismaService.js';
 
-/**
- * 🔍 BUSCA
- */
+function alertaMudou(existente, data) {
+  return (
+    existente.titulo !== data.titulo ||
+    existente.subtitulo !== data.subtitulo ||
+    existente.subtituloBase !== data.subtituloBase ||
+    existente.numeroOS !== data.numeroOS ||
+    String(existente.dataHoraAgendamentoInicio) !==
+      String(data.dataHoraAgendamentoInicio) ||
+    String(existente.dataHoraAgendamentoFim) !==
+      String(data.dataHoraAgendamentoFim) ||
+    existente.prioridade !== data.prioridade ||
+    String(existente.data) !== String(data.data) ||
+    existente.tipo !== data.tipo ||
+    existente.tipoCategoria !== data.tipoCategoria ||
+    existente.tipoEvento !== data.tipoEvento ||
+    existente.link !== data.link
+  );
+}
+
 export async function buscarContratosAtivosPorTenant(tenantId) {
   return prisma.contrato.findMany({
     where: {
@@ -15,24 +31,25 @@ export async function buscarContratosAtivosPorTenant(tenantId) {
   });
 }
 
-/**
- * 🔥 UPSERT INTELIGENTE (PADRÃO DO SISTEMA)
- */
 export async function upsertAlertaContrato(tenantId, alertaId, data) {
   const existente = await prisma.alerta.findUnique({
     where: { id: alertaId },
     select: {
       titulo: true,
       subtitulo: true,
+      subtituloBase: true,
+      numeroOS: true,
+      dataHoraAgendamentoInicio: true,
+      dataHoraAgendamentoFim: true,
       prioridade: true,
       data: true,
-      metadata: true,
+      tipo: true,
+      tipoCategoria: true,
+      tipoEvento: true,
+      link: true,
     },
   });
 
-  /**
-   * 🟢 NÃO EXISTE → CRIA
-   */
   if (!existente) {
     await prisma.alerta.create({
       data: {
@@ -45,27 +62,10 @@ export async function upsertAlertaContrato(tenantId, alertaId, data) {
     return { created: true, updated: false };
   }
 
-  /**
-   * 🔍 VERIFICA SE MUDOU
-   */
-  const mudou =
-    existente.titulo !== data.titulo ||
-    existente.subtitulo !== data.subtitulo ||
-    existente.prioridade !== data.prioridade ||
-    String(existente.data) !== String(data.data) ||
-    JSON.stringify(existente.metadata || {}) !==
-      JSON.stringify(data.metadata || {});
-
-  /**
-   * ⚪ NÃO MUDOU → IGNORA
-   */
-  if (!mudou) {
+  if (!alertaMudou(existente, data)) {
     return { created: false, updated: false };
   }
 
-  /**
-   * 🟡 MUDOU → ATUALIZA
-   */
   await prisma.alerta.update({
     where: { id: alertaId },
     data: {

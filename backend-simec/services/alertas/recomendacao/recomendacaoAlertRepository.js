@@ -1,5 +1,24 @@
 import prisma from '../../prismaService.js';
 
+function alertaMudou(existente, data) {
+  return (
+    existente.titulo !== data.titulo ||
+    existente.subtitulo !== data.subtitulo ||
+    existente.subtituloBase !== data.subtituloBase ||
+    existente.numeroOS !== data.numeroOS ||
+    String(existente.dataHoraAgendamentoInicio) !==
+      String(data.dataHoraAgendamentoInicio) ||
+    String(existente.dataHoraAgendamentoFim) !==
+      String(data.dataHoraAgendamentoFim) ||
+    existente.prioridade !== data.prioridade ||
+    String(existente.data) !== String(data.data) ||
+    existente.tipo !== data.tipo ||
+    existente.tipoCategoria !== data.tipoCategoria ||
+    existente.tipoEvento !== data.tipoEvento ||
+    existente.link !== data.link
+  );
+}
+
 export async function buscarEquipamentosComHistorico(tenantId, dataCorte) {
   return prisma.equipamento.findMany({
     where: {
@@ -48,9 +67,16 @@ export async function upsertAlertaRecomendacao(tenantId, alertaId, data) {
     select: {
       titulo: true,
       subtitulo: true,
+      subtituloBase: true,
+      numeroOS: true,
+      dataHoraAgendamentoInicio: true,
+      dataHoraAgendamentoFim: true,
       prioridade: true,
       data: true,
-      metadata: true,
+      tipo: true,
+      tipoCategoria: true,
+      tipoEvento: true,
+      link: true,
     },
   });
 
@@ -66,15 +92,7 @@ export async function upsertAlertaRecomendacao(tenantId, alertaId, data) {
     return { created: true, updated: false };
   }
 
-  const mudou =
-    existente.titulo !== data.titulo ||
-    existente.subtitulo !== data.subtitulo ||
-    existente.prioridade !== data.prioridade ||
-    String(existente.data) !== String(data.data) ||
-    JSON.stringify(existente.metadata || {}) !==
-      JSON.stringify(data.metadata || {});
-
-  if (!mudou) {
+  if (!alertaMudou(existente, data)) {
     return { created: false, updated: false };
   }
 

@@ -8,16 +8,11 @@ import React, {
   useMemo,
   useRef,
 } from 'react';
-import { io } from 'socket.io-client';
 
 import { getAlertas, updateStatusAlerta } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 
 const AlertasContext = createContext(null);
-
-function getSocketUrl() {
-  return import.meta.env.VITE_API_URL?.split('/api')[0] || 'http://localhost:5000';
-}
 
 export function AlertasProvider({ children }) {
   const [alertas, setAlertas] = useState([]);
@@ -28,7 +23,7 @@ export function AlertasProvider({ children }) {
   const isAuthenticated = auth?.isAuthenticated || false;
   const authLoading = auth?.loading || false;
 
-  const socketRef = useRef(null);
+  const pollingRef = useRef(null);
 
   const carregarAlertas = useCallback(async () => {
     if (!isAuthenticated || authLoading || !usuario?.id) {
@@ -52,33 +47,31 @@ export function AlertasProvider({ children }) {
 
   useEffect(() => {
     if (!isAuthenticated || authLoading || !usuario?.id) {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+
       if (!authLoading) {
         setAlertas([]);
         setLoading(false);
       }
+
       return undefined;
     }
 
     carregarAlertas();
 
-    const socket = io(getSocketUrl(), {
-      transports: ['websocket', 'polling'],
-    });
-
-    socketRef.current = socket;
-
-    socket.on('connect_error', (error) => {
-      console.error('[ALERTAS_CONTEXT_SOCKET_CONNECT_ERROR]', error);
-    });
-
-    socket.on('atualizar-alertas', () => {
+    pollingRef.current = setInterval(() => {
       carregarAlertas();
-    });
+    }, 30000);
 
     return () => {
-      socket.off('atualizar-alertas');
-      socket.disconnect();
-      socketRef.current = null;
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+
       setAlertas([]);
       setLoading(true);
     };

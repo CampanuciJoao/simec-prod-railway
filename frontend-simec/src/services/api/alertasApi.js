@@ -7,4 +7,4 @@ export const updateStatusAlerta = (alertaId, status) =>
   api.put(`/alertas/${alertaId}/status`, { status }).then((res) => res.data);
 
 export const dismissAlerta = (alertaId) =>
-  api.delete(`/alertas/${alertaId}`).then((res) => res.data);
+  updateStatusAlerta(alertaId, 'Visto');

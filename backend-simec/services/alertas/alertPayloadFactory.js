@@ -1,9 +1,8 @@
-// Ficheiro: backend-simec/services/alertas/alertPayloadFactory.js
-
 import {
   ALERT_CATEGORIAS,
   ALERT_EVENTOS,
   ALERT_PRIORIDADES,
+  getAlertTypeLabel,
 } from './alertTypes.js';
 
 export async function criarPayloadBaseAlerta({
@@ -19,8 +18,6 @@ export async function criarPayloadBaseAlerta({
   tipoCategoria,
   tipoEvento,
   link = null,
-  contexto = {},
-  metadata = {},
 }) {
   return {
     id,
@@ -32,12 +29,10 @@ export async function criarPayloadBaseAlerta({
     dataHoraAgendamentoInicio,
     dataHoraAgendamentoFim,
     prioridade,
-    tipo: tipoCategoria,
+    tipo: getAlertTypeLabel(tipoCategoria),
+    tipoCategoria,
     tipoEvento,
     link,
-    contexto,
-    metadata,
-    createdAt: new Date(),
   };
 }
 
