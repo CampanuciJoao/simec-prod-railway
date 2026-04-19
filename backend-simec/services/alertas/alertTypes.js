@@ -20,16 +20,16 @@ export const ALERT_EVENTOS = {
   CONTRATO_VENCIDO: 'CONTRATO_VENCIDO',
 };
 
-// 🔥 PRIORIDADE TÉCNICA (ordenável)
 export const ALERT_PRIORIDADES = {
-  BAIXA: 1,
-  MEDIA: 2,
-  ALTA: 3,
+  BAIXA: 'Baixa',
+  MEDIA: 'Media',
+  ALTA: 'Alta',
 };
 
-// 🔥 LABELS (para UI)
-export const ALERT_PRIORIDADE_LABEL = {
-  1: 'Baixa',
-  2: 'Média',
-  3: 'Alta',
-};
+export function getAlertTypeLabel(categoria) {
+  if (categoria === ALERT_CATEGORIAS.RECOMENDACAO) {
+    return 'Recomendação';
+  }
+
+  return 'Alerta';
+}

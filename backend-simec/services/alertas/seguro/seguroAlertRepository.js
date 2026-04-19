@@ -1,5 +1,24 @@
 import prisma from '../../prismaService.js';
 
+function alertaMudou(existente, data) {
+  return (
+    existente.titulo !== data.titulo ||
+    existente.subtitulo !== data.subtitulo ||
+    existente.subtituloBase !== data.subtituloBase ||
+    existente.numeroOS !== data.numeroOS ||
+    String(existente.dataHoraAgendamentoInicio) !==
+      String(data.dataHoraAgendamentoInicio) ||
+    String(existente.dataHoraAgendamentoFim) !==
+      String(data.dataHoraAgendamentoFim) ||
+    existente.prioridade !== data.prioridade ||
+    String(existente.data) !== String(data.data) ||
+    existente.tipo !== data.tipo ||
+    existente.tipoCategoria !== data.tipoCategoria ||
+    existente.tipoEvento !== data.tipoEvento ||
+    existente.link !== data.link
+  );
+}
+
 export async function buscarSegurosAtivosPorTenant(tenantId) {
   return prisma.seguro.findMany({
     where: {
@@ -10,19 +29,24 @@ export async function buscarSegurosAtivosPorTenant(tenantId) {
 }
 
 export async function upsertAlertaSeguro(tenantId, alertaId, data) {
-  // 🔥 busca alerta existente
   const existente = await prisma.alerta.findUnique({
     where: { id: alertaId },
     select: {
       titulo: true,
       subtitulo: true,
+      subtituloBase: true,
+      numeroOS: true,
+      dataHoraAgendamentoInicio: true,
+      dataHoraAgendamentoFim: true,
       prioridade: true,
       data: true,
-      metadata: true,
+      tipo: true,
+      tipoCategoria: true,
+      tipoEvento: true,
+      link: true,
     },
   });
 
-  // 🔥 se não existe → cria
   if (!existente) {
     await prisma.alerta.create({
       data: {
@@ -35,21 +59,10 @@ export async function upsertAlertaSeguro(tenantId, alertaId, data) {
     return { created: true, updated: false };
   }
 
-  // 🔥 compara se mudou algo relevante
-  const mudou =
-    existente.titulo !== data.titulo ||
-    existente.subtitulo !== data.subtitulo ||
-    existente.prioridade !== data.prioridade ||
-    String(existente.data) !== String(data.data) ||
-    JSON.stringify(existente.metadata || {}) !==
-      JSON.stringify(data.metadata || {});
-
-  // 🔥 se não mudou → ignora
-  if (!mudou) {
+  if (!alertaMudou(existente, data)) {
     return { created: false, updated: false };
   }
 
-  // 🔥 atualiza
   await prisma.alerta.update({
     where: { id: alertaId },
     data: {
