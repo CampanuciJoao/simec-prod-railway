@@ -1,5 +1,9 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+import { useToast } from '@/contexts/ToastContext';
 import { sendMessageToAgent } from '@/services/chat/chatAdapter';
+import { handleChatAction } from '@/services/chat/chatActionHandler';
 import { interpretarRespostaAgente } from '@/services/chat/chatResponseInterpreter';
 
 function formatTime(date = new Date()) {
@@ -28,6 +32,8 @@ function getInitialMessages() {
 }
 
 export function useChat() {
+  const navigate = useNavigate();
+  const { addToast } = useToast();
   const [messages, setMessages] = useState(getInitialMessages);
   const [isTyping, setIsTyping] = useState(false);
 
@@ -60,7 +66,13 @@ export function useChat() {
         );
 
         if (parsed.acao) {
-          console.log('[CHAT_ACTION]', parsed.acao, parsed.contexto);
+          await handleChatAction({
+            acao: parsed.acao,
+            contexto: parsed.contexto,
+            meta: parsed.meta,
+            navigate,
+            addToast,
+          });
         }
       } catch {
         appendMessage('assistant', 'Erro ao responder. Tente novamente.');
@@ -68,7 +80,7 @@ export function useChat() {
         setIsTyping(false);
       }
     },
-    [messages, isTyping, appendMessage]
+    [messages, isTyping, appendMessage, navigate, addToast]
   );
 
   const resetChat = useCallback(() => {

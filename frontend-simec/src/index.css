@@ -35,7 +35,7 @@
 @layer components {
   .chat-markdown {
     @apply text-sm leading-relaxed;
-    color: var(--text-secondary);
+    color: #334155;
   }
 
   .chat-markdown p {
@@ -44,7 +44,7 @@
 
   .chat-markdown strong {
     font-weight: 600;
-    color: var(--brand-primary);
+    color: #0f172a;
   }
 
   .chat-markdown ul {
@@ -60,30 +60,41 @@
   }
 
   .chat-markdown code {
-    @apply rounded px-1 py-0.5 text-xs;
-    background: var(--bg-surface-subtle);
-    color: var(--text-primary);
+    @apply rounded-md px-1.5 py-0.5 text-xs;
+    background: #e2e8f0;
+    color: #0f172a;
   }
 
   .chat-markdown pre {
-    @apply overflow-x-auto rounded-lg p-3 text-xs;
-    background: var(--bg-elevated);
-    color: var(--text-primary);
+    @apply overflow-x-auto rounded-2xl p-3 text-xs;
+    background: #0f172a;
+    color: #e2e8f0;
   }
 
   .chat-markdown h1 {
     @apply mb-1 mt-2 text-lg font-bold;
-    color: var(--text-primary);
+    color: #0f172a;
   }
 
   .chat-markdown h2 {
     @apply mb-1 mt-2 text-base font-semibold;
-    color: var(--text-primary);
+    color: #0f172a;
   }
 
   .chat-markdown a {
-    color: var(--brand-primary);
+    color: #0891b2;
     text-decoration: underline;
+  }
+
+  .chat-markdown pre code {
+    @apply bg-transparent p-0;
+    color: inherit;
+  }
+
+  .chat-markdown blockquote {
+    @apply my-2 border-l-4 pl-3 italic;
+    border-color: #67e8f9;
+    color: #475569;
   }
 }
 
