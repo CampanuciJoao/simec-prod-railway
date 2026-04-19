@@ -45,6 +45,18 @@ async function processarTenant(tenantId, agora) {
   };
 }
 
+export async function processarAlertasManutencaoDoTenant(
+  tenantId,
+  agora = getAgora()
+) {
+  const resultado = await processarTenant(tenantId, agora);
+
+  return {
+    total: resultado.total,
+    tenantsAfetados: resultado.afetou ? [tenantId] : [],
+  };
+}
+
 /**
  * 🌍 Orquestrador global
  */

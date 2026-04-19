@@ -32,6 +32,20 @@ import {
   montarWorkflowPayload,
   validarAcaoWorkflow,
 } from './manutencaoWorkflowRules.js';
+import {
+  processarAlertasManutencaoDoTenant,
+} from '../alertas/manutencao/index.js';
+
+async function reprocessarAlertasManutencaoSemBloquear(tenantId) {
+  try {
+    await processarAlertasManutencaoDoTenant(tenantId);
+  } catch (error) {
+    console.error(
+      `[MANUTENCAO_ALERTAS_REPROCESS_ERROR] tenantId=${tenantId}`,
+      error
+    );
+  }
+}
 
 export async function listarManutencoesService({
   tenantId,
@@ -156,6 +170,8 @@ export async function criarManutencaoService({
     detalhes: `OS ${numeroOS} criada.`,
   });
 
+  await reprocessarAlertasManutencaoSemBloquear(tenantId);
+
   return {
     ok: true,
     status: 201,
@@ -246,6 +262,8 @@ export async function atualizarManutencaoService({
     entidadeId: atualizada.id,
     detalhes: `OS ${atualizada.numeroOS} atualizada.`,
   });
+
+  await reprocessarAlertasManutencaoSemBloquear(tenantId);
 
   return {
     ok: true,
