@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AgendamentoSchema } from './schema.js';
 import {
   normalizarObjetoIA,
@@ -9,15 +8,17 @@ import {
   mensagemEhConfirmacaoCurta,
 } from './heuristicaExtractor.js';
 import { extrairDataUTC } from '../../../timeService.js';
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY?.trim());
-const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' });
+import {
+  generateTextWithLlm,
+  getLlmRuntimeInfo,
+} from '../../../ai/llmService.js';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export const extrairCamposComIA = async (mensagem, estado) => {
   const dataHoje = extrairDataUTC();
   const fallback = extrairCamposHeuristico(mensagem, estado);
+  const llm = getLlmRuntimeInfo();
 
   if (mensagemEhConfirmacaoCurta(mensagem)) {
     return AgendamentoSchema.parse({
@@ -31,6 +32,10 @@ export const extrairCamposComIA = async (mensagem, estado) => {
       descricao: null,
       confirmacao: fallback.confirmacao,
     });
+  }
+
+  if (!llm.available) {
+    return fallback;
   }
 
   const prompt = `
@@ -57,18 +62,17 @@ REGRAS:
 2. "tipoManutencao" deve ser apenas "Corretiva" ou "Preventiva".
 3. "horaInicio/horaFim" em HH:mm.
 4. Se disser "hoje", use ${dataHoje}.
-5. "confirmacao": true para sim/confirmar, false para não/cancelar, null caso contrário.
+5. "confirmacao": true para sim/confirmar, false para nao/cancelar, null caso contrario.
 6. Retorne APENAS JSON puro.
 `;
 
   for (let tentativa = 1; tentativa <= 2; tentativa++) {
     try {
-      const result = await model.generateContent(prompt);
-      const texto = result.response.text();
+      const texto = await generateTextWithLlm(prompt);
       const match = texto.match(/{[\s\S]*}/);
 
       if (!match) {
-        throw new Error('JSON não encontrado na resposta da IA');
+        throw new Error('JSON nao encontrado na resposta da IA');
       }
 
       const bruto = JSON.parse(match[0]);
@@ -81,7 +85,7 @@ REGRAS:
       return AgendamentoSchema.parse(finalObj);
     } catch (e) {
       console.error(
-        `[AGENT_EXTRACT_ERROR][tentativa ${tentativa}]:`,
+        `[AGENT_EXTRACT_ERROR][provider ${llm.activeProvider}][tentativa ${tentativa}]:`,
         e.message
       );
 

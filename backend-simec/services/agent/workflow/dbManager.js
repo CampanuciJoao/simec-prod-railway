@@ -152,8 +152,9 @@ export async function criarManutencaoNoBanco(estado, tenantId) {
               ? estado.numeroChamado?.trim() || null
               : null,
 
-          agendamentoDataLocal: dateLocal,
+          agendamentoDataInicioLocal: dateLocal,
           agendamentoHoraInicioLocal: startTimeLocal,
+          agendamentoDataFimLocal: dateLocal,
           agendamentoHoraFimLocal: endTimeLocal,
           agendamentoTimezone: timezone,
 

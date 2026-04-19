@@ -1,15 +1,16 @@
 // simec/backend-simec/services/agent/intentClassifier.js
-import { GoogleGenerativeAI } from '@google/generative-ai';
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY?.trim() || null;
-
-const genAI = GEMINI_API_KEY ? new GoogleGenerativeAI(GEMINI_API_KEY) : null;
-const model = genAI
-  ? genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
-  : null;
+import {
+  generateTextWithLlm,
+  getLlmRuntimeInfo,
+} from '../../ai/llmService.js';
 
 function normalizarMensagem(mensagem = '') {
-  return mensagem.toString().toLowerCase().trim();
+  return mensagem
+    .toString()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim();
 }
 
 function classificarHeuristica(mensagem) {
@@ -17,7 +18,6 @@ function classificarHeuristica(mensagem) {
 
   const termosSeguro = [
     'seguro',
-    'apólice',
     'apolice',
     'seguradora',
     'cobertura',
@@ -31,12 +31,9 @@ function classificarHeuristica(mensagem) {
   const termosRelatorio = [
     'quando foi',
     'qual foi',
-    'última',
     'ultima',
     'mais recente',
-    'histórico',
     'historico',
-    'relatório',
     'relatorio',
     'quantas',
     'quais',
@@ -47,9 +44,8 @@ function classificarHeuristica(mensagem) {
     'consulta',
     'feita em',
     'feitas em',
-    'no período',
+    'no periodo',
     'periodo',
-    'último ano',
     'ultimo ano',
     'preventivas',
     'corretivas',
@@ -61,7 +57,7 @@ function classificarHeuristica(mensagem) {
     'abrir os',
     'abrir uma os',
     'abrir chamado',
-    'nova manutenção',
+    'nova manutencao',
     'novo agendamento',
     'quero agendar',
     'preciso agendar',
@@ -102,11 +98,9 @@ function extrairCategoriaValida(texto = '') {
   return categoriasValidas.find((cat) => respostaIA.includes(cat)) || null;
 }
 
-/**
- * Classifica a intenção do usuário.
- */
 export async function classificarIntencao(mensagem) {
   const msg = mensagem?.toString()?.trim();
+  const llm = getLlmRuntimeInfo();
 
   if (!msg) {
     return 'OUTRO';
@@ -114,33 +108,33 @@ export async function classificarIntencao(mensagem) {
 
   const heuristica = classificarHeuristica(msg);
   if (heuristica) {
-    console.log(`[INTENT_MANUAL] Detectado ${heuristica} por heurística.`);
+    console.log(`[INTENT_MANUAL] Detectado ${heuristica} por heuristica.`);
     return heuristica;
   }
 
-  if (!model) {
+  if (!llm.available) {
     console.warn(
-      '[IA_INTENT_WARN] GEMINI_API_KEY não configurada. Usando fallback OUTRO.'
+      `[IA_INTENT_WARN] Nenhum provider de IA disponivel. provider=${llm.activeProvider}. Usando fallback OUTRO.`
     );
     return 'OUTRO';
   }
 
   const prompt = `
-Você é um triador de tarefas hospitalares.
-Classifique a mensagem do usuário em apenas uma categoria:
+Voce e um triador de tarefas hospitalares.
+Classifique a mensagem do usuario em apenas uma categoria:
 
-- AGENDAR_MANUTENCAO: quando o usuário quer criar, marcar, agendar ou abrir uma manutenção
-- RELATORIO: quando o usuário quer consultar histórico, última manutenção, listas, relatórios ou períodos
-- SEGURO: quando o usuário quer consultar seguro, apólice, seguradora, cobertura, vigência, vencimento ou documento da apólice
-- OUTRO: saudação ou conversa sem ação clara
+- AGENDAR_MANUTENCAO: quando o usuario quer criar, marcar, agendar ou abrir uma manutencao
+- RELATORIO: quando o usuario quer consultar historico, ultima manutencao, listas, relatorios ou periodos
+- SEGURO: quando o usuario quer consultar seguro, apolice, seguradora, cobertura, vigencia, vencimento ou documento da apolice
+- OUTRO: saudacao ou conversa sem acao clara
 
 Regras importantes:
-- "quando foi a última preventiva em Coxim?" = RELATORIO
-- "quais preventivas no último ano?" = RELATORIO
-- "marcar uma preventiva para amanhã" = AGENDAR_MANUTENCAO
+- "quando foi a ultima preventiva em Coxim?" = RELATORIO
+- "quais preventivas no ultimo ano?" = RELATORIO
+- "marcar uma preventiva para amanha" = AGENDAR_MANUTENCAO
 - "abrir uma corretiva" = AGENDAR_MANUTENCAO
 - "me traga o seguro da unidade sede" = SEGURO
-- "qual o vencimento da apólice de Coxim?" = SEGURO
+- "qual o vencimento da apolice de Coxim?" = SEGURO
 - "me mostre a cobertura do seguro" = SEGURO
 
 Mensagem: "${msg}"
@@ -153,17 +147,19 @@ OUTRO
 `;
 
   try {
-    const result = await model.generateContent(prompt);
-    const textoResposta = result?.response?.text?.() || '';
+    const textoResposta = await generateTextWithLlm(prompt);
     const detectada = extrairCategoriaValida(textoResposta);
 
     console.log(
-      `[IA_INTENT] Input: "${msg}" | Detectada: ${detectada || 'OUTRO'}`
+      `[IA_INTENT] provider=${llm.activeProvider} model=${llm.activeModel || 'n/a'} | Input: "${msg}" | Detectada: ${detectada || 'OUTRO'}`
     );
 
     return detectada || 'OUTRO';
   } catch (error) {
-    console.error('[IA_INTENT_ERROR] Falha na API do Google:', error.message);
+    console.error(
+      `[IA_INTENT_ERROR] provider=${llm.activeProvider} | Falha na IA:`,
+      error.message
+    );
     return 'OUTRO';
   }
 }

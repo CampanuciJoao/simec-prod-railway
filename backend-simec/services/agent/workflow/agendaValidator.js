@@ -8,6 +8,7 @@ import {
   MANUTENCAO_STATUSS_CONFLITANTES,
   FAR_FUTURE_UTC_DATE,
 } from '../../time/index.js';
+import prismaClient from '../../prismaService.js';
 
 /**
  * Resolve o timezone operacional para o contexto da manutenção.
@@ -109,11 +110,71 @@ export async function validarConflitoAgenda(
   unidade = null,
   opcoes = {}
 ) {
+  let tenantContext = tenant;
+  let prismaContext = prisma || prismaClient;
+  let equipamentoIdContext = equipamentoId || estado?.equipamentoId || null;
+  let unidadeContext = unidade;
+
+  if (typeof tenant === 'string') {
+    tenantContext = await prismaContext.tenant.findFirst({
+      where: {
+        id: tenant,
+        ativo: true,
+      },
+      select: {
+        id: true,
+        timezone: true,
+      },
+    });
+
+    if (!tenantContext) {
+      return {
+        valido: false,
+        motivo: 'TENANT_INVALIDO',
+        mensagem: 'Nao foi possivel validar a agenda para o tenant informado.',
+      };
+    }
+
+    if (equipamentoIdContext && !unidadeContext) {
+      const equipamento = await prismaContext.equipamento.findFirst({
+        where: {
+          tenantId: tenantContext.id,
+          id: equipamentoIdContext,
+        },
+        select: {
+          unidade: {
+            select: {
+              timezone: true,
+            },
+          },
+        },
+      });
+
+      unidadeContext = equipamento?.unidade || null;
+    }
+  }
+
+  if (!tenantContext?.id) {
+    return {
+      valido: false,
+      motivo: 'TENANT_INVALIDO',
+      mensagem: 'Nao foi possivel validar a agenda do tenant.',
+    };
+  }
+
+  if (!equipamentoIdContext) {
+    return {
+      valido: false,
+      motivo: 'EQUIPAMENTO_INVALIDO',
+      mensagem: 'Nao foi possivel validar a agenda sem um equipamento definido.',
+    };
+  }
+
   const dateLocal = estado?.data;
   const startTimeLocal = estado?.horaInicio;
   const endTimeLocal = estado?.horaFim || null;
 
-  const timezone = resolverTimezoneOperacional(tenant, unidade);
+  const timezone = resolverTimezoneOperacional(tenantContext, unidadeContext);
 
   const validation = validateSchedulingWindow({
     dateLocal,
@@ -133,10 +194,10 @@ export async function validarConflitoAgenda(
   const { startUtc, endUtc } = validation;
   const manutencaoIdIgnorar = opcoes?.manutencaoIdIgnorar || null;
 
-  const conflito = await prisma.manutencao.findFirst({
+  const conflito = await prismaContext.manutencao.findFirst({
     where: {
-      tenantId: tenant.id,
-      equipamentoId,
+      tenantId: tenantContext.id,
+      equipamentoId: equipamentoIdContext,
       ...(manutencaoIdIgnorar
         ? {
             id: {
@@ -175,8 +236,9 @@ export async function validarConflitoAgenda(
       numeroOS: true,
       tipo: true,
       status: true,
-      agendamentoDataLocal: true,
+      agendamentoDataInicioLocal: true,
       agendamentoHoraInicioLocal: true,
+      agendamentoDataFimLocal: true,
       agendamentoHoraFimLocal: true,
       agendamentoTimezone: true,
       dataHoraAgendamentoInicio: true,

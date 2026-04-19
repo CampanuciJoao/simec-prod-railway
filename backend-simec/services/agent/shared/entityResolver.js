@@ -129,6 +129,7 @@ export async function resolverEntidades(estado, tenantId) {
     const whereBase = {
       tenantId,
       OR: sinonimos.flatMap((s) => [
+        { tag: { contains: s, mode: 'insensitive' } },
         { modelo: { contains: s, mode: 'insensitive' } },
         { tipo: { contains: s, mode: 'insensitive' } },
         { fabricante: { contains: s, mode: 'insensitive' } },

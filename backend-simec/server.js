@@ -8,7 +8,6 @@ import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
-// Rotas
 import authRoutes from './routes/authRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
 import userRoutes from './routes/userRoutes.js';
@@ -26,8 +25,8 @@ import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js';
 import pdfDataRoutes from './routes/pdfDataRoutes.js';
 
-// Middlewares / serviços
 import { proteger } from './middleware/authMiddleware.js';
+import { getLlmRuntimeInfo } from './services/ai/llmService.js';
 import { iniciarJobsDeAlertas } from './services/queueService.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -38,12 +37,8 @@ const httpServer = createServer(app);
 
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || '*';
-
 const corsOrigin = FRONTEND_URL === '*' ? '*' : FRONTEND_URL;
 
-/**
- * Socket.IO
- */
 const io = new Server(httpServer, {
   cors: {
     origin: corsOrigin,
@@ -54,16 +49,13 @@ const io = new Server(httpServer, {
 global.io = io;
 
 io.on('connection', (socket) => {
-  console.log(`🔌 Novo navegador conectado ao SIMEC: ${socket.id}`);
+  console.log(`[SOCKET] Navegador conectado ao SIMEC: ${socket.id}`);
 
   socket.on('disconnect', () => {
-    console.log(`🔌 Navegador desconectado do SIMEC: ${socket.id}`);
+    console.log(`[SOCKET] Navegador desconectado do SIMEC: ${socket.id}`);
   });
 });
 
-/**
- * Middlewares globais
- */
 app.use(
   cors({
     origin: corsOrigin,
@@ -74,29 +66,15 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
-/**
- * Arquivos estáticos
- * Mantém acesso público aos anexos persistidos em disco.
- */
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-/**
- * Health check
- */
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');
 });
 
-/**
- * Rotas públicas
- */
 app.use('/api/auth', authRoutes);
 app.use('/api/agent', agentRoutes);
 
-/**
- * Rotas protegidas
- */
 app.use(proteger);
 
 app.use('/api/dashboard-data', dashboardRoutes);
@@ -114,18 +92,12 @@ app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes);
 app.use('/api/pdf-data', pdfDataRoutes);
 
-/**
- * 404 da API
- */
 app.use('/api', (req, res) => {
   return res.status(404).json({
-    message: 'Rota da API não encontrada.',
+    message: 'Rota da API nao encontrada.',
   });
 });
 
-/**
- * Tratador global de erro do Express
- */
 app.use((err, req, res, next) => {
   console.error('[SERVER_ERROR]', err);
 
@@ -134,25 +106,24 @@ app.use((err, req, res, next) => {
   });
 });
 
-/**
- * Inicialização do servidor
- */
 httpServer.listen(PORT, '0.0.0.0', async () => {
+  const llm = getLlmRuntimeInfo();
+
   console.log('======================================================');
-  console.log(`✅ SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
-  console.log(`🌐 FRONTEND_URL: ${FRONTEND_URL}`);
-  console.log(`🛠️ Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`SIMEC REAL-TIME ATIVO NA PORTA: ${PORT}`);
+  console.log(`FRONTEND_URL: ${FRONTEND_URL}`);
+  console.log(`Ambiente: ${process.env.NODE_ENV || 'development'}`);
+  console.log(
+    `LLM ativo: provider=${llm.activeProvider} model=${llm.activeModel || 'n/a'} disponivel=${llm.available}`
+  );
   console.log('======================================================');
 
   try {
     await iniciarJobsDeAlertas();
-    console.log('⏰ Jobs recorrentes de alertas inicializados com sucesso.');
+    console.log('Jobs recorrentes de alertas inicializados com sucesso.');
   } catch (error) {
-    console.error('❌ Erro ao iniciar jobs de alertas:', error.message);
+    console.error('Erro ao iniciar jobs de alertas:', error.message);
   }
 });
 
-/**
- * Timeout do servidor HTTP
- */
 httpServer.timeout = 120000;

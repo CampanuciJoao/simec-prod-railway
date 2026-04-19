@@ -30,6 +30,14 @@ export function construirRespostaAcaoContextual(
     };
   }
 
+  if (acaoContextual.action === ACTIONS.ABRIR_DOCUMENTO) {
+    return {
+      mensagem: `Perfeito. Vou preparar o documento da OS ${contextoPDF.numeroOS}.`,
+      acao: 'GERAR_PDF_OS',
+      contexto: { manutencaoId: contextoPDF.idPrincipal },
+    };
+  }
+
   if (acaoContextual.action === ACTIONS.CANCELAR_ACAO) {
     return {
       mensagem: 'Tudo bem. Não vou abrir PDF nem detalhes agora.',

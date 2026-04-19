@@ -3,15 +3,22 @@ import { normalizarHora } from './normalizers.js';
 import { extrairDataUTC } from '../../../timeService.js';
 
 export const mensagemEhConfirmacaoCurta = (mensagem) => {
-  const lower = mensagem.trim().toLowerCase();
-  return /^(sim|s|ok|confirmo|pode confirmar|certo|não|nao|n|cancela|cancelar)$/i.test(
+  const lower = mensagem
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+  return /^(sim|s|ok|confirmo|pode confirmar|certo|nao|n|cancela|cancelar)$/i.test(
     lower
   );
 };
 
 export const extrairCamposHeuristico = (mensagem, estado = {}) => {
   const msg = mensagem.trim();
-  const lower = msg.toLowerCase();
+  const lower = msg
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
 
   const extraido = {
     tipoManutencao: null,
@@ -27,19 +34,46 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
 
   if (/^(sim|s|confirmo|pode confirmar|ok|certo)$/i.test(lower)) {
     extraido.confirmacao = true;
-  } else if (/^(não|nao|n|cancelar|cancela)$/i.test(lower)) {
+  } else if (/^(nao|n|cancelar|cancela)$/i.test(lower)) {
     extraido.confirmacao = false;
   }
 
   if (lower.includes('corretiva')) extraido.tipoManutencao = 'Corretiva';
   if (lower.includes('preventiva')) extraido.tipoManutencao = 'Preventiva';
 
+  const matchTag = msg.match(/\btag[:\s-]*([a-z0-9-]+)\b/i);
+  if (matchTag?.[1]) {
+    extraido.equipamentoTexto = matchTag[1].trim();
+  }
+
+  if (
+    !extraido.equipamentoTexto &&
+    Array.isArray(estado.ambiguidadeEquipamento) &&
+    estado.ambiguidadeEquipamento.length > 0
+  ) {
+    const escolha = estado.ambiguidadeEquipamento.find((item) => {
+      const tag = item?.tag?.toString().toLowerCase().trim();
+      const modelo = item?.modelo?.toString().toLowerCase().trim();
+
+      return (
+        (!!tag && lower === tag) ||
+        (!!tag && lower.includes(tag)) ||
+        (!!modelo && lower === modelo)
+      );
+    });
+
+    if (escolha) {
+      extraido.equipamentoTexto = escolha.tag || escolha.modelo || null;
+      extraido.unidadeTexto = escolha.unidade || extraido.unidadeTexto;
+    }
+  }
+
   const matchUnidade = msg.match(/(?:unidade|hospital)\s+(?:de\s+)?(.+)/i);
   if (matchUnidade) {
     extraido.unidadeTexto = matchUnidade[1].trim();
   }
 
-  const matchEquipUnidade = msg.match(/^(.+?)\s+de\s+([a-zà-ú0-9\s-]+)$/i);
+  const matchEquipUnidade = msg.match(/^(.+?)\s+de\s+([a-zÀ-Úà-ú0-9\s-]+)$/i);
   if (
     matchEquipUnidade &&
     !extraido.equipamentoTexto &&
