@@ -32,19 +32,19 @@ function LoginForm({
       <Input
         label="Empresa / slug"
         value={tenant}
-        onChange={(e) => onChangeTenant(e.target.value)}
+        onChange={(event) => onChangeTenant(event.target.value)}
         placeholder="Ex.: simec-default"
-        hint="Identifica a empresa no ambiente SaaS."
+        hint="O login sempre e vinculado ao tenant informado."
         leadingIcon={<FontAwesomeIcon icon={faBuilding} />}
         disabled={loading}
         required
       />
 
       <Input
-        label="Nome de usuário"
+        label="Usuario"
         value={username}
-        onChange={(e) => onChangeUsername(e.target.value)}
-        placeholder="Digite seu usuário"
+        onChange={(event) => onChangeUsername(event.target.value)}
+        placeholder="Digite seu usuario"
         leadingIcon={<FontAwesomeIcon icon={faUser} />}
         disabled={loading}
         required
@@ -54,25 +54,21 @@ function LoginForm({
         label="Senha"
         type="password"
         value={senha}
-        onChange={(e) => onChangeSenha(e.target.value)}
+        onChange={(event) => onChangeSenha(event.target.value)}
         placeholder="Digite sua senha"
         leadingIcon={<FontAwesomeIcon icon={faLock} />}
         disabled={loading}
         required
       />
 
-      <Button
-        type="submit"
-        className="w-full justify-center"
-        disabled={loading}
-      >
+      <Button type="submit" className="w-full justify-center" disabled={loading}>
         {loading ? (
           <>
             <FontAwesomeIcon icon={faSpinner} spin />
             Entrando...
           </>
         ) : (
-          'Entrar'
+          'Entrar no SIMEC'
         )}
       </Button>
     </form>
