@@ -240,7 +240,9 @@ export const AgendamentoService = {
         const houveNovosDados = Object.values(extraido).some(
           (v) => v !== null && v !== undefined
         );
-        const prefixo = houveNovosDados ? 'Legal, anotei.' : 'Entendi.';
+        const prefixo = houveNovosDados
+          ? 'Perfeito, informação registrada.'
+          : 'Certo.';
         mensagemResposta = `${prefixo} ${proximaPergunta(estado, faltantes)}`;
       }
 

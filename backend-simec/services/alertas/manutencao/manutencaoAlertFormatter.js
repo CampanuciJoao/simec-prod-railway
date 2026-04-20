@@ -1,54 +1,57 @@
-// Ficheiro: services/alertas/manutencao/manutencaoAlertFormatter.js
-// Descrição: formata títulos e payload base dos alertas de manutenção
-
 import { buildAlertMetaManutencao } from './manutencaoAlertMeta.js';
 
-/**
- * 🔧 Helpers internos
- */
 function normalizarTexto(valor, fallback = 'N/A') {
   return String(valor || fallback).trim();
 }
 
-function capitalizar(texto) {
-  const str = String(texto || '').toLowerCase();
-  return str.charAt(0).toUpperCase() + str.slice(1);
+function normalizarTipoManutencao(manut) {
+  return String(manut?.tipo || 'manutencao').toLowerCase();
 }
 
-/**
- * 🟢 TÍTULOS
- */
-export function montarTituloInicio(manut) {
-  const tipo = capitalizar(manut.tipo || 'Manutenção');
-  const unidade = normalizarTexto(
-    manut.equipamento?.unidade?.nomeSistema
-  );
+function normalizarUnidade(manut) {
+  return normalizarTexto(manut?.equipamento?.unidade?.nomeSistema);
+}
 
-  return `${tipo} na unidade de ${unidade}`;
+function formatarJanelaTempo(minutos) {
+  if (minutos === 60) return '1 h';
+  if (minutos === 1440) return '24 h';
+  return `${minutos} min`;
+}
+
+export function montarTituloProximidadeInicio(manut, minutos) {
+  const tipo = normalizarTipoManutencao(manut);
+  const unidade = normalizarUnidade(manut);
+  const janela = formatarJanelaTempo(minutos);
+
+  return `Manutencao ${tipo} comeca em ${janela} na unidade ${unidade}`;
+}
+
+export function montarTituloInicio(manut) {
+  const tipo = normalizarTipoManutencao(manut);
+  const unidade = normalizarUnidade(manut);
+
+  return `Manutencao ${tipo} iniciou na unidade ${unidade}`;
+}
+
+export function montarTituloProximidadeFim(manut, minutos) {
+  const tipo = normalizarTipoManutencao(manut);
+  const unidade = normalizarUnidade(manut);
+  const janela = formatarJanelaTempo(minutos);
+
+  return `Manutencao ${tipo} termina em ${janela} na unidade ${unidade}`;
 }
 
 export function montarTituloFim(manut) {
-  const tipo = capitalizar(manut.tipo || 'Manutenção');
-  const unidade = normalizarTexto(
-    manut.equipamento?.unidade?.nomeSistema
-  );
+  const tipo = normalizarTipoManutencao(manut);
+  const unidade = normalizarUnidade(manut);
 
-  return `Término de ${tipo} na unidade de ${unidade}`;
+  return `Manutencao ${tipo} encerrou na unidade ${unidade}`;
 }
 
 export function montarTituloConfirmacao(manut) {
-  const modelo = normalizarTexto(manut.equipamento?.modelo, 'Equipamento');
-  const tag = normalizarTexto(manut.equipamento?.tag, 'Sem TAG');
-  const unidade = normalizarTexto(
-    manut.equipamento?.unidade?.nomeSistema
-  );
-
-  return `Confirmar conclusão: ${modelo} (${tag}) na unidade de ${unidade}`;
+  return montarTituloFim(manut);
 }
 
-/**
- * 🟡 SUBTÍTULOS
- */
 export function montarSubtituloBase(manut) {
   const modelo = normalizarTexto(manut.equipamento?.modelo, 'Equipamento');
   const tag = normalizarTexto(manut.equipamento?.tag, 'Sem TAG');
@@ -56,13 +59,10 @@ export function montarSubtituloBase(manut) {
   return `${modelo} (${tag})`;
 }
 
-export function montarSubtituloConfirmacaoFallback(manut) {
-  return `OS ${manut.numeroOS} | O prazo expirou. Confirme se a manutenção foi concluída ou prorrogada.`;
+export function montarSubtituloConfirmacaoFallback() {
+  return 'O horario agendado terminou. Confirme se a manutencao foi concluida ou prorrogada.';
 }
 
-/**
- * 🔥 ID PADRONIZADO (mesma lógica do seguro)
- */
 export function buildAlertId(tenantId, tipo, manutId, label = '') {
   const safeTenant = String(tenantId).trim();
   const safeTipo = String(tipo).trim().toLowerCase();
@@ -72,9 +72,6 @@ export function buildAlertId(tenantId, tipo, manutId, label = '') {
   return `tenant-${safeTenant}-${safeTipo}-${safeId}${safeLabel}`;
 }
 
-/**
- * 🧠 BASE DE PAYLOAD (sem lógica de negócio)
- */
 export function montarPayloadAlertaManutencaoBase(manut) {
   const subtituloBase = montarSubtituloBase(manut);
 

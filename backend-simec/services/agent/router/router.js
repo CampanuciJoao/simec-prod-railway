@@ -7,7 +7,12 @@ import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { respostaAgente } from '../core/agentResponse.js';
 import { getSessionKey } from '../core/sessionKeys.js';
 import { RESET_COMMANDS } from './resetCommands.js';
-import { ajustarIntencaoPorHeuristica } from './intentRouting.js';
+import {
+  ajustarIntencaoPorHeuristica,
+  pareceAgendamento,
+  pareceConsultaRelatorio,
+  pareceSeguro,
+} from './intentRouting.js';
 
 async function cancelarSessaoSeExistir(sessao, mensagem) {
   if (!sessao) return;
@@ -121,6 +126,45 @@ export const RoteadorAgente = async ({
       );
     }
 
+    if (
+      temAgendamentoAtivo &&
+      !pareceSeguro(msgMinuscula) &&
+      !pareceConsultaRelatorio(msgMinuscula)
+    ) {
+      return await AgendamentoService.processar(
+        mensagem,
+        contextoUsuario,
+        sessaoAgendamento,
+        null
+      );
+    }
+
+    if (
+      temRelatorioAtivo &&
+      !pareceAgendamento(msgMinuscula) &&
+      !pareceSeguro(msgMinuscula)
+    ) {
+      return await RelatorioService.processar(
+        mensagem,
+        contextoUsuario,
+        sessaoRelatorio,
+        null
+      );
+    }
+
+    if (
+      temSeguroAtivo &&
+      !pareceAgendamento(msgMinuscula) &&
+      !pareceConsultaRelatorio(msgMinuscula)
+    ) {
+      return await SeguroService.processar(
+        mensagem,
+        contextoUsuario,
+        sessaoSeguro,
+        null
+      );
+    }
+
     let intencao = await classificarIntencao(mensagem);
     intencao = ajustarIntencaoPorHeuristica(intencao, msgMinuscula);
 
@@ -160,33 +204,6 @@ export const RoteadorAgente = async ({
         mensagem,
         contextoUsuario,
         sessaoSeguro || null,
-        null
-      );
-    }
-
-    if (temAgendamentoAtivo) {
-      return await AgendamentoService.processar(
-        mensagem,
-        contextoUsuario,
-        sessaoAgendamento,
-        null
-      );
-    }
-
-    if (temRelatorioAtivo) {
-      return await RelatorioService.processar(
-        mensagem,
-        contextoUsuario,
-        sessaoRelatorio,
-        null
-      );
-    }
-
-    if (temSeguroAtivo) {
-      return await SeguroService.processar(
-        mensagem,
-        contextoUsuario,
-        sessaoSeguro,
         null
       );
     }

@@ -1,13 +1,14 @@
+function contemAlgumTermo(msg, termos) {
+  return termos.some((termo) => msg.includes(termo));
+}
+
 export function pareceConsultaRelatorio(msg) {
-  return [
+  return contemAlgumTermo(msg, [
     'quando foi',
     'qual foi',
-    'última',
     'ultima',
     'mais recente',
-    'histórico',
     'historico',
-    'relatório',
     'relatorio',
     'quantas',
     'quais',
@@ -18,34 +19,32 @@ export function pareceConsultaRelatorio(msg) {
     'consulta',
     'feita em',
     'feitas em',
-    'no período',
+    'no periodo',
     'periodo',
-    'último ano',
     'ultimo ano',
     'preventivas',
     'corretivas',
-  ].some((t) => msg.includes(t));
+  ]);
 }
 
 export function pareceAgendamento(msg) {
-  return [
+  return contemAlgumTermo(msg, [
     'agendar',
     'marcar',
     'abrir os',
     'abrir uma os',
     'abrir chamado',
-    'nova manutenção',
+    'nova manutencao',
     'novo agendamento',
     'quero agendar',
     'preciso agendar',
     'gostaria de agendar',
-  ].some((t) => msg.includes(t));
+  ]);
 }
 
 export function pareceSeguro(msg) {
-  return [
+  return contemAlgumTermo(msg, [
     'seguro',
-    'apólice',
     'apolice',
     'seguradora',
     'cobertura',
@@ -54,23 +53,11 @@ export function pareceSeguro(msg) {
     'vence o seguro',
     'pdf do seguro',
     'documento do seguro',
-  ].some((t) => msg.includes(t));
+  ]);
 }
 
 export function ajustarIntencaoPorHeuristica(intencao, msgMinuscula) {
   let intencaoFinal = intencao;
-
-  if (intencaoFinal === 'OUTRO' && pareceSeguro(msgMinuscula)) {
-    intencaoFinal = 'SEGURO';
-  }
-
-  if (intencaoFinal === 'OUTRO' && pareceConsultaRelatorio(msgMinuscula)) {
-    intencaoFinal = 'RELATORIO';
-  }
-
-  if (intencaoFinal === 'OUTRO' && pareceAgendamento(msgMinuscula)) {
-    intencaoFinal = 'AGENDAR_MANUTENCAO';
-  }
 
   if (pareceSeguro(msgMinuscula)) {
     intencaoFinal = 'SEGURO';

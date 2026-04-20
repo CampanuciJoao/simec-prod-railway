@@ -1,5 +1,5 @@
 import { AgendamentoSchema } from './schema.js';
-import { normalizarHora } from './normalizers.js';
+import { normalizarData, normalizarHora } from './normalizers.js';
 import { extrairDataUTC } from '../../../timeService.js';
 
 export const mensagemEhConfirmacaoCurta = (mensagem) => {
@@ -8,6 +8,7 @@ export const mensagemEhConfirmacaoCurta = (mensagem) => {
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '');
+
   return /^(sim|s|ok|confirmo|pode confirmar|certo|nao|n|cancela|cancelar)$/i.test(
     lower
   );
@@ -94,11 +95,25 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
   }
 
   const matchIntervalo = msg.match(
-    /(?:das|de)\s+(\d{1,2}(?::\d{2})?\s*h?)\s+(?:até|as?|à|a)\s+(\d{1,2}(?::\d{2})?\s*h?)/i
+    /(?:das|de)\s+(\d{1,2}(?::\d{2})?\s*h?(?:s)?)\s+(?:ate|as?|a)\s+(\d{1,2}(?::\d{2})?\s*h?(?:s)?)/i
   );
   if (matchIntervalo) {
     extraido.horaInicio = normalizarHora(matchIntervalo[1]);
     extraido.horaFim = normalizarHora(matchIntervalo[2]);
+  }
+
+  if (!extraido.data) {
+    const matchData = msg.match(/\b(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/);
+    if (matchData?.[1]) {
+      extraido.data = normalizarData(matchData[1]);
+    }
+  }
+
+  if (!extraido.horaInicio) {
+    const matchHora = msg.match(/\b(\d{1,2}(?::\d{2})?\s*h(?:s)?|\d{1,2}:\d{2}|\d{1,2}h)\b/i);
+    if (matchHora?.[1]) {
+      extraido.horaInicio = normalizarHora(matchHora[1]);
+    }
   }
 
   if (lower.includes('hoje')) {

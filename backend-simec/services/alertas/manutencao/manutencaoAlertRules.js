@@ -1,8 +1,9 @@
 // Ficheiro: services/alertas/manutencao/manutencaoAlertRules.js
 
 import {
+  montarTituloProximidadeInicio,
   montarTituloInicio,
-  montarTituloFim,
+  montarTituloProximidadeFim,
   montarTituloConfirmacao,
   montarSubtituloConfirmacaoFallback,
   buildAlertId,
@@ -56,7 +57,7 @@ export async function gerarAlertasAproximacaoInicio(tenantId, agora) {
           alertaId,
           await criarPayloadBaseAlerta({
             id: alertaId,
-            titulo: montarTituloInicio(manut),
+            titulo: montarTituloProximidadeInicio(manut, ponto.limiar),
             ...montarPayloadAlertaManutencaoBase(manut),
             data: manut.dataHoraAgendamentoInicio,
             prioridade: ponto.prioridade,
@@ -143,7 +144,7 @@ export async function gerarAlertasAproximacaoFim(tenantId, agora) {
           alertaId,
           await criarPayloadBaseAlerta({
             id: alertaId,
-            titulo: montarTituloFim(manut),
+            titulo: montarTituloProximidadeFim(manut, ponto.limiar),
             ...montarPayloadAlertaManutencaoBase(manut),
             data: manut.dataHoraAgendamentoFim,
             prioridade: ponto.prioridade,
@@ -186,8 +187,8 @@ export async function moverParaAguardandoConfirmacao(tenantId, agora) {
       await criarPayloadBaseAlerta({
         id: alertaId,
         titulo: montarTituloConfirmacao(manut),
-        subtituloBase: montarSubtituloConfirmacaoFallback(manut),
         ...montarPayloadAlertaManutencaoBase(manut),
+        subtitulo: montarSubtituloConfirmacaoFallback(manut),
         data: agora,
         prioridade: ALERT_PRIORIDADES.ALTA,
         tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,

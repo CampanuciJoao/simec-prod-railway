@@ -31,7 +31,19 @@ export const normalizarHora = (texto) => {
 
 export const normalizarData = (valor) => {
   if (!valor || typeof valor !== 'string') return null;
-  return valor.trim();
+
+  const texto = valor.trim();
+
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(texto)) {
+    const [dia, mes, ano] = texto.split('/');
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) {
+    return texto;
+  }
+
+  return null;
 };
 
 export const normalizarObjetoIA = (obj) => {
@@ -58,7 +70,8 @@ export const mesclarPreferindoIAComFallback = (normalizadoIA, fallback) => {
   return {
     tipoManutencao: normalizadoIA.tipoManutencao ?? fallback.tipoManutencao,
     unidadeTexto: normalizadoIA.unidadeTexto ?? fallback.unidadeTexto,
-    equipamentoTexto: normalizadoIA.equipamentoTexto ?? fallback.equipamentoTexto,
+    equipamentoTexto:
+      normalizadoIA.equipamentoTexto ?? fallback.equipamentoTexto,
     data: normalizadoIA.data ?? fallback.data,
     horaInicio: normalizadoIA.horaInicio ?? fallback.horaInicio,
     horaFim: normalizadoIA.horaFim ?? fallback.horaFim,
