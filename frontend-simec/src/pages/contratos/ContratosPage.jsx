@@ -1,36 +1,47 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlusCircle, faFileContract } from '@fortawesome/free-solid-svg-icons';
+import {
+  faPlusCircle,
+  faFileContract,
+} from '@fortawesome/free-solid-svg-icons';
 
-import { useContratosPage } from '../../hooks/contratos/useContratosPage';
+import { useContratosPage } from '@/hooks/contratos/useContratosPage';
 
-import ModalConfirmacao from '../../components/ui/feedback/ModalConfirmacao';
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageHeader from '../../components/ui/layout/PageHeader';
-import PageState from '../../components/ui/feedback/PageState';
-import ContratosListSection from '../../components/contratos/ContratosListSection';
+import {
+  Button,
+  ModalConfirmacao,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
 
-import { Button } from '@/components/ui';
+import ContratosListSection from '@/components/contratos/ContratosListSection';
 
 function ContratosPage() {
   const page = useContratosPage();
 
   const isInitialLoading = page.loading && page.contratos.length === 0;
   const hasError = Boolean(page.error);
-  const isEmpty = !page.loading && !page.error && page.contratos.length === 0;
+  const isEmpty =
+    !page.loading &&
+    !page.error &&
+    Array.isArray(page.contratos) &&
+    page.contratos.length === 0;
+
+  const shouldShowState = isInitialLoading || hasError || isEmpty;
 
   return (
-    <>
-      <ModalConfirmacao
-        isOpen={page.deleteModal.isOpen}
-        onClose={page.deleteModal.closeModal}
-        onConfirm={page.confirmarExclusao}
-        title="Excluir contrato"
-        message={`Tem certeza que deseja excluir o contrato nº ${page.deleteModal.modalData?.numeroContrato}?`}
-        isDestructive
-      />
+    <PageLayout padded fullHeight>
+      <div className="space-y-6">
+        <ModalConfirmacao
+          isOpen={page.deleteModal.isOpen}
+          onClose={page.deleteModal.closeModal}
+          onConfirm={page.confirmarExclusao}
+          title="Excluir contrato"
+          message={`Tem certeza que deseja excluir o contrato nº ${page.deleteModal.modalData?.numeroContrato}?`}
+          isDestructive
+        />
 
-      <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Gestão de Contratos de Manutenção"
           subtitle="Acompanhe, filtre e gerencie os contratos cadastrados"
@@ -38,15 +49,15 @@ function ContratosPage() {
           actions={
             <Button type="button" onClick={page.goToCreate}>
               <FontAwesomeIcon icon={faPlusCircle} />
-              Novo Contrato
+              <span>Novo Contrato</span>
             </Button>
           }
         />
 
-        {isInitialLoading || hasError || isEmpty ? (
+        {shouldShowState ? (
           <PageState
             loading={isInitialLoading}
-            error={page.error || ''}
+            error={page.error?.message || page.error || ''}
             isEmpty={isEmpty}
             emptyMessage="Nenhum contrato encontrado."
           />
@@ -70,8 +81,8 @@ function ContratosPage() {
             onAskDelete={page.deleteModal.openModal}
           />
         )}
-      </PageLayout>
-    </>
+      </div>
+    </PageLayout>
   );
 }
 
