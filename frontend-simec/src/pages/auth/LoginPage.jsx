@@ -2,14 +2,13 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faBuildingShield,
-  faClockRotateLeft,
+  faBolt,
+  faChartLine,
   faShieldHalved,
 } from '@fortawesome/free-solid-svg-icons';
 
 import AuthLayout from '@/components/auth/AuthLayout';
 import LoginForm from '@/components/auth/LoginForm';
-import { Card } from '@/components/ui';
 import { useLogin } from '@/hooks/auth/useLogin';
 
 function LoginPage() {
@@ -30,8 +29,10 @@ function LoginPage() {
       <div
         className="w-full rounded-[32px] border p-6 shadow-2xl sm:p-8"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.96)',
-          borderColor: 'rgba(255,255,255,0.18)',
+          background:
+            'linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(248,250,252,0.98) 100%)',
+          borderColor: 'rgba(148,163,184,0.2)',
+          boxShadow: '0 30px 80px rgba(15, 23, 42, 0.28)',
           backdropFilter: 'blur(24px)',
         }}
       >
@@ -52,16 +53,16 @@ function LoginPage() {
             <div>
               <h2
                 className="text-3xl font-bold tracking-tight"
-                style={{ color: 'var(--text-primary)' }}
+                style={{ color: '#0f172a' }}
               >
                 Entrar no SIMEC
               </h2>
               <p
                 className="mt-2 text-sm leading-6"
-                style={{ color: 'var(--text-muted)' }}
+                style={{ color: '#64748b' }}
               >
-                Acesse seu ambiente com escopo por empresa, sessao controlada e
-                isolamento multi-tenant.
+                A plataforma que organiza sua operacao tecnica, melhora a
+                rastreabilidade e apoia decisoes com mais clareza.
               </p>
             </div>
           </div>
@@ -70,62 +71,69 @@ function LoginPage() {
             <div
               className="rounded-2xl border p-4"
               style={{
-                backgroundColor: 'var(--bg-surface-soft)',
-                borderColor: 'var(--border-soft)',
+                backgroundColor: '#eff6ff',
+                borderColor: '#bfdbfe',
               }}
             >
               <div
                 className="text-sm font-semibold"
-                style={{ color: 'var(--text-primary)' }}
+                style={{ color: '#0f172a' }}
               >
-                <FontAwesomeIcon icon={faBuildingShield} className="mr-2" />
-                Tenant
+                <FontAwesomeIcon icon={faBolt} className="mr-2" />
+                Agilidade
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Cada acesso entra no tenant informado.
+              <div className="mt-1 text-xs leading-5" style={{ color: '#475569' }}>
+                Rotinas mais organizadas para a equipe atuar com rapidez.
               </div>
             </div>
 
             <div
               className="rounded-2xl border p-4"
               style={{
-                backgroundColor: 'var(--bg-surface-soft)',
-                borderColor: 'var(--border-soft)',
+                backgroundColor: '#eef2ff',
+                borderColor: '#c7d2fe',
               }}
             >
               <div
                 className="text-sm font-semibold"
-                style={{ color: 'var(--text-primary)' }}
+                style={{ color: '#0f172a' }}
               >
                 <FontAwesomeIcon icon={faShieldHalved} className="mr-2" />
-                Protecao
+                Seguranca
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Rotas autenticadas e governanca por perfil.
+              <div className="mt-1 text-xs leading-5" style={{ color: '#475569' }}>
+                Acesso protegido para manter controle e confiabilidade.
               </div>
             </div>
 
             <div
               className="rounded-2xl border p-4"
               style={{
-                backgroundColor: 'var(--bg-surface-soft)',
-                borderColor: 'var(--border-soft)',
+                backgroundColor: '#ecfeff',
+                borderColor: '#a5f3fc',
               }}
             >
               <div
                 className="text-sm font-semibold"
-                style={{ color: 'var(--text-primary)' }}
+                style={{ color: '#0f172a' }}
               >
-                <FontAwesomeIcon icon={faClockRotateLeft} className="mr-2" />
-                Sessao
+                <FontAwesomeIcon icon={faChartLine} className="mr-2" />
+                Visao
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Expiracao e renovacao controladas.
+              <div className="mt-1 text-xs leading-5" style={{ color: '#475569' }}>
+                Indicadores e historico para apoiar a operacao do dia a dia.
               </div>
             </div>
           </div>
 
-          <Card surface="default" className="rounded-2xl">
+          <div
+            className="rounded-[28px] border p-5 sm:p-6"
+            style={{
+              backgroundColor: '#ffffff',
+              borderColor: '#dbe4f0',
+              boxShadow: '0 18px 40px rgba(15, 23, 42, 0.08)',
+            }}
+          >
             <LoginForm
               tenant={tenant}
               username={username}
@@ -137,20 +145,20 @@ function LoginPage() {
               onChangeSenha={setSenha}
               onSubmit={handleSubmit}
             />
-          </Card>
+          </div>
 
           <div
             className="flex items-center justify-between gap-4 border-t pt-5"
-            style={{ borderColor: 'var(--border-soft)' }}
+            style={{ borderColor: '#e2e8f0' }}
           >
-            <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Ambiente SaaS com operacao por tenant.
+            <div className="text-xs" style={{ color: '#64748b' }}>
+              Acesso exclusivo para clientes e equipes autorizadas.
             </div>
 
             <Link
               to="/recuperar-senha"
               className="text-sm font-medium transition-opacity hover:opacity-80"
-              style={{ color: 'var(--brand-primary)' }}
+              style={{ color: '#2563eb' }}
             >
               Esqueceu sua senha?
             </Link>

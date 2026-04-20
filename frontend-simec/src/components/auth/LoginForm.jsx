@@ -30,11 +30,11 @@ function LoginForm({
       ) : null}
 
       <Input
-        label="Empresa / slug"
+        label="Empresa"
         value={tenant}
         onChange={(event) => onChangeTenant(event.target.value)}
-        placeholder="Ex.: simec-default"
-        hint="O login sempre e vinculado ao tenant informado."
+        placeholder="Informe sua empresa"
+        hint="Use o acesso da empresa liberado para a sua equipe."
         leadingIcon={<FontAwesomeIcon icon={faBuilding} />}
         disabled={loading}
         required
