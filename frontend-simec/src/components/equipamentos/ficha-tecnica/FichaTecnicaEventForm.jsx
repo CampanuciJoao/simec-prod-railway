@@ -1,9 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faCircleInfo,
-} from '@fortawesome/free-solid-svg-icons';
+import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
 
 import {
   FormActions,
@@ -18,7 +16,6 @@ const TIPOS_OCORRENCIA = [
   'Operacional',
   'Falha',
   'Ajuste',
-  'Manutencao',
   'Inspecao',
   'Observacao',
 ];
@@ -35,8 +32,8 @@ function FichaTecnicaEventForm({
 }) {
   return (
     <PageSection
-      title="Registrar evento"
-      description="Cadastre rapidamente ocorrências, falhas, ajustes, inspeções e observações do equipamento."
+      title="Registrar evento leve"
+      description="Cadastre ocorrencias leves, falhas percebidas, ajustes, inspecoes visuais e observacoes do equipamento."
     >
       <div className="space-y-5">
         <div className="flex items-start gap-3">
@@ -55,13 +52,13 @@ function FichaTecnicaEventForm({
               className="text-sm font-semibold"
               style={{ color: 'var(--text-primary)' }}
             >
-              Event Log operacional
+              Registro operacional rapido
             </p>
             <p
               className="text-sm"
               style={{ color: 'var(--text-muted)' }}
             >
-              Esta base será útil para rastreabilidade, análise técnica e IA futura.
+              Esses registros alimentam o historico unico do ativo e ajudam a analise do agente.
             </p>
           </div>
         </div>
@@ -70,10 +67,10 @@ function FichaTecnicaEventForm({
           <ResponsiveGrid cols={{ base: 1, md: 2, xl: 5 }}>
             <Input
               name="titulo"
-              label="Título"
+              label="Titulo"
               value={novoEvento.titulo}
               onChange={onChange}
-              placeholder="Ex.: Ruído intermitente no gantry"
+              placeholder="Ex.: Ruido intermitente no gantry"
               required
             />
 
@@ -118,20 +115,20 @@ function FichaTecnicaEventForm({
 
             <Input
               name="tecnico"
-              label="Responsável / Técnico"
+              label="Responsavel / Tecnico"
               value={novoEvento.tecnico}
               onChange={onChange}
-              placeholder="Ex.: João Marcos"
+              placeholder="Ex.: Joao Marcos"
             />
           </ResponsiveGrid>
 
           <Textarea
             name="descricao"
-            label="Descrição"
+            label="Descricao"
             value={novoEvento.descricao}
             onChange={onChange}
             rows={4}
-            placeholder="Descreva o evento técnico observado..."
+            placeholder="Descreva o evento tecnico observado..."
           />
 
           <Textarea

@@ -71,6 +71,7 @@ async function processarTenant(tenant, agoraUtc) {
         unidadeNome,
         ocorrencias: equipamento.ocorrencias || [],
         manutencoes: equipamento.manutencoes || [],
+        historicoEventos: equipamento.historicoEventos || [],
       });
 
       if (!deveRecomendar({ metricas })) {

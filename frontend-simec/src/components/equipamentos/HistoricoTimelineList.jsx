@@ -3,10 +3,14 @@ import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faWrench,
+  faArrowsRotate,
+  faCalendarCheck,
+  faCircleInfo,
   faExternalLinkAlt,
-  faPaperclip,
-  faFileDownload,
+  faFilePen,
+  faPowerOff,
+  faTriangleExclamation,
+  faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -22,8 +26,19 @@ import {
   formatarDataHora,
 } from '@/utils/equipamentos/historicoTimelineUtils';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+function getTimelineIcon(item) {
+  if (item.subcategoria === 'Corretiva' || item.subcategoria === 'Preventiva') {
+    return faWrench;
+  }
+
+  if (item.categoriaBase === 'ocorrencia') return faTriangleExclamation;
+  if (item.categoriaBase === 'transferencia_unidade') return faArrowsRotate;
+  if (item.categoriaBase === 'instalacao') return faCalendarCheck;
+  if (item.categoriaBase === 'alteracao_cadastral') return faFilePen;
+  if (item.categoriaBase === 'status_operacional') return faPowerOff;
+
+  return faCircleInfo;
+}
 
 function HistoricoTimelineList({
   linhaDoTempo = [],
@@ -40,18 +55,18 @@ function HistoricoTimelineList({
             key={item.uniqueId}
             title={
               item.chamado
-                ? `${item.titulo} • Chamado: ${item.chamado}`
+                ? `${item.titulo} | Chamado: ${item.chamado}`
                 : item.titulo
             }
             badge={<Badge variant="slate">{item.categoria}</Badge>}
             meta={
               <>
                 <span>{formatarDataHora(item.data)}</span>
-                <span>Responsável: {item.responsavel}</span>
+                <span>Origem: {item.responsavel}</span>
                 <span>Status: {item.status}</span>
               </>
             }
-            icon={<FontAwesomeIcon icon={faWrench} />}
+            icon={<FontAwesomeIcon icon={getTimelineIcon(item)} />}
             iconClassName={getTimelineIconClass(item)}
             borderClassName={getTimelineBorderClass(item)}
             expanded={expandido}
@@ -60,7 +75,7 @@ function HistoricoTimelineList({
             <div className="space-y-4">
               <Card>
                 <span className="text-[11px] font-bold uppercase text-slate-500">
-                  Descrição
+                  Descricao
                 </span>
                 <p className="mt-2 text-sm text-slate-700">
                   {item.descricao || 'Sem detalhes informados.'}
@@ -69,58 +84,34 @@ function HistoricoTimelineList({
 
               <Card>
                 <span className="text-[11px] font-bold uppercase text-slate-500">
-                  Responsável
+                  Contexto
                 </span>
                 <p className="mt-2 text-sm font-medium text-slate-900">
-                  {item.responsavel}
+                  Tipo do evento: {item.tipo || 'N/A'}
+                </p>
+                <p className="mt-1 text-sm text-slate-700">
+                  Impacta analise: {item.impactaAnalise ? 'Sim' : 'Nao'}
                 </p>
               </Card>
 
-              {item.solucao ? (
+              {item.metadata ? (
                 <Card surface="soft">
-                  <span className="text-[11px] font-bold uppercase text-emerald-600">
-                    Solução técnica
+                  <span className="text-[11px] font-bold uppercase text-slate-500">
+                    Metadata
                   </span>
-                  <p className="mt-2 text-sm font-medium text-slate-900">
-                    {item.solucao}
-                  </p>
+                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-slate-700">
+                    {JSON.stringify(item.metadata, null, 2)}
+                  </pre>
                 </Card>
               ) : null}
 
-              {item.isOS ? (
-                <Link to={`/manutencoes/${item.idOriginal}`}>
+              {item.referenciaTipo === 'manutencao' && item.referenciaId ? (
+                <Link to={`/manutencoes/${item.referenciaId}`}>
                   <Button type="button" variant="secondary">
                     <FontAwesomeIcon icon={faExternalLinkAlt} />
-                    Abrir manutenção
+                    Abrir manutencao
                   </Button>
                 </Link>
-              ) : null}
-
-              {item.isOS && item.anexos?.length > 0 ? (
-                <Card>
-                  <div className="mb-3 flex items-center gap-2 text-slate-500">
-                    <FontAwesomeIcon icon={faPaperclip} />
-                    <span className="text-[11px] font-bold uppercase">
-                      Documentos
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col gap-2">
-                    {item.anexos.map((file) => (
-                      <a
-                        key={file.id}
-                        href={`${API_BASE_URL}/${file.path}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Button variant="ghost">
-                          <FontAwesomeIcon icon={faFileDownload} />
-                          {file.nomeOriginal}
-                        </Button>
-                      </a>
-                    ))}
-                  </div>
-                </Card>
               ) : null}
             </div>
           </ExpandableTimelineItem>

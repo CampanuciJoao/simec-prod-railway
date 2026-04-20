@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -10,6 +10,8 @@ import {
   faClock,
   faWrench,
   faArrowUpRightFromSquare,
+  faChevronDown,
+  faChevronUp,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useTenantTime } from '@/hooks/time/useTenantTime';
@@ -46,19 +48,44 @@ function montarSubtitulo(alerta, timezone, locale) {
   return partes.filter(Boolean).join(' | ');
 }
 
+function extrairExplicacao(alerta) {
+  const subtituloCompleto = String(alerta?.subtitulo || '').trim();
+  const subtituloBase = String(alerta?.subtituloBase || '').trim();
+
+  if (!subtituloCompleto) return '';
+  if (!subtituloBase) return subtituloCompleto;
+
+  if (!subtituloCompleto.startsWith(subtituloBase)) {
+    return subtituloCompleto;
+  }
+
+  const restante = subtituloCompleto.slice(subtituloBase.length).trim();
+  return restante.replace(/^([.|-]|\u2022)\s*/, '').trim();
+}
+
 function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
   const { timezone, locale } = useTenantTime();
+  const [showExplicacao, setShowExplicacao] = useState(false);
 
   const style = getAlertaVisual(alerta);
   const isRecomendacao = alerta.tipo === 'Recomendação';
 
   const dataFormatada = alerta.data ? formatarData(alerta.data) : '-';
   const subtituloRenderizado = montarSubtitulo(alerta, timezone, locale);
+  const explicacao = useMemo(() => extrairExplicacao(alerta), [alerta]);
+  const resumoRecomendacao =
+    subtituloRenderizado ||
+    'O sistema identificou sinais de risco e recomenda avaliacao humana do ativo.';
 
   const handleViewDetails = () => {
     if (alerta.status === 'NaoVisto') {
       onUpdateStatus(alerta.id, 'Visto');
     }
+  };
+
+  const handleToggleExplicacao = () => {
+    handleViewDetails();
+    setShowExplicacao((prev) => !prev);
   };
 
   return (
@@ -186,11 +213,24 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                   Recomendação proativa
                 </p>
                 <p className="mt-1 text-sm text-violet-700">
-                  O sistema identificou sinais de risco e recomenda avaliar uma preventiva ou preditiva para esse ativo.
+                  {resumoRecomendacao}
                 </p>
               </div>
 
               <div className="flex flex-wrap gap-2">
+                {explicacao ? (
+                  <button
+                    type="button"
+                    onClick={handleToggleExplicacao}
+                    className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-4 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100"
+                  >
+                    <FontAwesomeIcon
+                      icon={showExplicacao ? faChevronUp : faChevronDown}
+                    />
+                    {showExplicacao ? 'Ocultar explicacao' : 'Ver explicacao'}
+                  </button>
+                ) : null}
+
                 <Link
                   to={buildAgendarPreventivaLink(alerta)}
                   className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white no-underline transition hover:bg-violet-700"
@@ -210,6 +250,17 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 </Link>
               </div>
             </div>
+
+            {showExplicacao && explicacao ? (
+              <div className="mt-4 rounded-xl border border-violet-200 bg-white/80 p-4">
+                <p className="text-xs font-black uppercase tracking-wide text-violet-500">
+                  Explicacao analitica
+                </p>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  {explicacao}
+                </p>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

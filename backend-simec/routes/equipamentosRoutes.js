@@ -16,6 +16,10 @@ import {
   removerAnexo,
 } from '../services/uploads/anexoService.js';
 import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
+import {
+  listarHistoricoAtivoPorEquipamento,
+  registrarEventoHistoricoAtivo,
+} from '../services/historicoAtivoService.js';
 
 const router = express.Router();
 
@@ -23,6 +27,64 @@ router.use(proteger);
 
 function parseDate(date) {
   return date ? new Date(date) : null;
+}
+
+function isSameDateValue(a, b) {
+  if (!a && !b) return true;
+  if (!a || !b) return false;
+  return new Date(a).getTime() === new Date(b).getTime();
+}
+
+function montarDescricaoInstalacao({
+  equipamento,
+  unidadeNome,
+  dataInstalacao,
+}) {
+  const partes = [
+    `Ativo ${equipamento.modelo} (${equipamento.tag}) vinculado a unidade ${unidadeNome}.`,
+  ];
+
+  if (dataInstalacao) {
+    partes.push(`Data de instalacao informada: ${dataInstalacao}.`);
+  }
+
+  return partes.join(' ');
+}
+
+function coletarCamposAlterados(anterior, proximo) {
+  const alterados = [];
+
+  const camposTexto = [
+    ['tag', 'TAG'],
+    ['modelo', 'Modelo'],
+    ['tipo', 'Tipo'],
+    ['setor', 'Setor'],
+    ['fabricante', 'Fabricante'],
+    ['anoFabricacao', 'Ano de fabricacao'],
+    ['numeroPatrimonio', 'Numero de patrimonio'],
+    ['registroAnvisa', 'Registro Anvisa'],
+    ['observacoes', 'Observacoes'],
+  ];
+
+  for (const [campo, label] of camposTexto) {
+    if (String(anterior?.[campo] || '') !== String(proximo?.[campo] || '')) {
+      alterados.push(label);
+    }
+  }
+
+  if (!isSameDateValue(anterior?.dataInstalacao, proximo?.dataInstalacao)) {
+    alterados.push('Data de instalacao');
+  }
+
+  return alterados;
+}
+
+function montarDescricaoAlteracaoCadastral(camposAlterados = []) {
+  if (!camposAlterados.length) {
+    return 'Cadastro do equipamento atualizado.';
+  }
+
+  return `Cadastro do equipamento atualizado. Campos alterados: ${camposAlterados.join(', ')}.`;
 }
 
 async function buscarEquipamentoCompleto(tenantId, id) {
@@ -172,6 +234,39 @@ router.get('/:id', async (req, res) => {
   }
 });
 
+router.get('/:id/historico', async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const equipamentoId = req.params.id;
+
+    const equipamento = await prisma.equipamento.findFirst({
+      where: {
+        id: equipamentoId,
+        tenantId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!equipamento) {
+      return res.status(404).json({ message: 'Equipamento nao encontrado.' });
+    }
+
+    const historico = await listarHistoricoAtivoPorEquipamento({
+      tenantId,
+      equipamentoId,
+    });
+
+    return res.json(historico);
+  } catch (error) {
+    console.error('[EQUIP_HISTORICO_GET_ERROR]', error);
+    return res.status(500).json({
+      message: 'Erro ao buscar historico do equipamento.',
+    });
+  }
+});
+
 // ==============================
 // POST CRIAR
 // ==============================
@@ -182,7 +277,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
 
-    await validarUnidadeDoTenant(tenantId, unidadeId);
+    const unidade = await validarUnidadeDoTenant(tenantId, unidadeId);
     await validarPatrimonioUnico({
       tenantId,
       numeroPatrimonio: restante.numeroPatrimonio,
@@ -217,6 +312,35 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
       entidade: 'Equipamento',
       entidadeId: novo.id,
       detalhes: `Equipamento "${novo.modelo}" criado.`,
+    });
+
+    await registrarEventoHistoricoAtivo({
+      tenantId,
+      equipamentoId: novo.id,
+      tipoEvento: 'equipamento_criado',
+      categoria: dataInstalacao ? 'instalacao' : 'alteracao_cadastral',
+      subcategoria: dataInstalacao ? 'instalacao_inicial' : 'criacao_ativo',
+      titulo: dataInstalacao
+        ? 'Instalacao inicial registrada'
+        : 'Ativo cadastrado no sistema',
+      descricao: montarDescricaoInstalacao({
+        equipamento: novo,
+        unidadeNome: unidade.nomeSistema,
+        dataInstalacao,
+      }),
+      origem: 'sistema',
+      status: novo.status,
+      impactaAnalise: false,
+      referenciaId: novo.id,
+      referenciaTipo: 'equipamento',
+      metadata: {
+        modelo: novo.modelo,
+        tag: novo.tag,
+        unidadeId,
+        unidadeNome: unidade.nomeSistema,
+        dataInstalacao: dataInstalacao || null,
+      },
+      dataEvento: parseDate(dataInstalacao) || novo.createdAt,
     });
 
     const equipamentoCompleto = await buscarEquipamentoCompleto(tenantId, novo.id);
@@ -260,6 +384,23 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       select: {
         id: true,
         modelo: true,
+        tag: true,
+        tipo: true,
+        setor: true,
+        fabricante: true,
+        anoFabricacao: true,
+        numeroPatrimonio: true,
+        registroAnvisa: true,
+        observacoes: true,
+        dataInstalacao: true,
+        status: true,
+        unidadeId: true,
+        unidade: {
+          select: {
+            id: true,
+            nomeSistema: true,
+          },
+        },
       },
     });
 
@@ -267,9 +408,9 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       return res.status(404).json({ message: 'Equipamento não encontrado.' });
     }
 
-    if (unidadeId) {
-      await validarUnidadeDoTenant(tenantId, unidadeId);
-    }
+    const unidadeDestino = unidadeId
+      ? await validarUnidadeDoTenant(tenantId, unidadeId)
+      : null;
 
     await validarPatrimonioUnico({
       tenantId,
@@ -311,6 +452,77 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
       entidadeId: id,
       detalhes: `Equipamento "${atualizado.modelo}" atualizado.`,
     });
+
+    const proximoEstado = {
+      ...equipamento,
+      ...restante,
+      dataInstalacao: parseDate(dataInstalacao),
+    };
+    const camposAlterados = coletarCamposAlterados(equipamento, proximoEstado);
+
+    if (unidadeId && unidadeId !== equipamento.unidadeId) {
+      await registrarEventoHistoricoAtivo({
+        tenantId,
+        equipamentoId: id,
+        tipoEvento: 'transferencia_unidade',
+        categoria: 'transferencia_unidade',
+        subcategoria: 'mudanca_unidade',
+        titulo: 'Transferencia de unidade registrada',
+        descricao: `Ativo transferido da unidade ${equipamento.unidade?.nomeSistema || 'N/A'} para ${unidadeDestino?.nomeSistema || 'N/A'}.`,
+        origem: 'usuario',
+        status: atualizado.status,
+        impactaAnalise: false,
+        referenciaId: id,
+        referenciaTipo: 'equipamento',
+        metadata: {
+          unidadeOrigemId: equipamento.unidadeId,
+          unidadeOrigemNome: equipamento.unidade?.nomeSistema || null,
+          unidadeDestinoId: unidadeId,
+          unidadeDestinoNome: unidadeDestino?.nomeSistema || null,
+        },
+      });
+    }
+
+    if (restante.status && restante.status !== equipamento.status) {
+      await registrarEventoHistoricoAtivo({
+        tenantId,
+        equipamentoId: id,
+        tipoEvento: 'status_operacional_atualizado',
+        categoria: 'status_operacional',
+        subcategoria: 'mudanca_status',
+        titulo: 'Status operacional atualizado',
+        descricao: `Status alterado de ${equipamento.status} para ${restante.status}.`,
+        origem: 'usuario',
+        status: restante.status,
+        impactaAnalise: ['Inoperante', 'UsoLimitado'].includes(restante.status),
+        referenciaId: id,
+        referenciaTipo: 'equipamento',
+        metadata: {
+          statusAnterior: equipamento.status,
+          statusNovo: restante.status,
+        },
+      });
+    }
+
+    if (camposAlterados.length > 0) {
+      await registrarEventoHistoricoAtivo({
+        tenantId,
+        equipamentoId: id,
+        tipoEvento: 'alteracao_cadastral',
+        categoria: 'alteracao_cadastral',
+        subcategoria: 'edicao_cadastro',
+        titulo: 'Cadastro do equipamento atualizado',
+        descricao: montarDescricaoAlteracaoCadastral(camposAlterados),
+        origem: 'usuario',
+        status: atualizado.status,
+        impactaAnalise: false,
+        referenciaId: id,
+        referenciaTipo: 'equipamento',
+        metadata: {
+          camposAlterados,
+        },
+      });
+    }
 
     const equipamentoCompleto = await buscarEquipamentoCompleto(tenantId, id);
 

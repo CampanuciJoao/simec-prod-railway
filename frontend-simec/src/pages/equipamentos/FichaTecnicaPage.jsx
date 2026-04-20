@@ -1,9 +1,6 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowLeft,
-  faFileMedical,
-} from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faFileMedical } from '@fortawesome/free-solid-svg-icons';
 
 import { useFichaTecnicaPage } from '@/hooks/equipamentos/useFichaTecnicaPage';
 
@@ -26,11 +23,7 @@ function FichaTecnicaPage() {
     return (
       <PageLayout padded fullHeight>
         <div className="space-y-6">
-          <PageHeader
-            title="Ficha Técnica"
-            icon={faFileMedical}
-          />
-
+          <PageHeader title="Ficha Tecnica" icon={faFileMedical} />
           <PageState loading />
         </div>
       </PageLayout>
@@ -41,14 +34,10 @@ function FichaTecnicaPage() {
     return (
       <PageLayout padded fullHeight>
         <div className="space-y-6">
-          <PageHeader
-            title="Ficha Técnica"
-            icon={faFileMedical}
-          />
-
+          <PageHeader title="Ficha Tecnica" icon={faFileMedical} />
           <PageState
             isEmpty
-            emptyMessage="Equipamento não encontrado."
+            emptyMessage="Equipamento nao encontrado."
           />
         </div>
       </PageLayout>
@@ -59,8 +48,8 @@ function FichaTecnicaPage() {
     <PageLayout padded fullHeight>
       <div className="space-y-6">
         <PageHeader
-          title={`Ficha Técnica: ${page.equipamento.modelo}`}
-          subtitle={`Tag: ${page.equipamento.tag || 'N/A'} • Registro operacional rápido do equipamento`}
+          title={`Ficha Tecnica: ${page.equipamento.modelo}`}
+          subtitle={`Tag: ${page.equipamento.tag || 'N/A'} | Registro rapido de eventos leves do equipamento`}
           icon={faFileMedical}
           actions={
             <Button

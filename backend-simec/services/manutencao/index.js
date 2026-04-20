@@ -35,6 +35,7 @@ import {
 import {
   processarAlertasManutencaoDoTenant,
 } from '../alertas/manutencao/index.js';
+import { registrarEventoHistoricoAtivo } from '../historicoAtivoService.js';
 
 async function reprocessarAlertasManutencaoSemBloquear(tenantId) {
   try {
@@ -45,6 +46,36 @@ async function reprocessarAlertasManutencaoSemBloquear(tenantId) {
       error
     );
   }
+}
+
+function descricaoHistoricoManutencao({
+  manutencao,
+  contexto,
+  observacao = null,
+}) {
+  const partes = [
+    `Tipo ${manutencao.tipo}.`,
+    `Equipamento ${contexto.equipamento.modelo} (${contexto.equipamento.tag}).`,
+    `Unidade ${contexto.equipamento.unidade?.nomeSistema || 'N/A'}.`,
+  ];
+
+  if (manutencao.agendamentoDataInicioLocal && manutencao.agendamentoHoraInicioLocal) {
+    partes.push(
+      `Inicio previsto em ${manutencao.agendamentoDataInicioLocal} ${manutencao.agendamentoHoraInicioLocal}.`
+    );
+  }
+
+  if (manutencao.agendamentoDataFimLocal && manutencao.agendamentoHoraFimLocal) {
+    partes.push(
+      `Fim previsto em ${manutencao.agendamentoDataFimLocal} ${manutencao.agendamentoHoraFimLocal}.`
+    );
+  }
+
+  if (observacao) {
+    partes.push(observacao);
+  }
+
+  return partes.join(' ');
 }
 
 export async function listarManutencoesService({
@@ -170,6 +201,31 @@ export async function criarManutencaoService({
     detalhes: `OS ${numeroOS} criada.`,
   });
 
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: nova.equipamentoId,
+    tipoEvento: 'manutencao_registrada',
+    categoria: 'manutencao',
+    subcategoria: nova.tipo,
+    titulo: `OS ${numeroOS} registrada`,
+    descricao: descricaoHistoricoManutencao({
+      manutencao: nova,
+      contexto,
+    }),
+    origem: 'usuario',
+    status: nova.status,
+    impactaAnalise: nova.tipo === 'Corretiva',
+    referenciaId: nova.id,
+    referenciaTipo: 'manutencao',
+    metadata: {
+      numeroOS,
+      tipo: nova.tipo,
+      status: nova.status,
+      numeroChamado: nova.numeroChamado || null,
+    },
+    dataEvento: nova.dataHoraAgendamentoInicio || nova.createdAt,
+  });
+
   await reprocessarAlertasManutencaoSemBloquear(tenantId);
 
   return {
@@ -261,6 +317,32 @@ export async function atualizarManutencaoService({
     entidade: 'Manutenção',
     entidadeId: atualizada.id,
     detalhes: `OS ${atualizada.numeroOS} atualizada.`,
+  });
+
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: atualizada.equipamentoId,
+    tipoEvento: 'manutencao_atualizada',
+    categoria: 'manutencao',
+    subcategoria: atualizada.tipo,
+    titulo: `OS ${atualizada.numeroOS} atualizada`,
+    descricao: descricaoHistoricoManutencao({
+      manutencao: atualizada,
+      contexto,
+      observacao: 'Cronograma ou dados operacionais da OS foram revisados.',
+    }),
+    origem: 'usuario',
+    status: atualizada.status,
+    impactaAnalise: false,
+    referenciaId: atualizada.id,
+    referenciaTipo: 'manutencao',
+    metadata: {
+      numeroOS: atualizada.numeroOS,
+      tipo: atualizada.tipo,
+      status: atualizada.status,
+      numeroChamado: atualizada.numeroChamado || null,
+    },
+    dataEvento: new Date(),
   });
 
   await reprocessarAlertasManutencaoSemBloquear(tenantId);
@@ -437,29 +519,33 @@ export async function concluirManutencaoComAcaoService({
       });
     }
 
-    if (workflow.historicoTitulo) {
-      await tx.ocorrencia.create({
-        data: {
-          tenant: {
-            connect: { id: tenantId },
-          },
-          equipamento: {
-            connect: {
-              tenantId_id: {
-                tenantId,
-                id: manutencaoAtual.equipamentoId,
-              },
-            },
-          },
-          titulo: workflow.historicoTitulo,
-          descricao: workflow.historicoDescricao || null,
-          tipo: 'Manutencao',
-          origem: 'usuario',
-          gravidade: workflow.equipamentoStatus === 'Operante' ? 'baixa' : 'media',
-          tecnico: null,
-        },
-      });
-    }
+    await registrarEventoHistoricoAtivo({
+      db: tx,
+      tenantId,
+      equipamentoId: manutencaoAtual.equipamentoId,
+      tipoEvento: `manutencao_${acao}`,
+      categoria: 'manutencao',
+      subcategoria: manutencaoAtual.tipo,
+      titulo: workflow.historicoTitulo || `OS ${manutencaoAtual.numeroOS} atualizada`,
+      descricao: workflow.historicoDescricao || null,
+      origem: 'usuario',
+      status: workflow.updateData.status || manutencaoAtual.status,
+      impactaAnalise: false,
+      referenciaId: manutencaoId,
+      referenciaTipo: 'manutencao',
+      metadata: {
+        numeroOS: manutencaoAtual.numeroOS,
+        acao,
+        tipo: manutencaoAtual.tipo,
+        manutencaoRealizada,
+        equipamentoOperante,
+      },
+      dataEvento:
+        workflow.updateData.dataConclusao ||
+        workflow.updateData.dataHoraAgendamentoFim ||
+        new Date(),
+    });
+
   });
 
   await registrarLog({
@@ -475,6 +561,8 @@ export async function concluirManutencaoComAcaoService({
     tenantId,
     manutencaoId,
   });
+
+  await reprocessarAlertasManutencaoSemBloquear(tenantId);
 
   return {
     ok: true,

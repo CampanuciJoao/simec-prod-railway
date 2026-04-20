@@ -138,17 +138,48 @@ export function calcularScoreRisco({
   unidadeNome,
   ocorrencias = [],
   manutencoes = [],
+  historicoEventos = [],
 }) {
-  const corretivas = manutencoes.filter((m) => m.tipo === 'Corretiva');
-  const preventivas = manutencoes.filter((m) => m.tipo === 'Preventiva');
-  const calibracoes = manutencoes.filter((m) => m.tipo === 'Calibracao');
-  const inspecoes = manutencoes.filter((m) => m.tipo === 'Inspecao');
+  const eventosAnaliticos = Array.isArray(historicoEventos)
+    ? historicoEventos
+    : [];
 
-  const { maiorGrupo, grupos } = calcularReincidencia(ocorrencias);
+  const usarHistoricoAnalitico = eventosAnaliticos.length > 0;
+
+  const ocorrenciasBase = usarHistoricoAnalitico
+    ? eventosAnaliticos.filter(
+        (evento) =>
+          evento.categoria === 'ocorrencia' &&
+          evento.tipoEvento === 'ocorrencia_registrada'
+      )
+    : ocorrencias;
+
+  const corretivas = usarHistoricoAnalitico
+    ? eventosAnaliticos.filter(
+        (evento) =>
+          evento.categoria === 'manutencao' &&
+          evento.tipoEvento === 'manutencao_registrada' &&
+          evento.subcategoria === 'Corretiva'
+      )
+    : manutencoes.filter((m) => m.tipo === 'Corretiva');
+
+  const preventivas = usarHistoricoAnalitico
+    ? []
+    : manutencoes.filter((m) => m.tipo === 'Preventiva');
+
+  const calibracoes = usarHistoricoAnalitico
+    ? []
+    : manutencoes.filter((m) => m.tipo === 'Calibracao');
+
+  const inspecoes = usarHistoricoAnalitico
+    ? []
+    : manutencoes.filter((m) => m.tipo === 'Inspecao');
+
+  const { maiorGrupo, grupos } = calcularReincidencia(ocorrenciasBase);
 
   let scoreBase = 0;
 
-  scoreBase += ocorrencias.length * 2.2;
+  scoreBase += ocorrenciasBase.length * 2.2;
   scoreBase += corretivas.length * 4.5;
   scoreBase += calibracoes.length * 1.2;
   scoreBase += inspecoes.length * 1.0;
@@ -176,7 +207,7 @@ export function calcularScoreRisco({
   return {
     scoreBase,
     scoreFinal,
-    ocorrencias: ocorrencias.length,
+    ocorrencias: ocorrenciasBase.length,
     corretivas: corretivas.length,
     preventivas: preventivas.length,
     calibracoes: calibracoes.length,

@@ -37,6 +37,7 @@ model Tenant {
   agentMessages        AgentMessage[]
   userAgentMemories    UserAgentMemory[]
   manutencaoEventos    ManutencaoEvento[]
+  historicoAtivoEventos HistoricoAtivoEvento[]
 
   @@map("tenants")
 }
@@ -121,6 +122,7 @@ model Equipamento {
   ocorrencias       Ocorrencia[]
   seguros           Seguro[]
   contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
+  historicoEventos  HistoricoAtivoEvento[]
 
   riskScore     Int?
   riskLevel     String?
@@ -252,6 +254,33 @@ model ManutencaoEvento {
   @@index([tenantId, manutencaoId, dataEvento])
   @@index([tenantId, tipo, dataEvento])
   @@map("manutencao_eventos")
+}
+
+model HistoricoAtivoEvento {
+  id             String   @id @default(uuid())
+  tenantId       String
+  equipamentoId  String   @map("equipamento_id")
+  tipoEvento     String   @map("tipo_evento")
+  categoria      String
+  subcategoria   String?
+  titulo         String
+  descricao      String?
+  origem         String   @default("sistema")
+  status         String?
+  impactaAnalise Boolean  @default(false) @map("impacta_analise")
+  referenciaId   String?  @map("referencia_id")
+  referenciaTipo String?  @map("referencia_tipo")
+  metadataJson   String?  @db.Text @map("metadata_json")
+  dataEvento     DateTime @default(now()) @map("data_evento")
+  createdAt      DateTime @default(now())
+
+  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, equipamentoId, dataEvento(sort: Desc)])
+  @@index([tenantId, categoria, dataEvento(sort: Desc)])
+  @@index([tenantId, impactaAnalise, dataEvento(sort: Desc)])
+  @@map("historico_ativo_eventos")
 }
 
 model Acessorio {

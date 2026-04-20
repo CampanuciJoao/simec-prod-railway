@@ -8,6 +8,7 @@ export * from './contratosApi';
 export * from './dashboardApi';
 export * from './emailsNotificacaoApi';
 export * from './equipamentosApi';
+export * from './historicoAtivoApi';
 export * from './manutencoesApi';
 export * from './ocorrenciasApi';
 export * from './pdfApi';

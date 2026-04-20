@@ -8,10 +8,7 @@ import {
   faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 
-import {
-  getManutencoes,
-  getOcorrenciasPorEquipamento,
-} from '@/services/api';
+import { getHistoricoAtivoByEquipamento } from '@/services/api';
 
 import { useToast } from '@/contexts/ToastContext';
 import { exportarHistoricoEquipamentoPDF } from '@/utils/pdfUtils';
@@ -32,10 +29,7 @@ import {
 function TabHistorico({ equipamento }) {
   const { addToast } = useToast();
 
-  const [historicoBruto, setHistoricoBruto] = useState({
-    manutencoes: [],
-    ocorrencias: [],
-  });
+  const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
 
@@ -52,17 +46,11 @@ function TabHistorico({ equipamento }) {
     setLoading(true);
 
     try {
-      const [manuts, ocorrs] = await Promise.all([
-        getManutencoes({ equipamentoId: equipamento.id }),
-        getOcorrenciasPorEquipamento(equipamento.id),
-      ]);
-
-      setHistoricoBruto({
-        manutencoes: Array.isArray(manuts) ? manuts : [],
-        ocorrencias: Array.isArray(ocorrs) ? ocorrs : [],
-      });
+      const resposta = await getHistoricoAtivoByEquipamento(equipamento.id);
+      setEventos(Array.isArray(resposta) ? resposta : []);
     } catch {
-      addToast('Erro ao carregar histórico.', 'error');
+      addToast('Erro ao carregar historico.', 'error');
+      setEventos([]);
     } finally {
       setLoading(false);
     }
@@ -85,12 +73,12 @@ function TabHistorico({ equipamento }) {
     useMemo(
       () =>
         buildHistoricoTimeline({
-          historicoBruto,
+          eventos,
           dataInicio,
           dataFim,
           filtroTipo,
         }),
-      [historicoBruto, dataInicio, dataFim, filtroTipo]
+      [eventos, dataInicio, dataFim, filtroTipo]
     );
 
   const handleSetHoje = (campo) => {
@@ -118,8 +106,8 @@ function TabHistorico({ equipamento }) {
 
   return (
     <PageSection
-      title="Histórico do equipamento"
-      description="Auditoria consolidada de manutenções e ocorrências."
+      title="Historico do equipamento"
+      description="Historico unico do ativo com manutencoes, ocorrencias e mudancas relevantes."
     >
       <div className="space-y-5">
         <div className="flex items-start gap-3">
@@ -138,13 +126,13 @@ function TabHistorico({ equipamento }) {
               className="text-sm font-semibold"
               style={{ color: 'var(--text-primary)' }}
             >
-              Linha do tempo operacional
+              Linha do tempo do ativo
             </p>
             <p
               className="text-sm"
               style={{ color: 'var(--text-muted)' }}
             >
-              Consulte eventos, ordens de serviço e registros associados.
+              Consulte a vida completa do ativo em uma unica linha do tempo.
             </p>
           </div>
         </div>
@@ -171,13 +159,16 @@ function TabHistorico({ equipamento }) {
               <option value="Todos">Todos os registros</option>
               <option value="Preventiva">Apenas preventivas</option>
               <option value="Corretiva">Apenas corretivas</option>
-              <option value="Evento">Apenas ocorrências</option>
+              <option value="Ocorrencia">Apenas ocorrencias</option>
+              <option value="Transferencia">Transferencias</option>
+              <option value="Alteracao">Alteracoes cadastrais</option>
+              <option value="Instalacao">Instalacao inicial</option>
             </Select>
 
             <div className="flex gap-2">
               <div className="flex-1">
                 <DateInput
-                  label="Início"
+                  label="Inicio"
                   value={dataInicio}
                   onChange={(e) => setDataInicio(e.target.value)}
                 />
@@ -250,14 +241,14 @@ function TabHistorico({ equipamento }) {
               <div>
                 Exibindo os <strong>20 registros mais recentes</strong> de um
                 total de <strong>{` ${totalSemFiltro}`}</strong>. Use os filtros
-                para visualizar todo o histórico.
+                para visualizar todo o historico.
               </div>
             </div>
           ) : null}
         </Card>
 
         {loading ? (
-          <LoadingState message="Carregando histórico..." />
+          <LoadingState message="Carregando historico..." />
         ) : linhaDoTempo.length === 0 ? (
           <EmptyState message="Nenhum registro encontrado para os filtros selecionados." />
         ) : (

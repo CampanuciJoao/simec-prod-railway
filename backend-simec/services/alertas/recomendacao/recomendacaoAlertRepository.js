@@ -29,12 +29,27 @@ export async function buscarEquipamentosComHistorico(tenantId, dataCorte) {
       ocorrencias: {
         where: {
           tenantId,
+          tipo: {
+            not: 'Manutencao',
+          },
           data: {
             gte: dataCorte,
           },
         },
         orderBy: {
           data: 'desc',
+        },
+      },
+      historicoEventos: {
+        where: {
+          tenantId,
+          impactaAnalise: true,
+          dataEvento: {
+            gte: dataCorte,
+          },
+        },
+        orderBy: {
+          dataEvento: 'desc',
         },
       },
       manutencoes: {

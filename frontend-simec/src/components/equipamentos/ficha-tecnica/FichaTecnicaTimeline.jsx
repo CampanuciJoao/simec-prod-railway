@@ -1,10 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import {
-  PageSection,
-  PageState,
-} from '@/components/ui';
+import { PageSection, PageState } from '@/components/ui';
 import FichaTecnicaTimelineItem from '@/components/equipamentos/ficha-tecnica/FichaTecnicaTimelineItem';
 
 function FichaTecnicaTimeline({
@@ -21,13 +18,13 @@ function FichaTecnicaTimeline({
 }) {
   return (
     <PageSection
-      title={`Histórico operacional (${ocorrencias.length})`}
-      description="Linha do tempo de eventos técnicos e operacionais do equipamento."
+      title={`Eventos leves registrados (${ocorrencias.length})`}
+      description="Consulte apenas os eventos leves lancados por esta tela. O historico completo fica na aba Historico do equipamento."
     >
       {ocorrencias.length === 0 ? (
         <PageState
           isEmpty
-          emptyMessage="Nenhum evento registrado para este equipamento."
+          emptyMessage="Nenhum evento leve registrado para este equipamento."
         />
       ) : (
         <div className="space-y-4">

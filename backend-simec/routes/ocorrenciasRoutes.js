@@ -5,6 +5,7 @@ import express from 'express';
 import prisma from '../services/prismaService.js';
 import { proteger } from '../middleware/authMiddleware.js';
 import { registrarLog } from '../services/logService.js';
+import { registrarEventoHistoricoAtivo } from '../services/historicoAtivoService.js';
 
 const router = express.Router();
 
@@ -14,13 +15,16 @@ const TIPOS_OCORRENCIA_VALIDOS = [
   'Operacional',
   'Falha',
   'Ajuste',
-  'Manutencao',
   'Inspecao',
   'Observacao',
 ];
 
 const ORIGENS_VALIDAS = ['usuario', 'agente', 'sistema'];
 const GRAVIDADES_VALIDAS = ['baixa', 'media', 'alta'];
+
+function tipoOcorrenciaImpactaAnalise(tipo) {
+  return ['Operacional', 'Falha'].includes(tipo);
+}
 
 function normalizarTexto(value) {
   if (typeof value !== 'string') return null;
@@ -169,6 +173,28 @@ router.post('/', async (req, res) => {
       detalhes: `Evento "${nova.titulo}" (${nova.tipo}, gravidade ${nova.gravidade}, origem ${nova.origem}) criado para o equipamento ${equipamento.modelo} (${equipamento.tag}).`,
     });
 
+    await registrarEventoHistoricoAtivo({
+      tenantId,
+      equipamentoId,
+      tipoEvento: 'ocorrencia_registrada',
+      categoria: 'ocorrencia',
+      subcategoria: tipoNormalizado,
+      titulo: nova.titulo,
+      descricao: nova.descricao,
+      origem: origemNormalizada,
+      status: 'Pendente',
+      impactaAnalise: tipoOcorrenciaImpactaAnalise(tipoNormalizado),
+      referenciaId: nova.id,
+      referenciaTipo: 'ocorrencia',
+      metadata: {
+        tipo: tipoNormalizado,
+        gravidade: gravidadeNormalizada,
+        tecnico: nova.tecnico,
+        metadata: metadataNormalizada,
+      },
+      dataEvento: nova.data,
+    });
+
     return res.status(201).json(nova);
   } catch (error) {
     console.error('[OCORRENCIA_CREATE_ERROR]', error);
@@ -202,6 +228,8 @@ router.put('/:id/resolver', async (req, res) => {
       select: {
         id: true,
         titulo: true,
+        tipo: true,
+        equipamentoId: true,
         resolvido: true,
       },
     });
@@ -237,6 +265,27 @@ router.put('/:id/resolver', async (req, res) => {
       entidade: 'Ocorrência',
       entidadeId: id,
       detalhes: `Evento "${ocorrencia.titulo}" marcado como resolvido.`,
+    });
+
+    await registrarEventoHistoricoAtivo({
+      tenantId,
+      equipamentoId: ocorrencia.equipamentoId,
+      tipoEvento: 'ocorrencia_resolvida',
+      categoria: 'ocorrencia',
+      subcategoria: 'resolucao',
+      titulo: `Resolucao da ocorrencia: ${ocorrencia.titulo}`,
+      descricao: atualizada.solucao,
+      origem: 'usuario',
+      status: 'Resolvido',
+      impactaAnalise: false,
+      referenciaId: id,
+      referenciaTipo: 'ocorrencia',
+      metadata: {
+        tipo: ocorrencia.tipo,
+        tecnicoResolucao: atualizada.tecnicoResolucao,
+        dataResolucao: atualizada.dataResolucao,
+      },
+      dataEvento: atualizada.dataResolucao,
     });
 
     return res.json(atualizada);
@@ -277,6 +326,9 @@ router.get('/equipamento/:id', async (req, res) => {
       where: {
         tenantId,
         equipamentoId,
+        tipo: {
+          not: 'Manutencao',
+        },
       },
       orderBy: {
         data: 'desc',
