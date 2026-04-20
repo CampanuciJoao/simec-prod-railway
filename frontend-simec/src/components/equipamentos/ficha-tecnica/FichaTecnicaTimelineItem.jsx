@@ -9,11 +9,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { formatarDataHora } from '@/utils/timeUtils';
-import {
-  Badge,
-  Button,
-  Card,
-} from '@/components/ui';
+import { Badge, Button, Card } from '@/components/ui';
 import FichaTecnicaResolveForm from '@/components/equipamentos/ficha-tecnica/FichaTecnicaResolveForm';
 
 function getGravidadeBadgeVariant(gravidade) {
@@ -51,12 +47,16 @@ function FichaTecnicaTimelineItem({
   onCancelarResolucao,
   onSalvarSolucao,
 }) {
+  const detalhesComplementares = [
+    item.origem ? { label: 'Origem', value: item.origem } : null,
+    item.tecnico ? { label: 'Responsavel', value: item.tecnico } : null,
+    item.tecnicoResolucao
+      ? { label: 'Resolvido por', value: item.tecnicoResolucao }
+      : null,
+  ].filter(Boolean);
+
   return (
-    <Card
-      padded={false}
-      className="overflow-hidden rounded-2xl"
-      surface="default"
-    >
+    <Card padded={false} className="overflow-hidden rounded-2xl" surface="default">
       <button
         type="button"
         className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
@@ -88,18 +88,13 @@ function FichaTecnicaTimelineItem({
                 {item.titulo}
               </p>
 
-              <Badge variant="slate">
-                {item.tipo}
-              </Badge>
-
+              <Badge variant="slate">{item.tipo}</Badge>
               <Badge variant={getGravidadeBadgeVariant(item.gravidade)}>
                 {item.gravidade || 'media'}
               </Badge>
-
               <Badge variant={getOrigemBadgeVariant(item.origem)}>
                 {item.origem || 'usuario'}
               </Badge>
-
               <Badge variant={getStatusBadgeVariant(item.resolvido)}>
                 {item.resolvido ? 'Resolvido' : 'Pendente'}
               </Badge>
@@ -110,15 +105,12 @@ function FichaTecnicaTimelineItem({
               style={{ color: 'var(--text-muted)' }}
             >
               <span>{formatarDataHora(item.data)}</span>
-              <span>Técnico: {item.tecnico || 'N/A'}</span>
+              <span>Tecnico: {item.tecnico || 'N/A'}</span>
             </div>
           </div>
         </div>
 
-        <span
-          className="pt-1"
-          style={{ color: 'var(--text-muted)' }}
-        >
+        <span className="pt-1" style={{ color: 'var(--text-muted)' }}>
           <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} />
         </span>
       </button>
@@ -137,34 +129,43 @@ function FichaTecnicaTimelineItem({
                 className="text-[11px] font-bold uppercase tracking-[0.14em]"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Descrição
+                Descricao
               </span>
               <p
-                className="mt-2 text-sm"
-                style={{ color: 'var(--text-secondary)' }}
+                className="mt-2 text-sm leading-6"
+                style={{ color: 'var(--text-primary)' }}
               >
-                {item.descricao || 'Sem descrição.'}
+                {item.descricao || 'Sem descricao informada.'}
               </p>
             </Card>
 
-            {item.metadata ? (
-              <Card className="rounded-xl" surface="default">
+            {detalhesComplementares.length ? (
+              <Card className="rounded-xl" surface="soft">
                 <span
                   className="text-[11px] font-bold uppercase tracking-[0.14em]"
                   style={{ color: 'var(--text-muted)' }}
                 >
-                  Metadata
+                  Detalhes do evento
                 </span>
 
-                <pre
-                  className="mt-2 overflow-x-auto whitespace-pre-wrap rounded-lg p-3 text-xs"
-                  style={{
-                    backgroundColor: 'var(--bg-surface-soft)',
-                    color: 'var(--text-secondary)',
-                  }}
-                >
-{JSON.stringify(item.metadata, null, 2)}
-                </pre>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {detalhesComplementares.map((detalhe) => (
+                    <span
+                      key={`${item.id}-${detalhe.label}`}
+                      className="rounded-full border px-3 py-1.5 text-xs font-medium"
+                      style={{
+                        borderColor: 'var(--border-soft)',
+                        backgroundColor: 'var(--bg-surface)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    >
+                      <strong style={{ color: 'var(--text-primary)' }}>
+                        {detalhe.label}:
+                      </strong>{' '}
+                      {detalhe.value}
+                    </span>
+                  ))}
+                </div>
               </Card>
             ) : null}
 
@@ -172,7 +173,7 @@ function FichaTecnicaTimelineItem({
               <Card
                 className="rounded-xl"
                 surface="soft"
-                styleOverride={{
+                style={{
                   borderColor: 'var(--color-success-soft)',
                   backgroundColor: 'var(--color-success-soft)',
                 }}
@@ -181,21 +182,18 @@ function FichaTecnicaTimelineItem({
                   className="text-[11px] font-bold uppercase tracking-[0.14em]"
                   style={{ color: 'var(--color-success)' }}
                 >
-                  Solução
+                  Solucao
                 </span>
 
                 <p
-                  className="mt-2 text-sm"
+                  className="mt-2 text-sm leading-6"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   {item.solucao}
                 </p>
 
-                <p
-                  className="mt-2 text-xs"
-                  style={{ color: 'var(--color-success)' }}
-                >
-                  Técnico de resolução: {item.tecnicoResolucao || 'N/A'}
+                <p className="mt-2 text-xs" style={{ color: 'var(--color-success)' }}>
+                  Tecnico de resolucao: {item.tecnicoResolucao || 'N/A'}
                 </p>
               </Card>
             ) : isResolvendo ? (

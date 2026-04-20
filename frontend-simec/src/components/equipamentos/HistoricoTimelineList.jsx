@@ -73,40 +73,53 @@ function HistoricoTimelineList({
             onToggle={() => onToggleExpandir(item.uniqueId)}
           >
             <div className="space-y-4">
-              <Card>
-                <span className="text-[11px] font-bold uppercase text-slate-500">
+              <Card surface="soft" className="rounded-2xl">
+                <span
+                  className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                  style={{ color: 'var(--text-muted)' }}
+                >
                   Descricao
                 </span>
-                <p className="mt-2 text-sm text-slate-700">
+                <p
+                  className="mt-2 text-sm leading-6"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {item.descricao || 'Sem detalhes informados.'}
                 </p>
               </Card>
 
-              <Card>
-                <span className="text-[11px] font-bold uppercase text-slate-500">
-                  Contexto
-                </span>
-                <p className="mt-2 text-sm font-medium text-slate-900">
-                  Tipo do evento: {item.tipo || 'N/A'}
-                </p>
-                <p className="mt-1 text-sm text-slate-700">
-                  Impacta analise: {item.impactaAnalise ? 'Sim' : 'Nao'}
-                </p>
-              </Card>
-
-              {item.metadata ? (
-                <Card surface="soft">
-                  <span className="text-[11px] font-bold uppercase text-slate-500">
-                    Metadata
+              {item.detalhesComplementares?.length ? (
+                <Card surface="soft" className="rounded-2xl">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Detalhes do registro
                   </span>
-                  <pre className="mt-2 overflow-x-auto whitespace-pre-wrap text-xs text-slate-700">
-                    {JSON.stringify(item.metadata, null, 2)}
-                  </pre>
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {item.detalhesComplementares.map((detalhe) => (
+                      <span
+                        key={`${item.uniqueId}-${detalhe.label}`}
+                        className="rounded-full border px-3 py-1.5 text-xs font-medium"
+                        style={{
+                          borderColor: 'var(--border-soft)',
+                          backgroundColor: 'var(--bg-surface)',
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        <strong style={{ color: 'var(--text-primary)' }}>
+                          {detalhe.label}:
+                        </strong>{' '}
+                        {detalhe.value}
+                      </span>
+                    ))}
+                  </div>
                 </Card>
               ) : null}
 
               {item.referenciaTipo === 'manutencao' && item.referenciaId ? (
-                <Link to={`/manutencoes/${item.referenciaId}`}>
+                <Link to={`/manutencoes/detalhes/${item.referenciaId}`}>
                   <Button type="button" variant="secondary">
                     <FontAwesomeIcon icon={faExternalLinkAlt} />
                     Abrir manutencao

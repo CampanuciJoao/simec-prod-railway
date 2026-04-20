@@ -33,10 +33,10 @@ function FichaTecnicaEventForm({
   return (
     <PageSection
       title="Registrar evento leve"
-      description="Cadastre ocorrencias leves, falhas percebidas, ajustes, inspecoes visuais e observacoes do equipamento."
+      description="Cadastre observacoes operacionais, falhas percebidas, pequenos ajustes e inspecoes do equipamento."
     >
       <div className="space-y-5">
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 rounded-2xl border px-4 py-4">
           <span
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
             style={{
@@ -55,10 +55,11 @@ function FichaTecnicaEventForm({
               Registro operacional rapido
             </p>
             <p
-              className="text-sm"
+              className="text-sm leading-6"
               style={{ color: 'var(--text-muted)' }}
             >
-              Esses registros alimentam o historico unico do ativo e ajudam a analise do agente.
+              Use esta tela para registrar eventos leves. O historico completo do
+              ativo continua centralizado na aba Historico do equipamento.
             </p>
           </div>
         </div>
@@ -95,7 +96,11 @@ function FichaTecnicaEventForm({
             >
               {ORIGENS.map((origem) => (
                 <option key={origem} value={origem}>
-                  {origem}
+                  {origem === 'usuario'
+                    ? 'Usuario'
+                    : origem === 'agente'
+                      ? 'Agente'
+                      : 'Sistema'}
                 </option>
               ))}
             </Select>
@@ -108,7 +113,7 @@ function FichaTecnicaEventForm({
             >
               {GRAVIDADES.map((gravidade) => (
                 <option key={gravidade} value={gravidade}>
-                  {gravidade}
+                  {gravidade.charAt(0).toUpperCase() + gravidade.slice(1)}
                 </option>
               ))}
             </Select>
@@ -128,16 +133,7 @@ function FichaTecnicaEventForm({
             value={novoEvento.descricao}
             onChange={onChange}
             rows={4}
-            placeholder="Descreva o evento tecnico observado..."
-          />
-
-          <Textarea
-            name="metadataTexto"
-            label="Metadata JSON"
-            value={novoEvento.metadataTexto}
-            onChange={onChange}
-            rows={5}
-            placeholder='Ex.: { "temperaturaSala": 21, "mensagemPainel": "E104", "turno": "noite" }'
+            placeholder="Descreva de forma objetiva o que foi observado, ajustado ou validado."
           />
 
           <FormActions

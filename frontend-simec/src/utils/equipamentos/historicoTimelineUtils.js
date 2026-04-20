@@ -24,12 +24,33 @@ function getCategoriaLabel(categoria, subcategoria) {
 function getResponsavelLabel(item) {
   const metadata = parseJsonIfNeeded(item.metadata);
 
-  return (
-    metadata?.tecnico ||
-    metadata?.tecnicoResolucao ||
-    item?.origem ||
-    'sistema'
-  );
+  return metadata?.tecnico || metadata?.tecnicoResolucao || item?.origem || 'sistema';
+}
+
+function getDetalhesComplementares(item, metadata) {
+  const detalhes = [];
+
+  if (metadata?.numeroOS) {
+    detalhes.push({ label: 'OS', value: metadata.numeroOS });
+  }
+
+  if (metadata?.numeroChamado) {
+    detalhes.push({ label: 'Chamado', value: metadata.numeroChamado });
+  }
+
+  if (item.subcategoria) {
+    detalhes.push({ label: 'Categoria', value: item.subcategoria });
+  }
+
+  if (item.status) {
+    detalhes.push({ label: 'Status', value: item.status });
+  }
+
+  if (item.origem) {
+    detalhes.push({ label: 'Origem', value: item.origem });
+  }
+
+  return detalhes;
 }
 
 function mapHistoricoEvento(item) {
@@ -47,35 +68,19 @@ function mapHistoricoEvento(item) {
     chamado: metadata?.numeroChamado || null,
     descricao: item.descricao,
     responsavel: getResponsavelLabel(item),
+    origem: item.origem || metadata?.origem || null,
     status: item.status || 'Registrado',
     isOS: item.referenciaTipo === 'manutencao',
     referenciaTipo: item.referenciaTipo || null,
     referenciaId: item.referenciaId || null,
     metadata,
     impactaAnalise: Boolean(item.impactaAnalise),
+    detalhesComplementares: getDetalhesComplementares(item, metadata),
   };
 }
 
-function filtrarPorTipo(item, filtroTipo) {
-  if (filtroTipo === 'Todos') return true;
-  if (filtroTipo === 'Corretiva') return item.subcategoria === 'Corretiva';
-  if (filtroTipo === 'Preventiva') return item.subcategoria === 'Preventiva';
-  if (filtroTipo === 'Ocorrencia') return item.categoriaBase === 'ocorrencia';
-  if (filtroTipo === 'Transferencia') {
-    return item.categoriaBase === 'transferencia_unidade';
-  }
-  if (filtroTipo === 'Alteracao') {
-    return item.categoriaBase === 'alteracao_cadastral';
-  }
-  if (filtroTipo === 'Instalacao') return item.categoriaBase === 'instalacao';
-
-  return true;
-}
-
-export function buildHistoricoTimeline({
-  eventos = [],
-}) {
-  let unificado = (eventos || []).map(mapHistoricoEvento);
+export function buildHistoricoTimeline({ eventos = [] }) {
+  const unificado = (eventos || []).map(mapHistoricoEvento);
   const totalSemFiltro = unificado.length;
 
   unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
@@ -123,19 +128,6 @@ export function mapFiltroHistoricoParaQuery(filtroTipo) {
   return {};
 }
 
-export function getCategoriaBadgeClass(item) {
-  if (item.subcategoria === 'Corretiva') return 'badge badge-red';
-  if (item.subcategoria === 'Preventiva') return 'badge badge-green';
-  if (item.subcategoria === 'Calibracao') return 'badge badge-blue';
-  if (item.subcategoria === 'Inspecao') return 'badge badge-yellow';
-  if (item.categoriaBase === 'ocorrencia') return 'badge badge-orange';
-  if (item.categoriaBase === 'transferencia_unidade') return 'badge badge-indigo';
-  if (item.categoriaBase === 'instalacao') return 'badge badge-cyan';
-  if (item.categoriaBase === 'alteracao_cadastral') return 'badge badge-slate';
-  if (item.categoriaBase === 'status_operacional') return 'badge badge-purple';
-  return 'badge badge-slate';
-}
-
 export function getTimelineBorderClass(item) {
   if (item.subcategoria === 'Corretiva') return 'border-l-red-500';
   if (item.subcategoria === 'Preventiva') return 'border-l-emerald-500';
@@ -150,26 +142,17 @@ export function getTimelineBorderClass(item) {
 
 export function getTimelineIconClass(item) {
   if (item.subcategoria === 'Corretiva') return 'bg-red-50 text-red-500';
-  if (item.subcategoria === 'Preventiva') {
-    return 'bg-emerald-50 text-emerald-500';
-  }
+  if (item.subcategoria === 'Preventiva') return 'bg-emerald-50 text-emerald-500';
   if (item.subcategoria === 'Calibracao') return 'bg-blue-50 text-blue-500';
   if (item.subcategoria === 'Inspecao') return 'bg-amber-50 text-amber-500';
   if (item.categoriaBase === 'ocorrencia') return 'bg-orange-50 text-orange-500';
-  if (item.categoriaBase === 'transferencia_unidade') {
-    return 'bg-indigo-50 text-indigo-500';
-  }
+  if (item.categoriaBase === 'transferencia_unidade') return 'bg-indigo-50 text-indigo-500';
   if (item.categoriaBase === 'instalacao') return 'bg-cyan-50 text-cyan-500';
-  if (item.categoriaBase === 'status_operacional') {
-    return 'bg-violet-50 text-violet-500';
-  }
+  if (item.categoriaBase === 'status_operacional') return 'bg-violet-50 text-violet-500';
   return 'bg-slate-50 text-slate-500';
 }
 
-export function formatarResumoHistorico({
-  linhaDoTempo,
-  totalFiltrado,
-}) {
+export function formatarResumoHistorico({ linhaDoTempo, totalFiltrado }) {
   return `Exibindo ${linhaDoTempo.length} de ${totalFiltrado} registro(s) filtrado(s).`;
 }
 

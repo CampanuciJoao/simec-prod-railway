@@ -18,7 +18,6 @@ const NOVO_EVENTO_INICIAL = {
   tecnico: '',
   origem: 'usuario',
   gravidade: 'media',
-  metadataTexto: '',
 };
 
 export function useFichaTecnicaPage() {
@@ -88,25 +87,13 @@ export function useFichaTecnicaPage() {
       event.preventDefault();
 
       if (!novoEvento.titulo.trim()) {
-        addToast('Título do evento é obrigatório.', 'error');
+        addToast('Titulo do evento e obrigatorio.', 'error');
         return;
       }
 
       setSubmitting(true);
 
       try {
-        let metadata = null;
-
-        if (novoEvento.metadataTexto.trim()) {
-          try {
-            metadata = JSON.parse(novoEvento.metadataTexto);
-          } catch {
-            addToast('metadata deve ser um JSON válido.', 'error');
-            setSubmitting(false);
-            return;
-          }
-        }
-
         const criado = await addOcorrencia({
           equipamentoId: id,
           titulo: novoEvento.titulo.trim(),
@@ -115,7 +102,6 @@ export function useFichaTecnicaPage() {
           tecnico: novoEvento.tecnico.trim(),
           origem: novoEvento.origem,
           gravidade: novoEvento.gravidade,
-          metadata,
         });
 
         addToast('Evento registrado com sucesso!', 'success');
@@ -154,7 +140,7 @@ export function useFichaTecnicaPage() {
       const payload = dadosSolucao[ocorrenciaId] || {};
 
       if (!payload.solucao || !payload.solucao.trim()) {
-        addToast('Descreva a solução.', 'error');
+        addToast('Descreva a solucao.', 'error');
         return;
       }
 
@@ -180,7 +166,7 @@ export function useFichaTecnicaPage() {
 
         setResolvendoId(null);
       } catch (err) {
-        addToast(getErrorMessage(err, 'Erro ao salvar solução.'), 'error');
+        addToast(getErrorMessage(err, 'Erro ao salvar solucao.'), 'error');
       } finally {
         setSubmitting(false);
       }
