@@ -150,7 +150,6 @@ export function calcularScoreRisco({
 
   scoreBase += ocorrencias.length * 2.2;
   scoreBase += corretivas.length * 4.5;
-  scoreBase += preventivas.length * 0.8;
   scoreBase += calibracoes.length * 1.2;
   scoreBase += inspecoes.length * 1.0;
 
