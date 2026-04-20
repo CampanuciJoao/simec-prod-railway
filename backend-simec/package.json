@@ -8,6 +8,7 @@
     "start": "node server.js",
     "start:prod": "node server.js",
     "seed": "node seed.js",
+    "tenant:maintenance": "node scripts/tenantOperationalMaintenance.js",
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push",
     "prisma:reset": "npx prisma db push --force-reset && npm run seed",

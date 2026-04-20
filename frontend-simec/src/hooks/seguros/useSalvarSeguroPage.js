@@ -26,11 +26,11 @@ export function useSalvarSeguroPage({ id, addToast, navigate }) {
       setError('');
 
       const [equipamentosData, unidadesData] = await Promise.all([
-        getEquipamentos(),
+        getEquipamentos({ page: 1, pageSize: 500, sortBy: 'modelo', sortDirection: 'asc' }),
         getUnidades(),
       ]);
 
-      setEquipamentos(equipamentosData || []);
+      setEquipamentos(equipamentosData?.items || []);
       setUnidades(unidadesData || []);
 
       if (isEditing) {

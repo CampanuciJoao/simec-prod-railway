@@ -3,6 +3,7 @@ import express from 'express';
 import { proteger } from '../middleware/authMiddleware.js';
 import {
   listarAlertasService,
+  resumirAlertasService,
   atualizarStatusAlertaService,
 } from '../services/alertas/alertasService.js';
 
@@ -12,9 +13,14 @@ router.use(proteger);
 
 router.get('/', async (req, res) => {
   try {
+    const limitQuery = Number.parseInt(req.query?.limit, 10);
     const resultado = await listarAlertasService({
       tenantId: req.usuario.tenantId,
       userId: req.usuario.id,
+      limit:
+        Number.isNaN(limitQuery) || limitQuery <= 0
+          ? null
+          : Math.min(limitQuery, 50),
     });
 
     return res.json(resultado.data);
@@ -22,6 +28,22 @@ router.get('/', async (req, res) => {
     console.error('[ALERTA_LIST_ERROR]', error);
     return res.status(500).json({
       message: 'Erro ao buscar alertas.',
+    });
+  }
+});
+
+router.get('/resumo', async (req, res) => {
+  try {
+    const resultado = await resumirAlertasService({
+      tenantId: req.usuario.tenantId,
+      userId: req.usuario.id,
+    });
+
+    return res.json(resultado.data);
+  } catch (error) {
+    console.error('[ALERTA_RESUMO_ERROR]', error);
+    return res.status(500).json({
+      message: 'Erro ao buscar resumo de alertas.',
     });
   }
 });

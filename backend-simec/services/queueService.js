@@ -7,6 +7,8 @@ dotenv.config();
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 const connection = new IORedis(redisUrl, {
+  lazyConnect: true,
+  enableOfflineQueue: false,
   maxRetriesPerRequest: null,
 });
 
@@ -122,4 +124,24 @@ export async function encerrarQueueDeAlertas() {
   } catch (error) {
     console.error('❌ Erro ao encerrar queue:', error);
   }
+}
+
+export async function enfileirarReprocessamentoAlertasDoTenant(
+  tenantId,
+  motivo = 'manutencao_atualizada'
+) {
+  if (!tenantId) return null;
+
+  return alertasQueue.add(
+    'reprocessar-alertas-tenant',
+    {
+      tenantId,
+      motivo,
+    },
+    {
+      jobId: `reprocessar-alertas-tenant-${tenantId}-${motivo}`,
+      removeOnComplete: 50,
+      removeOnFail: 50,
+    }
+  );
 }

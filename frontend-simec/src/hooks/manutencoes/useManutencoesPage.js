@@ -10,23 +10,10 @@ function formatarLabel(valor) {
   return String(valor).replace(/([A-Z])/g, ' $1').trim();
 }
 
-function buildUniqueOptions(list, accessor) {
-  return [...new Set(list.map(accessor).filter(Boolean))].map((item) => ({
-    value: item,
-    label: formatarLabel(item),
-  }));
-}
-
 export function useManutencoesPage() {
   const navigate = useNavigate();
   const dataHook = useManutencoes();
   const deleteModal = useModal();
-
-  const baseList = useMemo(() => {
-    return Array.isArray(dataHook.manutencoesOriginais)
-      ? dataHook.manutencoesOriginais
-      : [];
-  }, [dataHook.manutencoesOriginais]);
 
   /**
    * =========================
@@ -34,12 +21,28 @@ export function useManutencoesPage() {
    * =========================
    */
   const selectFiltersConfig = useMemo(() => {
-    const statusOptions = buildUniqueOptions(baseList, (m) => m.status);
-    const tipoOptions = buildUniqueOptions(baseList, (m) => m.tipo);
-    const unidadeOptions = buildUniqueOptions(
-      baseList,
-      (m) => m.equipamento?.unidade?.nomeSistema
+    const statusOptions = [
+      'Agendada',
+      'EmAndamento',
+      'AguardandoConfirmacao',
+      'Concluida',
+      'Cancelada',
+    ].map((item) => ({
+      value: item,
+      label: formatarLabel(item),
+    }));
+
+    const tipoOptions = ['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'].map(
+      (item) => ({
+        value: item,
+        label: formatarLabel(item),
+      })
     );
+
+    const unidadeOptions = (dataHook.unidadesDisponiveis || []).map((unidade) => ({
+      value: unidade.id,
+      label: unidade.nomeSistema,
+    }));
 
     return [
       {
@@ -63,14 +66,14 @@ export function useManutencoesPage() {
       {
         id: 'unidade',
         label: 'Unidade',
-        value: dataHook.filtros.unidade,
+        value: dataHook.filtros.unidadeId,
         defaultLabel: 'Todas as unidades',
         options: unidadeOptions,
         onChange: (value) =>
-          dataHook.controles.handleFilterChange('unidade', value),
+          dataHook.controles.handleFilterChange('unidadeId', value),
       },
     ];
-  }, [baseList, dataHook.filtros, dataHook.controles]);
+  }, [dataHook.filtros, dataHook.controles, dataHook.unidadesDisponiveis]);
 
   /**
    * =========================
@@ -78,7 +81,10 @@ export function useManutencoesPage() {
    * =========================
    */
   const activeFilters = useMemo(() => {
-    const { status, tipo, unidade } = dataHook.filtros;
+    const { status, tipo, unidadeId } = dataHook.filtros;
+    const unidade = (dataHook.unidadesDisponiveis || []).find(
+      (item) => item.id === unidadeId
+    );
 
     return [
       status && {
@@ -91,10 +97,10 @@ export function useManutencoesPage() {
         label: `Tipo: ${formatarLabel(tipo)}`,
         value: tipo,
       },
-      unidade && {
+      unidadeId && {
         key: 'unidade',
-        label: `Unidade: ${unidade}`,
-        value: unidade,
+        label: `Unidade: ${unidade?.nomeSistema || unidadeId}`,
+        value: unidadeId,
       },
       dataHook.searchTerm && {
         key: 'searchTerm',
@@ -102,7 +108,7 @@ export function useManutencoesPage() {
         value: dataHook.searchTerm,
       },
     ].filter(Boolean);
-  }, [dataHook.filtros, dataHook.searchTerm]);
+  }, [dataHook.filtros, dataHook.searchTerm, dataHook.unidadesDisponiveis]);
 
   /**
    * =========================
@@ -116,7 +122,10 @@ export function useManutencoesPage() {
         return;
       }
 
-      dataHook.controles.handleFilterChange(key, '');
+      dataHook.controles.handleFilterChange(
+        key === 'unidade' ? 'unidadeId' : key,
+        ''
+      );
     },
     [dataHook.controles]
   );
@@ -124,7 +133,7 @@ export function useManutencoesPage() {
   const clearAllFilters = useCallback(() => {
     dataHook.controles.handleSearchChange({ target: { value: '' } });
 
-    ['status', 'tipo', 'unidade'].forEach((filtro) =>
+    ['status', 'tipo', 'unidadeId'].forEach((filtro) =>
       dataHook.controles.handleFilterChange(filtro, '')
     );
   }, [dataHook.controles]);

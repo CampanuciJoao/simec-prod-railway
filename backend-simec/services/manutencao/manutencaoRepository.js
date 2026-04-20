@@ -126,10 +126,6 @@ export async function buscarEquipamentoDoTenant({
   });
 }
 
-/**
- * Mantido para compatibilidade com services/manutencao/index.js
- * Essa função compõe tenant + equipamento + timezone operacional.
- */
 export async function buscarContextoOperacional({
   tenantId,
   equipamentoId,
@@ -200,6 +196,11 @@ export async function listarManutencoes({
   unidadeId,
   tipo,
   status,
+  search,
+  page = 1,
+  pageSize = 20,
+  sortBy = 'dataHoraAgendamentoInicio',
+  sortDirection = 'desc',
 }) {
   const whereClause = { tenantId };
 
@@ -215,6 +216,61 @@ export async function listarManutencoes({
     whereClause.status = status;
   }
 
+  if (search) {
+    whereClause.OR = [
+      {
+        numeroOS: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        descricaoProblemaServico: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        numeroChamado: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        tecnicoResponsavel: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        equipamento: {
+          OR: [
+            {
+              modelo: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              tag: {
+                contains: search,
+                mode: 'insensitive',
+              },
+            },
+            {
+              unidade: {
+                nomeSistema: {
+                  contains: search,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          ],
+        },
+      },
+    ];
+  }
+
   if (unidadeId) {
     whereClause.equipamento = {
       tenantId,
@@ -222,13 +278,71 @@ export async function listarManutencoes({
     };
   }
 
-  return prisma.manutencao.findMany({
+  const orderBy =
+    sortBy === 'unidade'
+      ? {
+          equipamento: {
+            unidade: {
+              nomeSistema: sortDirection === 'asc' ? 'asc' : 'desc',
+            },
+          },
+        }
+      : {
+          [sortBy]: sortDirection === 'asc' ? 'asc' : 'desc',
+        };
+
+  const queryBase = {
     where: whereClause,
     include: getManutencaoBaseInclude(),
-    orderBy: {
-      dataHoraAgendamentoInicio: 'desc',
+    orderBy,
+  };
+
+  const skip = (page - 1) * pageSize;
+
+  const [items, total, statusSummary] = await Promise.all([
+    prisma.manutencao.findMany({
+      ...queryBase,
+      take: pageSize,
+      skip,
+    }),
+    prisma.manutencao.count({
+      where: whereClause,
+    }),
+    prisma.manutencao.groupBy({
+      by: ['status'],
+      where: whereClause,
+      _count: {
+        id: true,
+      },
+    }),
+  ]);
+
+  const metricas = statusSummary.reduce(
+    (acc, item) => {
+      acc.total = total;
+      if (item.status === 'EmAndamento') acc.emAndamento = item._count.id;
+      if (item.status === 'AguardandoConfirmacao') acc.aguardando = item._count.id;
+      if (item.status === 'Concluida') acc.concluidas = item._count.id;
+      if (item.status === 'Cancelada') acc.canceladas = item._count.id;
+      return acc;
     },
-  });
+    {
+      total,
+      emAndamento: 0,
+      aguardando: 0,
+      concluidas: 0,
+      canceladas: 0,
+    }
+  );
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    hasNextPage: skip + items.length < total,
+    metricas,
+  };
 }
 
 export async function contarManutencoesDoTenant(tenantId) {

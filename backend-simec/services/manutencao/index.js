@@ -32,17 +32,37 @@ import {
   montarWorkflowPayload,
   validarAcaoWorkflow,
 } from './manutencaoWorkflowRules.js';
-import {
-  processarAlertasManutencaoDoTenant,
-} from '../alertas/manutencao/index.js';
 import { registrarEventoHistoricoAtivo } from '../historicoAtivoService.js';
+import { enfileirarReprocessamentoAlertasDoTenant } from '../queueService.js';
+import { removerAlertasManutencaoDaOS } from '../alertas/manutencao/manutencaoAlertRepository.js';
 
 async function reprocessarAlertasManutencaoSemBloquear(tenantId) {
   try {
-    await processarAlertasManutencaoDoTenant(tenantId);
+    void enfileirarReprocessamentoAlertasDoTenant(tenantId, 'manutencao_atualizada').catch(
+      (error) => {
+        console.error(
+          `[MANUTENCAO_ALERTAS_REPROCESS_ERROR] tenantId=${tenantId}`,
+          error
+        );
+      }
+    );
   } catch (error) {
     console.error(
       `[MANUTENCAO_ALERTAS_REPROCESS_ERROR] tenantId=${tenantId}`,
+      error
+    );
+  }
+}
+
+async function limparAlertasOperacionaisDaOS({
+  tenantId,
+  numeroOS,
+}) {
+  try {
+    await removerAlertasManutencaoDaOS(tenantId, numeroOS);
+  } catch (error) {
+    console.error(
+      `[MANUTENCAO_ALERTAS_CLEANUP_ERROR] tenantId=${tenantId} numeroOS=${numeroOS}`,
       error
     );
   }
@@ -78,19 +98,46 @@ function descricaoHistoricoManutencao({
   return partes.join(' ');
 }
 
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
 export async function listarManutencoesService({
   tenantId,
   filters,
 }) {
+  const page = parsePositiveInt(filters?.page, 1);
+  const pageSize = Math.min(parsePositiveInt(filters?.pageSize, 20), 100);
+
   const manutencoes = await listarManutencoes({
     tenantId,
     equipamentoId: filters?.equipamentoId,
     unidadeId: filters?.unidadeId,
     tipo: filters?.tipo,
     status: filters?.status,
+    search: filters?.search?.trim() || null,
+    page,
+    pageSize,
+    sortBy: filters?.sortBy || 'dataHoraAgendamentoInicio',
+    sortDirection: filters?.sortDirection === 'asc' ? 'asc' : 'desc',
   });
 
-  return adaptarListaManutencoesResponse(manutencoes);
+  return {
+    items: adaptarListaManutencoesResponse(manutencoes.items || []),
+    total: manutencoes.total || 0,
+    page: manutencoes.page || page,
+    pageSize: manutencoes.pageSize || pageSize,
+    hasNextPage: Boolean(manutencoes.hasNextPage),
+    metricas: manutencoes.metricas || {
+      total: 0,
+      emAndamento: 0,
+      aguardando: 0,
+      concluidas: 0,
+      canceladas: 0,
+    },
+  };
 }
 
 export async function obterManutencaoDetalhadaService({
@@ -226,6 +273,10 @@ export async function criarManutencaoService({
     dataEvento: nova.dataHoraAgendamentoInicio || nova.createdAt,
   });
 
+  await limparAlertasOperacionaisDaOS({
+    tenantId,
+    numeroOS: nova.numeroOS,
+  });
   await reprocessarAlertasManutencaoSemBloquear(tenantId);
 
   return {
@@ -557,6 +608,10 @@ export async function concluirManutencaoComAcaoService({
     detalhes: workflow.detalheLog,
   });
 
+  await limparAlertasOperacionaisDaOS({
+    tenantId,
+    numeroOS: manutencaoAtual.numeroOS,
+  });
   const respostaFinal = await buscarManutencaoPorId({
     tenantId,
     manutencaoId,
@@ -587,6 +642,11 @@ export async function excluirManutencaoService({
       message: 'Manutenção não encontrada.',
     };
   }
+
+  await limparAlertasOperacionaisDaOS({
+    tenantId,
+    numeroOS: manut.numeroOS,
+  });
 
   return {
     ok: true,

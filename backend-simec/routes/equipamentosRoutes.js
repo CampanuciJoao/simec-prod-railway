@@ -17,6 +17,7 @@ import {
 } from '../services/uploads/anexoService.js';
 import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
 import {
+  exportarHistoricoAtivoPorEquipamento,
   listarHistoricoAtivoPorEquipamento,
   registrarEventoHistoricoAtivo,
 } from '../services/historicoAtivoService.js';
@@ -27,6 +28,89 @@ router.use(proteger);
 
 function parseDate(date) {
   return date ? new Date(date) : null;
+}
+
+function normalizarTextoOpcional(value) {
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
+function parsePositiveInt(value, fallback) {
+  const parsed = Number.parseInt(value, 10);
+  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
+  return parsed;
+}
+
+function buildEquipamentosWhereClause(tenantId, query = {}) {
+  const where = {
+    tenantId,
+  };
+
+  const status = normalizarTextoOpcional(query?.status);
+  const tipo = normalizarTextoOpcional(query?.tipo);
+  const fabricante = normalizarTextoOpcional(query?.fabricante);
+  const unidadeId = normalizarTextoOpcional(query?.unidadeId);
+  const search = normalizarTextoOpcional(query?.search);
+
+  if (status) where.status = status;
+  if (tipo) where.tipo = tipo;
+  if (fabricante) where.fabricante = fabricante;
+  if (unidadeId) where.unidadeId = unidadeId;
+
+  if (search) {
+    where.OR = [
+      {
+        modelo: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        tag: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
+        unidade: {
+          nomeSistema: {
+            contains: search,
+            mode: 'insensitive',
+          },
+        },
+      },
+    ];
+  }
+
+  return where;
+}
+
+function buildEquipamentosOrderBy(sortBy, sortDirection) {
+  const direction = sortDirection === 'desc' ? 'desc' : 'asc';
+
+  if (sortBy === 'unidade') {
+    return {
+      unidade: {
+        nomeSistema: direction,
+      },
+    };
+  }
+
+  const sortableFields = new Set([
+    'modelo',
+    'tag',
+    'tipo',
+    'fabricante',
+    'status',
+    'dataInstalacao',
+    'createdAt',
+    'anoFabricacao',
+  ]);
+
+  return sortableFields.has(sortBy)
+    ? { [sortBy]: direction }
+    : { modelo: 'asc' };
 }
 
 function isSameDateValue(a, b) {
@@ -179,34 +263,117 @@ async function validarPatrimonioUnico({
 // ==============================
 router.get('/', async (req, res) => {
   try {
-    const equipamentos = await prisma.equipamento.findMany({
-      where: {
-        tenantId: req.usuario.tenantId,
-      },
-      include: {
-        unidade: {
-          select: {
-            id: true,
-            nomeSistema: true,
-          },
-        },
-        anexos: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-        acessorios: {
-          orderBy: {
-            nome: 'asc',
-          },
-        },
-      },
-      orderBy: {
-        modelo: 'asc',
-      },
-    });
+    const tenantId = req.usuario.tenantId;
+    const page = parsePositiveInt(req.query?.page, 1);
+    const pageSize = Math.min(parsePositiveInt(req.query?.pageSize, 20), 500);
+    const skip = (page - 1) * pageSize;
+    const where = buildEquipamentosWhereClause(tenantId, req.query);
+    const sortBy = normalizarTextoOpcional(req.query?.sortBy) || 'modelo';
+    const sortDirection =
+      normalizarTextoOpcional(req.query?.sortDirection) || 'asc';
 
-    return res.json(equipamentos);
+    const [items, total, statusSummary, tipos, fabricantes] =
+      await Promise.all([
+        prisma.equipamento.findMany({
+          where,
+          include: {
+            unidade: {
+              select: {
+                id: true,
+                nomeSistema: true,
+              },
+            },
+            anexos: {
+              select: {
+                id: true,
+                nomeOriginal: true,
+                path: true,
+                tipoMime: true,
+                createdAt: true,
+              },
+              orderBy: {
+                createdAt: 'desc',
+              },
+            },
+          },
+          orderBy: buildEquipamentosOrderBy(sortBy, sortDirection),
+          take: pageSize,
+          skip,
+        }),
+        prisma.equipamento.count({ where }),
+        prisma.equipamento.groupBy({
+          by: ['status'],
+          where,
+          _count: {
+            id: true,
+          },
+        }),
+        prisma.equipamento.findMany({
+          where: {
+            tenantId,
+            tipo: {
+              not: null,
+            },
+          },
+          distinct: ['tipo'],
+          select: {
+            tipo: true,
+          },
+          orderBy: {
+            tipo: 'asc',
+          },
+        }),
+        prisma.equipamento.findMany({
+          where: {
+            tenantId,
+            fabricante: {
+              not: null,
+            },
+          },
+          distinct: ['fabricante'],
+          select: {
+            fabricante: true,
+          },
+          orderBy: {
+            fabricante: 'asc',
+          },
+        }),
+      ]);
+
+    const metricas = statusSummary.reduce(
+      (acc, item) => {
+        acc.total = total;
+        if (item.status === 'Operante') acc.operantes = item._count.id;
+        if (item.status === 'EmManutencao') acc.emManutencao = item._count.id;
+        if (item.status === 'Inoperante') acc.inoperantes = item._count.id;
+        if (item.status === 'UsoLimitado') acc.usoLimitado = item._count.id;
+        return acc;
+      },
+      {
+        total,
+        operantes: 0,
+        emManutencao: 0,
+        inoperantes: 0,
+        usoLimitado: 0,
+      }
+    );
+
+    return res.json({
+      items,
+      total,
+      page,
+      pageSize,
+      hasNextPage: skip + items.length < total,
+      filters: {
+        tipos: tipos
+          .map((item) => item.tipo)
+          .filter(Boolean),
+        fabricantes: fabricantes
+          .map((item) => item.fabricante)
+          .filter(Boolean),
+      },
+      metricas,
+    });
   } catch (error) {
     console.error('[EQUIP_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar equipamentos.' });
@@ -238,6 +405,12 @@ router.get('/:id/historico', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
     const equipamentoId = req.params.id;
+    const categoria = normalizarTextoOpcional(req.query?.categoria);
+    const subcategoria = normalizarTextoOpcional(req.query?.subcategoria);
+    const dataInicio = normalizarTextoOpcional(req.query?.dataInicio);
+    const dataFim = normalizarTextoOpcional(req.query?.dataFim);
+    const limit = req.query?.limit;
+    const offset = req.query?.offset;
 
     const equipamento = await prisma.equipamento.findFirst({
       where: {
@@ -256,6 +429,12 @@ router.get('/:id/historico', async (req, res) => {
     const historico = await listarHistoricoAtivoPorEquipamento({
       tenantId,
       equipamentoId,
+      categoria,
+      subcategoria,
+      dataInicio,
+      dataFim,
+      limit,
+      offset,
     });
 
     return res.json(historico);
@@ -263,6 +442,47 @@ router.get('/:id/historico', async (req, res) => {
     console.error('[EQUIP_HISTORICO_GET_ERROR]', error);
     return res.status(500).json({
       message: 'Erro ao buscar historico do equipamento.',
+    });
+  }
+});
+
+router.get('/:id/historico/exportar', async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const equipamentoId = req.params.id;
+    const categoria = normalizarTextoOpcional(req.query?.categoria);
+    const subcategoria = normalizarTextoOpcional(req.query?.subcategoria);
+    const dataInicio = normalizarTextoOpcional(req.query?.dataInicio);
+    const dataFim = normalizarTextoOpcional(req.query?.dataFim);
+
+    const equipamento = await prisma.equipamento.findFirst({
+      where: {
+        id: equipamentoId,
+        tenantId,
+      },
+      select: {
+        id: true,
+      },
+    });
+
+    if (!equipamento) {
+      return res.status(404).json({ message: 'Equipamento nao encontrado.' });
+    }
+
+    const historico = await exportarHistoricoAtivoPorEquipamento({
+      tenantId,
+      equipamentoId,
+      categoria,
+      subcategoria,
+      dataInicio,
+      dataFim,
+    });
+
+    return res.json(historico);
+  } catch (error) {
+    console.error('[EQUIP_HISTORICO_EXPORT_ERROR]', error);
+    return res.status(500).json({
+      message: 'Erro ao exportar historico do equipamento.',
     });
   }
 });

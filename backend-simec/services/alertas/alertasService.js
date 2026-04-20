@@ -1,5 +1,6 @@
 import {
   listarAlertasDoUsuario,
+  contarAlertasNaoVistosDoUsuario,
   buscarAlertaPorId,
   buscarUsuarioDoTenant,
   buscarLeituraAlerta,
@@ -11,12 +12,26 @@ import { adaptarAlertaStatus, adaptarListaAlertas } from './alertasAdapter.js';
 
 const STATUS_VALIDOS = new Set(['Visto', 'NaoVisto']);
 
-export async function listarAlertasService({ tenantId, userId }) {
-  const alertas = await listarAlertasDoUsuario({ tenantId, userId });
+export async function listarAlertasService({ tenantId, userId, limit = null }) {
+  const alertas = await listarAlertasDoUsuario({ tenantId, userId, limit });
 
   return {
     ok: true,
     data: adaptarListaAlertas(alertas),
+  };
+}
+
+export async function resumirAlertasService({ tenantId, userId }) {
+  const naoVistos = await contarAlertasNaoVistosDoUsuario({
+    tenantId,
+    userId,
+  });
+
+  return {
+    ok: true,
+    data: {
+      naoVistos,
+    },
   };
 }
 

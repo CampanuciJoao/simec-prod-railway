@@ -1,16 +1,60 @@
-// Ficheiro: src/hooks/equipamentos/useEquipamentos.js
-// VERSÃO 6.1 - ADICIONADO EXPORTAÇÃO DE REFETCH PARA ATUALIZAÇÃO DE ANEXOS
-
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { getEquipamentos, getUnidades, deleteEquipamento } from '../../services/api';
+import debounce from 'lodash/debounce';
+
+import {
+  deleteEquipamento,
+  getEquipamentos,
+  getUnidades,
+} from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 
+const PAGE_SIZE = 12;
+
+function buildQueryParams({
+  searchTerm,
+  filtros,
+  sortConfig,
+  page,
+}) {
+  return {
+    page,
+    pageSize: PAGE_SIZE,
+    search: searchTerm || undefined,
+    unidadeId: filtros.unidadeId || undefined,
+    tipo: filtros.tipo || undefined,
+    fabricante: filtros.fabricante || undefined,
+    status: filtros.status || undefined,
+    sortBy: sortConfig.key || 'modelo',
+    sortDirection:
+      sortConfig.direction === 'descending' ? 'desc' : 'asc',
+  };
+}
+
 export const useEquipamentos = () => {
-  const [equipamentosOriginais, setEquipamentosOriginais] = useState([]);
-  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const { addToast } = useToast();
+
+  const [equipamentos, setEquipamentos] = useState([]);
+  const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
+  const [filterOptions, setFilterOptions] = useState({
+    tipos: [],
+    fabricantes: [],
+  });
+  const [metricas, setMetricas] = useState({
+    total: 0,
+    operantes: 0,
+    emManutencao: 0,
+    inoperantes: 0,
+    usoLimitado: 0,
+  });
+  const [pagination, setPagination] = useState({
+    page: 1,
+    pageSize: PAGE_SIZE,
+    total: 0,
+    hasNextPage: false,
+  });
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [error, setError] = useState(null);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filtros, setFiltros] = useState({
@@ -24,101 +68,101 @@ export const useEquipamentos = () => {
     direction: 'ascending',
   });
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-
+  const fetchUnidades = useCallback(async () => {
     try {
-      const [equipData, unidadesData] = await Promise.all([
-        getEquipamentos(),
-        getUnidades(),
-      ]);
-
-      setEquipamentosOriginais(equipData || []);
+      const unidadesData = await getUnidades();
       setUnidadesDisponiveis(unidadesData || []);
     } catch (err) {
-      setError(err);
-      addToast('Erro ao carregar dados dos equipamentos.', 'error');
-    } finally {
-      setLoading(false);
+      console.error('[EQUIPAMENTOS_UNIDADES_FETCH_ERROR]', err);
     }
-  }, [addToast]);
+  }, []);
+
+  const fetchData = useCallback(
+    async ({ page = 1, append = false } = {}) => {
+      if (append) {
+        setLoadingMore(true);
+      } else {
+        setLoading(true);
+      }
+
+      setError(null);
+
+      try {
+        const response = await getEquipamentos(
+          buildQueryParams({
+            searchTerm,
+            filtros,
+            sortConfig,
+            page,
+          })
+        );
+
+        const items = Array.isArray(response?.items) ? response.items : [];
+
+        setEquipamentos((prev) => (append ? [...prev, ...items] : items));
+        setMetricas(
+          response?.metricas || {
+            total: response?.total || items.length,
+            operantes: 0,
+            emManutencao: 0,
+            inoperantes: 0,
+            usoLimitado: 0,
+          }
+        );
+        setFilterOptions({
+          tipos: Array.isArray(response?.filters?.tipos)
+            ? response.filters.tipos
+            : [],
+          fabricantes: Array.isArray(response?.filters?.fabricantes)
+            ? response.filters.fabricantes
+            : [],
+        });
+        setPagination({
+          page: response?.page || page,
+          pageSize: response?.pageSize || PAGE_SIZE,
+          total: response?.total || items.length,
+          hasNextPage: Boolean(response?.hasNextPage),
+        });
+      } catch (err) {
+        setError(err);
+        if (!append) {
+          setEquipamentos([]);
+          setMetricas({
+            total: 0,
+            operantes: 0,
+            emManutencao: 0,
+            inoperantes: 0,
+            usoLimitado: 0,
+          });
+        }
+        addToast('Erro ao carregar dados dos equipamentos.', 'error');
+      } finally {
+        setLoading(false);
+        setLoadingMore(false);
+      }
+    },
+    [addToast, filtros, searchTerm, sortConfig]
+  );
+
+  const debouncedFetch = useMemo(
+    () =>
+      debounce((page = 1) => {
+        fetchData({ page, append: false });
+      }, 250),
+    [fetchData]
+  );
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchUnidades();
+  }, [fetchUnidades]);
 
-  const equipamentosFiltrados = useMemo(() => {
-    let filtrados = [...equipamentosOriginais];
+  useEffect(() => {
+    debouncedFetch(1);
 
-    if (searchTerm) {
-      const termo = searchTerm.toLowerCase();
-      filtrados = filtrados.filter(
-        (e) =>
-          e.modelo?.toLowerCase().includes(termo) ||
-          e.tag?.toLowerCase().includes(termo) ||
-          e.unidade?.nomeSistema?.toLowerCase().includes(termo)
-      );
-    }
-
-    if (filtros.unidadeId) {
-      filtrados = filtrados.filter((e) => e.unidadeId === filtros.unidadeId);
-    }
-
-    if (filtros.tipo) {
-      filtrados = filtrados.filter((e) => e.tipo === filtros.tipo);
-    }
-
-    if (filtros.fabricante) {
-      filtrados = filtrados.filter((e) => e.fabricante === filtros.fabricante);
-    }
-
-    if (filtros.status) {
-      filtrados = filtrados.filter((e) => e.status === filtros.status);
-    }
-
-    return filtrados;
-  }, [equipamentosOriginais, searchTerm, filtros]);
-
-  const equipamentosOrdenados = useMemo(() => {
-    const ordenados = [...equipamentosFiltrados];
-
-    if (sortConfig.key) {
-      ordenados.sort((a, b) => {
-        let valA;
-        let valB;
-
-        if (sortConfig.key === 'unidade') {
-          valA = a.unidade?.nomeSistema || '';
-          valB = b.unidade?.nomeSistema || '';
-        } else {
-          valA = a[sortConfig.key];
-          valB = b[sortConfig.key];
-        }
-
-        if (sortConfig.key === 'dataInstalacao' || sortConfig.key === 'createdAt') {
-          const dataA = valA ? new Date(valA).getTime() : 0;
-          const dataB = valB ? new Date(valB).getTime() : 0;
-          return sortConfig.direction === 'ascending' ? dataA - dataB : dataB - dataA;
-        }
-
-        if (sortConfig.key === 'anoFabricacao') {
-          const numA = Number(valA) || 0;
-          const numB = Number(valB) || 0;
-          return sortConfig.direction === 'ascending' ? numA - numB : numB - numA;
-        }
-
-        const strA = String(valA || '').toLowerCase();
-        const strB = String(valB || '').toLowerCase();
-
-        if (strA < strB) return sortConfig.direction === 'ascending' ? -1 : 1;
-        if (strA > strB) return sortConfig.direction === 'ascending' ? 1 : -1;
-        return 0;
-      });
-    }
-
-    return ordenados;
-  }, [equipamentosFiltrados, sortConfig]);
+    return () => {
+      debouncedFetch.cancel?.();
+    };
+  }, [debouncedFetch]);
 
   const requestSort = useCallback((key) => {
     setSortConfig((current) => ({
@@ -136,13 +180,27 @@ export const useEquipamentos = () => {
 
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
 
+  const carregarMais = useCallback(async () => {
+    if (loadingMore || !pagination.hasNextPage) return;
+
+    await fetchData({
+      page: pagination.page + 1,
+      append: true,
+    });
+  }, [fetchData, loadingMore, pagination]);
+
   return {
-    equipamentos: equipamentosOrdenados,
+    equipamentos,
     unidadesDisponiveis,
+    filterOptions,
+    metricas,
+    pagination,
     loading,
+    loadingMore,
     error,
     setFiltros,
-    refetch: fetchData,
+    refetch: () => fetchData({ page: 1, append: false }),
+    carregarMais,
     controles: {
       searchTerm,
       filtros,
@@ -154,14 +212,14 @@ export const useEquipamentos = () => {
     removerEquipamento: async (id) => {
       try {
         await deleteEquipamento(id);
-        addToast('Equipamento excluído!', 'success');
-        fetchData();
+        addToast('Equipamento excluido!', 'success');
+        fetchData({ page: 1, append: false });
       } catch {
         addToast('Erro ao excluir.', 'error');
       }
     },
     atualizarStatusLocalmente: (id, status) => {
-      setEquipamentosOriginais((prev) =>
+      setEquipamentos((prev) =>
         prev.map((e) => (e.id === id ? { ...e, status } : e))
       );
     },

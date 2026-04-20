@@ -5,6 +5,7 @@ import { useAlertas } from '@/contexts/AlertasContext';
 export function useAppLayoutAlerts({ navigate }) {
   const {
     alertas = [],
+    naoVistos = 0,
     loading: alertasLoading,
     updateStatus,
     dismissAlerta,
@@ -13,8 +14,8 @@ export function useAppLayoutAlerts({ navigate }) {
   const [alertsOpen, setAlertsOpen] = useState(false);
 
   const contadorNaoVistos = useMemo(() => {
-    return alertas.filter((alerta) => alerta.status === 'NaoVisto').length;
-  }, [alertas]);
+    return Number(naoVistos || 0);
+  }, [naoVistos]);
 
   const handleToggleAlerts = useCallback(() => {
     setAlertsOpen((prev) => !prev);

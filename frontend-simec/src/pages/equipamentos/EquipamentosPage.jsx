@@ -14,6 +14,7 @@ import {
   ModalConfirmacao,
   PageHeader,
   PageLayout,
+  PageSection,
   PageState,
 } from '@/components/ui';
 
@@ -98,13 +99,35 @@ function EquipamentosPage() {
             emptyMessage="Nenhum equipamento encontrado."
           />
         ) : (
-          <EquipamentosList
-            equipamentos={page.equipamentos}
-            expansion={expansion}
-            onGoToFichaTecnica={page.goToFichaTecnica}
-            onStatusUpdated={page.atualizarStatusLocalmente}
-            onRefresh={page.refetch}
-          />
+          <div className="space-y-4">
+            <EquipamentosList
+              equipamentos={page.equipamentos}
+              expansion={expansion}
+              onGoToFichaTecnica={page.goToFichaTecnica}
+              onStatusUpdated={page.atualizarStatusLocalmente}
+              onRefresh={page.refetch}
+            />
+
+            <PageSection>
+              <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
+                <span>
+                  Exibindo <strong>{page.equipamentos.length}</strong> de{' '}
+                  <strong>{page.pagination.total}</strong> equipamento(s).
+                </span>
+
+                {page.pagination.hasNextPage ? (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={page.carregarMais}
+                    disabled={page.loadingMore}
+                  >
+                    {page.loadingMore ? 'Carregando...' : 'Carregar mais'}
+                  </Button>
+                ) : null}
+              </div>
+            </PageSection>
+          </div>
         )}
       </div>
     </PageLayout>

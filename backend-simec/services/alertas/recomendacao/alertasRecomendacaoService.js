@@ -155,6 +155,25 @@ async function processarTenant(tenant, agoraUtc) {
   };
 }
 
+export async function gerarAlertasRecomendacaoDoTenant(
+  tenantId,
+  timezone = 'America/Campo_Grande',
+  agoraUtc = getAgora()
+) {
+  const resultado = await processarTenant(
+    {
+      id: tenantId,
+      timezone,
+    },
+    agoraUtc
+  );
+
+  return {
+    total: resultado.total,
+    tenantsAfetados: resultado.afetou ? [tenantId] : [],
+  };
+}
+
 /**
  * 🌍 Orquestrador global
  */

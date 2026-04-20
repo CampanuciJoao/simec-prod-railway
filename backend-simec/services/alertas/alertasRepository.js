@@ -1,6 +1,6 @@
 import prisma from '../prismaService.js';
 
-export function listarAlertasDoUsuario({ tenantId, userId }) {
+export function listarAlertasDoUsuario({ tenantId, userId, limit = null }) {
   return prisma.alerta.findMany({
     where: { tenantId },
     include: {
@@ -18,7 +18,24 @@ export function listarAlertasDoUsuario({ tenantId, userId }) {
     orderBy: {
       data: 'desc',
     },
+    ...(limit ? { take: limit } : {}),
   });
+}
+
+export async function contarAlertasNaoVistosDoUsuario({ tenantId, userId }) {
+  const totalAlertas = await prisma.alerta.count({
+    where: { tenantId },
+  });
+
+  const totalVistos = await prisma.alertaLidoPorUsuario.count({
+    where: {
+      tenantId,
+      usuarioId: userId,
+      visto: true,
+    },
+  });
+
+  return Math.max(0, totalAlertas - totalVistos);
 }
 
 export function buscarAlertaPorId({ tenantId, alertaId }) {

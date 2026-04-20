@@ -8,11 +8,17 @@ import {
   faRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { getHistoricoAtivoByEquipamento } from '@/services/api';
+import {
+  exportHistoricoAtivoByEquipamento,
+  getHistoricoAtivoByEquipamento,
+} from '@/services/api';
 
 import { useToast } from '@/contexts/ToastContext';
 import { exportarHistoricoEquipamentoPDF } from '@/utils/pdfUtils';
-import { buildHistoricoTimeline } from '@/utils/equipamentos/historicoTimelineUtils';
+import {
+  buildHistoricoTimeline,
+  mapFiltroHistoricoParaQuery,
+} from '@/utils/equipamentos/historicoTimelineUtils';
 
 import HistoricoTimelineList from '@/components/equipamentos/HistoricoTimelineList';
 
@@ -32,10 +38,25 @@ function TabHistorico({ equipamento }) {
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
+  const [totalRegistros, setTotalRegistros] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [offsetAtual, setOffsetAtual] = useState(0);
+  const [carregandoMais, setCarregandoMais] = useState(false);
 
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
   const [filtroTipo, setFiltroTipo] = useState('Todos');
+
+  const buildQueryParams = useCallback(
+    ({ offset = 0, limit = 20 } = {}) => ({
+      limit,
+      offset,
+      dataInicio: dataInicio || undefined,
+      dataFim: dataFim || undefined,
+      ...mapFiltroHistoricoParaQuery(filtroTipo),
+    }),
+    [dataInicio, dataFim, filtroTipo]
+  );
 
   const carregarDados = useCallback(async () => {
     if (!equipamento?.id) {
@@ -46,15 +67,25 @@ function TabHistorico({ equipamento }) {
     setLoading(true);
 
     try {
-      const resposta = await getHistoricoAtivoByEquipamento(equipamento.id);
-      setEventos(Array.isArray(resposta) ? resposta : []);
+      const resposta = await getHistoricoAtivoByEquipamento(
+        equipamento.id,
+        buildQueryParams({ offset: 0, limit: 20 })
+      );
+
+      setEventos(Array.isArray(resposta?.items) ? resposta.items : []);
+      setTotalRegistros(Number(resposta?.total || 0));
+      setHasMore(Boolean(resposta?.hasMore));
+      setOffsetAtual(Number(resposta?.nextOffset || 0));
     } catch {
       addToast('Erro ao carregar historico.', 'error');
       setEventos([]);
+      setTotalRegistros(0);
+      setHasMore(false);
+      setOffsetAtual(0);
     } finally {
       setLoading(false);
     }
-  }, [equipamento?.id, addToast]);
+  }, [equipamento?.id, addToast, buildQueryParams]);
 
   useEffect(() => {
     carregarDados();
@@ -69,17 +100,18 @@ function TabHistorico({ equipamento }) {
     });
   };
 
-  const { linhaDoTempo, totalFiltrado, totalSemFiltro, temFiltroAtivo } =
+  const { linhaDoTempo, totalFiltrado } =
     useMemo(
       () =>
         buildHistoricoTimeline({
           eventos,
-          dataInicio,
-          dataFim,
-          filtroTipo,
         }),
-      [eventos, dataInicio, dataFim, filtroTipo]
+      [eventos]
     );
+
+  const temFiltroAtivo = Boolean(
+    dataInicio || dataFim || filtroTipo !== 'Todos'
+  );
 
   const handleSetHoje = (campo) => {
     const hoje = new Date().toISOString().split('T')[0];
@@ -94,14 +126,49 @@ function TabHistorico({ equipamento }) {
   };
 
   const handleExportarPDF = () => {
-    exportarHistoricoEquipamentoPDF(linhaDoTempo, {
-      modelo: equipamento?.modelo,
-      tag: equipamento?.tag,
-      unidade: equipamento?.unidade?.nomeSistema,
-      inicio: dataInicio,
-      fim: dataFim,
-      tipoFiltro: filtroTipo,
-    });
+    exportHistoricoAtivoByEquipamento(equipamento.id, buildQueryParams({}))
+      .then((lista) => {
+        const timelineCompleta = buildHistoricoTimeline({
+          eventos: Array.isArray(lista) ? lista : [],
+        });
+
+        exportarHistoricoEquipamentoPDF(timelineCompleta.linhaDoTempo, {
+          modelo: equipamento?.modelo,
+          tag: equipamento?.tag,
+          unidade: equipamento?.unidade?.nomeSistema,
+          inicio: dataInicio,
+          fim: dataFim,
+          tipoFiltro: filtroTipo,
+        });
+      })
+      .catch(() => {
+        addToast('Erro ao exportar historico completo.', 'error');
+      });
+  };
+
+  const handleCarregarMais = async () => {
+    if (!hasMore || carregandoMais) return;
+
+    setCarregandoMais(true);
+
+    try {
+      const resposta = await getHistoricoAtivoByEquipamento(
+        equipamento.id,
+        buildQueryParams({ offset: offsetAtual, limit: 20 })
+      );
+
+      setEventos((prev) => [
+        ...prev,
+        ...(Array.isArray(resposta?.items) ? resposta.items : []),
+      ]);
+      setHasMore(Boolean(resposta?.hasMore));
+      setOffsetAtual(Number(resposta?.nextOffset || offsetAtual));
+      setTotalRegistros(Number(resposta?.total || totalRegistros));
+    } catch {
+      addToast('Erro ao carregar mais registros do historico.', 'error');
+    } finally {
+      setCarregandoMais(false);
+    }
   };
 
   return (
@@ -223,7 +290,7 @@ function TabHistorico({ equipamento }) {
             </div>
           </div>
 
-          {!temFiltroAtivo && totalSemFiltro > 20 ? (
+          {!temFiltroAtivo && totalRegistros > 20 ? (
             <div
               className="mt-4 flex items-start gap-3 rounded-xl border px-4 py-3 text-sm"
               style={{
@@ -240,7 +307,7 @@ function TabHistorico({ equipamento }) {
 
               <div>
                 Exibindo os <strong>20 registros mais recentes</strong> de um
-                total de <strong>{` ${totalSemFiltro}`}</strong>. Use os filtros
+                total de <strong>{` ${totalRegistros}`}</strong>. Use os filtros
                 para visualizar todo o historico.
               </div>
             </div>
@@ -260,12 +327,27 @@ function TabHistorico({ equipamento }) {
         )}
 
         {!loading && linhaDoTempo.length > 0 ? (
-          <div
-            className="text-right text-xs"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            Exibindo <strong>{linhaDoTempo.length}</strong> de{' '}
-            <strong>{totalFiltrado}</strong> registro(s) filtrado(s).
+          <div className="space-y-3">
+            <div
+              className="text-right text-xs"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Exibindo <strong>{linhaDoTempo.length}</strong> de{' '}
+              <strong>{totalRegistros || totalFiltrado}</strong> registro(s) filtrado(s).
+            </div>
+
+            {hasMore ? (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleCarregarMais}
+                  disabled={carregandoMais}
+                >
+                  {carregandoMais ? 'Carregando...' : 'Carregar mais'}
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

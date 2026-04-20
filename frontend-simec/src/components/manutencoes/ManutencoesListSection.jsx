@@ -9,6 +9,7 @@ import {
 
 import {
   ActiveFiltersBar,
+  Button,
   GlobalFilterBar,
   KpiCard,
   KpiGrid,
@@ -28,6 +29,10 @@ function ManutencoesListSection({
   onDelete,
   isAdmin,
   metricas,
+  total,
+  hasNextPage,
+  loadingMore,
+  onLoadMore,
 }) {
   return (
     <PageSection>
@@ -90,6 +95,24 @@ function ManutencoesListSection({
             />
           ))}
         </div>
+
+        <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
+          <span>
+            Exibindo <strong>{manutencoes.length}</strong> de{' '}
+            <strong>{total ?? manutencoes.length}</strong> manutenção(ões).
+          </span>
+
+          {hasNextPage ? (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onLoadMore}
+              disabled={loadingMore}
+            >
+              {loadingMore ? 'Carregando...' : 'Carregar mais'}
+            </Button>
+          ) : null}
+        </div>
       </div>
     </PageSection>
   );
@@ -106,6 +129,10 @@ ManutencoesListSection.propTypes = {
   onDelete: PropTypes.func.isRequired,
   isAdmin: PropTypes.bool,
   metricas: PropTypes.object,
+  total: PropTypes.number,
+  hasNextPage: PropTypes.bool,
+  loadingMore: PropTypes.bool,
+  onLoadMore: PropTypes.func,
 };
 
 export default ManutencoesListSection;

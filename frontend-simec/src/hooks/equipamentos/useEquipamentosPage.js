@@ -10,9 +10,13 @@ export function useEquipamentosPage() {
   const {
     equipamentos,
     unidadesDisponiveis,
+    filterOptions,
     loading,
+    loadingMore,
     error,
+    pagination,
     refetch,
+    carregarMais,
     controles,
     removerEquipamento,
     atualizarStatusLocalmente,
@@ -43,39 +47,23 @@ export function useEquipamentosPage() {
     }
   }, [equipamentoParaExcluir, removerEquipamento, addToast]);
 
-  const fabricantesDisponiveis = useMemo(() => {
-    const valores = new Set();
-
-    for (const equipamento of equipamentos) {
-      if (equipamento?.fabricante) {
-        valores.add(String(equipamento.fabricante));
-      }
-    }
-
-    return Array.from(valores)
-      .sort((a, b) => a.localeCompare(b))
-      .map((fabricante) => ({
+  const fabricantesDisponiveis = useMemo(
+    () =>
+      (filterOptions?.fabricantes || []).map((fabricante) => ({
         label: fabricante,
         value: fabricante,
-      }));
-  }, [equipamentos]);
+      })),
+    [filterOptions]
+  );
 
-  const tiposDisponiveis = useMemo(() => {
-    const valores = new Set();
-
-    for (const equipamento of equipamentos) {
-      if (equipamento?.tipo) {
-        valores.add(String(equipamento.tipo));
-      }
-    }
-
-    return Array.from(valores)
-      .sort((a, b) => a.localeCompare(b))
-      .map((tipo) => ({
+  const tiposDisponiveis = useMemo(
+    () =>
+      (filterOptions?.tipos || []).map((tipo) => ({
         label: tipo,
         value: tipo,
-      }));
-  }, [equipamentos]);
+      })),
+    [filterOptions]
+  );
 
   const selectFiltersConfig = useMemo(
     () => [
@@ -228,8 +216,11 @@ export function useEquipamentosPage() {
   return {
     equipamentos,
     loading,
+    loadingMore,
     error,
     refetch,
+    pagination,
+    carregarMais,
     metricas,
     searchTerm: controles.searchTerm,
     onSearchChange,

@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { getAlertas } from '@/services/api';
-
-function normalizarArray(data) {
-  return Array.isArray(data) ? data : [];
-}
-
-function contarNaoVistos(alertas = []) {
-  return alertas.filter((alerta) => alerta.status === 'NaoVisto').length;
-}
+import { getResumoAlertas } from '@/services/api';
 
 export function useAlertasRealtime({
   enabled = true,
@@ -22,9 +14,8 @@ export function useAlertasRealtime({
   const fetchRealtimeAlertas = useCallback(async () => {
     try {
       setError('');
-      const data = await getAlertas();
-      const lista = normalizarArray(data);
-      setNaoVistos(contarNaoVistos(lista));
+      const data = await getResumoAlertas();
+      setNaoVistos(Number(data?.naoVistos || 0));
     } catch (err) {
       setError(
         err?.response?.data?.message ||

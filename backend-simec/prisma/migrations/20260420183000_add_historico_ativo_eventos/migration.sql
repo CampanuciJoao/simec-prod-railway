@@ -53,7 +53,7 @@ INSERT INTO "historico_ativo_eventos" (
   "data_evento"
 )
 SELECT
-  gen_random_uuid()::text,
+  CONCAT('hist-equipamento-', e."id"),
   e."tenantId",
   e."id",
   'equipamento_criado',
@@ -114,7 +114,7 @@ INSERT INTO "historico_ativo_eventos" (
   "data_evento"
 )
 SELECT
-  gen_random_uuid()::text,
+  CONCAT('hist-manutencao-', m."id"),
   m."tenantId",
   m."equipamento_id",
   'manutencao_registrada',
@@ -158,7 +158,7 @@ INSERT INTO "historico_ativo_eventos" (
   "data_evento"
 )
 SELECT
-  gen_random_uuid()::text,
+  CONCAT('hist-ocorrencia-', o."id"),
   o."tenantId",
   o."equipamentoId",
   'ocorrencia_registrada',
@@ -204,7 +204,7 @@ INSERT INTO "historico_ativo_eventos" (
   "data_evento"
 )
 SELECT
-  gen_random_uuid()::text,
+  CONCAT('hist-ocorrencia-resolucao-', o."id"),
   o."tenantId",
   o."equipamentoId",
   'ocorrencia_resolvida',

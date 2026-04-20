@@ -4,7 +4,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faXmark } from '@fortawesome/free-solid-svg-icons';
 
 import { useAuth } from '@/contexts/AuthContext';
-import { useAlertasRealtime } from '@/hooks/alertas/useAlertasRealtime';
 
 import logoSimec from '@/assets/images/logo-simec.png';
 
@@ -17,9 +16,8 @@ function Sidebar({
   onClose = () => {},
 }) {
   const { usuario } = useAuth();
-  const { naoVistos } = useAlertasRealtime({ enabled: true });
 
-  const badgeCountFinal = naoVistos ?? notificacoesCount ?? 0;
+  const badgeCountFinal = notificacoesCount ?? 0;
 
   const { mainItems, adminItems } = useMemo(() => {
     const isAllowed = (item) => {

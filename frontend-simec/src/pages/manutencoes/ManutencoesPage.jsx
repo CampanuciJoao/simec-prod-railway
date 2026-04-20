@@ -55,6 +55,10 @@ function ManutencoesPage() {
               onDelete={(item) => page.deleteModal.openModal(item)}
               isAdmin={usuario?.role === 'admin'}
               metricas={page.metricas}
+              total={page.pagination?.total}
+              hasNextPage={page.pagination?.hasNextPage}
+              loadingMore={page.loadingMore}
+              onLoadMore={page.carregarMais}
             />
           )}
         </div>

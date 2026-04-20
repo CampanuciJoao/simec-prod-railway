@@ -74,41 +74,53 @@ function filtrarPorTipo(item, filtroTipo) {
 
 export function buildHistoricoTimeline({
   eventos = [],
-  dataInicio,
-  dataFim,
-  filtroTipo,
 }) {
   let unificado = (eventos || []).map(mapHistoricoEvento);
   const totalSemFiltro = unificado.length;
 
-  unificado = unificado.filter((item) => filtrarPorTipo(item, filtroTipo));
-
-  if (dataInicio) {
-    unificado = unificado.filter(
-      (item) => new Date(item.data) >= new Date(`${dataInicio}T00:00:00`)
-    );
-  }
-
-  if (dataFim) {
-    unificado = unificado.filter(
-      (item) => new Date(item.data) <= new Date(`${dataFim}T23:59:59`)
-    );
-  }
-
   unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
 
-  const temFiltroAtivo = Boolean(
-    dataInicio || dataFim || filtroTipo !== 'Todos'
-  );
-
-  const linhaDoTempo = !temFiltroAtivo ? unificado.slice(0, 20) : unificado;
-
   return {
-    linhaDoTempo,
+    linhaDoTempo: unificado,
     totalFiltrado: unificado.length,
     totalSemFiltro,
-    temFiltroAtivo,
+    temFiltroAtivo: false,
   };
+}
+
+export function mapFiltroHistoricoParaQuery(filtroTipo) {
+  if (filtroTipo === 'Ocorrencia') {
+    return {
+      categoria: 'ocorrencia',
+    };
+  }
+
+  if (filtroTipo === 'Transferencia') {
+    return {
+      categoria: 'transferencia_unidade',
+    };
+  }
+
+  if (filtroTipo === 'Alteracao') {
+    return {
+      categoria: 'alteracao_cadastral',
+    };
+  }
+
+  if (filtroTipo === 'Instalacao') {
+    return {
+      categoria: 'instalacao',
+    };
+  }
+
+  if (filtroTipo === 'Preventiva' || filtroTipo === 'Corretiva') {
+    return {
+      categoria: 'manutencao',
+      subcategoria: filtroTipo,
+    };
+  }
+
+  return {};
 }
 
 export function getCategoriaBadgeClass(item) {

@@ -35,7 +35,12 @@ export function useRelatoriosPage() {
       try {
         const [unidadesData, equipamentosData] = await Promise.all([
           getUnidades(),
-          getEquipamentos(),
+          getEquipamentos({
+            page: 1,
+            pageSize: 500,
+            sortBy: 'modelo',
+            sortDirection: 'asc',
+          }),
         ]);
 
         setUnidadesDisponiveis(
@@ -46,7 +51,9 @@ export function useRelatoriosPage() {
 
         const fabricantes = [
           ...new Set(
-            (equipamentosData || []).map((eq) => eq.fabricante).filter(Boolean)
+            (equipamentosData?.items || [])
+              .map((eq) => eq.fabricante)
+              .filter(Boolean)
           ),
         ].sort();
 

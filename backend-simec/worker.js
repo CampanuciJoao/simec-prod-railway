@@ -2,6 +2,9 @@ import { Worker, QueueEvents, Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import dotenv from 'dotenv';
 import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasOrchestrator.js';
+import { processarAlertasManutencaoDoTenant } from './services/alertas/manutencao/index.js';
+import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
+import prisma from './services/prismaService.js';
 
 dotenv.config();
 
@@ -54,7 +57,50 @@ const worker = new Worker(
       `[${new Date().toLocaleTimeString('pt-BR')}] ⚙️ Executando ciclo de alertas... jobName=${job?.name || 'N/A'} | jobId=${job?.id || 'N/A'}`
     );
 
-    const resultado = await processarAlertasEEnviarNotificacoes();
+    let resultado;
+
+    if (job?.name === 'reprocessar-alertas-tenant' && job?.data?.tenantId) {
+      const tenant = await prisma.tenant.findFirst({
+        where: {
+          id: job.data.tenantId,
+          ativo: true,
+        },
+        select: {
+          id: true,
+          timezone: true,
+        },
+      });
+
+      if (!tenant) {
+        return {
+          ok: false,
+          skipped: true,
+          reason: 'tenant_inativo_ou_inexistente',
+        };
+      }
+
+      const [manutencoes, recomendacoes] = await Promise.all([
+        processarAlertasManutencaoDoTenant(tenant.id),
+        gerarAlertasRecomendacaoDoTenant(tenant.id, tenant.timezone),
+      ]);
+
+      resultado = {
+        ok: true,
+        total: Number(manutencoes?.total || 0) + Number(recomendacoes?.total || 0),
+        manutencoes: Number(manutencoes?.total || 0),
+        seguros: 0,
+        contratos: 0,
+        recomendacoes: Number(recomendacoes?.total || 0),
+        tenantsAfetados: [
+          ...new Set([
+            ...(manutencoes?.tenantsAfetados || []),
+            ...(recomendacoes?.tenantsAfetados || []),
+          ]),
+        ],
+      };
+    } else {
+      resultado = await processarAlertasEEnviarNotificacoes();
+    }
 
     const duracaoMs = Date.now() - inicio;
 

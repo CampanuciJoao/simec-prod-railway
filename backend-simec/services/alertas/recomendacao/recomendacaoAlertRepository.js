@@ -26,20 +26,6 @@ export async function buscarEquipamentosComHistorico(tenantId, dataCorte) {
     },
     include: {
       unidade: true,
-      ocorrencias: {
-        where: {
-          tenantId,
-          tipo: {
-            not: 'Manutencao',
-          },
-          data: {
-            gte: dataCorte,
-          },
-        },
-        orderBy: {
-          data: 'desc',
-        },
-      },
       historicoEventos: {
         where: {
           tenantId,
@@ -50,26 +36,6 @@ export async function buscarEquipamentosComHistorico(tenantId, dataCorte) {
         },
         orderBy: {
           dataEvento: 'desc',
-        },
-      },
-      manutencoes: {
-        where: {
-          tenantId,
-          OR: [
-            {
-              dataHoraAgendamentoInicio: {
-                gte: dataCorte,
-              },
-            },
-            {
-              dataConclusao: {
-                gte: dataCorte,
-              },
-            },
-          ],
-        },
-        orderBy: {
-          dataHoraAgendamentoInicio: 'desc',
         },
       },
     },

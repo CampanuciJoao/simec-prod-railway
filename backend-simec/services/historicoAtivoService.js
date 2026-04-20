@@ -37,6 +37,42 @@ export function normalizarHistoricoAtivoEvento(evento) {
   };
 }
 
+function buildHistoricoWhereClause({
+  tenantId,
+  equipamentoId,
+  categoria = null,
+  subcategoria = null,
+  dataInicio = null,
+  dataFim = null,
+}) {
+  const where = {
+    tenantId,
+    equipamentoId,
+  };
+
+  if (categoria) {
+    where.categoria = categoria;
+  }
+
+  if (subcategoria) {
+    where.subcategoria = subcategoria;
+  }
+
+  if (dataInicio || dataFim) {
+    where.dataEvento = {};
+
+    if (dataInicio) {
+      where.dataEvento.gte = new Date(`${dataInicio}T00:00:00.000Z`);
+    }
+
+    if (dataFim) {
+      where.dataEvento.lte = new Date(`${dataFim}T23:59:59.999Z`);
+    }
+  }
+
+  return where;
+}
+
 export async function registrarEventoHistoricoAtivo({
   db = prisma,
   tenantId,
@@ -83,12 +119,85 @@ export async function registrarEventoHistoricoAtivo({
 export async function listarHistoricoAtivoPorEquipamento({
   tenantId,
   equipamentoId,
+  categoria = null,
+  subcategoria = null,
+  dataInicio = null,
+  dataFim = null,
+  limit = 20,
+  offset = 0,
 }) {
-  const eventos = await prisma.historicoAtivoEvento.findMany({
-    where: {
+  const where = buildHistoricoWhereClause({
+    tenantId,
+    equipamentoId,
+    categoria,
+    subcategoria,
+    dataInicio,
+    dataFim,
+  });
+
+  const safeLimit = Math.max(1, Math.min(Number(limit) || 20, 100));
+  const safeOffset = Math.max(0, Number(offset) || 0);
+
+  const [eventos, total] = await Promise.all([
+    prisma.historicoAtivoEvento.findMany({
+      where,
+      orderBy: [
+        {
+          dataEvento: 'desc',
+        },
+        {
+          createdAt: 'desc',
+        },
+      ],
+      take: safeLimit,
+      skip: safeOffset,
+    }),
+    prisma.historicoAtivoEvento.count({ where }),
+  ]);
+
+  if (total === 0) {
+    return listarHistoricoLegadoPorEquipamento({
       tenantId,
       equipamentoId,
-    },
+      categoria,
+      subcategoria,
+      dataInicio,
+      dataFim,
+      limit: safeLimit,
+      offset: safeOffset,
+    });
+  }
+
+  return {
+    items: eventos.map(normalizarHistoricoAtivoEvento),
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+    hasMore: safeOffset + eventos.length < total,
+    nextOffset: safeOffset + eventos.length,
+    fonte: 'historico_ativo',
+  };
+}
+
+export async function exportarHistoricoAtivoPorEquipamento({
+  tenantId,
+  equipamentoId,
+  categoria = null,
+  subcategoria = null,
+  dataInicio = null,
+  dataFim = null,
+}) {
+  const where = buildHistoricoWhereClause({
+    tenantId,
+    equipamentoId,
+    categoria,
+    subcategoria,
+    dataInicio,
+    dataFim,
+  });
+
+  const eventos = await prisma.historicoAtivoEvento.findMany({
+    where,
     orderBy: [
       {
         dataEvento: 'desc',

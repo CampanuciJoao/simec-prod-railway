@@ -1,4 +1,5 @@
 import prisma from '../../prismaService.js';
+import { ALERT_CATEGORIAS } from '../alertTypes.js';
 
 function alertaMudou(existente, data) {
   return (
@@ -158,6 +159,21 @@ export async function upsertAlertaManutencao(tenantId, alertaId, data) {
   });
 
   return { created: false, updated: true };
+}
+
+export async function removerAlertasManutencaoDaOS(
+  tenantId,
+  numeroOS
+) {
+  if (!tenantId || !numeroOS) return { count: 0 };
+
+  return prisma.alerta.deleteMany({
+    where: {
+      tenantId,
+      tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
+      numeroOS,
+    },
+  });
 }
 
 export async function atualizarStatusParaEmAndamento(

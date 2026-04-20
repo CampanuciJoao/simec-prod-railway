@@ -26,6 +26,7 @@ function AppLayout() {
 
   const {
     alertas = [],
+    naoVistos = 0,
     loading: alertasLoading,
     updateStatus,
     dismissAlerta,
@@ -74,9 +75,7 @@ function AppLayout() {
     usuario?.username ||
     'Administrador do Sistema';
 
-  const contadorNaoVistos = useMemo(() => {
-    return alertas.filter((alerta) => alerta.status === 'NaoVisto').length;
-  }, [alertas]);
+  const contadorNaoVistos = useMemo(() => Number(naoVistos || 0), [naoVistos]);
 
   const handleToggleAlerts = useCallback(() => {
     setAlertsOpen((prev) => !prev);
