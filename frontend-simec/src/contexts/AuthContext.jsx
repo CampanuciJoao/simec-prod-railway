@@ -9,9 +9,47 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-import { loginUsuario } from '@/services/api';
+import { loginUsuario, logoutUsuario, refreshSessao } from '@/services/api';
 
 export const AuthContext = createContext(null);
+
+function parseJwtPayload(token) {
+  try {
+    const payload = token.split('.')[1];
+    if (!payload) return null;
+
+    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
+    const decoded = window.atob(normalized);
+    return JSON.parse(decoded);
+  } catch (error) {
+    console.error('[AUTH_CONTEXT_JWT_PARSE_ERROR]', error);
+    return null;
+  }
+}
+
+function hydrateStoredData(parsed) {
+  const tenant = parsed?.tenant || null;
+  const usuario = parsed?.usuario
+    ? {
+        ...parsed.usuario,
+        tenant,
+      }
+    : null;
+
+  return {
+    ...parsed,
+    tenant,
+    usuario,
+  };
+}
+
+function clearStorage() {
+  localStorage.removeItem('userInfo');
+}
+
+function setStorage(data) {
+  localStorage.setItem('userInfo', JSON.stringify(data));
+}
 
 function getStoredUserInfo() {
   try {
@@ -21,72 +59,135 @@ function getStoredUserInfo() {
 
     const parsed = JSON.parse(userInfoString);
 
-    if (parsed?.usuario && parsed?.token) {
-      return parsed;
+    if (!parsed?.usuario || !parsed?.token) {
+      clearStorage();
+      return null;
     }
 
-    localStorage.removeItem('userInfo');
-    return null;
+    return hydrateStoredData(parsed);
   } catch (error) {
     console.error(
       '[AUTH_CONTEXT_STORAGE_ERROR] Falha ao carregar userInfo do localStorage.',
       error
     );
-    localStorage.removeItem('userInfo');
+    clearStorage();
     return null;
   }
 }
 
+function isTokenExpired(token) {
+  const jwtPayload = parseJwtPayload(token);
+  const nowInSeconds = Math.floor(Date.now() / 1000);
+  return Boolean(jwtPayload?.exp && jwtPayload.exp <= nowInSeconds);
+}
+
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
+  const [tenant, setTenant] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const storedData = getStoredUserInfo();
+  const syncAuthState = useCallback((data) => {
+    const hydrated = hydrateStoredData(data);
+    setStorage(hydrated);
+    setUsuario(hydrated.usuario);
+    setTenant(hydrated.tenant || null);
+    return hydrated;
+  }, []);
 
-    if (storedData?.usuario) {
-      setUsuario(storedData.usuario);
+  useEffect(() => {
+    let active = true;
+
+    async function bootstrapAuth() {
+      const storedData = getStoredUserInfo();
+
+      if (!storedData?.usuario || !storedData?.token) {
+        if (active) setLoading(false);
+        return;
+      }
+
+      if (!isTokenExpired(storedData.token)) {
+        if (active) {
+          setUsuario(storedData.usuario);
+          setTenant(storedData.tenant || null);
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const refreshed = await refreshSessao();
+        const hydrated = hydrateStoredData(refreshed);
+
+        if (active) {
+          setStorage(hydrated);
+          setUsuario(hydrated.usuario);
+          setTenant(hydrated.tenant || null);
+        }
+      } catch (error) {
+        console.error('[AUTH_CONTEXT_REFRESH_BOOTSTRAP_ERROR]', error);
+        clearStorage();
+        if (active) {
+          setUsuario(null);
+          setTenant(null);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
     }
 
-    setLoading(false);
+    bootstrapAuth();
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   const login = useCallback(
-    async (username, senha) => {
+    async (username, senha, tenantSlug, redirectPath = '/dashboard') => {
       try {
-        const credenciais = { username, senha };
-        const responseData = await loginUsuario(credenciais);
+        const responseData = await loginUsuario({
+          username,
+          senha,
+          tenant: tenantSlug,
+        });
 
-        localStorage.setItem('userInfo', JSON.stringify(responseData));
-        setUsuario(responseData.usuario);
-
-        navigate('/dashboard', { replace: true });
+        syncAuthState(responseData);
+        navigate(redirectPath, { replace: true });
       } catch (error) {
         console.error('[AUTH_CONTEXT_LOGIN_ERROR]', error);
         throw error;
       }
     },
-    [navigate]
+    [navigate, syncAuthState]
   );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('userInfo');
-    setUsuario(null);
-    navigate('/login', { replace: true });
+  const logout = useCallback(async () => {
+    try {
+      await logoutUsuario();
+    } catch (error) {
+      console.error('[AUTH_CONTEXT_LOGOUT_ERROR]', error);
+    } finally {
+      clearStorage();
+      setUsuario(null);
+      setTenant(null);
+      navigate('/login', { replace: true });
+    }
   }, [navigate]);
 
   const value = useMemo(
     () => ({
       usuario,
-      user: usuario, // compatibilidade temporária
+      user: usuario,
+      tenant,
       isAuthenticated: !!usuario,
       loading,
       login,
       logout,
+      syncAuthState,
     }),
-    [usuario, loading, login, logout]
+    [usuario, tenant, loading, login, logout, syncAuthState]
   );
 
   return (

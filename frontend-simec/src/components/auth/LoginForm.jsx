@@ -1,65 +1,69 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faSpinner, faUser, faLock } from '@fortawesome/free-solid-svg-icons';
+import {
+  faBuilding,
+  faLock,
+  faSpinner,
+  faUser,
+} from '@fortawesome/free-solid-svg-icons';
+
+import { Button, Input } from '@/components/ui';
 
 function LoginForm({
+  tenant,
   username,
   senha,
   error,
   loading,
+  onChangeTenant,
   onChangeUsername,
   onChangeSenha,
   onSubmit,
 }) {
   return (
     <form onSubmit={onSubmit} className="space-y-5">
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+      {error ? (
+        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {error}
         </div>
-      )}
+      ) : null}
 
-      <div>
-        <label className="label">Nome de Usuário</label>
+      <Input
+        label="Empresa / slug"
+        value={tenant}
+        onChange={(e) => onChangeTenant(e.target.value)}
+        placeholder="Ex.: simec-default"
+        hint="Identifica a empresa no ambiente SaaS."
+        leadingIcon={<FontAwesomeIcon icon={faBuilding} />}
+        disabled={loading}
+        required
+      />
 
-        <div className="relative">
-          <span className="icon-input">
-            <FontAwesomeIcon icon={faUser} />
-          </span>
+      <Input
+        label="Nome de usuário"
+        value={username}
+        onChange={(e) => onChangeUsername(e.target.value)}
+        placeholder="Digite seu usuário"
+        leadingIcon={<FontAwesomeIcon icon={faUser} />}
+        disabled={loading}
+        required
+      />
 
-          <input
-            value={username}
-            onChange={(e) => onChangeUsername(e.target.value)}
-            className="input pl-10"
-            disabled={loading}
-            required
-          />
-        </div>
-      </div>
+      <Input
+        label="Senha"
+        type="password"
+        value={senha}
+        onChange={(e) => onChangeSenha(e.target.value)}
+        placeholder="Digite sua senha"
+        leadingIcon={<FontAwesomeIcon icon={faLock} />}
+        disabled={loading}
+        required
+      />
 
-      <div>
-        <label className="label">Senha</label>
-
-        <div className="relative">
-          <span className="icon-input">
-            <FontAwesomeIcon icon={faLock} />
-          </span>
-
-          <input
-            type="password"
-            value={senha}
-            onChange={(e) => onChangeSenha(e.target.value)}
-            className="input pl-10"
-            disabled={loading}
-            required
-          />
-        </div>
-      </div>
-
-      <button
+      <Button
         type="submit"
-        className="btn btn-primary w-full justify-center"
+        className="w-full justify-center"
         disabled={loading}
       >
         {loading ? (
@@ -70,16 +74,18 @@ function LoginForm({
         ) : (
           'Entrar'
         )}
-      </button>
+      </Button>
     </form>
   );
 }
 
 LoginForm.propTypes = {
+  tenant: PropTypes.string,
   username: PropTypes.string,
   senha: PropTypes.string,
   error: PropTypes.string,
   loading: PropTypes.bool,
+  onChangeTenant: PropTypes.func,
   onChangeUsername: PropTypes.func,
   onChangeSenha: PropTypes.func,
   onSubmit: PropTypes.func,

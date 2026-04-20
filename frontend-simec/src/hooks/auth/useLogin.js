@@ -1,15 +1,18 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useLogin() {
+  const [tenant, setTenant] = useState('simec-default');
   const [username, setUsername] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
   const { login } = useAuth();
-  const navigate = useNavigate();
+  const location = useLocation();
+
+  const redirectPath = location.state?.from?.pathname || '/dashboard';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -18,10 +21,10 @@ export function useLogin() {
     setLoading(true);
 
     try {
-      await login(username, senha);
-      navigate('/dashboard', { replace: true });
+      await login(username, senha, tenant, redirectPath);
     } catch (err) {
       setError(
+        err?.response?.data?.message ||
         err?.message ||
         'Falha no login. Verifique suas credenciais.'
       );
@@ -31,10 +34,12 @@ export function useLogin() {
   };
 
   return {
+    tenant,
     username,
     senha,
     error,
     loading,
+    setTenant,
     setUsername,
     setSenha,
     handleSubmit,

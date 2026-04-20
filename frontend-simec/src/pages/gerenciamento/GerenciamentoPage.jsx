@@ -5,13 +5,10 @@ import {
   faUsersCog,
   faScroll,
   faCogs,
+  faBuilding,
 } from '@fortawesome/free-solid-svg-icons';
 
-import {
-  PageLayout,
-  PageHeader,
-  ResponsiveTabs,
-} from '@/components/ui';
+import { PageLayout, PageHeader, ResponsiveTabs } from '@/components/ui';
 
 function GerenciamentoPage() {
   const navigate = useNavigate();
@@ -20,13 +17,19 @@ function GerenciamentoPage() {
   const tabs = [
     {
       id: 'usuarios',
-      label: 'Usuários',
+      label: 'Usuarios',
       icon: <FontAwesomeIcon icon={faUsersCog} />,
       path: '/gerenciamento/usuarios',
     },
     {
+      id: 'empresa',
+      label: 'Empresa',
+      icon: <FontAwesomeIcon icon={faBuilding} />,
+      path: '/gerenciamento/empresa',
+    },
+    {
       id: 'auditoria',
-      label: 'Log de Auditoria',
+      label: 'Log de auditoria',
       icon: <FontAwesomeIcon icon={faScroll} />,
       path: '/gerenciamento/auditoria',
     },
@@ -37,10 +40,7 @@ function GerenciamentoPage() {
 
   const handleChangeTab = (tabId) => {
     const selectedTab = tabs.find((tab) => tab.id === tabId);
-
-    if (selectedTab) {
-      navigate(selectedTab.path);
-    }
+    if (selectedTab) navigate(selectedTab.path);
   };
 
   return (
@@ -48,7 +48,7 @@ function GerenciamentoPage() {
       <div className="space-y-6">
         <PageHeader
           title="Gerenciamento"
-          subtitle="Administre usuários e acompanhe os registros de auditoria do sistema"
+          subtitle="Governanca do tenant com usuarios, empresa e auditoria."
           icon={faCogs}
         />
 

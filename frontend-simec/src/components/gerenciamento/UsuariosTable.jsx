@@ -7,11 +7,7 @@ import {
   faEdit,
 } from '@fortawesome/free-solid-svg-icons';
 
-import {
-  Button,
-  Card,
-  ListToolbar,
-} from '@/components/ui';
+import { Button, Card, ListToolbar } from '@/components/ui';
 import { RoleBadge } from '@/components/shared';
 
 function UsuariosTable({
@@ -24,11 +20,11 @@ function UsuariosTable({
   return (
     <div className="space-y-4">
       <ListToolbar
-        countLabel={`${usuarios.length} usuário(s) encontrado(s)`}
+        countLabel={`${usuarios.length} usuario(s) encontrado(s)`}
         actions={
           <Button type="button" onClick={onCreate}>
             <FontAwesomeIcon icon={faPlus} />
-            Novo Usuário
+            Novo usuario
           </Button>
         }
       />
@@ -47,15 +43,14 @@ function UsuariosTable({
                 style={{ color: 'var(--text-muted)' }}
               >
                 <th className="px-4 py-3">Nome completo</th>
-                <th className="px-4 py-3">Nome de usuário</th>
-                <th className="px-4 py-3">Função</th>
-                <th className="px-4 py-3 text-center">Ações</th>
+                <th className="px-4 py-3">E-mail</th>
+                <th className="px-4 py-3">Usuario</th>
+                <th className="px-4 py-3">Perfil</th>
+                <th className="px-4 py-3 text-center">Acoes</th>
               </tr>
             </thead>
 
-            <tbody
-              style={{ backgroundColor: 'var(--bg-surface)' }}
-            >
+            <tbody style={{ backgroundColor: 'var(--bg-surface)' }}>
               {usuarios.map((user) => {
                 const isSelf = usuarioLogadoId === user.id;
 
@@ -77,6 +72,13 @@ function UsuariosTable({
                       className="px-4 py-3 text-sm"
                       style={{ color: 'var(--text-secondary)' }}
                     >
+                      {user.email || '-'}
+                    </td>
+
+                    <td
+                      className="px-4 py-3 text-sm"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
                       {user.username}
                     </td>
 
@@ -89,7 +91,7 @@ function UsuariosTable({
                         <Button
                           type="button"
                           variant="secondary"
-                          title="Editar usuário"
+                          title="Editar usuario"
                           onClick={() => onEdit(user)}
                           className="px-3"
                         >
@@ -101,8 +103,8 @@ function UsuariosTable({
                           variant="danger"
                           title={
                             isSelf
-                              ? 'Não é possível excluir a si mesmo'
-                              : 'Excluir usuário'
+                              ? 'Nao e possivel excluir a si mesmo'
+                              : 'Excluir usuario'
                           }
                           onClick={() => onAskDelete(user)}
                           disabled={isSelf}

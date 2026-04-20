@@ -24,6 +24,10 @@ import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js';
 import pdfDataRoutes from './routes/pdfDataRoutes.js';
+import superadminTenantsRoutes from './routes/superadminTenantsRoutes.js';
+import tenantSettingsRoutes from './routes/tenantSettingsRoutes.js';
+import helpRoutes from './routes/helpRoutes.js';
+import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
@@ -36,12 +40,13 @@ const app = express();
 const httpServer = createServer(app);
 
 const PORT = process.env.PORT || 5000;
-const FRONTEND_URL = process.env.FRONTEND_URL || '*';
-const corsOrigin = FRONTEND_URL === '*' ? '*' : FRONTEND_URL;
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const corsOrigin = FRONTEND_URL === '*' ? true : FRONTEND_URL;
 
 const io = new Server(httpServer, {
   cors: {
     origin: corsOrigin,
+    credentials: true,
     methods: ['GET', 'POST'],
   },
 });
@@ -59,6 +64,7 @@ io.on('connection', (socket) => {
 app.use(
   cors({
     origin: corsOrigin,
+    credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
   })
@@ -91,6 +97,10 @@ app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes);
 app.use('/api/pdf-data', pdfDataRoutes);
+app.use('/api/superadmin', superadminTenantsRoutes);
+app.use('/api/superadmin/help', superadminHelpRoutes);
+app.use('/api/tenant', tenantSettingsRoutes);
+app.use('/api/help', helpRoutes);
 
 app.use('/api', (req, res) => {
   return res.status(404).json({

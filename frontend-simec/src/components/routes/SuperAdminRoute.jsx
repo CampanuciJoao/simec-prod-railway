@@ -3,14 +3,14 @@ import { Navigate } from 'react-router-dom';
 
 import { useAuth } from '@/contexts/AuthContext';
 
-const AdminRoute = ({ children }) => {
+const SuperAdminRoute = ({ children }) => {
   const { user } = useAuth();
 
-  if (!['admin', 'superadmin'].includes(user?.role)) {
+  if (user?.role !== 'superadmin') {
     return <Navigate to="/dashboard" replace />;
   }
 
   return children;
 };
 
-export default AdminRoute;
+export default SuperAdminRoute;

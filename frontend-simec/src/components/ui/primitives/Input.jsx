@@ -9,6 +9,7 @@ function Input({
   hint,
   error,
   required = false,
+  leadingIcon = null,
   className = '',
   onFocus,
   onBlur,
@@ -37,23 +38,35 @@ function Input({
       required={required}
       htmlFor={inputId}
     >
-      <input
-        id={inputId}
-        className={[
-          'ui-transition w-full rounded-xl border px-3 py-2.5 text-sm outline-none placeholder:opacity-70',
-          'disabled:cursor-not-allowed disabled:opacity-70',
-          className,
-        ].join(' ')}
-        style={{
-          backgroundColor: 'var(--bg-surface)',
-          borderColor: error ? 'var(--color-danger)' : 'var(--border-default)',
-          color: 'var(--text-primary)',
-          boxShadow: 'none',
-        }}
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-        {...props}
-      />
+      <div className="relative">
+        {leadingIcon ? (
+          <span
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {leadingIcon}
+          </span>
+        ) : null}
+
+        <input
+          id={inputId}
+          className={[
+            'ui-transition w-full rounded-xl border px-3 py-2.5 text-sm outline-none placeholder:opacity-70',
+            'disabled:cursor-not-allowed disabled:opacity-70',
+            leadingIcon ? 'pl-10' : '',
+            className,
+          ].join(' ')}
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: error ? 'var(--color-danger)' : 'var(--border-default)',
+            color: 'var(--text-primary)',
+            boxShadow: 'none',
+          }}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+          {...props}
+        />
+      </div>
     </FormFieldShell>
   );
 }
@@ -64,6 +77,7 @@ Input.propTypes = {
   hint: PropTypes.string,
   error: PropTypes.string,
   required: PropTypes.bool,
+  leadingIcon: PropTypes.node,
   className: PropTypes.string,
   onFocus: PropTypes.func,
   onBlur: PropTypes.func,

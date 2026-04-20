@@ -1,25 +1,13 @@
-// Ficheiro: middleware/authMiddleware.js
-// Versão: Multi-tenant hardened
-// Descrição: Middleware de autenticação com suporte a tenant e validações reforçadas.
-
 import jwt from 'jsonwebtoken';
 import prisma from '../services/prismaService.js';
 
-/**
- * Middleware para proteger rotas.
- * - Valida o token JWT
- * - Busca o usuário no banco
- * - Carrega o tenant vinculado
- * - Bloqueia tenants inativos
- * - Injeta o contexto autenticado em req.usuario e req.auth
- */
 export const proteger = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
-        message: 'Não autorizado. Nenhum token foi fornecido.',
+        message: 'Nao autorizado. Nenhum token foi fornecido.',
       });
     }
 
@@ -27,14 +15,14 @@ export const proteger = async (req, res, next) => {
 
     if (!token) {
       return res.status(401).json({
-        message: 'Não autorizado. Nenhum token foi fornecido.',
+        message: 'Nao autorizado. Nenhum token foi fornecido.',
       });
     }
 
     if (!process.env.JWT_SECRET) {
-      console.error('[AUTH_MIDDLEWARE_ERROR] JWT_SECRET não configurado.');
+      console.error('[AUTH_MIDDLEWARE_ERROR] JWT_SECRET nao configurado.');
       return res.status(500).json({
-        message: 'Erro de configuração do servidor.',
+        message: 'Erro de configuracao do servidor.',
       });
     }
 
@@ -42,7 +30,7 @@ export const proteger = async (req, res, next) => {
 
     if (!decoded || !decoded.id) {
       return res.status(401).json({
-        message: 'Não autorizado. Token inválido.',
+        message: 'Nao autorizado. Token invalido.',
       });
     }
 
@@ -59,6 +47,9 @@ export const proteger = async (req, res, next) => {
             timezone: true,
             locale: true,
             ativo: true,
+            contatoNome: true,
+            contatoEmail: true,
+            contatoTelefone: true,
           },
         },
       },
@@ -66,19 +57,19 @@ export const proteger = async (req, res, next) => {
 
     if (!usuarioAtual) {
       return res.status(401).json({
-        message: 'Não autorizado. O usuário deste token não existe mais.',
+        message: 'Nao autorizado. O usuario deste token nao existe mais.',
       });
     }
 
     if (!usuarioAtual.tenantId || !usuarioAtual.tenant) {
       return res.status(403).json({
-        message: 'Usuário sem tenant vinculado. Verifique a configuração do sistema.',
+        message: 'Usuario sem tenant vinculado. Verifique a configuracao do sistema.',
       });
     }
 
     if (!usuarioAtual.tenant.ativo) {
       return res.status(403).json({
-        message: 'A empresa vinculada a este usuário está inativa.',
+        message: 'A empresa vinculada a este usuario esta inativa.',
       });
     }
 
@@ -86,6 +77,7 @@ export const proteger = async (req, res, next) => {
       id: usuarioAtual.id,
       nome: usuarioAtual.nome,
       role: usuarioAtual.role,
+      email: usuarioAtual.email,
       tenantId: usuarioAtual.tenantId,
       tenant: usuarioAtual.tenant,
     };
@@ -94,6 +86,7 @@ export const proteger = async (req, res, next) => {
       userId: usuarioAtual.id,
       nome: usuarioAtual.nome,
       role: usuarioAtual.role,
+      email: usuarioAtual.email,
       tenantId: usuarioAtual.tenantId,
       tenant: usuarioAtual.tenant,
     };
@@ -103,21 +96,27 @@ export const proteger = async (req, res, next) => {
     console.error('[AUTH_MIDDLEWARE_ERROR]', error.message);
 
     return res.status(401).json({
-      message: 'Não autorizado. O token falhou ou expirou.',
+      message: 'Nao autorizado. O token falhou ou expirou.',
     });
   }
 };
 
-/**
- * Middleware para restringir acesso a administradores.
- * Deve ser usado depois do middleware `proteger`.
- */
 export const admin = (req, res, next) => {
-  if (req.usuario && req.usuario.role === 'admin') {
+  if (req.usuario && ['admin', 'superadmin'].includes(req.usuario.role)) {
     return next();
   }
 
   return res.status(403).json({
-    message: 'Acesso negado. Requer privilégios de administrador.',
+    message: 'Acesso negado. Requer privilegios de administrador.',
+  });
+};
+
+export const superadmin = (req, res, next) => {
+  if (req.usuario && req.usuario.role === 'superadmin') {
+    return next();
+  }
+
+  return res.status(403).json({
+    message: 'Acesso negado. Requer privilegios de superadmin.',
   });
 };

@@ -14,6 +14,9 @@ model Tenant {
   timezone  String   @default("UTC")
   locale    String   @default("pt-BR")
   ativo     Boolean  @default(true)
+  contatoNome String?
+  contatoEmail String?
+  contatoTelefone String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -38,6 +41,8 @@ model Tenant {
   userAgentMemories    UserAgentMemory[]
   manutencaoEventos    ManutencaoEvento[]
   historicoAtivoEventos HistoricoAtivoEvento[]
+  authSessions         AuthSession[]
+  passwordResetTokens  PasswordResetToken[]
 
   @@map("tenants")
 }
@@ -78,6 +83,7 @@ model Usuario {
   id        String   @id @default(uuid())
   tenantId  String
   username  String
+  email     String?
   nome      String
   senha     String
   role      Role     @default(user)
@@ -89,8 +95,11 @@ model Usuario {
   logsDeAuditoria   LogAuditoria[]
   notasDeAndamento  NotaAndamento[]
   manutencaoEventos ManutencaoEvento[]
+  authSessions      AuthSession[]
+  passwordResetTokens PasswordResetToken[]
 
   @@unique([tenantId, username])
+  @@unique([tenantId, email])
   @@unique([tenantId, id])
   @@index([tenantId, role])
   @@map("usuarios")
@@ -538,11 +547,6 @@ model NotificacaoEnviada {
   @@map("notificacoes_enviadas")
 }
 
-enum Role {
-  admin
-  user
-}
-
 enum StatusEquipamento {
   Operante
   Inoperante
@@ -678,4 +682,67 @@ model UserAgentMemory {
 
   @@unique([tenantId, usuario])
   @@map("user_agent_memory")
+}
+
+model AuthSession {
+  id               String   @id @default(uuid())
+  tenantId         String
+  usuarioId        String
+  refreshTokenHash String
+  ipAddress        String?
+  userAgent        String?
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([refreshTokenHash])
+  @@unique([tenantId, id])
+  @@index([tenantId, usuarioId, expiresAt])
+  @@index([tenantId, revokedAt])
+  @@map("auth_sessions")
+}
+
+model PasswordResetToken {
+  id         String   @id @default(uuid())
+  tenantId   String
+  usuarioId  String
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime @default(now())
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, usuarioId, expiresAt])
+  @@index([tenantId, usedAt])
+  @@map("password_reset_tokens")
+}
+
+model HelpArticle {
+  id               String   @id @default(uuid())
+  slug             String   @unique
+  categoria        String
+  titulo           String
+  resumo           String?
+  conteudoMarkdown String   @db.Text
+  audience         String   @default("all")
+  published        Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([categoria, published])
+  @@index([audience, published])
+  @@map("help_articles")
+}
+
+enum Role {
+  superadmin
+  admin
+  user
 }

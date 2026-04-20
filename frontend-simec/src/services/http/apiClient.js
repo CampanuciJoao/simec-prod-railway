@@ -4,24 +4,44 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 const api = axios.create({
   baseURL: API_BASE_URL,
+  withCredentials: true,
 });
+
+const refreshClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
+
+let refreshPromise = null;
+
+function getStoredUserInfo() {
+  const userString = localStorage.getItem('userInfo');
+  if (!userString) return null;
+
+  try {
+    return JSON.parse(userString);
+  } catch (error) {
+    console.error('Falha ao processar userInfo do localStorage.', error);
+    localStorage.removeItem('userInfo');
+    return null;
+  }
+}
+
+function setStoredUserInfo(payload) {
+  localStorage.setItem('userInfo', JSON.stringify(payload));
+}
+
+function clearStoredUserInfo() {
+  localStorage.removeItem('userInfo');
+}
 
 api.interceptors.request.use(
   (config) => {
-    const userString = localStorage.getItem('userInfo');
+    const userInfo = getStoredUserInfo();
+    const token = userInfo?.token;
 
-    if (userString) {
-      try {
-        const token = JSON.parse(userString)?.token;
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
-        }
-      } catch (error) {
-        console.error(
-          'Interceptor de Requisição: Erro ao processar dados do localStorage.',
-          error
-        );
-      }
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
 
     return config;
@@ -31,19 +51,42 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
+    const originalRequest = error.config;
+    const isAuthRoute = originalRequest?.url?.includes('/auth/');
+
     if (
       error.response?.status === 401 &&
-      !error.config?.url?.endsWith('/auth/login')
+      !isAuthRoute &&
+      !originalRequest?._retry
     ) {
-      console.warn(
-        'Interceptor de Resposta: Erro 401 (token expirado/inválido). Deslogando...'
-      );
+      originalRequest._retry = true;
 
-      localStorage.removeItem('userInfo');
+      try {
+        refreshPromise ??= refreshClient.post('/auth/refresh');
+        const refreshResponse = await refreshPromise;
+        refreshPromise = null;
 
-      if (window.location.pathname !== '/login') {
-        window.location.href = '/login';
+        const current = getStoredUserInfo();
+        const nextUserInfo = {
+          ...(current || {}),
+          ...refreshResponse.data,
+        };
+        setStoredUserInfo(nextUserInfo);
+
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${nextUserInfo.token}`;
+
+        return api(originalRequest);
+      } catch (refreshError) {
+        refreshPromise = null;
+        clearStoredUserInfo();
+
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+
+        return Promise.reject(refreshError);
       }
     }
 

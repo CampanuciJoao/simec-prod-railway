@@ -10,14 +10,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useToast } from '@/contexts/ToastContext';
-
-import {
-  Button,
-  Input,
-  PageSection,
-  ResponsiveGrid,
-  Select,
-} from '@/components/ui';
+import { Button, Input, PageSection, ResponsiveGrid, Select } from '@/components/ui';
 
 function UsuarioForm({
   onSubmit,
@@ -29,6 +22,7 @@ function UsuarioForm({
   const [formData, setFormData] = useState({
     nome: '',
     username: '',
+    email: '',
     senha: '',
     confirmaSenha: '',
     role: 'user',
@@ -44,6 +38,7 @@ function UsuarioForm({
       setFormData({
         nome: initialData.nome || '',
         username: initialData.username || '',
+        email: initialData.email || '',
         role: initialData.role || 'user',
         senha: '',
         confirmaSenha: '',
@@ -54,6 +49,7 @@ function UsuarioForm({
     setFormData({
       nome: '',
       username: '',
+      email: '',
       senha: '',
       confirmaSenha: '',
       role: 'user',
@@ -69,12 +65,13 @@ function UsuarioForm({
     event.preventDefault();
 
     if (formData.senha && formData.senha !== formData.confirmaSenha) {
-      addToast('As senhas não coincidem.', 'error');
+      addToast('As senhas nao coincidem.', 'error');
       return;
     }
 
     const payload = {
       nome: formData.nome.trim(),
+      email: formData.email.trim(),
       role: formData.role,
     };
 
@@ -91,11 +88,10 @@ function UsuarioForm({
 
   return (
     <PageSection
-      title={isEditing ? 'Editar usuário' : 'Novo usuário'}
-      description="Gerencie os dados de acesso e permissões do sistema"
+      title={isEditing ? 'Editar usuario' : 'Novo usuario'}
+      description="Gerencie acesso, contato e permissao dentro do tenant."
     >
       <form onSubmit={handleSubmit} className="space-y-6">
-
         <ResponsiveGrid cols={{ base: 1, md: 2 }}>
           <Input
             label="Nome completo"
@@ -107,7 +103,17 @@ function UsuarioForm({
           />
 
           <Input
-            label="Usuário (login)"
+            label="E-mail"
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleChange}
+            required
+            disabled={isSubmitting}
+          />
+
+          <Input
+            label="Usuario (login)"
             name="username"
             value={formData.username}
             onChange={handleChange}
@@ -172,7 +178,7 @@ function UsuarioForm({
             onChange={handleChange}
             disabled={isSubmitting}
           >
-            <option value="user">Usuário padrão</option>
+            <option value="user">Usuario padrao</option>
             <option value="admin">Administrador</option>
           </Select>
         </div>
@@ -183,8 +189,8 @@ function UsuarioForm({
             {isSubmitting
               ? 'Salvando...'
               : isEditing
-                ? 'Salvar alterações'
-                : 'Criar usuário'}
+                ? 'Salvar alteracoes'
+                : 'Criar usuario'}
           </Button>
 
           <Button
@@ -197,7 +203,6 @@ function UsuarioForm({
             Cancelar
           </Button>
         </div>
-
       </form>
     </PageSection>
   );

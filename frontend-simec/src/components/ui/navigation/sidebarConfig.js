@@ -9,6 +9,8 @@ import {
   faPlus,
   faMicrochip,
   faChartBar,
+  faLifeRing,
+  faBuildingShield,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const sidebarConfig = [
@@ -44,7 +46,7 @@ export const sidebarConfig = [
     showBadge: true,
   },
   {
-    label: 'Manutenções',
+    label: 'Manutencoes',
     path: '/manutencoes',
     icon: faWrench,
   },
@@ -54,15 +56,27 @@ export const sidebarConfig = [
     icon: faChartBar,
   },
   {
-    label: 'Relatórios',
+    label: 'Relatorios',
     path: '/relatorios',
     icon: faChartLine,
+  },
+  {
+    label: 'Ajuda',
+    path: '/ajuda',
+    icon: faLifeRing,
   },
   {
     label: 'Gerenciamento',
     path: '/gerenciamento',
     icon: faCogs,
-    roles: ['admin'],
+    roles: ['admin', 'superadmin'],
+    section: 'admin',
+  },
+  {
+    label: 'Superadmin',
+    path: '/superadmin',
+    icon: faBuildingShield,
+    roles: ['superadmin'],
     section: 'admin',
   },
 ];

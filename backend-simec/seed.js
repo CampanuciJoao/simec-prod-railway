@@ -1,129 +1,130 @@
-// Ficheiro: backend-simec/seed.js
-// Versão: 3.0 (Multi-tenant ready)
-// Descrição: Cria Tenant padrão + Admin + Unidade inicial
-
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+async function upsertHelpArticle(article) {
+  return prisma.helpArticle.upsert({
+    where: { slug: article.slug },
+    update: article,
+    create: article,
+  });
+}
+
 async function seed() {
-  console.log('🌱 Iniciando seed do SIMEC...');
+  console.log('Iniciando seed do SIMEC...');
 
-  // ==============================
-  // 1. TENANT PADRÃO
-  // ==============================
   const tenantSlug = 'simec-default';
-
   const tenant = await prisma.tenant.upsert({
     where: { slug: tenantSlug },
-    update: {},
+    update: {
+      nome: 'SIMEC Default',
+      timezone: 'America/Campo_Grande',
+      locale: 'pt-BR',
+      ativo: true,
+      contatoNome: 'Equipe SIMEC',
+      contatoEmail: 'suporte@simec.local',
+    },
     create: {
       nome: 'SIMEC Default',
       slug: tenantSlug,
       timezone: 'America/Campo_Grande',
       locale: 'pt-BR',
       ativo: true,
+      contatoNome: 'Equipe SIMEC',
+      contatoEmail: 'suporte@simec.local',
     },
   });
 
-  console.log(`🏢 Tenant OK: ${tenant.nome}`);
+  console.log(`Tenant OK: ${tenant.nome}`);
 
-  // ==============================
-  // 2. ADMIN
-  // ==============================
-  const adminUsername = 'admin';
-  const adminNome = 'Administrador do Sistema';
   const adminSenhaPlana = '751953';
-
   const senhaCriptografada = await bcrypt.hash(adminSenhaPlana, 10);
 
-  const adminExistente = await prisma.usuario.findFirst({
+  const admin = await prisma.usuario.upsert({
     where: {
-      username: adminUsername.toLowerCase(),
+      tenantId_username: {
+        tenantId: tenant.id,
+        username: 'admin',
+      },
+    },
+    update: {
+      nome: 'Administrador do Sistema',
+      email: 'admin@simec.local',
+      senha: senhaCriptografada,
+      role: 'superadmin',
+    },
+    create: {
       tenantId: tenant.id,
+      username: 'admin',
+      email: 'admin@simec.local',
+      nome: 'Administrador do Sistema',
+      senha: senhaCriptografada,
+      role: 'superadmin',
     },
   });
 
-  let admin;
+  console.log('Usuario admin OK');
 
-  if (adminExistente) {
-    admin = await prisma.usuario.update({
-      where: { id: adminExistente.id },
-      data: {
-        nome: adminNome,
-        senha: senhaCriptografada,
-        role: 'admin',
-      },
-    });
-
-    console.log('🔄 Admin atualizado');
-  } else {
-    admin = await prisma.usuario.create({
-      data: {
-        tenantId: tenant.id,
-        username: adminUsername.toLowerCase(),
-        nome: adminNome,
-        senha: senhaCriptografada,
-        role: 'admin',
-      },
-    });
-
-    console.log('✅ Admin criado');
-  }
-
-  // ==============================
-  // 3. UNIDADE PADRÃO
-  // ==============================
-  const unidadeNome = 'Unidade Matriz';
-
-  const unidadeExistente = await prisma.unidade.findFirst({
+  const unidade = await prisma.unidade.upsert({
     where: {
-      nomeSistema: unidadeNome,
+      tenantId_nomeSistema: {
+        tenantId: tenant.id,
+        nomeSistema: 'Unidade Matriz',
+      },
+    },
+    update: {
+      nomeFantasia: 'SIMEC Matriz',
+      cidade: 'Campo Grande',
+      estado: 'MS',
+      timezone: 'America/Campo_Grande',
+    },
+    create: {
       tenantId: tenant.id,
+      nomeSistema: 'Unidade Matriz',
+      nomeFantasia: 'SIMEC Matriz',
+      cidade: 'Campo Grande',
+      estado: 'MS',
+      timezone: 'America/Campo_Grande',
     },
   });
 
-  let unidade;
+  console.log('Unidade padrao OK');
 
-  if (unidadeExistente) {
-    unidade = await prisma.unidade.update({
-      where: { id: unidadeExistente.id },
-      data: {
-        nomeFantasia: 'SIMEC Matriz',
-        cidade: 'Campo Grande',
-        estado: 'MS',
-        timezone: 'America/Campo_Grande',
-      },
-    });
+  await upsertHelpArticle({
+    slug: 'como-funciona-o-historico-do-ativo',
+    categoria: 'Operacao',
+    titulo: 'Como funciona o historico do ativo',
+    resumo: 'Entenda como manutencoes, ocorrencias e alteracoes compoem a linha do tempo do equipamento.',
+    conteudoMarkdown:
+      'O historico do ativo consolida manutencoes, ocorrencias, transferencias e alteracoes relevantes. Use a aba Historico para leitura completa e a Ficha Tecnica para registrar eventos leves.',
+    audience: 'all',
+    published: true,
+  });
 
-    console.log('🔄 Unidade atualizada');
-  } else {
-    unidade = await prisma.unidade.create({
-      data: {
-        tenantId: tenant.id,
-        nomeSistema: unidadeNome,
-        nomeFantasia: 'SIMEC Matriz',
-        cidade: 'Campo Grande',
-        estado: 'MS',
-        timezone: 'America/Campo_Grande',
-      },
-    });
+  await upsertHelpArticle({
+    slug: 'como-gerenciar-tenants-no-simec',
+    categoria: 'Backoffice',
+    titulo: 'Como gerenciar tenants no SIMEC',
+    resumo: 'Visao geral da area superadmin para operacao do SaaS.',
+    conteudoMarkdown:
+      'A area Superadmin permite criar clientes, ativar ou inativar tenants, definir timezone e locale e preparar o administrador inicial de cada empresa.',
+    audience: 'superadmin',
+    published: true,
+  });
 
-    console.log('✅ Unidade criada');
-  }
-
-  console.log('----------------------------------------------------');
-  console.log('🎉 Seed executado com sucesso!');
+  console.log('Artigos de ajuda OK');
+  console.log('----------------------------------------');
   console.log(`Tenant: ${tenant.nome}`);
   console.log(`Admin: ${admin.username}`);
   console.log(`Unidade: ${unidade.nomeSistema}`);
-  console.log('----------------------------------------------------');
+  console.log('Seed executado com sucesso.');
+  console.log('----------------------------------------');
 }
 
 seed()
   .catch((error) => {
-    console.error('❌ Erro no seed:', error);
+    console.error('Erro no seed:', error);
     process.exit(1);
   })
   .finally(async () => {

@@ -1,17 +1,8 @@
 import React from 'react';
 
 import { useGerenciarUsuariosPage } from '@/hooks/gerenciamento/useGerenciarUsuariosPage';
-
-import {
-  ModalConfirmacao,
-  PageSection,
-  PageState,
-} from '@/components/ui';
-
-import {
-  UsuarioForm,
-  UsuariosTable,
-} from '@/components/gerenciamento';
+import { ModalConfirmacao, PageSection, PageState } from '@/components/ui';
+import { UsuarioForm, UsuariosTable } from '@/components/gerenciamento';
 
 function GerenciarUsuariosPage() {
   const page = useGerenciarUsuariosPage();
@@ -26,14 +17,14 @@ function GerenciarUsuariosPage() {
         isOpen={page.isDeleteModalOpen}
         onClose={page.closeDeleteModal}
         onConfirm={page.handleConfirmDelete}
-        title="Confirmar exclusão"
-        message={`Tem certeza que deseja excluir o usuário "${page.userToDelete?.nome}"?`}
+        title="Confirmar exclusao"
+        message={`Tem certeza que deseja excluir o usuario "${page.userToDelete?.nome}"?`}
         isDestructive
       />
 
       <PageSection
-        title="Usuários"
-        description="Cadastre, edite e remova usuários com segurança."
+        title="Usuarios"
+        description="Cadastre, edite e remova usuarios com seguranca."
       >
         {page.showForm ? (
           <UsuarioForm
@@ -44,10 +35,22 @@ function GerenciarUsuariosPage() {
             initialData={page.editingUser}
           />
         ) : page.isEmpty ? (
-          <PageState
-            isEmpty
-            emptyMessage="Nenhum usuário encontrado."
-          />
+          <div className="space-y-4">
+            <PageState isEmpty emptyMessage="Nenhum usuario encontrado." />
+            <div className="flex justify-center sm:justify-start">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold"
+                style={{
+                  backgroundColor: 'var(--brand-primary)',
+                  color: 'var(--text-on-brand)',
+                }}
+                onClick={page.handleCreate}
+              >
+                Criar primeiro usuario
+              </button>
+            </div>
+          </div>
         ) : (
           <UsuariosTable
             usuarios={page.usuarios}

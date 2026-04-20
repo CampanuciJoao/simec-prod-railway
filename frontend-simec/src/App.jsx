@@ -1,15 +1,13 @@
 import React, { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-
-import ProtectedRoute from '@/components/routes/ProtectedRoute';
-import AdminRoute from '@/components/routes/AdminRoute';
-import AppLayout from '@/components/layouts/AppLayout';
-
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSpinner } from '@fortawesome/free-solid-svg-icons';
 
-// Importação fixa do BI
+import { useAuth } from '@/contexts/AuthContext';
+import ProtectedRoute from '@/components/routes/ProtectedRoute';
+import AdminRoute from '@/components/routes/AdminRoute';
+import SuperAdminRoute from '@/components/routes/SuperAdminRoute';
+import AppLayout from '@/components/layouts/AppLayout';
 import BIPage from '@/pages/bi/BIPage';
 
 const PageLoader = () => (
@@ -18,15 +16,19 @@ const PageLoader = () => (
   </div>
 );
 
-// Pages com lazy loading
 const LoginPage = React.lazy(() => import('@/pages/auth/LoginPage'));
-
-const DashboardPage = React.lazy(() => import('@/pages/dashboard/DashboardPage'));
-
+const ForgotPasswordPage = React.lazy(() =>
+  import('@/pages/auth/ForgotPasswordPage')
+);
+const ResetPasswordPage = React.lazy(() =>
+  import('@/pages/auth/ResetPasswordPage')
+);
+const DashboardPage = React.lazy(() =>
+  import('@/pages/dashboard/DashboardPage')
+);
 const CadastrosGeraisPage = React.lazy(() =>
   import('@/pages/cadastros/CadastrosGeraisPage')
 );
-
 const EquipamentosPage = React.lazy(() =>
   import('@/pages/equipamentos/EquipamentosPage')
 );
@@ -39,7 +41,6 @@ const FichaTecnicaPage = React.lazy(() =>
 const SalvarEquipamentoPage = React.lazy(() =>
   import('@/pages/equipamentos/SalvarEquipamentoPage')
 );
-
 const ManutencoesPage = React.lazy(() =>
   import('@/pages/manutencoes/ManutencoesPage')
 );
@@ -49,7 +50,6 @@ const DetalhesManutencaoPage = React.lazy(() =>
 const SalvarManutencaoPage = React.lazy(() =>
   import('@/pages/manutencoes/SalvarManutencaoPage')
 );
-
 const ContratosPage = React.lazy(() =>
   import('@/pages/contratos/ContratosPage')
 );
@@ -59,7 +59,6 @@ const SalvarContratoPage = React.lazy(() =>
 const DetalhesContratoPage = React.lazy(() =>
   import('@/pages/contratos/DetalhesContratoPage')
 );
-
 const SegurosPage = React.lazy(() => import('@/pages/seguros/SegurosPage'));
 const SalvarSeguroPage = React.lazy(() =>
   import('@/pages/seguros/SalvarSeguroPage')
@@ -67,35 +66,43 @@ const SalvarSeguroPage = React.lazy(() =>
 const DetalhesSeguroPage = React.lazy(() =>
   import('@/pages/seguros/DetalhesSeguroPage')
 );
-
 const UnidadesPage = React.lazy(() => import('@/pages/unidades/UnidadesPage'));
 const SalvarUnidadePage = React.lazy(() =>
   import('@/pages/unidades/SalvarUnidadePage')
 );
-
 const RelatoriosPage = React.lazy(() =>
   import('@/pages/relatorios/RelatoriosPage')
 );
-
 const AlertasPage = React.lazy(() =>
   import('@/pages/notificacoes/AlertasPage')
 );
 const EmailsNotificacaoPage = React.lazy(() =>
   import('@/pages/notificacoes/EmailsNotificacaoPage')
 );
-
+const HelpCenterPage = React.lazy(() => import('@/pages/help/HelpCenterPage'));
 const GerenciamentoPage = React.lazy(() =>
   import('@/pages/gerenciamento/GerenciamentoPage')
 );
 const GerenciarUsuariosPage = React.lazy(() =>
   import('@/pages/gerenciamento/GerenciarUsuariosPage')
 );
-
+const TenantSettingsPage = React.lazy(() =>
+  import('@/pages/gerenciamento/TenantSettingsPage')
+);
 const LogAuditoriaPage = React.lazy(() =>
   import('@/pages/auditoria/LogAuditoriaPage')
 );
 const AuditoriaDetalhadaPage = React.lazy(() =>
   import('@/pages/auditoria/AuditoriaDetalhadaPage')
+);
+const SuperAdminPage = React.lazy(() =>
+  import('@/pages/superadmin/SuperAdminPage')
+);
+const SuperAdminTenantsPage = React.lazy(() =>
+  import('@/pages/superadmin/SuperAdminTenantsPage')
+);
+const SuperAdminHelpPage = React.lazy(() =>
+  import('@/pages/superadmin/SuperAdminHelpPage')
 );
 
 function App() {
@@ -117,6 +124,18 @@ function App() {
             path="/login"
             element={isAuthenticated ? <Navigate to="/" replace /> : <LoginPage />}
           />
+          <Route
+            path="/recuperar-senha"
+            element={
+              isAuthenticated ? <Navigate to="/" replace /> : <ForgotPasswordPage />
+            }
+          />
+          <Route
+            path="/redefinir-senha/:token"
+            element={
+              isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />
+            }
+          />
 
           <Route
             path="/"
@@ -127,14 +146,11 @@ function App() {
             }
           >
             <Route index element={<Navigate to="dashboard" replace />} />
-
             <Route path="dashboard" element={<DashboardPage />} />
             <Route path="bi" element={<BIPage />} />
+            <Route path="ajuda" element={<HelpCenterPage />} />
 
-            {/* HUB DE CADASTROS */}
             <Route path="cadastros" element={<CadastrosGeraisPage />} />
-
-            {/* SUBROTAS DE CADASTROS */}
             <Route path="cadastros/unidades" element={<UnidadesPage />} />
             <Route
               path="cadastros/unidades/adicionar"
@@ -144,7 +160,6 @@ function App() {
               path="cadastros/unidades/editar/:id"
               element={<SalvarUnidadePage />}
             />
-
             <Route
               path="cadastros/equipamentos/adicionar"
               element={<SalvarEquipamentoPage />}
@@ -153,7 +168,6 @@ function App() {
               path="cadastros/equipamentos/editar/:equipamentoId"
               element={<SalvarEquipamentoPage />}
             />
-
             <Route
               path="cadastros/emails"
               element={
@@ -163,7 +177,6 @@ function App() {
               }
             />
 
-            {/* EQUIPAMENTOS */}
             <Route path="equipamentos" element={<EquipamentosPage />} />
             <Route
               path="equipamentos/detalhes/:equipamentoId"
@@ -174,22 +187,17 @@ function App() {
               element={<FichaTecnicaPage />}
             />
 
-            {/* MANUTENÇÕES */}
             <Route path="manutencoes" element={<ManutencoesPage />} />
             <Route
               path="manutencoes/detalhes/:manutencaoId"
               element={<DetalhesManutencaoPage />}
             />
-            <Route
-              path="manutencoes/agendar"
-              element={<SalvarManutencaoPage />}
-            />
+            <Route path="manutencoes/agendar" element={<SalvarManutencaoPage />} />
             <Route
               path="manutencoes/editar/:manutencaoId"
               element={<SalvarManutencaoPage />}
             />
 
-            {/* CONTRATOS */}
             <Route path="contratos" element={<ContratosPage />} />
             <Route path="contratos/adicionar" element={<SalvarContratoPage />} />
             <Route path="contratos/editar/:id" element={<SalvarContratoPage />} />
@@ -198,27 +206,43 @@ function App() {
               element={<DetalhesContratoPage />}
             />
 
-            {/* SEGUROS */}
             <Route path="seguros" element={<SegurosPage />} />
             <Route path="seguros/adicionar" element={<SalvarSeguroPage />} />
             <Route path="seguros/editar/:id" element={<SalvarSeguroPage />} />
             <Route path="seguros/detalhes/:id" element={<DetalhesSeguroPage />} />
 
-            {/* RELATÓRIOS / ALERTAS */}
             <Route path="relatorios" element={<RelatoriosPage />} />
             <Route path="alertas" element={<AlertasPage />} />
-
-            {/* AUDITORIA */}
             <Route
               path="auditoria/manutencao/:id"
               element={<AuditoriaDetalhadaPage />}
             />
 
-            {/* GERENCIAMENTO */}
-            <Route path="gerenciamento" element={<GerenciamentoPage />}>
+            <Route
+              path="gerenciamento"
+              element={
+                <AdminRoute>
+                  <GerenciamentoPage />
+                </AdminRoute>
+              }
+            >
               <Route index element={<Navigate to="usuarios" replace />} />
               <Route path="usuarios" element={<GerenciarUsuariosPage />} />
+              <Route path="empresa" element={<TenantSettingsPage />} />
               <Route path="auditoria" element={<LogAuditoriaPage />} />
+            </Route>
+
+            <Route
+              path="superadmin"
+              element={
+                <SuperAdminRoute>
+                  <SuperAdminPage />
+                </SuperAdminRoute>
+              }
+            >
+              <Route index element={<Navigate to="tenants" replace />} />
+              <Route path="tenants" element={<SuperAdminTenantsPage />} />
+              <Route path="ajuda" element={<SuperAdminHelpPage />} />
             </Route>
           </Route>
 
@@ -226,7 +250,7 @@ function App() {
         </Routes>
       </Suspense>
 
-      <div className="app-creator-signature">Desenvolvido por João Campanuci</div>
+      <div className="app-creator-signature">Desenvolvido por Joao Campanuci</div>
     </>
   );
 }
