@@ -1,22 +1,48 @@
 import React from 'react';
-import { faFileContract } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faArrowLeft,
+  faFileContract,
+} from '@fortawesome/free-solid-svg-icons';
 
-import { useSalvarContratoPage } from '../../hooks/contratos/useSalvarContratoPage';
+import { useSalvarContratoPage } from '@/hooks/contratos/useSalvarContratoPage';
 
-import PageLayout from '../../components/ui/layout/PageLayout';
-import PageHeader from '../../components/ui/layout/PageHeader';
-import PageSection from '../../components/ui/layout/PageSection';
-import PageState from '../../components/ui/feedback/PageState';
-import Button from '../../components/ui/primitives/Button';
+import {
+  Button,
+  PageHeader,
+  PageLayout,
+  PageState,
+} from '@/components/ui';
 
-import ContratoForm from '../../components/contratos/ContratoForm';
+import ContratoForm from '@/components/contratos/ContratoForm';
 
 function SalvarContratoPage() {
   const page = useSalvarContratoPage();
 
+  const title = page.isEditing
+    ? `Editar Contrato (${page.initialData?.numeroContrato || ''})`
+    : 'Novo Contrato';
+
+  const subtitle = page.isEditing
+    ? 'Atualize os dados do contrato e sua cobertura operacional.'
+    : 'Cadastre um novo contrato com dados de vigência e cobertura.';
+
+  const headerActions = (
+    <Button variant="secondary" onClick={page.goBack}>
+      <FontAwesomeIcon icon={faArrowLeft} />
+      Voltar
+    </Button>
+  );
+
   if (page.loading) {
     return (
       <PageLayout background="slate" padded fullHeight>
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          icon={faFileContract}
+          actions={headerActions}
+        />
         <PageState loading />
       </PageLayout>
     );
@@ -26,19 +52,11 @@ function SalvarContratoPage() {
     return (
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
-          title={
-            page.isEditing
-              ? 'Editar Contrato'
-              : 'Cadastrar Novo Contrato'
-          }
+          title={title}
+          subtitle={subtitle}
           icon={faFileContract}
-          actions={
-            <Button variant="secondary" onClick={page.goBack}>
-              Voltar
-            </Button>
-          }
+          actions={headerActions}
         />
-
         <PageState error={page.error} />
       </PageLayout>
     );
@@ -49,14 +67,10 @@ function SalvarContratoPage() {
       <PageLayout background="slate" padded fullHeight>
         <PageHeader
           title="Editar Contrato"
+          subtitle="O contrato solicitado não foi encontrado."
           icon={faFileContract}
-          actions={
-            <Button variant="secondary" onClick={page.goBack}>
-              Voltar
-            </Button>
-          }
+          actions={headerActions}
         />
-
         <PageState
           isEmpty
           emptyMessage="Contrato não encontrado."
@@ -68,33 +82,20 @@ function SalvarContratoPage() {
   return (
     <PageLayout background="slate" padded fullHeight>
       <PageHeader
-        title={
-          page.isEditing
-            ? `Editar Contrato (${page.initialData?.numeroContrato || ''})`
-            : 'Cadastrar Novo Contrato'
-        }
-        subtitle={
-          page.isEditing
-            ? 'Atualize os dados do contrato'
-            : 'Preencha os dados para criar um novo contrato'
-        }
+        title={title}
+        subtitle={subtitle}
         icon={faFileContract}
-        actions={
-          <Button variant="secondary" onClick={page.goBack}>
-            Voltar
-          </Button>
-        }
+        actions={headerActions}
       />
 
-      <PageSection>
-        <ContratoForm
-          onSubmit={page.handleSave}
-          initialData={page.initialData}
-          isEditing={page.isEditing}
-          todosEquipamentos={page.equipamentos}
-          unidadesDisponiveis={page.unidades}
-        />
-      </PageSection>
+      <ContratoForm
+        onSubmit={page.handleSave}
+        initialData={page.initialData}
+        isEditing={page.isEditing}
+        todosEquipamentos={page.equipamentos}
+        unidadesDisponiveis={page.unidades}
+        onCancel={page.goBack}
+      />
     </PageLayout>
   );
 }

@@ -1,9 +1,11 @@
 import React from 'react';
-import { faEnvelope } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faEnvelope, faPlus } from '@fortawesome/free-solid-svg-icons';
 
 import { useEmailsNotificacaoPage } from '@/hooks/notificacoes/useEmailsNotificacaoPage';
 
 import {
+  Button,
   PageHeader,
   PageLayout,
   PageSection,
@@ -19,6 +21,13 @@ import {
 
 function EmailsNotificacaoPage() {
   const page = useEmailsNotificacaoPage();
+
+  const createAction = (
+    <Button type="button" onClick={page.handleOpenCreate}>
+      <FontAwesomeIcon icon={faPlus} />
+      Adicionar e-mail
+    </Button>
+  );
 
   return (
     <PageLayout background="slate" padded fullHeight>
@@ -47,20 +56,26 @@ function EmailsNotificacaoPage() {
           title="E-mails de Notificação"
           subtitle="Gerencie os destinatários de alertas e suas preferências de envio"
           icon={faEnvelope}
+          actions={createAction}
         />
 
         <PageSection
           title="Lista de destinatários"
           description="Configure antecedência e subscrições de contratos, manutenções e seguros."
+          headerRight={!page.loading && !page.isEmpty ? createAction : null}
         >
           {page.loading ? (
             <PageState loading />
           ) : page.isEmpty ? (
-            <PageState isEmpty emptyMessage="Nenhum e-mail cadastrado." />
+            <div className="space-y-4">
+              <PageState isEmpty emptyMessage="Nenhum e-mail cadastrado." />
+              <div className="flex justify-center sm:justify-start">
+                {createAction}
+              </div>
+            </div>
           ) : (
             <EmailsTable
               emails={page.emails}
-              onCreate={page.handleOpenCreate}
               onEdit={page.handleOpenEdit}
               onDelete={page.openDeleteModal}
             />

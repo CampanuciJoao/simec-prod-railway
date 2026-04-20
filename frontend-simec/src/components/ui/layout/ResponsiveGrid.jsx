@@ -1,6 +1,18 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
+function normalizeCols(cols = {}) {
+  if (typeof cols === 'number') {
+    return {
+      base: 1,
+      md: Math.min(cols, 2),
+      xl: cols,
+    };
+  }
+
+  return cols || { base: 1 };
+}
+
 function buildGridClasses(cols = {}) {
   const { base = 1, sm, md, lg, xl } = cols;
   const classes = ['grid', `grid-cols-${base}`];
@@ -28,7 +40,7 @@ function ResponsiveGrid({
   gap = 'gap-4',
   className = '',
 }) {
-  const config = preset ? PRESETS[preset] : cols || { base: 1 };
+  const config = preset ? PRESETS[preset] : normalizeCols(cols);
 
   return (
     <div className={[buildGridClasses(config), gap, className].join(' ')}>
@@ -39,7 +51,7 @@ function ResponsiveGrid({
 
 ResponsiveGrid.propTypes = {
   children: PropTypes.node.isRequired,
-  cols: PropTypes.object,
+  cols: PropTypes.oneOfType([PropTypes.object, PropTypes.number]),
   preset: PropTypes.oneOf(['form', 'details', 'cards', 'compact', 'twoCols']),
   gap: PropTypes.string,
   className: PropTypes.string,

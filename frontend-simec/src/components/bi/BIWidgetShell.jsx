@@ -14,7 +14,12 @@ function ActionButton({ title, onClick, disabled, icon }) {
       title={title}
       onClick={onClick}
       disabled={disabled}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition disabled:cursor-not-allowed disabled:opacity-40"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface)',
+        color: 'var(--text-secondary)',
+      }}
     >
       <FontAwesomeIcon icon={icon} />
     </button>
@@ -33,12 +38,31 @@ function BIWidgetShell({
   children,
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col gap-4 border-b border-slate-100 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+    <section
+      className="rounded-2xl border shadow-sm"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface)',
+      }}
+    >
+      <div
+        className="flex flex-col gap-4 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between"
+        style={{ borderColor: 'var(--border-soft)' }}
+      >
         <div className="min-w-0">
-          <h2 className="text-base font-semibold text-slate-900">{title}</h2>
+          <h2
+            className="text-base font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {title}
+          </h2>
           {description ? (
-            <p className="mt-1 text-sm text-slate-500">{description}</p>
+            <p
+              className="mt-1 text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {description}
+            </p>
           ) : null}
         </div>
 

@@ -33,17 +33,26 @@ function InteractiveKpiCard({ icon, title, value, tone = 'slate', onClick }) {
             </div>
 
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <p
+                className="text-xs font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {title}
               </p>
 
-              <p className="mt-3 break-words text-3xl font-bold leading-tight tracking-tight text-slate-900">
+              <p
+                className="mt-3 break-words text-3xl font-bold leading-tight tracking-tight"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {value}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-semibold text-blue-600">
+          <div
+            className="flex items-center gap-2 text-xs font-semibold"
+            style={{ color: 'var(--brand-primary)' }}
+          >
             <span>Ver detalhes</span>
             <FontAwesomeIcon icon={faArrowRight} />
           </div>

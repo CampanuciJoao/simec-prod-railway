@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 
 import { useBIPage } from '@/hooks/bi/useBIPage';
 
-import { PageLayout, PageState } from '@/components/ui';
+import { PageLayout, PageSection, PageState } from '@/components/ui';
 
 import BIPageHeader from '@/components/bi/BIPageHeader';
 import BIResumoCardsSection from '@/components/bi/BIResumoCardsSection';
@@ -103,7 +103,9 @@ function BIPage() {
         <BIPageHeader
           ano={page.dados?.ano}
           onPrint={page.handlePrint}
+          onRefresh={page.recarregar}
           canPrint={!!page.dados}
+          canRefresh={!page.loading}
         />
 
         <PageState
@@ -123,7 +125,9 @@ function BIPage() {
           <BIPageHeader
             ano={page.dados?.ano}
             onPrint={page.handlePrint}
+            onRefresh={page.recarregar}
             canPrint
+            canRefresh={!page.loading}
           />
 
           <BIResumoCardsSection
@@ -131,32 +135,37 @@ function BIPage() {
             onOpenDrawer={page.openDrawer}
           />
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-            {orderedWidgets.map((widget, index) => {
-              const isExpanded = expandedWidget === widget.id;
+          <PageSection
+            title="Widgets analíticos"
+            description="Os gráficos priorizam leitura executiva rápida, com drill-down e priorização operacional."
+          >
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              {orderedWidgets.map((widget, index) => {
+                const isExpanded = expandedWidget === widget.id;
 
-              const spanClassName = isExpanded
-                ? 'xl:col-span-2'
-                : widget.defaultSpanClassName;
+                const spanClassName = isExpanded
+                  ? 'xl:col-span-2'
+                  : widget.defaultSpanClassName;
 
-              return (
-                <div key={widget.id} className={spanClassName}>
-                  <BIWidgetShell
-                    title={widget.title}
-                    description={widget.description}
-                    expanded={isExpanded}
-                    canMoveUp={index > 0}
-                    canMoveDown={index < orderedWidgets.length - 1}
-                    onToggleExpand={() => toggleExpand(widget.id)}
-                    onMoveUp={() => moveWidgetUp(widget.id)}
-                    onMoveDown={() => moveWidgetDown(widget.id)}
-                  >
-                    {widget.render(isExpanded)}
-                  </BIWidgetShell>
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <div key={widget.id} className={spanClassName}>
+                    <BIWidgetShell
+                      title={widget.title}
+                      description={widget.description}
+                      expanded={isExpanded}
+                      canMoveUp={index > 0}
+                      canMoveDown={index < orderedWidgets.length - 1}
+                      onToggleExpand={() => toggleExpand(widget.id)}
+                      onMoveUp={() => moveWidgetUp(widget.id)}
+                      onMoveDown={() => moveWidgetDown(widget.id)}
+                    >
+                      {widget.render(isExpanded)}
+                    </BIWidgetShell>
+                  </div>
+                );
+              })}
+            </div>
+          </PageSection>
         </div>
       </PageLayout>
 

@@ -10,7 +10,11 @@ function BIDowntimeChartWidget({ data, expanded = false }) {
 
   return (
     <div className={expanded ? 'h-[460px]' : 'h-[320px]'}>
-      <BarChart data={data} />
+      <BarChart
+        data={data}
+        datasetLabel="Horas paradas"
+        emptyMessage="Sem dados válidos de downtime por unidade."
+      />
     </div>
   );
 }

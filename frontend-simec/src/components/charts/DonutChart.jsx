@@ -5,6 +5,33 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
 
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+function getThemeChartColors() {
+  if (typeof window === 'undefined') {
+    return {
+      legend: '#475569',
+      tooltipBg: '#0f172a',
+      tooltipTitle: '#ffffff',
+      tooltipBody: '#e2e8f0',
+      tooltipBorder: '#1e293b',
+      border: '#ffffff',
+    };
+  }
+
+  const styles = window.getComputedStyle(document.documentElement);
+
+  return {
+    legend: styles.getPropertyValue('--text-muted').trim() || '#475569',
+    tooltipBg: styles.getPropertyValue('--bg-elevated').trim() || '#0f172a',
+    tooltipTitle:
+      styles.getPropertyValue('--text-primary').trim() || '#ffffff',
+    tooltipBody:
+      styles.getPropertyValue('--text-secondary').trim() || '#e2e8f0',
+    tooltipBorder:
+      styles.getPropertyValue('--border-default').trim() || '#1e293b',
+    border: styles.getPropertyValue('--bg-surface').trim() || '#ffffff',
+  };
+}
+
 function getStatusColor(label) {
   const normalized = String(label || '')
     .toLowerCase()
@@ -34,6 +61,7 @@ function normalizarDados(input) {
   const labels = itemsValidos.map((item) => item.name);
   const values = itemsValidos.map((item) => item.value);
   const colors = labels.map((label) => getStatusColor(label));
+  const themeColors = getThemeChartColors();
 
   return {
     labels,
@@ -41,7 +69,7 @@ function normalizarDados(input) {
       {
         data: values,
         backgroundColor: colors,
-        borderColor: '#ffffff',
+        borderColor: themeColors.border,
         borderWidth: 3,
         hoverOffset: 6,
       },
@@ -64,8 +92,10 @@ EmptyChartState.propTypes = {
 function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráfico.' }) {
   const chartData = useMemo(() => normalizarDados(data), [data]);
 
-  const options = useMemo(
-    () => ({
+  const options = useMemo(() => {
+    const colors = getThemeChartColors();
+
+    return {
       responsive: true,
       maintainAspectRatio: false,
       cutout: '62%',
@@ -73,10 +103,11 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
         legend: {
           position: 'bottom',
           labels: {
-            color: '#475569',
+            color: colors.legend,
             usePointStyle: true,
             pointStyle: 'circle',
             padding: 18,
+            boxWidth: 10,
             font: {
               size: 12,
               weight: '600',
@@ -85,12 +116,12 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
               const labels = chart.data.labels || [];
               const dataset = chart.data.datasets?.[0];
               const values = dataset?.data || [];
-              const colors = dataset?.backgroundColor || [];
+              const datasetColors = dataset?.backgroundColor || [];
 
               return labels.map((label, index) => ({
                 text: `${label} (${values[index] ?? 0})`,
-                fillStyle: colors[index],
-                strokeStyle: colors[index],
+                fillStyle: datasetColors[index],
+                strokeStyle: datasetColors[index],
                 lineWidth: 0,
                 hidden: false,
                 index,
@@ -99,17 +130,16 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
           },
         },
         tooltip: {
-          backgroundColor: '#0f172a',
-          titleColor: '#ffffff',
-          bodyColor: '#e2e8f0',
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipTitle,
+          bodyColor: colors.tooltipBody,
           padding: 12,
-          borderColor: '#1e293b',
+          borderColor: colors.tooltipBorder,
           borderWidth: 1,
         },
       },
-    }),
-    []
-  );
+    };
+  }, []);
 
   if (!chartData) {
     return <EmptyChartState message={emptyMessage} />;

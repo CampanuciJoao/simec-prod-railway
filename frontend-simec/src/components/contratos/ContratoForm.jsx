@@ -3,10 +3,6 @@ import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faSave,
-  faTimes,
-  faSpinner,
-  faFileContract,
   faHospital,
   faMicrochip,
 } from '@fortawesome/free-solid-svg-icons';
@@ -14,10 +10,10 @@ import {
 import { useContratoForm } from '@/hooks/contratos/useContratoForm';
 
 import {
-  Button,
   DateInput,
+  FormActions,
+  FormSection,
   Input,
-  PageSection,
   ResponsiveGrid,
   Select,
 } from '@/components/ui';
@@ -31,26 +27,6 @@ const OPCOES_CATEGORIA = [
 ];
 
 const OPCOES_STATUS = ['Ativo', 'Expirado', 'Cancelado'];
-
-function FormField({ label, required = false, hint = '', children }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-700">
-        {label}
-        {required ? ' *' : ''}
-      </label>
-      {children}
-      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
-    </div>
-  );
-}
-
-FormField.propTypes = {
-  label: PropTypes.string.isRequired,
-  required: PropTypes.bool,
-  hint: PropTypes.string,
-  children: PropTypes.node.isRequired,
-};
 
 function ContratoForm({
   onSubmit,
@@ -95,109 +71,77 @@ function ContratoForm({
         </div>
       ) : null}
 
-      <PageSection
+      <FormSection
         title="Informações do contrato"
-        description="Dados principais de identificação e vigência."
+        description="Dados principais de identificação, fornecedor e vigência."
       >
-        <div className="mb-5 flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-blue-100 text-blue-600">
-            <FontAwesomeIcon icon={faFileContract} />
-          </span>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Cadastro principal do contrato
-            </p>
-            <p className="text-sm text-slate-500">
-              Informe dados básicos para registrar o contrato no sistema.
-            </p>
-          </div>
-        </div>
-
         <ResponsiveGrid preset="form">
-          <FormField label="Número do contrato" required>
-            <Input
-              type="text"
-              name="numeroContrato"
-              value={formData.numeroContrato}
-              onChange={handleChange}
-              placeholder="Digite o número do contrato"
-              required
-            />
-          </FormField>
+          <Input
+            label="Número do contrato"
+            name="numeroContrato"
+            value={formData.numeroContrato}
+            onChange={handleChange}
+            placeholder="Digite o número do contrato"
+            required
+          />
 
-          <FormField label="Categoria" required>
-            <Select
-              name="categoria"
-              value={formData.categoria}
-              onChange={handleChange}
-              required
-            >
-              <option value="">Selecione</option>
-              {OPCOES_CATEGORIA.map((categoria) => (
-                <option key={categoria} value={categoria}>
-                  {categoria}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+          <Select
+            label="Categoria"
+            name="categoria"
+            value={formData.categoria}
+            onChange={handleChange}
+            options={OPCOES_CATEGORIA.map((categoria) => ({
+              value: categoria,
+              label: categoria,
+            }))}
+            placeholder="Selecione a categoria"
+            required
+          />
 
-          <FormField label="Fornecedor" required>
-            <Input
-              type="text"
-              name="fornecedor"
-              value={formData.fornecedor}
-              onChange={handleChange}
-              placeholder="Digite o fornecedor"
-              required
-            />
-          </FormField>
+          <Input
+            label="Fornecedor"
+            name="fornecedor"
+            value={formData.fornecedor}
+            onChange={handleChange}
+            placeholder="Digite o fornecedor"
+            required
+          />
 
-          <FormField
+          <DateInput
             label="Data de início"
-            required
+            name="dataInicio"
+            value={formData.dataInicio}
+            onChange={handleChange}
             hint="Você pode selecionar no calendário ou digitar."
-          >
-            <DateInput
-              name="dataInicio"
-              value={formData.dataInicio}
-              onChange={handleChange}
-            />
-          </FormField>
+          />
 
-          <FormField
+          <DateInput
             label="Data de fim"
-            required
+            name="dataFim"
+            value={formData.dataFim}
+            onChange={handleChange}
+            min={formData.dataInicio || undefined}
             hint="A vigência final não pode ser anterior ao início."
-          >
-            <DateInput
-              name="dataFim"
-              value={formData.dataFim}
-              onChange={handleChange}
-              min={formData.dataInicio || undefined}
-            />
-          </FormField>
+          />
 
-          <FormField label="Status" required>
-            <Select
-              name="status"
-              value={formData.status}
-              onChange={handleChange}
-              required
-            >
-              {OPCOES_STATUS.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </Select>
-          </FormField>
+          <Select
+            label="Status"
+            name="status"
+            value={formData.status}
+            onChange={handleChange}
+            options={OPCOES_STATUS.map((status) => ({
+              value: status,
+              label: status,
+            }))}
+            placeholder=""
+            required
+          />
         </ResponsiveGrid>
-      </PageSection>
+      </FormSection>
 
-      <PageSection
+      <FormSection
         title="Cobertura"
-        description="Selecione unidades e equipamentos cobertos pelo contrato."
+        description="Selecione as unidades e equipamentos cobertos por este contrato."
       >
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
           <ContratoSelectionCard
@@ -240,31 +184,13 @@ function ContratoForm({
             )}
           />
         </div>
-      </PageSection>
+      </FormSection>
 
-      <div className="flex flex-wrap justify-end gap-3">
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={handleCancelClick}
-          disabled={isSubmitting}
-        >
-          <FontAwesomeIcon icon={faTimes} />
-          Cancelar
-        </Button>
-
-        <Button type="submit" disabled={isSubmitting}>
-          <FontAwesomeIcon
-            icon={isSubmitting ? faSpinner : faSave}
-            spin={isSubmitting}
-          />
-          {isSubmitting
-            ? 'Salvando...'
-            : isEditing
-              ? 'Salvar alterações'
-              : 'Salvar contrato'}
-        </Button>
-      </div>
+      <FormActions
+        onCancel={handleCancelClick}
+        loading={isSubmitting}
+        submitLabel={isEditing ? 'Salvar alterações' : 'Salvar contrato'}
+      />
     </form>
   );
 }

@@ -2,7 +2,6 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faPlus,
   faEdit,
   faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
@@ -10,18 +9,13 @@ import {
 import { Button, Card } from '@/components/ui';
 import EmailStatusIcon from '@/components/emails/EmailStatusIcon';
 
-function EmailsTable({ emails, onCreate, onEdit, onDelete }) {
+function EmailsTable({ emails, onEdit, onDelete }) {
   return (
     <div className="space-y-4">
       <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <span className="text-sm font-medium text-slate-600">
           {emails.length} e-mail(s) cadastrado(s)
         </span>
-
-        <Button type="button" onClick={onCreate}>
-          <FontAwesomeIcon icon={faPlus} />
-          Adicionar E-mail
-        </Button>
       </div>
 
       <Card padded={false} className="overflow-hidden">
@@ -100,7 +94,6 @@ function EmailsTable({ emails, onCreate, onEdit, onDelete }) {
 
 EmailsTable.propTypes = {
   emails: PropTypes.arrayOf(PropTypes.object).isRequired,
-  onCreate: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
 };

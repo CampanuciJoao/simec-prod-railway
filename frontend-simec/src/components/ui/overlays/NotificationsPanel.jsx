@@ -58,131 +58,140 @@ function NotificationsPanel({
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-3 w-[420px] max-w-[calc(100vw-32px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
-          <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-            <div>
-              <h3 className="text-sm font-bold text-slate-900">Notificações</h3>
-              <p className="text-xs text-slate-500">
-                {contadorNaoVistos} não visto(s)
-              </p>
-            </div>
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-slate-950/30 md:hidden"
+            onClick={onClose}
+            aria-label="Fechar notificações"
+          />
 
-            <div className="flex items-center gap-2">
-              <Link
-                to="/alertas"
-                onClick={onClose}
-                className="text-xs font-semibold text-blue-600 transition hover:underline"
-              >
-                Ver todos
-              </Link>
-
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Fechar notificações"
-              >
-                <FontAwesomeIcon icon={faXmark} />
-              </button>
-            </div>
-          </div>
-
-          <div className="max-h-[420px] overflow-y-auto">
-            {loading ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
-                Carregando alertas...
+          <div className="fixed inset-x-3 bottom-3 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:mt-3 md:w-[420px] md:max-w-[calc(100vw-32px)]">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+              <div className="min-w-0">
+                <h3 className="text-sm font-bold text-slate-900">Notificações</h3>
+                <p className="text-xs text-slate-500">
+                  {contadorNaoVistos} não visto(s)
+                </p>
               </div>
-            ) : alertasRecentes.length === 0 ? (
-              <div className="px-4 py-6 text-sm text-slate-500">
-                Nenhuma notificação disponível.
-              </div>
-            ) : (
-              alertasRecentes.map((alerta) => (
-                <div
-                  key={alerta.id}
-                  className={[
-                    'border-b border-slate-100 px-4 py-3 transition',
-                    alerta.status === 'NaoVisto' ? 'bg-blue-50/40' : 'bg-white',
-                  ].join(' ')}
+
+              <div className="flex shrink-0 items-center gap-2">
+                <Link
+                  to="/alertas"
+                  onClick={onClose}
+                  className="text-xs font-semibold text-blue-600 transition hover:underline"
                 >
-                  <div className="flex items-start gap-3">
-                    <button
-                      type="button"
-                      onClick={() => onOpenAlert(alerta)}
-                      className="min-w-0 flex-1 text-left"
-                    >
-                      <div className="flex items-center gap-2">
-                        <p className="truncate text-sm font-semibold text-slate-900">
-                          {alerta.titulo}
-                        </p>
+                  Ver todos
+                </Link>
 
-                        {alerta.status === 'NaoVisto' && (
-                          <span className="h-2.5 w-2.5 rounded-full bg-blue-500" />
-                        )}
-                      </div>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
+                  aria-label="Fechar notificações"
+                >
+                  <FontAwesomeIcon icon={faXmark} />
+                </button>
+              </div>
+            </div>
 
-                      {alerta.subtitulo ? (
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-500">
-                          {alerta.subtitulo}
-                        </p>
-                      ) : null}
-
-                      <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-slate-400">
-                        <span className="inline-flex items-center gap-1">
-                          <FontAwesomeIcon icon={faClock} />
-                          {formatarDataCurta(alerta.data)}
-                        </span>
-
-                        {alerta.tipo ? (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
-                            {alerta.tipo}
-                          </span>
-                        ) : null}
-
-                        {alerta.prioridade ? (
-                          <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
-                            {alerta.prioridade}
-                          </span>
-                        ) : null}
-                      </div>
-                    </button>
-
-                    <div className="flex shrink-0 items-center gap-1">
-                      {alerta.status === 'NaoVisto' ? (
-                        <button
-                          type="button"
-                          onClick={() => onMarkAsRead(alerta.id)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50"
-                          title="Marcar como visto"
-                        >
-                          <FontAwesomeIcon icon={faCheck} />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => onOpenAlert(alerta)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50"
-                          title="Abrir alerta"
-                        >
-                          <FontAwesomeIcon icon={faEye} />
-                        </button>
-                      )}
-
+            <div className="max-h-[min(70vh,420px)] overflow-y-auto md:max-h-[420px]">
+              {loading ? (
+                <div className="px-4 py-6 text-sm text-slate-500">
+                  Carregando alertas...
+                </div>
+              ) : alertasRecentes.length === 0 ? (
+                <div className="px-4 py-6 text-sm text-slate-500">
+                  Nenhuma notificação disponível.
+                </div>
+              ) : (
+                alertasRecentes.map((alerta) => (
+                  <div
+                    key={alerta.id}
+                    className={[
+                      'border-b border-slate-100 px-4 py-3 transition last:border-b-0',
+                      alerta.status === 'NaoVisto' ? 'bg-blue-50/40' : 'bg-white',
+                    ].join(' ')}
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                       <button
                         type="button"
-                        onClick={() => onDismiss(alerta.id)}
-                        className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
-                        title="Dispensar alerta"
+                        onClick={() => onOpenAlert(alerta)}
+                        className="min-w-0 flex-1 text-left"
                       >
-                        <FontAwesomeIcon icon={faBellSlash} />
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-sm font-semibold text-slate-900">
+                            {alerta.titulo}
+                          </p>
+
+                          {alerta.status === 'NaoVisto' && (
+                            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
+                          )}
+                        </div>
+
+                        {alerta.subtitulo ? (
+                          <p className="mt-1 line-clamp-2 text-xs text-slate-500">
+                            {alerta.subtitulo}
+                          </p>
+                        ) : null}
+
+                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400 sm:gap-3">
+                          <span className="inline-flex items-center gap-1">
+                            <FontAwesomeIcon icon={faClock} />
+                            {formatarDataCurta(alerta.data)}
+                          </span>
+
+                          {alerta.tipo ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
+                              {alerta.tipo}
+                            </span>
+                          ) : null}
+
+                          {alerta.prioridade ? (
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
+                              {alerta.prioridade}
+                            </span>
+                          ) : null}
+                        </div>
                       </button>
+
+                      <div className="flex shrink-0 items-center justify-end gap-1 sm:pt-0.5">
+                        {alerta.status === 'NaoVisto' ? (
+                          <button
+                            type="button"
+                            onClick={() => onMarkAsRead(alerta.id)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-green-600 transition hover:bg-green-50"
+                            title="Marcar como visto"
+                          >
+                            <FontAwesomeIcon icon={faCheck} />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => onOpenAlert(alerta)}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 transition hover:bg-blue-50"
+                            title="Abrir alerta"
+                          >
+                            <FontAwesomeIcon icon={faEye} />
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => onDismiss(alerta.id)}
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                          title="Dispensar alerta"
+                        >
+                          <FontAwesomeIcon icon={faBellSlash} />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))
-            )}
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

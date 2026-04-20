@@ -12,6 +12,39 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Tooltip, Legend);
 
+function getThemeChartColors() {
+  if (typeof window === 'undefined') {
+    return {
+      axis: '#64748b',
+      grid: 'rgba(148, 163, 184, 0.18)',
+      tooltipBg: '#0f172a',
+      tooltipTitle: '#ffffff',
+      tooltipBody: '#e2e8f0',
+      tooltipBorder: '#1e293b',
+      bar: 'rgba(59, 130, 246, 0.9)',
+    };
+  }
+
+  const styles = window.getComputedStyle(document.documentElement);
+
+  return {
+    axis: styles.getPropertyValue('--text-muted').trim() || '#64748b',
+    grid:
+      styles.getPropertyValue('--border-soft').trim() ||
+      'rgba(148, 163, 184, 0.18)',
+    tooltipBg: styles.getPropertyValue('--bg-elevated').trim() || '#0f172a',
+    tooltipTitle:
+      styles.getPropertyValue('--text-primary').trim() || '#ffffff',
+    tooltipBody:
+      styles.getPropertyValue('--text-secondary').trim() || '#e2e8f0',
+    tooltipBorder:
+      styles.getPropertyValue('--border-default').trim() || '#1e293b',
+    bar:
+      styles.getPropertyValue('--brand-primary').trim() ||
+      'rgba(59, 130, 246, 0.9)',
+  };
+}
+
 function normalizarDados(input) {
   if (!Array.isArray(input) || input.length === 0) return null;
 
@@ -61,6 +94,7 @@ function BarChart({
 
   const chartData = useMemo(() => {
     const normalizado = normalizarDados(data);
+    const colors = getThemeChartColors();
 
     if (!normalizado) return null;
 
@@ -69,6 +103,7 @@ function BarChart({
       datasets: normalizado.datasets.map((dataset) => ({
         ...dataset,
         label: datasetLabel,
+        backgroundColor: colors.bar,
       })),
     };
   }, [data, datasetLabel]);
@@ -85,17 +120,20 @@ function BarChart({
   };
 
   const options = useMemo(
-    () => ({
+    () => {
+      const colors = getThemeChartColors();
+
+      return {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#0f172a',
-          titleColor: '#ffffff',
-          bodyColor: '#e2e8f0',
+          backgroundColor: colors.tooltipBg,
+          titleColor: colors.tooltipTitle,
+          bodyColor: colors.tooltipBody,
           padding: 12,
-          borderColor: '#1e293b',
+          borderColor: colors.tooltipBorder,
           borderWidth: 1,
         },
       },
@@ -103,25 +141,28 @@ function BarChart({
         x: {
           grid: { display: false },
           ticks: {
-            color: '#64748b',
+            color: colors.axis,
             font: {
               size: 11,
               weight: '600',
             },
+            maxRotation: 0,
+            minRotation: 0,
           },
         },
         y: {
           beginAtZero: true,
           ticks: {
             precision: 0,
-            color: '#64748b',
+            color: colors.axis,
           },
           grid: {
-            color: 'rgba(148, 163, 184, 0.18)',
+            color: colors.grid,
           },
         },
       },
-    }),
+      };
+    },
     []
   );
 
