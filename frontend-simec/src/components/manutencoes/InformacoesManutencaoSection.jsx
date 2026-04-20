@@ -11,7 +11,6 @@ import {
   DateInput,
   Input,
   PageSection,
-  ResponsiveGrid,
   Textarea,
   TimeInput,
 } from '@/components/ui';
@@ -111,41 +110,45 @@ function InformacoesManutencaoSection({
           />
         </ResponsiveGrid>
 
-        <ResponsiveGrid preset="form">
-          <DateInput
-            label="Data de inicio"
-            name="agendamentoDataInicioLocal"
-            value={formData.agendamentoDataInicioLocal}
-            onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados || submitting}
-          />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="space-y-4">
+            <DateInput
+              label="Data de inicio"
+              name="agendamentoDataInicioLocal"
+              value={formData.agendamentoDataInicioLocal}
+              onChange={onFormChange}
+              disabled={camposPrincipaisBloqueados || submitting}
+            />
 
-          <TimeInput
-            label="Hora inicial"
-            name="agendamentoHoraInicioLocal"
-            value={formData.agendamentoHoraInicioLocal}
-            onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados || submitting}
-            required
-          />
+            <TimeInput
+              label="Hora inicial"
+              name="agendamentoHoraInicioLocal"
+              value={formData.agendamentoHoraInicioLocal}
+              onChange={onFormChange}
+              disabled={camposPrincipaisBloqueados || submitting}
+              required
+            />
+          </div>
 
-          <DateInput
-            label="Data de termino"
-            name="agendamentoDataFimLocal"
-            value={formData.agendamentoDataFimLocal}
-            onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados || submitting}
-          />
+          <div className="space-y-4">
+            <DateInput
+              label="Data de termino"
+              name="agendamentoDataFimLocal"
+              value={formData.agendamentoDataFimLocal}
+              onChange={onFormChange}
+              disabled={camposPrincipaisBloqueados || submitting}
+            />
 
-          <TimeInput
-            label="Hora final"
-            name="agendamentoHoraFimLocal"
-            value={formData.agendamentoHoraFimLocal}
-            onChange={onFormChange}
-            disabled={camposPrincipaisBloqueados || submitting}
-            required
-          />
-        </ResponsiveGrid>
+            <TimeInput
+              label="Hora final"
+              name="agendamentoHoraFimLocal"
+              value={formData.agendamentoHoraFimLocal}
+              onChange={onFormChange}
+              disabled={camposPrincipaisBloqueados || submitting}
+              required
+            />
+          </div>
+        </div>
 
         {!camposPrincipaisBloqueados ? (
           <div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
