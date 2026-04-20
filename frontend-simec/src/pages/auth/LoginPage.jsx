@@ -10,6 +10,7 @@ import {
 import AuthLayout from '../../components/auth/AuthLayout';
 import LoginForm from '../../components/auth/LoginForm';
 import { useLogin } from '../../hooks/auth/useLogin';
+import { Card } from '@/components/ui';
 
 function LoginPage() {
   const {
@@ -26,32 +27,24 @@ function LoginPage() {
 
   return (
     <AuthLayout>
-      <div
-        className="w-full rounded-3xl border shadow-2xl backdrop-blur-sm"
+      <Card
+        className="w-full overflow-hidden rounded-3xl shadow-2xl"
+        padded={false}
         style={{
-          '--bg-surface': 'var(--brand-primary-surface)',
-          '--bg-surface-soft': 'var(--brand-primary-surface-soft)',
-          '--text-primary': 'var(--text-on-brand, #f8fbff)',
-          '--text-muted': 'var(--text-on-brand-muted, rgba(248,251,255,0.78))',
-          '--border-soft': 'var(--border-on-brand-soft, rgba(255,255,255,0.16))',
+          background:
+            'linear-gradient(180deg, var(--brand-primary-surface-soft) 0%, var(--brand-primary-surface) 100%)',
+          borderColor: 'var(--brand-primary-soft)',
+          boxShadow: '0 24px 60px rgba(2, 6, 23, 0.28)',
         }}
       >
-        <div
-          className="rounded-3xl border p-8 md:p-10"
-          style={{
-            backgroundColor: 'var(--bg-surface)',
-            borderColor: 'var(--border-soft)',
-            boxShadow:
-              '0 24px 60px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
-          }}
-        >
+        <div className="p-8 md:p-10">
           <div className="mb-8">
             <div
               className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em]"
               style={{
-                borderColor: 'var(--border-soft)',
-                color: 'var(--text-primary)',
-                backgroundColor: 'var(--bg-surface-soft)',
+                borderColor: 'var(--brand-primary-soft)',
+                color: 'var(--brand-primary)',
+                backgroundColor: 'var(--bg-elevated)',
               }}
             >
               <FontAwesomeIcon icon={faShieldHalved} />
@@ -74,12 +67,10 @@ function LoginPage() {
           </div>
 
           <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                backgroundColor: 'var(--bg-surface-soft)',
-                borderColor: 'var(--border-soft)',
-              }}
+            <Card
+              surface="elevated"
+              className="rounded-2xl"
+              style={{ borderColor: 'var(--brand-primary-soft)' }}
             >
               <div
                 className="text-sm font-semibold"
@@ -89,19 +80,17 @@ function LoginPage() {
                 Empresa isolada
               </div>
               <div
-                className="mt-1 text-xs"
+                className="mt-1 text-xs leading-5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Cada login é vinculado ao tenant informado.
               </div>
-            </div>
+            </Card>
 
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                backgroundColor: 'var(--bg-surface-soft)',
-                borderColor: 'var(--border-soft)',
-              }}
+            <Card
+              surface="elevated"
+              className="rounded-2xl"
+              style={{ borderColor: 'var(--brand-primary-soft)' }}
             >
               <div
                 className="text-sm font-semibold"
@@ -111,19 +100,17 @@ function LoginPage() {
                 Rotas protegidas
               </div>
               <div
-                className="mt-1 text-xs"
+                className="mt-1 text-xs leading-5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 O sistema exige token válido em toda a área autenticada.
               </div>
-            </div>
+            </Card>
 
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                backgroundColor: 'var(--bg-surface-soft)',
-                borderColor: 'var(--border-soft)',
-              }}
+            <Card
+              surface="elevated"
+              className="rounded-2xl"
+              style={{ borderColor: 'var(--brand-primary-soft)' }}
             >
               <div
                 className="text-sm font-semibold"
@@ -133,37 +120,39 @@ function LoginPage() {
                 Sessão controlada
               </div>
               <div
-                className="mt-1 text-xs"
+                className="mt-1 text-xs leading-5"
                 style={{ color: 'var(--text-muted)' }}
               >
                 Sessões expiradas são descartadas automaticamente.
               </div>
-            </div>
+            </Card>
           </div>
 
-          <LoginForm
-            tenant={tenant}
-            username={username}
-            senha={senha}
-            error={error}
-            loading={loading}
-            onChangeTenant={setTenant}
-            onChangeUsername={setUsername}
-            onChangeSenha={setSenha}
-            onSubmit={handleSubmit}
-          />
+          <Card surface="default" className="rounded-2xl">
+            <LoginForm
+              tenant={tenant}
+              username={username}
+              senha={senha}
+              error={error}
+              loading={loading}
+              onChangeTenant={setTenant}
+              onChangeUsername={setUsername}
+              onChangeSenha={setSenha}
+              onSubmit={handleSubmit}
+            />
+          </Card>
 
           <div className="mt-6 text-center">
             <Link
               to="/recuperar-senha"
-              className="text-sm font-medium"
-              style={{ color: 'var(--text-primary)' }}
+              className="text-sm font-medium transition-opacity hover:opacity-80"
+              style={{ color: 'var(--brand-primary)' }}
             >
               Esqueceu sua senha?
             </Link>
           </div>
         </div>
-      </div>
+      </Card>
     </AuthLayout>
   );
 }
