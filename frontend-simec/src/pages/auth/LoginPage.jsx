@@ -26,20 +26,32 @@ function LoginPage() {
 
   return (
     <AuthLayout>
-      <div className="w-full rounded-3xl border shadow-2xl backdrop-blur-sm">
+      <div
+        className="w-full rounded-3xl border shadow-2xl backdrop-blur-sm"
+        style={{
+          '--bg-surface': 'var(--brand-primary-surface)',
+          '--bg-surface-soft': 'var(--brand-primary-surface-soft)',
+          '--text-primary': 'var(--text-on-brand, #f8fbff)',
+          '--text-muted': 'var(--text-on-brand-muted, rgba(248,251,255,0.78))',
+          '--border-soft': 'var(--border-on-brand-soft, rgba(255,255,255,0.16))',
+        }}
+      >
         <div
           className="rounded-3xl border p-8 md:p-10"
           style={{
             backgroundColor: 'var(--bg-surface)',
             borderColor: 'var(--border-soft)',
+            boxShadow:
+              '0 24px 60px rgba(2, 6, 23, 0.28), inset 0 1px 0 rgba(255,255,255,0.04)',
           }}
         >
           <div className="mb-8">
-            <div className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em]"
+            <div
+              className="inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.22em]"
               style={{
-                borderColor: 'var(--brand-primary-soft)',
-                color: 'var(--brand-primary)',
-                backgroundColor: 'var(--brand-primary-surface-soft)',
+                borderColor: 'var(--border-soft)',
+                color: 'var(--text-primary)',
+                backgroundColor: 'var(--bg-surface-soft)',
               }}
             >
               <FontAwesomeIcon icon={faShieldHalved} />
@@ -52,6 +64,7 @@ function LoginPage() {
             >
               Entrar no SIMEC
             </h2>
+
             <p
               className="mt-2 text-sm leading-6"
               style={{ color: 'var(--text-muted)' }}
@@ -68,11 +81,17 @@ function LoginPage() {
                 borderColor: 'var(--border-soft)',
               }}
             >
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 <FontAwesomeIcon icon={faBuildingShield} className="mr-2" />
                 Empresa isolada
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <div
+                className="mt-1 text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Cada login é vinculado ao tenant informado.
               </div>
             </div>
@@ -84,11 +103,17 @@ function LoginPage() {
                 borderColor: 'var(--border-soft)',
               }}
             >
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 <FontAwesomeIcon icon={faShieldHalved} className="mr-2" />
                 Rotas protegidas
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <div
+                className="mt-1 text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 O sistema exige token válido em toda a área autenticada.
               </div>
             </div>
@@ -100,11 +125,17 @@ function LoginPage() {
                 borderColor: 'var(--border-soft)',
               }}
             >
-              <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <div
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 <FontAwesomeIcon icon={faClockRotateLeft} className="mr-2" />
                 Sessão controlada
               </div>
-              <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <div
+                className="mt-1 text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Sessões expiradas são descartadas automaticamente.
               </div>
             </div>
@@ -126,7 +157,7 @@ function LoginPage() {
             <Link
               to="/recuperar-senha"
               className="text-sm font-medium"
-              style={{ color: 'var(--brand-primary)' }}
+              style={{ color: 'var(--text-primary)' }}
             >
               Esqueceu sua senha?
             </Link>
