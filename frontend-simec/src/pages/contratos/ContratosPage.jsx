@@ -8,15 +8,15 @@ import ModalConfirmacao from '../../components/ui/feedback/ModalConfirmacao';
 import PageLayout from '../../components/ui/layout/PageLayout';
 import PageHeader from '../../components/ui/layout/PageHeader';
 import PageState from '../../components/ui/feedback/PageState';
-import Button from '../../components/ui/primitives/Button';
-
 import ContratosListSection from '../../components/contratos/ContratosListSection';
+
+import { Button } from '@/components/ui';
 
 function ContratosPage() {
   const page = useContratosPage();
 
   const isInitialLoading = page.loading && page.contratos.length === 0;
-  const hasError = !!page.error;
+  const hasError = Boolean(page.error);
   const isEmpty = !page.loading && !page.error && page.contratos.length === 0;
 
   return (
