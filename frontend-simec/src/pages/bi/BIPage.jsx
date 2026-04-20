@@ -35,6 +35,8 @@ function BIPage() {
         !page.rankingFrequencia.length &&
         !page.downtimePorUnidadeChartData.length));
 
+  const shouldShowState = page.loading || Boolean(page.error) || isEmpty;
+
   const widgetMap = useMemo(
     () => ({
       downtime: {
@@ -97,27 +99,6 @@ function BIPage() {
     setWidgetOrder((prev) => moverItem(prev, index, index + 1));
   };
 
-  if (page.loading || page.error || isEmpty) {
-    return (
-      <PageLayout background="slate" padded fullHeight>
-        <BIPageHeader
-          ano={page.dados?.ano}
-          onPrint={page.handlePrint}
-          onRefresh={page.recarregar}
-          canPrint={!!page.dados}
-          canRefresh={!page.loading}
-        />
-
-        <PageState
-          loading={page.loading}
-          error={page.error}
-          isEmpty={isEmpty}
-          emptyMessage="Dados de BI não disponíveis para o período."
-        />
-      </PageLayout>
-    );
-  }
-
   return (
     <>
       <PageLayout background="slate" padded fullHeight>
@@ -126,46 +107,57 @@ function BIPage() {
             ano={page.dados?.ano}
             onPrint={page.handlePrint}
             onRefresh={page.recarregar}
-            canPrint
+            canPrint={!!page.dados}
             canRefresh={!page.loading}
           />
 
-          <BIResumoCardsSection
-            resumoCards={page.resumoCards}
-            onOpenDrawer={page.openDrawer}
-          />
+          {shouldShowState ? (
+            <PageState
+              loading={page.loading}
+              error={page.error?.message || page.error || ''}
+              isEmpty={isEmpty}
+              emptyMessage="Dados de BI não disponíveis para o período."
+            />
+          ) : (
+            <>
+              <BIResumoCardsSection
+                resumoCards={page.resumoCards}
+                onOpenDrawer={page.openDrawer}
+              />
 
-          <PageSection
-            title="Widgets analíticos"
-            description="Os gráficos priorizam leitura executiva rápida, com drill-down e priorização operacional."
-          >
-            <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-              {orderedWidgets.map((widget, index) => {
-                const isExpanded = expandedWidget === widget.id;
+              <PageSection
+                title="Widgets analíticos"
+                description="Os gráficos priorizam leitura executiva rápida, com drill-down e priorização operacional."
+              >
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                  {orderedWidgets.map((widget, index) => {
+                    const isExpanded = expandedWidget === widget.id;
 
-                const spanClassName = isExpanded
-                  ? 'xl:col-span-2'
-                  : widget.defaultSpanClassName;
+                    const spanClassName = isExpanded
+                      ? 'xl:col-span-2'
+                      : widget.defaultSpanClassName;
 
-                return (
-                  <div key={widget.id} className={spanClassName}>
-                    <BIWidgetShell
-                      title={widget.title}
-                      description={widget.description}
-                      expanded={isExpanded}
-                      canMoveUp={index > 0}
-                      canMoveDown={index < orderedWidgets.length - 1}
-                      onToggleExpand={() => toggleExpand(widget.id)}
-                      onMoveUp={() => moveWidgetUp(widget.id)}
-                      onMoveDown={() => moveWidgetDown(widget.id)}
-                    >
-                      {widget.render(isExpanded)}
-                    </BIWidgetShell>
-                  </div>
-                );
-              })}
-            </div>
-          </PageSection>
+                    return (
+                      <div key={widget.id} className={spanClassName}>
+                        <BIWidgetShell
+                          title={widget.title}
+                          description={widget.description}
+                          expanded={isExpanded}
+                          canMoveUp={index > 0}
+                          canMoveDown={index < orderedWidgets.length - 1}
+                          onToggleExpand={() => toggleExpand(widget.id)}
+                          onMoveUp={() => moveWidgetUp(widget.id)}
+                          onMoveDown={() => moveWidgetDown(widget.id)}
+                        >
+                          {widget.render(isExpanded)}
+                        </BIWidgetShell>
+                      </div>
+                    );
+                  })}
+                </div>
+              </PageSection>
+            </>
+          )}
         </div>
       </PageLayout>
 
