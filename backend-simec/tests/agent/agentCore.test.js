@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 
-import { normalizarData } from '../../services/agent/agendamento/extractor/normalizers.js';
+import {
+  normalizarData,
+  normalizarDataRelativa,
+  normalizarHora,
+} from '../../services/agent/agendamento/extractor/normalizers.js';
 import { extrairCamposHeuristico } from '../../services/agent/agendamento/extractor/heuristicaExtractor.js';
+import { buildParsingHintMessage } from '../../services/agent/agendamento/agendamentoService.js';
 import { getFaltantes } from '../../services/agent/agendamento/state/faltantes.js';
 import { validarPayloadAgendamentoDoAgente } from '../../services/agent/workflow/dbManager.js';
 import {
@@ -25,13 +30,63 @@ runTest('normalizarData aceita DD/MM/AAAA e DD/MM', () => {
   assert.match(normalizarData('21/04'), /^\d{4}-04-21$/);
 });
 
+runTest('normalizarData aceita ano curto e prefixo dia', () => {
+  assert.equal(normalizarData('21/04/26'), '2026-04-21');
+  assert.match(normalizarData('dia 21/04'), /^\d{4}-04-21$/);
+});
+
+runTest('normalizarHora aceita formatos com h', () => {
+  assert.equal(normalizarHora('10h'), '10:00');
+  assert.equal(normalizarHora('11:00h'), '11:00');
+  assert.equal(normalizarHora('11h30'), '11:30');
+});
+
+runTest('normalizarDataRelativa aceita hoje e amanha', () => {
+  const referencia = new Date('2026-04-20T12:00:00Z');
+
+  assert.equal(normalizarDataRelativa('hoje', referencia), '2026-04-20');
+  assert.equal(normalizarDataRelativa('amanhã', referencia), '2026-04-21');
+});
+
 runTest('heuristica extrai data e hora em formatos operacionais', () => {
   const extraidoData = extrairCamposHeuristico('21/04/2026', {});
   const extraidoHora = extrairCamposHeuristico('09:00h', {});
+  const extraidoHoraCompacta = extrairCamposHeuristico('11h30', {});
+  const extraidoDataCurta = extrairCamposHeuristico('dia 21/04/26', {});
+  const extraidoDataRelativa = extrairCamposHeuristico('amanhã', {});
 
   assert.equal(extraidoData.data, '2026-04-21');
+  assert.equal(extraidoData.horaInicio, null);
   assert.equal(extraidoHora.horaInicio, '09:00');
+  assert.equal(extraidoHoraCompacta.horaInicio, '11:30');
+  assert.equal(extraidoDataCurta.data, '2026-04-21');
+  assert.match(extraidoDataRelativa.data, /^\d{4}-\d{2}-\d{2}$/);
 });
+
+runTest(
+  'dica de parsing nao acusa horario quando a mensagem trouxe uma data valida',
+  () => {
+    const hint = buildParsingHintMessage(
+      '21/04/2026',
+      ['horaInicio', 'horaFim'],
+      { data: '2026-04-21' }
+    );
+
+    assert.equal(hint, null);
+  }
+);
+
+runTest(
+  'dica de parsing acusa horario quando a mensagem numerica nao gerou extracao util',
+  () => {
+    const hint = buildParsingHintMessage('1030', ['horaInicio'], {});
+
+    assert.equal(
+      hint,
+      'Nao consegui interpretar o horario informado. Use o formato HH:mm, por exemplo 09:00.'
+    );
+  }
+);
 
 runTest(
   'faltantes do agendamento parcial pedem apenas horario quando a data ja existe',

@@ -6,6 +6,8 @@
 | --- | --- |
 | `quero agendar uma preventiva` | entrar no fluxo e pedir unidade |
 | `preventiva na tomografia de Coxim amanha das 10h as 11h` | identificar tipo, equipamento, unidade, data e horario |
+| `preventiva na tomografia da Matriz dia 21/04/26 as 11:00h` | aceitar data com ano curto e horario com sufixo `h` |
+| `agendar preventiva hoje 10h` | aceitar data relativa e horario compacto |
 | `sim` apos resumo do agendamento | confirmar e criar a OS |
 | `nao` apos resumo do agendamento | cancelar o fluxo sem erro tecnico |
 | `TAG 1234` apos lista de ambiguidades | resolver o equipamento escolhido |

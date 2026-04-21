@@ -153,11 +153,32 @@ function buildUserFriendlyValidationMessage(fieldErrors = {}, faltantes = []) {
   return message || null;
 }
 
-function buildParsingHintMessage(mensagem, faltantes = []) {
+export function buildParsingHintMessage(
+  mensagem,
+  faltantes = [],
+  extraido = {}
+) {
   const campoAtual = faltantes?.[0];
   const texto = (mensagem || '').trim();
+  const houveExtracaoRelevante = [
+    'data',
+    'horaInicio',
+    'horaFim',
+    'tipoManutencao',
+    'unidadeTexto',
+    'equipamentoTexto',
+    'numeroChamado',
+    'descricao',
+  ].some((campo) => {
+    const valor = extraido?.[campo];
+    return (
+      valor !== null &&
+      valor !== undefined &&
+      !(typeof valor === 'string' && valor.trim() === '')
+    );
+  });
 
-  if (!texto || !/\d/.test(texto)) {
+  if (!texto || !/\d/.test(texto) || houveExtracaoRelevante) {
     return null;
   }
 
@@ -450,7 +471,8 @@ export const AgendamentoService = {
       );
       const mensagemParsing = buildParsingHintMessage(
         mensagem,
-        faltantesValidados
+        faltantesValidados,
+        extraido
       );
 
       if (conflitoAgenda && !conflitoAgenda.valido) {

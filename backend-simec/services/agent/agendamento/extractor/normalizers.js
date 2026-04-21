@@ -65,6 +65,15 @@ export const normalizarHora = (texto) => {
   // Remove sufixos: "h", "hs", "hr", "hrs"
   h = h.replace(/\s*h(?:r?s?)?\s*$/i, '').trim();
 
+  // Formato "11h30"
+  const matchHoraComH = h.match(/^(\d{1,2})h(\d{2})$/i);
+  if (matchHoraComH) {
+    const hora = Number(matchHoraComH[1]);
+    const min = Number(matchHoraComH[2]);
+    if (hora > 23 || min > 59) return null;
+    return `${String(hora).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  }
+
   // Formato "HH:MM"
   if (/^\d{1,2}:\d{2}$/.test(h)) {
     const [hora, min] = h.split(':').map(Number);
@@ -94,12 +103,32 @@ export const normalizarHora = (texto) => {
 export const normalizarData = (valor) => {
   if (!valor || typeof valor !== 'string') return null;
 
-  const texto = valor.trim();
+  const texto = valor
+    .trim()
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/^dia\s+/, '')
+    .trim();
+  const anoAtual = new Date().getFullYear();
+
+  const normalizarAno = (ano) => {
+    if (ano.length === 4) return ano;
+    const anoCurto = Number(ano);
+    if (Number.isNaN(anoCurto)) return null;
+    return String(Math.floor(anoAtual / 100) * 100 + anoCurto);
+  };
 
   // DD/MM/YYYY ou DD-MM-YYYY
-  const matchCompleto = texto.match(/^(\d{2})[\/\-](\d{2})[\/\-](\d{4})$/);
+  const matchCompleto = texto.match(
+    /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2}|\d{4})$/
+  );
   if (matchCompleto) {
-    const [, dia, mes, ano] = matchCompleto;
+    const [, diaBruto, mesBruto, anoBruto] = matchCompleto;
+    const dia = diaBruto.padStart(2, '0');
+    const mes = mesBruto.padStart(2, '0');
+    const ano = normalizarAno(anoBruto);
+    if (!ano) return null;
     return `${ano}-${mes}-${dia}`;
   }
 
@@ -113,7 +142,7 @@ export const normalizarData = (valor) => {
   if (matchSemAno) {
     const dia = matchSemAno[1].padStart(2, '0');
     const mes = matchSemAno[2].padStart(2, '0');
-    const ano = new Date().getFullYear();
+    const ano = anoAtual;
     return `${ano}-${mes}-${dia}`;
   }
 
@@ -169,6 +198,13 @@ export const normalizarDataRelativa = (texto, agora = new Date()) => {
     const d = new Date(hoje);
     d.setDate(d.getDate() + 2);
     return toISO(d);
+  }
+
+  const matchDiaComData = lower.match(
+    /\bdia\s+(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?)\b/
+  );
+  if (matchDiaComData?.[1]) {
+    return normalizarData(matchDiaComData[1]);
   }
 
   // "dia 21", "dia 5"

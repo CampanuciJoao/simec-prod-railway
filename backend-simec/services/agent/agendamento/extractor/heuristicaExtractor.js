@@ -115,7 +115,7 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
   // Aceita: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, DD/MM (sem ano)
   if (!extraido.data) {
     const matchData = msg.match(
-      /\b(\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2})\b/
+      /\b(?:dia\s+)?(\d{1,2}[\/\-]\d{1,2}(?:[\/\-]\d{2,4})?|\d{4}-\d{2}-\d{2})\b/i
     );
     if (matchData?.[1]) {
       extraido.data = normalizarData(matchData[1]);
@@ -125,9 +125,9 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
   // ── Horário avulso ───────────────────────────────────────────────────────────
   // Captura: "10:00h", "10h", "8:30h", "10:00", "às 10", "as 14h", "8"
   // A regex captura o token numérico; normalizarHora remove prefixos/sufixos.
-  if (!extraido.horaInicio) {
+  if (!extraido.horaInicio && !extraido.data) {
     const matchHora = msg.match(
-      /\b(\d{1,2}(?::\d{2})?\s*h(?:r?s?)?|\d{1,2}:\d{2})\b/i
+      /\b(\d{1,2}(?::\d{2})?\s*h(?:r?s?)?|\d{1,2}h\d{2}|\d{1,2}:\d{2})\b/i
     );
     if (matchHora?.[1]) {
       extraido.horaInicio = normalizarHora(matchHora[1]);
