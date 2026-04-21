@@ -101,6 +101,77 @@ function buildBaseMeta(estado, extra = {}) {
   };
 }
 
+function buildUserFriendlyValidationMessage(fieldErrors = {}, faltantes = []) {
+  const fieldToAgentField = {
+    equipamentoId: 'equipamentoId',
+    tipo: 'tipoManutencao',
+    agendamentoDataInicioLocal: 'data',
+    agendamentoHoraInicioLocal: 'horaInicio',
+    agendamentoDataFimLocal: 'data',
+    agendamentoHoraFimLocal: 'horaFim',
+    numeroChamado: 'numeroChamado',
+    descricaoProblemaServico: 'descricao',
+  };
+
+  const relevantEntries = Object.entries(fieldErrors).filter(([field]) => {
+    const agentField = fieldToAgentField[field] || field;
+    return !faltantes.includes(agentField);
+  });
+
+  if (relevantEntries.length === 0) {
+    return null;
+  }
+
+  const [field, message] = relevantEntries[0];
+
+  if (
+    field === 'agendamentoDataInicioLocal' ||
+    field === 'agendamentoDataFimLocal'
+  ) {
+    return 'Nao consegui validar a data informada. Use o formato DD/MM/AAAA.';
+  }
+
+  if (
+    field === 'agendamentoHoraInicioLocal' ||
+    field === 'agendamentoHoraFimLocal'
+  ) {
+    if (message === 'O término deve ser posterior ao início.') {
+      return 'O horario de termino precisa ser posterior ao horario de inicio.';
+    }
+
+    return 'Nao consegui validar o horario informado. Use o formato HH:mm, por exemplo 09:00.';
+  }
+
+  if (field === 'numeroChamado') {
+    return 'Para manutencao corretiva, preciso do numero do chamado antes de concluir.';
+  }
+
+  if (field === 'descricaoProblemaServico') {
+    return 'Para manutencao corretiva, preciso de uma descricao do problema ou servico.';
+  }
+
+  return message || null;
+}
+
+function buildParsingHintMessage(mensagem, faltantes = []) {
+  const campoAtual = faltantes?.[0];
+  const texto = (mensagem || '').trim();
+
+  if (!texto || !/\d/.test(texto)) {
+    return null;
+  }
+
+  if (campoAtual === 'data') {
+    return 'Nao consegui interpretar a data informada. Use o formato DD/MM/AAAA.';
+  }
+
+  if (campoAtual === 'horaInicio' || campoAtual === 'horaFim') {
+    return 'Nao consegui interpretar o horario informado. Use o formato HH:mm, por exemplo 09:00.';
+  }
+
+  return null;
+}
+
 async function salvarERegistrarMensagemAgente(
   sessaoId,
   step,
@@ -363,6 +434,14 @@ export const AgendamentoService = {
     if (proximoStep === STEPS.COLETANDO_DADOS) {
       let mensagemResposta;
       let meta;
+      const mensagemValidacaoAmigavel = buildUserFriendlyValidationMessage(
+        validacao.fieldErrors || {},
+        faltantesValidados
+      );
+      const mensagemParsing = buildParsingHintMessage(
+        mensagem,
+        faltantesValidados
+      );
 
       if (conflitoAgenda && !conflitoAgenda.valido) {
         estado.aguardandoConfirmacao = false;
@@ -372,8 +451,8 @@ export const AgendamentoService = {
           reason: 'CONFLICTING_SCHEDULE',
           missingFields: faltantesValidados,
         });
-      } else if (!validacao.ok && validacao.message) {
-        mensagemResposta = `${validacao.message} ${proximaPergunta(
+      } else if (mensagemValidacaoAmigavel) {
+        mensagemResposta = `${mensagemValidacaoAmigavel} ${proximaPergunta(
           estado,
           faltantesValidados
         )}`;
@@ -382,6 +461,16 @@ export const AgendamentoService = {
           missingFields: faltantesValidados,
           fieldErrors: validacao.fieldErrors,
           validationSource: 'manutencaoSchema',
+        });
+      } else if (mensagemParsing) {
+        mensagemResposta = `${mensagemParsing} ${proximaPergunta(
+          estado,
+          faltantesValidados
+        )}`;
+        meta = buildBaseMeta(estado, {
+          reason: 'INVALID_FORMAT',
+          missingFields: faltantesValidados,
+          validationSource: 'agentParser',
         });
       } else {
         const houveNovosDados = Object.values(extraido).some(

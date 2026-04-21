@@ -35,9 +35,27 @@ export const normalizarData = (valor) => {
   if (!valor || typeof valor !== 'string') return null;
 
   const texto = valor.trim();
+  const agora = new Date();
 
   if (/^\d{2}\/\d{2}\/\d{4}$/.test(texto)) {
     const [dia, mes, ano] = texto.split('/');
+    return `${ano}-${mes}-${dia}`;
+  }
+
+  if (/^\d{2}\/\d{2}$/.test(texto)) {
+    const [dia, mes] = texto.split('/');
+    const anoAtual = agora.getFullYear();
+    const candidato = new Date(`${anoAtual}-${mes}-${dia}T00:00:00`);
+
+    if (Number.isNaN(candidato.getTime())) {
+      return null;
+    }
+
+    const ano =
+      candidato.getTime() < new Date(anoAtual, agora.getMonth(), agora.getDate()).getTime()
+        ? anoAtual + 1
+        : anoAtual;
+
     return `${ano}-${mes}-${dia}`;
   }
 
