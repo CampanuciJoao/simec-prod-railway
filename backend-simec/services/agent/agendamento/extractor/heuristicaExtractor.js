@@ -1,5 +1,9 @@
 import { AgendamentoSchema } from './schema.js';
-import { normalizarData, normalizarHora } from './normalizers.js';
+import {
+  normalizarData,
+  normalizarHora,
+  normalizarDataRelativa,
+} from './normalizers.js';
 import { extrairDataUTC } from '../../../timeService.js';
 
 export const mensagemEhConfirmacaoCurta = (mensagem) => {
@@ -33,26 +37,24 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
     confirmacao: null,
   };
 
+  // ── Confirmação ─────────────────────────────────────────────────────────────
   if (/^(sim|s|confirmo|pode confirmar|ok|certo)$/i.test(lower)) {
     extraido.confirmacao = true;
   } else if (/^(nao|n|cancelar|cancela)$/i.test(lower)) {
     extraido.confirmacao = false;
   }
 
+  // ── Tipo de manutenção ───────────────────────────────────────────────────────
   if (lower.includes('corretiva')) extraido.tipoManutencao = 'Corretiva';
   if (lower.includes('preventiva')) extraido.tipoManutencao = 'Preventiva';
-  if (lower.includes('calibracao') || lower.includes('calibração')) {
-    extraido.tipoManutencao = 'Calibracao';
-  }
-  if (lower.includes('inspecao') || lower.includes('inspeção')) {
-    extraido.tipoManutencao = 'Inspecao';
-  }
 
+  // ── Equipamento por TAG explícita ────────────────────────────────────────────
   const matchTag = msg.match(/\btag[:\s-]*([a-z0-9-]+)\b/i);
   if (matchTag?.[1]) {
     extraido.equipamentoTexto = matchTag[1].trim();
   }
 
+  // ── Equipamento por ambiguidade previamente detectada ────────────────────────
   if (
     !extraido.equipamentoTexto &&
     Array.isArray(estado.ambiguidadeEquipamento) &&
@@ -61,7 +63,6 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
     const escolha = estado.ambiguidadeEquipamento.find((item) => {
       const tag = item?.tag?.toString().toLowerCase().trim();
       const modelo = item?.modelo?.toString().toLowerCase().trim();
-
       return (
         (!!tag && lower === tag) ||
         (!!tag && lower.includes(tag)) ||
@@ -75,6 +76,7 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
     }
   }
 
+  // ── Unidade ──────────────────────────────────────────────────────────────────
   const matchUnidade = msg.match(/(?:unidade|hospital)\s+(?:de\s+)?(.+)/i);
   if (matchUnidade) {
     extraido.unidadeTexto = matchUnidade[1].trim();
@@ -100,6 +102,7 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
     }
   }
 
+  // ── Intervalo de horário (ex: "das 8h às 17h") ───────────────────────────────
   const matchIntervalo = msg.match(
     /(?:das|de)\s+(\d{1,2}(?::\d{2})?\s*h?(?:s)?)\s+(?:ate|as?|a)\s+(\d{1,2}(?::\d{2})?\s*h?(?:s)?)/i
   );
@@ -108,26 +111,39 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
     extraido.horaFim = normalizarHora(matchIntervalo[2]);
   }
 
+  // ── Data explícita ───────────────────────────────────────────────────────────
+  // Aceita: DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD, DD/MM (sem ano)
   if (!extraido.data) {
     const matchData = msg.match(
-      /\b(\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}|\d{4}-\d{2}-\d{2})\b/
+      /\b(\d{2}[\/\-]\d{2}[\/\-]\d{4}|\d{4}-\d{2}-\d{2}|\d{2}[\/\-]\d{2})\b/
     );
     if (matchData?.[1]) {
       extraido.data = normalizarData(matchData[1]);
     }
   }
 
+  // ── Horário avulso ───────────────────────────────────────────────────────────
+  // Captura: "10:00h", "10h", "8:30h", "10:00", "às 10", "as 14h", "8"
+  // A regex captura o token numérico; normalizarHora remove prefixos/sufixos.
   if (!extraido.horaInicio) {
-    const matchHora = msg.match(/\b(\d{1,2}(?::\d{2})?\s*h(?:s)?|\d{1,2}:\d{2}|\d{1,2}h)\b/i);
+    const matchHora = msg.match(
+      /\b(\d{1,2}(?::\d{2})?\s*h(?:r?s?)?|\d{1,2}:\d{2})\b/i
+    );
     if (matchHora?.[1]) {
       extraido.horaInicio = normalizarHora(matchHora[1]);
     }
   }
 
-  if (lower.includes('hoje')) {
-    extraido.data = extrairDataUTC();
+  // ── Datas relativas (hoje, amanhã, dia 21, próxima terça…) ───────────────────
+  // Executar DEPOIS de tentar data explícita para não sobrescrever.
+  if (!extraido.data) {
+    const dataRelativa = normalizarDataRelativa(lower);
+    if (dataRelativa) {
+      extraido.data = dataRelativa;
+    }
   }
 
+  // ── Número de chamado ────────────────────────────────────────────────────────
   const matchChamado = msg.match(/\b\d{4,}\b/);
   if (
     matchChamado &&
@@ -136,6 +152,7 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
     extraido.numeroChamado = matchChamado[0];
   }
 
+  // ── Descrição livre (apenas para Corretiva sem outros campos) ────────────────
   if (
     !extraido.tipoManutencao &&
     !extraido.unidadeTexto &&
