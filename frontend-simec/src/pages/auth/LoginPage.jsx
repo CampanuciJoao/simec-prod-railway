@@ -1,11 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBolt,
-  faChartLine,
-  faShieldHalved,
-} from '@fortawesome/free-solid-svg-icons';
+import { faShieldHalved } from '@fortawesome/free-solid-svg-icons';
 
 import AuthLayout from '@/components/auth/AuthLayout';
 import LoginForm from '@/components/auth/LoginForm';
@@ -61,68 +57,9 @@ function LoginPage() {
                 className="mt-2 text-sm leading-6"
                 style={{ color: '#64748b' }}
               >
-                A plataforma que organiza sua operacao tecnica, melhora a
-                rastreabilidade e apoia decisoes com mais clareza.
+                Acesse sua area de trabalho para acompanhar ativos,
+                manutencoes, contratos e indicadores em um unico ambiente.
               </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                backgroundColor: '#eff6ff',
-                borderColor: '#bfdbfe',
-              }}
-            >
-              <div
-                className="text-sm font-semibold"
-                style={{ color: '#0f172a' }}
-              >
-                <FontAwesomeIcon icon={faBolt} className="mr-2" />
-                Agilidade
-              </div>
-              <div className="mt-1 text-xs leading-5" style={{ color: '#475569' }}>
-                Rotinas mais organizadas para a equipe atuar com rapidez.
-              </div>
-            </div>
-
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                backgroundColor: '#eef2ff',
-                borderColor: '#c7d2fe',
-              }}
-            >
-              <div
-                className="text-sm font-semibold"
-                style={{ color: '#0f172a' }}
-              >
-                <FontAwesomeIcon icon={faShieldHalved} className="mr-2" />
-                Seguranca
-              </div>
-              <div className="mt-1 text-xs leading-5" style={{ color: '#475569' }}>
-                Acesso protegido para manter controle e confiabilidade.
-              </div>
-            </div>
-
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                backgroundColor: '#ecfeff',
-                borderColor: '#a5f3fc',
-              }}
-            >
-              <div
-                className="text-sm font-semibold"
-                style={{ color: '#0f172a' }}
-              >
-                <FontAwesomeIcon icon={faChartLine} className="mr-2" />
-                Visao
-              </div>
-              <div className="mt-1 text-xs leading-5" style={{ color: '#475569' }}>
-                Indicadores e historico para apoiar a operacao do dia a dia.
-              </div>
             </div>
           </div>
 
@@ -152,7 +89,7 @@ function LoginPage() {
             style={{ borderColor: '#e2e8f0' }}
           >
             <div className="text-xs" style={{ color: '#64748b' }}>
-              Acesso exclusivo para clientes e equipes autorizadas.
+              Acesso exclusivo para clientes autorizados.
             </div>
 
             <Link
