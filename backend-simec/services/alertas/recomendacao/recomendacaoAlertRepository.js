@@ -29,10 +29,21 @@ export async function buscarEquipamentosComHistorico(tenantId, dataCorte) {
       historicoEventos: {
         where: {
           tenantId,
-          impactaAnalise: true,
           dataEvento: {
             gte: dataCorte,
           },
+          OR: [
+            {
+              impactaAnalise: true,
+            },
+            {
+              categoria: 'manutencao',
+              tipoEvento: 'manutencao_concluir',
+              subcategoria: {
+                in: ['Corretiva', 'Preventiva'],
+              },
+            },
+          ],
         },
         orderBy: {
           dataEvento: 'desc',

@@ -4,9 +4,12 @@ import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowsRotate,
+  faCommentDots,
   faCalendarCheck,
   faCircleInfo,
   faExternalLinkAlt,
+  faFileArrowDown,
+  faPaperclip,
   faFilePen,
   faPowerOff,
   faTriangleExclamation,
@@ -45,6 +48,26 @@ function HistoricoTimelineList({
   itensExpandidos,
   onToggleExpandir,
 }) {
+  const renderAttachmentLink = (attachment, item) => (
+    <a
+      key={`${item.uniqueId}-${attachment.id}`}
+      href={attachment.path}
+      target="_blank"
+      rel="noreferrer"
+      className="flex items-center justify-between gap-3 rounded-xl border px-3 py-2 text-sm transition"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface)',
+        color: 'var(--text-secondary)',
+      }}
+    >
+      <span className="min-w-0 truncate" title={attachment.nomeOriginal}>
+        {attachment.nomeOriginal}
+      </span>
+      <FontAwesomeIcon icon={faFileArrowDown} />
+    </a>
+  );
+
   return (
     <div className="space-y-4">
       {linhaDoTempo.map((item) => {
@@ -64,6 +87,8 @@ function HistoricoTimelineList({
                 <span>{formatarDataHora(item.data)}</span>
                 <span>Origem: {item.responsavel}</span>
                 <span>Status: {item.status}</span>
+                {item.contagemNotas ? <span>{item.contagemNotas} comentario(s)</span> : null}
+                {item.contagemAnexos ? <span>{item.contagemAnexos} anexo(s)</span> : null}
               </>
             }
             icon={<FontAwesomeIcon icon={getTimelineIcon(item)} />}
@@ -87,6 +112,43 @@ function HistoricoTimelineList({
                   {item.descricao || 'Sem detalhes informados.'}
                 </p>
               </Card>
+
+              {item.resumoOperacional?.length ? (
+                <Card surface="soft" className="rounded-2xl">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Contexto operacional
+                  </span>
+
+                  <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {item.resumoOperacional.map((detalhe) => (
+                      <div
+                        key={`${item.uniqueId}-${detalhe.label}`}
+                        className="rounded-xl border px-3 py-3"
+                        style={{
+                          borderColor: 'var(--border-soft)',
+                          backgroundColor: 'var(--bg-surface)',
+                        }}
+                      >
+                        <div
+                          className="text-[11px] font-bold uppercase tracking-[0.12em]"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {detalhe.label}
+                        </div>
+                        <div
+                          className="mt-1 text-sm font-medium"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {detalhe.value}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
 
               {item.detalhesComplementares?.length ? (
                 <Card surface="soft" className="rounded-2xl">
@@ -114,6 +176,73 @@ function HistoricoTimelineList({
                         {detalhe.value}
                       </span>
                     ))}
+                  </div>
+                </Card>
+              ) : null}
+
+              {item.notasAndamento?.length ? (
+                <Card surface="soft" className="rounded-2xl">
+                  <div className="flex items-center gap-2">
+                    <FontAwesomeIcon
+                      icon={faCommentDots}
+                      style={{ color: 'var(--brand-primary)' }}
+                    />
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Comentarios e notas da OS
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-3">
+                    {item.notasAndamento.map((nota) => (
+                      <div
+                        key={`${item.uniqueId}-${nota.id}`}
+                        className="rounded-xl border px-4 py-3"
+                        style={{
+                          borderColor: 'var(--border-soft)',
+                          backgroundColor: 'var(--bg-surface)',
+                        }}
+                      >
+                        <p
+                          className="text-sm leading-6"
+                          style={{ color: 'var(--text-primary)' }}
+                        >
+                          {nota.nota}
+                        </p>
+                        <div
+                          className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          <span>{nota.autor?.nome || 'Sistema'}</span>
+                          {nota.data ? <span>{formatarDataHora(nota.data)}</span> : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : null}
+
+              {item.anexos?.length ? (
+                <Card surface="soft" className="rounded-2xl">
+                  <div className="flex items-center gap-2">
+                    <FontAwesomeIcon
+                      icon={faPaperclip}
+                      style={{ color: 'var(--color-danger)' }}
+                    />
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Anexos relacionados
+                    </span>
+                  </div>
+
+                  <div className="mt-3 space-y-2">
+                    {item.anexos.map((attachment) =>
+                      renderAttachmentLink(attachment, item)
+                    )}
                   </div>
                 </Card>
               ) : null}

@@ -15,6 +15,25 @@ export async function buscarEquipamentoComHistoricoParaScore(
     },
     include: {
       unidade: true,
+      historicoEventos: {
+        where: {
+          OR: [
+            {
+              impactaAnalise: true,
+            },
+            {
+              categoria: 'manutencao',
+              tipoEvento: 'manutencao_concluir',
+              subcategoria: {
+                in: ['Corretiva', 'Preventiva'],
+              },
+            },
+          ],
+        },
+        orderBy: {
+          dataEvento: 'desc',
+        },
+      },
       ocorrencias: {
         where: {
           tenantId,
@@ -55,6 +74,7 @@ export async function calcularScoreEquipamento({
     unidadeNome,
     ocorrencias: equipamento.ocorrencias || [],
     manutencoes: equipamento.manutencoes || [],
+    historicoEventos: equipamento.historicoEventos || [],
   });
 
   const nivel = definirNivelRisco(metricas.scoreFinal);
@@ -74,6 +94,8 @@ export async function calcularScoreEquipamento({
       inspecoes: metricas.inspecoes,
       gruposReincidencia: metricas.gruposReincidencia,
       maiorReincidencia: metricas.maiorReincidencia,
+      manutencoesResolvidasComSucesso: metricas.manutencoesResolvidasComSucesso,
+      ultimaResolucaoManutencao: metricas.ultimaResolucaoManutencao,
       pesoTipo: metricas.pesoTipo,
       pesoUnidade: metricas.pesoUnidade,
     },

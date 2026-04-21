@@ -28,11 +28,18 @@ function ExpandableTimelineItem({
         borderClassName,
         className,
       ].join(' ')}
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface)',
+      }}
     >
       <button
         type="button"
         onClick={onToggle}
-        className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left hover:bg-slate-50"
+        className="flex w-full items-start justify-between gap-4 px-5 py-4 text-left transition"
+        style={{
+          backgroundColor: expanded ? 'var(--bg-surface-soft)' : 'var(--bg-surface)',
+        }}
       >
         <div className="flex min-w-0 items-start gap-4">
           <span
@@ -46,7 +53,10 @@ function ExpandableTimelineItem({
 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h4 className="text-sm font-bold text-slate-900">
+              <h4
+                className="text-sm font-bold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {title}
               </h4>
 
@@ -54,20 +64,29 @@ function ExpandableTimelineItem({
             </div>
 
             {meta ? (
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+              <div
+                className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {meta}
               </div>
             ) : null}
           </div>
         </div>
 
-        <span className="pt-1 text-slate-400">
+        <span className="pt-1" style={{ color: 'var(--text-muted)' }}>
           <FontAwesomeIcon icon={expanded ? faChevronUp : faChevronDown} />
         </span>
       </button>
 
       {expanded ? (
-        <div className="border-t border-slate-200 bg-slate-50 px-5 py-5">
+        <div
+          className="border-t px-5 py-5"
+          style={{
+            borderColor: 'var(--border-soft)',
+            backgroundColor: 'var(--bg-surface-soft)',
+          }}
+        >
           {children}
         </div>
       ) : null}

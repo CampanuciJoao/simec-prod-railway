@@ -6,6 +6,55 @@ export function normalizarTexto(texto = '') {
     .trim();
 }
 
+function parseMetadata(evento) {
+  if (!evento) return null;
+
+  if (evento.metadata && typeof evento.metadata === 'object') {
+    return evento.metadata;
+  }
+
+  if (typeof evento.metadataJson === 'string' && evento.metadataJson.trim()) {
+    try {
+      return JSON.parse(evento.metadataJson);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
+}
+
+function toDateOrNull(valor) {
+  if (!valor) return null;
+  const parsed = new Date(valor);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function obterDataEvento(evento) {
+  return (
+    toDateOrNull(evento?.dataEvento) ||
+    toDateOrNull(evento?.createdAt) ||
+    null
+  );
+}
+
+function ehManutencaoResolvidaComSucesso(evento) {
+  if (
+    evento?.categoria !== 'manutencao' ||
+    evento?.tipoEvento !== 'manutencao_concluir' ||
+    !['Corretiva', 'Preventiva'].includes(evento?.subcategoria)
+  ) {
+    return false;
+  }
+
+  const metadata = parseMetadata(evento);
+
+  return (
+    metadata?.manutencaoRealizada === true &&
+    metadata?.equipamentoOperante === true
+  );
+}
+
 function contemPalavra(textoNormalizado, termo) {
   return textoNormalizado.includes(termo);
 }
@@ -146,7 +195,25 @@ export function calcularScoreRisco({
 
   const usarHistoricoAnalitico = eventosAnaliticos.length > 0;
 
-  const ocorrenciasBase = usarHistoricoAnalitico
+  const resolucoesManutencao = usarHistoricoAnalitico
+    ? eventosAnaliticos.filter(ehManutencaoResolvidaComSucesso)
+    : [];
+
+  const ultimaResolucaoManutencao = resolucoesManutencao
+    .map(obterDataEvento)
+    .filter(Boolean)
+    .sort((a, b) => b.getTime() - a.getTime())[0] || null;
+
+  const filtrarAposUltimaResolucao = (eventos = [], getData) => {
+    if (!ultimaResolucaoManutencao) return eventos;
+
+    return eventos.filter((item) => {
+      const data = getData(item);
+      return data && data.getTime() > ultimaResolucaoManutencao.getTime();
+    });
+  };
+
+  const ocorrenciasBaseOriginal = usarHistoricoAnalitico
     ? eventosAnaliticos.filter(
         (evento) =>
           evento.categoria === 'ocorrencia' &&
@@ -154,7 +221,7 @@ export function calcularScoreRisco({
       )
     : ocorrencias;
 
-  const corretivas = usarHistoricoAnalitico
+  const corretivasOriginais = usarHistoricoAnalitico
     ? eventosAnaliticos.filter(
         (evento) =>
           evento.categoria === 'manutencao' &&
@@ -162,6 +229,20 @@ export function calcularScoreRisco({
           evento.subcategoria === 'Corretiva'
       )
     : manutencoes.filter((m) => m.tipo === 'Corretiva');
+
+  const ocorrenciasBase = filtrarAposUltimaResolucao(
+    ocorrenciasBaseOriginal,
+    (evento) => obterDataEvento(evento) || toDateOrNull(evento?.data)
+  );
+
+  const corretivas = filtrarAposUltimaResolucao(
+    corretivasOriginais,
+    (evento) =>
+      obterDataEvento(evento) ||
+      toDateOrNull(evento?.dataConclusao) ||
+      toDateOrNull(evento?.dataHoraAgendamentoInicio) ||
+      toDateOrNull(evento?.createdAt)
+  );
 
   const preventivas = usarHistoricoAnalitico
     ? []
@@ -214,6 +295,9 @@ export function calcularScoreRisco({
     inspecoes: inspecoes.length,
     gruposReincidencia: grupos,
     maiorReincidencia: maiorGrupo,
+    manutencoesResolvidasComSucesso: resolucoesManutencao.length,
+    ultimaResolucaoManutencao:
+      ultimaResolucaoManutencao?.toISOString?.() || null,
     pesoTipo,
     pesoUnidade,
   };

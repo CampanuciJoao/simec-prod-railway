@@ -16,7 +16,209 @@ function toIsoOrNull(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }
 
-export function normalizarHistoricoAtivoEvento(evento) {
+function normalizarAnexo(anexo) {
+  if (!anexo) return null;
+
+  return {
+    id: anexo.id,
+    nomeOriginal: anexo.nomeOriginal,
+    path: anexo.path,
+    tipoMime: anexo.tipoMime || null,
+    createdAt: toIsoOrNull(anexo.createdAt),
+  };
+}
+
+function normalizarNotaAndamento(nota) {
+  if (!nota) return null;
+
+  return {
+    id: nota.id,
+    nota: nota.nota,
+    origem: nota.origem || 'manual',
+    data: toIsoOrNull(nota.data),
+    autor: nota.autor
+      ? {
+          nome: nota.autor.nome || 'Sistema',
+        }
+      : null,
+  };
+}
+
+function normalizarReferenciaManutencao(manutencao) {
+  if (!manutencao) return null;
+
+  return {
+    id: manutencao.id,
+    numeroOS: manutencao.numeroOS,
+    tipo: manutencao.tipo,
+    status: manutencao.status,
+    descricaoProblemaServico: manutencao.descricaoProblemaServico || null,
+    tecnicoResponsavel: manutencao.tecnicoResponsavel || null,
+    numeroChamado: manutencao.numeroChamado || null,
+    dataConclusao: toIsoOrNull(manutencao.dataConclusao),
+    dataInicioReal: toIsoOrNull(manutencao.dataInicioReal),
+    dataFimReal: toIsoOrNull(manutencao.dataFimReal),
+    dataHoraAgendamentoInicio: toIsoOrNull(manutencao.dataHoraAgendamentoInicio),
+    dataHoraAgendamentoFim: toIsoOrNull(manutencao.dataHoraAgendamentoFim),
+    agendamentoLocal: {
+      dataInicio: manutencao.agendamentoDataInicioLocal || null,
+      horaInicio: manutencao.agendamentoHoraInicioLocal || null,
+      dataFim: manutencao.agendamentoDataFimLocal || null,
+      horaFim: manutencao.agendamentoHoraFimLocal || null,
+      timezone: manutencao.agendamentoTimezone || null,
+    },
+    anexos: Array.isArray(manutencao.anexos)
+      ? manutencao.anexos.map(normalizarAnexo).filter(Boolean)
+      : [],
+    notasAndamento: Array.isArray(manutencao.notasAndamento)
+      ? manutencao.notasAndamento.map(normalizarNotaAndamento).filter(Boolean)
+      : [],
+  };
+}
+
+function normalizarReferenciaOcorrencia(ocorrencia) {
+  if (!ocorrencia) return null;
+
+  return {
+    id: ocorrencia.id,
+    titulo: ocorrencia.titulo,
+    descricao: ocorrencia.descricao || null,
+    tipo: ocorrencia.tipo,
+    gravidade: ocorrencia.gravidade || null,
+    resolvido: Boolean(ocorrencia.resolvido),
+    solucao: ocorrencia.solucao || null,
+    tecnicoResolucao: ocorrencia.tecnicoResolucao || null,
+    data: toIsoOrNull(ocorrencia.data),
+    dataResolucao: toIsoOrNull(ocorrencia.dataResolucao),
+  };
+}
+
+async function carregarReferenciasHistorico(db, eventos = [], tenantId) {
+  const manutencaoIds = [
+    ...new Set(
+      eventos
+        .filter(
+          (evento) => evento.referenciaTipo === 'manutencao' && evento.referenciaId
+        )
+        .map((evento) => evento.referenciaId)
+    ),
+  ];
+
+  const ocorrenciaIds = [
+    ...new Set(
+      eventos
+        .filter(
+          (evento) => evento.referenciaTipo === 'ocorrencia' && evento.referenciaId
+        )
+        .map((evento) => evento.referenciaId)
+    ),
+  ];
+
+  const [manutencoes, ocorrencias] = await Promise.all([
+    manutencaoIds.length
+      ? db.manutencao.findMany({
+          where: {
+            tenantId,
+            id: {
+              in: manutencaoIds,
+            },
+          },
+          select: {
+            id: true,
+            numeroOS: true,
+            tipo: true,
+            status: true,
+            descricaoProblemaServico: true,
+            tecnicoResponsavel: true,
+            numeroChamado: true,
+            dataConclusao: true,
+            dataInicioReal: true,
+            dataFimReal: true,
+            dataHoraAgendamentoInicio: true,
+            dataHoraAgendamentoFim: true,
+            agendamentoDataInicioLocal: true,
+            agendamentoHoraInicioLocal: true,
+            agendamentoDataFimLocal: true,
+            agendamentoHoraFimLocal: true,
+            agendamentoTimezone: true,
+            anexos: {
+              orderBy: {
+                createdAt: 'desc',
+              },
+              select: {
+                id: true,
+                nomeOriginal: true,
+                path: true,
+                tipoMime: true,
+                createdAt: true,
+              },
+            },
+            notasAndamento: {
+              where: {
+                tenantId,
+              },
+              orderBy: {
+                data: 'desc',
+              },
+              include: {
+                autor: {
+                  select: {
+                    nome: true,
+                  },
+                },
+              },
+            },
+          },
+        })
+      : [],
+    ocorrenciaIds.length
+      ? db.ocorrencia.findMany({
+          where: {
+            tenantId,
+            id: {
+              in: ocorrenciaIds,
+            },
+          },
+          select: {
+            id: true,
+            titulo: true,
+            descricao: true,
+            tipo: true,
+            gravidade: true,
+            resolvido: true,
+            solucao: true,
+            tecnicoResolucao: true,
+            data: true,
+            dataResolucao: true,
+          },
+        })
+      : [],
+  ]);
+
+  return {
+    manutencoes: new Map(
+      manutencoes.map((manutencao) => [
+        manutencao.id,
+        normalizarReferenciaManutencao(manutencao),
+      ])
+    ),
+    ocorrencias: new Map(
+      ocorrencias.map((ocorrencia) => [
+        ocorrencia.id,
+        normalizarReferenciaOcorrencia(ocorrencia),
+      ])
+    ),
+  };
+}
+
+export function normalizarHistoricoAtivoEvento(evento, referencias = null) {
+  const referenciaDetalhes =
+    evento.referenciaTipo === 'manutencao'
+      ? referencias?.manutencoes?.get(evento.referenciaId) || null
+      : evento.referenciaTipo === 'ocorrencia'
+      ? referencias?.ocorrencias?.get(evento.referenciaId) || null
+      : null;
+
   return {
     id: evento.id,
     tenantId: evento.tenantId,
@@ -31,6 +233,7 @@ export function normalizarHistoricoAtivoEvento(evento) {
     impactaAnalise: Boolean(evento.impactaAnalise),
     referenciaId: evento.referenciaId || null,
     referenciaTipo: evento.referenciaTipo || null,
+    referenciaDetalhes,
     metadata: parseMetadata(evento.metadataJson),
     dataEvento: toIsoOrNull(evento.dataEvento) || toIsoOrNull(evento.createdAt),
     createdAt: toIsoOrNull(evento.createdAt),
@@ -168,8 +371,12 @@ export async function listarHistoricoAtivoPorEquipamento({
     });
   }
 
+  const referencias = await carregarReferenciasHistorico(prisma, eventos, tenantId);
+
   return {
-    items: eventos.map(normalizarHistoricoAtivoEvento),
+    items: eventos.map((evento) =>
+      normalizarHistoricoAtivoEvento(evento, referencias)
+    ),
     total,
     limit: safeLimit,
     offset: safeOffset,
@@ -208,5 +415,9 @@ export async function exportarHistoricoAtivoPorEquipamento({
     ],
   });
 
-  return eventos.map(normalizarHistoricoAtivoEvento);
+  const referencias = await carregarReferenciasHistorico(prisma, eventos, tenantId);
+
+  return eventos.map((evento) =>
+    normalizarHistoricoAtivoEvento(evento, referencias)
+  );
 }

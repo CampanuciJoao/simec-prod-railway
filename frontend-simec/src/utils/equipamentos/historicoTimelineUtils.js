@@ -27,6 +27,67 @@ function getResponsavelLabel(item) {
   return metadata?.tecnico || metadata?.tecnicoResolucao || item?.origem || 'sistema';
 }
 
+function getDescricaoPrincipal(item, metadata, referenciaDetalhes) {
+  return (
+    item.descricao ||
+    referenciaDetalhes?.descricaoProblemaServico ||
+    referenciaDetalhes?.descricao ||
+    referenciaDetalhes?.solucao ||
+    metadata?.observacao ||
+    'Sem detalhes informados.'
+  );
+}
+
+function getResumoOperacional(item, metadata, referenciaDetalhes) {
+  const resumo = [];
+
+  if (referenciaDetalhes?.tecnicoResponsavel) {
+    resumo.push({ label: 'Tecnico', value: referenciaDetalhes.tecnicoResponsavel });
+  }
+
+  if (referenciaDetalhes?.agendamentoLocal?.dataInicio) {
+    resumo.push({
+      label: 'Inicio previsto',
+      value: `${referenciaDetalhes.agendamentoLocal.dataInicio} ${referenciaDetalhes.agendamentoLocal.horaInicio || ''}`.trim(),
+    });
+  }
+
+  if (referenciaDetalhes?.agendamentoLocal?.dataFim) {
+    resumo.push({
+      label: 'Fim previsto',
+      value: `${referenciaDetalhes.agendamentoLocal.dataFim} ${referenciaDetalhes.agendamentoLocal.horaFim || ''}`.trim(),
+    });
+  }
+
+  if (referenciaDetalhes?.dataConclusao) {
+    resumo.push({
+      label: 'Conclusao',
+      value: formatarDataHora(referenciaDetalhes.dataConclusao),
+    });
+  }
+
+  if (referenciaDetalhes?.gravidade) {
+    resumo.push({ label: 'Gravidade', value: referenciaDetalhes.gravidade });
+  }
+
+  if (referenciaDetalhes?.tecnicoResolucao) {
+    resumo.push({
+      label: 'Resolvido por',
+      value: referenciaDetalhes.tecnicoResolucao,
+    });
+  }
+
+  if (metadata?.equipamentoOperante === true) {
+    resumo.push({ label: 'Resultado', value: 'Equipamento operante' });
+  }
+
+  if (metadata?.equipamentoOperante === false) {
+    resumo.push({ label: 'Resultado', value: 'Equipamento inoperante' });
+  }
+
+  return resumo;
+}
+
 function getDetalhesComplementares(item, metadata) {
   const detalhes = [];
 
@@ -55,6 +116,13 @@ function getDetalhesComplementares(item, metadata) {
 
 function mapHistoricoEvento(item) {
   const metadata = parseJsonIfNeeded(item.metadata);
+  const referenciaDetalhes = item.referenciaDetalhes || null;
+  const anexos = Array.isArray(referenciaDetalhes?.anexos)
+    ? referenciaDetalhes.anexos
+    : [];
+  const notasAndamento = Array.isArray(referenciaDetalhes?.notasAndamento)
+    ? referenciaDetalhes.notasAndamento
+    : [];
 
   return {
     uniqueId: `hist-${item.id}`,
@@ -66,16 +134,22 @@ function mapHistoricoEvento(item) {
     subcategoria: item.subcategoria || null,
     titulo: item.titulo,
     chamado: metadata?.numeroChamado || null,
-    descricao: item.descricao,
+    descricao: getDescricaoPrincipal(item, metadata, referenciaDetalhes),
     responsavel: getResponsavelLabel(item),
     origem: item.origem || metadata?.origem || null,
     status: item.status || 'Registrado',
     isOS: item.referenciaTipo === 'manutencao',
     referenciaTipo: item.referenciaTipo || null,
     referenciaId: item.referenciaId || null,
+    referenciaDetalhes,
     metadata,
     impactaAnalise: Boolean(item.impactaAnalise),
     detalhesComplementares: getDetalhesComplementares(item, metadata),
+    resumoOperacional: getResumoOperacional(item, metadata, referenciaDetalhes),
+    anexos,
+    notasAndamento,
+    contagemAnexos: anexos.length,
+    contagemNotas: notasAndamento.length,
   };
 }
 
