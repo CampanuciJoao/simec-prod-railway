@@ -12,7 +12,8 @@
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push",
     "prisma:reset": "npx prisma db push --force-reset && npm run seed",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node tests/agent/agentCore.test.js",
+    "test:agent": "node tests/agent/agentCore.test.js"
   },
   "prisma": {
     "seed": "node seed.js"
