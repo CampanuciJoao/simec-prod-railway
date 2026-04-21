@@ -17,7 +17,9 @@ function normalizeMetricas(item) {
 }
 
 function normalizeTimeline(item) {
-  return toArray(item?.timeline || item?.historico || item?.eventos).filter(Boolean);
+  return toArray(item?.timeline || item?.historico || item?.eventos).filter(
+    Boolean
+  );
 }
 
 function normalizeTags(item) {

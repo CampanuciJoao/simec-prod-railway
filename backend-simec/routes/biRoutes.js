@@ -3,12 +3,37 @@
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
-import { startOfYear, endOfYear, differenceInHours } from 'date-fns';
+import { startOfYear, endOfYear, differenceInMinutes } from 'date-fns';
 import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.use(proteger);
+
+function toDateOrNull(value) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function calcularHorasParado(manutencao) {
+  const inicio =
+    toDateOrNull(manutencao.dataInicioReal) ||
+    toDateOrNull(manutencao.dataHoraAgendamentoInicio);
+
+  const fim =
+    toDateOrNull(manutencao.dataFimReal) ||
+    toDateOrNull(manutencao.dataConclusao) ||
+    toDateOrNull(manutencao.dataHoraAgendamentoFim);
+
+  if (!inicio || !fim || fim < inicio) {
+    return 0;
+  }
+
+  const minutos = differenceInMinutes(fim, inicio);
+  return Math.max(0, minutos) / 60;
+}
 
 router.get('/indicadores', async (req, res) => {
   try {
@@ -85,14 +110,8 @@ router.get('/indicadores', async (req, res) => {
         statsEquip[eId].preventivas += 1;
       }
 
-      if (m.dataInicioReal && m.dataFimReal) {
-        const diff = differenceInHours(
-          new Date(m.dataFimReal),
-          new Date(m.dataInicioReal)
-        );
-
-        const horasValidas = Math.max(0, diff);
-
+      {
+        const horasValidas = calcularHorasParado(m);
         statsEquip[eId].horasParado += horasValidas;
         statsUnidade[uId].horasParado += horasValidas;
       }

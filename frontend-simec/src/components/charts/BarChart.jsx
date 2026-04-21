@@ -54,7 +54,9 @@ function normalizarDados(input) {
       name: String(item.name || '').trim(),
       value: Number(item.value || 0),
     }))
-    .filter((item) => item.name && Number.isFinite(item.value) && item.value >= 0);
+    .filter(
+      (item) => item.name && Number.isFinite(item.value) && item.value >= 0
+    );
 
   if (itemsValidos.length === 0) return null;
 
@@ -119,11 +121,10 @@ function BarChart({
     }
   };
 
-  const options = useMemo(
-    () => {
-      const colors = getThemeChartColors();
+  const options = useMemo(() => {
+    const colors = getThemeChartColors();
 
-      return {
+    return {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
@@ -135,6 +136,13 @@ function BarChart({
           padding: 12,
           borderColor: colors.tooltipBorder,
           borderWidth: 1,
+          callbacks: {
+            label(context) {
+              const label = context.dataset.label || '';
+              const value = context.raw ?? 0;
+              return `${label}: ${value}`;
+            },
+          },
         },
       },
       scales: {
@@ -161,10 +169,8 @@ function BarChart({
           },
         },
       },
-      };
-    },
-    []
-  );
+    };
+  }, []);
 
   if (!chartData) {
     return <EmptyChartState message={emptyMessage} />;

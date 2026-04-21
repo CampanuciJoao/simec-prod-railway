@@ -9,13 +9,22 @@ function toNumber(value) {
 }
 
 export function mapRankingUnidades(rankingUnidades = []) {
-  return toArray(rankingUnidades);
+  return toArray(rankingUnidades).map((item) => {
+    const horasParado = toNumber(item.horasParado);
+
+    return {
+      ...item,
+      horasParado,
+      downtimeFormatado: formatarDowntime(horasParado),
+    };
+  });
 }
 
 export function mapDowntimePorUnidadeChartData(rankingUnidades = []) {
   return toArray(rankingUnidades).map((item) => ({
     name: item.nome,
     value: toNumber(item.horasParado),
+    subtitle: item.downtimeFormatado || formatarDowntime(item.horasParado),
   }));
 }
 

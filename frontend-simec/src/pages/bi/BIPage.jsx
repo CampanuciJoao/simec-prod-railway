@@ -27,9 +27,7 @@ function BIPage() {
   const [widgetOrder, setWidgetOrder] = useState(INITIAL_WIDGET_ORDER);
   const [expandedWidget, setExpandedWidget] = useState(null);
 
-  const hasResumoCards =
-    !!page.resumoCards &&
-    typeof page.resumoCards === 'object';
+  const hasResumoCards = !!page.resumoCards && typeof page.resumoCards === 'object';
 
   const isEmpty =
     !page.loading &&
@@ -46,7 +44,8 @@ function BIPage() {
       downtime: {
         id: 'downtime',
         title: 'Downtime por unidade',
-        description: 'Tempo acumulado de indisponibilidade',
+        description:
+          'Tempo acumulado de indisponibilidade por unidade no período analisado.',
         defaultSpanClassName: 'xl:col-span-1',
         render: (expanded) => (
           <BIDowntimeChartWidget
@@ -58,7 +57,8 @@ function BIPage() {
       frequencia: {
         id: 'frequencia',
         title: 'Reincidência de falhas',
-        description: 'Equipamentos com maior volume de corretivas',
+        description:
+          'Equipamentos com maior volume de corretivas concluídas no período.',
         defaultSpanClassName: 'xl:col-span-1',
         render: () => (
           <BIFrequenciaFalhasWidget
@@ -70,7 +70,8 @@ function BIPage() {
       ranking: {
         id: 'ranking',
         title: 'Ranking de downtime',
-        description: 'Equipamentos com maior tempo parado no período',
+        description:
+          'Equipamentos com maior tempo parado, já considerando a duração efetiva da OS.',
         defaultSpanClassName: 'xl:col-span-2',
         render: (expanded) => (
           <BIRankingDowntimeWidget
@@ -83,9 +84,7 @@ function BIPage() {
     [page]
   );
 
-  const orderedWidgets = widgetOrder
-    .map((id) => widgetMap[id])
-    .filter(Boolean);
+  const orderedWidgets = widgetOrder.map((id) => widgetMap[id]).filter(Boolean);
 
   const toggleExpand = (widgetId) => {
     setExpandedWidget((prev) => (prev === widgetId ? null : widgetId));
@@ -125,19 +124,19 @@ function BIPage() {
           {shouldShowState ? (
             <PageSection
               title="Widgets analíticos"
-              description="Os gráficos priorizam leitura executiva rápida, com drill-down e priorização operacional."
+              description="Os gráficos priorizam leitura executiva rápida, com foco em downtime, criticidade e recorrência operacional."
             >
               <PageState
                 loading={page.loading}
                 error={page.error?.message || page.error || ''}
                 isEmpty={isEmpty}
-                emptyMessage="Dados de BI não disponíveis para o período."
+                emptyMessage="Dados de BI não disponíveis para o período selecionado."
               />
             </PageSection>
           ) : (
             <PageSection
               title="Widgets analíticos"
-              description="Os gráficos priorizam leitura executiva rápida, com drill-down e priorização operacional."
+              description="Os gráficos priorizam leitura executiva rápida, com foco em downtime, criticidade e recorrência operacional."
             >
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
                 {orderedWidgets.map((widget, index) => {

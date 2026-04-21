@@ -20,7 +20,7 @@ function BIPageHeader({
   return (
     <PageHeader
       title={`Painel de Business Intelligence${ano ? ` - ${ano}` : ''}`}
-      subtitle="Acompanhe indicadores executivos de criticidade, downtime e reincidência operacional."
+      subtitle="Acompanhe indicadores executivos de criticidade, downtime e recorrência operacional."
       icon={faChartBar}
       actions={
         <>
@@ -34,11 +34,7 @@ function BIPageHeader({
             Atualizar
           </Button>
 
-          <Button
-            type="button"
-            onClick={onPrint}
-            disabled={!canPrint}
-          >
+          <Button type="button" onClick={onPrint} disabled={!canPrint}>
             <FontAwesomeIcon icon={faPrint} />
             Imprimir relatório executivo
           </Button>
