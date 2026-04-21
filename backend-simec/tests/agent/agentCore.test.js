@@ -8,6 +8,7 @@ import {
   avaliarCandidato,
   resolveFromCandidates,
 } from '../../services/agent/shared/entityScoring.js';
+import { validarHorarioFuturo } from '../../services/agent/agendamento/validators/horarioValidator.js';
 
 function runTest(name, fn) {
   try {
@@ -109,6 +110,19 @@ runTest('avaliarCandidato diferencia match exato de termo parcial', () => {
   assert.equal(exato, 1);
   assert.ok(parcial < exato);
   assert.ok(parcial >= 0.76);
+});
+
+runTest('validarHorarioFuturo aceita data e horario validos', () => {
+  const amanha = new Date();
+  amanha.setDate(amanha.getDate() + 1);
+
+  const yyyy = amanha.getFullYear();
+  const mm = String(amanha.getMonth() + 1).padStart(2, '0');
+  const dd = String(amanha.getDate()).padStart(2, '0');
+
+  const resultado = validarHorarioFuturo(`${yyyy}-${mm}-${dd}`, '11:00');
+
+  assert.equal(resultado.valido, true);
 });
 
 console.log('agent-core-tests-ok');

@@ -19,11 +19,10 @@ function formatarHoraNoTimezone(date, timeZone) {
 }
 
 /**
- * Valida se o horário agendado (data + hora locais) é futuro.
+ * Valida se o horario agendado (data + hora locais) e futuro.
  *
  * FIX: criarDateUTCFromLocal espera objeto { dateLocal, timeLocal, timezone },
- * não argumentos posicionais. A chamada anterior passava 3 args posicionais,
- * fazendo dateLocal = undefined e isDataValida retornar false sempre.
+ * nao argumentos posicionais.
  */
 export const validarHorarioFuturo = (data, hora, tenant = null) => {
   if (!data || !hora) {
@@ -42,7 +41,7 @@ export const validarHorarioFuturo = (data, hora, tenant = null) => {
   if (!isDataValida(solicitado)) {
     return {
       valido: false,
-      msg: 'Não consegui interpretar a data ou horário informado. Por favor informe a data (ex: 21/04/2026) e o horário (ex: 10:00) separadamente.',
+      msg: 'Nao consegui interpretar a data ou horario informado. Por favor, informe a data no formato DD/MM/AAAA e o horario como, por exemplo, 10:00.',
     };
   }
 
@@ -50,7 +49,7 @@ export const validarHorarioFuturo = (data, hora, tenant = null) => {
     const agoraFmt = formatarHoraNoTimezone(agora, tenantTimezone);
     return {
       valido: false,
-      msg: `O horário **${hora}** já passou. Agora são **${agoraFmt}**. Por favor, informe um horário futuro.`,
+      msg: `O horario **${hora}** ja passou. Agora sao **${agoraFmt}**. Por favor, informe um horario futuro.`,
     };
   }
 
