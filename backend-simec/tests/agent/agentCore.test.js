@@ -6,7 +6,10 @@ import {
   normalizarHora,
 } from '../../services/agent/agendamento/extractor/normalizers.js';
 import { extrairCamposHeuristico } from '../../services/agent/agendamento/extractor/heuristicaExtractor.js';
-import { buildParsingHintMessage } from '../../services/agent/agendamento/agendamentoService.js';
+import {
+  buildParsingHintMessage,
+  normalizeAgentMissingFields,
+} from '../../services/agent/agendamento/agendamentoService.js';
 import { buildAgentLogContext } from '../../services/agent/core/agentLogger.js';
 import { getFaltantes } from '../../services/agent/agendamento/state/faltantes.js';
 import { validarPayloadAgendamentoDoAgente } from '../../services/agent/workflow/dbManager.js';
@@ -119,6 +122,21 @@ runTest('logger do agente normaliza erros e limita profundidade', () => {
 
   assert.equal(contexto.error.message, 'Falha de teste');
   assert.equal(contexto.nested.level1.level2.level3.level4, '[max-depth]');
+});
+
+runTest('campos faltantes do schema sao convertidos para o vocabulário do agente', () => {
+  assert.deepEqual(normalizeAgentMissingFields(['agendamentoHoraFimLocal']), [
+    'horaFim',
+  ]);
+  assert.deepEqual(
+    normalizeAgentMissingFields([
+      'agendamentoDataInicioLocal',
+      'agendamentoHoraInicioLocal',
+      'agendamentoDataFimLocal',
+      'agendamentoHoraFimLocal',
+    ]),
+    ['data', 'horaInicio', 'horaFim']
+  );
 });
 
 runTest(

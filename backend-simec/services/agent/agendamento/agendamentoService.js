@@ -105,20 +105,30 @@ function buildBaseMeta(estado, extra = {}) {
   };
 }
 
-function buildUserFriendlyValidationMessage(fieldErrors = {}, faltantes = []) {
-  const fieldToAgentField = {
-    equipamentoId: 'equipamentoId',
-    tipo: 'tipoManutencao',
-    agendamentoDataInicioLocal: 'data',
-    agendamentoHoraInicioLocal: 'horaInicio',
-    agendamentoDataFimLocal: 'data',
-    agendamentoHoraFimLocal: 'horaFim',
-    numeroChamado: 'numeroChamado',
-    descricaoProblemaServico: 'descricao',
-  };
+const validationFieldToAgentField = {
+  equipamentoId: 'equipamentoId',
+  tipo: 'tipoManutencao',
+  agendamentoDataInicioLocal: 'data',
+  agendamentoHoraInicioLocal: 'horaInicio',
+  agendamentoDataFimLocal: 'data',
+  agendamentoHoraFimLocal: 'horaFim',
+  numeroChamado: 'numeroChamado',
+  descricaoProblemaServico: 'descricao',
+};
 
+export function normalizeAgentMissingFields(fields = []) {
+  return [
+    ...new Set(
+      (fields || [])
+        .map((field) => validationFieldToAgentField[field] || field)
+        .filter(Boolean)
+    ),
+  ];
+}
+
+function buildUserFriendlyValidationMessage(fieldErrors = {}, faltantes = []) {
   const relevantEntries = Object.entries(fieldErrors).filter(([field]) => {
-    const agentField = fieldToAgentField[field] || field;
+    const agentField = validationFieldToAgentField[field] || field;
     return !faltantes.includes(agentField);
   });
 
@@ -507,7 +517,10 @@ export const AgendamentoService = {
     if (faltantesValidados.length === 0) {
       ({ validacao } = validarPayloadAgendamentoDoAgente(estado));
       faltantesValidados = [
-        ...new Set([...(faltantesValidados || []), ...(validacao.missingFields || [])]),
+        ...new Set([
+          ...(faltantesValidados || []),
+          ...normalizeAgentMissingFields(validacao.missingFields || []),
+        ]),
       ];
     }
 
@@ -763,7 +776,9 @@ export const AgendamentoService = {
               ? 'REQUIRED_FIELD_MISSING'
               : 'DATABASE_ERROR',
           fieldErrors: error?.details?.fieldErrors || null,
-          missingFields: error?.details?.missingFields || null,
+          missingFields: normalizeAgentMissingFields(
+            error?.details?.missingFields || []
+          ),
           validationSource:
             error?.code === 'AGENT_VALIDATION_ERROR'
               ? 'manutencaoSchema'
