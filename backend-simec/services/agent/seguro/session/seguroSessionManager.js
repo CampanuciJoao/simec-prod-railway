@@ -1,4 +1,5 @@
 import { AgentSessionRepository } from '../../session/agentSessionRepository.js';
+import { logAgentStage } from '../../core/agentLogger.js';
 import { getSessionKey } from '../../core/sessionKeys.js';
 
 export async function registrarSessaoSeguro(
@@ -8,8 +9,20 @@ export async function registrarSessaoSeguro(
   payload,
   sessaoExistente = null
 ) {
-  const { usuarioId, tenantId } = contextoUsuario;
+  const {
+    usuarioId,
+    tenantId,
+    usuarioNome = null,
+    requestId = null,
+  } = contextoUsuario;
   const sessionKey = getSessionKey(usuarioId, tenantId);
+  const logContext = {
+    requestId,
+    tenantId,
+    usuarioId,
+    usuarioNome,
+    intent: 'SEGURO',
+  };
 
   let sessao = sessaoExistente;
 
@@ -21,11 +34,21 @@ export async function registrarSessaoSeguro(
       step: 'FINALIZADO',
       state: payload,
     });
+
+    logAgentStage('SEGURO_SESSION', logContext, {
+      action: 'CREATED',
+      sessionId: sessao.id,
+    });
   } else {
     await AgentSessionRepository.salvarSessao(sessao.id, {
       step: 'FINALIZADO',
       state: payload,
       resumo: respostaTexto,
+    });
+
+    logAgentStage('SEGURO_SESSION', logContext, {
+      action: 'UPDATED',
+      sessionId: sessao.id,
     });
   }
 
@@ -36,6 +59,11 @@ export async function registrarSessaoSeguro(
     respostaTexto,
     payload
   );
+
+  logAgentStage('SEGURO_SESSION', logContext, {
+    action: 'MESSAGES_REGISTERED',
+    sessionId: sessao.id,
+  });
 
   return sessao;
 }

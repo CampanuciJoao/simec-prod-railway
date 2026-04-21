@@ -1,6 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCheck,
@@ -64,6 +64,7 @@ function extrairExplicacao(alerta) {
 }
 
 function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
+  const navigate = useNavigate();
   const { timezone, locale } = useTenantTime();
   const [showExplicacao, setShowExplicacao] = useState(false);
 
@@ -77,11 +78,20 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
     subtituloRenderizado ||
     'O sistema identificou sinais de risco e recomenda avaliacao humana do ativo.';
 
-  const handleViewDetails = () => {
+  const handleViewDetails = useCallback(async () => {
     if (alerta.status === 'NaoVisto') {
-      onUpdateStatus(alerta.id, 'Visto');
+      await onUpdateStatus(alerta.id, 'Visto');
     }
-  };
+  }, [alerta.id, alerta.status, onUpdateStatus]);
+
+  const handleOpenLink = useCallback(
+    async (event, targetLink = alerta.link || '#') => {
+      event.preventDefault();
+      await handleViewDetails();
+      navigate(targetLink);
+    },
+    [alerta.link, handleViewDetails, navigate]
+  );
 
   const handleToggleExplicacao = () => {
     handleViewDetails();
@@ -166,7 +176,7 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
             <Link
               to={alerta.link || '#'}
               className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-600 no-underline transition-all hover:bg-blue-600 hover:text-white"
-              onClick={handleViewDetails}
+              onClick={(event) => handleOpenLink(event)}
             >
               <FontAwesomeIcon icon={faEye} />
               Detalhes
@@ -234,7 +244,9 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 <Link
                   to={buildAgendarPreventivaLink(alerta)}
                   className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white no-underline transition hover:bg-violet-700"
-                  onClick={handleViewDetails}
+                  onClick={(event) =>
+                    handleOpenLink(event, buildAgendarPreventivaLink(alerta))
+                  }
                 >
                   <FontAwesomeIcon icon={faWrench} />
                   Agendar preventiva
@@ -243,7 +255,7 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 <Link
                   to={alerta.link || '#'}
                   className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-4 py-2 text-xs font-bold text-violet-700 no-underline transition hover:bg-violet-100"
-                  onClick={handleViewDetails}
+                  onClick={(event) => handleOpenLink(event)}
                 >
                   <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
                   Ver ficha técnica

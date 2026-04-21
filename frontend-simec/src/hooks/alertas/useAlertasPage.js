@@ -6,6 +6,7 @@ import {
   dismissAlerta as dismissAlertaApi,
 } from '@/services/api';
 
+import { useAlertas } from '@/contexts/AlertasContext';
 import { useToast } from '@/contexts/ToastContext';
 
 import {
@@ -26,6 +27,7 @@ function getFiltrosIniciais() {
 
 export function useAlertasPage() {
   const { addToast } = useToast();
+  const { refetchAlertas } = useAlertas();
 
   const [alertas, setAlertas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -92,11 +94,13 @@ export function useAlertasPage() {
             alerta.id === id ? { ...alerta, status } : alerta
           )
         );
+
+        await refetchAlertas?.();
       } catch {
         addToast('Erro ao atualizar status.', 'error');
       }
     },
-    [addToast]
+    [addToast, refetchAlertas]
   );
 
   const dismissItem = useCallback(
@@ -105,13 +109,14 @@ export function useAlertasPage() {
         await dismissAlertaApi(id);
 
         setAlertas((prev) => prev.filter((alerta) => alerta.id !== id));
+        await refetchAlertas?.();
 
         addToast('Alerta dispensado.', 'success');
       } catch {
         addToast('Erro ao dispensar alerta.', 'error');
       }
     },
-    [addToast]
+    [addToast, refetchAlertas]
   );
 
   return {

@@ -1,8 +1,9 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { Card, Badge } from '@/components/ui';
+import { useAlertas } from '@/contexts/AlertasContext';
 
 function getPrioridadeVariant(prioridade) {
   if (prioridade === 'Alta') return 'red';
@@ -11,12 +12,29 @@ function getPrioridadeVariant(prioridade) {
 }
 
 function AlertListItem({ alerta }) {
+  const navigate = useNavigate();
+  const { updateStatus } = useAlertas();
   const prioridadeVariant = getPrioridadeVariant(alerta?.prioridade);
+
+  const handleOpenAlert = async (event) => {
+    event.preventDefault();
+
+    if (alerta?.status === 'NaoVisto') {
+      try {
+        await updateStatus(alerta.id, 'Visto');
+      } catch (error) {
+        console.error('[DASHBOARD_ALERT_OPEN_ERROR]', error);
+      }
+    }
+
+    navigate(alerta?.link || '/alertas');
+  };
 
   return (
     <Link
       to={alerta?.link || '/alertas'}
       className="block"
+      onClick={handleOpenAlert}
     >
       <Card
         padded={false}
