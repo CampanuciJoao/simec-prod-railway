@@ -92,6 +92,7 @@ function DetalhesEquipamentoPage() {
           equipamento={equipamento}
           equipamentoId={equipamentoId}
           onRefresh={refetchEquipamento}
+          onChangeTab={setAbaAtiva}
         />
       </div>
     </PageLayout>

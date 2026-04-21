@@ -1,30 +1,70 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
-
-import { ResponsiveTabs } from '@/components/ui';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  TabAcessorios,
+  faArrowUpRightFromSquare,
+  faFileMedical,
+  faFilePdf,
+  faPaperclip,
+  faShieldAlt,
+} from '@fortawesome/free-solid-svg-icons';
+
+import { Button, ResponsiveTabs } from '@/components/ui';
+import { useToast } from '@/contexts/ToastContext';
+import {
   TabAnexos,
-  TabCadastro,
+  TabCobertura,
+  TabFichaTecnica,
   TabHistorico,
+  TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
+import { exportHistoricoAtivoByEquipamento } from '@/services/api';
+import { exportarHistoricoEquipamentoPDF } from '@/utils/pdfUtils';
+import { buildHistoricoTimeline } from '@/utils/equipamentos/historicoTimelineUtils';
 
 const TABS = [
-  { id: 'cadastro', label: 'Cadastro' },
-  { id: 'acessorios', label: 'Acessórios' },
+  { id: 'visaoGeral', label: 'Visao geral' },
+  { id: 'historico', label: 'Historico' },
+  { id: 'fichaTecnica', label: 'Ficha tecnica' },
   { id: 'anexos', label: 'Anexos' },
-  { id: 'historico', label: 'Histórico' },
+  { id: 'cobertura', label: 'Cobertura' },
 ];
 
 function EquipamentoCardExpanded({
   equipamento,
   abaAtiva,
   onChangeTab,
+  onOpenFullPage,
   onRefresh,
 }) {
+  const { addToast } = useToast();
+
+  const handlePrintHistorico = useCallback(async () => {
+    try {
+      const lista = await exportHistoricoAtivoByEquipamento(equipamento.id);
+      const timeline = buildHistoricoTimeline({
+        eventos: Array.isArray(lista) ? lista : [],
+      });
+
+      exportarHistoricoEquipamentoPDF(timeline.linhaDoTempo, {
+        modelo: equipamento?.modelo,
+        tag: equipamento?.tag,
+        unidade: equipamento?.unidade?.nomeSistema,
+      });
+    } catch {
+      addToast('Erro ao exportar historico do ativo.', 'error');
+    }
+  }, [equipamento, addToast]);
+
   const tabContentMap = {
-    cadastro: <TabCadastro equipamentoInicial={equipamento} />,
-    acessorios: <TabAcessorios equipamentoId={equipamento.id} />,
+    visaoGeral: (
+      <TabVisaoGeral
+        equipamento={equipamento}
+        onNavigateTab={(tabId) => onChangeTab(equipamento.id, tabId)}
+        editHref={`/cadastros/equipamentos/editar/${equipamento.id}`}
+      />
+    ),
+    fichaTecnica: <TabFichaTecnica equipamentoId={equipamento.id} />,
     anexos: (
       <TabAnexos
         equipamentoId={equipamento.id}
@@ -33,26 +73,106 @@ function EquipamentoCardExpanded({
       />
     ),
     historico: <TabHistorico equipamento={equipamento} />,
+    cobertura: <TabCobertura equipamento={equipamento} />,
   };
 
   return (
     <div
-      className="border-t px-4 py-5 md:px-6 md:py-6"
+      className="space-y-5 border-t px-4 py-5 md:px-6 md:py-6"
       style={{
         borderColor: 'var(--section-header-border)',
         backgroundColor: 'var(--bg-surface)',
       }}
     >
-      <div className="mb-6">
-        <ResponsiveTabs
-          tabs={TABS}
-          activeTab={abaAtiva}
-          onChange={(tabId) => onChangeTab(equipamento.id, tabId)}
-        />
+      <div
+        className="rounded-3xl border px-4 py-4 md:px-5"
+        style={{
+          borderColor: 'var(--border-soft)',
+          backgroundColor: 'var(--bg-surface-soft)',
+        }}
+      >
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <p
+              className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Workspace do ativo
+            </p>
+            <h4
+              className="mt-1 text-lg font-bold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {equipamento.modelo}
+            </h4>
+            <div
+              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <span>Tag: {equipamento.tag || 'N/A'}</span>
+              <span>Tipo: {equipamento.tipo || 'N/A'}</span>
+              <span>Unidade: {equipamento.unidade?.nomeSistema || 'N/A'}</span>
+              <span>Fabricante: {equipamento.fabricante || 'N/A'}</span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onChangeTab(equipamento.id, 'fichaTecnica')}
+            >
+              <FontAwesomeIcon icon={faFileMedical} />
+              Nova ocorrencia
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handlePrintHistorico}
+            >
+              <FontAwesomeIcon icon={faFilePdf} />
+              Imprimir historico
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onChangeTab(equipamento.id, 'anexos')}
+            >
+              <FontAwesomeIcon icon={faPaperclip} />
+              Anexos
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => onChangeTab(equipamento.id, 'cobertura')}
+            >
+              <FontAwesomeIcon icon={faShieldAlt} />
+              Cobertura
+            </Button>
+
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onOpenFullPage}
+            >
+              <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+              Detalhe completo
+            </Button>
+          </div>
+        </div>
       </div>
 
+      <ResponsiveTabs
+        tabs={TABS}
+        activeTab={abaAtiva}
+        onChange={(tabId) => onChangeTab(equipamento.id, tabId)}
+      />
+
       <div
-        className="min-h-[220px] rounded-2xl border p-4 md:p-5"
+        className="min-h-[260px] rounded-3xl border p-4 md:p-5"
         style={{
           backgroundColor: 'var(--bg-surface-soft)',
           borderColor: 'var(--border-soft)',
@@ -72,6 +192,7 @@ EquipamentoCardExpanded.propTypes = {
   }).isRequired,
   abaAtiva: PropTypes.string.isRequired,
   onChangeTab: PropTypes.func.isRequired,
+  onOpenFullPage: PropTypes.func,
   onRefresh: PropTypes.func,
 };
 

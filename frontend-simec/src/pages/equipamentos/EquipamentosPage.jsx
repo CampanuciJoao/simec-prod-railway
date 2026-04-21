@@ -26,7 +26,7 @@ import {
 
 function EquipamentosPage() {
   const page = useEquipamentosPage();
-  const expansion = useEquipamentosExpansion('cadastro');
+  const expansion = useEquipamentosExpansion('visaoGeral');
 
   const isInitialLoading = page.loading && page.equipamentos.length === 0;
   const hasError = Boolean(page.error);
@@ -104,6 +104,7 @@ function EquipamentosPage() {
               equipamentos={page.equipamentos}
               expansion={expansion}
               onGoToFichaTecnica={page.goToFichaTecnica}
+              onOpenFullPage={page.goToDetalhes}
               onStatusUpdated={page.atualizarStatusLocalmente}
               onRefresh={page.refetch}
             />

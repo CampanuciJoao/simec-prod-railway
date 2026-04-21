@@ -153,7 +153,7 @@ FichaTecnicaEventForm.propTypes = {
   submitting: PropTypes.bool.isRequired,
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
-  onCancel: PropTypes.func.isRequired,
+  onCancel: PropTypes.func,
 };
 
 export default FichaTecnicaEventForm;

@@ -1,10 +1,11 @@
 import React from 'react';
 
 import {
-  TabAcessorios,
   TabAnexos,
-  TabCadastro,
+  TabCobertura,
+  TabFichaTecnica,
   TabHistorico,
+  TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
 
 function DetalhesEquipamentoTabContent({
@@ -12,15 +13,17 @@ function DetalhesEquipamentoTabContent({
   equipamento,
   equipamentoId,
   onRefresh,
+  onChangeTab,
 }) {
   const tabContentMap = {
-    cadastro: (
-      <TabCadastro
-        equipamentoInicial={equipamento}
-        onUpdate={onRefresh}
+    visaoGeral: (
+      <TabVisaoGeral
+        equipamento={equipamento}
+        onNavigateTab={onChangeTab}
+        editHref={`/cadastros/equipamentos/editar/${equipamentoId}`}
       />
     ),
-    acessorios: <TabAcessorios equipamentoId={equipamentoId} />,
+    fichaTecnica: <TabFichaTecnica equipamentoId={equipamentoId} />,
     anexos: (
       <TabAnexos
         equipamentoId={equipamentoId}
@@ -29,6 +32,7 @@ function DetalhesEquipamentoTabContent({
       />
     ),
     historico: <TabHistorico equipamento={equipamento} />,
+    cobertura: <TabCobertura equipamento={equipamento} />,
   };
 
   return tabContentMap[abaAtiva] || null;

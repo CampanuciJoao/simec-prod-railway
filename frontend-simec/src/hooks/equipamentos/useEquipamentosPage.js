@@ -213,6 +213,13 @@ export function useEquipamentosPage() {
     [navigate]
   );
 
+  const goToDetalhes = useCallback(
+    (equipamentoId) => {
+      navigate(`/equipamentos/detalhes/${equipamentoId}`);
+    },
+    [navigate]
+  );
+
   return {
     equipamentos,
     loading,
@@ -230,6 +237,7 @@ export function useEquipamentosPage() {
     clearAllFilters,
     goToCreate,
     goToFichaTecnica,
+    goToDetalhes,
     atualizarStatusLocalmente,
     deleteModal,
     handleConfirmDelete,

@@ -30,6 +30,7 @@ import {
   LoadingState,
   PageSection,
   Select,
+  StatusBadge,
 } from '@/components/ui';
 
 function TabHistorico({ equipamento }) {
@@ -314,17 +315,89 @@ function TabHistorico({ equipamento }) {
           ) : null}
         </Card>
 
-        {loading ? (
-          <LoadingState message="Carregando historico..." />
-        ) : linhaDoTempo.length === 0 ? (
-          <EmptyState message="Nenhum registro encontrado para os filtros selecionados." />
-        ) : (
-          <HistoricoTimelineList
-            linhaDoTempo={linhaDoTempo}
-            itensExpandidos={itensExpandidos}
-            onToggleExpandir={toggleExpandir}
-          />
-        )}
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.45fr)_320px]">
+          <div>
+            {loading ? (
+              <LoadingState message="Carregando historico..." />
+            ) : linhaDoTempo.length === 0 ? (
+              <EmptyState message="Nenhum registro encontrado para os filtros selecionados." />
+            ) : (
+              <HistoricoTimelineList
+                linhaDoTempo={linhaDoTempo}
+                itensExpandidos={itensExpandidos}
+                onToggleExpandir={toggleExpandir}
+              />
+            )}
+          </div>
+
+          <div className="space-y-4">
+            <Card surface="soft" className="rounded-2xl">
+              <span
+                className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Contexto do ativo
+              </span>
+
+              <div className="mt-3 space-y-3 text-sm">
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>Modelo</div>
+                  <div style={{ color: 'var(--text-primary)' }}>
+                    {equipamento?.modelo || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>Tag</div>
+                  <div style={{ color: 'var(--text-primary)' }}>
+                    {equipamento?.tag || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>Unidade</div>
+                  <div style={{ color: 'var(--text-primary)' }}>
+                    {equipamento?.unidade?.nomeSistema || 'N/A'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ color: 'var(--text-muted)' }}>Status atual</div>
+                  <div className="mt-1">
+                    <StatusBadge value={equipamento?.status || 'N/A'} />
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            <Card surface="soft" className="rounded-2xl">
+              <span
+                className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Resumo filtrado
+              </span>
+
+              <div className="mt-3 space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span style={{ color: 'var(--text-muted)' }}>Registros exibidos</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {linhaDoTempo.length}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span style={{ color: 'var(--text-muted)' }}>Total encontrado</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {totalRegistros || totalFiltrado}
+                  </strong>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span style={{ color: 'var(--text-muted)' }}>Filtro de tipo</span>
+                  <strong style={{ color: 'var(--text-primary)' }}>
+                    {filtroTipo === 'Todos' ? 'Todos' : filtroTipo}
+                  </strong>
+                </div>
+              </div>
+            </Card>
+          </div>
+        </div>
 
         {!loading && linhaDoTempo.length > 0 ? (
           <div className="space-y-3">

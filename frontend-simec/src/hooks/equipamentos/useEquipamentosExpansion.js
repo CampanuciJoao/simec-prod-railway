@@ -23,6 +23,21 @@ export function useEquipamentosExpansion(defaultTab = 'cadastro') {
     }));
   }, []);
 
+  const abrirNaAba = useCallback(
+    (equipamentoId, nomeAba) => {
+      setExpandidos((prev) => ({
+        ...prev,
+        [equipamentoId]: true,
+      }));
+
+      setAbasAtivas((prev) => ({
+        ...prev,
+        [equipamentoId]: nomeAba,
+      }));
+    },
+    []
+  );
+
   const isExpandido = useCallback(
     (equipamentoId) => !!expandidos[equipamentoId],
     [expandidos]
@@ -41,6 +56,7 @@ export function useEquipamentosExpansion(defaultTab = 'cadastro') {
   return {
     toggleExpandir,
     trocarAba,
+    abrirNaAba,
     isExpandido,
     getAbaAtiva,
     recolherTodos,

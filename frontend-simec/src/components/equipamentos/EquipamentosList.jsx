@@ -8,6 +8,7 @@ function EquipamentosList({
   equipamentos = [],
   expansion,
   onGoToFichaTecnica,
+  onOpenFullPage,
   onStatusUpdated,
   onRefresh,
 }) {
@@ -25,11 +26,11 @@ function EquipamentosList({
     [expansion]
   );
 
-  const handleGoToFichaTecnica = useCallback(
+  const handleAbrirFichaTecnica = useCallback(
     (id) => {
-      onGoToFichaTecnica?.(id);
+      expansion.abrirNaAba(id, 'fichaTecnica');
     },
-    [onGoToFichaTecnica]
+    [expansion]
   );
 
   const handleStatusUpdated = useCallback(
@@ -61,7 +62,8 @@ function EquipamentosList({
             abaAtiva={abaAtiva}
             onToggleExpandir={handleToggleExpandir}
             onTrocarAba={handleTrocarAba}
-            onGoToFichaTecnica={handleGoToFichaTecnica}
+            onGoToFichaTecnica={handleAbrirFichaTecnica}
+            onOpenFullPage={onOpenFullPage}
             onStatusUpdated={handleStatusUpdated}
             onRefresh={handleRefresh}
           />
@@ -76,10 +78,12 @@ EquipamentosList.propTypes = {
   expansion: PropTypes.shape({
     toggleExpandir: PropTypes.func.isRequired,
     trocarAba: PropTypes.func.isRequired,
+    abrirNaAba: PropTypes.func.isRequired,
     isExpandido: PropTypes.func.isRequired,
     getAbaAtiva: PropTypes.func.isRequired,
   }).isRequired,
   onGoToFichaTecnica: PropTypes.func,
+  onOpenFullPage: PropTypes.func,
   onStatusUpdated: PropTypes.func,
   onRefresh: PropTypes.func,
 };
