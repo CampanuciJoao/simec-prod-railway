@@ -19,7 +19,6 @@ function DetalhesEquipamentoTabContent({
     visaoGeral: (
       <TabVisaoGeral
         equipamento={equipamento}
-        onNavigateTab={onChangeTab}
         editHref={`/cadastros/equipamentos/editar/${equipamentoId}`}
       />
     ),

@@ -1,16 +1,10 @@
-import React, { useCallback } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faArrowUpRightFromSquare,
-  faFileMedical,
-  faFilePdf,
-  faPaperclip,
-  faShieldAlt,
-} from '@fortawesome/free-solid-svg-icons';
+import { faPenToSquare } from '@fortawesome/free-solid-svg-icons';
 
 import { Button, ResponsiveTabs } from '@/components/ui';
-import { useToast } from '@/contexts/ToastContext';
 import {
   TabAnexos,
   TabCobertura,
@@ -18,9 +12,6 @@ import {
   TabHistorico,
   TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
-import { exportHistoricoAtivoByEquipamento } from '@/services/api';
-import { exportarHistoricoEquipamentoPDF } from '@/utils/pdfUtils';
-import { buildHistoricoTimeline } from '@/utils/equipamentos/historicoTimelineUtils';
 
 const TABS = [
   { id: 'visaoGeral', label: 'Visao geral' },
@@ -34,33 +25,12 @@ function EquipamentoCardExpanded({
   equipamento,
   abaAtiva,
   onChangeTab,
-  onOpenFullPage,
   onRefresh,
 }) {
-  const { addToast } = useToast();
-
-  const handlePrintHistorico = useCallback(async () => {
-    try {
-      const lista = await exportHistoricoAtivoByEquipamento(equipamento.id);
-      const timeline = buildHistoricoTimeline({
-        eventos: Array.isArray(lista) ? lista : [],
-      });
-
-      exportarHistoricoEquipamentoPDF(timeline.linhaDoTempo, {
-        modelo: equipamento?.modelo,
-        tag: equipamento?.tag,
-        unidade: equipamento?.unidade?.nomeSistema,
-      });
-    } catch {
-      addToast('Erro ao exportar historico do ativo.', 'error');
-    }
-  }, [equipamento, addToast]);
-
   const tabContentMap = {
     visaoGeral: (
       <TabVisaoGeral
         equipamento={equipamento}
-        onNavigateTab={(tabId) => onChangeTab(equipamento.id, tabId)}
         editHref={`/cadastros/equipamentos/editar/${equipamento.id}`}
       />
     ),
@@ -116,52 +86,12 @@ function EquipamentoCardExpanded({
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onChangeTab(equipamento.id, 'fichaTecnica')}
-            >
-              <FontAwesomeIcon icon={faFileMedical} />
-              Nova ocorrencia
+          <Link to={`/cadastros/equipamentos/editar/${equipamento.id}`}>
+            <Button type="button" variant="secondary">
+              <FontAwesomeIcon icon={faPenToSquare} />
+              Editar cadastro
             </Button>
-
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handlePrintHistorico}
-            >
-              <FontAwesomeIcon icon={faFilePdf} />
-              Imprimir historico
-            </Button>
-
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onChangeTab(equipamento.id, 'anexos')}
-            >
-              <FontAwesomeIcon icon={faPaperclip} />
-              Anexos
-            </Button>
-
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => onChangeTab(equipamento.id, 'cobertura')}
-            >
-              <FontAwesomeIcon icon={faShieldAlt} />
-              Cobertura
-            </Button>
-
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={onOpenFullPage}
-            >
-              <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-              Detalhe completo
-            </Button>
-          </div>
+          </Link>
         </div>
       </div>
 
@@ -192,7 +122,6 @@ EquipamentoCardExpanded.propTypes = {
   }).isRequired,
   abaAtiva: PropTypes.string.isRequired,
   onChangeTab: PropTypes.func.isRequired,
-  onOpenFullPage: PropTypes.func,
   onRefresh: PropTypes.func,
 };
 

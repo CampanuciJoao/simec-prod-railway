@@ -6,12 +6,9 @@ import {
   faBolt,
   faBuilding,
   faCalendarCheck,
-  faFileMedical,
-  faFilePdf,
   faMicrochip,
   faPenToSquare,
   faShieldAlt,
-  faTimeline,
   faTriangleExclamation,
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
@@ -27,11 +24,7 @@ import { formatarData } from '@/utils/timeUtils';
 import { useEquipamentoCobertura } from '@/hooks/equipamentos/useEquipamentoCobertura';
 import { useEquipamentoFichaTecnica } from '@/hooks/equipamentos/useEquipamentoFichaTecnica';
 
-function TabVisaoGeral({
-  equipamento,
-  onNavigateTab,
-  editHref,
-}) {
+function TabVisaoGeral({ equipamento, editHref }) {
   const { contratosRelacionados, segurosRelacionados } =
     useEquipamentoCobertura(equipamento);
   const { ocorrencias, loading: loadingOcorrencias } =
@@ -66,12 +59,12 @@ function TabVisaoGeral({
         />
       </ResponsiveGrid>
 
-      <ResponsiveGrid cols={{ base: 1, xl: 2 }}>
-        <PageSection
-          title="Resumo do ativo"
-          description="Informacoes executivas e operacionais mais relevantes deste equipamento."
-        >
-          <ResponsiveGrid cols={{ base: 1, md: 2 }}>
+      <PageSection
+        title="Resumo do ativo"
+        description="Informacoes executivas e operacionais mais relevantes deste equipamento."
+      >
+        <div className="space-y-5">
+          <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
             <InfoCard
               icon={faMicrochip}
               label="Modelo"
@@ -103,58 +96,23 @@ function TabVisaoGeral({
               value={equipamento.numeroPatrimonio || 'N/A'}
             />
           </ResponsiveGrid>
-        </PageSection>
 
-        <PageSection
-          title="Acoes rapidas"
-          description="Atalhos operacionais para o dia a dia do ativo."
-        >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <Button type="button" onClick={() => onNavigateTab('historico')}>
-              <FontAwesomeIcon icon={faTimeline} />
-              Ver historico completo
-            </Button>
-
-            <Button type="button" onClick={() => onNavigateTab('fichaTecnica')}>
-              <FontAwesomeIcon icon={faFileMedical} />
-              Registrar ocorrencia
-            </Button>
-
-            <Link to={`/equipamentos/detalhes/${equipamento.id}`}>
-              <Button type="button" variant="secondary" className="w-full">
-                <FontAwesomeIcon icon={faWrench} />
-                Abrir detalhe completo
-              </Button>
-            </Link>
-
+          <div className="flex justify-start">
             <Link to={editHref}>
-              <Button type="button" variant="secondary" className="w-full">
+              <Button type="button" variant="secondary">
                 <FontAwesomeIcon icon={faPenToSquare} />
                 Editar cadastro
               </Button>
             </Link>
-
-            <Button type="button" variant="secondary" onClick={() => onNavigateTab('cobertura')}>
-              <FontAwesomeIcon icon={faShieldAlt} />
-              Ver cobertura
-            </Button>
-
-            <Link to="/relatorios">
-              <Button type="button" variant="secondary" className="w-full">
-                <FontAwesomeIcon icon={faFilePdf} />
-                Relatorios do modulo
-              </Button>
-            </Link>
           </div>
-        </PageSection>
-      </ResponsiveGrid>
+        </div>
+      </PageSection>
     </div>
   );
 }
 
 TabVisaoGeral.propTypes = {
   equipamento: PropTypes.object.isRequired,
-  onNavigateTab: PropTypes.func.isRequired,
   editHref: PropTypes.string.isRequired,
 };
 

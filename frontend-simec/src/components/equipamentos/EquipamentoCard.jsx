@@ -1,21 +1,15 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowUpRightFromSquare,
   faBuilding,
-  faFileMedical,
   faMicrochip,
+  faPenToSquare,
   faTag,
 } from '@fortawesome/free-solid-svg-icons';
 
-import {
-  Badge,
-  Button,
-  EntityCard,
-  EntityInfoGrid,
-  StatusBadge,
-} from '@/components/ui';
+import { Badge, Button, EntityCard, StatusBadge } from '@/components/ui';
 import { StatusSelector } from '@/components/equipamentos';
 import EquipamentoCardExpanded from '@/components/equipamentos/EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '@/utils/equipamentoCardStyles';
@@ -26,59 +20,15 @@ function EquipamentoCard({
   abaAtiva,
   onToggleExpandir,
   onTrocarAba,
-  onGoToFichaTecnica,
-  onOpenFullPage,
   onStatusUpdated,
   onRefresh,
 }) {
-  const {
-    cardStyle,
-    toggleStyle,
-    expandedStyle,
-    infoCardStyle,
-  } = getEquipamentoCardStyles(equipamento.status);
+  const { cardStyle, toggleStyle, expandedStyle, infoCardStyle } =
+    getEquipamentoCardStyles(equipamento.status);
 
   const handleToggle = () => {
     onToggleExpandir(equipamento.id);
   };
-
-  const handleGoToFicha = (event) => {
-    event.stopPropagation();
-    onGoToFichaTecnica(equipamento.id);
-  };
-
-  const handleOpenFullPage = (event) => {
-    event.stopPropagation();
-    onOpenFullPage?.(equipamento.id);
-  };
-
-  const summaryItems = [
-    {
-      key: 'fabricante',
-      label: 'Fabricante',
-      value: equipamento.fabricante || 'N/A',
-    },
-    {
-      key: 'tag',
-      label: 'Tag',
-      value: equipamento.tag || 'N/A',
-    },
-    {
-      key: 'tipo',
-      label: 'Tipo',
-      value: equipamento.tipo,
-    },
-    {
-      key: 'unidade',
-      label: 'Unidade',
-      value: equipamento.unidade?.nomeSistema,
-    },
-    {
-      key: 'patrimonio',
-      label: 'Patrimonio',
-      value: equipamento.numeroPatrimonio || 'N/A',
-    },
-  ];
 
   return (
     <EntityCard
@@ -89,13 +39,15 @@ function EquipamentoCard({
       toggleStyle={toggleStyle}
       expandedStyle={expandedStyle}
       actions={
-        <>
+        <Link
+          to={`/cadastros/equipamentos/editar/${equipamento.id}`}
+          onClick={(event) => event.stopPropagation()}
+        >
           <Button
             type="button"
             variant="secondary"
             size="sm"
-            title="Abrir ficha tecnica"
-            onClick={handleGoToFicha}
+            title="Editar cadastro"
             className="px-3 sm:px-4"
             style={{
               '--button-bg': 'var(--bg-surface)',
@@ -104,50 +56,32 @@ function EquipamentoCard({
               '--button-border': 'var(--border-soft)',
             }}
           >
-            <FontAwesomeIcon icon={faFileMedical} />
-            <span className="hidden sm:inline">Ficha tecnica</span>
+            <FontAwesomeIcon icon={faPenToSquare} />
+            <span className="hidden sm:inline">Editar cadastro</span>
           </Button>
-
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            title="Abrir detalhe completo"
-            onClick={handleOpenFullPage}
-            className="px-3 sm:px-4"
-            style={{
-              '--button-bg': 'var(--bg-surface)',
-              '--button-bg-hover': 'var(--bg-hover)',
-              '--button-text': 'var(--text-primary)',
-              '--button-border': 'var(--border-soft)',
-            }}
-          >
-            <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-            <span className="hidden xl:inline">Detalhe</span>
-          </Button>
-        </>
+        </Link>
       }
       summary={
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge variant="slate">
-                  <FontAwesomeIcon icon={faMicrochip} className="mr-1" />
-                  Ativo
-                </Badge>
-                <StatusBadge value={equipamento.status || 'N/A'} />
-              </div>
+        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="slate">
+                <FontAwesomeIcon icon={faMicrochip} className="mr-1" />
+                Ativo
+              </Badge>
+              <StatusBadge value={equipamento.status || 'N/A'} />
+            </div>
 
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
               <h3
-                className="mt-3 break-words text-lg font-bold sm:text-xl"
+                className="break-words text-lg font-bold sm:text-xl"
                 style={{ color: 'var(--text-primary)' }}
               >
                 {equipamento.modelo}
               </h3>
 
               <div
-                className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm"
+                className="flex flex-wrap gap-x-4 gap-y-1 text-sm"
                 style={{ color: 'var(--text-muted)' }}
               >
                 <span className="inline-flex items-center gap-2">
@@ -158,33 +92,39 @@ function EquipamentoCard({
                   <FontAwesomeIcon icon={faBuilding} className="text-xs" />
                   {equipamento.unidade?.nomeSistema || 'Sem unidade'}
                 </span>
+                <span className="inline-flex items-center gap-2">
+                  <FontAwesomeIcon icon={faMicrochip} className="text-xs" />
+                  {equipamento.tipo || 'Sem tipo'}
+                </span>
               </div>
             </div>
 
             <div
-              className="rounded-2xl border px-3 py-3"
-              style={infoCardStyle}
+              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm"
+              style={{ color: 'var(--text-muted)' }}
             >
-              <div
-                className="text-[11px] font-bold uppercase tracking-[0.14em]"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                Alterar status
-              </div>
-              <div className="mt-2 min-w-[220px] max-w-full">
-                <StatusSelector
-                  equipamento={equipamento}
-                  onSuccessUpdate={onStatusUpdated}
-                />
-              </div>
+              <span>Fabricante: {equipamento.fabricante || 'N/A'}</span>
+              <span>Patrimonio: {equipamento.numeroPatrimonio || 'N/A'}</span>
             </div>
           </div>
 
-          <EntityInfoGrid
-            items={summaryItems}
-            compact
-            itemStyle={infoCardStyle}
-          />
+          <div
+            className="w-full rounded-2xl border px-3 py-3 xl:w-auto xl:min-w-[250px]"
+            style={infoCardStyle}
+          >
+            <div
+              className="text-[11px] font-bold uppercase tracking-[0.14em]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Alterar status
+            </div>
+            <div className="mt-2">
+              <StatusSelector
+                equipamento={equipamento}
+                onSuccessUpdate={onStatusUpdated}
+              />
+            </div>
+          </div>
         </div>
       }
       expandedContent={
@@ -192,7 +132,6 @@ function EquipamentoCard({
           equipamento={equipamento}
           abaAtiva={abaAtiva}
           onChangeTab={onTrocarAba}
-          onOpenFullPage={handleOpenFullPage}
           onRefresh={onRefresh}
         />
       }
@@ -215,8 +154,6 @@ EquipamentoCard.propTypes = {
   abaAtiva: PropTypes.string,
   onToggleExpandir: PropTypes.func.isRequired,
   onTrocarAba: PropTypes.func.isRequired,
-  onGoToFichaTecnica: PropTypes.func.isRequired,
-  onOpenFullPage: PropTypes.func,
   onStatusUpdated: PropTypes.func,
   onRefresh: PropTypes.func,
 };
