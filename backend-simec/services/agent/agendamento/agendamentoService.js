@@ -11,6 +11,10 @@ import {
   criarManutencaoNoBanco,
   validarPayloadAgendamentoDoAgente,
 } from '../workflow/dbManager.js';
+import {
+  logAgentError,
+  logAgentStage,
+} from '../core/agentLogger.js';
 import { validarConflitoAgenda } from '../workflow/agendaValidator.js';
 import {
   STEPS,
@@ -306,8 +310,16 @@ export const AgendamentoService = {
     sessaoExistente = null,
     acaoContextual = null
   ) {
-    const { usuarioId, tenantId } = contextoUsuario;
+    const { usuarioId, tenantId, usuarioNome = null, requestId = null } =
+      contextoUsuario;
     const sessionKey = getSessionKey(usuarioId, tenantId);
+    const logContext = {
+      requestId,
+      tenantId,
+      usuarioId,
+      usuarioNome,
+      intent: 'AGENDAR_MANUTENCAO',
+    };
 
     let sessao = sessaoExistente;
 
@@ -319,12 +331,28 @@ export const AgendamentoService = {
         step: STEPS.START,
         state: {},
       });
+
+      logAgentStage('AGENDAMENTO_SESSION', logContext, {
+        action: 'CREATED',
+        sessionId: sessao.id,
+      });
     }
 
     let estado = JSON.parse(sessao.stateJson || '{}');
     estado = inicializarStep(estado);
+    const stageContext = {
+      ...logContext,
+      sessionId: sessao.id,
+    };
 
     await AgentSessionRepository.registrarMensagem(sessao.id, 'user', mensagem);
+
+    logAgentStage('AGENDAMENTO_STATE_BEFORE', stageContext, {
+      mensagem,
+      step: estado.step,
+      state: estado,
+      contextualAction: acaoContextual || null,
+    });
 
     const extraido = await extrairCamposComIA(mensagem, estado);
     const msgNormalizada = mensagem.toLowerCase().trim();
@@ -354,11 +382,22 @@ export const AgendamentoService = {
       extraido.confirmacao = false;
     }
 
+    logAgentStage('AGENDAMENTO_EXTRACTION', stageContext, {
+      extraido,
+      normalizedMessage: msgNormalizada,
+    });
+
     estado = mergeEstadoAgente(estado, extraido);
     estado = aplicarConfirmacaoDeResolucaoPendente(estado, extraido.confirmacao);
 
     const houveCorrecao = detectarSeHouveCorrecao(extraido);
     estado = resetarConfirmacaoSeHouverMudanca(estado, houveCorrecao);
+
+    logAgentStage('AGENDAMENTO_STATE_MERGED', stageContext, {
+      state: estado,
+      houveCorrecao,
+      confirmacao: extraido.confirmacao ?? null,
+    });
 
     if (extraido.confirmacao === false && !houveCorrecao) {
       estado.step = STEPS.CANCELADO;
@@ -383,10 +422,21 @@ export const AgendamentoService = {
 
       await AgentSessionRepository.cancelarSessao(sessao.id);
 
+      logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+        decision: 'FLOW_CANCELLED',
+        step: estado.step,
+      });
+
       return resposta;
     }
 
     estado = await resolverEntidades(estado, tenantId);
+
+    logAgentStage('AGENDAMENTO_ENTITY_RESOLUTION', stageContext, {
+      state: estado,
+      entityResolution: estado.entityResolution || null,
+      ambiguidadeEquipamento: estado.ambiguidadeEquipamento || [],
+    });
 
     const problemaResolucao = construirMensagemResolucaoEntidade(estado);
     if (problemaResolucao) {
@@ -399,6 +449,13 @@ export const AgendamentoService = {
         problemaResolucao.mensagem,
         problemaResolucao.meta
       );
+
+      logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+        decision: 'ENTITY_RESOLUTION_BLOCKED',
+        step: estado.step,
+        meta: problemaResolucao.meta,
+        mensagem: problemaResolucao.mensagem,
+      });
 
       return respostaPadrao(problemaResolucao.mensagem, {
         meta: problemaResolucao.meta,
@@ -426,6 +483,13 @@ export const AgendamentoService = {
         meta
       );
 
+      logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+        decision: 'INVALID_TIME',
+        step: estado.step,
+        validation: validacaoHorario,
+        mensagem: validacaoHorario.msg,
+      });
+
       return respostaPadrao(validacaoHorario.msg, {
         meta,
       });
@@ -452,6 +516,14 @@ export const AgendamentoService = {
       conflitoAgenda = await validarConflitoAgenda(estado, tenantId);
     }
 
+    logAgentStage('AGENDAMENTO_VALIDATION', stageContext, {
+      stepAtual: estado.step,
+      faltantes,
+      faltantesValidados,
+      validacao,
+      conflitoAgenda,
+    });
+
     const proximoStep = determinarProximoStep({
       estado,
       faltantes: faltantesValidados,
@@ -461,6 +533,12 @@ export const AgendamentoService = {
     });
 
     estado.step = proximoStep;
+
+    logAgentStage('AGENDAMENTO_STEP_DECISION', stageContext, {
+      proximoStep,
+      confirmacao: extraido.confirmacao ?? null,
+      houveCorrecao,
+    });
 
     if (proximoStep === STEPS.COLETANDO_DADOS) {
       let mensagemResposta;
@@ -529,6 +607,13 @@ export const AgendamentoService = {
         meta
       );
 
+      logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+        decision: meta?.reason || 'COLLECTING_DATA',
+        step: estado.step,
+        meta,
+        mensagem: mensagemResposta,
+      });
+
       return respostaPadrao(mensagemResposta, {
         meta,
       });
@@ -559,6 +644,13 @@ export const AgendamentoService = {
         mensagemResposta
       );
 
+      logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+        decision: 'AWAITING_CONFIRMATION',
+        step: estado.step,
+        meta,
+        mensagem: mensagemResposta,
+      });
+
       return respostaPadrao(mensagemResposta, {
         meta,
       });
@@ -585,6 +677,13 @@ export const AgendamentoService = {
             mensagemResposta,
             meta
           );
+
+          logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+            decision: 'REVALIDACAO_CONFLITO',
+            step: estado.step,
+            meta,
+            mensagem: mensagemResposta,
+          });
 
           return respostaPadrao(mensagemResposta, {
             meta,
@@ -637,11 +736,21 @@ export const AgendamentoService = {
 
         await AgentSessionRepository.finalizarSessao(sessao.id);
 
+        logAgentStage('AGENDAMENTO_SUCCESS', stageContext, {
+          decision: 'SCHEDULE_CREATED',
+          manutencaoId: manutencao.id,
+          numeroOS: manutencao.numeroOS,
+          step: STEPS.FINALIZADO,
+        });
+
         return respostaPadrao(mensagemResposta, {
           meta,
         });
       } catch (error) {
-        console.error('[AGENDAMENTO_DB_ERROR]', error);
+        logAgentError('AGENDAMENTO_DB_ERROR', error, stageContext, {
+          step: estado.step,
+          state: estado,
+        });
 
         const mensagemResposta =
           error?.code === 'AGENT_VALIDATION_ERROR'
@@ -668,6 +777,13 @@ export const AgendamentoService = {
           meta
         );
 
+        logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+          decision: meta.reason,
+          step: estado.step,
+          meta,
+          mensagem: mensagemResposta,
+        });
+
         return respostaPadrao(mensagemResposta, {
           meta,
         });
@@ -689,6 +805,13 @@ export const AgendamentoService = {
       meta,
       fallback
     );
+
+    logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+      decision: 'FALLBACK',
+      step: estado.step,
+      meta,
+      mensagem: fallback,
+    });
 
     return respostaPadrao(fallback, {
       meta,

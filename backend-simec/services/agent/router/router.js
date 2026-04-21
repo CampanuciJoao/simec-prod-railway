@@ -5,6 +5,10 @@ import { classificarIntencao } from '../shared/intentClassifier.js';
 import { resolverAcaoPorContexto } from '../shared/actionResolver.js';
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { respostaAgente } from '../core/agentResponse.js';
+import {
+  logAgentError,
+  logAgentStage,
+} from '../core/agentLogger.js';
 import { getSessionKey } from '../core/sessionKeys.js';
 import { RESET_COMMANDS } from './resetCommands.js';
 import {
@@ -49,8 +53,8 @@ async function buscarSessoesAtivas(tenantId, sessionKey) {
   };
 }
 
-function montarContextoUsuario(usuarioId, usuarioNome, tenantId) {
-  return { usuarioId, usuarioNome, tenantId };
+function montarContextoUsuario(usuarioId, usuarioNome, tenantId, requestId) {
+  return { usuarioId, usuarioNome, tenantId, requestId };
 }
 
 export const RoteadorAgente = async ({
@@ -58,6 +62,7 @@ export const RoteadorAgente = async ({
   usuarioId,
   usuarioNome,
   tenantId,
+  requestId = null,
 }) => {
   try {
     const msgMinuscula = mensagem.toLowerCase().trim();
@@ -65,8 +70,15 @@ export const RoteadorAgente = async ({
     const contextoUsuario = montarContextoUsuario(
       usuarioId,
       usuarioNome,
-      tenantId
+      tenantId,
+      requestId
     );
+    const logContext = {
+      requestId,
+      tenantId,
+      usuarioId,
+      usuarioNome,
+    };
 
     await AgentSessionRepository.expirarSessoesAntigas(tenantId, sessionKey);
 
@@ -79,10 +91,26 @@ export const RoteadorAgente = async ({
       temSeguroAtivo,
     } = await buscarSessoesAtivas(tenantId, sessionKey);
 
+    logAgentStage('AGENT_ROUTER_STATE', logContext, {
+      sessionKey,
+      mensagem,
+      temAgendamentoAtivo,
+      temRelatorioAtivo,
+      temSeguroAtivo,
+      sessaoAgendamentoId: sessaoAgendamento?.id || null,
+      sessaoRelatorioId: sessaoRelatorio?.id || null,
+      sessaoSeguroId: sessaoSeguro?.id || null,
+    });
+
     if (RESET_COMMANDS.some((cmd) => msgMinuscula.includes(cmd))) {
       await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
       await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
       await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
+
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'RESET',
+        matchedCommand: RESET_COMMANDS.find((cmd) => msgMinuscula.includes(cmd)),
+      });
 
       return respostaAgente('Certo, vamos começar de novo. Como posso ajudar?');
     }
@@ -92,6 +120,13 @@ export const RoteadorAgente = async ({
       : null;
 
     if (acaoAgendamento?.matched) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTEXTUAL_ACTION',
+        targetIntent: 'AGENDAR_MANUTENCAO',
+        sessionId: sessaoAgendamento.id,
+        action: acaoAgendamento.action,
+      });
+
       return await AgendamentoService.processar(
         mensagem,
         contextoUsuario,
@@ -105,6 +140,13 @@ export const RoteadorAgente = async ({
       : null;
 
     if (acaoRelatorio?.matched) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTEXTUAL_ACTION',
+        targetIntent: 'RELATORIO',
+        sessionId: sessaoRelatorio.id,
+        action: acaoRelatorio.action,
+      });
+
       return await RelatorioService.processar(
         mensagem,
         contextoUsuario,
@@ -118,6 +160,13 @@ export const RoteadorAgente = async ({
       : null;
 
     if (acaoSeguro?.matched) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTEXTUAL_ACTION',
+        targetIntent: 'SEGURO',
+        sessionId: sessaoSeguro.id,
+        action: acaoSeguro.action,
+      });
+
       return await SeguroService.processar(
         mensagem,
         contextoUsuario,
@@ -131,6 +180,12 @@ export const RoteadorAgente = async ({
       !pareceSeguro(msgMinuscula) &&
       !pareceConsultaRelatorio(msgMinuscula)
     ) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTINUE_ACTIVE_SESSION',
+        targetIntent: 'AGENDAR_MANUTENCAO',
+        sessionId: sessaoAgendamento?.id || null,
+      });
+
       return await AgendamentoService.processar(
         mensagem,
         contextoUsuario,
@@ -144,6 +199,12 @@ export const RoteadorAgente = async ({
       !pareceAgendamento(msgMinuscula) &&
       !pareceSeguro(msgMinuscula)
     ) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTINUE_ACTIVE_SESSION',
+        targetIntent: 'RELATORIO',
+        sessionId: sessaoRelatorio?.id || null,
+      });
+
       return await RelatorioService.processar(
         mensagem,
         contextoUsuario,
@@ -157,6 +218,12 @@ export const RoteadorAgente = async ({
       !pareceAgendamento(msgMinuscula) &&
       !pareceConsultaRelatorio(msgMinuscula)
     ) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTINUE_ACTIVE_SESSION',
+        targetIntent: 'SEGURO',
+        sessionId: sessaoSeguro?.id || null,
+      });
+
       return await SeguroService.processar(
         mensagem,
         contextoUsuario,
@@ -168,13 +235,19 @@ export const RoteadorAgente = async ({
     let intencao = await classificarIntencao(mensagem);
     intencao = ajustarIntencaoPorHeuristica(intencao, msgMinuscula);
 
-    console.log(
-      `[AGENT_ROUTER] Tenant: ${tenantId} | User: ${usuarioNome} | Intenção: ${intencao}`
-    );
+    logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+      decision: 'CLASSIFIED_INTENT',
+      targetIntent: intencao,
+    });
 
     if (intencao === 'AGENDAR_MANUTENCAO') {
       await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
       await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
+
+      logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
+        targetIntent: intencao,
+        reusedSessionId: sessaoAgendamento?.id || null,
+      });
 
       return await AgendamentoService.processar(
         mensagem,
@@ -188,6 +261,11 @@ export const RoteadorAgente = async ({
       await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
       await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
 
+      logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
+        targetIntent: intencao,
+        reusedSessionId: sessaoRelatorio?.id || null,
+      });
+
       return await RelatorioService.processar(
         mensagem,
         contextoUsuario,
@@ -200,6 +278,11 @@ export const RoteadorAgente = async ({
       await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
       await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
 
+      logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
+        targetIntent: intencao,
+        reusedSessionId: sessaoSeguro?.id || null,
+      });
+
       return await SeguroService.processar(
         mensagem,
         contextoUsuario,
@@ -208,11 +291,28 @@ export const RoteadorAgente = async ({
       );
     }
 
+    logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
+      targetIntent: 'UNKNOWN',
+      decision: 'FALLBACK_GREETING',
+    });
+
     return respostaAgente(
       'Olá! Sou a T.H.I.A.G.O. Posso ajudar com agendamentos, relatórios e seguros. Como posso ajudar?'
     );
   } catch (error) {
-    console.error('[AGENT_ROUTER_ERROR]', error);
+    logAgentError(
+      'AGENT_ROUTER_ERROR',
+      error,
+      {
+        requestId,
+        tenantId,
+        usuarioId,
+        usuarioNome,
+      },
+      {
+        mensagem,
+      }
+    );
 
     return respostaAgente(
       'Tive um problema técnico ao processar sua mensagem. Poderia repetir?'

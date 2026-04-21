@@ -2,9 +2,14 @@
 // Versão: Multi-tenant hardened
 
 import express from 'express';
+import { randomUUID } from 'node:crypto';
 import { RoteadorAgente } from '../services/agent/index.js';
 import { proteger } from '../middleware/authMiddleware.js';
 import { AgentSessionRepository } from '../services/agent/session/agentSessionRepository.js';
+import {
+  logAgentError,
+  logAgentStage,
+} from '../services/agent/core/agentLogger.js';
 import { getSessionKey } from '../services/agent/core/sessionKeys.js';
 
 const router = express.Router();
@@ -16,6 +21,7 @@ const router = express.Router();
  */
 router.post('/chat', proteger, async (req, res) => {
   const mensagem = req.body?.mensagem;
+  const requestId = randomUUID();
 
   if (!mensagem || typeof mensagem !== 'string' || mensagem.trim() === '') {
     return res.status(400).json({
@@ -32,6 +38,13 @@ router.post('/chat', proteger, async (req, res) => {
     const usuarioId = req.usuario?.id;
     const tenantId = req.usuario?.tenantId;
     const usuarioNome = req.usuario?.nome || 'Usuário';
+    const mensagemNormalizada = mensagem.trim();
+    const logContext = {
+      requestId,
+      tenantId,
+      usuarioId,
+      usuarioNome,
+    };
 
     if (!usuarioId || !tenantId) {
       return res.status(401).json({
@@ -45,14 +58,25 @@ router.post('/chat', proteger, async (req, res) => {
       });
     }
 
+    logAgentStage('AGENT_REQUEST', logContext, {
+      route: '/api/agent/chat',
+      mensagem: mensagemNormalizada,
+    });
+
     const resultado = await RoteadorAgente({
-      mensagem: mensagem.trim(),
+      mensagem: mensagemNormalizada,
       usuarioId,
       usuarioNome,
       tenantId,
+      requestId,
     });
 
     if (typeof resultado === 'string') {
+      logAgentStage('AGENT_RESPONSE', logContext, {
+        responseType: 'string',
+        mensagem: resultado,
+      });
+
       return res.status(200).json({
         resposta: {
           mensagem: resultado,
@@ -64,6 +88,13 @@ router.post('/chat', proteger, async (req, res) => {
     }
 
     if (resultado && typeof resultado === 'object') {
+      logAgentStage('AGENT_RESPONSE', logContext, {
+        responseType: 'object',
+        mensagem: resultado.mensagem || 'Operação concluída.',
+        meta: resultado.meta || null,
+        acao: resultado.acao || null,
+      });
+
       return res.status(200).json({
         resposta: {
           mensagem: resultado.mensagem || 'Operação concluída.',
@@ -73,6 +104,12 @@ router.post('/chat', proteger, async (req, res) => {
         },
       });
     }
+
+    logAgentStage('AGENT_RESPONSE', logContext, {
+      responseType: 'fallback',
+      mensagem:
+        'Recebi sua solicitação, mas não consegui montar uma resposta válida.',
+    });
 
     return res.status(200).json({
       resposta: {
@@ -84,9 +121,18 @@ router.post('/chat', proteger, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error(
-      `[AGENT_CHAT_ERROR] Usuário: ${req.usuario?.nome || 'desconhecido'} | Tenant: ${req.usuario?.tenantId || 'desconhecido'} | Erro:`,
-      error
+    logAgentError(
+      'AGENT_CHAT_ERROR',
+      error,
+      {
+        requestId,
+        tenantId: req.usuario?.tenantId || null,
+        usuarioId: req.usuario?.id || null,
+        usuarioNome: req.usuario?.nome || 'desconhecido',
+      },
+      {
+        route: '/api/agent/chat',
+      }
     );
 
     return res.status(500).json({
@@ -124,6 +170,18 @@ router.post('/reset', proteger, async (req, res) => {
       sessionKey
     );
 
+    logAgentStage(
+      'AGENT_RESET',
+      {
+        tenantId,
+        usuarioId,
+        usuarioNome: req.usuario?.nome || 'Usuário',
+      },
+      {
+        cancelledSessions: resultado?.count || 0,
+      }
+    );
+
     return res.status(200).json({
       resposta: {
         mensagem: 'Conversa reiniciada. Como posso ajudar você?',
@@ -136,7 +194,15 @@ router.post('/reset', proteger, async (req, res) => {
       },
     });
   } catch (error) {
-    console.error('[AGENT_RESET_ERROR]', error);
+    logAgentError(
+      'AGENT_RESET_ERROR',
+      error,
+      {
+        tenantId: req.usuario?.tenantId || null,
+        usuarioId: req.usuario?.id || null,
+        usuarioNome: req.usuario?.nome || 'desconhecido',
+      }
+    );
 
     return res.status(500).json({
       resposta: {

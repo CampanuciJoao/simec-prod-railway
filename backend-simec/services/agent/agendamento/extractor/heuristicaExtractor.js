@@ -130,7 +130,15 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
       /\b(\d{1,2}(?::\d{2})?\s*h(?:r?s?)?|\d{1,2}h\d{2}|\d{1,2}:\d{2})\b/i
     );
     if (matchHora?.[1]) {
-      extraido.horaInicio = normalizarHora(matchHora[1]);
+      const horaNormalizada = normalizarHora(matchHora[1]);
+
+      if (horaNormalizada) {
+        if (estado?.horaInicio && !estado?.horaFim) {
+          extraido.horaFim = horaNormalizada;
+        } else {
+          extraido.horaInicio = horaNormalizada;
+        }
+      }
     }
   }
 

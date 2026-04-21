@@ -7,6 +7,7 @@ import {
 } from '../../services/agent/agendamento/extractor/normalizers.js';
 import { extrairCamposHeuristico } from '../../services/agent/agendamento/extractor/heuristicaExtractor.js';
 import { buildParsingHintMessage } from '../../services/agent/agendamento/agendamentoService.js';
+import { buildAgentLogContext } from '../../services/agent/core/agentLogger.js';
 import { getFaltantes } from '../../services/agent/agendamento/state/faltantes.js';
 import { validarPayloadAgendamentoDoAgente } from '../../services/agent/workflow/dbManager.js';
 import {
@@ -54,6 +55,10 @@ runTest('heuristica extrai data e hora em formatos operacionais', () => {
   const extraidoHoraCompacta = extrairCamposHeuristico('11h30', {});
   const extraidoDataCurta = extrairCamposHeuristico('dia 21/04/26', {});
   const extraidoDataRelativa = extrairCamposHeuristico('amanhã', {});
+  const extraidoHoraFim = extrairCamposHeuristico('13:00h', {
+    horaInicio: '12:00',
+    horaFim: null,
+  });
 
   assert.equal(extraidoData.data, '2026-04-21');
   assert.equal(extraidoData.horaInicio, null);
@@ -61,6 +66,8 @@ runTest('heuristica extrai data e hora em formatos operacionais', () => {
   assert.equal(extraidoHoraCompacta.horaInicio, '11:30');
   assert.equal(extraidoDataCurta.data, '2026-04-21');
   assert.match(extraidoDataRelativa.data, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(extraidoHoraFim.horaInicio, null);
+  assert.equal(extraidoHoraFim.horaFim, '13:00');
 });
 
 runTest(
@@ -87,6 +94,32 @@ runTest(
     );
   }
 );
+
+runTest('logger do agente normaliza erros e limita profundidade', () => {
+  const contexto = buildAgentLogContext(
+    {
+      requestId: 'req-1',
+      tenantId: 'tenant-1',
+    },
+    {
+      error: new Error('Falha de teste'),
+      nested: {
+        level1: {
+          level2: {
+            level3: {
+              level4: {
+                level5: true,
+              },
+            },
+          },
+        },
+      },
+    }
+  );
+
+  assert.equal(contexto.error.message, 'Falha de teste');
+  assert.equal(contexto.nested.level1.level2.level3.level4, '[max-depth]');
+});
 
 runTest(
   'faltantes do agendamento parcial pedem apenas horario quando a data ja existe',
