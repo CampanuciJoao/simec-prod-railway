@@ -411,13 +411,23 @@ export const AgendamentoService = {
     }
 
     const faltantes = getFaltantes(estado);
-    const { validacao } = validarPayloadAgendamentoDoAgente(estado);
-    const faltantesValidados = [
-      ...new Set([...(faltantes || []), ...(validacao.missingFields || [])]),
-    ];
+    let validacao = {
+      ok: true,
+      fieldErrors: {},
+      missingFields: [],
+      message: null,
+    };
+    let faltantesValidados = [...new Set([...(faltantes || [])])];
+
+    if (faltantesValidados.length === 0) {
+      ({ validacao } = validarPayloadAgendamentoDoAgente(estado));
+      faltantesValidados = [
+        ...new Set([...(faltantesValidados || []), ...(validacao.missingFields || [])]),
+      ];
+    }
 
     let conflitoAgenda = null;
-    if (faltantesValidados.length === 0) {
+    if (faltantesValidados.length === 0 && validacao.ok) {
       conflitoAgenda = await validarConflitoAgenda(estado, tenantId);
     }
 
@@ -451,7 +461,7 @@ export const AgendamentoService = {
           reason: 'CONFLICTING_SCHEDULE',
           missingFields: faltantesValidados,
         });
-      } else if (mensagemValidacaoAmigavel) {
+      } else if (!validacao.ok && mensagemValidacaoAmigavel) {
         mensagemResposta = `${mensagemValidacaoAmigavel} ${proximaPergunta(
           estado,
           faltantesValidados

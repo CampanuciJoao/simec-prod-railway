@@ -34,6 +34,8 @@ Depois da execucao, registrar apenas conhecimento que mereca memoria futura.
 - Decisoes tecnicas ou de produto com impacto futuro.
 - Regras de negocio e restricoes importantes.
 - Padroes e convencoes adotadas.
+- O que deu certo quando virar referencia reaproveitavel.
+- O que deu errado quando revelar armadilhas ou limites importantes.
 - Causas raiz e aprendizados reutilizaveis.
 - Trade-offs, excecoes e combinados relevantes.
 
@@ -41,6 +43,7 @@ Depois da execucao, registrar apenas conhecimento que mereca memoria futura.
 
 - Log de cada acao executada.
 - Passo a passo de tarefas pequenas.
+- Sucessos ou erros sem aprendizado reutilizavel.
 - Tentativas descartadas sem impacto futuro.
 - Informacoes temporarias que nao alteram decisoes.
 

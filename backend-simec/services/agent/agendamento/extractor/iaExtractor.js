@@ -59,11 +59,12 @@ Extraia os dados do agendamento para este JSON:
 
 REGRAS:
 1. Se disser "Tomografia de Coxim", extraia "Tomografia" em equipamentoTexto e "Coxim" em unidadeTexto.
-2. "tipoManutencao" deve ser apenas "Corretiva" ou "Preventiva".
-3. "horaInicio/horaFim" em HH:mm.
-4. Se disser "hoje", use ${dataHoje}.
-5. "confirmacao": true para sim/confirmar, false para nao/cancelar, null caso contrario.
-6. Retorne APENAS JSON puro.
+2. "tipoManutencao" deve ser apenas "Corretiva", "Preventiva", "Calibracao" ou "Inspecao".
+3. "data" deve vir em YYYY-MM-DD, mesmo que o usuario escreva DD/MM/AAAA ou DD/MM.
+4. "horaInicio/horaFim" em HH:mm.
+5. Se disser "hoje", use ${dataHoje}.
+6. "confirmacao": true para sim/confirmar, false para nao/cancelar, null caso contrario.
+7. Retorne APENAS JSON puro.
 `;
 
   for (let tentativa = 1; tentativa <= 2; tentativa++) {

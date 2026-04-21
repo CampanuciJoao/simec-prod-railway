@@ -109,7 +109,9 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
   }
 
   if (!extraido.data) {
-    const matchData = msg.match(/\b(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})\b/);
+    const matchData = msg.match(
+      /\b(\d{2}\/\d{2}\/\d{4}|\d{2}\/\d{2}|\d{4}-\d{2}-\d{2})\b/
+    );
     if (matchData?.[1]) {
       extraido.data = normalizarData(matchData[1]);
     }

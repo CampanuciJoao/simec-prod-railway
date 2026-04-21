@@ -13,13 +13,13 @@ const CAMPOS_BASE = [
 
 export const MANUTENCAO_FIELD_LABELS = {
   equipamentoId: 'equipamento',
-  tipo: 'tipo da manutenção',
+  tipo: 'tipo da manutencao',
   agendamentoDataInicioLocal: 'data inicial',
   agendamentoHoraInicioLocal: 'hora inicial',
   agendamentoDataFimLocal: 'data final',
   agendamentoHoraFimLocal: 'hora final',
-  numeroChamado: 'número do chamado',
-  descricaoProblemaServico: 'descrição do serviço',
+  numeroChamado: 'numero do chamado',
+  descricaoProblemaServico: 'descricao do servico',
 };
 
 export function obterCamposObrigatoriosManutencao(tipo) {
@@ -32,41 +32,37 @@ export const manutencaoSchema = z
   .object({
     equipamentoId: z
       .string({
-        required_error: 'O equipamento é obrigatório.',
+        required_error: 'O equipamento e obrigatorio.',
       })
-      .min(1, 'O equipamento é obrigatório.'),
+      .min(1, 'O equipamento e obrigatorio.'),
 
     tipo: z.enum(['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'], {
-      errorMap: () => ({ message: 'Tipo de manutenção inválido.' }),
+      errorMap: () => ({ message: 'Tipo de manutencao invalido.' }),
     }),
 
-    descricaoProblemaServico: z
-      .string()
-      .trim()
-      .nullable()
-      .optional(),
+    descricaoProblemaServico: z.string().trim().nullable().optional(),
 
     agendamentoDataInicioLocal: z
       .string({
-        required_error: 'A data inicial é obrigatória.',
+        required_error: 'A data inicial e obrigatoria.',
       })
       .regex(localDateRegex, 'A data inicial deve estar no formato YYYY-MM-DD.'),
 
     agendamentoHoraInicioLocal: z
       .string({
-        required_error: 'A hora inicial é obrigatória.',
+        required_error: 'A hora inicial e obrigatoria.',
       })
       .regex(localTimeRegex, 'A hora inicial deve estar no formato HH:mm.'),
 
     agendamentoDataFimLocal: z
       .string({
-        required_error: 'A data final é obrigatória.',
+        required_error: 'A data final e obrigatoria.',
       })
       .regex(localDateRegex, 'A data final deve estar no formato YYYY-MM-DD.'),
 
     agendamentoHoraFimLocal: z
       .string({
-        required_error: 'A hora final é obrigatória.',
+        required_error: 'A hora final e obrigatoria.',
       })
       .regex(localTimeRegex, 'A hora final deve estar no formato HH:mm.'),
 
@@ -85,30 +81,42 @@ export const manutencaoSchema = z
       .optional(),
   })
   .superRefine((data, ctx) => {
-    const inicio = new Date(
-      `${data.agendamentoDataInicioLocal}T${data.agendamentoHoraInicioLocal}:00`
-    );
-    const fim = new Date(
-      `${data.agendamentoDataFimLocal}T${data.agendamentoHoraFimLocal}:00`
-    );
+    const possuiInicioCompleto =
+      !!data.agendamentoDataInicioLocal && !!data.agendamentoHoraInicioLocal;
+    const possuiFimCompleto =
+      !!data.agendamentoDataFimLocal && !!data.agendamentoHoraFimLocal;
 
-    if (Number.isNaN(inicio.getTime())) {
+    const inicio = possuiInicioCompleto
+      ? new Date(
+          `${data.agendamentoDataInicioLocal}T${data.agendamentoHoraInicioLocal}:00`
+        )
+      : null;
+
+    const fim = possuiFimCompleto
+      ? new Date(
+          `${data.agendamentoDataFimLocal}T${data.agendamentoHoraFimLocal}:00`
+        )
+      : null;
+
+    if (inicio && Number.isNaN(inicio.getTime())) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['agendamentoDataInicioLocal'],
-        message: 'Data/hora inicial inválida.',
+        message: 'Data/hora inicial invalida.',
       });
     }
 
-    if (Number.isNaN(fim.getTime())) {
+    if (fim && Number.isNaN(fim.getTime())) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['agendamentoDataFimLocal'],
-        message: 'Data/hora final inválida.',
+        message: 'Data/hora final invalida.',
       });
     }
 
     if (
+      inicio &&
+      fim &&
       !Number.isNaN(inicio.getTime()) &&
       !Number.isNaN(fim.getTime()) &&
       fim.getTime() <= inicio.getTime()
@@ -116,7 +124,7 @@ export const manutencaoSchema = z
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['agendamentoHoraFimLocal'],
-        message: 'O término deve ser posterior ao início.',
+        message: 'O termino deve ser posterior ao inicio.',
       });
     }
 
@@ -125,7 +133,7 @@ export const manutencaoSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['numeroChamado'],
-          message: 'O número do chamado é obrigatório para manutenção corretiva.',
+          message: 'O numero do chamado e obrigatorio para manutencao corretiva.',
         });
       }
 
@@ -133,7 +141,7 @@ export const manutencaoSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ['descricaoProblemaServico'],
-          message: 'A descrição do serviço é obrigatória para manutenção corretiva.',
+          message: 'A descricao do servico e obrigatoria para manutencao corretiva.',
         });
       }
     }
@@ -171,6 +179,6 @@ export function validarManutencaoPayload(payload) {
     fieldErrors,
     missingFields,
     message:
-      result.error.issues?.[0]?.message || 'Dados de manutenção inválidos.',
+      result.error.issues?.[0]?.message || 'Dados de manutencao invalidos.',
   };
 }
