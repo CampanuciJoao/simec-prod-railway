@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPenToSquare } from '@fortawesome/free-solid-svg-icons';
+import { faFileMedical } from '@fortawesome/free-solid-svg-icons';
 
 import { Button, ResponsiveTabs } from '@/components/ui';
 import {
@@ -86,12 +86,14 @@ function EquipamentoCardExpanded({
             </div>
           </div>
 
-          <Link to={`/cadastros/equipamentos/editar/${equipamento.id}`}>
-            <Button type="button" variant="secondary">
-              <FontAwesomeIcon icon={faPenToSquare} />
-              Editar cadastro
-            </Button>
-          </Link>
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onChangeTab(equipamento.id, 'fichaTecnica')}
+          >
+            <FontAwesomeIcon icon={faFileMedical} />
+            Ficha tecnica
+          </Button>
         </div>
       </div>
 

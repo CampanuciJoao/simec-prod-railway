@@ -1,11 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBuilding,
+  faFileMedical,
   faMicrochip,
-  faPenToSquare,
   faTag,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -20,6 +19,7 @@ function EquipamentoCard({
   abaAtiva,
   onToggleExpandir,
   onTrocarAba,
+  onGoToFichaTecnica,
   onStatusUpdated,
   onRefresh,
 }) {
@@ -28,6 +28,11 @@ function EquipamentoCard({
 
   const handleToggle = () => {
     onToggleExpandir(equipamento.id);
+  };
+
+  const handleGoToFicha = (event) => {
+    event.stopPropagation();
+    onGoToFichaTecnica(equipamento.id);
   };
 
   return (
@@ -39,27 +44,23 @@ function EquipamentoCard({
       toggleStyle={toggleStyle}
       expandedStyle={expandedStyle}
       actions={
-        <Link
-          to={`/cadastros/equipamentos/editar/${equipamento.id}`}
-          onClick={(event) => event.stopPropagation()}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          title="Abrir ficha tecnica"
+          onClick={handleGoToFicha}
+          className="px-3 sm:px-4"
+          style={{
+            '--button-bg': 'var(--bg-surface)',
+            '--button-bg-hover': 'var(--bg-hover)',
+            '--button-text': 'var(--text-primary)',
+            '--button-border': 'var(--border-soft)',
+          }}
         >
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            title="Editar cadastro"
-            className="px-3 sm:px-4"
-            style={{
-              '--button-bg': 'var(--bg-surface)',
-              '--button-bg-hover': 'var(--bg-hover)',
-              '--button-text': 'var(--text-primary)',
-              '--button-border': 'var(--border-soft)',
-            }}
-          >
-            <FontAwesomeIcon icon={faPenToSquare} />
-            <span className="hidden sm:inline">Editar cadastro</span>
-          </Button>
-        </Link>
+          <FontAwesomeIcon icon={faFileMedical} />
+          <span className="hidden sm:inline">Ficha tecnica</span>
+        </Button>
       }
       summary={
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
@@ -154,6 +155,7 @@ EquipamentoCard.propTypes = {
   abaAtiva: PropTypes.string,
   onToggleExpandir: PropTypes.func.isRequired,
   onTrocarAba: PropTypes.func.isRequired,
+  onGoToFichaTecnica: PropTypes.func.isRequired,
   onStatusUpdated: PropTypes.func,
   onRefresh: PropTypes.func,
 };

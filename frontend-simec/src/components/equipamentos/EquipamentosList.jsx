@@ -7,6 +7,7 @@ import EquipamentoCard from './EquipamentoCard';
 function EquipamentosList({
   equipamentos = [],
   expansion,
+  onGoToFichaTecnica,
   onStatusUpdated,
   onRefresh,
 }) {
@@ -22,6 +23,14 @@ function EquipamentosList({
       expansion.trocarAba(id, aba);
     },
     [expansion]
+  );
+
+  const handleAbrirFichaTecnica = useCallback(
+    (id) => {
+      expansion.abrirNaAba(id, 'fichaTecnica');
+      onGoToFichaTecnica?.(id);
+    },
+    [expansion, onGoToFichaTecnica]
   );
 
   const handleStatusUpdated = useCallback(
@@ -53,6 +62,7 @@ function EquipamentosList({
             abaAtiva={abaAtiva}
             onToggleExpandir={handleToggleExpandir}
             onTrocarAba={handleTrocarAba}
+            onGoToFichaTecnica={handleAbrirFichaTecnica}
             onStatusUpdated={handleStatusUpdated}
             onRefresh={handleRefresh}
           />
@@ -67,9 +77,11 @@ EquipamentosList.propTypes = {
   expansion: PropTypes.shape({
     toggleExpandir: PropTypes.func.isRequired,
     trocarAba: PropTypes.func.isRequired,
+    abrirNaAba: PropTypes.func.isRequired,
     isExpandido: PropTypes.func.isRequired,
     getAbaAtiva: PropTypes.func.isRequired,
   }).isRequired,
+  onGoToFichaTecnica: PropTypes.func,
   onStatusUpdated: PropTypes.func,
   onRefresh: PropTypes.func,
 };
