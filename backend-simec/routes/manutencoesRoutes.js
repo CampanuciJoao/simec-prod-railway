@@ -75,6 +75,8 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
       return res.status(resultado.status).json({
         message: resultado.message,
         ...(resultado.conflito ? { conflito: resultado.conflito } : {}),
+        ...(resultado.fieldErrors ? { fieldErrors: resultado.fieldErrors } : {}),
+        ...(resultado.missingFields ? { missingFields: resultado.missingFields } : {}),
       });
     }
 
@@ -98,6 +100,8 @@ router.put('/:id', validate(manutencaoSchema), async (req, res) => {
       return res.status(resultado.status).json({
         message: resultado.message,
         ...(resultado.conflito ? { conflito: resultado.conflito } : {}),
+        ...(resultado.fieldErrors ? { fieldErrors: resultado.fieldErrors } : {}),
+        ...(resultado.missingFields ? { missingFields: resultado.missingFields } : {}),
       });
     }
 

@@ -4,6 +4,8 @@ export const normalizarTipoManutencao = (valor) => {
 
   if (v.includes('corret')) return 'Corretiva';
   if (v.includes('prevent')) return 'Preventiva';
+  if (v.includes('calibr')) return 'Calibracao';
+  if (v.includes('inspec')) return 'Inspecao';
 
   return null;
 };

@@ -1,17 +1,23 @@
+import { obterCamposObrigatoriosManutencao } from '../../../../validators/manutencaoValidator.js';
+
 export const getFaltantes = (estado) => {
-  const base = [
+  const mapping = {
+    equipamentoId: 'equipamentoId',
+    tipo: 'tipoManutencao',
+    agendamentoDataInicioLocal: 'data',
+    agendamentoHoraInicioLocal: 'horaInicio',
+    agendamentoDataFimLocal: 'data',
+    agendamentoHoraFimLocal: 'horaFim',
+    numeroChamado: 'numeroChamado',
+    descricaoProblemaServico: 'descricao',
+  };
+
+  const obrigatorios = [
     'unidadeId',
-    'equipamentoId',
-    'tipoManutencao',
-    'data',
-    'horaInicio',
-    'horaFim',
-  ];
+    ...obterCamposObrigatoriosManutencao(estado.tipoManutencao).map(
+      (campo) => mapping[campo]
+    ),
+  ].filter(Boolean);
 
-  const obrigatorios =
-    estado.tipoManutencao === 'Corretiva'
-      ? [...base, 'numeroChamado', 'descricao']
-      : base;
-
-  return obrigatorios.filter((campo) => !estado[campo]);
+  return [...new Set(obrigatorios)].filter((campo) => !estado[campo]);
 };

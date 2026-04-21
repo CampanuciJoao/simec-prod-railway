@@ -49,7 +49,9 @@ function ChatBot() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={resetChat}
+                onClick={() => {
+                  void resetChat();
+                }}
                 aria-label="Reiniciar conversa"
                 className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white transition hover:bg-white/20"
               >
@@ -70,7 +72,11 @@ function ChatBot() {
           <div className="flex-1 overflow-y-auto bg-slate-50/80 px-3 py-3 sm:px-4">
             <div className="space-y-3">
               {messages.map((m) => (
-                <ChatMessageBubble key={m.id} {...m} />
+                <ChatMessageBubble
+                  key={m.id}
+                  {...m}
+                  onSelectSuggestion={(value) => sendMessage(value)}
+                />
               ))}
 
               {isTyping && (

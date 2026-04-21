@@ -41,6 +41,12 @@ export const extrairCamposHeuristico = (mensagem, estado = {}) => {
 
   if (lower.includes('corretiva')) extraido.tipoManutencao = 'Corretiva';
   if (lower.includes('preventiva')) extraido.tipoManutencao = 'Preventiva';
+  if (lower.includes('calibracao') || lower.includes('calibração')) {
+    extraido.tipoManutencao = 'Calibracao';
+  }
+  if (lower.includes('inspecao') || lower.includes('inspeção')) {
+    extraido.tipoManutencao = 'Inspecao';
+  }
 
   const matchTag = msg.match(/\btag[:\s-]*([a-z0-9-]+)\b/i);
   if (matchTag?.[1]) {

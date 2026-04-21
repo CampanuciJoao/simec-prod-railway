@@ -142,6 +142,31 @@ export const AgentSessionRepository = {
     });
   },
 
+  async cancelarSessoesAtivasDoUsuario(tenantId, usuario) {
+    if (!tenantId) {
+      throw new Error('TENANT_ID_OBRIGATORIO');
+    }
+
+    if (!usuario) {
+      throw new Error('USUARIO_OBRIGATORIO');
+    }
+
+    const agora = new Date();
+
+    return prisma.agentSession.updateMany({
+      where: {
+        tenantId,
+        usuario,
+        status: 'Ativa',
+      },
+      data: {
+        status: 'Cancelada',
+        step: 'CANCELADO',
+        canceladaAt: agora,
+      },
+    });
+  },
+
   async registrarMensagem(sessionId, role, mensagem, metadata = null) {
     const sessao = await prisma.agentSession.findUnique({
       where: { id: sessionId },

@@ -1,4 +1,5 @@
 import { resolverEntidades } from '../shared/entityResolver.js';
+import { construirFeedbackResolucaoEntidades } from '../shared/entityFeedback.js';
 import { extrairFiltrosRelatorio } from './parser/index.js';
 import { montarResumoUltima, montarResumoLista } from './presenter/index.js';
 import {
@@ -56,10 +57,27 @@ export const RelatorioService = {
 
     contexto = await resolverEntidades(contexto, tenantId);
 
+    const feedbackEntidades = construirFeedbackResolucaoEntidades({
+      entityResolution: contexto.entityResolution,
+      intent: 'RELATORIO',
+    });
+
+    if (feedbackEntidades) {
+      return {
+        mensagem: feedbackEntidades.mensagem,
+        meta: feedbackEntidades.meta,
+      };
+    }
+
     if (!contexto.unidadeId && !contexto.equipamentoId) {
       return {
         mensagem:
-          'Não consegui identificar a unidade ou equipamento. Pode informar novamente?',
+          'Não consegui identificar a unidade ou o equipamento. Pode informar novamente?',
+        meta: {
+          intent: 'RELATORIO',
+          entityStatus: contexto.entityResolution,
+          reason: 'ENTITY_NOT_FOUND',
+        },
       };
     }
 
@@ -79,10 +97,7 @@ export const RelatorioService = {
           contexto.tipoEquipamento,
       });
 
-      const payload = construirPayloadConsultaUnica(
-        manutencao,
-        respostaTexto
-      );
+      const payload = construirPayloadConsultaUnica(manutencao, respostaTexto);
 
       await registrarSessaoRelatorio(
         contextoUsuario,
@@ -115,11 +130,7 @@ export const RelatorioService = {
         contexto.tipoEquipamento,
     });
 
-    const payload = construirPayloadLista(
-      manutencoes,
-      filtros,
-      respostaTexto
-    );
+    const payload = construirPayloadLista(manutencoes, filtros, respostaTexto);
 
     await registrarSessaoRelatorio(
       contextoUsuario,

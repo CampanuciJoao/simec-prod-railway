@@ -1,6 +1,3 @@
-// Ficheiro: services/agent/agendamento/agendamentoService.js
-// Versão: Multi-tenant ready + modularizado + compatível com router contextual
-
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { UserAgentMemoryRepository } from '../session/userAgentMemoryRepository.js';
 import { extrairCamposComIA } from './extractor/index.js';
@@ -10,7 +7,10 @@ import { proximaPergunta } from './ui/perguntas.js';
 import { buildResumoConfirmacao } from './ui/resumoBuilder.js';
 import { validarHorarioFuturo } from './validators/horarioValidator.js';
 import { resolverEntidades } from '../shared/entityResolver.js';
-import { criarManutencaoNoBanco } from '../workflow/dbManager.js';
+import {
+  criarManutencaoNoBanco,
+  validarPayloadAgendamentoDoAgente,
+} from '../workflow/dbManager.js';
 import { validarConflitoAgenda } from '../workflow/agendaValidator.js';
 import {
   STEPS,
@@ -52,6 +52,55 @@ function detectarSeHouveCorrecao(extraido) {
   );
 }
 
+function aplicarConfirmacaoDeResolucaoPendente(estado, confirmacao) {
+  if (confirmacao !== true) return estado;
+
+  const proximo = { ...estado };
+  const unidade = proximo.entityResolution?.unidade;
+  const equipamento = proximo.entityResolution?.equipamento;
+
+  if (unidade?.status === 'low_confidence' && unidade.matches?.[0]) {
+    proximo.unidadeId = unidade.matches[0].id;
+    proximo.unidadeNome = unidade.matches[0].nomeSistema || unidade.matches[0].label;
+    proximo.unidadeTexto = unidade.matches[0].label;
+    proximo.entityResolution.unidade = {
+      ...unidade,
+      status: 'resolved',
+      reason: null,
+    };
+  }
+
+  if (equipamento?.status === 'low_confidence' && equipamento.matches?.[0]) {
+    proximo.equipamentoId = equipamento.matches[0].id;
+    proximo.equipamentoNome = equipamento.matches[0].modelo || equipamento.matches[0].label;
+    proximo.modelo = equipamento.matches[0].modelo || equipamento.matches[0].label;
+    proximo.tag = equipamento.matches[0].tag || null;
+    proximo.tipoEquipamento = equipamento.matches[0].tipoEquipamento || null;
+    proximo.equipamentoTexto = equipamento.matches[0].label;
+
+    if (!proximo.unidadeNome && equipamento.matches[0].unidade) {
+      proximo.unidadeNome = equipamento.matches[0].unidade;
+    }
+
+    proximo.entityResolution.equipamento = {
+      ...equipamento,
+      status: 'resolved',
+      reason: null,
+    };
+  }
+
+  return proximo;
+}
+
+function buildBaseMeta(estado, extra = {}) {
+  return {
+    step: estado.step,
+    intent: 'AGENDAR_MANUTENCAO',
+    entityStatus: estado.entityResolution || null,
+    ...extra,
+  };
+}
+
 async function salvarERegistrarMensagemAgente(
   sessaoId,
   step,
@@ -70,6 +119,92 @@ async function salvarERegistrarMensagemAgente(
     step,
     ...meta,
   });
+}
+
+function buildEntitySuggestionText(suggestions = []) {
+  return suggestions
+    .slice(0, 4)
+    .map((item) =>
+      item.secondary
+        ? `**${item.label}** (${item.secondary})`
+        : `**${item.label}**`
+    )
+    .join(', ');
+}
+
+function construirMensagemResolucaoEntidade(estado) {
+  const unidade = estado.entityResolution?.unidade;
+  const equipamento = estado.entityResolution?.equipamento;
+
+  if (unidade?.status === 'not_found') {
+    const sugestoes = buildEntitySuggestionText(unidade.suggestions);
+    return {
+      mensagem: sugestoes
+        ? `Não encontrei a unidade informada. Você quis dizer ${sugestoes}?`
+        : 'Não encontrei a unidade informada. Pode escrever novamente como ela está cadastrada?',
+      meta: buildBaseMeta(estado, {
+        reason: 'ENTITY_NOT_FOUND',
+        target: 'unidade',
+        suggestions: unidade.suggestions,
+      }),
+    };
+  }
+
+  if (unidade?.status === 'low_confidence') {
+    return {
+      mensagem: `Encontrei uma unidade parecida: **${unidade.matches[0]?.label}**. Confirma que é essa unidade?`,
+      meta: buildBaseMeta(estado, {
+        reason: 'LOW_CONFIDENCE_MATCH',
+        target: 'unidade',
+        suggestions: unidade.suggestions,
+      }),
+    };
+  }
+
+  if (equipamento?.status === 'not_found') {
+    const sugestoes = buildEntitySuggestionText(equipamento.suggestions);
+    return {
+      mensagem: sugestoes
+        ? `Não encontrei esse equipamento na unidade selecionada. Você quis dizer ${sugestoes}?`
+        : 'Não encontrei esse equipamento na unidade informada. Pode escrever o modelo ou a TAG como está no cadastro?',
+      meta: buildBaseMeta(estado, {
+        reason: 'ENTITY_NOT_FOUND',
+        target: 'equipamento',
+        suggestions: equipamento.suggestions,
+      }),
+    };
+  }
+
+  if (equipamento?.status === 'low_confidence') {
+    return {
+      mensagem: `Encontrei um equipamento parecido: **${equipamento.matches[0]?.label}**${equipamento.matches[0]?.secondary ? ` (${equipamento.matches[0].secondary})` : ''}. Confirma que é esse?`,
+      meta: buildBaseMeta(estado, {
+        reason: 'LOW_CONFIDENCE_MATCH',
+        target: 'equipamento',
+        suggestions: equipamento.suggestions,
+      }),
+    };
+  }
+
+  if (estado.ambiguidadeEquipamento?.length > 0) {
+    return {
+      mensagem: `Encontrei mais de um equipamento compatível. Qual deles você deseja? ${estado.ambiguidadeEquipamento
+        .map(
+          (e) =>
+            `**${e.modelo}** (TAG: ${e.tag})${
+              e.unidade ? ` - ${e.unidade}` : ''
+            }`
+        )
+        .join(', ')}`,
+      meta: buildBaseMeta(estado, {
+        reason: 'ENTITY_AMBIGUOUS',
+        target: 'equipamento',
+        suggestions: estado.ambiguidadeEquipamento,
+      }),
+    };
+  }
+
+  return null;
 }
 
 export const AgendamentoService = {
@@ -102,9 +237,11 @@ export const AgendamentoService = {
     const extraido = await extrairCamposComIA(mensagem, estado);
     const msgNormalizada = mensagem.toLowerCase().trim();
 
-    // Compatibilidade com ações contextuais do router
     if (acaoContextual?.matched) {
-      if (acaoContextual.action === 'CONFIRMAR' || acaoContextual.action === 'SIM') {
+      if (
+        acaoContextual.action === 'CONFIRMAR' ||
+        acaoContextual.action === 'SIM'
+      ) {
         extraido.confirmacao = true;
       }
 
@@ -126,6 +263,7 @@ export const AgendamentoService = {
     }
 
     estado = mergeEstadoAgente(estado, extraido);
+    estado = aplicarConfirmacaoDeResolucaoPendente(estado, extraido.confirmacao);
 
     const houveCorrecao = detectarSeHouveCorrecao(extraido);
     estado = resetarConfirmacaoSeHouverMudanca(estado, houveCorrecao);
@@ -134,7 +272,12 @@ export const AgendamentoService = {
       estado.step = STEPS.CANCELADO;
 
       const resposta = respostaPadrao(
-        'Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?'
+        'Entendido. Cancelei o agendamento. Como posso ajudar com outra coisa?',
+        {
+          meta: buildBaseMeta(estado, {
+            reason: 'FLOW_CANCELLED',
+          }),
+        }
       );
 
       await salvarERegistrarMensagemAgente(
@@ -142,7 +285,7 @@ export const AgendamentoService = {
         estado.step,
         estado,
         resposta.mensagem,
-        { acao: 'CANCELAMENTO' },
+        resposta.meta,
         null
       );
 
@@ -153,41 +296,24 @@ export const AgendamentoService = {
 
     estado = await resolverEntidades(estado, tenantId);
 
-    if (estado.ambiguidadeEquipamento?.length > 0) {
+    const problemaResolucao = construirMensagemResolucaoEntidade(estado);
+    if (problemaResolucao) {
       estado.step = STEPS.COLETANDO_DADOS;
-
-      const mensagemResposta = `Encontrei mais de um equipamento compatível. Qual deles você deseja? ${estado.ambiguidadeEquipamento
-        .map(
-          (e) =>
-            `**${e.modelo}** (TAG: ${e.tag})${
-              e.tipoEquipamento ? ` - ${e.tipoEquipamento}` : ''
-            }`
-        )
-        .join(', ')}`;
 
       await salvarERegistrarMensagemAgente(
         sessao.id,
         estado.step,
         estado,
-        mensagemResposta,
-        {
-          tipo: 'AMBIGUIDADE_EQUIPAMENTO',
-          ambiguidadeEquipamento: estado.ambiguidadeEquipamento,
-        }
+        problemaResolucao.mensagem,
+        problemaResolucao.meta
       );
 
-      return respostaPadrao(mensagemResposta, {
-        meta: {
-          step: estado.step,
-          ambiguidadeEquipamento: estado.ambiguidadeEquipamento,
-        },
+      return respostaPadrao(problemaResolucao.mensagem, {
+        meta: problemaResolucao.meta,
       });
     }
 
-    const validacaoHorario = validarHorarioFuturo(
-      estado.data,
-      estado.horaInicio
-    );
+    const validacaoHorario = validarHorarioFuturo(estado.data, estado.horaInicio);
 
     if (!validacaoHorario.valido) {
       estado.horaInicio = null;
@@ -196,32 +322,37 @@ export const AgendamentoService = {
       estado.confirmacao = null;
       estado.step = STEPS.COLETANDO_DADOS;
 
+      const meta = buildBaseMeta(estado, {
+        reason: 'INVALID_TIME',
+      });
+
       await salvarERegistrarMensagemAgente(
         sessao.id,
         estado.step,
         estado,
         validacaoHorario.msg,
-        { tipo: 'HORARIO_INVALIDO' }
+        meta
       );
 
       return respostaPadrao(validacaoHorario.msg, {
-        meta: {
-          step: estado.step,
-          tipo: 'HORARIO_INVALIDO',
-        },
+        meta,
       });
     }
 
     const faltantes = getFaltantes(estado);
+    const { validacao } = validarPayloadAgendamentoDoAgente(estado);
+    const faltantesValidados = [
+      ...new Set([...(faltantes || []), ...(validacao.missingFields || [])]),
+    ];
 
     let conflitoAgenda = null;
-    if (faltantes.length === 0) {
+    if (faltantesValidados.length === 0) {
       conflitoAgenda = await validarConflitoAgenda(estado, tenantId);
     }
 
     const proximoStep = determinarProximoStep({
       estado,
-      faltantes,
+      faltantes: faltantesValidados,
       conflitoAgenda,
       confirmacao: extraido.confirmacao,
       houveCorrecao,
@@ -231,11 +362,27 @@ export const AgendamentoService = {
 
     if (proximoStep === STEPS.COLETANDO_DADOS) {
       let mensagemResposta;
+      let meta;
 
       if (conflitoAgenda && !conflitoAgenda.valido) {
         estado.aguardandoConfirmacao = false;
         estado.confirmacao = null;
         mensagemResposta = `${conflitoAgenda.mensagem} Por favor, informe outro horário.`;
+        meta = buildBaseMeta(estado, {
+          reason: 'CONFLICTING_SCHEDULE',
+          missingFields: faltantesValidados,
+        });
+      } else if (!validacao.ok && validacao.message) {
+        mensagemResposta = `${validacao.message} ${proximaPergunta(
+          estado,
+          faltantesValidados
+        )}`;
+        meta = buildBaseMeta(estado, {
+          reason: 'REQUIRED_FIELD_MISSING',
+          missingFields: faltantesValidados,
+          fieldErrors: validacao.fieldErrors,
+          validationSource: 'manutencaoSchema',
+        });
       } else {
         const houveNovosDados = Object.values(extraido).some(
           (v) => v !== null && v !== undefined
@@ -243,7 +390,14 @@ export const AgendamentoService = {
         const prefixo = houveNovosDados
           ? 'Perfeito, informação registrada.'
           : 'Certo.';
-        mensagemResposta = `${prefixo} ${proximaPergunta(estado, faltantes)}`;
+        mensagemResposta = `${prefixo} ${proximaPergunta(
+          estado,
+          faltantesValidados
+        )}`;
+        meta = buildBaseMeta(estado, {
+          missingFields: faltantesValidados,
+          validationSource: 'manutencaoSchema',
+        });
       }
 
       await salvarERegistrarMensagemAgente(
@@ -251,14 +405,11 @@ export const AgendamentoService = {
         estado.step,
         estado,
         mensagemResposta,
-        { faltantes }
+        meta
       );
 
       return respostaPadrao(mensagemResposta, {
-        meta: {
-          step: estado.step,
-          faltantes,
-        },
+        meta,
       });
     }
 
@@ -273,20 +424,22 @@ export const AgendamentoService = {
           'Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.';
       }
 
+      const meta = buildBaseMeta(estado, {
+        aguardandoConfirmacao: true,
+        validationSource: 'manutencaoSchema',
+      });
+
       await salvarERegistrarMensagemAgente(
         sessao.id,
         estado.step,
         estado,
         mensagemResposta,
-        { aguardandoConfirmacao: true },
+        meta,
         mensagemResposta
       );
 
       return respostaPadrao(mensagemResposta, {
-        meta: {
-          step: estado.step,
-          aguardandoConfirmacao: true,
-        },
+        meta,
       });
     }
 
@@ -300,24 +453,27 @@ export const AgendamentoService = {
           estado.confirmacao = null;
 
           const mensagemResposta = `${revalidacao.mensagem} O horário ficou indisponível antes da confirmação. Por favor, informe outro horário.`;
+          const meta = buildBaseMeta(estado, {
+            reason: 'REVALIDACAO_CONFLITO',
+          });
 
           await salvarERegistrarMensagemAgente(
             sessao.id,
             estado.step,
             estado,
             mensagemResposta,
-            { tipo: 'REVALIDACAO_CONFLITO' }
+            meta
           );
 
           return respostaPadrao(mensagemResposta, {
-            meta: {
-              step: estado.step,
-              tipo: 'REVALIDACAO_CONFLITO',
-            },
+            meta,
           });
         }
 
-        const manutencao = await criarManutencaoNoBanco(estado, tenantId);
+        const manutencao = await criarManutencaoNoBanco(
+          estado,
+          contextoUsuario
+        );
 
         await UserAgentMemoryRepository.upsertMemoria(sessionKey, {
           tenantId,
@@ -339,6 +495,12 @@ export const AgendamentoService = {
           numeroOS: manutencao.numeroOS,
         };
 
+        const meta = buildBaseMeta(stateFinal, {
+          reason: 'SCHEDULE_CREATED',
+          manutencaoId: manutencao.id,
+          numeroOS: manutencao.numeroOS,
+        });
+
         await AgentSessionRepository.salvarSessao(sessao.id, {
           step: STEPS.FINALIZADO,
           state: stateFinal,
@@ -349,43 +511,44 @@ export const AgendamentoService = {
           sessao.id,
           'agent',
           mensagemResposta,
-          {
-            step: STEPS.FINALIZADO,
-            manutencaoId: manutencao.id,
-            numeroOS: manutencao.numeroOS,
-          }
+          meta
         );
 
         await AgentSessionRepository.finalizarSessao(sessao.id);
 
         return respostaPadrao(mensagemResposta, {
-          meta: {
-            step: STEPS.FINALIZADO,
-            manutencaoId: manutencao.id,
-            numeroOS: manutencao.numeroOS,
-          },
+          meta,
         });
       } catch (error) {
         console.error('[AGENDAMENTO_DB_ERROR]', error);
 
         const mensagemResposta =
-          'Tive um erro técnico ao salvar no banco. Por favor, tente confirmar novamente ou contate o suporte.';
+          error?.code === 'AGENT_VALIDATION_ERROR'
+            ? `${error.message} Vamos ajustar os dados antes de concluir.`
+            : 'Tive um erro técnico ao salvar no banco. Por favor, tente confirmar novamente ou contate o suporte.';
+
+        const meta = buildBaseMeta(estado, {
+          reason:
+            error?.code === 'AGENT_VALIDATION_ERROR'
+              ? 'REQUIRED_FIELD_MISSING'
+              : 'DATABASE_ERROR',
+          fieldErrors: error?.details?.fieldErrors || null,
+          missingFields: error?.details?.missingFields || null,
+          validationSource:
+            error?.code === 'AGENT_VALIDATION_ERROR'
+              ? 'manutencaoSchema'
+              : null,
+        });
 
         await AgentSessionRepository.registrarMensagem(
           sessao.id,
           'agent',
           mensagemResposta,
-          {
-            step: estado.step,
-            tipo: 'ERRO_BANCO',
-          }
+          meta
         );
 
         return respostaPadrao(mensagemResposta, {
-          meta: {
-            step: estado.step,
-            tipo: 'ERRO_BANCO',
-          },
+          meta,
         });
       }
     }
@@ -393,20 +556,21 @@ export const AgendamentoService = {
     const fallback =
       'Tive dificuldade para continuar o fluxo do agendamento. Pode repetir a última informação?';
 
+    const meta = buildBaseMeta(estado, {
+      reason: 'FALLBACK',
+    });
+
     await salvarERegistrarMensagemAgente(
       sessao.id,
       estado.step,
       estado,
       fallback,
-      { tipo: 'FALLBACK' },
+      meta,
       fallback
     );
 
     return respostaPadrao(fallback, {
-      meta: {
-        step: estado.step,
-        tipo: 'FALLBACK',
-      },
+      meta,
     });
   },
 };

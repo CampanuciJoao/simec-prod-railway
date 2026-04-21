@@ -4,6 +4,8 @@
 import express from 'express';
 import { RoteadorAgente } from '../services/agent/index.js';
 import { proteger } from '../middleware/authMiddleware.js';
+import { AgentSessionRepository } from '../services/agent/session/agentSessionRepository.js';
+import { getSessionKey } from '../services/agent/core/sessionKeys.js';
 
 const router = express.Router();
 
@@ -93,6 +95,57 @@ router.post('/chat', proteger, async (req, res) => {
         acao: null,
         contexto: null,
         meta: null,
+      },
+    });
+  }
+});
+
+router.post('/reset', proteger, async (req, res) => {
+  try {
+    const usuarioId = req.usuario?.id;
+    const tenantId = req.usuario?.tenantId;
+
+    if (!usuarioId || !tenantId) {
+      return res.status(401).json({
+        resposta: {
+          mensagem: 'Sessão inválida. Não foi possível reiniciar o agente.',
+          acao: null,
+          contexto: null,
+          meta: {
+            reason: 'INVALID_SESSION',
+          },
+        },
+      });
+    }
+
+    const sessionKey = getSessionKey(usuarioId, tenantId);
+    const resultado = await AgentSessionRepository.cancelarSessoesAtivasDoUsuario(
+      tenantId,
+      sessionKey
+    );
+
+    return res.status(200).json({
+      resposta: {
+        mensagem: 'Conversa reiniciada. Como posso ajudar você?',
+        acao: null,
+        contexto: null,
+        meta: {
+          reason: 'RESET_CONFIRMED',
+          cancelledSessions: resultado?.count || 0,
+        },
+      },
+    });
+  } catch (error) {
+    console.error('[AGENT_RESET_ERROR]', error);
+
+    return res.status(500).json({
+      resposta: {
+        mensagem: 'Não consegui reiniciar o agente agora. Tente novamente.',
+        acao: null,
+        contexto: null,
+        meta: {
+          reason: 'RESET_ERROR',
+        },
       },
     });
   }

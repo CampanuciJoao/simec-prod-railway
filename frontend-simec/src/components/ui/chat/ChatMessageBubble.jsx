@@ -5,8 +5,15 @@ import remarkGfm from 'remark-gfm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRobot, faUser } from '@fortawesome/free-solid-svg-icons';
 
-function ChatMessageBubble({ role = 'assistant', content = '', createdAt }) {
+function ChatMessageBubble({
+  role = 'assistant',
+  content = '',
+  createdAt,
+  meta = null,
+  onSelectSuggestion,
+}) {
   const isUser = role === 'user';
+  const suggestions = Array.isArray(meta?.suggestions) ? meta.suggestions : [];
 
   return (
     <div
@@ -45,12 +52,41 @@ function ChatMessageBubble({ role = 'assistant', content = '', createdAt }) {
             </p>
           ) : (
             <div className="chat-markdown text-[13px] leading-6 sm:text-sm">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {content}
-              </ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
             </div>
           )}
         </div>
+
+        {!isUser && suggestions.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {suggestions.slice(0, 4).map((suggestion, index) => {
+              const label =
+                typeof suggestion === 'string'
+                  ? suggestion
+                  : suggestion.label || suggestion.nome || suggestion.modelo;
+              const secondary =
+                typeof suggestion === 'object' ? suggestion.secondary : null;
+
+              if (!label) return null;
+
+              return (
+                <button
+                  key={`${label}-${index}`}
+                  type="button"
+                  onClick={() => onSelectSuggestion?.(label)}
+                  className="rounded-full border px-3 py-1.5 text-xs font-medium transition hover:-translate-y-[1px]"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: 'var(--bg-surface)',
+                    color: 'var(--text-secondary)',
+                  }}
+                >
+                  {secondary ? `${label} • ${secondary}` : label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         <div
           className={[
@@ -67,11 +103,7 @@ function ChatMessageBubble({ role = 'assistant', content = '', createdAt }) {
             {isUser ? 'Você' : 'T.H.I.A.G.O'}
           </span>
 
-          {createdAt && (
-            <span className="text-[11px] text-slate-400">
-              {createdAt}
-            </span>
-          )}
+          {createdAt && <span className="text-[11px] text-slate-400">{createdAt}</span>}
         </div>
       </div>
 
@@ -88,6 +120,8 @@ ChatMessageBubble.propTypes = {
   role: PropTypes.oneOf(['user', 'assistant', 'system']),
   content: PropTypes.string,
   createdAt: PropTypes.string,
+  meta: PropTypes.object,
+  onSelectSuggestion: PropTypes.func,
 };
 
 export default ChatMessageBubble;

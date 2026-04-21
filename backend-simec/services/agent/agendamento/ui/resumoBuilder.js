@@ -1,13 +1,29 @@
 export const buildResumoConfirmacao = (estado) => {
   const dataFmt = estado.data ? estado.data.split('-').reverse().join('/') : '';
+  const linhas = [
+    '📋 **Resumo para agendamento**',
+    `- **Ativo:** ${estado.equipamentoNome || estado.modelo || estado.tipoEquipamento || 'Equipamento não resolvido'} (Tag: ${estado.tag || 'sem tag'})`,
+    `- **Local:** ${estado.unidadeNome || 'Unidade não resolvida'}`,
+    `- **Tipo de manutenção:** ${estado.tipoManutencao || 'Não informado'}`,
+    `- **Horário:** ${dataFmt} | das ${estado.horaInicio} às ${estado.horaFim}`,
+  ];
 
-  return `📋 **Resumo para Agendamento**
-- **Ativo:** ${estado.equipamentoNome || estado.modelo || estado.tipoEquipamento || 'Equipamento não resolvido'} (Tag: ${estado.tag || 'sem tag'})
-- **Local:** ${estado.unidadeNome || 'Unidade não resolvida'}
-- **Tipo de Manutenção:** ${estado.tipoManutencao || 'Não informado'}
-- **Categoria do Equipamento:** ${estado.tipoEquipamento || 'Não informado'}
-- **Horário:** ${dataFmt} | das ${estado.horaInicio} às ${estado.horaFim}
-${estado.tipoManutencao === 'Corretiva' ? `- **Chamado:** ${estado.numeroChamado}` : ''}
+  if (estado.tipoEquipamento) {
+    linhas.push(`- **Categoria do equipamento:** ${estado.tipoEquipamento}`);
+  }
 
-**Confirma a criação desta manutenção?** (Responda **Sim** ou **Não**)`;
+  if (estado.tipoManutencao === 'Corretiva' && estado.numeroChamado) {
+    linhas.push(`- **Chamado:** ${estado.numeroChamado}`);
+  }
+
+  if (estado.descricao) {
+    linhas.push(`- **Descrição:** ${estado.descricao}`);
+  }
+
+  linhas.push(
+    '',
+    '**Confirma a criação desta manutenção?** (Responda **Sim** ou **Não**)'
+  );
+
+  return linhas.join('\n');
 };

@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { sendMessageToAgent } from '@/services/chat/chatAdapter';
 import { handleChatAction } from '@/services/chat/chatActionHandler';
 import { interpretarRespostaAgente } from '@/services/chat/chatResponseInterpreter';
+import { resetarSessaoDoAgente } from '@/services/api/agentApi';
 
 function formatTime(date = new Date()) {
   return new Intl.DateTimeFormat('pt-BR', {
@@ -13,12 +14,14 @@ function formatTime(date = new Date()) {
   }).format(date);
 }
 
-function createMessage(role, content) {
+function createMessage(role, content, extras = {}) {
   return {
     id: crypto.randomUUID(),
     role,
     content,
     createdAt: formatTime(),
+    meta: extras.meta || null,
+    contexto: extras.contexto || null,
   };
 }
 
@@ -37,8 +40,8 @@ export function useChat() {
   const [messages, setMessages] = useState(getInitialMessages);
   const [isTyping, setIsTyping] = useState(false);
 
-  const appendMessage = useCallback((role, content) => {
-    setMessages((prev) => [...prev, createMessage(role, content)]);
+  const appendMessage = useCallback((role, content, extras = {}) => {
+    setMessages((prev) => [...prev, createMessage(role, content, extras)]);
   }, []);
 
   const sendMessage = useCallback(
@@ -60,10 +63,10 @@ export function useChat() {
 
         const parsed = interpretarRespostaAgente(response);
 
-        appendMessage(
-          'assistant',
-          parsed.mensagem || 'Não recebi resposta válida.'
-        );
+        appendMessage('assistant', parsed.mensagem || 'Não recebi resposta válida.', {
+          meta: parsed.meta,
+          contexto: parsed.contexto,
+        });
 
         if (parsed.acao) {
           await handleChatAction({
@@ -83,14 +86,32 @@ export function useChat() {
     [messages, isTyping, appendMessage, navigate, addToast]
   );
 
-  const resetChat = useCallback(() => {
-    setMessages([
-      createMessage(
-        'assistant',
-        'Conversa reiniciada.\n\nComo posso ajudar você?'
-      ),
-    ]);
-  }, []);
+  const resetChat = useCallback(async () => {
+    if (isTyping) return;
+
+    setIsTyping(true);
+
+    try {
+      const response = await resetarSessaoDoAgente();
+
+      setMessages([
+        createMessage(
+          'assistant',
+          response.mensagem || 'Conversa reiniciada. Como posso ajudar você?',
+          { meta: response.meta }
+        ),
+      ]);
+    } catch {
+      setMessages([
+        createMessage(
+          'assistant',
+          'Não consegui reiniciar a conversa agora. Tente novamente.'
+        ),
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
+  }, [isTyping]);
 
   return {
     messages,

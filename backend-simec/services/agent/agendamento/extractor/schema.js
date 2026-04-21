@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
 export const AgendamentoSchema = z.object({
-  tipoManutencao: z.enum(['Corretiva', 'Preventiva']).nullable(),
+  tipoManutencao: z
+    .enum(['Corretiva', 'Preventiva', 'Calibracao', 'Inspecao'])
+    .nullable(),
   unidadeTexto: z.string().nullable(),
   equipamentoTexto: z.string().nullable(),
   data: z.string().nullable(),

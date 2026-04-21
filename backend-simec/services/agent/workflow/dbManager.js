@@ -1,11 +1,8 @@
-// Ficheiro: backend-simec/services/agent/dbManager.js
-// Versão: profissional, multi-tenant, timezone-aware, alinhada ao núcleo temporal oficial
-
-import prisma from '../../prismaService.js';
+import { criarManutencaoService } from '../../manutencao/index.js';
 import {
-  resolveOperationalTimezone,
-  validateSchedulingWindow,
-} from '../../time/index.js';
+  MANUTENCAO_FIELD_LABELS,
+  validarManutencaoPayload,
+} from '../../../validators/manutencaoValidator.js';
 
 function normalizarTipoManutencao(tipoManutencao) {
   const tipo = (tipoManutencao || '').toString().trim().toLowerCase();
@@ -28,206 +25,68 @@ function montarDescricaoFinal(tipoManutencao, estado) {
   }
 
   if (tipoManutencao === 'Corretiva') {
-    return 'Manutenção Corretiva';
+    return '';
   }
 
-  return 'Manutenção Preventiva Programada';
+  return 'Manutenção preventiva de rotina';
 }
 
-export async function criarManutencaoNoBanco(estado, tenantId) {
-  if (!tenantId) {
-    throw new Error('TENANT_ID_OBRIGATORIO_PARA_CRIAR_MANUTENCAO');
+export function montarPayloadManutencaoDoAgente(estado) {
+  const tipo = normalizarTipoManutencao(estado?.tipoManutencao);
+
+  return {
+    equipamentoId: estado?.equipamentoId || '',
+    tipo: tipo || '',
+    descricaoProblemaServico: montarDescricaoFinal(tipo, estado),
+    tecnicoResponsavel: estado?.tecnicoResponsavel?.trim() || null,
+    numeroChamado: estado?.numeroChamado?.trim() || null,
+    agendamentoDataInicioLocal: estado?.data || '',
+    agendamentoHoraInicioLocal: estado?.horaInicio || '',
+    agendamentoDataFimLocal: estado?.data || '',
+    agendamentoHoraFimLocal: estado?.horaFim || '',
+    status: 'Agendada',
+  };
+}
+
+export function validarPayloadAgendamentoDoAgente(estado) {
+  const payload = montarPayloadManutencaoDoAgente(estado);
+  const validacao = validarManutencaoPayload(payload);
+
+  return {
+    payload,
+    validacao,
+    labels: MANUTENCAO_FIELD_LABELS,
+  };
+}
+
+export async function criarManutencaoNoBanco(estado, contextoUsuario) {
+  const { tenantId, usuarioId } = contextoUsuario || {};
+
+  if (!tenantId || !usuarioId) {
+    throw new Error('CONTEXTO_USUARIO_INVALIDO_PARA_CRIAR_MANUTENCAO');
   }
 
-  if (!estado?.equipamentoId) {
-    throw new Error('Falha na persistência: ID do equipamento não resolvido.');
+  const { payload, validacao } = validarPayloadAgendamentoDoAgente(estado);
+
+  if (!validacao.ok) {
+    const error = new Error(validacao.message || 'Dados inválidos para criação da manutenção.');
+    error.code = 'AGENT_VALIDATION_ERROR';
+    error.details = validacao;
+    throw error;
   }
 
-  if (!estado?.data || !estado?.horaInicio) {
-    throw new Error(
-      'Falha na persistência: data e hora de início são obrigatórias.'
-    );
+  const resultado = await criarManutencaoService({
+    tenantId,
+    usuarioId,
+    dados: payload,
+  });
+
+  if (!resultado.ok) {
+    const error = new Error(resultado.message || 'Falha ao criar manutenção pelo agente.');
+    error.code = 'MANUTENCAO_SERVICE_ERROR';
+    error.details = resultado;
+    throw error;
   }
 
-  const tipoManutencao = normalizarTipoManutencao(estado.tipoManutencao);
-
-  if (!tipoManutencao) {
-    throw new Error(
-      `Falha na persistência: tipo de manutenção inválido (${estado.tipoManutencao || 'não informado'}).`
-    );
-  }
-
-  try {
-    const resultado = await prisma.$transaction(async (tx) => {
-      const tenant = await tx.tenant.findFirst({
-        where: {
-          id: tenantId,
-          ativo: true,
-        },
-        select: {
-          id: true,
-          timezone: true,
-        },
-      });
-
-      if (!tenant) {
-        throw new Error('TENANT_NAO_ENCONTRADO_OU_INATIVO');
-      }
-
-      const equipamento = await tx.equipamento.findFirst({
-        where: {
-          id: estado.equipamentoId,
-          tenantId,
-        },
-        select: {
-          id: true,
-          tag: true,
-          modelo: true,
-          status: true,
-          unidadeId: true,
-          unidade: {
-            select: {
-              id: true,
-              timezone: true,
-            },
-          },
-        },
-      });
-
-      if (!equipamento) {
-        throw new Error('EQUIPAMENTO_NAO_ENCONTRADO_NO_TENANT');
-      }
-
-      const timezone = resolveOperationalTimezone({
-        tenantTimezone: tenant.timezone,
-        unidadeTimezone: equipamento.unidade?.timezone,
-      });
-
-      const dateLocal = estado.data;
-      const startTimeLocal = estado.horaInicio;
-      const endTimeLocal = estado.horaFim || null;
-
-      const scheduling = validateSchedulingWindow({
-        dateLocal,
-        startTimeLocal,
-        endTimeLocal,
-        timezone,
-      });
-
-      if (!scheduling.valid) {
-        throw new Error(scheduling.code || 'JANELA_AGENDAMENTO_INVALIDA');
-      }
-
-      if (!scheduling.startUtc) {
-        throw new Error('FALHA_CONVERSAO_DATA_INICIO');
-      }
-
-      const totalTenant = await tx.manutencao.count({
-        where: {
-          tenantId,
-        },
-      });
-
-      const osSequence = String(totalTenant + 1).padStart(4, '0');
-      const tagPrefix = (estado.tag || equipamento.tag || 'MAN')
-        .substring(0, 3)
-        .toUpperCase();
-      const typeInitial = tipoManutencao.charAt(0).toUpperCase();
-      const numeroOS = `${typeInitial}${tagPrefix}-${osSequence}`;
-
-      const descricaoFinal = montarDescricaoFinal(tipoManutencao, estado);
-
-      const novaManutencao = await tx.manutencao.create({
-        data: {
-          tenant: {
-            connect: { id: tenantId },
-          },
-          numeroOS,
-          tipo: tipoManutencao,
-          descricaoProblemaServico: descricaoFinal,
-          tecnicoResponsavel:
-            estado.tecnicoResponsavel?.trim() || 'Agente Guardião',
-          numeroChamado:
-            tipoManutencao === 'Corretiva'
-              ? estado.numeroChamado?.trim() || null
-              : null,
-
-          agendamentoDataInicioLocal: dateLocal,
-          agendamentoHoraInicioLocal: startTimeLocal,
-          agendamentoDataFimLocal: dateLocal,
-          agendamentoHoraFimLocal: endTimeLocal,
-          agendamentoTimezone: timezone,
-
-          dataHoraAgendamentoInicio: scheduling.startUtc,
-          dataHoraAgendamentoFim: scheduling.endUtc || null,
-
-          equipamento: {
-            connect: {
-              tenantId_id: {
-                tenantId,
-                id: estado.equipamentoId,
-              },
-            },
-          },
-
-          // IMPORTANTE: ao criar, fica apenas agendada
-          status: 'Agendada',
-        },
-      });
-
-      // NÃO alteramos o status do equipamento aqui.
-      // O equipamento só deve ir para EmManutencao quando a OS realmente começar.
-
-      return novaManutencao;
-    });
-
-    console.log(
-      `[DB_MANAGER] Sucesso: OS ${resultado.numeroOS} criada no tenant ${tenantId}.`
-    );
-
-    return resultado;
-  } catch (error) {
-    if (error.message === 'EQUIPAMENTO_NAO_ENCONTRADO_NO_TENANT') {
-      throw new Error(
-        'Falha na persistência: equipamento não encontrado no tenant informado.'
-      );
-    }
-
-    if (error.message === 'TENANT_NAO_ENCONTRADO_OU_INATIVO') {
-      throw new Error('Falha na persistência: tenant inválido ou inativo.');
-    }
-
-    if (error.message === 'INVALID_LOCAL_DATE') {
-      throw new Error('Falha na persistência: data local inválida.');
-    }
-
-    if (error.message === 'INVALID_LOCAL_START_TIME') {
-      throw new Error('Falha na persistência: hora inicial inválida.');
-    }
-
-    if (error.message === 'INVALID_LOCAL_END_TIME') {
-      throw new Error('Falha na persistência: hora final inválida.');
-    }
-
-    if (error.message === 'PAST_LOCAL_DATETIME') {
-      throw new Error(
-        'Falha na persistência: a data/hora de início está no passado.'
-      );
-    }
-
-    if (error.message === 'END_BEFORE_OR_EQUAL_START') {
-      throw new Error(
-        'Falha na persistência: a hora final deve ser maior que a hora inicial.'
-      );
-    }
-
-    if (error.message === 'FALHA_CONVERSAO_DATA_INICIO') {
-      throw new Error(
-        'Falha na persistência: não foi possível converter a data/hora inicial.'
-      );
-    }
-
-    console.error('[DB_MANAGER_TRANSACTION_ERROR]:', error);
-    throw new Error('Erro ao processar gravação no banco de dados.');
-  }
+  return resultado.data;
 }

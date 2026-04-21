@@ -1,9 +1,5 @@
 import api from '../http/apiClient';
 
-/**
- * Envia mensagem para o agente inteligente do SIMEC
- * Suporta histórico para contexto
- */
 export const enviarMensagemAoAgente = async ({
   mensagem,
   historico = [],
@@ -41,10 +37,17 @@ export const enviarMensagemAoAgente = async ({
     console.error('[AGENT_API_ERROR]', error);
 
     return normalizarResposta({
-      mensagem:
-        '⚠️ Tive um problema ao processar sua solicitação.\n\nTente novamente.',
+      mensagem: 'Tive um problema ao processar sua solicitação. Tente novamente.',
+      meta: {
+        reason: 'AGENT_API_ERROR',
+      },
     });
   }
+};
+
+export const resetarSessaoDoAgente = async () => {
+  const res = await api.post('/agent/reset');
+  return normalizarResposta(res?.data?.resposta || {});
 };
 
 function normalizarResposta(resposta = {}) {

@@ -1,4 +1,5 @@
 import { resolverEntidades } from '../shared/entityResolver.js';
+import { construirFeedbackResolucaoEntidades } from '../shared/entityFeedback.js';
 import { extrairFiltrosSeguro } from './parser/index.js';
 import { montarResumoSeguro } from './presenter/index.js';
 import { construirPayloadSeguro } from './payload/index.js';
@@ -72,12 +73,28 @@ export const SeguroService = {
 
     contexto = await resolverEntidades(contexto, tenantId);
 
+    const feedbackEntidades = construirFeedbackResolucaoEntidades({
+      entityResolution: contexto.entityResolution,
+      intent: 'SEGURO',
+    });
+
+    if (feedbackEntidades) {
+      return respostaPadrao(feedbackEntidades.mensagem, {
+        meta: feedbackEntidades.meta,
+      });
+    }
+
     if (!contexto.unidadeId && !contexto.equipamentoId) {
       if (estadoAnterior?.seguroId) {
         const resposta = respostaPadrao(
-          'Entendi que você está continuando a consulta do seguro anterior, mas não consegui identificar o novo alvo. Pode informar, por exemplo: "da unidade de Coxim", "da sede" ou "da tomografia de Coxim"?',
+          'Entendi que você está continuando a consulta do seguro anterior, mas não consegui identificar o novo alvo. Pode informar, por exemplo: "da unidade Matriz" ou "da tomografia da Matriz"?',
           {
-            meta: estadoAnterior,
+            meta: {
+              ...estadoAnterior,
+              intent: 'SEGURO',
+              entityStatus: contexto.entityResolution,
+              reason: 'ENTITY_NOT_FOUND',
+            },
           }
         );
 
@@ -93,7 +110,14 @@ export const SeguroService = {
       }
 
       return respostaPadrao(
-        "Não consegui identificar a unidade ou o equipamento do seguro. Pode informar novamente, por exemplo: 'me traga o seguro da unidade de Coxim'?"
+        'Não consegui identificar a unidade ou o equipamento do seguro. Pode informar novamente?',
+        {
+          meta: {
+            intent: 'SEGURO',
+            entityStatus: contexto.entityResolution,
+            reason: 'ENTITY_NOT_FOUND',
+          },
+        }
       );
     }
 

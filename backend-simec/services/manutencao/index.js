@@ -35,6 +35,7 @@ import {
 import { registrarEventoHistoricoAtivo } from '../historicoAtivoService.js';
 import { enfileirarReprocessamentoAlertasDoTenant } from '../queueService.js';
 import { removerAlertasManutencaoDaOS } from '../alertas/manutencao/manutencaoAlertRepository.js';
+import { validarManutencaoPayload } from '../../validators/manutencaoValidator.js';
 
 async function reprocessarAlertasManutencaoSemBloquear(tenantId) {
   try {
@@ -168,9 +169,22 @@ export async function criarManutencaoService({
   usuarioId,
   dados,
 }) {
+  const validacaoPayload = validarManutencaoPayload(dados);
+
+  if (!validacaoPayload.ok) {
+    return {
+      ok: false,
+      status: 400,
+      message: validacaoPayload.message,
+      fieldErrors: validacaoPayload.fieldErrors,
+      missingFields: validacaoPayload.missingFields,
+    };
+  }
+
+  const dadosValidados = validacaoPayload.data;
   const contexto = await buscarContextoOperacional({
     tenantId,
-    equipamentoId: dados.equipamentoId,
+    equipamentoId: dadosValidados.equipamentoId,
   });
 
   if (!contexto.ok) {
@@ -178,10 +192,10 @@ export async function criarManutencaoService({
   }
 
   const agendamento = validarAgendamento({
-    startDateLocal: dados.agendamentoDataInicioLocal,
-    startTimeLocal: dados.agendamentoHoraInicioLocal,
-    endDateLocal: dados.agendamentoDataFimLocal,
-    endTimeLocal: dados.agendamentoHoraFimLocal || null,
+    startDateLocal: dadosValidados.agendamentoDataInicioLocal,
+    startTimeLocal: dadosValidados.agendamentoHoraInicioLocal,
+    endDateLocal: dadosValidados.agendamentoDataFimLocal,
+    endTimeLocal: dadosValidados.agendamentoHoraFimLocal || null,
     timezone: contexto.timezone,
   });
 
@@ -195,7 +209,7 @@ export async function criarManutencaoService({
 
   const conflito = await existeConflitoAgendamento({
     tenantId,
-    equipamentoId: dados.equipamentoId,
+    equipamentoId: dadosValidados.equipamentoId,
     startUtc: agendamento.startUtc,
     endUtc: agendamento.endUtc,
   });
@@ -212,16 +226,16 @@ export async function criarManutencaoService({
   const totalTenant = await contarManutencoesDoTenant(tenantId);
 
   const numeroOS = gerarNumeroOS({
-    tipo: dados.tipo,
+    tipo: dadosValidados.tipo,
     tag: contexto.equipamento.tag,
     sequencia: totalTenant + 1,
   });
 
   const payload = montarPayloadPersistencia({
-    dados,
+    dados: dadosValidados,
     agendamento,
     tenantId,
-    equipamentoId: dados.equipamentoId,
+    equipamentoId: dadosValidados.equipamentoId,
     numeroOS,
   });
 
@@ -292,6 +306,19 @@ export async function atualizarManutencaoService({
   manutencaoId,
   dados,
 }) {
+  const validacaoPayload = validarManutencaoPayload(dados);
+
+  if (!validacaoPayload.ok) {
+    return {
+      ok: false,
+      status: 400,
+      message: validacaoPayload.message,
+      fieldErrors: validacaoPayload.fieldErrors,
+      missingFields: validacaoPayload.missingFields,
+    };
+  }
+
+  const dadosValidados = validacaoPayload.data;
   const manutencaoAtual = await buscarManutencaoResumo({
     tenantId,
     manutencaoId,
@@ -307,7 +334,7 @@ export async function atualizarManutencaoService({
 
   const contexto = await buscarContextoOperacional({
     tenantId,
-    equipamentoId: dados.equipamentoId,
+    equipamentoId: dadosValidados.equipamentoId,
   });
 
   if (!contexto.ok) {
@@ -315,10 +342,10 @@ export async function atualizarManutencaoService({
   }
 
   const agendamento = validarAgendamento({
-    startDateLocal: dados.agendamentoDataInicioLocal,
-    startTimeLocal: dados.agendamentoHoraInicioLocal,
-    endDateLocal: dados.agendamentoDataFimLocal,
-    endTimeLocal: dados.agendamentoHoraFimLocal || null,
+    startDateLocal: dadosValidados.agendamentoDataInicioLocal,
+    startTimeLocal: dadosValidados.agendamentoHoraInicioLocal,
+    endDateLocal: dadosValidados.agendamentoDataFimLocal,
+    endTimeLocal: dadosValidados.agendamentoHoraFimLocal || null,
     timezone: contexto.timezone,
   });
 
@@ -332,7 +359,7 @@ export async function atualizarManutencaoService({
 
   const conflito = await existeConflitoAgendamento({
     tenantId,
-    equipamentoId: dados.equipamentoId,
+    equipamentoId: dadosValidados.equipamentoId,
     startUtc: agendamento.startUtc,
     endUtc: agendamento.endUtc,
     manutencaoIdIgnorar: manutencaoId,
@@ -348,10 +375,10 @@ export async function atualizarManutencaoService({
   }
 
   const payload = montarPayloadPersistencia({
-    dados,
+    dados: dadosValidados,
     agendamento,
     tenantId,
-    equipamentoId: dados.equipamentoId,
+    equipamentoId: dadosValidados.equipamentoId,
     numeroOSExistente: manutencaoAtual.numeroOS,
   });
 
