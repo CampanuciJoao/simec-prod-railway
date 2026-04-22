@@ -121,6 +121,21 @@ function buildEquipamentosOrderBy(sortBy, sortDirection) {
     : { modelo: 'asc' };
 }
 
+function agruparAnexosPorEquipamento(anexos = []) {
+  return anexos.reduce((acc, anexo) => {
+    if (!anexo?.equipamentoId) {
+      return acc;
+    }
+
+    if (!acc[anexo.equipamentoId]) {
+      acc[anexo.equipamentoId] = [];
+    }
+
+    acc[anexo.equipamentoId].push(anexo);
+    return acc;
+  }, {});
+}
+
 function isSameDateValue(a, b) {
   if (!a && !b) return true;
   if (!a || !b) return false;
@@ -282,29 +297,29 @@ router.get('/', async (req, res) => {
     const sortDirection =
       normalizarTextoOpcional(req.query?.sortDirection) || 'asc';
 
-    const [items, total, statusSummary, tipos, fabricantes] =
+    const [rawItems, total, statusSummary, tipos, fabricantes] =
       await Promise.all([
         prisma.equipamento.findMany({
           where,
-          include: {
-            unidade: {
-              select: {
-                id: true,
-                nomeSistema: true,
-              },
-            },
-            anexos: {
-              select: {
-                id: true,
-                nomeOriginal: true,
-                path: true,
-                tipoMime: true,
-                createdAt: true,
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
+          select: {
+            id: true,
+            tenantId: true,
+            tag: true,
+            modelo: true,
+            tipo: true,
+            setor: true,
+            fabricante: true,
+            anoFabricacao: true,
+            dataInstalacao: true,
+            status: true,
+            numeroPatrimonio: true,
+            registroAnvisa: true,
+            aeTitle: true,
+            telefoneSuporte: true,
+            observacoes: true,
+            unidadeId: true,
+            createdAt: true,
+            updatedAt: true,
           },
           orderBy: buildEquipamentosOrderBy(sortBy, sortDirection),
           take: pageSize,
@@ -349,6 +364,57 @@ router.get('/', async (req, res) => {
           },
         }),
       ]);
+
+    const unidadeIds = [
+      ...new Set(rawItems.map((item) => item.unidadeId).filter(Boolean)),
+    ];
+    const equipamentoIds = rawItems.map((item) => item.id).filter(Boolean);
+
+    const [unidades, anexos] = await Promise.all([
+      unidadeIds.length > 0
+        ? prisma.unidade.findMany({
+            where: {
+              tenantId,
+              id: {
+                in: unidadeIds,
+              },
+            },
+            select: {
+              id: true,
+              nomeSistema: true,
+            },
+          })
+        : [],
+      equipamentoIds.length > 0
+        ? prisma.anexo.findMany({
+            where: {
+              tenantId,
+              equipamentoId: {
+                in: equipamentoIds,
+              },
+            },
+            select: {
+              id: true,
+              equipamentoId: true,
+              nomeOriginal: true,
+              path: true,
+              tipoMime: true,
+              createdAt: true,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+        : [],
+    ]);
+
+    const unidadeMap = new Map(unidades.map((unidade) => [unidade.id, unidade]));
+    const anexosPorEquipamento = agruparAnexosPorEquipamento(anexos);
+    const items = rawItems.map((item) => ({
+      ...item,
+      unidade: unidadeMap.get(item.unidadeId) || null,
+      anexos: anexosPorEquipamento[item.id] || [],
+    }));
 
     const metricas = statusSummary.reduce(
       (acc, item) => {
