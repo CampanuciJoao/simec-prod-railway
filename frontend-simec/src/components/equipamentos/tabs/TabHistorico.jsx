@@ -27,7 +27,6 @@ import {
   DateInput,
   EmptyState,
   LoadingState,
-  PageSection,
   Select,
   StatusBadge,
 } from '@/components/ui';
@@ -162,11 +161,7 @@ function TabHistorico({ equipamento }) {
   };
 
   return (
-    <PageSection
-      title="Historico do equipamento"
-      description="Historico unico do ativo com manutencoes, ocorrencias e mudancas relevantes."
-    >
-      <div className="space-y-5">
+    <div className="space-y-5">
         <div className="flex items-start gap-3">
           <span
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
@@ -412,8 +407,7 @@ function TabHistorico({ equipamento }) {
             ) : null}
           </div>
         ) : null}
-      </div>
-    </PageSection>
+    </div>
   );
 }
 
