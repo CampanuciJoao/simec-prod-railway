@@ -5,7 +5,7 @@ import {
   gerarRelatorio,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { exportarRelatorioPDFLazy } from '@/services/pdf/pdfExportService';
+import { exportarRelatorioPDF } from '@/services/api/pdfApi';
 import { getErrorMessage } from '../../utils/getErrorMessage';
 
 export function useRelatoriosPage() {
@@ -116,7 +116,7 @@ export function useRelatoriosPage() {
       .split('T')[0]}`;
 
     try {
-      await exportarRelatorioPDFLazy(resultadoRelatorio, nomeArquivo);
+      await exportarRelatorioPDF(filtros, `${nomeArquivo}.pdf`);
     } catch (err) {
       const message = getErrorMessage(err, 'Falha ao exportar o relatÃ³rio em PDF.');
       addToast(message, 'error');

@@ -20,14 +20,6 @@ const chunkMatchers = {
     'chart.js',
     'react-chartjs-2',
   ],
-  pdfExport: [
-    'jspdf',
-    'jspdf-autotable',
-    'html2canvas',
-    'canvg',
-    'dompurify',
-    'html2pdf',
-  ],
   markdown: [
     'react-markdown',
     'remark-',
@@ -104,10 +96,6 @@ export default defineConfig({
 
           if (matchesAny(normalizedId, chunkMatchers.charts)) {
             return 'charts';
-          }
-
-          if (matchesAny(normalizedId, chunkMatchers.pdfExport)) {
-            return 'pdf-export';
           }
 
           if (matchesAny(normalizedId, chunkMatchers.markdown)) {

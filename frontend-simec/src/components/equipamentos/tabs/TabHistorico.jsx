@@ -9,10 +9,9 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  exportHistoricoAtivoByEquipamento,
   getHistoricoAtivoByEquipamento,
 } from '@/services/api';
-import { exportarHistoricoEquipamentoPDFLazy } from '@/services/pdf/pdfExportService';
+import { exportarHistoricoEquipamentoPDF } from '@/services/api/pdfApi';
 
 import { useToast } from '@/contexts/ToastContext';
 import {
@@ -127,25 +126,13 @@ function TabHistorico({ equipamento }) {
   };
 
   const handleExportarPDF = () => {
-    exportHistoricoAtivoByEquipamento(equipamento.id, buildQueryParams({}))
-      .then((lista) => {
-        const timelineCompleta = buildHistoricoTimeline({
-          eventos: Array.isArray(lista) ? lista : [],
-        });
-
-        void exportarHistoricoEquipamentoPDFLazy(timelineCompleta.linhaDoTempo, {
-          modelo: equipamento?.modelo,
-          tag: equipamento?.tag,
-          unidade: equipamento?.unidade?.nomeSistema,
-          inicio: dataInicio,
-          fim: dataFim,
-          tipoFiltro: filtroTipo,
-        }).catch(() => {
-          addToast('Erro ao gerar o PDF do historico.', 'error');
-        });
-      })
+    void exportarHistoricoEquipamentoPDF(
+      equipamento.id,
+      buildQueryParams({}),
+      `auditoria_${equipamento?.tag || 'Equipamento'}.pdf`
+    )
       .catch(() => {
-        addToast('Erro ao exportar historico completo.', 'error');
+        addToast('Erro ao gerar o PDF do historico.', 'error');
       });
   };
 
