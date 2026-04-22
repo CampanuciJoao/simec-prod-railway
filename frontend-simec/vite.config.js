@@ -7,6 +7,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const chunkMatchers = {
+  runtime: [
+    'vite/preload-helper',
+    'commonjsHelpers',
+  ],
   reactCore: [
     'react',
     'react-dom',
@@ -19,6 +23,10 @@ const chunkMatchers = {
   pdfExport: [
     'jspdf',
     'jspdf-autotable',
+    'html2canvas',
+    'canvg',
+    'dompurify',
+    'html2pdf',
   ],
   markdown: [
     'react-markdown',
@@ -80,11 +88,15 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks(id) {
-          if (!id.includes('node_modules')) {
-            return undefined;
+          const normalizedId = normalizeModuleId(id);
+
+          if (matchesAny(normalizedId, chunkMatchers.runtime)) {
+            return 'runtime';
           }
 
-          const normalizedId = normalizeModuleId(id);
+          if (!normalizedId.includes('node_modules')) {
+            return undefined;
+          }
 
           if (matchesAny(normalizedId, chunkMatchers.reactCore)) {
             return 'react-core';
