@@ -6,10 +6,12 @@ import {
   faExclamationTriangle,
   faChevronDown,
   faChevronUp,
+  faFilePdf,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { formatarDataHora } from '@/utils/timeUtils';
 import { Badge, Button, Card } from '@/components/ui';
+import { exportarOcorrenciaPDF } from '@/services/api/pdfApi';
 import FichaTecnicaResolveForm from '@/components/equipamentos/ficha-tecnica/FichaTecnicaResolveForm';
 
 function getGravidadeBadgeVariant(gravidade) {
@@ -110,9 +112,28 @@ function FichaTecnicaTimelineItem({
           </div>
         </div>
 
-        <span className="pt-1" style={{ color: 'var(--text-muted)' }}>
-          <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} />
-        </span>
+        <div className="flex shrink-0 items-center gap-2 pt-0.5">
+          <button
+            type="button"
+            title="Exportar PDF desta ocorrencia"
+            onClick={(e) => {
+              e.stopPropagation();
+              exportarOcorrenciaPDF(item.id);
+            }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-lg border text-xs transition hover:opacity-70"
+            style={{
+              borderColor: 'var(--border-soft)',
+              backgroundColor: 'var(--bg-surface-soft)',
+              color: 'var(--color-danger)',
+            }}
+          >
+            <FontAwesomeIcon icon={faFilePdf} />
+          </button>
+
+          <span style={{ color: 'var(--text-muted)' }}>
+            <FontAwesomeIcon icon={expandido ? faChevronUp : faChevronDown} />
+          </span>
+        </div>
       </button>
 
       {expandido ? (

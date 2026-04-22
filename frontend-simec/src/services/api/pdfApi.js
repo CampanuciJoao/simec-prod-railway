@@ -47,6 +47,12 @@ export const exportarBIPDF = () =>
     'BI_ESTRATEGICO_SIMEC.pdf'
   );
 
+export const exportarOcorrenciaPDF = (ocorrenciaId) =>
+  baixarPdf(
+    { url: `/pdfs/ocorrencia/${ocorrenciaId}`, method: 'get' },
+    'ocorrencia_SIMEC.pdf'
+  );
+
 export const exportarOSManutencaoPDF = (manutencaoId) =>
   baixarPdf(
     {

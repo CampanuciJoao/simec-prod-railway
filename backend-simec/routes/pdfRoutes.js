@@ -3,6 +3,7 @@ import { proteger } from '../middleware/authMiddleware.js';
 import {
   gerarPdfBIBuffer,
   gerarPdfHistoricoEquipamentoBuffer,
+  gerarPdfOcorrenciaBuffer,
   gerarPdfOSManutencaoBuffer,
   gerarPdfRelatorioBuffer,
 } from '../services/pdf/pdfDocumentService.js';
@@ -10,6 +11,7 @@ import {
   obterDadosPdfBI,
   obterDadosPdfHistoricoEquipamento,
   obterDadosPdfManutencao,
+  obterDadosPdfOcorrencia,
   obterDadosPdfRelatorio,
   obterDadosPdfRelatorioPorIds,
 } from '../services/pdf/pdfQueryService.js';
@@ -42,6 +44,8 @@ function mapErrorToResponse(res, error, fallbackMessage) {
     MANUTENCAO_ID_INVALIDO: [400, 'O id da manutencao e obrigatorio.'],
     MANUTENCAO_NAO_ENCONTRADA: [404, 'Manutencao nao encontrada.'],
     EQUIPAMENTO_NAO_ENCONTRADO: [404, 'Equipamento nao encontrado.'],
+    OCORRENCIA_ID_INVALIDO: [400, 'O id da ocorrencia e obrigatorio.'],
+    OCORRENCIA_NAO_ENCONTRADA: [404, 'Ocorrencia nao encontrada.'],
   };
 
   const [status, message] = knownStatus[error?.message] || [500, fallbackMessage];
@@ -109,6 +113,22 @@ router.post('/relatorio/manutencoes-ids', async (req, res) => {
   } catch (error) {
     console.error('[PDF_RELATORIO_IDS_ERROR]', error);
     return mapErrorToResponse(res, error, 'Erro ao gerar PDF do relatorio.');
+  }
+});
+
+router.get('/ocorrencia/:id', async (req, res) => {
+  try {
+    const ocorrencia = await obterDadosPdfOcorrencia({
+      tenantId: req.usuario.tenantId,
+      ocorrenciaId: req.params.id,
+    });
+    const buffer = await gerarPdfOcorrenciaBuffer(ocorrencia, getPdfOptions(req));
+    const tag = ocorrencia.equipamento?.tag || 'EQ';
+    const suffix = ocorrencia.id.slice(-6).toUpperCase();
+    return sendPdf(res, buffer, `ocorrencia_${tag}_${suffix}.pdf`);
+  } catch (error) {
+    console.error('[PDF_OCORRENCIA_ERROR]', error);
+    return mapErrorToResponse(res, error, 'Erro ao gerar PDF da ocorrencia.');
   }
 });
 

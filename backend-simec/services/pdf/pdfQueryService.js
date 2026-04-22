@@ -339,6 +339,25 @@ export async function obterDadosPdfRelatorioPorIds({ tenantId, ids = [] }) {
   };
 }
 
+export async function obterDadosPdfOcorrencia({ tenantId, ocorrenciaId }) {
+  if (!ocorrenciaId) throw new Error('OCORRENCIA_ID_INVALIDO');
+
+  const ocorrencia = await prisma.ocorrencia.findFirst({
+    where: { id: ocorrenciaId, tenantId },
+    include: {
+      equipamento: {
+        include: {
+          unidade: { select: { nomeSistema: true } },
+        },
+      },
+    },
+  });
+
+  if (!ocorrencia) throw new Error('OCORRENCIA_NAO_ENCONTRADA');
+
+  return ocorrencia;
+}
+
 export async function obterDadosPdfHistoricoEquipamento({
   tenantId,
   equipamentoId,

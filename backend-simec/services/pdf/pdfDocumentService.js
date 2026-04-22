@@ -542,3 +542,58 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
 
   return finalizeDocument(doc, 'OS SIMEC');
 }
+
+export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
+  const title = 'REGISTRO DE OCORRENCIA';
+  const doc = createDocument(title, options);
+  const { locale, timeZone } = options;
+
+  drawSectionTitle(doc, 'Equipamento');
+  drawInfoGrid(doc, [
+    { label: 'Modelo', value: ocorrencia.equipamento?.modelo },
+    { label: 'Numero de serie / TAG', value: ocorrencia.equipamento?.tag },
+    { label: 'Unidade', value: ocorrencia.equipamento?.unidade?.nomeSistema },
+  ], 3);
+
+  drawSectionTitle(doc, 'Identificacao do registro');
+  drawInfoGrid(doc, [
+    { label: 'Identificador unico', value: ocorrencia.id },
+    { label: 'Data do registro', value: formatDateTime(ocorrencia.data, locale, timeZone) },
+    { label: 'Tipo', value: ocorrencia.tipo },
+    { label: 'Gravidade', value: String(ocorrencia.gravidade || 'media').toUpperCase() },
+    { label: 'Origem', value: ocorrencia.origem || 'usuario' },
+    { label: 'Tecnico responsavel', value: ocorrencia.tecnico || 'N/A' },
+    { label: 'Status', value: ocorrencia.resolvido ? 'Resolvido' : 'Pendente' },
+    ocorrencia.resolvido
+      ? { label: 'Data resolucao', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) }
+      : { label: 'Aguardando', value: 'Sem resolucao registrada' },
+  ]);
+
+  drawSectionTitle(doc, 'Titulo');
+  drawParagraph(doc, ocorrencia.titulo);
+
+  drawSectionTitle(doc, 'Descricao');
+  drawParagraph(doc, ocorrencia.descricao || 'Sem descricao informada.');
+
+  if (ocorrencia.resolvido) {
+    drawSectionTitle(doc, 'Resolucao');
+    drawInfoGrid(doc, [
+      { label: 'Resolvido por', value: ocorrencia.tecnicoResolucao || 'N/A' },
+      { label: 'Data', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) },
+    ]);
+    drawParagraph(doc, ocorrencia.solucao || '-');
+  } else {
+    ensureSpace(doc, 90);
+    const signatureY = doc.y + 30;
+    doc.moveTo(50, signatureY).lineTo(230, signatureY).strokeColor(COLORS.slate500).stroke();
+    doc.moveTo(320, signatureY).lineTo(545, signatureY).stroke();
+    doc
+      .font('Helvetica')
+      .fontSize(9)
+      .fillColor(COLORS.slate700)
+      .text('Tecnico responsavel', 50, signatureY + 6)
+      .text('Responsavel pela unidade', 320, signatureY + 6);
+  }
+
+  return finalizeDocument(doc, 'Ocorrencia SIMEC');
+}
