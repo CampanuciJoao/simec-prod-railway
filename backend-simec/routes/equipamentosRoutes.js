@@ -2,6 +2,7 @@
 // Versão: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
+import { Prisma } from '@prisma/client';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
@@ -134,6 +135,232 @@ function agruparAnexosPorEquipamento(anexos = []) {
     acc[anexo.equipamentoId].push(anexo);
     return acc;
   }, {});
+}
+
+function buildEquipamentosSqlConditions(tenantId, query = {}, equipamentoAlias = 'e', unidadeAlias = 'u') {
+  const conditions = [Prisma.sql`${Prisma.raw(equipamentoAlias)}."tenantId" = ${tenantId}`];
+
+  const status = normalizarTextoOpcional(query?.status);
+  const tipo = normalizarTextoOpcional(query?.tipo);
+  const fabricante = normalizarTextoOpcional(query?.fabricante);
+  const unidadeId = normalizarTextoOpcional(query?.unidadeId);
+  const search = normalizarTextoOpcional(query?.search);
+
+  if (status) {
+    conditions.push(
+      Prisma.sql`${Prisma.raw(equipamentoAlias)}."status" = ${status}`
+    );
+  }
+
+  if (tipo) {
+    conditions.push(
+      Prisma.sql`${Prisma.raw(equipamentoAlias)}."tipo" = ${tipo}`
+    );
+  }
+
+  if (fabricante) {
+    conditions.push(
+      Prisma.sql`${Prisma.raw(equipamentoAlias)}."fabricante" = ${fabricante}`
+    );
+  }
+
+  if (unidadeId) {
+    conditions.push(
+      Prisma.sql`${Prisma.raw(equipamentoAlias)}."unidadeId" = ${unidadeId}`
+    );
+  }
+
+  if (search) {
+    const searchLike = `%${search}%`;
+    conditions.push(
+      Prisma.sql`(
+        ${Prisma.raw(equipamentoAlias)}."modelo" ILIKE ${searchLike}
+        OR ${Prisma.raw(equipamentoAlias)}."tag" ILIKE ${searchLike}
+        OR COALESCE(${Prisma.raw(equipamentoAlias)}."ae_title", '') ILIKE ${searchLike}
+        OR COALESCE(${Prisma.raw(unidadeAlias)}."nomeSistema", '') ILIKE ${searchLike}
+      )`
+    );
+  }
+
+  return conditions;
+}
+
+function buildEquipamentosSqlOrderBy(sortBy, sortDirection) {
+  const direction = sortDirection === 'desc' ? 'DESC' : 'ASC';
+
+  const sortableFields = {
+    modelo: 'e."modelo"',
+    tag: 'e."tag"',
+    tipo: 'e."tipo"',
+    fabricante: 'e."fabricante"',
+    status: 'e."status"',
+    dataInstalacao: 'e."data_instalacao"',
+    createdAt: 'e."createdAt"',
+    anoFabricacao: 'e."ano_fabricacao"',
+    unidade: 'u."nomeSistema"',
+  };
+
+  const column = sortableFields[sortBy] || sortableFields.modelo;
+  return Prisma.raw(`${column} ${direction}`);
+}
+
+async function listarEquipamentosFallbackRaw({
+  tenantId,
+  query,
+  page,
+  pageSize,
+  skip,
+  sortBy,
+  sortDirection,
+}) {
+  const conditions = buildEquipamentosSqlConditions(tenantId, query);
+  const whereClause = Prisma.sql`${Prisma.join(conditions, ' AND ')}`;
+
+  const [rawItems, totalRows, statusRows, tiposRows, fabricantesRows] =
+    await Promise.all([
+      prisma.$queryRaw`
+        SELECT
+          e."id",
+          e."tenantId",
+          e."tag",
+          e."modelo",
+          e."tipo",
+          e."setor",
+          e."fabricante",
+          e."ano_fabricacao" AS "anoFabricacao",
+          e."data_instalacao" AS "dataInstalacao",
+          e."status",
+          e."numero_patrimonio" AS "numeroPatrimonio",
+          e."registro_anvisa" AS "registroAnvisa",
+          e."ae_title" AS "aeTitle",
+          e."telefone_suporte" AS "telefoneSuporte",
+          e."observacoes",
+          e."unidadeId",
+          e."createdAt",
+          e."updatedAt",
+          u."id" AS "unidadeRefId",
+          u."nomeSistema" AS "unidadeNomeSistema"
+        FROM "equipamentos" e
+        LEFT JOIN "unidades" u
+          ON u."tenantId" = e."tenantId"
+         AND u."id" = e."unidadeId"
+        WHERE ${whereClause}
+        ORDER BY ${buildEquipamentosSqlOrderBy(sortBy, sortDirection)}
+        LIMIT ${pageSize}
+        OFFSET ${skip}
+      `,
+      prisma.$queryRaw`
+        SELECT COUNT(*)::int AS "total"
+        FROM "equipamentos" e
+        LEFT JOIN "unidades" u
+          ON u."tenantId" = e."tenantId"
+         AND u."id" = e."unidadeId"
+        WHERE ${whereClause}
+      `,
+      prisma.$queryRaw`
+        SELECT e."status", COUNT(*)::int AS "count"
+        FROM "equipamentos" e
+        LEFT JOIN "unidades" u
+          ON u."tenantId" = e."tenantId"
+         AND u."id" = e."unidadeId"
+        WHERE ${whereClause}
+        GROUP BY e."status"
+      `,
+      prisma.$queryRaw`
+        SELECT DISTINCT e."tipo"
+        FROM "equipamentos" e
+        WHERE e."tenantId" = ${tenantId}
+          AND e."tipo" IS NOT NULL
+        ORDER BY e."tipo" ASC
+      `,
+      prisma.$queryRaw`
+        SELECT DISTINCT e."fabricante"
+        FROM "equipamentos" e
+        WHERE e."tenantId" = ${tenantId}
+          AND e."fabricante" IS NOT NULL
+        ORDER BY e."fabricante" ASC
+      `,
+    ]);
+
+  const equipamentoIds = rawItems.map((item) => item.id).filter(Boolean);
+  const anexos = equipamentoIds.length
+    ? await prisma.$queryRaw`
+        SELECT
+          a."id",
+          a."equipamento_id" AS "equipamentoId",
+          a."nome_original" AS "nomeOriginal",
+          a."path",
+          a."tipo_mime" AS "tipoMime",
+          a."createdAt"
+        FROM "anexos" a
+        WHERE a."tenantId" = ${tenantId}
+          AND a."equipamento_id" IN (${Prisma.join(equipamentoIds)})
+        ORDER BY a."createdAt" DESC
+      `
+    : [];
+
+  const total = Number(totalRows?.[0]?.total || 0);
+  const anexosPorEquipamento = agruparAnexosPorEquipamento(anexos);
+  const items = rawItems.map((item) => ({
+    id: item.id,
+    tenantId: item.tenantId,
+    tag: item.tag,
+    modelo: item.modelo,
+    tipo: item.tipo,
+    setor: item.setor,
+    fabricante: item.fabricante,
+    anoFabricacao: item.anoFabricacao,
+    dataInstalacao: item.dataInstalacao,
+    status: item.status,
+    numeroPatrimonio: item.numeroPatrimonio,
+    registroAnvisa: item.registroAnvisa,
+    aeTitle: item.aeTitle,
+    telefoneSuporte: item.telefoneSuporte,
+    observacoes: item.observacoes,
+    unidadeId: item.unidadeId,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    unidade: item.unidadeRefId
+      ? {
+          id: item.unidadeRefId,
+          nomeSistema: item.unidadeNomeSistema,
+        }
+      : null,
+    anexos: anexosPorEquipamento[item.id] || [],
+  }));
+
+  const metricas = statusRows.reduce(
+    (acc, item) => {
+      acc.total = total;
+      if (item.status === 'Operante') acc.operantes = Number(item.count || 0);
+      if (item.status === 'EmManutencao') {
+        acc.emManutencao = Number(item.count || 0);
+      }
+      if (item.status === 'Inoperante') acc.inoperantes = Number(item.count || 0);
+      if (item.status === 'UsoLimitado') acc.usoLimitado = Number(item.count || 0);
+      return acc;
+    },
+    {
+      total,
+      operantes: 0,
+      emManutencao: 0,
+      inoperantes: 0,
+      usoLimitado: 0,
+    }
+  );
+
+  return {
+    items,
+    total,
+    page,
+    pageSize,
+    hasNextPage: skip + items.length < total,
+    filters: {
+      tipos: tiposRows.map((item) => item.tipo).filter(Boolean),
+      fabricantes: fabricantesRows.map((item) => item.fabricante).filter(Boolean),
+    },
+    metricas,
+  };
 }
 
 function isSameDateValue(a, b) {
@@ -452,7 +679,31 @@ router.get('/', async (req, res) => {
     });
   } catch (error) {
     console.error('[EQUIP_LIST_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao buscar equipamentos.' });
+
+    try {
+      const tenantId = req.usuario.tenantId;
+      const page = parsePositiveInt(req.query?.page, 1);
+      const pageSize = Math.min(parsePositiveInt(req.query?.pageSize, 20), 500);
+      const skip = (page - 1) * pageSize;
+      const sortBy = normalizarTextoOpcional(req.query?.sortBy) || 'modelo';
+      const sortDirection =
+        normalizarTextoOpcional(req.query?.sortDirection) || 'asc';
+
+      const fallbackResponse = await listarEquipamentosFallbackRaw({
+        tenantId,
+        query: req.query,
+        page,
+        pageSize,
+        skip,
+        sortBy,
+        sortDirection,
+      });
+
+      return res.json(fallbackResponse);
+    } catch (fallbackError) {
+      console.error('[EQUIP_LIST_FALLBACK_ERROR]', fallbackError);
+      return res.status(500).json({ message: 'Erro ao buscar equipamentos.' });
+    }
   }
 });
 
