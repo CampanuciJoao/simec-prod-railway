@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
+import { exportarOSManutencaoPDF } from '../../services/api/pdfApi';
 import { useModal } from '../shared/useModal';
 import { useManutencaoDetalhes } from './useManutencaoDetalhes';
 
@@ -156,7 +157,7 @@ export function useDetalhesManutencaoPage() {
   };
 
   const handlePrint = () => {
-    window.print();
+    exportarOSManutencaoPDF(manutencaoId);
   };
 
   const handleFormChange = (event) => {
