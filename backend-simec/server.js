@@ -7,6 +7,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
 import authRoutes from './routes/authRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
@@ -28,10 +29,12 @@ import superadminTenantsRoutes from './routes/superadminTenantsRoutes.js';
 import tenantSettingsRoutes from './routes/tenantSettingsRoutes.js';
 import helpRoutes from './routes/helpRoutes.js';
 import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
+import pacsRoutes from './routes/pacsRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
-import { iniciarJobsDeAlertas } from './services/queueService.js';
+import { iniciarJobsDeAlertas, iniciarJobsDoPacs } from './services/queueService.js';
+import { buildPacsSocketRoom } from './services/pacs/pacsRealtimeService.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -53,7 +56,34 @@ const io = new Server(httpServer, {
 
 global.io = io;
 
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+
+    if (!token || !process.env.JWT_SECRET) {
+      return next(new Error('SOCKET_UNAUTHORIZED'));
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.data.user = {
+      id: decoded.id,
+      tenantId: decoded.tenantId,
+    };
+
+    return next();
+  } catch (error) {
+    return next(new Error('SOCKET_UNAUTHORIZED'));
+  }
+});
+
 io.on('connection', (socket) => {
+  const userId = socket.data?.user?.id;
+  const tenantId = socket.data?.user?.tenantId;
+
+  if (tenantId && userId) {
+    socket.join(buildPacsSocketRoom(tenantId, userId));
+  }
+
   console.log(`[SOCKET] Navegador conectado ao SIMEC: ${socket.id}`);
 
   socket.on('disconnect', () => {
@@ -99,6 +129,7 @@ app.use('/api/bi', biRoutes);
 app.use('/api/pdf-data', pdfDataRoutes);
 app.use('/api/superadmin', superadminTenantsRoutes);
 app.use('/api/superadmin/help', superadminHelpRoutes);
+app.use('/api/tenant/pacs', pacsRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 
@@ -131,8 +162,10 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   try {
     await iniciarJobsDeAlertas();
     console.log('Jobs recorrentes de alertas inicializados com sucesso.');
+    await iniciarJobsDoPacs();
+    console.log('Jobs recorrentes de PACS inicializados com sucesso.');
   } catch (error) {
-    console.error('Erro ao iniciar jobs de alertas:', error.message);
+    console.error('Erro ao iniciar jobs iniciais:', error.message);
   }
 });
 

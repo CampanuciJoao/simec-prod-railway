@@ -15,6 +15,8 @@ const ESTADO_INICIAL = {
   status: 'Operante',
   numeroPatrimonio: '',
   registroAnvisa: '',
+  aeTitle: '',
+  telefoneSuporte: '',
   observacoes: '',
 };
 

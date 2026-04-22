@@ -41,6 +41,7 @@ const FichaTecnicaPage = React.lazy(() =>
 const SalvarEquipamentoPage = React.lazy(() =>
   import('@/pages/equipamentos/SalvarEquipamentoPage')
 );
+const PacsPage = React.lazy(() => import('@/pages/cadastros/PacsPage'));
 const ManutencoesPage = React.lazy(() =>
   import('@/pages/manutencoes/ManutencoesPage')
 );
@@ -173,6 +174,14 @@ function App() {
               element={
                 <AdminRoute>
                   <EmailsNotificacaoPage />
+                </AdminRoute>
+              }
+            />
+            <Route
+              path="cadastros/pacs"
+              element={
+                <AdminRoute>
+                  <PacsPage />
                 </AdminRoute>
               }
             />

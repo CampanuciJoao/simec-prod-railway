@@ -1,6 +1,29 @@
 // Ficheiro: backend-simec/validators/equipamentoValidator.js
 import { z } from 'zod';
 
+const aeTitleSchema = z
+  .string()
+  .trim()
+  .max(16, 'AE Title deve ter no maximo 16 caracteres.')
+  .regex(/^[A-Z0-9 _-]+$/, 'AE Title deve seguir o padrao DICOM.')
+  .nullable()
+  .optional()
+  .transform((value) => {
+    if (typeof value !== 'string') return null;
+    const normalized = value.trim().toUpperCase();
+    return normalized.length > 0 ? normalized : null;
+  });
+
+const optionalTextSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value) => {
+    if (typeof value !== 'string') return value ?? null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? trimmed : null;
+  });
+
 /**
  * Esquema de validação para CRIAÇÃO de equipamentos.
  * Define que campos como Modelo e Tag são obrigatórios ao cadastrar.
@@ -23,14 +46,16 @@ export const equipamentoSchema = z.object({
   }).default('Operante'),
 
   // Campos Opcionais: Podem ser nulos ou omitidos no formulário
-  numeroPatrimonio: z.string().nullable().optional(),
-  fabricante: z.string().nullable().optional(),
-  dataInstalacao: z.string().nullable().optional(),
-  tipo: z.string().nullable().optional(),
-  setor: z.string().nullable().optional(),
-  observacoes: z.string().nullable().optional(),
-  registroAnvisa: z.string().nullable().optional(),
-  anoFabricacao: z.string().nullable().optional(),
+  numeroPatrimonio: optionalTextSchema,
+  fabricante: optionalTextSchema,
+  dataInstalacao: optionalTextSchema,
+  tipo: optionalTextSchema,
+  setor: optionalTextSchema,
+  observacoes: optionalTextSchema,
+  registroAnvisa: optionalTextSchema,
+  anoFabricacao: optionalTextSchema,
+  aeTitle: aeTitleSchema,
+  telefoneSuporte: optionalTextSchema,
 });
 
 /**

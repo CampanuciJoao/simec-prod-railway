@@ -36,6 +36,9 @@ model Tenant {
   notasAndamento       NotaAndamento[]
   emailsNotificacao    EmailNotificacao[]
   notificacoesEnviadas NotificacaoEnviada[]
+  pacsConnections      PacsConnection[]
+  pacsIngestionRuns    PacsIngestionRun[]
+  pacsEquipmentFeatures PacsEquipmentFeatureDaily[]
   agentSessions        AgentSession[]
   agentMessages        AgentMessage[]
   userAgentMemories    UserAgentMemory[]
@@ -118,6 +121,8 @@ model Equipamento {
   status           StatusEquipamento @default(Operante)
   numeroPatrimonio String?           @map("numero_patrimonio")
   registroAnvisa   String?           @map("registro_anvisa")
+  aeTitle          String?           @map("ae_title")
+  telefoneSuporte  String?           @map("telefone_suporte")
   observacoes      String?
   unidadeId        String
   createdAt        DateTime          @default(now())
@@ -132,19 +137,98 @@ model Equipamento {
   seguros           Seguro[]
   contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
   historicoEventos  HistoricoAtivoEvento[]
+  pacsFeatures      PacsEquipmentFeatureDaily[]
 
   riskScore     Int?
   riskLevel     String?
   riskUpdatedAt DateTime?
 
   @@unique([tenantId, tag])
+  @@unique([tenantId, aeTitle])
   @@unique([tenantId, id])
   @@index([tenantId, unidadeId, status])
+  @@index([tenantId, aeTitle])
   @@index([tenantId, modelo])
   @@index([tenantId, tipo])
   @@index([tenantId, fabricante])
   @@index([tenantId, numeroPatrimonio])
   @@map("equipamentos")
+}
+
+model PacsConnection {
+  id          String   @id @default(uuid())
+  tenantId    String
+  nome        String
+  tipoAdapter String   @default("dicomweb_qido") @map("tipo_adapter")
+  baseUrl     String   @map("base_url")
+  credenciais String   @db.Text
+  ativo       Boolean  @default(true)
+  status      String   @default("pendente")
+  ultimoTeste DateTime? @map("ultimo_teste")
+  ultimoErro  String?  @map("ultimo_erro")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  runs   PacsIngestionRun[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, ativo])
+  @@map("pacs_connections")
+}
+
+model PacsIngestionRun {
+  id               String    @id @default(uuid())
+  tenantId         String
+  connectionId     String    @map("connection_id")
+  equipamentoId    String?   @map("equipamento_id")
+  status           String
+  janelaInicio     DateTime  @map("janela_inicio")
+  janelaFim        DateTime  @map("janela_fim")
+  estudosLidos     Int       @default(0) @map("estudos_lidos")
+  estudosAgregados Int       @default(0) @map("estudos_agregados")
+  latenciaMs       Int?      @map("latencia_ms")
+  erroResumo       String?   @map("erro_resumo")
+  metadataJson     String?   @db.Text @map("metadata_json")
+  iniciadoEm       DateTime  @default(now()) @map("iniciado_em")
+  concluidoEm      DateTime? @map("concluido_em")
+
+  tenant     Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  connection PacsConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, connectionId, iniciadoEm])
+  @@index([tenantId, equipamentoId, iniciadoEm])
+  @@index([tenantId, iniciadoEm])
+  @@map("pacs_ingestion_runs")
+}
+
+model PacsEquipmentFeatureDaily {
+  id                        String    @id @default(uuid())
+  tenantId                  String
+  equipamentoId             String    @map("equipamento_id")
+  data                      DateTime
+  volumeEstudos             Int       @default(0) @map("volume_estudos")
+  volumeSeries              Int       @default(0) @map("volume_series")
+  volumeInstancias          Int       @default(0) @map("volume_instancias")
+  duracaoMediaMinutos       Float?    @map("duracao_media_minutos")
+  duracaoVariancia          Float?    @map("duracao_variancia")
+  horarioPicoUso            Int?      @map("horario_pico_uso")
+  gapMaximoInatividade      Float?    @map("gap_maximo_inatividade")
+  disponibilidade           Float?
+  mixModalidades            String?   @db.Text @map("mix_modalidades")
+  tendenciaVsSemanaAnterior Float?    @map("tendencia_vs_semana_anterior")
+  anomalia                  Boolean   @default(false)
+  sinaisAnomalia            String?   @db.Text @map("sinais_anomalia")
+  createdAt                 DateTime  @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, equipamentoId, data])
+  @@index([tenantId, equipamentoId, data])
+  @@index([tenantId, data])
+  @@index([tenantId, anomalia, data])
+  @@map("pacs_equipment_feature_daily")
 }
 
 model Veiculo {

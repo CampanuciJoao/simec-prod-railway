@@ -73,6 +73,12 @@ function buildEquipamentosWhereClause(tenantId, query = {}) {
         },
       },
       {
+        aeTitle: {
+          contains: search,
+          mode: 'insensitive',
+        },
+      },
+      {
         unidade: {
           nomeSistema: {
             contains: search,
@@ -147,6 +153,8 @@ function coletarCamposAlterados(anterior, proximo) {
     ['anoFabricacao', 'Ano de fabricacao'],
     ['numeroPatrimonio', 'Numero de patrimonio'],
     ['registroAnvisa', 'Registro Anvisa'],
+    ['aeTitle', 'AE Title'],
+    ['telefoneSuporte', 'Telefone de suporte'],
     ['observacoes', 'Observacoes'],
   ];
 
@@ -611,6 +619,8 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
         anoFabricacao: true,
         numeroPatrimonio: true,
         registroAnvisa: true,
+        aeTitle: true,
+        telefoneSuporte: true,
         observacoes: true,
         dataInstalacao: true,
         status: true,

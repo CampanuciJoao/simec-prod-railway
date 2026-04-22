@@ -95,6 +95,16 @@ function TabVisaoGeral({ equipamento, editHref }) {
               label="Patrimonio"
               value={equipamento.numeroPatrimonio || 'N/A'}
             />
+            <InfoCard
+              icon={faMicrochip}
+              label="AE Title"
+              value={equipamento.aeTitle || 'N/A'}
+            />
+            <InfoCard
+              icon={faWrench}
+              label="Suporte tecnico"
+              value={equipamento.telefoneSuporte || 'N/A'}
+            />
           </ResponsiveGrid>
 
           <div className="flex justify-start">

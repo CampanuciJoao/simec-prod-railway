@@ -194,6 +194,33 @@ function EquipamentoForm({
         </div>
       </FormSection>
 
+      <FormSection
+        title="Integracao e suporte"
+        description="Campos operacionais usados na integracao PACS e no contato tecnico."
+      >
+        <ResponsiveGrid preset="form">
+          <Input
+            label="AE Title"
+            value={formData.aeTitle}
+            onChange={(e) =>
+              handleChange('aeTitle', e.target.value.toUpperCase())
+            }
+            placeholder="Ex.: CT_SCANNER_01"
+            maxLength={16}
+            hint="Vinculo primario para resolver estudos do PACS."
+          />
+
+          <Input
+            label="Telefone de suporte"
+            value={formData.telefoneSuporte}
+            onChange={(e) =>
+              handleChange('telefoneSuporte', e.target.value)
+            }
+            placeholder="Ex.: (65) 99999-9999"
+          />
+        </ResponsiveGrid>
+      </FormSection>
+
       <FormActions
         loading={submitting}
         onCancel={onCancel}
