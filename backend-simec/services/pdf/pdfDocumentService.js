@@ -582,18 +582,18 @@ export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
       { label: 'Data', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) },
     ]);
     drawParagraph(doc, ocorrencia.solucao || '-');
-  } else {
-    ensureSpace(doc, 90);
-    const signatureY = doc.y + 30;
-    doc.moveTo(50, signatureY).lineTo(230, signatureY).strokeColor(COLORS.slate500).stroke();
-    doc.moveTo(320, signatureY).lineTo(545, signatureY).stroke();
-    doc
-      .font('Helvetica')
-      .fontSize(9)
-      .fillColor(COLORS.slate700)
-      .text('Tecnico responsavel', 50, signatureY + 6)
-      .text('Responsavel pela unidade', 320, signatureY + 6);
   }
+
+  ensureSpace(doc, 90);
+  const signatureY = doc.y + 30;
+  doc.moveTo(50, signatureY).lineTo(230, signatureY).strokeColor(COLORS.slate500).stroke();
+  doc.moveTo(320, signatureY).lineTo(545, signatureY).stroke();
+  doc
+    .font('Helvetica')
+    .fontSize(9)
+    .fillColor(COLORS.slate700)
+    .text('Tecnico responsavel', 50, signatureY + 6)
+    .text('Responsavel pela unidade', 320, signatureY + 6);
 
   return finalizeDocument(doc, 'Ocorrencia SIMEC');
 }
