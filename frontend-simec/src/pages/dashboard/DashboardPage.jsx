@@ -123,6 +123,15 @@ function DashboardStatusList({ items = [] }) {
 
 const GRAVIDADE_TONE = { alta: 'danger', media: 'warning', baixa: 'default' };
 const GRAVIDADE_LABEL = { alta: 'Alta', media: 'Media', baixa: 'Baixa' };
+const GRAVIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
+const MAX_OCORRENCIAS_VISIVEIS = 5;
+
+function ordenarOcorrencias(lista) {
+  return [...lista].sort(
+    (a, b) =>
+      (GRAVIDADE_ORDEM[a.gravidade] ?? 3) - (GRAVIDADE_ORDEM[b.gravidade] ?? 3)
+  );
+}
 
 function OcorrenciaPendenteItem({ ocorrencia }) {
   const tone = GRAVIDADE_TONE[ocorrencia.gravidade] || 'default';
@@ -137,7 +146,7 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
 
   return (
     <Link
-      to={`/equipamentos/${ocorrencia.equipamento?.id}`}
+      to={`/equipamentos/ficha-tecnica/${ocorrencia.equipamento?.id}`}
       className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition hover:opacity-80"
       style={{
         backgroundColor: 'var(--bg-surface)',
@@ -332,13 +341,31 @@ function DashboardPage() {
               ) : null
             }
           >
-            {data.ocorrenciasPendentes.length > 0 ? (
-              <div className="space-y-2">
-                {data.ocorrenciasPendentes.map((oc) => (
-                  <OcorrenciaPendenteItem key={oc.id} ocorrencia={oc} />
-                ))}
-              </div>
-            ) : (
+            {data.ocorrenciasPendentes.length > 0 ? (() => {
+              const ordenadas = ordenarOcorrencias(data.ocorrenciasPendentes);
+              const visiveis = ordenadas.slice(0, MAX_OCORRENCIAS_VISIVEIS);
+              const restantes = ordenadas.length - visiveis.length;
+
+              return (
+                <div className="space-y-2">
+                  {visiveis.map((oc) => (
+                    <OcorrenciaPendenteItem key={oc.id} ocorrencia={oc} />
+                  ))}
+                  {restantes > 0 ? (
+                    <p
+                      className="pt-1 text-center text-xs"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      e mais{' '}
+                      <strong style={{ color: 'var(--color-danger)' }}>
+                        {restantes}
+                      </strong>{' '}
+                      ocorrencia(s) pendente(s) — acesse cada equipamento para ver.
+                    </p>
+                  ) : null}
+                </div>
+              );
+            })() : (
               <InlineEmptyState message="Nenhuma ocorrencia pendente. Parque sem registros em aberto." />
             )}
           </PageSection>
