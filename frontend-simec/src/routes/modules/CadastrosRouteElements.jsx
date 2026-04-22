@@ -1,4 +1,4 @@
-import { Route } from 'react-router-dom';
+import { Navigate, Route } from 'react-router-dom';
 
 import AdminRoute from '@/components/routes/AdminRoute';
 import {
@@ -24,7 +24,7 @@ function CadastrosRouteElements() {
       />
       <Route
         path="cadastros/equipamentos/adicionar"
-        element={<SalvarEquipamentoPage />}
+        element={<Navigate to="/equipamentos/adicionar" replace />}
       />
       <Route
         path="cadastros/equipamentos/editar/:equipamentoId"

@@ -203,7 +203,7 @@ export function useEquipamentosPage() {
   );
 
   const goToCreate = useCallback(() => {
-    navigate('/cadastros/equipamentos/adicionar');
+    navigate('/equipamentos/adicionar');
   }, [navigate]);
 
   const goToFichaTecnica = useCallback(

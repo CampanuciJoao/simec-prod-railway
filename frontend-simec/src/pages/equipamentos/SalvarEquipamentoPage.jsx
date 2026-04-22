@@ -25,7 +25,6 @@ function SalvarEquipamentoPage() {
     error,
     handleSave,
     goBackToEquipamentos,
-    goBackToCadastros,
   } = useSalvarEquipamentoPage();
 
   const title = isEditing ? 'Editar Equipamento' : 'Novo Equipamento';
@@ -33,16 +32,6 @@ function SalvarEquipamentoPage() {
 
   const actions = (
     <div className="flex flex-wrap gap-2">
-      <Button
-        type="button"
-        variant="secondary"
-        onClick={goBackToCadastros}
-        disabled={saving}
-      >
-        <FontAwesomeIcon icon={faArrowLeft} />
-        Voltar ao menu de cadastros
-      </Button>
-
       <Button
         type="button"
         variant="secondary"

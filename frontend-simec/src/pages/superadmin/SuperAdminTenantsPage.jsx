@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { faBuildingShield } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -45,7 +45,7 @@ function SuperAdminTenantsPage() {
   const [saving, setSaving] = useState(false);
   const [statusModalTenant, setStatusModalTenant] = useState(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const response = await listarTenants();
@@ -63,11 +63,11 @@ function SuperAdminTenantsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast, selectedTenant]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const selectedSummary = useMemo(
     () => items.find((item) => item.id === selectedTenant?.id) || selectedTenant,

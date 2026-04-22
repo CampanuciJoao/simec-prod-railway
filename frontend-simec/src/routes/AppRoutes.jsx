@@ -12,7 +12,7 @@ import SuperAdminRouteElements from '@/routes/modules/SuperAdminRouteElements';
 function AppRoutes({ isAuthenticated }) {
   return (
     <Routes>
-      <PublicRouteElements isAuthenticated={isAuthenticated} />
+      {PublicRouteElements({ isAuthenticated })}
 
       <Route
         path="/"
@@ -22,11 +22,11 @@ function AppRoutes({ isAuthenticated }) {
           </ProtectedRoute>
         }
       >
-        <CoreRouteElements />
-        <CadastrosRouteElements />
-        <OperacionalRouteElements />
-        <AdminRouteElements />
-        <SuperAdminRouteElements />
+        {CoreRouteElements()}
+        {CadastrosRouteElements()}
+        {OperacionalRouteElements()}
+        {AdminRouteElements()}
+        {SuperAdminRouteElements()}
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

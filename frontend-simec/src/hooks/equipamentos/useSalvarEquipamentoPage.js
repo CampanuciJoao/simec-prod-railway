@@ -82,10 +82,6 @@ export function useSalvarEquipamentoPage() {
     navigate('/equipamentos');
   }, [navigate]);
 
-  const goBackToCadastros = useCallback(() => {
-    navigate('/cadastros');
-  }, [navigate]);
-
   return {
     equipamentoId,
     isEditing,
@@ -95,7 +91,6 @@ export function useSalvarEquipamentoPage() {
     error,
     handleSave,
     goBackToEquipamentos,
-    goBackToCadastros,
     refetch: fetchEquipamento,
   };
 }

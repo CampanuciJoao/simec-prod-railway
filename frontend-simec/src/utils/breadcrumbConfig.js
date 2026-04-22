@@ -32,17 +32,15 @@ export function getBreadcrumbItems(pathname = '') {
     ];
   }
 
-  if (path.startsWith('/cadastros/equipamentos/adicionar')) {
+  if (path.startsWith('/equipamentos/adicionar')) {
     return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
       { label: 'Equipamentos', to: '/equipamentos' },
       { label: 'Novo Equipamento' },
     ];
   }
 
-  if (path.startsWith('/cadastros/equipamentos/editar')) {
+  if (path.startsWith('/equipamentos/editar')) {
     return [
-      { label: 'Cadastros Gerais', to: '/cadastros' },
       { label: 'Equipamentos', to: '/equipamentos' },
       { label: 'Editar Equipamento' },
     ];

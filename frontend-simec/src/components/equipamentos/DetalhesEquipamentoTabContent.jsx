@@ -13,13 +13,12 @@ function DetalhesEquipamentoTabContent({
   equipamento,
   equipamentoId,
   onRefresh,
-  onChangeTab,
 }) {
   const tabContentMap = {
     visaoGeral: (
       <TabVisaoGeral
         equipamento={equipamento}
-        editHref={`/cadastros/equipamentos/editar/${equipamentoId}`}
+        editHref={`/equipamentos/editar/${equipamentoId}`}
       />
     ),
     fichaTecnica: <TabFichaTecnica equipamentoId={equipamentoId} />,

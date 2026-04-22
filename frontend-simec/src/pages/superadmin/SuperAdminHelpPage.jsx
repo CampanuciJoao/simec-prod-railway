@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { faBookOpen } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -35,7 +35,7 @@ function SuperAdminHelpPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const response = await listarHelpArticlesAdmin();
@@ -45,11 +45,11 @@ function SuperAdminHelpPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [addToast]);
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const handleSelect = (item) => {
     setSelected(item);

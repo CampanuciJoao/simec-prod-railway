@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import {
   faBuilding,
   faEnvelope,
-  faMicrochip,
   faPlus,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
@@ -21,13 +20,6 @@ function CadastrosGeraisPage() {
       description: 'Gerencie as unidades cadastradas no sistema.',
       tone: 'blue',
       path: '/cadastros/unidades',
-    },
-    {
-      icon: faMicrochip,
-      title: 'Equipamentos',
-      description: 'Cadastre e mantenha o parque de equipamentos.',
-      tone: 'green',
-      path: '/cadastros/equipamentos/adicionar',
     },
     {
       icon: faUsers,
@@ -54,7 +46,7 @@ function CadastrosGeraisPage() {
           icon={faPlus}
         />
 
-        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
           {cadastros.map((item) => (
             <CadastroNavigationCard
               key={item.title}

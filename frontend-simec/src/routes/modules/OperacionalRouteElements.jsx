@@ -13,6 +13,7 @@ import {
   ManutencoesPage,
   RelatoriosPage,
   SalvarContratoPage,
+  SalvarEquipamentoPage,
   SalvarManutencaoPage,
   SalvarSeguroPage,
   SegurosPage,
@@ -22,6 +23,11 @@ function OperacionalRouteElements() {
   return (
     <>
       <Route path="equipamentos" element={<EquipamentosPage />} />
+      <Route path="equipamentos/adicionar" element={<SalvarEquipamentoPage />} />
+      <Route
+        path="equipamentos/editar/:equipamentoId"
+        element={<SalvarEquipamentoPage />}
+      />
       <Route
         path="equipamentos/detalhes/:equipamentoId"
         element={<DetalhesEquipamentoPage />}

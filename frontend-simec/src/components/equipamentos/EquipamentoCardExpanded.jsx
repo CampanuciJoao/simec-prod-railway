@@ -31,7 +31,7 @@ function EquipamentoCardExpanded({
     visaoGeral: (
       <TabVisaoGeral
         equipamento={equipamento}
-        editHref={`/cadastros/equipamentos/editar/${equipamento.id}`}
+        editHref={`/equipamentos/editar/${equipamento.id}`}
       />
     ),
     fichaTecnica: <TabFichaTecnica equipamentoId={equipamento.id} />,

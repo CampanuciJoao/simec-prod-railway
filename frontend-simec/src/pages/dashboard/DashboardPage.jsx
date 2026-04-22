@@ -10,7 +10,6 @@ import {
   faHeartbeat,
   faRotateRight,
   faShieldHeart,
-  faTriangleExclamation,
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 

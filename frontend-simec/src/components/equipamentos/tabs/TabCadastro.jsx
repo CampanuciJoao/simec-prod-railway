@@ -102,9 +102,7 @@ function TabCadastro({ equipamentoInicial }) {
             <Button
               type="button"
               size="sm"
-              onClick={() =>
-                navigate(`/cadastros/equipamentos/editar/${equipamentoInicial.id}`)
-              }
+              onClick={() => navigate(`/equipamentos/editar/${equipamentoInicial.id}`)}
             >
               <FontAwesomeIcon icon={faEdit} />
               Editar cadastro
