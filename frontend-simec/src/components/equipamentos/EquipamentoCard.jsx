@@ -3,14 +3,14 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFileMedical } from '@fortawesome/free-solid-svg-icons';
 
-import { Button, EntityCard } from '@/components/ui';
+import { EntityCard } from '@/components/ui';
 import { StatusSelector } from '@/components/equipamentos';
 import EquipamentoCardExpanded from '@/components/equipamentos/EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '@/utils/equipamentoCardStyles';
 
 function Col({ label, value, bold = false }) {
   return (
-    <div className="flex min-w-0 flex-col gap-0.5">
+    <div className="flex min-w-0 flex-1 flex-col gap-0.5">
       <span
         className="text-[10px] font-semibold uppercase tracking-widest"
         style={{ color: 'var(--text-muted)' }}
@@ -59,30 +59,24 @@ function EquipamentoCard({
       toggleStyle={toggleStyle}
       expandedStyle={expandedStyle}
       actions={
-        <Button
+        <button
           type="button"
-          variant="secondary"
-          size="sm"
           title="Abrir ficha tecnica"
           onClick={handleGoToFicha}
-          style={{
-            '--button-bg': 'var(--bg-surface)',
-            '--button-bg-hover': 'var(--bg-hover)',
-            '--button-text': 'var(--text-primary)',
-            '--button-border': 'var(--border-soft)',
-          }}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm transition-all hover:-translate-y-[1px]"
+          style={toggleStyle}
         >
           <FontAwesomeIcon icon={faFileMedical} />
-        </Button>
+        </button>
       }
       summary={
-        <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
+        <div className="flex w-full items-start gap-4">
           <Col label="Modelo" value={equipamento.modelo} bold />
           <Col label="Nº Série / Tag" value={equipamento.tag} />
           <Col label="Tipo" value={equipamento.tipo} />
           <Col label="Unidade" value={equipamento.unidade?.nomeSistema} />
 
-          <div className="ml-auto flex flex-col gap-0.5">
+          <div className="flex w-[180px] shrink-0 flex-col gap-0.5">
             <span
               className="text-[10px] font-semibold uppercase tracking-widest"
               style={{ color: 'var(--text-muted)' }}
