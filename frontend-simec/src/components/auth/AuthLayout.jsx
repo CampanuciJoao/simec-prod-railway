@@ -31,7 +31,7 @@ function AuthLayout({ children }) {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.2),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(16,185,129,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.14),transparent_26%)]" />
 
           <div className="relative z-10 flex h-full w-full flex-col justify-between px-12 py-12 text-white xl:px-16">
-            <div className="max-w-2xl space-y-10">
+            <div className="max-w-2xl space-y-12">
               <img src={logoSimec} alt="SIMEC" className="max-w-[220px]" />
 
               <div className="space-y-5">
@@ -44,18 +44,19 @@ function AuthLayout({ children }) {
                 </h1>
 
                 <p className="max-w-xl text-base leading-7 text-slate-300 xl:text-lg">
-                  Centralize operacao, historico tecnico, contratos, seguros e
-                  indicadores em uma experiencia unica, clara e pronta para crescer.
+                  Centralize a operacao, o historico tecnico, os contratos, os
+                  seguros e os indicadores em uma experiencia unica, clara e
+                  pronta para crescer.
                 </p>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-3">
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
                     Organizacao
                   </div>
                   <div className="mt-2 text-sm font-semibold text-white">
-                    Equipamentos, agendas e historico em um unico lugar
+                    Equipamentos, agendas e historico tecnico em um unico lugar
                   </div>
                 </div>
 
@@ -79,9 +80,9 @@ function AuthLayout({ children }) {
               </div>
             </div>
 
-            <div className="max-w-xl rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-300 backdrop-blur">
-              Uma plataforma desenhada para dar mais previsibilidade, padrao e
-              confianca a toda a rotina da engenharia clinica.
+            <div className="mt-10 max-w-xl rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-300 backdrop-blur">
+              Uma plataforma desenhada para trazer mais previsibilidade,
+              padrao e confianca para a rotina da engenharia clinica.
             </div>
           </div>
         </section>

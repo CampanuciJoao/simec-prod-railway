@@ -34,7 +34,7 @@ function LoginForm({
         value={tenant}
         onChange={(event) => onChangeTenant(event.target.value)}
         placeholder="Informe sua empresa"
-        hint="Use o acesso da empresa liberado para a sua equipe."
+        hint="Use o acesso liberado para a empresa da sua equipe."
         leadingIcon={<FontAwesomeIcon icon={faBuilding} />}
         disabled={loading}
         required

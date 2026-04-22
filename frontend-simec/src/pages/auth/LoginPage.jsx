@@ -58,7 +58,8 @@ function LoginPage() {
                 style={{ color: '#64748b' }}
               >
                 Acesse sua area de trabalho para acompanhar ativos,
-                manutencoes, contratos e indicadores em um unico ambiente.
+                manutencoes, contratos e indicadores em um unico ambiente de
+                operacao.
               </p>
             </div>
           </div>
@@ -94,10 +95,10 @@ function LoginPage() {
 
             <Link
               to="/recuperar-senha"
-              className="text-sm font-medium transition-opacity hover:opacity-80"
-              style={{ color: '#2563eb' }}
-            >
-              Esqueceu sua senha?
+            className="text-sm font-medium transition-opacity hover:opacity-80"
+            style={{ color: '#2563eb' }}
+          >
+            Esqueceu sua senha?
             </Link>
           </div>
         </div>
