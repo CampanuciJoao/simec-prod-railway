@@ -5,9 +5,7 @@ import {
   faArrowRight,
   faBell,
   faChartPie,
-  faClipboardList,
   faFileContract,
-  faGaugeHigh,
   faHospital,
   faRotateRight,
   faScrewdriverWrench,
@@ -25,75 +23,6 @@ import {
 import { AlertListItem } from '@/components/dashboard';
 import BarChart from '@/components/charts/BarChart';
 import DonutChart from '@/components/charts/DonutChart';
-
-function DashboardPrimaryCard({
-  icon,
-  title,
-  value,
-  helper,
-  emphasis = 'default',
-}) {
-  const emphasisMap = {
-    default: {
-      accent: 'var(--brand-primary)',
-      accentSurface: 'var(--brand-primary-soft)',
-    },
-    success: {
-      accent: 'var(--color-success)',
-      accentSurface: 'var(--color-success-soft)',
-    },
-    warning: {
-      accent: 'var(--color-warning)',
-      accentSurface: 'var(--color-warning-soft)',
-    },
-    danger: {
-      accent: 'var(--color-danger)',
-      accentSurface: 'var(--color-danger-soft)',
-    },
-  };
-
-  const palette = emphasisMap[emphasis] || emphasisMap.default;
-
-  return (
-    <div
-      className="rounded-3xl border p-5"
-      style={{
-        backgroundColor: 'var(--bg-surface)',
-        borderColor: 'var(--border-soft)',
-      }}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-          style={{
-            backgroundColor: palette.accentSurface,
-            color: palette.accent,
-          }}
-        >
-          <FontAwesomeIcon icon={icon} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p
-            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            {title}
-          </p>
-          <p
-            className="mt-3 text-4xl font-bold leading-none tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {value}
-          </p>
-          <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-            {helper}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
   const toneMap = {
@@ -395,23 +324,37 @@ function DashboardPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
-          <DashboardPrimaryCard
-            icon={faGaugeHigh}
-            title="Disponibilidade do parque"
-            value={`${resumo.disponibilidade}%`}
-            helper={`${resumo.ativos} ativos de ${resumo.totalEquipamentos} equipamentos monitorados.`}
-            emphasis={resumo.disponibilidade >= 85 ? 'success' : 'warning'}
-          />
-
-          <DashboardPrimaryCard
-            icon={faClipboardList}
-            title="Carga operacional recente"
-            value={resumo.manutencoesPeriodo}
-            helper={`Media de ${resumo.manutencaoMedia} ordens por periodo consolidado no painel.`}
-            emphasis={resumo.emManutencao > 0 ? 'warning' : 'default'}
-          />
-        </div>
+        <PageSection
+          title="Resumo executivo"
+          description="Leituras-chave para orientar a proxima acao da equipe."
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <DashboardMetricPill
+              label="Ativos operantes"
+              value={resumo.ativos}
+              helper="Equipamentos disponiveis para operacao."
+              tone="success"
+            />
+            <DashboardMetricPill
+              label="Intervencoes abertas"
+              value={resumo.emManutencao}
+              helper="Ordens que ainda exigem acompanhamento."
+              tone={resumo.emManutencao > 0 ? 'warning' : 'default'}
+            />
+            <DashboardMetricPill
+              label="Contratos em atencao"
+              value={resumo.contratosVencendo}
+              helper="Coberturas proximas do vencimento."
+              tone={resumo.contratosVencendo > 0 ? 'warning' : 'default'}
+            />
+            <DashboardMetricPill
+              label="Alertas criticos"
+              value={resumo.alertasCriticos}
+              helper="Casos que merecem priorizacao imediata."
+              tone={resumo.alertasCriticos > 0 ? 'danger' : 'info'}
+            />
+          </div>
+        </PageSection>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <PageSection
@@ -491,37 +434,6 @@ function DashboardPage() {
           </PageSection>
         </div>
 
-        <PageSection
-          title="Resumo executivo"
-          description="Leituras-chave para orientar a proxima acao da equipe."
-        >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DashboardMetricPill
-              label="Ativos operantes"
-              value={resumo.ativos}
-              helper="Equipamentos disponiveis para operacao."
-              tone="success"
-            />
-            <DashboardMetricPill
-              label="Intervencoes abertas"
-              value={resumo.emManutencao}
-              helper="Ordens que ainda exigem acompanhamento."
-              tone={resumo.emManutencao > 0 ? 'warning' : 'default'}
-            />
-            <DashboardMetricPill
-              label="Contratos em atencao"
-              value={resumo.contratosVencendo}
-              helper="Coberturas proximas do vencimento."
-              tone={resumo.contratosVencendo > 0 ? 'warning' : 'default'}
-            />
-            <DashboardMetricPill
-              label="Alertas criticos"
-              value={resumo.alertasCriticos}
-              helper="Casos que merecem priorizacao imediata."
-              tone={resumo.alertasCriticos > 0 ? 'danger' : 'info'}
-            />
-          </div>
-        </PageSection>
       </div>
     </PageLayout>
   );
