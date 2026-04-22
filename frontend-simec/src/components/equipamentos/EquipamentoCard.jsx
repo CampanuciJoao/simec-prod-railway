@@ -18,7 +18,7 @@ function Col({ label, value, bold = false }) {
         {label}
       </span>
       <span
-        className="truncate text-sm"
+        className="truncate text-base"
         style={{
           color: 'var(--text-primary)',
           fontWeight: bold ? 700 : 600,
@@ -70,7 +70,7 @@ function EquipamentoCard({
         </button>
       }
       summary={
-        <div className="flex w-full items-start gap-4">
+        <div className="flex w-full items-center gap-4">
           <Col label="Modelo" value={equipamento.modelo} bold />
           <Col label="Nº Série / Tag" value={equipamento.tag} />
           <Col label="Tipo" value={equipamento.tipo} />
