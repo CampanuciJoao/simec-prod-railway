@@ -7,6 +7,7 @@ import {
   getUnidades,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 
 const PAGE_SIZE = 12;
 
@@ -124,7 +125,12 @@ export const useEquipamentos = () => {
           hasNextPage: Boolean(response?.hasNextPage),
         });
       } catch (err) {
-        setError(err);
+        const errorMessage = getErrorMessage(
+          err,
+          'Erro ao carregar dados dos equipamentos.'
+        );
+
+        setError(errorMessage);
         if (!append) {
           setEquipamentos([]);
           setMetricas({
@@ -135,7 +141,7 @@ export const useEquipamentos = () => {
             usoLimitado: 0,
           });
         }
-        addToast('Erro ao carregar dados dos equipamentos.', 'error');
+        addToast(errorMessage, 'error');
       } finally {
         setLoading(false);
         setLoadingMore(false);

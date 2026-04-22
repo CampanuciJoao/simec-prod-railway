@@ -80,9 +80,11 @@ function buildEquipamentosWhereClause(tenantId, query = {}) {
       },
       {
         unidade: {
-          nomeSistema: {
-            contains: search,
-            mode: 'insensitive',
+          is: {
+            nomeSistema: {
+              contains: search,
+              mode: 'insensitive',
+            },
           },
         },
       },

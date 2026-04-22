@@ -5,30 +5,157 @@ import {
   faArrowRight,
   faBell,
   faChartPie,
-  faClock,
+  faClipboardList,
   faFileContract,
-  faHeartbeat,
+  faGaugeHigh,
+  faHospital,
   faRotateRight,
-  faShieldHeart,
-  faWrench,
+  faScrewdriverWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useDashboard } from '@/hooks/dashboard/useDashboard';
 import {
   Button,
   InlineEmptyState,
-  KpiCard,
   PageHeader,
   PageLayout,
   PageSection,
   PageState,
-  ResponsiveGrid,
 } from '@/components/ui';
 import { AlertListItem } from '@/components/dashboard';
 import BarChart from '@/components/charts/BarChart';
 import DonutChart from '@/components/charts/DonutChart';
 
-function DashboardMetricPill({ label, value, tone = 'default' }) {
+function DashboardPrimaryCard({
+  icon,
+  title,
+  value,
+  helper,
+  emphasis = 'default',
+}) {
+  const emphasisMap = {
+    default: {
+      accent: 'var(--brand-primary)',
+      accentSurface: 'var(--brand-primary-soft)',
+    },
+    success: {
+      accent: 'var(--color-success)',
+      accentSurface: 'var(--color-success-soft)',
+    },
+    warning: {
+      accent: 'var(--color-warning)',
+      accentSurface: 'var(--color-warning-soft)',
+    },
+    danger: {
+      accent: 'var(--color-danger)',
+      accentSurface: 'var(--color-danger-soft)',
+    },
+  };
+
+  const palette = emphasisMap[emphasis] || emphasisMap.default;
+
+  return (
+    <div
+      className="rounded-3xl border p-5"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex items-start gap-4">
+        <div
+          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: palette.accentSurface,
+            color: palette.accent,
+          }}
+        >
+          <FontAwesomeIcon icon={icon} />
+        </div>
+
+        <div className="min-w-0 flex-1">
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {title}
+          </p>
+          <p
+            className="mt-3 text-4xl font-bold leading-none tracking-tight"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {value}
+          </p>
+          <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
+            {helper}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
+  const toneMap = {
+    default: {
+      iconSurface: 'var(--brand-primary-soft)',
+      iconText: 'var(--brand-primary)',
+    },
+    success: {
+      iconSurface: 'var(--color-success-soft)',
+      iconText: 'var(--color-success)',
+    },
+    warning: {
+      iconSurface: 'var(--color-warning-soft)',
+      iconText: 'var(--color-warning)',
+    },
+    danger: {
+      iconSurface: 'var(--color-danger-soft)',
+      iconText: 'var(--color-danger)',
+    },
+  };
+
+  const resolvedTone = toneMap[tone] || toneMap.default;
+
+  return (
+    <div
+      className="rounded-2xl border px-4 py-4"
+      style={{
+        backgroundColor: 'var(--bg-surface-soft)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+          style={{
+            backgroundColor: resolvedTone.iconSurface,
+            color: resolvedTone.iconText,
+          }}
+        >
+          <FontAwesomeIcon icon={icon} />
+        </div>
+
+        <div className="min-w-0">
+          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+            {label}
+          </p>
+          <p
+            className="mt-2 text-2xl font-bold leading-none"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {value}
+          </p>
+          <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>
+            {helper}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DashboardMetricPill({ label, value, helper, tone = 'default' }) {
   const toneMap = {
     default: {
       bg: 'var(--bg-surface-subtle)',
@@ -84,48 +211,89 @@ function DashboardMetricPill({ label, value, tone = 'default' }) {
       >
         {value}
       </p>
+      <p className="mt-2 text-sm leading-6" style={{ color: resolvedTone.text }}>
+        {helper}
+      </p>
     </div>
   );
 }
 
-function DashboardMiniStat({ icon, label, value, helper }) {
-  return (
-    <div
-      className="flex items-start gap-3 rounded-2xl border px-4 py-4"
-      style={{
-        backgroundColor: 'var(--bg-surface-soft)',
-        borderColor: 'var(--border-soft)',
-      }}
-    >
-      <div
-        className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-        style={{
-          backgroundColor: 'var(--brand-primary-soft)',
-          color: 'var(--brand-primary)',
-        }}
-      >
-        <FontAwesomeIcon icon={icon} />
-      </div>
+function DashboardStatusList({ items = [] }) {
+  if (!items.length) {
+    return <InlineEmptyState message="Sem consolidacao de status disponivel." />;
+  }
 
-      <div className="min-w-0">
-        <p
-          className="text-sm font-medium"
-          style={{ color: 'var(--text-primary)' }}
+  return (
+    <div className="space-y-3">
+      {items.map((item) => (
+        <div
+          key={item.name}
+          className="flex items-center justify-between gap-4 rounded-2xl border px-4 py-3"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-soft)',
+          }}
         >
-          {label}
-        </p>
-        <p
-          className="mt-2 text-2xl font-bold leading-none"
-          style={{ color: 'var(--text-primary)' }}
-        >
-          {value}
-        </p>
-        {helper ? (
-          <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-            {helper}
-          </p>
-        ) : null}
-      </div>
+          <div className="min-w-0">
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              {item.name}
+            </p>
+            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              {item.value === 1 ? '1 equipamento' : `${item.value} equipamentos`}
+            </p>
+          </div>
+          <span
+            className="text-2xl font-bold leading-none"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {item.value}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function DashboardActionQueue({ resumo }) {
+  const items = [
+    {
+      icon: faBell,
+      label: 'Alertas ativos',
+      value: resumo.alertasAtivos,
+      helper:
+        resumo.alertasCriticos > 0
+          ? `${resumo.alertasCriticos} em prioridade alta`
+          : 'Nenhum alerta critico no momento',
+      tone: resumo.alertasCriticos > 0 ? 'danger' : 'default',
+    },
+    {
+      icon: faScrewdriverWrench,
+      label: 'OS em andamento',
+      value: resumo.emManutencao,
+      helper: 'Ordens abertas que pressionam a disponibilidade do parque.',
+      tone: resumo.emManutencao > 0 ? 'warning' : 'default',
+    },
+    {
+      icon: faFileContract,
+      label: 'Cobertura em atencao',
+      value: resumo.contratosVencendo,
+      helper: 'Contratos que pedem acompanhamento de vigencia.',
+      tone: resumo.contratosVencendo > 0 ? 'warning' : 'default',
+    },
+    {
+      icon: faHospital,
+      label: 'Ativos restritos',
+      value: resumo.inativos,
+      helper: 'Equipamentos fora de operacao ou em uso limitado.',
+      tone: resumo.inativos > 0 ? 'danger' : 'success',
+    },
+  ];
+
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {items.map((item) => (
+        <DashboardMiniStat key={item.label} {...item} />
+      ))}
     </div>
   );
 }
@@ -153,7 +321,11 @@ function DashboardPage() {
         : 0;
     const principalStatus = [...(data.statusEquipamentos || [])]
       .sort((a, b) => Number(b?.value || 0) - Number(a?.value || 0))
-      .slice(0, 3);
+      .slice(0, 4);
+    const manutencaoMedia =
+      data.manutencoesPorTipo?.length > 0
+        ? Math.round(manutencoesPeriodo / data.manutencoesPorTipo.length)
+        : 0;
 
     return {
       totalEquipamentos,
@@ -163,6 +335,7 @@ function DashboardPage() {
       contratosVencendo,
       alertasAtivos,
       manutencoesPeriodo,
+      manutencaoMedia,
       alertasCriticos,
       disponibilidade,
       principalStatus,
@@ -186,7 +359,7 @@ function DashboardPage() {
         <div className="space-y-6">
           <PageHeader
             title="Dashboard"
-            subtitle="Acompanhe equipamentos, manutencoes e alertas em tempo real."
+            subtitle="Resumo operacional do parque, manutencoes e alertas."
             icon={faChartPie}
             actions={
               <Button type="button" variant="secondary" onClick={recarregar}>
@@ -212,7 +385,7 @@ function DashboardPage() {
       <div className="space-y-6 lg:space-y-8">
         <PageHeader
           title="Dashboard"
-          subtitle="Leitura executiva do parque, manutencoes e alertas com foco operacional."
+          subtitle="Leitura rapida do que exige atencao operacional agora."
           icon={faChartPie}
           actions={
             <Button type="button" variant="secondary" onClick={recarregar}>
@@ -222,206 +395,58 @@ function DashboardPage() {
           }
         />
 
-        <ResponsiveGrid cols={{ base: 1, sm: 2, xl: 4 }}>
-          <KpiCard
-            to="/equipamentos"
-            icon={faHeartbeat}
-            title="Equipamentos"
-            value={resumo.totalEquipamentos}
-            subtitle={`${resumo.ativos} operantes no momento`}
-            tone="green"
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
+          <DashboardPrimaryCard
+            icon={faGaugeHigh}
+            title="Disponibilidade do parque"
+            value={`${resumo.disponibilidade}%`}
+            helper={`${resumo.ativos} ativos de ${resumo.totalEquipamentos} equipamentos monitorados.`}
+            emphasis={resumo.disponibilidade >= 85 ? 'success' : 'warning'}
           />
-          <KpiCard
-            to="/manutencoes"
-            icon={faWrench}
-            title="Em manutencao"
-            value={resumo.emManutencao}
-            subtitle="Ordens em andamento no parque"
-            tone="yellow"
-          />
-          <KpiCard
-            to="/alertas"
-            icon={faBell}
-            title="Alertas ativos"
-            value={resumo.alertasAtivos}
-            subtitle={`${resumo.alertasCriticos} em prioridade alta`}
-            tone="red"
-          />
-          <KpiCard
-            to="/contratos"
-            icon={faFileContract}
-            title="Contratos vencendo"
-            value={resumo.contratosVencendo}
-            subtitle="Vigencias proximas de atencao"
-            tone="blue"
-          />
-        </ResponsiveGrid>
 
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
+          <DashboardPrimaryCard
+            icon={faClipboardList}
+            title="Carga operacional recente"
+            value={resumo.manutencoesPeriodo}
+            helper={`Media de ${resumo.manutencaoMedia} ordens por periodo consolidado no painel.`}
+            emphasis={resumo.emManutencao > 0 ? 'warning' : 'default'}
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <PageSection
-            title="Panorama operacional"
-            description="Visao rapida do estado atual do parque e da pressao operacional."
+            title="Fila de atencao"
+            description="Itens que ajudam a priorizar a operacao sem repetir o mesmo indicador em varios cards."
           >
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(280px,340px)]">
-              <div className="space-y-5">
-                <div
-                  className="rounded-3xl border p-4 md:p-5"
-                  style={{
-                    backgroundColor: 'var(--bg-surface-soft)',
-                    borderColor: 'var(--border-soft)',
-                  }}
-                >
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                    <DashboardMetricPill
-                      label="Disponibilidade"
-                      value={`${resumo.disponibilidade}%`}
-                      tone={resumo.disponibilidade >= 85 ? 'success' : 'warning'}
-                    />
-                    <DashboardMetricPill
-                      label="Ativos"
-                      value={resumo.ativos}
-                      tone="success"
-                    />
-                    <DashboardMetricPill
-                      label="Inativos"
-                      value={resumo.inativos}
-                      tone={resumo.inativos > 0 ? 'danger' : 'default'}
-                    />
-                    <DashboardMetricPill
-                      label="Alertas criticos"
-                      value={resumo.alertasCriticos}
-                      tone={resumo.alertasCriticos > 0 ? 'danger' : 'info'}
-                    />
-                  </div>
-                </div>
-
-                <ResponsiveGrid cols={{ base: 1, md: 2 }}>
-                  <DashboardMiniStat
-                    icon={faClock}
-                    label="Carga de manutencao recente"
-                    value={resumo.manutencoesPeriodo}
-                    helper="Ordens registradas no periodo observado pelo dashboard."
-                  />
-                  <DashboardMiniStat
-                    icon={faShieldHeart}
-                    label="Cobertura em atencao"
-                    value={resumo.contratosVencendo}
-                    helper="Contratos que pedem acompanhamento nos proximos 30 dias."
-                  />
-                </ResponsiveGrid>
-              </div>
-
-              <div
-                className="rounded-3xl border p-4 md:p-5"
-                style={{
-                  backgroundColor: 'var(--bg-surface-soft)',
-                  borderColor: 'var(--border-soft)',
-                }}
-              >
-                <div className="flex h-full flex-col">
-                  <div>
-                    <h3
-                      className="text-sm font-semibold uppercase tracking-[0.14em]"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      Leitura dominante do parque
-                    </h3>
-                    <p
-                      className="mt-2 text-base font-semibold"
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      Status mais representativos neste momento
-                    </p>
-                  </div>
-
-                  <div className="mt-5 space-y-3">
-                    {resumo.principalStatus.length > 0 ? (
-                      resumo.principalStatus.map((item) => (
-                        <div
-                          key={item.name}
-                          className="flex items-center justify-between gap-4 rounded-2xl border px-4 py-3"
-                          style={{
-                            backgroundColor: 'var(--bg-surface)',
-                            borderColor: 'var(--border-soft)',
-                          }}
-                        >
-                          <span
-                            className="text-sm font-medium"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {item.name}
-                          </span>
-                          <span
-                            className="text-lg font-bold"
-                            style={{ color: 'var(--text-primary)' }}
-                          >
-                            {item.value}
-                          </span>
-                        </div>
-                      ))
-                    ) : (
-                      <InlineEmptyState message="Sem status consolidados no momento." />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
+            <DashboardActionQueue resumo={resumo} />
           </PageSection>
 
           <PageSection
-            title="Status dos equipamentos"
-            description="Distribuicao atual por condicao operacional."
+            title="Leitura do parque"
+            description="Distribuicao atual por status operacional e peso relativo no momento."
           >
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(220px,260px)] xl:grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(220px,260px)]">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
               <div
-                className="flex min-h-[280px] items-center justify-center rounded-3xl border p-3"
+                className="flex min-h-[260px] items-center justify-center rounded-3xl border p-4"
                 style={{
                   borderColor: 'var(--border-soft)',
                   backgroundColor: 'var(--bg-surface-soft)',
                 }}
               >
-                <div className="h-[240px] w-full max-w-[360px]">
+                <div className="h-[220px] w-full max-w-[280px]">
                   <DonutChart data={data.statusEquipamentos} />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                {(data.statusEquipamentos || []).length > 0 ? (
-                  data.statusEquipamentos.map((item) => (
-                    <div
-                      key={item.name}
-                      className="rounded-2xl border px-4 py-3"
-                      style={{
-                        backgroundColor: 'var(--bg-surface-soft)',
-                        borderColor: 'var(--border-soft)',
-                      }}
-                    >
-                      <p
-                        className="text-sm font-medium"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {item.name}
-                      </p>
-                      <p
-                        className="mt-2 text-2xl font-bold leading-none"
-                        style={{ color: 'var(--text-primary)' }}
-                      >
-                        {item.value}
-                      </p>
-                    </div>
-                  ))
-                ) : (
-                  <InlineEmptyState message="Sem consolidacao de status disponivel." />
-                )}
-              </div>
+              <DashboardStatusList items={resumo.principalStatus} />
             </div>
           </PageSection>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
           <PageSection
-            title="Historico recente de manutencoes"
-            description="Volume consolidado de ordens no periodo exibido pelo backend."
+            title="Historico de manutencoes"
+            description="Volume consolidado por periodo para leitura de tendencia e pressao operacional."
           >
             <div
               className="rounded-3xl border p-3 sm:p-4"
@@ -442,7 +467,7 @@ function DashboardPage() {
 
           <PageSection
             title="Alertas recentes"
-            description="Ultimos avisos do sistema com foco em acompanhamento rapido."
+            description="Acompanhamento rapido dos avisos mais recentes do sistema."
             headerRight={
               <Link
                 to="/alertas"
@@ -465,6 +490,38 @@ function DashboardPage() {
             )}
           </PageSection>
         </div>
+
+        <PageSection
+          title="Resumo executivo"
+          description="Leituras-chave para orientar a proxima acao da equipe."
+        >
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <DashboardMetricPill
+              label="Ativos operantes"
+              value={resumo.ativos}
+              helper="Equipamentos disponiveis para operacao."
+              tone="success"
+            />
+            <DashboardMetricPill
+              label="Intervencoes abertas"
+              value={resumo.emManutencao}
+              helper="Ordens que ainda exigem acompanhamento."
+              tone={resumo.emManutencao > 0 ? 'warning' : 'default'}
+            />
+            <DashboardMetricPill
+              label="Contratos em atencao"
+              value={resumo.contratosVencendo}
+              helper="Coberturas proximas do vencimento."
+              tone={resumo.contratosVencendo > 0 ? 'warning' : 'default'}
+            />
+            <DashboardMetricPill
+              label="Alertas criticos"
+              value={resumo.alertasCriticos}
+              helper="Casos que merecem priorizacao imediata."
+              tone={resumo.alertasCriticos > 0 ? 'danger' : 'info'}
+            />
+          </div>
+        </PageSection>
       </div>
     </PageLayout>
   );

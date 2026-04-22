@@ -1,8 +1,10 @@
 import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faArrowRotateRight,
   faPlus,
   faMicrochip,
+  faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useEquipamentosPage } from '@/hooks/equipamentos/useEquipamentosPage';
@@ -37,6 +39,7 @@ function EquipamentosPage() {
     page.equipamentos.length === 0;
 
   const shouldShowState = isInitialLoading || hasError || isEmpty;
+  const totalFiltrado = page.pagination.total ?? page.metricas.total ?? 0;
 
   const aplicarFiltroStatus = (status) => {
     page.clearAllFilters();
@@ -92,12 +95,57 @@ function EquipamentosPage() {
         />
 
         {shouldShowState ? (
-          <PageState
-            loading={isInitialLoading}
-            error={page.error?.message || page.error || ''}
-            isEmpty={isEmpty}
-            emptyMessage="Nenhum equipamento encontrado."
-          />
+          <PageSection>
+            <PageState
+              loading={isInitialLoading}
+              error={page.error || ''}
+              isEmpty={isEmpty}
+              emptyMessage="Nenhum equipamento encontrado."
+            />
+
+            {hasError ? (
+              <div
+                className="mt-5 flex flex-col gap-4 rounded-3xl border p-4 md:flex-row md:items-center md:justify-between"
+                style={{
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: 'var(--bg-surface-soft)',
+                }}
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                    style={{
+                      backgroundColor: 'var(--color-danger-soft)',
+                      color: 'var(--color-danger)',
+                    }}
+                  >
+                    <FontAwesomeIcon icon={faTriangleExclamation} />
+                  </div>
+
+                  <div className="min-w-0">
+                    <p
+                      className="text-sm font-semibold"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      A lista nao carregou como esperado
+                    </p>
+                    <p
+                      className="mt-1 text-sm"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Mantive filtros e acoes do modulo disponiveis para voce
+                      tentar novamente sem perder contexto.
+                    </p>
+                  </div>
+                </div>
+
+                <Button type="button" variant="secondary" onClick={page.refetch}>
+                  <FontAwesomeIcon icon={faArrowRotateRight} />
+                  Tentar novamente
+                </Button>
+              </div>
+            ) : null}
+          </PageSection>
         ) : (
           <div className="space-y-4">
             <EquipamentosList
@@ -113,7 +161,7 @@ function EquipamentosPage() {
               <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
                 <span>
                   Exibindo <strong>{page.equipamentos.length}</strong> de{' '}
-                  <strong>{page.pagination.total}</strong> equipamento(s).
+                  <strong>{totalFiltrado}</strong> equipamento(s).
                 </span>
 
                 {page.pagination.hasNextPage ? (

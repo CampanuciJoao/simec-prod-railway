@@ -11,6 +11,7 @@ export function useEquipamentosPage() {
     equipamentos,
     unidadesDisponiveis,
     filterOptions,
+    metricas,
     loading,
     loadingMore,
     error,
@@ -173,27 +174,6 @@ export function useEquipamentosPage() {
     controles.handleFilterChange('fabricante', '');
     controles.handleFilterChange('status', '');
   }, [controles]);
-
-  const metricas = useMemo(() => {
-    const base = {
-      total: equipamentos.length,
-      operantes: 0,
-      emManutencao: 0,
-      inoperantes: 0,
-      usoLimitado: 0,
-    };
-
-    for (const equipamento of equipamentos) {
-      const status = String(equipamento?.status || '');
-
-      if (status === 'Operante') base.operantes += 1;
-      if (status === 'EmManutencao') base.emManutencao += 1;
-      if (status === 'Inoperante') base.inoperantes += 1;
-      if (status === 'UsoLimitado') base.usoLimitado += 1;
-    }
-
-    return base;
-  }, [equipamentos]);
 
   const onSearchChange = useCallback(
     (event) => {
