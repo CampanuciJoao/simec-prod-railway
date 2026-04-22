@@ -153,10 +153,65 @@ function mapHistoricoEvento(item) {
   };
 }
 
-export function buildHistoricoTimeline({ eventos = [] }) {
-  const unificado = (eventos || []).map(mapHistoricoEvento);
-  const totalSemFiltro = unificado.length;
+function getTituloGrupo(eventosSorted) {
+  const primeiro = eventosSorted[0];
+  if (primeiro.categoriaBase === 'manutencao' && primeiro.metadata?.numeroOS) {
+    return `OS ${primeiro.metadata.numeroOS}`;
+  }
+  if (primeiro.categoriaBase === 'ocorrencia') {
+    return (
+      primeiro.referenciaDetalhes?.titulo ||
+      primeiro.referenciaDetalhes?.descricao ||
+      primeiro.titulo
+    );
+  }
+  return primeiro.titulo;
+}
 
+function mergeEventosGrupo(eventos) {
+  const sorted = [...eventos].sort((a, b) => new Date(a.data) - new Date(b.data));
+  const latest = sorted[sorted.length - 1];
+
+  return {
+    ...latest,
+    uniqueId: `grupo-${latest.referenciaTipo}-${latest.referenciaId}`,
+    data: latest.data,
+    titulo: getTituloGrupo(sorted),
+    status: latest.status,
+    impactaAnalise: eventos.some((e) => e.impactaAnalise),
+    eventos: sorted.map((e) => ({
+      uniqueId: e.uniqueId,
+      data: e.data,
+      status: e.status,
+      titulo: e.titulo,
+      descricao: e.descricao,
+      responsavel: e.responsavel,
+    })),
+  };
+}
+
+export function buildHistoricoTimeline({ eventos = [] }) {
+  const mapeados = (eventos || []).map(mapHistoricoEvento);
+  const totalSemFiltro = mapeados.length;
+
+  const grupos = new Map();
+  const soltos = [];
+
+  for (const evento of mapeados) {
+    if (evento.referenciaId && evento.referenciaTipo) {
+      const chave = `${evento.referenciaTipo}-${evento.referenciaId}`;
+      if (!grupos.has(chave)) grupos.set(chave, []);
+      grupos.get(chave).push(evento);
+    } else {
+      soltos.push(evento);
+    }
+  }
+
+  const agrupados = [...grupos.values()].map((grupo) =>
+    grupo.length > 1 ? mergeEventosGrupo(grupo) : grupo[0]
+  );
+
+  const unificado = [...agrupados, ...soltos];
   unificado.sort((a, b) => new Date(b.data) - new Date(a.data));
 
   return {

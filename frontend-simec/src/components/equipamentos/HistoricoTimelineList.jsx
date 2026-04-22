@@ -14,6 +14,7 @@ import {
   faPowerOff,
   faTriangleExclamation,
   faWrench,
+  faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -84,9 +85,20 @@ function HistoricoTimelineList({
             badge={<Badge variant="slate">{item.categoria}</Badge>}
             meta={
               <>
-                <span>{formatarDataHora(item.data)}</span>
+                {item.eventos?.length > 1 ? (
+                  <span>
+                    {formatarDataHora(item.eventos[0].data)}
+                    {' → '}
+                    {formatarDataHora(item.eventos[item.eventos.length - 1].data)}
+                  </span>
+                ) : (
+                  <span>{formatarDataHora(item.data)}</span>
+                )}
                 <span>Origem: {item.responsavel}</span>
                 <span>Status: {item.status}</span>
+                {item.eventos?.length > 1 ? (
+                  <span>{item.eventos.length} etapas</span>
+                ) : null}
                 {item.contagemNotas ? <span>{item.contagemNotas} comentario(s)</span> : null}
                 {item.contagemAnexos ? <span>{item.contagemAnexos} anexo(s)</span> : null}
               </>
@@ -98,20 +110,93 @@ function HistoricoTimelineList({
             onToggle={() => onToggleExpandir(item.uniqueId)}
           >
             <div className="space-y-4">
-              <Card surface="soft" className="rounded-2xl">
-                <span
-                  className="text-[11px] font-bold uppercase tracking-[0.14em]"
-                  style={{ color: 'var(--text-muted)' }}
-                >
-                  Descricao
-                </span>
-                <p
-                  className="mt-2 text-sm leading-6"
-                  style={{ color: 'var(--text-primary)' }}
-                >
-                  {item.descricao || 'Sem detalhes informados.'}
-                </p>
-              </Card>
+              {item.eventos?.length > 1 ? (
+                <Card surface="soft" className="rounded-2xl">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Progressao
+                  </span>
+
+                  <div className="mt-3 space-y-0">
+                    {item.eventos.map((ev, idx) => (
+                      <div key={ev.uniqueId} className="flex gap-3">
+                        <div className="flex flex-col items-center">
+                          <div
+                            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+                            style={{
+                              backgroundColor: 'var(--brand-primary-soft)',
+                              color: 'var(--brand-primary)',
+                            }}
+                          >
+                            {idx + 1}
+                          </div>
+                          {idx < item.eventos.length - 1 ? (
+                            <div
+                              className="w-px flex-1 my-1"
+                              style={{ backgroundColor: 'var(--border-soft)', minHeight: '12px' }}
+                            />
+                          ) : null}
+                        </div>
+
+                        <div className="pb-3 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className="text-xs font-semibold"
+                              style={{ color: 'var(--text-primary)' }}
+                            >
+                              {ev.status}
+                            </span>
+                            <FontAwesomeIcon
+                              icon={faChevronRight}
+                              className="text-[9px]"
+                              style={{ color: 'var(--text-muted)' }}
+                            />
+                            <span
+                              className="text-xs"
+                              style={{ color: 'var(--text-muted)' }}
+                            >
+                              {formatarDataHora(ev.data)}
+                            </span>
+                            {ev.responsavel ? (
+                              <span
+                                className="text-xs"
+                                style={{ color: 'var(--text-muted)' }}
+                              >
+                                · {ev.responsavel}
+                              </span>
+                            ) : null}
+                          </div>
+                          {ev.descricao && ev.descricao !== 'Sem detalhes informados.' ? (
+                            <p
+                              className="mt-1 text-xs leading-5"
+                              style={{ color: 'var(--text-secondary)' }}
+                            >
+                              {ev.descricao}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              ) : (
+                <Card surface="soft" className="rounded-2xl">
+                  <span
+                    className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Descricao
+                  </span>
+                  <p
+                    className="mt-2 text-sm leading-6"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    {item.descricao || 'Sem detalhes informados.'}
+                  </p>
+                </Card>
+              )}
 
               {item.resumoOperacional?.length ? (
                 <Card surface="soft" className="rounded-2xl">
