@@ -5,7 +5,6 @@ import {
   faEnvelope,
   faMicrochip,
   faPlus,
-  faSatelliteDish,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -29,13 +28,6 @@ function CadastrosGeraisPage() {
       description: 'Cadastre e mantenha o parque de equipamentos.',
       tone: 'green',
       path: '/cadastros/equipamentos/adicionar',
-    },
-    {
-      icon: faSatelliteDish,
-      title: 'PACS',
-      description: 'Configure conexoes PACS read-only e acompanhe os ciclos de ingestao.',
-      tone: 'blue',
-      path: '/cadastros/pacs',
     },
     {
       icon: faUsers,
@@ -62,7 +54,7 @@ function CadastrosGeraisPage() {
           icon={faPlus}
         />
 
-        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 5 }}>
+        <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
           {cadastros.map((item) => (
             <CadastroNavigationCard
               key={item.title}

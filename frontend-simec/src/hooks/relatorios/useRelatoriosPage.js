@@ -5,7 +5,7 @@ import {
   gerarRelatorio,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { exportarRelatorioPDF } from '../../utils/pdfUtils';
+import { exportarRelatorioPDFLazy } from '@/services/pdf/pdfExportService';
 import { getErrorMessage } from '../../utils/getErrorMessage';
 
 export function useRelatoriosPage() {
@@ -105,7 +105,7 @@ export function useRelatoriosPage() {
     }
   };
 
-  const handleExportarPDF = () => {
+  const handleExportarPDF = async () => {
     if (!resultadoRelatorio?.dados?.length) {
       addToast('Não há dados para exportar.', 'error');
       return;
@@ -115,7 +115,12 @@ export function useRelatoriosPage() {
       .toISOString()
       .split('T')[0]}`;
 
-    exportarRelatorioPDF(resultadoRelatorio, nomeArquivo);
+    try {
+      await exportarRelatorioPDFLazy(resultadoRelatorio, nomeArquivo);
+    } catch (err) {
+      const message = getErrorMessage(err, 'Falha ao exportar o relatÃ³rio em PDF.');
+      addToast(message, 'error');
+    }
   };
 
   const fabricantesOptions = useMemo(

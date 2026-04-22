@@ -12,8 +12,10 @@
     "prisma:generate": "npx prisma generate",
     "prisma:push": "npx prisma db push",
     "prisma:reset": "npx prisma db push --force-reset && npm run seed",
-    "test": "node tests/agent/agentCore.test.js",
-    "test:agent": "node tests/agent/agentCore.test.js"
+    "test": "node --test --experimental-test-isolation=none tests/**/*.test.js",
+    "test:agent": "node --test --experimental-test-isolation=none tests/agent/agentCore.test.js",
+    "test:auth": "node --test --experimental-test-isolation=none tests/auth/*.test.js",
+    "test:risk": "node --test --experimental-test-isolation=none tests/risk/*.test.js"
   },
   "prisma": {
     "seed": "node seed.js"

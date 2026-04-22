@@ -1,16 +1,7 @@
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import { calcularScoreRisco } from '../../services/alertas/recomendacao/recomendacaoAlertScoring.js';
-
-function runTest(name, fn) {
-  try {
-    fn();
-    console.log(`ok - ${name}`);
-  } catch (error) {
-    console.error(`not ok - ${name}`);
-    throw error;
-  }
-}
 
 function criarEvento({ tipoEvento, categoria, subcategoria, dataEvento, metadata }) {
   return {
@@ -22,7 +13,7 @@ function criarEvento({ tipoEvento, categoria, subcategoria, dataEvento, metadata
   };
 }
 
-runTest('score considera apenas sinais apos corretiva resolvida com sucesso', () => {
+test('score considera apenas sinais apos corretiva resolvida com sucesso', () => {
   const metricas = calcularScoreRisco({
     equipamento: {
       tipo: 'Tomografia',
@@ -68,7 +59,7 @@ runTest('score considera apenas sinais apos corretiva resolvida com sucesso', ()
   assert.equal(metricas.ultimaResolucaoManutencao, '2026-04-20T12:00:00.000Z');
 });
 
-runTest('conclusao sem manutencao realizada nao reseta a base de risco', () => {
+test('conclusao sem manutencao realizada nao reseta a base de risco', () => {
   const metricas = calcularScoreRisco({
     equipamento: {
       tipo: 'Tomografia',
@@ -108,7 +99,7 @@ runTest('conclusao sem manutencao realizada nao reseta a base de risco', () => {
   assert.equal(metricas.ultimaResolucaoManutencao, null);
 });
 
-runTest('preventiva concluida com sucesso tambem reseta o risco ativo anterior', () => {
+test('preventiva concluida com sucesso tambem reseta o risco ativo anterior', () => {
   const metricas = calcularScoreRisco({
     equipamento: {
       tipo: 'Tomografia',
@@ -146,6 +137,3 @@ runTest('preventiva concluida com sucesso tambem reseta o risco ativo anterior',
   assert.equal(metricas.manutencoesResolvidasComSucesso, 1);
   assert.equal(metricas.ultimaResolucaoManutencao, '2026-04-20T12:00:00.000Z');
 });
-
-console.log('recomendacao-alert-scoring-tests-ok');
-process.exit(0);

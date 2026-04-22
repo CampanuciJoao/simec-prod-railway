@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import test from 'node:test';
 
 import {
   normalizarData,
@@ -19,40 +20,30 @@ import {
 } from '../../services/agent/shared/entityScoring.js';
 import { validarHorarioFuturo } from '../../services/agent/agendamento/validators/horarioValidator.js';
 
-function runTest(name, fn) {
-  try {
-    fn();
-    console.log(`ok - ${name}`);
-  } catch (error) {
-    console.error(`not ok - ${name}`);
-    throw error;
-  }
-}
-
-runTest('normalizarData aceita DD/MM/AAAA e DD/MM', () => {
+test('normalizarData aceita DD/MM/AAAA e DD/MM', () => {
   assert.equal(normalizarData('21/04/2026'), '2026-04-21');
   assert.match(normalizarData('21/04'), /^\d{4}-04-21$/);
 });
 
-runTest('normalizarData aceita ano curto e prefixo dia', () => {
+test('normalizarData aceita ano curto e prefixo dia', () => {
   assert.equal(normalizarData('21/04/26'), '2026-04-21');
   assert.match(normalizarData('dia 21/04'), /^\d{4}-04-21$/);
 });
 
-runTest('normalizarHora aceita formatos com h', () => {
+test('normalizarHora aceita formatos com h', () => {
   assert.equal(normalizarHora('10h'), '10:00');
   assert.equal(normalizarHora('11:00h'), '11:00');
   assert.equal(normalizarHora('11h30'), '11:30');
 });
 
-runTest('normalizarDataRelativa aceita hoje e amanha', () => {
+test('normalizarDataRelativa aceita hoje e amanha', () => {
   const referencia = new Date('2026-04-20T12:00:00Z');
 
   assert.equal(normalizarDataRelativa('hoje', referencia), '2026-04-20');
   assert.equal(normalizarDataRelativa('amanhã', referencia), '2026-04-21');
 });
 
-runTest('heuristica extrai data e hora em formatos operacionais', () => {
+test('heuristica extrai data e hora em formatos operacionais', () => {
   const extraidoData = extrairCamposHeuristico('21/04/2026', {});
   const extraidoHora = extrairCamposHeuristico('09:00h', {});
   const extraidoHoraCompacta = extrairCamposHeuristico('11h30', {});
@@ -73,7 +64,7 @@ runTest('heuristica extrai data e hora em formatos operacionais', () => {
   assert.equal(extraidoHoraFim.horaFim, '13:00');
 });
 
-runTest(
+test(
   'dica de parsing nao acusa horario quando a mensagem trouxe uma data valida',
   () => {
     const hint = buildParsingHintMessage(
@@ -86,7 +77,7 @@ runTest(
   }
 );
 
-runTest(
+test(
   'dica de parsing acusa horario quando a mensagem numerica nao gerou extracao util',
   () => {
     const hint = buildParsingHintMessage('1030', ['horaInicio'], {});
@@ -98,7 +89,7 @@ runTest(
   }
 );
 
-runTest('logger do agente normaliza erros e limita profundidade', () => {
+test('logger do agente normaliza erros e limita profundidade', () => {
   const contexto = buildAgentLogContext(
     {
       requestId: 'req-1',
@@ -124,7 +115,7 @@ runTest('logger do agente normaliza erros e limita profundidade', () => {
   assert.equal(contexto.nested.level1.level2.level3.level4, '[max-depth]');
 });
 
-runTest('campos faltantes do schema sao convertidos para o vocabulário do agente', () => {
+test('campos faltantes do schema sao convertidos para o vocabulario do agente', () => {
   assert.deepEqual(normalizeAgentMissingFields(['agendamentoHoraFimLocal']), [
     'horaFim',
   ]);
@@ -139,7 +130,7 @@ runTest('campos faltantes do schema sao convertidos para o vocabulário do agent
   );
 });
 
-runTest(
+test(
   'faltantes do agendamento parcial pedem apenas horario quando a data ja existe',
   () => {
     const estadoParcial = {
@@ -153,7 +144,7 @@ runTest(
   }
 );
 
-runTest(
+test(
   'validacao final de manutencao parcial nao acusa data invalida quando so falta horario',
   () => {
     const estadoParcial = {
@@ -172,7 +163,7 @@ runTest(
   }
 );
 
-runTest(
+test(
   'matching parcial de unidade exige confirmacao em vez de resolucao automatica',
   () => {
     const candidatos = [
@@ -192,7 +183,7 @@ runTest(
   }
 );
 
-runTest('matching exato continua resolvendo automaticamente', () => {
+test('matching exato continua resolvendo automaticamente', () => {
   const candidatos = [
     { id: '1', nomeSistema: 'Unidade Matriz', cidade: 'Cuiaba' },
     { id: '2', nomeSistema: 'Unidade Centro', cidade: 'Cuiaba' },
@@ -209,7 +200,7 @@ runTest('matching exato continua resolvendo automaticamente', () => {
   assert.equal(resolution.matches[0].label, 'Unidade Matriz');
 });
 
-runTest('avaliarCandidato diferencia match exato de termo parcial', () => {
+test('avaliarCandidato diferencia match exato de termo parcial', () => {
   const exato = avaliarCandidato('Unidade Matriz', ['Unidade Matriz']);
   const parcial = avaliarCandidato('Matriz', ['Unidade Matriz']);
 
@@ -218,7 +209,7 @@ runTest('avaliarCandidato diferencia match exato de termo parcial', () => {
   assert.ok(parcial >= 0.76);
 });
 
-runTest('validarHorarioFuturo aceita data e horario validos', () => {
+test('validarHorarioFuturo aceita data e horario validos', () => {
   const amanha = new Date();
   amanha.setDate(amanha.getDate() + 1);
 
@@ -230,6 +221,3 @@ runTest('validarHorarioFuturo aceita data e horario validos', () => {
 
   assert.equal(resultado.valido, true);
 });
-
-console.log('agent-core-tests-ok');
-process.exit(0);

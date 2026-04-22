@@ -12,7 +12,6 @@ export * from './historicoAtivoApi';
 export * from './helpApi';
 export * from './manutencoesApi';
 export * from './ocorrenciasApi';
-export * from './pacsApi';
 export * from './pdfApi';
 export * from './relatoriosApi';
 export * from './segurosApi';

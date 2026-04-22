@@ -5,7 +5,6 @@ import {
   TabCobertura,
   TabFichaTecnica,
   TabHistorico,
-  TabPacs,
   TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
 
@@ -31,7 +30,6 @@ function DetalhesEquipamentoTabContent({
         onUpdate={onRefresh}
       />
     ),
-    pacs: <TabPacs equipamentoId={equipamentoId} />,
     historico: <TabHistorico equipamento={equipamento} />,
     cobertura: <TabCobertura equipamento={equipamento} />,
   };

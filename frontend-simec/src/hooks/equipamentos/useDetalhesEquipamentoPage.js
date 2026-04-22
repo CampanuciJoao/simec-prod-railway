@@ -4,7 +4,6 @@ import {
   faChartLine,
   faFileMedical,
   faHistory,
-  faSatelliteDish,
   faPaperclip,
   faShieldAlt,
 } from '@fortawesome/free-solid-svg-icons';
@@ -27,7 +26,6 @@ export function useDetalhesEquipamentoPage() {
       { id: 'visaoGeral', label: 'Visao geral', icon: faChartLine },
       { id: 'historico', label: 'Historico', icon: faHistory },
       { id: 'fichaTecnica', label: 'Ficha tecnica', icon: faFileMedical },
-      { id: 'pacs', label: 'PACS', icon: faSatelliteDish },
       { id: 'anexos', label: 'Anexos', icon: faPaperclip },
       { id: 'cobertura', label: 'Cobertura', icon: faShieldAlt },
     ],

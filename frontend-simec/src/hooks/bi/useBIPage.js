@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { getIndicadoresBI } from '@/services/api';
-import { exportarBIPDF } from '@/utils/pdfUtils';
+import { exportarBIPDFLazy } from '@/services/pdf/pdfExportService';
 import {
   mapRankingUnidades,
   mapDowntimePorUnidadeChartData,
@@ -81,9 +81,9 @@ export function useBIPage() {
     setDrawer({ open: false, type: null });
   }, []);
 
-  const handlePrint = useCallback(() => {
+  const handlePrint = useCallback(async () => {
     if (!dados) return;
-    exportarBIPDF(dados);
+    await exportarBIPDFLazy(dados);
   }, [dados]);
 
   const drawerContent = useMemo(() => {

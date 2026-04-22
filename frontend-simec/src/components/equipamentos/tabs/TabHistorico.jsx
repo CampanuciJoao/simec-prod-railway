@@ -12,9 +12,9 @@ import {
   exportHistoricoAtivoByEquipamento,
   getHistoricoAtivoByEquipamento,
 } from '@/services/api';
+import { exportarHistoricoEquipamentoPDFLazy } from '@/services/pdf/pdfExportService';
 
 import { useToast } from '@/contexts/ToastContext';
-import { exportarHistoricoEquipamentoPDF } from '@/utils/pdfUtils';
 import {
   buildHistoricoTimeline,
   mapFiltroHistoricoParaQuery,
@@ -133,13 +133,15 @@ function TabHistorico({ equipamento }) {
           eventos: Array.isArray(lista) ? lista : [],
         });
 
-        exportarHistoricoEquipamentoPDF(timelineCompleta.linhaDoTempo, {
+        void exportarHistoricoEquipamentoPDFLazy(timelineCompleta.linhaDoTempo, {
           modelo: equipamento?.modelo,
           tag: equipamento?.tag,
           unidade: equipamento?.unidade?.nomeSistema,
           inicio: dataInicio,
           fim: dataFim,
           tipoFiltro: filtroTipo,
+        }).catch(() => {
+          addToast('Erro ao gerar o PDF do historico.', 'error');
         });
       })
       .catch(() => {

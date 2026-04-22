@@ -24,6 +24,36 @@ export const REFRESH_TOKEN_COOKIE = 'simec_refresh_token';
 const RESET_TOKEN_TTL_MINUTES = 30;
 const REFRESH_TOKEN_TTL_DAYS = 14;
 
+const defaultAuthServiceDeps = {
+  atualizarSenhaUsuario,
+  buscarPasswordResetTokenPorHash,
+  buscarSessaoPorRefreshHash,
+  buscarTenantPorSlug,
+  buscarUsuarioPorEmailOuUsername,
+  buscarUsuariosPorUsername,
+  criarPasswordResetToken,
+  criarSessaoAutenticacao,
+  invalidarTokensResetDoUsuario,
+  marcarPasswordResetTokenComoUsado,
+  revogarSessaoPorId,
+  revogarSessoesDoUsuario,
+  registrarLog,
+  enviarEmail,
+};
+
+let authServiceDeps = { ...defaultAuthServiceDeps };
+
+export function __setAuthServiceDepsForTests(overrides = {}) {
+  authServiceDeps = {
+    ...defaultAuthServiceDeps,
+    ...overrides,
+  };
+}
+
+export function __resetAuthServiceDepsForTests() {
+  authServiceDeps = { ...defaultAuthServiceDeps };
+}
+
 function getJwtSecret() {
   if (!process.env.JWT_SECRET) {
     throw new Error('JWT_SECRET nao configurado.');
@@ -103,7 +133,7 @@ async function criarSessao(usuario, metadata = {}) {
     Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
   );
 
-  await criarSessaoAutenticacao({
+  await authServiceDeps.criarSessaoAutenticacao({
     tenant: {
       connect: {
         id: usuario.tenantId,
@@ -158,7 +188,7 @@ export async function autenticarUsuarioService({
 
   const usernameNormalizado = String(username).toLowerCase().trim();
   const tenantNormalizado = String(tenant).toLowerCase().trim();
-  const usuariosEncontrados = await buscarUsuariosPorUsername(
+  const usuariosEncontrados = await authServiceDeps.buscarUsuariosPorUsername(
     usernameNormalizado,
     tenantNormalizado
   );
@@ -212,7 +242,7 @@ export async function autenticarUsuarioService({
     userAgent,
   });
 
-  await registrarLog({
+  await authServiceDeps.registrarLog({
     tenantId: usuario.tenantId,
     usuarioId: usuario.id,
     acao: 'LOGIN',
@@ -241,7 +271,7 @@ export async function refreshAuthSessionService(refreshToken) {
   }
 
   const refreshTokenHash = hashPlainToken(refreshToken);
-  const session = await buscarSessaoPorRefreshHash(refreshTokenHash);
+  const session = await authServiceDeps.buscarSessaoPorRefreshHash(refreshTokenHash);
 
   if (!session || session.revokedAt || session.expiresAt <= new Date()) {
     return {
@@ -295,12 +325,12 @@ export async function logoutAuthSessionService(refreshToken) {
   }
 
   const refreshTokenHash = hashPlainToken(refreshToken);
-  const session = await buscarSessaoPorRefreshHash(refreshTokenHash);
+  const session = await authServiceDeps.buscarSessaoPorRefreshHash(refreshTokenHash);
 
   if (session && !session.revokedAt) {
-    await revogarSessaoPorId(session.id);
+    await authServiceDeps.revogarSessaoPorId(session.id);
 
-    await registrarLog({
+    await authServiceDeps.registrarLog({
       tenantId: session.tenantId,
       usuarioId: session.usuarioId,
       acao: 'LOGOUT',
@@ -336,7 +366,7 @@ export async function forgotPasswordService({
     };
   }
 
-  const tenantData = await buscarTenantPorSlug(tenantSlug);
+  const tenantData = await authServiceDeps.buscarTenantPorSlug(tenantSlug);
 
   if (!tenantData || !tenantData.ativo) {
     return {
@@ -347,7 +377,7 @@ export async function forgotPasswordService({
     };
   }
 
-  const usuario = await buscarUsuarioPorEmailOuUsername({
+  const usuario = await authServiceDeps.buscarUsuarioPorEmailOuUsername({
     tenantSlug,
     username: usernameNormalizado,
     email: emailNormalizado,
@@ -366,12 +396,12 @@ export async function forgotPasswordService({
   const tokenHash = hashPlainToken(plainToken);
   const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MINUTES * 60 * 1000);
 
-  await invalidarTokensResetDoUsuario({
+  await authServiceDeps.invalidarTokensResetDoUsuario({
     tenantId: usuario.tenantId,
     usuarioId: usuario.id,
   });
 
-  await criarPasswordResetToken({
+  await authServiceDeps.criarPasswordResetToken({
     tenant: {
       connect: {
         id: usuario.tenantId,
@@ -393,7 +423,7 @@ export async function forgotPasswordService({
     appBaseUrl || process.env.FRONTEND_URL || 'http://localhost:5173';
   const resetLink = `${baseUrl.replace(/\/$/, '')}/redefinir-senha/${plainToken}`;
 
-  await enviarEmail({
+  await authServiceDeps.enviarEmail({
     para: usuario.email,
     assunto: 'SIMEC | Redefinicao de senha',
     dadosTemplate: {
@@ -411,7 +441,7 @@ export async function forgotPasswordService({
     },
   });
 
-  await registrarLog({
+  await authServiceDeps.registrarLog({
     tenantId: usuario.tenantId,
     usuarioId: usuario.id,
     acao: 'RESET_SOLICITADO',
@@ -446,7 +476,7 @@ export async function resetPasswordService({ token, senha }) {
   }
 
   const tokenHash = hashPlainToken(token);
-  const resetToken = await buscarPasswordResetTokenPorHash(tokenHash);
+  const resetToken = await authServiceDeps.buscarPasswordResetTokenPorHash(tokenHash);
 
   if (
     !resetToken ||
@@ -463,18 +493,18 @@ export async function resetPasswordService({ token, senha }) {
 
   const senhaHash = await bcrypt.hash(senha, 10);
 
-  await atualizarSenhaUsuario({
+  await authServiceDeps.atualizarSenhaUsuario({
     tenantId: resetToken.tenantId,
     usuarioId: resetToken.usuarioId,
     senhaHash,
   });
-  await marcarPasswordResetTokenComoUsado(resetToken.id);
-  await revogarSessoesDoUsuario({
+  await authServiceDeps.marcarPasswordResetTokenComoUsado(resetToken.id);
+  await authServiceDeps.revogarSessoesDoUsuario({
     tenantId: resetToken.tenantId,
     usuarioId: resetToken.usuarioId,
   });
 
-  await registrarLog({
+  await authServiceDeps.registrarLog({
     tenantId: resetToken.tenantId,
     usuarioId: resetToken.usuarioId,
     acao: 'RESET_CONCLUIDO',

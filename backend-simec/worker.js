@@ -5,11 +5,6 @@ import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasO
 import { processarAlertasManutencaoDoTenant } from './services/alertas/manutencao/index.js';
 import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
 import prisma from './services/prismaService.js';
-import {
-  processarColetaPacsTenant,
-  processarPurgePacsTenant,
-  processarTesteConexaoPacs,
-} from './services/pacs/pacsService.js';
 
 dotenv.config();
 
@@ -21,15 +16,7 @@ const alertasQueue = new Queue('alertas-fila', {
   connection: inspectionConnection,
 });
 
-const pacsQueue = new Queue('pacs-fila', {
-  connection: inspectionConnection,
-});
-
 const alertasQueueEvents = new QueueEvents('alertas-fila', {
-  connection,
-});
-
-const pacsQueueEvents = new QueueEvents('pacs-fila', {
   connection,
 });
 
@@ -97,58 +84,16 @@ const alertasWorker = new Worker(
   }
 );
 
-const pacsWorker = new Worker(
-  'pacs-fila',
-  async (job) => {
-    if (job.name.startsWith('pacs-purgar-tenant') || job.name === 'pacs-purgar-tenant') {
-      return processarPurgePacsTenant({
-        tenantId: job.data.tenantId,
-      });
-    }
-
-    if (job.name === 'pacs-testar-conexao') {
-      return processarTesteConexaoPacs({
-        tenantId: job.data.tenantId,
-        connectionId: job.data.connectionId,
-        userId: job.data.userId,
-      });
-    }
-
-    return processarColetaPacsTenant({
-      tenantId: job.data.tenantId,
-      connectionId: job.data.connectionId || null,
-    });
-  },
-  {
-    connection,
-    concurrency: 1,
-    autorun: true,
-    limiter: { max: 1, duration: 1000 },
-  }
-);
-
 alertasWorker.on('ready', async () => {
   await logQueueState('ALERTAS_WORKER_READY', alertasQueue);
-});
-
-pacsWorker.on('ready', async () => {
-  await logQueueState('PACS_WORKER_READY', pacsQueue);
 });
 
 alertasWorker.on('failed', (job, err) => {
   console.error(`Erro no worker de alertas | job=${job?.name} | erro=${err.message}`);
 });
 
-pacsWorker.on('failed', (job, err) => {
-  console.error(`Erro no worker de PACS | job=${job?.name} | erro=${err.message}`);
-});
-
 alertasQueueEvents.on('failed', ({ jobId, failedReason }) => {
   console.log(`alertas failed | jobId=${jobId} | motivo=${failedReason}`);
-});
-
-pacsQueueEvents.on('failed', ({ jobId, failedReason }) => {
-  console.log(`pacs failed | jobId=${jobId} | motivo=${failedReason}`);
 });
 
 async function shutdown(signal) {
@@ -156,11 +101,8 @@ async function shutdown(signal) {
 
   try {
     await alertasWorker.close();
-    await pacsWorker.close();
     await alertasQueueEvents.close();
-    await pacsQueueEvents.close();
     await alertasQueue.close();
-    await pacsQueue.close();
     await connection.quit();
     await inspectionConnection.quit();
     process.exit(0);

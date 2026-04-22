@@ -1,57 +1,72 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import dotenv from 'dotenv';
-import prisma from './prismaService.js';
 
 dotenv.config();
 
 const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
-const connection = new IORedis(redisUrl, {
-  lazyConnect: true,
-  enableOfflineQueue: false,
-  maxRetriesPerRequest: null,
-});
+let connection = null;
+let alertasQueue = null;
 
-connection.on('connect', () => {
-  console.log('Redis (queue) conectado com sucesso.');
-});
+function getConnection() {
+  if (connection) {
+    return connection;
+  }
 
-connection.on('error', (err) => {
-  console.error('Erro Redis (queue):', err.message);
-});
+  connection = new IORedis(redisUrl, {
+    lazyConnect: true,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: null,
+  });
 
-export const alertasQueue = new Queue('alertas-fila', {
-  connection,
-});
+  connection.on('connect', () => {
+    console.log('Redis (queue) conectado com sucesso.');
+  });
 
-export const pacsQueue = new Queue('pacs-fila', {
-  connection,
-});
+  connection.on('error', (err) => {
+    console.error('Erro Redis (queue):', err.message);
+  });
+
+  return connection;
+}
+
+function getAlertasQueue() {
+  if (alertasQueue) {
+    return alertasQueue;
+  }
+
+  alertasQueue = new Queue('alertas-fila', {
+    connection: getConnection(),
+  });
+
+  return alertasQueue;
+}
 
 async function logQueueState(prefix = 'QUEUE_STATE') {
   try {
-    const [alertCounts, pacsCounts] = await Promise.all([
-      alertasQueue.getJobCounts(
-        'waiting',
-        'active',
-        'completed',
-        'failed',
-        'delayed',
-        'paused'
-      ),
-      pacsQueue.getJobCounts(
-        'waiting',
-        'active',
-        'completed',
-        'failed',
-        'delayed',
-        'paused'
-      ),
-    ]);
+    const queue = getAlertasQueue();
+    const counts = await queue.getJobCounts(
+      'waiting',
+      'active',
+      'completed',
+      'failed',
+      'delayed',
+      'paused'
+    );
 
-    console.log(`[${prefix}] alertas`, alertCounts);
-    console.log(`[${prefix}] pacs`, pacsCounts);
+    console.log(`[${prefix}]`, counts);
+
+    const repeatables = await queue.getRepeatableJobs();
+    console.log(
+      `[${prefix}] repeatables=${repeatables.length}`,
+      repeatables.map((job) => ({
+        name: job.name,
+        key: job.key,
+        every: job.every,
+        next: job.next,
+      }))
+    );
   } catch (error) {
     console.error(`[${prefix}] Erro ao inspecionar fila:`, error.message);
   }
@@ -59,16 +74,17 @@ async function logQueueState(prefix = 'QUEUE_STATE') {
 
 export async function iniciarJobsDeAlertas() {
   try {
-    await alertasQueue.waitUntilReady();
+    const queue = getAlertasQueue();
+    await queue.waitUntilReady();
 
-    const repeatables = await alertasQueue.getRepeatableJobs();
+    const repeatables = await queue.getRepeatableJobs();
     for (const job of repeatables) {
       if (job.name === 'processar-alertas-recorrente') {
-        await alertasQueue.removeRepeatableByKey(job.key);
+        await queue.removeRepeatableByKey(job.key);
       }
     }
 
-    await alertasQueue.add(
+    await queue.add(
       'processar-alertas-recorrente',
       {},
       {
@@ -81,7 +97,7 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
-    await alertasQueue.add(
+    await queue.add(
       'processar-alertas-imediato',
       {},
       {
@@ -91,86 +107,24 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
-    await logQueueState('ALERTAS_AFTER_INIT');
+    await logQueueState('QUEUE_AFTER_INIT');
   } catch (error) {
-    console.error('Erro ao iniciar jobs de alertas:', error);
-    throw error;
-  }
-}
-
-async function limparRepeatables(queue, prefix) {
-  const repeatables = await queue.getRepeatableJobs();
-
-  for (const job of repeatables) {
-    if (job.name.startsWith(prefix)) {
-      await queue.removeRepeatableByKey(job.key);
-    }
-  }
-}
-
-export async function iniciarJobsDoPacs() {
-  try {
-    await pacsQueue.waitUntilReady();
-    await limparRepeatables(pacsQueue, 'pacs-');
-
-    const tenants = await prisma.tenant.findMany({
-      where: {
-        ativo: true,
-        pacsConnections: {
-          some: {
-            ativo: true,
-          },
-        },
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    for (const tenant of tenants) {
-      await pacsQueue.add(
-        `pacs-coletar-tenant-${tenant.id}`,
-        {
-          tenantId: tenant.id,
-        },
-        {
-          jobId: `pacs-coletar-tenant-${tenant.id}`,
-          repeat: {
-            every: 6 * 60 * 60 * 1000,
-          },
-          removeOnComplete: 50,
-          removeOnFail: 50,
-        }
-      );
-
-      await pacsQueue.add(
-        `pacs-purgar-tenant-${tenant.id}`,
-        {
-          tenantId: tenant.id,
-        },
-        {
-          jobId: `pacs-purgar-tenant-${tenant.id}`,
-          repeat: {
-            every: 24 * 60 * 60 * 1000,
-          },
-          removeOnComplete: 50,
-          removeOnFail: 50,
-        }
-      );
-    }
-
-    await logQueueState('PACS_AFTER_INIT');
-  } catch (error) {
-    console.error('Erro ao iniciar jobs PACS:', error);
+    console.error('Erro ao iniciar jobs:', error);
     throw error;
   }
 }
 
 export async function encerrarQueueDeAlertas() {
   try {
-    await alertasQueue.close();
-    await pacsQueue.close();
-    await connection.quit();
+    if (alertasQueue) {
+      await alertasQueue.close();
+      alertasQueue = null;
+    }
+
+    if (connection) {
+      await connection.quit();
+      connection = null;
+    }
   } catch (error) {
     console.error('Erro ao encerrar queue:', error);
   }
@@ -182,7 +136,7 @@ export async function enfileirarReprocessamentoAlertasDoTenant(
 ) {
   if (!tenantId) return null;
 
-  return alertasQueue.add(
+  return getAlertasQueue().add(
     'reprocessar-alertas-tenant',
     {
       tenantId,
@@ -190,48 +144,6 @@ export async function enfileirarReprocessamentoAlertasDoTenant(
     },
     {
       jobId: `reprocessar-alertas-tenant-${tenantId}-${motivo}`,
-      removeOnComplete: 50,
-      removeOnFail: 50,
-    }
-  );
-}
-
-export async function enfileirarColetaPacsDoTenant(
-  tenantId,
-  motivo = 'manual_sync',
-  connectionId = null
-) {
-  if (!tenantId) return null;
-
-  return pacsQueue.add(
-    'pacs-coletar-tenant',
-    {
-      tenantId,
-      motivo,
-      connectionId,
-    },
-    {
-      jobId: `pacs-coletar-tenant-${tenantId}-${connectionId || 'all'}-${Date.now()}`,
-      removeOnComplete: 50,
-      removeOnFail: 50,
-    }
-  );
-}
-
-export async function enfileirarTesteConexaoPacs({
-  tenantId,
-  connectionId,
-  userId,
-}) {
-  return pacsQueue.add(
-    'pacs-testar-conexao',
-    {
-      tenantId,
-      connectionId,
-      userId,
-    },
-    {
-      jobId: `pacs-testar-conexao-${tenantId}-${connectionId}-${Date.now()}`,
       removeOnComplete: 50,
       removeOnFail: 50,
     }

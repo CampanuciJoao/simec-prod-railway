@@ -1,9 +1,9 @@
 import { getPdfDataManutencao, getPdfDataRelatorio } from '@/services/api/pdfApi';
 import { getSeguroById } from '@/services/api/segurosApi';
 import {
-  exportarOSManutencaoPDF,
-  exportarRelatorioPDF,
-} from '@/utils/pdfUtils';
+  exportarOSManutencaoPDFLazy,
+  exportarRelatorioPDFLazy,
+} from '@/services/pdf/pdfExportService';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -58,7 +58,7 @@ export async function handleChatAction({
       if (Array.isArray(contexto?.ids) && contexto.ids.length > 0) {
         try {
           const resultado = await getPdfDataRelatorio(contexto.ids);
-          exportarRelatorioPDF(resultado, 'relatorio_chat_agente');
+          await exportarRelatorioPDFLazy(resultado, 'relatorio_chat_agente');
           notify(addToast, 'PDF do relatório gerado com sucesso.', 'success');
           return;
         } catch (error) {
@@ -73,7 +73,7 @@ export async function handleChatAction({
       if (contexto?.manutencaoId) {
         try {
           const manutencao = await getPdfDataManutencao(contexto.manutencaoId);
-          exportarOSManutencaoPDF(manutencao);
+          await exportarOSManutencaoPDFLazy(manutencao);
           notify(addToast, 'PDF da OS gerado com sucesso.', 'success');
           return;
         } catch (error) {
