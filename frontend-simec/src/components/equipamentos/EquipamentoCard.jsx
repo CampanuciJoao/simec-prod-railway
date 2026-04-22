@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBuilding,
   faFileMedical,
+  faIndustry,
   faMicrochip,
   faTag,
 } from '@fortawesome/free-solid-svg-icons';
@@ -12,6 +13,30 @@ import { Badge, Button, EntityCard, StatusBadge } from '@/components/ui';
 import { StatusSelector } from '@/components/equipamentos';
 import EquipamentoCardExpanded from '@/components/equipamentos/EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '@/utils/equipamentoCardStyles';
+
+function MetaField({ icon, label, value }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span
+        className="text-[10px] font-semibold uppercase tracking-widest"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {label}
+      </span>
+      <span
+        className="flex items-center gap-1.5 text-sm font-medium"
+        style={{ color: 'var(--text-primary)' }}
+      >
+        <FontAwesomeIcon
+          icon={icon}
+          className="shrink-0 text-xs"
+          style={{ color: 'var(--text-muted)' }}
+        />
+        {value || '—'}
+      </span>
+    </div>
+  );
+}
 
 function EquipamentoCard({
   equipamento,
@@ -63,54 +88,46 @@ function EquipamentoCard({
         </Button>
       }
       summary={
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+          <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="slate">
-                <FontAwesomeIcon icon={faMicrochip} className="mr-1" />
-                Ativo
-              </Badge>
               <StatusBadge value={equipamento.status || 'N/A'} />
-            </div>
-
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <h3
-                className="break-words text-lg font-bold sm:text-xl"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {equipamento.modelo}
-              </h3>
-
-              <div
-                className="flex flex-wrap gap-x-4 gap-y-1 text-sm"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <FontAwesomeIcon icon={faTag} className="text-xs" />
-                  {equipamento.tag || 'Sem tag'}
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <FontAwesomeIcon icon={faBuilding} className="text-xs" />
-                  {equipamento.unidade?.nomeSistema || 'Sem unidade'}
-                </span>
-                <span className="inline-flex items-center gap-2">
+              {equipamento.tipo && (
+                <Badge variant="outline">
                   <FontAwesomeIcon icon={faMicrochip} className="text-xs" />
-                  {equipamento.tipo || 'Sem tipo'}
-                </span>
-              </div>
+                  {equipamento.tipo}
+                </Badge>
+              )}
             </div>
 
-            <div
-              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm"
-              style={{ color: 'var(--text-muted)' }}
+            <h3
+              className="mt-2 break-words text-lg font-bold sm:text-xl"
+              style={{ color: 'var(--text-primary)' }}
             >
-              <span>Fabricante: {equipamento.fabricante || 'N/A'}</span>
-              <span>Patrimonio: {equipamento.numeroPatrimonio || 'N/A'}</span>
+              {equipamento.modelo}
+            </h3>
+
+            <div className="mt-3 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+              <MetaField
+                icon={faTag}
+                label="Nº de Série"
+                value={equipamento.tag}
+              />
+              <MetaField
+                icon={faBuilding}
+                label="Unidade"
+                value={equipamento.unidade?.nomeSistema}
+              />
+              <MetaField
+                icon={faIndustry}
+                label="Fabricante"
+                value={equipamento.fabricante}
+              />
             </div>
           </div>
 
           <div
-            className="w-full rounded-2xl border px-3 py-3 xl:w-auto xl:min-w-[250px]"
+            className="w-full rounded-2xl border px-3 py-3 xl:w-auto xl:min-w-[200px]"
             style={infoCardStyle}
           >
             <div
