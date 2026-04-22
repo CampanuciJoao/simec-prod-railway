@@ -66,57 +66,67 @@ function getMaxY(doc) {
 
 function drawHeader(doc, title, options = {}) {
   const { locale, timeZone } = options;
+  const pageWidth = doc.page.width;
+  const bandH = 52;
 
-  if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, 50, 36, {
-      fit: [42, 42],
-    });
+  doc.save().rect(0, 0, pageWidth, bandH).fill(COLORS.slate900).restore();
+
+  const hasLogo = fs.existsSync(logoPath);
+  if (hasLogo) {
+    doc.image(logoPath, 12, 5, { fit: [42, 42] });
   }
+
+  const textX = hasLogo ? 60 : 14;
+  doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.white).text('SIMEC', textX, 10);
+  doc
+    .font('Helvetica')
+    .fontSize(7.5)
+    .fillColor(COLORS.slate300)
+    .text('Sistema de Manutencao de Equipamentos', textX, 30);
 
   doc
     .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLORS.slate500)
-    .text(`Gerado em: ${formatDateTime(new Date(), locale, timeZone)}`, 50, 42, {
+    .fontSize(8)
+    .fillColor(COLORS.slate300)
+    .text(`Gerado em: ${formatDateTime(new Date(), locale, timeZone)}`, 0, 20, {
       align: 'right',
+      width: pageWidth - 14,
+      lineBreak: false,
     });
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(18)
+    .fontSize(14)
     .fillColor(COLORS.slate900)
-    .text(title, 50, 82, {
-      align: 'center',
-    });
+    .text(title, 50, bandH + 12, { align: 'center', width: pageWidth - 100 });
 
-  doc
-    .moveTo(50, 108)
-    .lineTo(doc.page.width - 50, 108)
-    .lineWidth(1)
-    .strokeColor(COLORS.slate300)
-    .stroke();
+  const sepY = bandH + 38;
+  doc.moveTo(50, sepY).lineTo(pageWidth - 50, sepY).lineWidth(1).strokeColor(COLORS.slate300).stroke();
 
-  doc.y = 124;
+  doc.y = sepY + 14;
 }
 
 function drawFooter(doc, prefix = 'SIMEC') {
   const range = doc.bufferedPageRange();
+  const lastPage = range.start + range.count - 1;
 
   for (let index = 0; index < range.count; index += 1) {
     doc.switchToPage(range.start + index);
+    const footerY = doc.page.height - 40;
+
     doc
       .font('Helvetica')
       .fontSize(8)
       .fillColor(COLORS.slate500)
-      .text(
-        `${prefix} - Pagina ${index + 1} de ${range.count}`,
-        50,
-        doc.page.height - 40,
-        {
-          align: 'center',
-        }
-      );
+      .text(`${prefix} - Pagina ${index + 1} de ${range.count}`, 50, footerY, {
+        align: 'center',
+        lineBreak: false,
+      });
   }
+
+  // Restaura cursor dentro da margem para evitar página em branco extra no doc.end()
+  doc.switchToPage(lastPage);
+  doc.y = doc.page.height - doc.page.margins.bottom;
 }
 
 function createDocument(title, options = {}) {
@@ -157,15 +167,21 @@ function ensureSpace(doc, neededHeight = 32) {
 }
 
 function drawSectionTitle(doc, title) {
-  ensureSpace(doc, 30);
+  ensureSpace(doc, 36);
+
+  const x = doc.page.margins.left;
+  const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const y = doc.y;
+
+  doc.save().rect(x, y, w, 22).fill(COLORS.slate100).restore();
 
   doc
     .font('Helvetica-Bold')
-    .fontSize(11)
+    .fontSize(10)
     .fillColor(COLORS.slate900)
-    .text(title, 50, doc.y);
+    .text(title, x + 8, y + 6, { lineBreak: false });
 
-  doc.moveDown(0.4);
+  doc.y = y + 30;
 }
 
 function drawInfoGrid(doc, items = [], columns = 2) {
@@ -319,11 +335,7 @@ function buildHistoricoRows(eventos = [], locale, timeZone) {
     return [
       formatDateTime(evento?.dataEvento, locale, timeZone),
       safeText(evento?.subcategoria || evento?.categoria || 'Evento'),
-      safeText(
-        evento?.referenciaTipo === 'manutencao' && referencia?.numeroOS
-          ? `${evento?.titulo} (OS: ${referencia.numeroOS})`
-          : evento?.titulo
-      ),
+      safeText(evento?.titulo),
       safeText(
         metadata?.tecnico ||
           metadata?.tecnicoResolucao ||
@@ -448,8 +460,8 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
 
   drawSectionTitle(doc, 'Linha do tempo');
   drawTable(doc, {
-    headers: ['Data execucao', 'Categoria', 'Evento / OS', 'Responsavel', 'Status'],
-    columnWidths: [95, 80, 180, 80, 60],
+    headers: ['Data', 'Categoria', 'Evento / OS', 'Responsavel', 'Status'],
+    columnWidths: [95, 75, 200, 75, 50],
     rows: buildHistoricoRows(payload?.eventos || [], locale, timeZone),
   });
 
