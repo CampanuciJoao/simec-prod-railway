@@ -76,7 +76,7 @@ function EquipamentoCard({
         </Button>
       }
       summary={
-        <div className="flex flex-wrap items-center gap-x-8 gap-y-3">
+        <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
           <Col label="Modelo" value={equipamento.modelo} bold />
           <Col label="Nº Série / Tag" value={equipamento.tag} />
           <Col label="Tipo" value={equipamento.tipo} />
