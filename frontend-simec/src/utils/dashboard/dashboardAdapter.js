@@ -6,6 +6,7 @@ const INITIAL_DASHBOARD_STATE = {
   ativos: 0,
   inativos: 0,
   alertas: [],
+  ocorrenciasPendentes: [],
   statusEquipamentos: [],
   manutencoesPorTipo: [],
 };
@@ -73,6 +74,9 @@ export function adaptDashboardResponse(response) {
     inativos,
     alertas: Array.isArray(response?.alertasRecentes)
       ? response.alertasRecentes
+      : [],
+    ocorrenciasPendentes: Array.isArray(response?.ocorrenciasPendentes)
+      ? response.ocorrenciasPendentes
       : [],
     statusEquipamentos,
     manutencoesPorTipo,
