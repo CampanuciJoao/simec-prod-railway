@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import PropTypes from 'prop-types';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRobot, faUser } from '@fortawesome/free-solid-svg-icons';
+
+const MarkdownMessageContent = lazy(() =>
+  import('@/components/ui/chat/MarkdownMessageContent')
+);
 
 function ChatMessageBubble({
   role = 'assistant',
@@ -51,9 +53,15 @@ function ChatMessageBubble({
               {content}
             </p>
           ) : (
-            <div className="chat-markdown text-[13px] leading-6 sm:text-sm">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-            </div>
+            <Suspense
+              fallback={
+                <p className="whitespace-pre-wrap text-[13px] leading-6 sm:text-sm">
+                  {content}
+                </p>
+              }
+            >
+              <MarkdownMessageContent content={content} />
+            </Suspense>
           )}
         </div>
 

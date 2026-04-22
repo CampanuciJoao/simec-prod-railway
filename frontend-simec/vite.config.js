@@ -6,6 +6,69 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+const chunkMatchers = {
+  reactCore: [
+    'react',
+    'react-dom',
+    'scheduler',
+  ],
+  charts: [
+    'chart.js',
+    'react-chartjs-2',
+  ],
+  pdfExport: [
+    'jspdf',
+    'jspdf-autotable',
+  ],
+  markdown: [
+    'react-markdown',
+    'remark-',
+    'rehype-',
+    'unified',
+    'micromark',
+    'mdast-',
+    'hast-',
+    'property-information',
+    'space-separated-tokens',
+    'comma-separated-tokens',
+    'decode-named-character-reference',
+    'character-entities',
+    'character-reference-invalid',
+    'character-entities-legacy',
+    'lowlight',
+    'highlight.js',
+    'vfile',
+    'unist-',
+  ],
+  uiVendor: [
+    '@fortawesome',
+    'lodash',
+  ],
+  http: [
+    'axios',
+  ],
+  routing: [
+    'react-router',
+    '@remix-run',
+  ],
+  realtime: [
+    'socket.io-client',
+    'engine.io-client',
+    '@socket.io',
+  ],
+  streaming: [
+    '@microsoft/fetch-event-source',
+  ],
+};
+
+function normalizeModuleId(id) {
+  return id.replaceAll('\\', '/');
+}
+
+function matchesAny(id, patterns) {
+  return patterns.some((pattern) => id.includes(pattern));
+}
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -21,66 +84,41 @@ export default defineConfig({
             return undefined;
           }
 
-          if (
-            id.includes('/react/') ||
-            id.includes('\\react\\') ||
-            id.includes('/react-dom/') ||
-            id.includes('\\react-dom\\') ||
-            id.includes('/scheduler/') ||
-            id.includes('\\scheduler\\')
-          ) {
+          const normalizedId = normalizeModuleId(id);
+
+          if (matchesAny(normalizedId, chunkMatchers.reactCore)) {
             return 'react-core';
           }
 
-          if (
-            id.includes('chart.js') ||
-            id.includes('react-chartjs-2')
-          ) {
+          if (matchesAny(normalizedId, chunkMatchers.charts)) {
             return 'charts';
           }
 
-          if (
-            id.includes('jspdf') ||
-            id.includes('jspdf-autotable')
-          ) {
+          if (matchesAny(normalizedId, chunkMatchers.pdfExport)) {
             return 'pdf-export';
           }
 
-          if (
-            id.includes('react-markdown') ||
-            id.includes('remark-gfm') ||
-            id.includes('rehype-highlight')
-          ) {
+          if (matchesAny(normalizedId, chunkMatchers.markdown)) {
             return 'markdown';
           }
 
-          if (
-            id.includes('@fortawesome') ||
-            id.includes('lodash')
-          ) {
+          if (matchesAny(normalizedId, chunkMatchers.uiVendor)) {
             return 'ui-vendor';
           }
 
-          if (id.includes('axios')) {
+          if (matchesAny(normalizedId, chunkMatchers.http)) {
             return 'http';
           }
 
-          if (
-            id.includes('react-router') ||
-            id.includes('@remix-run')
-          ) {
+          if (matchesAny(normalizedId, chunkMatchers.routing)) {
             return 'routing';
           }
 
-          if (
-            id.includes('socket.io-client') ||
-            id.includes('engine.io-client') ||
-            id.includes('@socket.io')
-          ) {
+          if (matchesAny(normalizedId, chunkMatchers.realtime)) {
             return 'realtime';
           }
 
-          if (id.includes('@microsoft/fetch-event-source')) {
+          if (matchesAny(normalizedId, chunkMatchers.streaming)) {
             return 'streaming';
           }
 
