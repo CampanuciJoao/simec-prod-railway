@@ -1,12 +1,12 @@
-// Ficheiro: backend-simec/services/uploads/anexoService.js
-
 import { registrarLog } from '../logService.js';
 import {
   assertAllFilesValid,
   createHttpError,
 } from './uploadValidationService.js';
 import {
+  generateStoredFilename,
   normalizeStoredPath,
+  uploadToR2,
   deleteStoredFile,
 } from './fileStorageService.js';
 import { assertEntityBelongsToTenant } from './anexoPolicyService.js';
@@ -26,7 +26,7 @@ function normalizarFiles(files) {
       typeof file === 'object' &&
       file.originalname &&
       file.mimetype &&
-      file.filename
+      file.buffer
   );
 }
 
@@ -47,11 +47,21 @@ export async function adicionarAnexos({
 
   assertAllFilesValid(arquivosValidos, owner.config);
 
-  const anexosData = arquivosValidos.map((file) => ({
+  const uploads = arquivosValidos.map((file) => {
+    const filename = generateStoredFilename(file.originalname);
+    const key = normalizeStoredPath(owner.config.folder, filename);
+    return { file, filename, key };
+  });
+
+  await Promise.all(
+    uploads.map(({ file, key }) => uploadToR2(key, file.buffer, file.mimetype))
+  );
+
+  const anexosData = uploads.map(({ file, key }) => ({
     tenantId,
     [owner.relationField]: entityId,
     nomeOriginal: file.originalname,
-    path: normalizeStoredPath(owner.config.folder, file.filename),
+    path: key,
     tipoMime: file.mimetype,
   }));
 
@@ -100,13 +110,11 @@ export async function removerAnexo({
     throw createHttpError(404, 'Anexo não encontrado.', 'ANEXO_NOT_FOUND');
   }
 
-  // 🔥 CORREÇÃO AQUI
   await deleteAnexoById({
     tenantId,
     anexoId,
   });
 
-  // Remoção física desacoplada
   try {
     deleteStoredFile(anexo.path);
   } catch (error) {
