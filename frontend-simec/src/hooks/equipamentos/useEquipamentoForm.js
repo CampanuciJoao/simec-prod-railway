@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getUnidades } from '@/services/api';
+import { getEquipamentos } from '@/services/api/equipamentosApi';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 
@@ -25,6 +26,7 @@ export function useEquipamentoForm({ initialData, isEditing }) {
 
   const [formData, setFormData] = useState(ESTADO_INICIAL);
   const [unidades, setUnidades] = useState([]);
+  const [fabricantes, setFabricantes] = useState([]);
 
   const [loadingUnidades, setLoadingUnidades] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -62,6 +64,15 @@ export function useEquipamentoForm({ initialData, isEditing }) {
   useEffect(() => {
     fetchUnidades();
   }, [fetchUnidades]);
+
+  useEffect(() => {
+    getEquipamentos({ pageSize: 1 })
+      .then((data) => {
+        const list = data?.filters?.fabricantes;
+        if (Array.isArray(list)) setFabricantes(list.filter(Boolean).sort());
+      })
+      .catch(() => {});
+  }, []);
 
   /**
    * =========================
@@ -141,6 +152,7 @@ export function useEquipamentoForm({ initialData, isEditing }) {
   return {
     formData,
     unidades,
+    fabricantes,
     loadingUnidades,
     submitting,
     error,
