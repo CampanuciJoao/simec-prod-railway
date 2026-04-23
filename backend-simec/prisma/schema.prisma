@@ -556,6 +556,7 @@ enum StatusEquipamento {
   Inoperante
   UsoLimitado
   EmManutencao
+  Desativado
 }
 
 enum StatusContrato {
