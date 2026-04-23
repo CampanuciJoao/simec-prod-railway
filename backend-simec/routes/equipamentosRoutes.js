@@ -724,6 +724,9 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
   const motivoDesativacao = typeof req.body.motivoDesativacao === 'string'
     ? req.body.motivoDesativacao.trim() || null
     : null;
+  const motivoReativacao = typeof req.body.motivoReativacao === 'string'
+    ? req.body.motivoReativacao.trim() || null
+    : null;
   const { dataInstalacao, unidadeId, ...restante } = dados;
 
   try {
@@ -840,48 +843,45 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
 
     if (restante.status && restante.status !== equipamento.status) {
       const isDesativando = restante.status === 'Desativado';
+      const isReativando = equipamento.status === 'Desativado' && restante.status !== 'Desativado';
 
-      await registrarEventoHistoricoAtivo({
-        tenantId,
-        equipamentoId: id,
-        tipoEvento: isDesativando ? 'equipamento_desativado' : 'status_operacional_atualizado',
-        categoria: 'status_operacional',
-        subcategoria: isDesativando ? 'desativacao' : 'mudanca_status',
-        titulo: isDesativando ? 'Equipamento desativado' : 'Status operacional atualizado',
-        descricao: isDesativando
-          ? `Equipamento desativado.${motivoDesativacao ? ` Motivo: ${motivoDesativacao}` : ''}`
-          : `Status alterado de ${equipamento.status} para ${restante.status}.`,
-        origem: 'usuario',
-        status: restante.status,
-        impactaAnalise: ['Inoperante', 'UsoLimitado', 'Desativado'].includes(restante.status),
-        referenciaId: id,
-        referenciaTipo: 'equipamento',
-        metadata: {
-          statusAnterior: equipamento.status,
-          statusNovo: restante.status,
-          ...(isDesativando && { motivoDesativacao }),
-        },
-      });
-    }
-
-    if (camposAlterados.length > 0) {
-      await registrarEventoHistoricoAtivo({
-        tenantId,
-        equipamentoId: id,
-        tipoEvento: 'alteracao_cadastral',
-        categoria: 'alteracao_cadastral',
-        subcategoria: 'edicao_cadastro',
-        titulo: 'Cadastro do equipamento atualizado',
-        descricao: montarDescricaoAlteracaoCadastral(camposAlterados),
-        origem: 'usuario',
-        status: atualizado.status,
-        impactaAnalise: false,
-        referenciaId: id,
-        referenciaTipo: 'equipamento',
-        metadata: {
-          camposAlterados,
-        },
-      });
+      if (isDesativando) {
+        await registrarEventoHistoricoAtivo({
+          tenantId,
+          equipamentoId: id,
+          tipoEvento: 'equipamento_desativado',
+          categoria: 'status_operacional',
+          subcategoria: 'desativacao',
+          titulo: 'Equipamento desativado',
+          descricao: `Equipamento desativado.${motivoDesativacao ? ` Motivo: ${motivoDesativacao}` : ''}`,
+          origem: 'usuario',
+          status: restante.status,
+          impactaAnalise: true,
+          metadata: {
+            statusAnterior: equipamento.status,
+            statusNovo: restante.status,
+            motivoDesativacao,
+          },
+        });
+      } else if (isReativando) {
+        await registrarEventoHistoricoAtivo({
+          tenantId,
+          equipamentoId: id,
+          tipoEvento: 'equipamento_reativado',
+          categoria: 'status_operacional',
+          subcategoria: 'reativacao',
+          titulo: 'Equipamento reativado',
+          descricao: `Equipamento reativado com status "${restante.status}".${motivoReativacao ? ` Motivo: ${motivoReativacao}` : ''}`,
+          origem: 'usuario',
+          status: restante.status,
+          impactaAnalise: false,
+          metadata: {
+            statusAnterior: equipamento.status,
+            statusNovo: restante.status,
+            motivoReativacao,
+          },
+        });
+      }
     }
 
     const equipamentoCompleto = await buscarEquipamentoCompleto(tenantId, id);

@@ -68,6 +68,9 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [showModalDesativacao, setShowModalDesativacao] = useState(false);
   const [motivoDesativacao, setMotivoDesativacao] = useState('');
+  const [showModalReativacao, setShowModalReativacao] = useState(false);
+  const [motivoReativacao, setMotivoReativacao] = useState('');
+  const [statusPendente, setStatusPendente] = useState(null);
   const { addToast } = useToast();
 
   const variant = useMemo(
@@ -83,7 +86,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     [variant]
   );
 
-  const executarUpdate = async (novoStatus, motivo) => {
+  const executarUpdate = async (novoStatus, { motivoDesativacao: md, motivoReativacao: mr } = {}) => {
     const statusAnterior = currentStatus;
     setIsUpdating(true);
     setCurrentStatus(novoStatus);
@@ -91,7 +94,8 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     try {
       await updateEquipamento(equipamento.id, {
         status: novoStatus,
-        ...(motivo ? { motivoDesativacao: motivo } : {}),
+        ...(md ? { motivoDesativacao: md } : {}),
+        ...(mr ? { motivoReativacao: mr } : {}),
       });
 
       onSuccessUpdate?.(equipamento.id, novoStatus);
@@ -116,18 +120,38 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
       return;
     }
 
-    executarUpdate(novoStatus, null);
+    if (currentStatus === 'Desativado') {
+      setStatusPendente(novoStatus);
+      setMotivoReativacao('');
+      setShowModalReativacao(true);
+      return;
+    }
+
+    executarUpdate(novoStatus);
   };
 
   const handleConfirmarDesativacao = async () => {
     setShowModalDesativacao(false);
-    await executarUpdate('Desativado', motivoDesativacao);
+    await executarUpdate('Desativado', { motivoDesativacao });
     setMotivoDesativacao('');
   };
 
   const handleCancelarDesativacao = () => {
     setShowModalDesativacao(false);
     setMotivoDesativacao('');
+  };
+
+  const handleConfirmarReativacao = async () => {
+    setShowModalReativacao(false);
+    await executarUpdate(statusPendente, { motivoReativacao });
+    setMotivoReativacao('');
+    setStatusPendente(null);
+  };
+
+  const handleCancelarReativacao = () => {
+    setShowModalReativacao(false);
+    setMotivoReativacao('');
+    setStatusPendente(null);
   };
 
   return (
@@ -184,6 +208,26 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
           value={motivoDesativacao}
           onChange={(e) => setMotivoDesativacao(e.target.value)}
           placeholder="Ex.: Equipamento aguardando descarte, substituído por modelo mais recente..."
+          rows={3}
+          required
+        />
+      </ModalConfirmacao>
+
+      <ModalConfirmacao
+        isOpen={showModalReativacao}
+        onClose={handleCancelarReativacao}
+        onConfirm={handleConfirmarReativacao}
+        title="Reativar equipamento"
+        message="Informe o motivo pelo qual este equipamento está sendo reativado. Esse registro ficará salvo no histórico de vida do equipamento."
+        confirmText="Confirmar reativação"
+        cancelText="Cancelar"
+        confirmDisabled={!motivoReativacao.trim()}
+      >
+        <Textarea
+          label="Motivo da reativação"
+          value={motivoReativacao}
+          onChange={(e) => setMotivoReativacao(e.target.value)}
+          placeholder="Ex.: Novo local definido, equipamento retornou da manutenção..."
           rows={3}
           required
         />
