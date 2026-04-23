@@ -71,10 +71,11 @@ function EquipamentoCard({
         </button>
       }
       summary={
-        <div className="grid w-full items-center gap-x-5 md:grid-cols-[minmax(0,1.05fr)_minmax(120px,0.9fr)_minmax(0,1.45fr)_minmax(0,0.95fr)_160px] lg:gap-x-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(130px,0.9fr)_minmax(0,1.6fr)_minmax(0,1fr)_170px] xl:gap-x-8">
+        <div className="grid w-full items-center gap-x-5 md:grid-cols-[minmax(0,1.05fr)_minmax(110px,0.8fr)_minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,0.9fr)_160px] lg:gap-x-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(120px,0.85fr)_minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.95fr)_170px] xl:gap-x-8">
           <Col label="Modelo" value={equipamento.modelo} bold />
           <Col label="Nº Série / Tag" value={equipamento.tag} />
           <Col label="Tipo" value={equipamento.tipo} />
+          <Col label="Fabricante" value={equipamento.fabricante} />
           <Col label="Unidade" value={equipamento.unidade?.nomeSistema} />
 
           <div className="flex min-w-0 flex-col gap-0.5">
