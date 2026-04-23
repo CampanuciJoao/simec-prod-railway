@@ -70,8 +70,8 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-app.get('/uploads/*', async (req, res) => {
-  const key = req.path.slice(1);
+app.get('/uploads/*path', async (req, res) => {
+  const key = 'uploads/' + req.params.path;
   try {
     const obj = await getFromR2(key);
     res.set('Content-Type', obj.ContentType || 'application/octet-stream');
