@@ -7,8 +7,20 @@ dotenv.config();
 
 let connection = null;
 let alertasQueue = null;
+let queueUnavailable = false;
+let queueUnavailableReason = null;
+let queueErrorLogged = false;
+
+function markQueueUnavailable(reason) {
+  queueUnavailable = true;
+  queueUnavailableReason = reason || 'redis_unavailable';
+}
 
 function getConnection() {
+  if (queueUnavailable) {
+    return null;
+  }
+
   if (connection) {
     return connection;
   }
@@ -18,6 +30,7 @@ function getConnection() {
     lazyConnect: true,
     enableOfflineQueue: false,
     maxRetriesPerRequest: null,
+    retryStrategy: () => null,
   });
 
   connection.on('connect', () => {
@@ -25,19 +38,35 @@ function getConnection() {
   });
 
   connection.on('error', (err) => {
-    console.error('Erro Redis (queue):', err.message);
+    if (!queueErrorLogged) {
+      console.error('Erro Redis (queue):', err.message);
+      queueErrorLogged = true;
+    }
+
+    if (err?.message?.includes('WRONGPASS')) {
+      markQueueUnavailable('redis_wrongpass');
+    }
   });
 
   return connection;
 }
 
 function getAlertasQueue() {
+  if (queueUnavailable) {
+    return null;
+  }
+
   if (alertasQueue) {
     return alertasQueue;
   }
 
+  const activeConnection = getConnection();
+  if (!activeConnection) {
+    return null;
+  }
+
   alertasQueue = new Queue('alertas-fila', {
-    connection: getConnection(),
+    connection: activeConnection,
   });
 
   return alertasQueue;
@@ -75,6 +104,13 @@ async function logQueueState(prefix = 'QUEUE_STATE') {
 export async function iniciarJobsDeAlertas() {
   try {
     const queue = getAlertasQueue();
+    if (!queue) {
+      console.warn(
+        `[QUEUE_DISABLED] Jobs de alertas nao iniciados (${queueUnavailableReason || 'redis_indisponivel'}).`
+      );
+      return false;
+    }
+
     await queue.waitUntilReady();
 
     const repeatables = await queue.getRepeatableJobs();
@@ -108,9 +144,11 @@ export async function iniciarJobsDeAlertas() {
     );
 
     await logQueueState('QUEUE_AFTER_INIT');
+    return true;
   } catch (error) {
-    console.error('Erro ao iniciar jobs:', error);
-    throw error;
+    markQueueUnavailable(error?.message || 'queue_init_failed');
+    console.error('Erro ao iniciar jobs:', error.message || error);
+    return false;
   }
 }
 
@@ -136,7 +174,12 @@ export async function enfileirarReprocessamentoAlertasDoTenant(
 ) {
   if (!tenantId) return null;
 
-  return getAlertasQueue().add(
+  const queue = getAlertasQueue();
+  if (!queue) {
+    return null;
+  }
+
+  return queue.add(
     'reprocessar-alertas-tenant',
     {
       tenantId,
