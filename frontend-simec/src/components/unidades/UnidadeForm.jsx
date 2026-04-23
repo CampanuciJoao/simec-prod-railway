@@ -11,15 +11,37 @@ import {
 import { useUnidadeForm } from '@/hooks/unidades/useUnidadeForm';
 
 const ESTADOS = [
-  { value: 'MS', label: 'Mato Grosso do Sul' },
-  { value: 'MT', label: 'Mato Grosso' },
+  { value: 'AC', label: 'Acre' },
+  { value: 'AL', label: 'Alagoas' },
+  { value: 'AP', label: 'Amapá' },
+  { value: 'AM', label: 'Amazonas' },
+  { value: 'BA', label: 'Bahia' },
+  { value: 'CE', label: 'Ceará' },
+  { value: 'DF', label: 'Distrito Federal' },
+  { value: 'ES', label: 'Espírito Santo' },
   { value: 'GO', label: 'Goiás' },
-  { value: 'SP', label: 'São Paulo' },
+  { value: 'MA', label: 'Maranhão' },
+  { value: 'MT', label: 'Mato Grosso' },
+  { value: 'MS', label: 'Mato Grosso do Sul' },
+  { value: 'MG', label: 'Minas Gerais' },
+  { value: 'PA', label: 'Pará' },
+  { value: 'PB', label: 'Paraíba' },
   { value: 'PR', label: 'Paraná' },
+  { value: 'PE', label: 'Pernambuco' },
+  { value: 'PI', label: 'Piauí' },
+  { value: 'RJ', label: 'Rio de Janeiro' },
+  { value: 'RN', label: 'Rio Grande do Norte' },
+  { value: 'RS', label: 'Rio Grande do Sul' },
+  { value: 'RO', label: 'Rondônia' },
+  { value: 'RR', label: 'Roraima' },
+  { value: 'SC', label: 'Santa Catarina' },
+  { value: 'SP', label: 'São Paulo' },
+  { value: 'SE', label: 'Sergipe' },
+  { value: 'TO', label: 'Tocantins' },
 ];
 
 function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
-  const { formData, handleChange, isValid } = useUnidadeForm({
+  const { formData, handleChange, cepStatus, cepHint, isValid } = useUnidadeForm({
     initialData,
     isEditing,
   });
@@ -64,9 +86,40 @@ function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
 
       <FormSection
         title="Endereço"
-        description="Dados de localização e correspondência da unidade."
+        description="Use o CEP para adiantar cidade, estado, bairro e logradouro."
       >
         <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
+          <Input
+            label="CEP"
+            value={formData.cep}
+            onChange={(e) => handleChange('cep', e.target.value)}
+            placeholder="Ex.: 79000-000"
+            hint={cepStatus === 'error' ? '' : cepHint}
+            error={cepStatus === 'error' ? cepHint : ''}
+          />
+
+          <Select
+            label="Estado"
+            value={formData.estado}
+            onChange={(e) => handleChange('estado', e.target.value)}
+            options={ESTADOS}
+            placeholder="Selecione o estado"
+          />
+
+          <Input
+            label="Cidade"
+            value={formData.cidade}
+            onChange={(e) => handleChange('cidade', e.target.value)}
+            placeholder="Ex.: Campo Grande"
+          />
+
+          <Input
+            label="Bairro"
+            value={formData.bairro}
+            onChange={(e) => handleChange('bairro', e.target.value)}
+            placeholder="Ex.: Centro"
+          />
+
           <Input
             label="Logradouro"
             value={formData.logradouro}
@@ -79,6 +132,7 @@ function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
             value={formData.numero}
             onChange={(e) => handleChange('numero', e.target.value)}
             placeholder="Ex.: 1200"
+            hint="Normalmente este campo não vem pelo CEP."
           />
 
           <Input
@@ -86,35 +140,7 @@ function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
             value={formData.complemento}
             onChange={(e) => handleChange('complemento', e.target.value)}
             placeholder="Ex.: Bloco B"
-          />
-
-          <Input
-            label="Bairro"
-            value={formData.bairro}
-            onChange={(e) => handleChange('bairro', e.target.value)}
-            placeholder="Ex.: Centro"
-          />
-
-          <Input
-            label="CEP"
-            value={formData.cep}
-            onChange={(e) => handleChange('cep', e.target.value)}
-            placeholder="Ex.: 79000-000"
-          />
-
-          <Input
-            label="Cidade"
-            value={formData.cidade}
-            onChange={(e) => handleChange('cidade', e.target.value)}
-            placeholder="Ex.: Campo Grande"
-          />
-
-          <Select
-            label="Estado"
-            value={formData.estado}
-            onChange={(e) => handleChange('estado', e.target.value)}
-            options={ESTADOS}
-            placeholder="Selecione o estado"
+            hint="Use para bloco, sala, recepção ou referência interna."
           />
         </ResponsiveGrid>
       </FormSection>
