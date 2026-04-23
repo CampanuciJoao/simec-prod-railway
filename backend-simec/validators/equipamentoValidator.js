@@ -24,6 +24,22 @@ const optionalTextSchema = z
     return trimmed.length > 0 ? trimmed : null;
   });
 
+function toTitleCase(str) {
+  return str
+    .toLowerCase()
+    .replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
+}
+
+const fabricanteSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .transform((value) => {
+    if (typeof value !== 'string') return value ?? null;
+    const trimmed = value.trim();
+    return trimmed.length > 0 ? toTitleCase(trimmed) : null;
+  });
+
 export const equipamentoSchema = z.object({
   tag: z.string().min(2, 'A Tag (Nº de Série) é obrigatória.'),
   modelo: z.string().min(1, 'O modelo do equipamento é obrigatório.'),
@@ -34,7 +50,7 @@ export const equipamentoSchema = z.object({
     .default('Operante'),
 
   numeroPatrimonio: optionalTextSchema,
-  fabricante: optionalTextSchema,
+  fabricante: fabricanteSchema,
   dataInstalacao: optionalTextSchema,
   tipo: optionalTextSchema,
   setor: optionalTextSchema,

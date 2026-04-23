@@ -48,6 +48,7 @@ function EquipamentoForm({
   const {
     formData,
     unidades,
+    fabricantes,
     loadingUnidades,
     submitting,
     error,
@@ -58,6 +59,15 @@ function EquipamentoForm({
     toggleSemPatrimonio,
     validate,
   } = useEquipamentoForm({ initialData, isEditing });
+
+  const normalizeFabricante = () => {
+    const raw = formData.fabricante || '';
+    const normalized = raw
+      .trim()
+      .toLowerCase()
+      .replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
+    if (normalized !== raw) handleChange('fabricante', normalized);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -133,6 +143,24 @@ function EquipamentoForm({
             disabled={loadingUnidades}
             required
           />
+
+          <div>
+            <Input
+              label="Fabricante"
+              value={formData.fabricante}
+              onChange={(e) => handleChange('fabricante', e.target.value)}
+              onBlur={normalizeFabricante}
+              placeholder="Ex.: Siemens"
+              list="fabricantes-datalist"
+            />
+            {fabricantes.length > 0 && (
+              <datalist id="fabricantes-datalist">
+                {fabricantes.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+            )}
+          </div>
         </ResponsiveGrid>
       </FormSection>
 
@@ -148,15 +176,6 @@ function EquipamentoForm({
             onChange={(e) =>
               handleChange('dataInstalacao', e.target.value)
             }
-          />
-
-          <Input
-            label="Fabricante"
-            value={formData.fabricante}
-            onChange={(e) =>
-              handleChange('fabricante', e.target.value)
-            }
-            placeholder="Ex.: Siemens"
           />
 
           <Input
