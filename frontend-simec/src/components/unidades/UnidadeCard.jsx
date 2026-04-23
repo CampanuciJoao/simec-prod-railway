@@ -10,7 +10,10 @@ import {
 
 import { Button, Card } from '@/components/ui';
 
-import { formatarEndereco } from '@/utils/unidades/unidade.utils';
+import {
+  formatarCnpj,
+  formatarEndereco,
+} from '@/utils/unidades/unidade.utils';
 
 function MetaItem({ icon, label, value, title = value }) {
   return (
@@ -79,32 +82,21 @@ function UnidadeCard({ unidade, onEdit, onDelete }) {
             {unidade.nomeSistema}
           </h4>
 
-          <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="mt-3 flex items-center gap-2">
             <span
-              className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+              className="inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
               style={{
                 backgroundColor: 'var(--bg-surface-soft)',
                 color: 'var(--text-secondary)',
                 border: '1px solid var(--border-soft)',
               }}
+              title={unidade.nomeFantasia || 'Sem nome fantasia'}
             >
               <FontAwesomeIcon icon={faBuilding} />
-              {unidade.nomeFantasia || 'Sem nome fantasia'}
-            </span>
-
-            {localizacao ? (
-              <span
-                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
-                style={{
-                  backgroundColor: 'color-mix(in srgb, var(--brand-primary) 12%, transparent)',
-                  color: 'var(--brand-primary)',
-                  border: '1px solid color-mix(in srgb, var(--brand-primary) 22%, transparent)',
-                }}
-              >
-                <FontAwesomeIcon icon={faCity} />
-                {localizacao}
+              <span className="min-w-0 truncate whitespace-nowrap">
+                {unidade.nomeFantasia || 'Sem nome fantasia'}
               </span>
-            ) : null}
+            </span>
           </div>
         </div>
 
@@ -145,7 +137,7 @@ function UnidadeCard({ unidade, onEdit, onDelete }) {
         <MetaItem
           icon={faHashtag}
           label="CNPJ"
-          value={unidade.cnpj || 'Não informado'}
+          value={formatarCnpj(unidade.cnpj)}
         />
         <MetaItem
           icon={faCity}
