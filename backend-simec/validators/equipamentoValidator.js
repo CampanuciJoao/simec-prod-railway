@@ -1,17 +1,18 @@
 import { z } from 'zod';
 
-const aeTitleSchema = z
-  .string()
-  .trim()
-  .max(16, 'AE Title deve ter no maximo 16 caracteres.')
-  .regex(/^[A-Z0-9 _-]+$/, 'AE Title deve seguir o padrao DICOM.')
-  .nullable()
-  .optional()
-  .transform((value) => {
-    if (typeof value !== 'string') return null;
-    const normalized = value.trim().toUpperCase();
+const aeTitleSchema = z.preprocess(
+  (val) => {
+    if (typeof val !== 'string') return null;
+    const normalized = val.trim().toUpperCase();
     return normalized.length > 0 ? normalized : null;
-  });
+  },
+  z
+    .string()
+    .max(16, 'AE Title deve ter no maximo 16 caracteres.')
+    .regex(/^[A-Z0-9 _-]+$/, 'AE Title deve seguir o padrao DICOM.')
+    .nullable()
+    .optional()
+);
 
 const optionalTextSchema = z
   .string()
