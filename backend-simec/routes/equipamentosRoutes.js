@@ -667,6 +667,9 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData || req.body;
+  const motivoDesativacao = typeof req.body.motivoDesativacao === 'string'
+    ? req.body.motivoDesativacao.trim() || null
+    : null;
   const { dataInstalacao, unidadeId, ...restante } = dados;
 
   try {
@@ -782,22 +785,27 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
     }
 
     if (restante.status && restante.status !== equipamento.status) {
+      const isDesativando = restante.status === 'Desativado';
+
       await registrarEventoHistoricoAtivo({
         tenantId,
         equipamentoId: id,
-        tipoEvento: 'status_operacional_atualizado',
+        tipoEvento: isDesativando ? 'equipamento_desativado' : 'status_operacional_atualizado',
         categoria: 'status_operacional',
-        subcategoria: 'mudanca_status',
-        titulo: 'Status operacional atualizado',
-        descricao: `Status alterado de ${equipamento.status} para ${restante.status}.`,
+        subcategoria: isDesativando ? 'desativacao' : 'mudanca_status',
+        titulo: isDesativando ? 'Equipamento desativado' : 'Status operacional atualizado',
+        descricao: isDesativando
+          ? `Equipamento desativado.${motivoDesativacao ? ` Motivo: ${motivoDesativacao}` : ''}`
+          : `Status alterado de ${equipamento.status} para ${restante.status}.`,
         origem: 'usuario',
         status: restante.status,
-        impactaAnalise: ['Inoperante', 'UsoLimitado'].includes(restante.status),
+        impactaAnalise: ['Inoperante', 'UsoLimitado', 'Desativado'].includes(restante.status),
         referenciaId: id,
         referenciaTipo: 'equipamento',
         metadata: {
           statusAnterior: equipamento.status,
           statusNovo: restante.status,
+          ...(isDesativando && { motivoDesativacao }),
         },
       });
     }
