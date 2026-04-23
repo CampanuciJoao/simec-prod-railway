@@ -4,6 +4,7 @@ export * from './anexosApi';
 export * from './auditoriaApi';
 export * from './authApi';
 export * from './biApi';
+export * from './cepApi';
 export * from './contratosApi';
 export * from './dashboardApi';
 export * from './emailsNotificacaoApi';
