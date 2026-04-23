@@ -83,8 +83,12 @@ function EquipamentoForm({
     try {
       setSubmitting(true);
       await onSubmit(formData);
-    } catch {
-      setError('Erro ao salvar equipamento.');
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Erro ao salvar equipamento.';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
