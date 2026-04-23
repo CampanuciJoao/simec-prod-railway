@@ -3,8 +3,6 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
@@ -33,9 +31,7 @@ import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
 import { iniciarJobsDeAlertas } from './services/queueService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { getFromR2 } from './services/uploads/fileStorageService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -73,7 +69,17 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.get('/uploads/*', async (req, res) => {
+  const key = req.path.slice(1);
+  try {
+    const obj = await getFromR2(key);
+    res.set('Content-Type', obj.ContentType || 'application/octet-stream');
+    obj.Body.pipe(res);
+  } catch {
+    res.status(404).json({ error: 'Arquivo não encontrado.' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');

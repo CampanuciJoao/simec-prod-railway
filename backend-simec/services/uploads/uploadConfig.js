@@ -1,40 +1,11 @@
-// Ficheiro: backend-simec/services/uploads/uploadConfig.js
-
 import multer from 'multer';
-import {
-  assertUploadResourceExists,
-  assertMimeAllowed,
-} from './uploadValidationService.js';
-import {
-  ensureUploadDir,
-  generateStoredFilename,
-} from './fileStorageService.js';
+import { assertUploadResourceExists, assertMimeAllowed } from './uploadValidationService.js';
 
 export function createUploadInstance(resource) {
   const config = assertUploadResourceExists(resource);
 
-  const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-      try {
-        const absoluteDir = ensureUploadDir(config.folder);
-        cb(null, absoluteDir);
-      } catch (error) {
-        cb(error);
-      }
-    },
-
-    filename: (req, file, cb) => {
-      try {
-        const filename = generateStoredFilename(file.originalname);
-        cb(null, filename);
-      } catch (error) {
-        cb(error);
-      }
-    },
-  });
-
   return multer({
-    storage,
+    storage: multer.memoryStorage(),
     limits: {
       fileSize: config.maxFileSize,
       files: config.maxCount,

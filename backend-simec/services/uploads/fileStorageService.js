@@ -1,22 +1,13 @@
-// Ficheiro: backend-simec/services/uploads/fileStorageService.js
-
-import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  PutObjectCommand,
+  DeleteObjectCommand,
+  GetObjectCommand,
+} from '@aws-sdk/client-s3';
+import r2 from './r2Client.js';
 
-export function buildRelativeUploadDir(folder) {
-  return path.join('uploads', folder);
-}
-
-export function buildAbsoluteUploadDir(folder) {
-  return path.resolve(buildRelativeUploadDir(folder));
-}
-
-export function ensureUploadDir(folder) {
-  const absoluteDir = buildAbsoluteUploadDir(folder);
-  fs.mkdirSync(absoluteDir, { recursive: true });
-  return absoluteDir;
-}
+const BUCKET = process.env.R2_BUCKET_NAME;
 
 export function generateStoredFilename(originalname = '') {
   const ext = path.extname(String(originalname || '')).toLowerCase();
@@ -24,20 +15,32 @@ export function generateStoredFilename(originalname = '') {
 }
 
 export function normalizeStoredPath(folder, filename) {
-  return path.join('uploads', folder, filename).replace(/\\/g, '/');
+  return `uploads/${folder}/${filename}`;
 }
 
-export function deleteStoredFile(storedPath) {
-  if (!storedPath || typeof storedPath !== 'string') {
-    return false;
-  }
+export async function uploadToR2(key, buffer, mimetype) {
+  await r2.send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: buffer,
+      ContentType: mimetype,
+    })
+  );
+}
 
-  const absolutePath = path.resolve(storedPath);
+export async function getFromR2(key) {
+  return r2.send(
+    new GetObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+    })
+  );
+}
 
-  if (!fs.existsSync(absolutePath)) {
-    return false;
-  }
-
-  fs.unlinkSync(absolutePath);
-  return true;
+export function deleteStoredFile(key) {
+  if (!key || typeof key !== 'string') return;
+  r2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key })).catch((err) =>
+    console.error('[R2_DELETE_ERROR]', key, err)
+  );
 }

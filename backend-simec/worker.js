@@ -5,12 +5,19 @@ import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasO
 import { processarAlertasManutencaoDoTenant } from './services/alertas/manutencao/index.js';
 import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
 import prisma from './services/prismaService.js';
+import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 
 dotenv.config();
 
-const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
-const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
-const inspectionConnection = new IORedis(redisUrl, { maxRetriesPerRequest: null });
+const redisConnectionOptions = getRedisConnectionOptions();
+const connection = new IORedis({
+  ...redisConnectionOptions,
+  maxRetriesPerRequest: null,
+});
+const inspectionConnection = new IORedis({
+  ...redisConnectionOptions,
+  maxRetriesPerRequest: null,
+});
 
 const alertasQueue = new Queue('alertas-fila', {
   connection: inspectionConnection,
