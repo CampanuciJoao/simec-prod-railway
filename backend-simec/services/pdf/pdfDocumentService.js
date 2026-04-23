@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const logoPath = path.resolve(
   __dirname,
-  '../../../frontend-simec/src/assets/images/logo-simec.png'
+  '../../assets/logo-simec.png'
 );
 
 const COLORS = {
