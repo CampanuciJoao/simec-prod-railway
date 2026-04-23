@@ -74,6 +74,7 @@ function GlobalFilterBar({
                     value={filter.value ?? ''}
                     onChange={(e) => filter.onChange(e.target.value)}
                     className="pl-10 pr-10"
+                    placeholder=""
                     title={
                       filter.options?.find((opt) => opt.value === filter.value)?.label ||
                       filter.defaultLabel ||
