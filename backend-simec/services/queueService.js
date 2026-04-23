@@ -1,10 +1,9 @@
 import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import dotenv from 'dotenv';
+import { getRedisConnectionOptions } from './redis/redisConnectionOptions.js';
 
 dotenv.config();
-
-const redisUrl = process.env.REDIS_URL || 'redis://127.0.0.1:6379';
 
 let connection = null;
 let alertasQueue = null;
@@ -14,7 +13,8 @@ function getConnection() {
     return connection;
   }
 
-  connection = new IORedis(redisUrl, {
+  connection = new IORedis({
+    ...getRedisConnectionOptions(),
     lazyConnect: true,
     enableOfflineQueue: false,
     maxRetriesPerRequest: null,
