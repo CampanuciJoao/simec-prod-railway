@@ -1,3 +1,15 @@
+/**
+ * Roda prisma migrate deploy com suporte a baseline automatico.
+ *
+ * Quando o banco existe mas nao tem a tabela _prisma_migrations (criado via
+ * db push), o migrate deploy retorna P3005. Nesse caso este script:
+ *   1. Marca todas as migrations EXCETO a ultima como "ja aplicadas" (baseline)
+ *   2. Roda migrate deploy, que executa APENAS o SQL da ultima migration
+ *
+ * Nas proximas implantacoes, _prisma_migrations ja existe e o deploy funciona
+ * normalmente na primeira tentativa.
+ */
+
 import { spawnSync } from 'child_process';
 import { readdirSync } from 'fs';
 import { join, dirname } from 'path';
@@ -46,7 +58,13 @@ if (!firstOutput.includes('P3005')) {
 
 console.log('[migrate] P3005 detectado — realizando baseline das migrations existentes...');
 
-for (const name of getMigrationNames()) {
+const migrations = getMigrationNames();
+
+// Baseline todas EXCETO a ultima — a ultima precisa ter seu SQL executado pelo deploy.
+// Se houver mais de uma migration nova, ajuste o slice abaixo.
+const toBaseline = migrations.slice(0, -1);
+
+for (const name of toBaseline) {
   const r = run(`npx prisma migrate resolve --applied "${name}"`, { silent: true });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   if (r.status === 0 || out.includes('already recorded')) {
@@ -56,7 +74,7 @@ for (const name of getMigrationNames()) {
   }
 }
 
-console.log('[migrate] Baseline concluido. Rodando migrate deploy...');
+console.log(`[migrate] Baseline concluido. Executando SQL da migration: ${migrations.at(-1)}`);
 
 const second = run('npx prisma migrate deploy');
 process.exit(second.status ?? 0);
