@@ -64,7 +64,7 @@ function Sidebar({
         <div className="flex items-center justify-between px-3 pt-4 lg:justify-center">
           <Link
             to="/dashboard"
-            className="flex w-full items-center justify-center rounded-2xl border px-3 py-4 transition"
+            className="block w-full overflow-hidden rounded-2xl border transition"
             onClick={onClose}
             style={{
               backgroundColor: 'var(--bg-sidebar-soft)',
@@ -74,7 +74,7 @@ function Sidebar({
             <img
               src={logoSimec}
               alt="SIMEC Logo"
-              className="max-h-[200px] max-w-[170px] object-contain"
+              className="w-full object-cover"
             />
           </Link>
 
