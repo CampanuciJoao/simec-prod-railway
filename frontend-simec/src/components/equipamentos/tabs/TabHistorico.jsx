@@ -14,6 +14,11 @@ import {
 import { exportarHistoricoEquipamentoPDF } from '@/services/api/pdfApi';
 
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  deleteHistoricoEvento,
+  updateHistoricoEvento,
+} from '@/services/api/historicoAtivoApi';
 import {
   buildHistoricoTimeline,
   mapFiltroHistoricoParaQuery,
@@ -33,6 +38,7 @@ import {
 
 function TabHistorico({ equipamento }) {
   const { addToast } = useToast();
+  const { isAdmin } = useAuth();
 
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -133,6 +139,27 @@ function TabHistorico({ equipamento }) {
       .catch(() => {
         addToast('Erro ao gerar o PDF do historico.', 'error');
       });
+  };
+
+  const handleDeleteEvento = async (eventoId) => {
+    try {
+      await deleteHistoricoEvento(equipamento.id, eventoId);
+      setEventos((prev) => prev.filter((e) => e.id !== eventoId));
+      addToast('Registro excluido do historico.', 'success');
+      carregarDados();
+    } catch {
+      addToast('Erro ao excluir registro.', 'error');
+    }
+  };
+
+  const handleEditEvento = async (eventoId, dados) => {
+    try {
+      await updateHistoricoEvento(equipamento.id, eventoId, dados);
+      addToast('Registro atualizado.', 'success');
+      carregarDados();
+    } catch {
+      addToast('Erro ao atualizar registro.', 'error');
+    }
   };
 
   const handleCarregarMais = async () => {
@@ -310,6 +337,9 @@ function TabHistorico({ equipamento }) {
                 linhaDoTempo={linhaDoTempo}
                 itensExpandidos={itensExpandidos}
                 onToggleExpandir={toggleExpandir}
+                isAdmin={isAdmin}
+                onDeleteEvento={handleDeleteEvento}
+                onEditEvento={handleEditEvento}
               />
             )}
           </div>
