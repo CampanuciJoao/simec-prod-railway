@@ -46,7 +46,7 @@ export const equipamentoSchema = z.object({
   unidadeId: z.string().min(1, 'A unidade hospitalar é obrigatória.'),
 
   status: z
-    .enum(['Operante', 'Inoperante', 'EmManutencao', 'UsoLimitado'])
+    .enum(['Operante', 'Inoperante', 'EmManutencao', 'UsoLimitado', 'Desativado'])
     .default('Operante'),
 
   numeroPatrimonio: optionalTextSchema,

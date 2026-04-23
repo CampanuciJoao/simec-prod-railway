@@ -197,6 +197,19 @@ function EquipamentoForm({
             onChange={(e) => handleChange('setor', e.target.value)}
             placeholder="Ex.: Sala de Raio-X, 2º andar"
           />
+
+          <Select
+            label="Status"
+            value={formData.status}
+            onChange={(e) => handleChange('status', e.target.value)}
+            options={[
+              { value: 'Operante', label: 'Operante' },
+              { value: 'UsoLimitado', label: 'Uso Limitado' },
+              { value: 'EmManutencao', label: 'Em Manutenção' },
+              { value: 'Inoperante', label: 'Inoperante' },
+              { value: 'Desativado', label: 'Desativado' },
+            ]}
+          />
         </ResponsiveGrid>
 
         <Textarea

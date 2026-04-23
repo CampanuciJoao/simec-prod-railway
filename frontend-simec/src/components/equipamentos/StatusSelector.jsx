@@ -15,6 +15,7 @@ const STATUS_OPTIONS = [
   'Inoperante',
   'UsoLimitado',
   'EmManutencao',
+  'Desativado',
 ];
 
 function formatarStatusParaDisplay(status) {

@@ -6,6 +6,7 @@ const STATUS_VARIANT_MAP = {
   emmanutencao: 'yellow',
   inoperante: 'red',
   usolimitado: 'orange',
+  desativado: 'slate',
 
   // MANUTENÇÃO
   agendada: 'blue',
