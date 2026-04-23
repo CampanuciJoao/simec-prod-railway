@@ -10,7 +10,7 @@ import { getEquipamentoCardStyles } from '@/utils/equipamentoCardStyles';
 
 function Col({ label, value, bold = false }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
+    <div className="flex min-w-0 flex-col gap-0.5">
       <span
         className="text-[10px] font-semibold uppercase tracking-widest"
         style={{ color: 'var(--text-muted)' }}
@@ -18,11 +18,11 @@ function Col({ label, value, bold = false }) {
         {label}
       </span>
       <span
-        className="text-sm leading-snug md:text-base"
+        className="truncate text-base"
+        title={value || '-'}
         style={{
           color: 'var(--text-primary)',
           fontWeight: bold ? 700 : 600,
-          wordBreak: 'break-word',
         }}
       >
         {value || '—'}
@@ -71,13 +71,13 @@ function EquipamentoCard({
         </button>
       }
       summary={
-        <div className="grid w-full items-start gap-x-6 gap-y-3 md:grid-cols-[minmax(0,1.2fr)_minmax(140px,0.95fr)_minmax(0,1.1fr)_minmax(0,1fr)_180px] xl:gap-x-8">
+        <div className="grid w-full items-center gap-x-5 md:grid-cols-[minmax(0,1.05fr)_minmax(120px,0.9fr)_minmax(0,1.45fr)_minmax(0,0.95fr)_160px] lg:gap-x-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(130px,0.9fr)_minmax(0,1.6fr)_minmax(0,1fr)_170px] xl:gap-x-8">
           <Col label="Modelo" value={equipamento.modelo} bold />
           <Col label="Nº Série / Tag" value={equipamento.tag} />
           <Col label="Tipo" value={equipamento.tipo} />
           <Col label="Unidade" value={equipamento.unidade?.nomeSistema} />
 
-          <div className="flex min-w-0 flex-col gap-1.5">
+          <div className="flex min-w-0 flex-col gap-0.5">
             <span
               className="text-[10px] font-semibold uppercase tracking-widest"
               style={{ color: 'var(--text-muted)' }}
