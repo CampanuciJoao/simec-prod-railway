@@ -10,6 +10,7 @@ import {
   PageState,
   ResponsiveGrid,
   Select,
+  Textarea,
 } from '@/components/ui';
 
 import { useEquipamentoForm } from '@/hooks/equipamentos/useEquipamentoForm';
@@ -189,7 +190,22 @@ function EquipamentoForm({
             min="1900"
             max="2100"
           />
+
+          <Input
+            label="Localização"
+            value={formData.setor}
+            onChange={(e) => handleChange('setor', e.target.value)}
+            placeholder="Ex.: Sala de Raio-X, 2º andar"
+          />
         </ResponsiveGrid>
+
+        <Textarea
+          label="Observações"
+          value={formData.observacoes}
+          onChange={(e) => handleChange('observacoes', e.target.value)}
+          placeholder="Informações adicionais sobre o equipamento..."
+          rows={3}
+        />
       </FormSection>
 
       {/* 🔹 PATRIMÔNIO */}
