@@ -15,11 +15,26 @@ import {
 import { useEquipamentoForm } from '@/hooks/equipamentos/useEquipamentoForm';
 
 const TIPOS = [
+  'Angiógrafo',
   'Arco Cirúrgico',
-  'Tomografia Computadorizada',
-  'Ressonância Magnética',
-  'Ultrassom',
+  'Bomba Injetora de Contraste',
+  'Densitômetro Ósseo',
+  'Eletrocardiógrafo (ECG)',
+  'Ergômetro / Esteira',
+  'Fluoroscópio',
+  'Holter',
+  'Mamógrafo',
+  'Monitor Cardíaco',
+  'Monitor Multiparâmetros',
+  'PET-CT',
+  'Processadora de Filme',
   'Raio-X',
+  'Ressonância Magnética',
+  'SPECT / Cintilógrafo',
+  'Tomografia Computadorizada',
+  'Ultrassom',
+  'Ventilador Pulmonar',
+  'Outro',
 ];
 
 function EquipamentoForm({
