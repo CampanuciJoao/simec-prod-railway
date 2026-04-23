@@ -18,6 +18,8 @@ const TIPOS = [
   'Angiógrafo',
   'Arco Cirúrgico',
   'Bomba Injetora de Contraste',
+  'CR (Radiografia Computadorizada)',
+  'DR (Radiografia Digital)',
   'Densitômetro Ósseo',
   'Eletrocardiógrafo (ECG)',
   'Ergômetro / Esteira',
