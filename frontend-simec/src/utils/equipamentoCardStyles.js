@@ -5,18 +5,18 @@ export function getEquipamentoCardStyles(status) {
 
   return {
     cardStyle: {
-      backgroundColor: 'var(--bg-surface)',
-      borderColor: 'var(--border-soft)',
+      backgroundColor: tone.soft,
+      borderColor: tone.border,
       borderLeftColor: tone.strong,
       boxShadow: '0 18px 40px rgba(15, 23, 42, 0.06)',
     },
     toggleStyle: {
       backgroundColor: 'var(--bg-surface)',
-      borderColor: 'var(--border-soft)',
+      borderColor: tone.border,
       color: tone.strong,
     },
     expandedStyle: {
-      borderTop: '1px solid var(--border-soft)',
+      borderTop: `1px solid ${tone.border}`,
       backgroundColor: 'var(--bg-surface)',
     },
     infoCardStyle: {
