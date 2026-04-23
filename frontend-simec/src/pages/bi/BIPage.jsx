@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 
 import { useBIPage } from '@/hooks/bi/useBIPage';
+import { useBIDrawerData } from '@/hooks/bi/useBIDrawerData';
 
 import { PageLayout, PageSection, PageState } from '@/components/ui';
 
@@ -23,6 +24,13 @@ function moverItem(lista, fromIndex, toIndex) {
 
 function BIPage() {
   const page = useBIPage();
+
+  const unidadeCriticaId = page.rankingUnidades[0]?.unidadeId || null;
+  const drawerData = useBIDrawerData({
+    type: page.drawer.type,
+    open: page.drawer.open,
+    unidadeCriticaId,
+  });
 
   const [widgetOrder, setWidgetOrder] = useState(INITIAL_WIDGET_ORDER);
   const [expandedWidget, setExpandedWidget] = useState(null);
@@ -172,12 +180,14 @@ function BIPage() {
       <BIDetalhesDrawer
         open={page.drawer.open}
         onClose={page.closeDrawer}
-        title={page.drawerContent.title}
-        subtitle={page.drawerContent.subtitle}
-        stats={page.drawerContent.stats}
-        actionLabel={page.drawerContent.actionLabel}
-        onAction={page.drawerContent.onAction}
-        items={page.drawerContent.items}
+        drawerType={page.drawer.type}
+        resumoCards={page.resumoCards}
+        rankingUnidades={page.rankingUnidades}
+        rankingDowntime={page.rankingDowntime}
+        liveItems={drawerData.items}
+        liveLoading={drawerData.loading}
+        liveHasMore={drawerData.hasMore}
+        onLoadMore={drawerData.loadMore}
       />
     </>
   );
