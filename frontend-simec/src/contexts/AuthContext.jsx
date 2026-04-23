@@ -176,18 +176,30 @@ export function AuthProvider({ children }) {
     }
   }, [navigate]);
 
+  const isAdmin = useMemo(() => {
+    if (usuario?.role) return ['admin', 'superadmin'].includes(usuario.role);
+    try {
+      const stored = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const payload = parseJwtPayload(stored?.token || '');
+      return ['admin', 'superadmin'].includes(payload?.role);
+    } catch {
+      return false;
+    }
+  }, [usuario]);
+
   const value = useMemo(
     () => ({
       usuario,
       user: usuario,
       tenant,
       isAuthenticated: !!usuario,
+      isAdmin,
       loading,
       login,
       logout,
       syncAuthState,
     }),
-    [usuario, tenant, loading, login, logout, syncAuthState]
+    [usuario, tenant, isAdmin, loading, login, logout, syncAuthState]
   );
 
   return (

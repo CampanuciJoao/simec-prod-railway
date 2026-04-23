@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -11,7 +11,9 @@ import {
   faFileArrowDown,
   faPaperclip,
   faFilePen,
+  faPencil,
   faPowerOff,
+  faTrash,
   faTriangleExclamation,
   faWrench,
   faChevronRight,
@@ -22,6 +24,8 @@ import {
   Button,
   Card,
   ExpandableTimelineItem,
+  ModalConfirmacao,
+  Textarea,
 } from '@/components/ui';
 
 import {
@@ -44,10 +48,96 @@ function getTimelineIcon(item) {
   return faCircleInfo;
 }
 
+function AdminEventoActions({ eventoId, titulo, descricao, onDelete, onEdit }) {
+  const [showDelete, setShowDelete] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [editDescricao, setEditDescricao] = useState('');
+
+  const handleOpenEdit = () => {
+    setEditDescricao(descricao || '');
+    setShowEdit(true);
+  };
+
+  const handleConfirmEdit = () => {
+    setShowEdit(false);
+    onEdit(eventoId, { descricao: editDescricao });
+  };
+
+  const handleConfirmDelete = () => {
+    setShowDelete(false);
+    onDelete(eventoId);
+  };
+
+  return (
+    <>
+      <div className="flex gap-1">
+        <button
+          type="button"
+          title="Editar registro"
+          onClick={handleOpenEdit}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs transition hover:opacity-80"
+          style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-surface)' }}
+        >
+          <FontAwesomeIcon icon={faPencil} />
+        </button>
+        <button
+          type="button"
+          title="Excluir registro"
+          onClick={() => setShowDelete(true)}
+          className="inline-flex h-6 w-6 items-center justify-center rounded-lg text-xs transition hover:opacity-80"
+          style={{ color: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' }}
+        >
+          <FontAwesomeIcon icon={faTrash} />
+        </button>
+      </div>
+
+      <ModalConfirmacao
+        isOpen={showDelete}
+        onClose={() => setShowDelete(false)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir registro do histórico"
+        message={`Tem certeza que deseja excluir "${titulo}"? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        cancelText="Cancelar"
+        isDestructive
+      />
+
+      <ModalConfirmacao
+        isOpen={showEdit}
+        onClose={() => setShowEdit(false)}
+        onConfirm={handleConfirmEdit}
+        title="Editar registro do histórico"
+        message="Corrija a descrição deste registro."
+        confirmText="Salvar"
+        cancelText="Cancelar"
+        confirmDisabled={!editDescricao.trim()}
+      >
+        <Textarea
+          label="Descrição"
+          value={editDescricao}
+          onChange={(e) => setEditDescricao(e.target.value)}
+          rows={3}
+        />
+      </ModalConfirmacao>
+    </>
+  );
+}
+
+AdminEventoActions.propTypes = {
+  eventoId: PropTypes.string.isRequired,
+  titulo: PropTypes.string,
+  descricao: PropTypes.string,
+  onDelete: PropTypes.func.isRequired,
+  onEdit: PropTypes.func.isRequired,
+};
+
 function HistoricoTimelineList({
   linhaDoTempo = [],
   itensExpandidos,
   onToggleExpandir,
+  isAdmin = false,
+  onDeleteEvento,
+  onEditEvento,
 }) {
   const renderAttachmentLink = (attachment, item) => (
     <a
@@ -167,6 +257,15 @@ function HistoricoTimelineList({
                                 · {ev.responsavel}
                               </span>
                             ) : null}
+                            {isAdmin && ev.eventoId ? (
+                              <AdminEventoActions
+                                eventoId={ev.eventoId}
+                                titulo={ev.titulo || item.titulo}
+                                descricao={ev.descricao}
+                                onDelete={onDeleteEvento}
+                                onEdit={onEditEvento}
+                              />
+                            ) : null}
                           </div>
                           {ev.descricao && ev.descricao !== 'Sem detalhes informados.' ? (
                             <p
@@ -183,12 +282,23 @@ function HistoricoTimelineList({
                 </Card>
               ) : (
                 <Card surface="soft" className="rounded-2xl">
-                  <span
-                    className="text-[11px] font-bold uppercase tracking-[0.14em]"
-                    style={{ color: 'var(--text-muted)' }}
-                  >
-                    Descricao
-                  </span>
+                  <div className="flex items-center justify-between gap-3">
+                    <span
+                      className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      Descricao
+                    </span>
+                    {isAdmin && item.eventoId ? (
+                      <AdminEventoActions
+                        eventoId={item.eventoId}
+                        titulo={item.titulo}
+                        descricao={item.descricao}
+                        onDelete={onDeleteEvento}
+                        onEdit={onEditEvento}
+                      />
+                    ) : null}
+                  </div>
                   <p
                     className="mt-2 text-sm leading-6"
                     style={{ color: 'var(--text-primary)' }}
@@ -352,6 +462,9 @@ HistoricoTimelineList.propTypes = {
   linhaDoTempo: PropTypes.array,
   itensExpandidos: PropTypes.instanceOf(Set).isRequired,
   onToggleExpandir: PropTypes.func.isRequired,
+  isAdmin: PropTypes.bool,
+  onDeleteEvento: PropTypes.func,
+  onEditEvento: PropTypes.func,
 };
 
 export default HistoricoTimelineList;

@@ -564,6 +564,60 @@ router.get('/:id/historico/exportar', async (req, res) => {
 });
 
 // ==============================
+// PATCH / DELETE HISTORICO (admin)
+// ==============================
+router.patch('/:id/historico/:eventoId', admin, async (req, res) => {
+  const { id, eventoId } = req.params;
+  const tenantId = req.usuario.tenantId;
+  const { titulo, descricao } = req.body;
+
+  try {
+    const evento = await prisma.historicoAtivoEvento.findFirst({
+      where: { id: eventoId, equipamentoId: id, tenantId },
+    });
+
+    if (!evento) {
+      return res.status(404).json({ message: 'Registro de historico nao encontrado.' });
+    }
+
+    const atualizado = await prisma.historicoAtivoEvento.update({
+      where: { id: eventoId },
+      data: {
+        ...(titulo !== undefined ? { titulo: String(titulo).trim() } : {}),
+        ...(descricao !== undefined ? { descricao: String(descricao).trim() } : {}),
+      },
+    });
+
+    return res.json(atualizado);
+  } catch (error) {
+    console.error('[EQUIP_HISTORICO_PATCH_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao editar registro de historico.' });
+  }
+});
+
+router.delete('/:id/historico/:eventoId', admin, async (req, res) => {
+  const { id, eventoId } = req.params;
+  const tenantId = req.usuario.tenantId;
+
+  try {
+    const evento = await prisma.historicoAtivoEvento.findFirst({
+      where: { id: eventoId, equipamentoId: id, tenantId },
+    });
+
+    if (!evento) {
+      return res.status(404).json({ message: 'Registro de historico nao encontrado.' });
+    }
+
+    await prisma.historicoAtivoEvento.delete({ where: { id: eventoId } });
+
+    return res.json({ message: 'Registro excluido com sucesso.' });
+  } catch (error) {
+    console.error('[EQUIP_HISTORICO_DELETE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao excluir registro de historico.' });
+  }
+});
+
+// ==============================
 // POST CRIAR
 // ==============================
 router.post('/', validate(equipamentoSchema), async (req, res) => {

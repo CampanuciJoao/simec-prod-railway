@@ -126,6 +126,7 @@ function mapHistoricoEvento(item) {
 
   return {
     uniqueId: `hist-${item.id}`,
+    eventoId: item.id,
     idOriginal: item.referenciaId || item.id,
     data: item.dataEvento,
     tipo: item.tipoEvento,
@@ -181,6 +182,7 @@ function mergeEventosGrupo(eventos) {
     impactaAnalise: eventos.some((e) => e.impactaAnalise),
     eventos: sorted.map((e) => ({
       uniqueId: e.uniqueId,
+      eventoId: e.eventoId,
       data: e.data,
       status: e.status,
       titulo: e.titulo,
