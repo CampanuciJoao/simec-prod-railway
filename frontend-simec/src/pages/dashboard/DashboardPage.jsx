@@ -408,20 +408,16 @@ function DashboardPage() {
             title="Leitura do parque"
             description="Distribuicao atual por status operacional e peso relativo no momento."
           >
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(200px,240px)_minmax(0,1fr)]">
-              <div
-                className="flex min-h-[220px] items-center justify-center rounded-3xl border p-4"
-                style={{
-                  borderColor: 'var(--border-soft)',
-                  backgroundColor: 'var(--bg-surface-soft)',
-                }}
-              >
-                <div className="h-[200px] w-full max-w-[240px]">
-                  <DonutChart data={data.statusEquipamentos} />
-                </div>
+            <div
+              className="flex min-h-[320px] items-center justify-center rounded-3xl border p-5 sm:min-h-[360px] sm:p-6"
+              style={{
+                borderColor: 'var(--border-soft)',
+                backgroundColor: 'var(--bg-surface-soft)',
+              }}
+            >
+              <div className="h-[260px] w-full max-w-[340px] sm:h-[300px] sm:max-w-[380px]">
+                <DonutChart data={data.statusEquipamentos} />
               </div>
-
-              <DashboardStatusList items={resumo.principalStatus} />
             </div>
           </PageSection>
         </div>

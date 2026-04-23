@@ -142,7 +142,15 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
     return {
       responsive: true,
       maintainAspectRatio: false,
-      cutout: '72%',
+      layout: {
+        padding: {
+          top: 4,
+          right: 8,
+          bottom: 4,
+          left: 8,
+        },
+      },
+      cutout: '68%',
       plugins: {
         legend: {
           position: 'bottom',
@@ -150,9 +158,10 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
             color: colors.legend,
             usePointStyle: true,
             pointStyle: 'circle',
-            padding: 16,
-            boxWidth: 8,
-            font: { size: 11, weight: '500' },
+            padding: 18,
+            boxWidth: 10,
+            boxHeight: 10,
+            font: { size: 12, weight: '600' },
             generateLabels(chart) {
               const labels = chart.data.labels || [];
               const dataset = chart.data.datasets?.[0];
@@ -163,6 +172,7 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
                 text: `${label}  ${values[i] ?? 0}`,
                 fillStyle: bgColors[i],
                 strokeStyle: 'transparent',
+                fontColor: colors.legend,
                 lineWidth: 0,
                 hidden: false,
                 index: i,

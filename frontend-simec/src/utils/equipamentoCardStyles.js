@@ -5,22 +5,23 @@ export function getEquipamentoCardStyles(status) {
 
   return {
     cardStyle: {
-      backgroundColor: tone.soft,
-      borderColor: tone.border,
+      backgroundColor: 'var(--bg-surface)',
+      borderColor: 'var(--border-soft)',
       borderLeftColor: tone.strong,
+      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.06)',
     },
     toggleStyle: {
       backgroundColor: 'var(--bg-surface)',
-      borderColor: tone.border,
+      borderColor: 'var(--border-soft)',
       color: tone.strong,
     },
     expandedStyle: {
-      borderTop: `1px solid ${tone.border}`,
+      borderTop: '1px solid var(--border-soft)',
       backgroundColor: 'var(--bg-surface)',
     },
     infoCardStyle: {
-      backgroundColor: 'var(--bg-surface)',
-      borderColor: tone.border,
+      backgroundColor: tone.soft,
+      borderColor: 'transparent',
     },
   };
 }
