@@ -2,7 +2,7 @@ import UnidadeCard from './UnidadeCard';
 
 function UnidadesListSection({ unidades, actions }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
       {unidades.map((u) => (
         <UnidadeCard
           key={u.id}
