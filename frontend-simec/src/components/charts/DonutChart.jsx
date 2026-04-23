@@ -47,6 +47,8 @@ function getThemeColors() {
 const centerTextPlugin = {
   id: 'centerText',
   beforeDraw(chart) {
+    if (chart.config?.type !== 'doughnut') return;
+
     const { ctx, data, chartArea } = chart;
     if (!chartArea) return;
 
