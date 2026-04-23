@@ -3,6 +3,14 @@ function toInt(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function sanitizeRedisUsername(value) {
+  const normalized = String(value || '').trim();
+  if (!normalized || normalized.toLowerCase() === 'default') {
+    return undefined;
+  }
+  return normalized;
+}
+
 export function getRedisConnectionOptions() {
   const redisUrl = process.env.REDIS_URL?.trim();
 
@@ -10,7 +18,10 @@ export function getRedisConnectionOptions() {
     host: process.env.REDIS_HOST?.trim() || '127.0.0.1',
     port: toInt(process.env.REDIS_PORT, 6379),
     password: process.env.REDIS_PASSWORD?.trim() || undefined,
-    username: process.env.REDIS_USERNAME?.trim() || undefined,
+    username:
+      process.env.REDIS_FORCE_USERNAME === 'true'
+        ? process.env.REDIS_USERNAME?.trim() || undefined
+        : sanitizeRedisUsername(process.env.REDIS_USERNAME),
     tls:
       process.env.REDIS_TLS === 'true' ||
       process.env.REDIS_TLS === '1' ||
@@ -33,13 +44,11 @@ export function getRedisConnectionOptions() {
       host: parsed.hostname || baseOptions.host,
       port: toInt(parsed.port, baseOptions.port),
       password: baseOptions.password || passwordFromUrl || undefined,
-      // Many providers expose "default" in the URL even when legacy AUTH <password>
-      // is the only accepted mode. Omitting that username keeps both setups working.
       username:
         baseOptions.username ||
-        (usernameFromUrl && usernameFromUrl !== 'default'
-          ? usernameFromUrl
-          : undefined),
+        (process.env.REDIS_FORCE_USERNAME === 'true'
+          ? usernameFromUrl || undefined
+          : sanitizeRedisUsername(usernameFromUrl)),
       tls: parsed.protocol === 'rediss:' ? {} : baseOptions.tls,
     };
   } catch {
@@ -49,4 +58,3 @@ export function getRedisConnectionOptions() {
     };
   }
 }
-
