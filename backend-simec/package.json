@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "start": "node server.js",
-    "start:prod": "node server.js",
+    "start": "npx prisma migrate deploy && node server.js",
+    "start:prod": "npx prisma migrate deploy && node server.js",
     "pretest": "prisma generate",
     "seed": "node seed.js",
     "tenant:maintenance": "node scripts/tenantOperationalMaintenance.js",
