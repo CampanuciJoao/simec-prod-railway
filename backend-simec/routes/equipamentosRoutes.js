@@ -701,7 +701,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Já existe um equipamento com esse identificador único.',
+        message: 'Número de série (Tag) já está cadastrado para outro equipamento.',
       });
     }
 
@@ -892,7 +892,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Já existe um equipamento com esse identificador único.',
+        message: 'Número de série (Tag) já está cadastrado para outro equipamento.',
       });
     }
 
