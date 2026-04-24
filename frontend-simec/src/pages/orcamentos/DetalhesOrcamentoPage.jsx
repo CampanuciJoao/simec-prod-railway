@@ -250,40 +250,50 @@ function DetalhesOrcamentoPage() {
               Selecione o fornecedor aprovado para este orçamento:
             </p>
             <div className="flex flex-col gap-2 mb-5">
-              {(orc.fornecedores || []).map((f, i) => (
-                <label
-                  key={f.id}
-                  className="flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors"
-                  style={{
-                    borderColor: p.fornecedorAprovadoId === f.id
-                      ? 'var(--color-success, #16a34a)'
-                      : 'var(--border-default)',
-                    backgroundColor: p.fornecedorAprovadoId === f.id
-                      ? 'color-mix(in srgb, #16a34a 8%, transparent)'
-                      : 'var(--bg-surface-subtle)',
-                  }}
-                >
-                  <input
-                    type="radio"
-                    name="fornecedorAprovado"
-                    value={f.id}
-                    checked={p.fornecedorAprovadoId === f.id}
-                    onChange={() => p.setFornecedorAprovadoId(f.id)}
-                    className="accent-green-600"
-                  />
-                  <span className="font-semibold text-sm" style={{ color: 'var(--text-muted)' }}>
-                    {i + 1}.
-                  </span>
-                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                    {f.nome}
-                  </span>
-                  {f.formaPagamento && (
-                    <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {f.formaPagamento}
+              {(orc.fornecedores || []).map((f, i) => {
+                const total = p.calcularTotalFornecedor(f.id);
+                const selected = p.fornecedorAprovadoId === f.id;
+                return (
+                  <label
+                    key={f.id}
+                    className="flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors"
+                    style={{
+                      borderColor: selected ? '#16a34a' : 'var(--border-default)',
+                      backgroundColor: selected
+                        ? 'color-mix(in srgb, #16a34a 8%, transparent)'
+                        : 'var(--bg-surface-subtle)',
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="fornecedorAprovado"
+                      value={f.id}
+                      checked={selected}
+                      onChange={() => p.setFornecedorAprovadoId(f.id)}
+                      className="accent-green-600"
+                    />
+                    <span className="font-semibold text-sm" style={{ color: 'var(--text-muted)' }}>
+                      {i + 1}.
                     </span>
-                  )}
-                </label>
-              ))}
+                    <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                      {f.nome}
+                    </span>
+                    <div className="ml-auto text-right">
+                      <p
+                        className="text-sm font-bold"
+                        style={{ color: selected ? '#16a34a' : 'var(--text-primary)' }}
+                      >
+                        {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                      </p>
+                      {f.formaPagamento && (
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {f.formaPagamento}
+                        </p>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
             </div>
             <div className="flex justify-end gap-2">
               <Button
