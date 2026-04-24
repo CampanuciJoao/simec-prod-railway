@@ -166,6 +166,25 @@ function ensureSpace(doc, neededHeight = 32) {
   doc.addPage();
 }
 
+function drawGroupHeader(doc, title) {
+  ensureSpace(doc, 28);
+
+  const x = doc.page.margins.left;
+  const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const y = doc.y;
+
+  doc.save().rect(x, y, 3, 18).fill(COLORS.blue).restore();
+  doc.save().rect(x + 3, y, w - 3, 18).fill(COLORS.slate100).restore();
+
+  doc
+    .font('Helvetica-Bold')
+    .fontSize(9)
+    .fillColor(COLORS.slate700)
+    .text(title, x + 12, y + 5, { lineBreak: false });
+
+  doc.y = y + 24;
+}
+
 function drawSectionTitle(doc, title) {
   ensureSpace(doc, 36);
 
@@ -409,17 +428,34 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
 
   if (resultado?.tipoRelatorio === 'inventarioEquipamentos') {
     drawSectionTitle(doc, 'Inventario de ativos');
-    drawTable(doc, {
-      headers: ['Modelo', 'Serie / Tag', 'Fabricante', 'Status', 'Unidade'],
-      columnWidths: [125, 105, 100, 65, 100],
-      rows: (resultado?.dados || []).map((item) => [
-        safeText(item?.modelo),
-        safeText(item?.tag),
-        safeText(item?.fabricante),
-        safeText(item?.status),
-        safeText(item?.unidade?.nomeSistema),
-      ]),
-    });
+
+    const dados = resultado?.dados || [];
+
+    // agrupa por unidade, ordenando grupos e itens alfabeticamente
+    const grupos = {};
+    for (const item of dados) {
+      const key = item?.unidade?.nomeSistema || 'Sem unidade';
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(item);
+    }
+    const gruposOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    for (const unidadeNome of gruposOrdenados) {
+      const itens = grupos[unidadeNome].sort((a, b) =>
+        safeText(a?.modelo).localeCompare(safeText(b?.modelo), 'pt-BR')
+      );
+      drawGroupHeader(doc, unidadeNome);
+      drawTable(doc, {
+        headers: ['Modelo', 'Serie / Tag', 'Fabricante', 'Status'],
+        columnWidths: [175, 130, 120, 70],
+        rows: itens.map((item) => [
+          safeText(item?.modelo),
+          safeText(item?.tag),
+          safeText(item?.fabricante),
+          safeText(item?.status),
+        ]),
+      });
+    }
   } else {
     drawSectionTitle(doc, 'Manutencoes realizadas');
     drawTable(doc, {
