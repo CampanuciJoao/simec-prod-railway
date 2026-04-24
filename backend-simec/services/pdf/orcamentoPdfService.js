@@ -56,7 +56,7 @@ function buildCols(contentW, nForn) {
   const descW = Math.round(contentW * 0.36);
   const dataW = Math.round(contentW * 0.10);
   const leftW = descW + dataW;
-  const fornW = Math.round((contentW - leftW) / Math.max(nForn, 1));
+  const fornW = (contentW - leftW) / Math.max(nForn, 1); // sem arredondamento → colunas somam contentW exato
   return { descW, dataW, leftW, fornW };
 }
 
@@ -138,14 +138,13 @@ function _cabecalhoTitulo(doc, { marginX, contentW }) {
 // ─── 2. Linha do título real (ex: "Abrir Valeta") + metadados ────────────────
 //   full width, separado da linha de fornecedores
 
-function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW, fornW }) {
-  const nForn  = Math.round((contentW - leftW) / Math.max(fornW, 1));
+function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
   const rowH   = 30;
+  const rightW = contentW - leftW;
   const y      = doc.y;
 
-  box(doc, marginX, y, contentW, rowH);
-
-  // título à esquerda (ocupa leftW)
+  // célula esquerda: título
+  box(doc, marginX, y, leftW, rowH);
   doc
     .font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
     .text(safe(orc.titulo, '—'), marginX + 10, y + 9, {
@@ -154,7 +153,8 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW, fornW }) {
       ellipsis: true,
     });
 
-  // metadados à direita (ocupa área dos fornecedores)
+  // célula direita: metadados com borda própria
+  box(doc, marginX + leftW, y, rightW, rowH, { fill: C.gray50 });
   const tipo  = TIPO_LABEL[orc.tipo] || orc.tipo || '';
   const und   = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema || '';
   const data  = fmtData(orc.createdAt);
@@ -163,7 +163,7 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW, fornW }) {
   doc
     .font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
     .text(meta, marginX + leftW + 6, y + 11, {
-      width: fornW * nForn - 12,
+      width: rightW - 12,
       align: 'right',
       lineBreak: false,
     });
