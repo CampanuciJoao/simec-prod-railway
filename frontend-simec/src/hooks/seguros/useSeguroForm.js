@@ -21,7 +21,7 @@ export function useSeguroForm({
   }, [isEditing, initialData]);
 
   const coberturaFields = useMemo(
-    () => getCoberturaFieldsByTipo(formData.tipoSeguro),
+    () => (formData.tipoSeguro ? getCoberturaFieldsByTipo(formData.tipoSeguro) : []),
     [formData.tipoSeguro]
   );
 
