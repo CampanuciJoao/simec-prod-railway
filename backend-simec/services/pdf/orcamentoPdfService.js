@@ -103,90 +103,100 @@ function _desenhar(doc, orc, { marginX, contentW }) {
 
   doc.y = 32;
 
-  _cabecalho(doc, orc, fornecedores, { marginX, contentW, ...cols });
-  _tituloBanner(doc, orc, { marginX, contentW });
+  _cabecalhoTitulo(doc, { marginX, contentW });
+  _linhaTituloOrcamento(doc, orc, { marginX, contentW, ...cols });
+  _linhaFornecedores(doc, fornecedores, { marginX, contentW, ...cols });
   _formaPagamento(doc, fornecedores, { marginX, contentW, ...cols });
   _tabelaItens(doc, fornecedores, itens, { marginX, contentW, ...cols });
   _observacao(doc, orc, { marginX, contentW });
   _assinatura(doc, orc, { marginX, contentW });
 }
 
-// ─── 1. Cabeçalho (duas fileiras) ────────────────────────────────────────────
-//
-//  Fileira A (full width): logo  |  "Orçamento"
-//  Fileira B (alinhada): leftW vazio  |  1-Nome  |  2-Nome  |  ...
+// ─── 1. Linha "Orçamento" (full width, com logo) ─────────────────────────────
 
-function _cabecalho(doc, orc, fornecedores, { marginX, contentW, leftW, fornW }) {
-  const nForn = fornecedores.length;
-  const rowAH = 54;   // linha "Orçamento"
-  const rowBH = 34;   // linha com nomes dos fornecedores
+function _cabecalhoTitulo(doc, { marginX, contentW }) {
+  const rowH   = 56;
   const startY = doc.y;
+  const logoSize = 44;
 
-  // ── Fileira A — full width ──
-  box(doc, marginX, startY, contentW, rowAH);
+  box(doc, marginX, startY, contentW, rowH);
 
-  const logoSize = 42;
   if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, marginX + 7, startY + (rowAH - logoSize) / 2, { fit: [logoSize, logoSize] });
+    doc.image(logoPath, marginX + 8, startY + (rowH - logoSize) / 2, { fit: [logoSize, logoSize] });
   }
 
   doc
-    .font('Helvetica-Bold').fontSize(20).fillColor(TEXT)
-    .text('Orçamento', marginX + logoSize + 14, startY + 16, {
-      width: contentW - logoSize - 20,
+    .font('Helvetica-Bold').fontSize(22).fillColor(TEXT)
+    .text('Orçamento', marginX + logoSize + 16, startY + 17, {
+      width: contentW - logoSize - 24,
       align: 'center',
     });
 
-  // ── Fileira B — fornecedores alinhados com a tabela ──
-  // célula vazia (leftW)
-  box(doc, marginX, startY + rowAH, leftW, rowBH, { fill: C.gray100 });
+  doc.y = startY + rowH;
+}
+
+// ─── 2. Linha do título real (ex: "Abrir Valeta") + metadados ────────────────
+//   full width, separado da linha de fornecedores
+
+function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW, fornW }) {
+  const nForn  = Math.round((contentW - leftW) / Math.max(fornW, 1));
+  const rowH   = 30;
+  const y      = doc.y;
+
+  box(doc, marginX, y, contentW, rowH);
+
+  // título à esquerda (ocupa leftW)
+  doc
+    .font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
+    .text(safe(orc.titulo, '—'), marginX + 10, y + 9, {
+      width: leftW - 16,
+      lineBreak: false,
+      ellipsis: true,
+    });
+
+  // metadados à direita (ocupa área dos fornecedores)
+  const tipo  = TIPO_LABEL[orc.tipo] || orc.tipo || '';
+  const und   = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema || '';
+  const data  = fmtData(orc.createdAt);
+  const meta  = [tipo, und, data].filter(Boolean).join('   ·   ');
+
+  doc
+    .font('Helvetica').fontSize(8).fillColor(C.gray600)
+    .text(meta, marginX + leftW + 6, y + 11, {
+      width: fornW * nForn - 12,
+      align: 'right',
+      lineBreak: false,
+    });
+
+  doc.y = y + rowH;
+}
+
+// ─── 3. Linha de fornecedores (alinhada com colunas da tabela) ───────────────
+
+function _linhaFornecedores(doc, fornecedores, { marginX, leftW, fornW }) {
+  const nForn = fornecedores.length;
+  const rowH  = 36;
+  const y     = doc.y;
+
+  box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
 
   for (let i = 0; i < nForn; i++) {
     const cx = marginX + leftW + i * fornW;
-    box(doc, cx, startY + rowAH, fornW, rowBH, { fill: C.gray50 });
+    box(doc, cx, y, fornW, rowH, { fill: C.gray50 });
 
     doc
-      .font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
-      .text(String(i + 1), cx, startY + rowAH + 3, { width: fornW, align: 'center' });
+      .font('Helvetica-Bold').fontSize(13).fillColor(TEXT)
+      .text(String(i + 1), cx, y + 3, { width: fornW, align: 'center' });
 
     doc
-      .font('Helvetica').fontSize(8).fillColor(C.gray600)
-      .text(safe(fornecedores[i].nome, '—'), cx + 4, startY + rowAH + 19, {
+      .font('Helvetica').fontSize(8.5).fillColor(C.gray600)
+      .text(safe(fornecedores[i].nome, '—'), cx + 4, y + 21, {
         width: fornW - 8,
         align: 'center',
         lineBreak: false,
         ellipsis: true,
       });
   }
-
-  doc.y = startY + rowAH + rowBH;
-}
-
-// ─── 2. Banner com título real do orçamento ───────────────────────────────────
-
-function _tituloBanner(doc, orc, { marginX, contentW }) {
-  const rowH  = 26;
-  const tipo  = TIPO_LABEL[orc.tipo] || orc.tipo || '';
-  const und   = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema || '';
-  const data  = fmtData(orc.createdAt);
-  const y     = doc.y;
-
-  // título (fundo branco com borda preta)
-  box(doc, marginX, y, contentW, rowH);
-  doc
-    .font('Helvetica-Bold').fontSize(11).fillColor(TEXT)
-    .text(safe(orc.titulo, 'Orçamento'), marginX + 10, y + 7, {
-      width: contentW * 0.55,
-    });
-
-  // metadados à direita
-  const metaParts = [tipo, und, data].filter(Boolean).join('   ·   ');
-  doc
-    .font('Helvetica').fontSize(8).fillColor(C.gray600)
-    .text(metaParts, marginX + contentW * 0.55, y + 9, {
-      width: contentW * 0.42,
-      align: 'right',
-    });
 
   doc.y = y + rowH;
 }
