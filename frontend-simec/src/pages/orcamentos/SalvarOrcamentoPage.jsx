@@ -21,9 +21,12 @@ const TIPO_OPTIONS = [
 function SalvarOrcamentoPage() {
   const p = useSalvarOrcamento();
 
-  if (p.loadingData) {
-    return <LoadingState />;
-  }
+  if (p.loadingData) return <LoadingState />;
+
+  const unidadeOptions = p.unidades.map((u) => ({
+    value: u.id,
+    label: u.nomeFantasia || u.nomeSistema,
+  }));
 
   return (
     <PageLayout padded>
@@ -37,10 +40,10 @@ function SalvarOrcamentoPage() {
         {/* ── Informações gerais ── */}
         <FormSection
           title="Informações Gerais"
-          description="Identifique o orçamento e o tipo de itens"
+          description="Identifique o orçamento, o tipo de itens e a unidade solicitante"
         >
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            <div className="sm:col-span-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
+            <div className="sm:col-span-3">
               <Input
                 label="Título do Orçamento"
                 required
@@ -51,35 +54,44 @@ function SalvarOrcamentoPage() {
               />
             </div>
 
-            <Select
-              label="Tipo"
-              required
-              value={p.tipo}
-              onChange={(e) => p.setTipo(e.target.value)}
-              options={TIPO_OPTIONS}
-            />
+            <div className="sm:col-span-2">
+              <Select
+                label="Tipo"
+                required
+                value={p.tipo}
+                onChange={(e) => p.setTipo(e.target.value)}
+                options={TIPO_OPTIONS}
+              />
+            </div>
 
-            <Input
-              label="Local"
-              value={p.local}
-              onChange={(e) => p.setLocal(e.target.value)}
-              placeholder="Ex: Sede, Santa Ana - Naviraí"
-            />
+            <div className="sm:col-span-1">
+              {/* espaço reservado para visual */}
+            </div>
+
+            <div className="sm:col-span-3">
+              <Select
+                label="Unidade Solicitante"
+                value={p.unidadeId}
+                onChange={(e) => p.setUnidadeId(e.target.value)}
+                placeholder="Selecione a unidade"
+                options={unidadeOptions}
+              />
+            </div>
           </div>
         </FormSection>
 
         {/* ── Tabela de itens e fornecedores ── */}
         <FormSection
           title="Itens e Fornecedores"
-          description="Adicione fornecedores como colunas e itens como blocos. Use ★ para destacar itens em vermelho (ex: mão de obra)."
+          description="Adicione fornecedores como colunas e itens como linhas. Use ★ para destacar itens especiais (ex: mão de obra)."
         >
           {p.errors.fornecedores && (
-            <p className="mb-3 text-sm" style={{ color: 'var(--color-danger)' }}>
+            <p className="mb-3 text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
               {p.errors.fornecedores}
             </p>
           )}
           {p.errors.itens && (
-            <p className="mb-3 text-sm" style={{ color: 'var(--color-danger)' }}>
+            <p className="mb-3 text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
               {p.errors.itens}
             </p>
           )}
@@ -102,7 +114,7 @@ function SalvarOrcamentoPage() {
         {/* ── Justificativa ── */}
         <FormSection
           title="Justificativa / Observação"
-          description="Descreva o motivo do orçamento e detalhes importantes para a diretoria"
+          description="Descreva o motivo do orçamento e detalhes relevantes para a diretoria"
         >
           <Textarea
             label="Observação"

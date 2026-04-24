@@ -21,9 +21,9 @@ function OrcamentoRow({ orcamento, onVerDetalhes, onEditar, onExcluir }) {
         <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
           {orcamento.titulo}
         </p>
-        {orcamento.local && (
+        {orcamento.unidade && (
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {orcamento.local}
+            {orcamento.unidade.nomeFantasia || orcamento.unidade.nomeSistema}
           </p>
         )}
       </td>

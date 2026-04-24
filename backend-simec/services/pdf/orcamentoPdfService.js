@@ -46,6 +46,7 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
     include: {
       criadoPor: { select: { id: true, nome: true } },
       aprovadoPor: { select: { id: true, nome: true } },
+      unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
       fornecedores: {
         orderBy: { ordem: 'asc' },
         include: { precos: true },
@@ -274,9 +275,10 @@ function _desenharObservacao(doc, orc, { marginX, contentW }) {
   doc.font('Helvetica').fontSize(9).fillColor(COLORS.slate700)
     .text(obsText, marginX + 10, obsY + 10, { width: contentW - 20, align: 'center' });
 
-  if (orc.local) {
+  const unidadeNome = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema;
+  if (unidadeNome) {
     doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate900)
-      .text(`Local: ${orc.local}`, marginX + 10, obsY + obsH - 20, { width: contentW - 20, align: 'center' });
+      .text(`Unidade: ${unidadeNome}`, marginX + 10, obsY + obsH - 20, { width: contentW - 20, align: 'center' });
   }
 
   doc.y = obsY + obsH + 12;

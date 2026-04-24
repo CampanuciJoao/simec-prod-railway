@@ -71,6 +71,7 @@ model Unidade {
   veiculos          Veiculo[]
   segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
   contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
+  orcamentos        Orcamento[]
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -756,29 +757,31 @@ enum Role {
 }
 
 model Orcamento {
-  id            String    @id @default(uuid())
-  tenantId      String
-  titulo        String
-  tipo          String    // PRODUTO | SERVICO | MISTO
-  status        String    @default("RASCUNHO") // RASCUNHO | PENDENTE | APROVADO | REJEITADO
-  observacao    String?
-  local         String?
-  criadoPorId   String
-  aprovadoPorId String?
+  id             String    @id @default(uuid())
+  tenantId       String
+  titulo         String
+  tipo           String    // PRODUTO | SERVICO | MISTO
+  status         String    @default("RASCUNHO") // RASCUNHO | PENDENTE | APROVADO | REJEITADO
+  observacao     String?
+  unidadeId      String?
+  criadoPorId    String
+  aprovadoPorId  String?
   motivoRejeicao String?
-  dataAprovacao DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  dataAprovacao  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  criadoPor   Usuario   @relation("OrcamentoCriador", fields: [criadoPorId], references: [id])
-  aprovadoPor Usuario?  @relation("OrcamentoAprovador", fields: [aprovadoPorId], references: [id])
+  tenant       Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  criadoPor    Usuario   @relation("OrcamentoCriador", fields: [criadoPorId], references: [id])
+  aprovadoPor  Usuario?  @relation("OrcamentoAprovador", fields: [aprovadoPorId], references: [id])
+  unidade      Unidade?  @relation(fields: [unidadeId], references: [id], onDelete: SetNull)
   fornecedores OrcamentoFornecedor[]
   itens        OrcamentoItem[]
 
   @@index([tenantId, status])
   @@index([tenantId, tipo])
   @@index([tenantId, criadoPorId])
+  @@index([tenantId, unidadeId])
   @@map("orcamentos")
 }
 

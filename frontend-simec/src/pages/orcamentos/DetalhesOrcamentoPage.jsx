@@ -45,7 +45,7 @@ function DetalhesOrcamentoPage() {
         <PageHeader
           icon={faFileInvoiceDollar}
           title={orc.titulo}
-          subtitle={`${TIPO_LABEL[orc.tipo] || orc.tipo}${orc.local ? ` · ${orc.local}` : ''}`}
+          subtitle={`${TIPO_LABEL[orc.tipo] || orc.tipo}${orc.unidade ? ` · ${orc.unidade.nomeFantasia || orc.unidade.nomeSistema}` : ''}`}
           actions={
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="secondary" size="sm" onClick={() => navigate('/orcamentos')}>
@@ -120,6 +120,16 @@ function DetalhesOrcamentoPage() {
                 <OrcamentoStatusBadge status={orc.status} />
               </div>
             </div>
+            {orc.unidade && (
+              <div>
+                <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Unidade
+                </p>
+                <p className="mt-1 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {orc.unidade.nomeFantasia || orc.unidade.nomeSistema}
+                </p>
+              </div>
+            )}
             <div>
               <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                 Criado por

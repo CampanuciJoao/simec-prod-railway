@@ -3,17 +3,14 @@ import prisma from './prismaService.js';
 const INCLUDE_COMPLETO = {
   criadoPor: { select: { id: true, nome: true, email: true } },
   aprovadoPor: { select: { id: true, nome: true, email: true } },
+  unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
   fornecedores: {
     orderBy: { ordem: 'asc' },
-    include: {
-      precos: true,
-    },
+    include: { precos: true },
   },
   itens: {
     orderBy: { ordem: 'asc' },
-    include: {
-      precos: true,
-    },
+    include: { precos: true },
   },
 };
 
@@ -27,6 +24,7 @@ export async function listarOrcamentos({ tenantId, status, tipo }) {
     include: {
       criadoPor: { select: { id: true, nome: true } },
       aprovadoPor: { select: { id: true, nome: true } },
+      unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
       fornecedores: { select: { id: true, nome: true, ordem: true } },
       itens: { select: { id: true } },
     },
@@ -50,7 +48,7 @@ export async function buscarOrcamentoPorId({ tenantId, id }) {
 }
 
 export async function criarOrcamento({ tenantId, criadoPorId, dados }) {
-  const { titulo, tipo, observacao, local, fornecedores, itens } = dados;
+  const { titulo, tipo, observacao, unidadeId, fornecedores, itens } = dados;
 
   return prisma.$transaction(async (tx) => {
     const orcamento = await tx.orcamento.create({
@@ -60,7 +58,7 @@ export async function criarOrcamento({ tenantId, criadoPorId, dados }) {
         titulo,
         tipo,
         observacao,
-        local,
+        unidadeId: unidadeId || null,
       },
     });
 
@@ -110,7 +108,8 @@ export async function criarOrcamento({ tenantId, criadoPorId, dados }) {
       }
     }
 
-    return prisma.orcamento.findFirst({
+    // FIX: usar tx (não prisma) para ler dentro da transação
+    return tx.orcamento.findFirst({
       where: { id: orcamento.id },
       include: INCLUDE_COMPLETO,
     });
@@ -134,12 +133,12 @@ export async function atualizarOrcamento({ tenantId, id, dados }) {
     throw err;
   }
 
-  const { titulo, tipo, observacao, local, fornecedores, itens } = dados;
+  const { titulo, tipo, observacao, unidadeId, fornecedores, itens } = dados;
 
   return prisma.$transaction(async (tx) => {
     await tx.orcamento.update({
       where: { id },
-      data: { titulo, tipo, observacao, local },
+      data: { titulo, tipo, observacao, unidadeId: unidadeId || null },
     });
 
     await tx.orcamentoFornecedor.deleteMany({ where: { orcamentoId: id } });
@@ -191,7 +190,8 @@ export async function atualizarOrcamento({ tenantId, id, dados }) {
       }
     }
 
-    return prisma.orcamento.findFirst({
+    // FIX: usar tx (não prisma) para ler dentro da transação
+    return tx.orcamento.findFirst({
       where: { id },
       include: INCLUDE_COMPLETO,
     });
@@ -219,9 +219,7 @@ export async function excluirOrcamento({ tenantId, id }) {
 }
 
 export async function enviarParaAprovacao({ tenantId, id }) {
-  const orcamento = await prisma.orcamento.findFirst({
-    where: { id, tenantId },
-  });
+  const orcamento = await prisma.orcamento.findFirst({ where: { id, tenantId } });
 
   if (!orcamento) {
     const err = new Error('Orçamento não encontrado.');
@@ -243,9 +241,7 @@ export async function enviarParaAprovacao({ tenantId, id }) {
 }
 
 export async function aprovarOrcamento({ tenantId, id, aprovadoPorId }) {
-  const orcamento = await prisma.orcamento.findFirst({
-    where: { id, tenantId },
-  });
+  const orcamento = await prisma.orcamento.findFirst({ where: { id, tenantId } });
 
   if (!orcamento) {
     const err = new Error('Orçamento não encontrado.');
@@ -261,19 +257,13 @@ export async function aprovarOrcamento({ tenantId, id, aprovadoPorId }) {
 
   return prisma.orcamento.update({
     where: { id },
-    data: {
-      status: 'APROVADO',
-      aprovadoPorId,
-      dataAprovacao: new Date(),
-    },
+    data: { status: 'APROVADO', aprovadoPorId, dataAprovacao: new Date() },
     include: INCLUDE_COMPLETO,
   });
 }
 
 export async function rejeitarOrcamento({ tenantId, id, aprovadoPorId, motivoRejeicao }) {
-  const orcamento = await prisma.orcamento.findFirst({
-    where: { id, tenantId },
-  });
+  const orcamento = await prisma.orcamento.findFirst({ where: { id, tenantId } });
 
   if (!orcamento) {
     const err = new Error('Orçamento não encontrado.');
@@ -289,31 +279,18 @@ export async function rejeitarOrcamento({ tenantId, id, aprovadoPorId, motivoRej
 
   return prisma.orcamento.update({
     where: { id },
-    data: {
-      status: 'REJEITADO',
-      aprovadoPorId,
-      motivoRejeicao,
-      dataAprovacao: new Date(),
-    },
+    data: { status: 'REJEITADO', aprovadoPorId, motivoRejeicao, dataAprovacao: new Date() },
     include: INCLUDE_COMPLETO,
   });
 }
 
 export async function obterMetricasOrcamentos({ tenantId }) {
-  const [total, porStatus, orcamentosComItens] = await Promise.all([
+  const [total, porStatus] = await Promise.all([
     prisma.orcamento.count({ where: { tenantId } }),
     prisma.orcamento.groupBy({
       by: ['status'],
       where: { tenantId },
       _count: { id: true },
-    }),
-    prisma.orcamento.findMany({
-      where: { tenantId, status: { in: ['PENDENTE', 'APROVADO'] } },
-      include: {
-        fornecedores: {
-          include: { precos: true },
-        },
-      },
     }),
   ]);
 

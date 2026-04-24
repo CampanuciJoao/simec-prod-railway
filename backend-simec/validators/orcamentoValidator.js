@@ -27,7 +27,7 @@ export const orcamentoSchema = z.object({
     error_map: () => ({ message: 'Tipo de orçamento inválido.' }),
   }),
   observacao: z.string().nullable().optional(),
-  local: z.string().nullable().optional(),
+  unidadeId: z.string().nullable().optional(),
   fornecedores: z.array(fornecedorSchema).min(1, 'Pelo menos um fornecedor é obrigatório.'),
   itens: z.array(itemSchema).min(1, 'Pelo menos um item é obrigatório.'),
 });

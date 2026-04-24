@@ -8,47 +8,32 @@ function formatMoeda(valor) {
   });
 }
 
-function CelulaPreco({ valor, desconto, onChange }) {
+function InputValor({ value, onChange, isRed, placeholder = '0,00', prefix = 'R$' }) {
   return (
-    <div className="flex flex-col gap-1 p-1">
-      <div className="flex items-center gap-1">
-        <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-          R$
-        </span>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={valor || ''}
-          onChange={(e) => onChange('valor', e.target.value)}
-          placeholder="0,00"
-          className="w-full rounded border px-1.5 py-0.5 text-right text-sm focus:outline-none focus:ring-1"
-          style={{
-            borderColor: 'var(--border-default)',
-            backgroundColor: 'var(--bg-input)',
-            color: 'var(--text-primary)',
-          }}
-        />
-      </div>
-      <div className="flex items-center gap-1">
-        <span className="text-[10px]" style={{ color: 'var(--color-danger)' }}>
-          Desc
-        </span>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={desconto || ''}
-          onChange={(e) => onChange('desconto', e.target.value)}
-          placeholder="0,00"
-          className="w-full rounded border px-1.5 py-0.5 text-right text-sm focus:outline-none focus:ring-1"
-          style={{
-            borderColor: 'var(--border-default)',
-            backgroundColor: 'var(--bg-input)',
-            color: 'var(--color-danger)',
-          }}
-        />
-      </div>
+    <div
+      className="flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-colors focus-within:ring-2"
+      style={{
+        borderColor: isRed ? 'var(--color-danger)' : 'var(--border-default)',
+        backgroundColor: 'var(--bg-input)',
+        '--tw-ring-color': isRed ? 'var(--color-danger-soft)' : 'var(--brand-primary-soft)',
+      }}
+    >
+      <span
+        className="shrink-0 text-xs font-semibold"
+        style={{ color: isRed ? 'var(--color-danger)' : 'var(--text-muted)' }}
+      >
+        {prefix}
+      </span>
+      <input
+        type="number"
+        min="0"
+        step="0.01"
+        value={value || ''}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="w-full min-w-0 bg-transparent text-right text-sm focus:outline-none"
+        style={{ color: isRed ? 'var(--color-danger)' : 'var(--text-primary)' }}
+      />
     </div>
   );
 }
@@ -66,43 +51,48 @@ function OrcamentoBuilderTable({
   onAtualizarPreco,
   calcularTotalFornecedor,
 }) {
-  const MIN_COL_W = 160;
-
   return (
-    <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border-soft)' }}>
-      <table className="w-full border-collapse text-sm">
-        {/* ── Cabeçalho com número da coluna e nome do fornecedor ── */}
-        <thead>
-          <tr>
-            {/* Coluna DESCRIÇÃO */}
-            <th
-              className="border-b border-r px-3 py-2 text-left text-xs font-semibold uppercase tracking-wider"
-              style={{
-                borderColor: 'var(--border-soft)',
-                backgroundColor: 'var(--bg-surface-subtle)',
-                color: 'var(--text-muted)',
-                minWidth: 220,
-              }}
-            >
-              DESCRIÇÃO / Data
-            </th>
+    <div className="flex flex-col gap-0 overflow-hidden rounded-2xl border" style={{ borderColor: 'var(--border-soft)' }}>
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
 
-            {/* Colunas de fornecedor */}
-            {fornecedores.map((forn, idx) => (
+          {/* ── Cabeçalho ── */}
+          <thead>
+            <tr>
+              {/* Coluna descrição */}
               <th
-                key={forn.id}
-                className="border-b border-r px-2 py-2 text-center"
+                className="border-b border-r px-4 py-3 text-left align-bottom"
                 style={{
                   borderColor: 'var(--border-soft)',
                   backgroundColor: 'var(--bg-surface-subtle)',
-                  minWidth: MIN_COL_W,
+                  minWidth: 240,
+                  width: '30%',
                 }}
               >
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+                  Descrição / Data
+                </span>
+              </th>
+
+              {/* Colunas de fornecedor */}
+              {fornecedores.map((forn, idx) => (
+                <th
+                  key={forn.id}
+                  className="border-b border-r px-3 py-3 text-center"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: 'var(--bg-surface-subtle)',
+                    minWidth: 200,
+                  }}
+                >
+                  {/* número da coluna + delete */}
+                  <div className="mb-2 flex items-center justify-between">
                     <span
-                      className="text-xs font-bold"
-                      style={{ color: 'var(--text-muted)' }}
+                      className="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold"
+                      style={{
+                        backgroundColor: 'var(--brand-primary-soft)',
+                        color: 'var(--brand-primary)',
+                      }}
                     >
                       {idx + 1}
                     </span>
@@ -110,7 +100,7 @@ function OrcamentoBuilderTable({
                       <button
                         type="button"
                         onClick={() => onRemoverFornecedor(forn.id)}
-                        className="rounded p-0.5 transition-colors"
+                        className="rounded-lg p-1 transition-opacity hover:opacity-100 opacity-50"
                         style={{ color: 'var(--color-danger)' }}
                         title="Remover fornecedor"
                       >
@@ -118,195 +108,217 @@ function OrcamentoBuilderTable({
                       </button>
                     )}
                   </div>
+
+                  {/* Nome */}
                   <input
                     type="text"
                     value={forn.nome}
                     onChange={(e) => onAtualizarFornecedor(forn.id, 'nome', e.target.value)}
                     placeholder="Nome do fornecedor"
-                    className="w-full rounded border px-2 py-1 text-center text-sm font-semibold focus:outline-none focus:ring-1"
+                    className="mb-1.5 w-full rounded-lg border px-2.5 py-1.5 text-center text-sm font-semibold focus:outline-none focus:ring-2"
                     style={{
                       borderColor: 'var(--border-default)',
                       backgroundColor: 'var(--bg-input)',
                       color: 'var(--text-primary)',
                     }}
                   />
+
+                  {/* Forma de pagamento */}
                   <input
                     type="text"
                     value={forn.formaPagamento || ''}
-                    onChange={(e) =>
-                      onAtualizarFornecedor(forn.id, 'formaPagamento', e.target.value)
-                    }
+                    onChange={(e) => onAtualizarFornecedor(forn.id, 'formaPagamento', e.target.value)}
                     placeholder="Forma de pagamento"
-                    className="w-full rounded border px-2 py-1 text-center text-xs focus:outline-none"
+                    className="w-full rounded-lg border px-2.5 py-1 text-center text-xs focus:outline-none"
                     style={{
                       borderColor: 'var(--border-default)',
-                      backgroundColor: 'var(--bg-input)',
+                      backgroundColor: 'var(--bg-surface-subtle)',
                       color: 'var(--text-secondary)',
                     }}
                   />
-                </div>
-              </th>
-            ))}
+                </th>
+              ))}
 
-            {/* Botão adicionar fornecedor */}
-            <th
-              className="border-b px-2 py-2"
-              style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-subtle)' }}
-            >
-              <button
-                type="button"
-                onClick={onAdicionarFornecedor}
-                className="flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium transition-colors"
+              {/* Botão adicionar fornecedor */}
+              <th
+                className="border-b px-3 py-3 align-bottom"
                 style={{
-                  backgroundColor: 'var(--brand-primary-soft)',
-                  color: 'var(--brand-primary)',
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: 'var(--bg-surface-subtle)',
+                  minWidth: 120,
                 }}
-                title="Adicionar fornecedor"
               >
-                <FontAwesomeIcon icon={faPlus} />
-                <span>Fornecedor</span>
-              </button>
-            </th>
-          </tr>
-        </thead>
+                <button
+                  type="button"
+                  onClick={onAdicionarFornecedor}
+                  className="flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold transition-colors"
+                  style={{
+                    backgroundColor: 'var(--brand-primary-soft)',
+                    color: 'var(--brand-primary)',
+                  }}
+                >
+                  <FontAwesomeIcon icon={faPlus} />
+                  Fornecedor
+                </button>
+              </th>
+            </tr>
+          </thead>
 
-        <tbody>
-          {itens.map((item) => (
-            <tr
-              key={item.id}
-              className="border-b transition-colors"
-              style={{
-                borderColor: 'var(--border-soft)',
-                backgroundColor: item.isDestaque
-                  ? 'var(--color-danger-soft)'
-                  : 'var(--bg-surface)',
-              }}
-            >
-              {/* Célula de descrição */}
-              <td
-                className="border-r px-3 py-2"
-                style={{ borderColor: 'var(--border-soft)' }}
+          <tbody>
+            {itens.map((item, itemIdx) => (
+              <tr
+                key={item.id}
+                className="border-b transition-colors"
+                style={{
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: item.isDestaque
+                    ? 'color-mix(in srgb, var(--color-danger) 6%, transparent)'
+                    : itemIdx % 2 === 0 ? 'var(--bg-surface)' : 'var(--bg-surface-subtle)',
+                }}
               >
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="text"
-                      value={item.descricao}
-                      onChange={(e) => onAtualizarItem(item.id, 'descricao', e.target.value)}
-                      placeholder="Descrição do item"
-                      className="flex-1 rounded border px-2 py-1 text-sm font-medium focus:outline-none focus:ring-1"
-                      style={{
-                        borderColor: 'var(--border-default)',
-                        backgroundColor: 'var(--bg-input)',
-                        color: item.isDestaque ? 'var(--color-danger)' : 'var(--text-primary)',
-                      }}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => onAtualizarItem(item.id, 'isDestaque', !item.isDestaque)}
-                      className="rounded p-1 transition-colors"
-                      style={{
-                        color: item.isDestaque ? 'var(--color-danger)' : 'var(--text-muted)',
-                      }}
-                      title={item.isDestaque ? 'Remover destaque' : 'Marcar como destaque (vermelho)'}
-                    >
-                      <FontAwesomeIcon icon={faStar} className="text-xs" />
-                    </button>
-                    {itens.length > 1 && (
+                {/* Célula descrição */}
+                <td className="border-r px-3 py-3" style={{ borderColor: 'var(--border-soft)' }}>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={item.descricao}
+                        onChange={(e) => onAtualizarItem(item.id, 'descricao', e.target.value)}
+                        placeholder="Descrição do item"
+                        className="flex-1 rounded-lg border px-2.5 py-1.5 text-sm font-medium focus:outline-none focus:ring-2"
+                        style={{
+                          borderColor: item.isDestaque ? 'var(--color-danger)' : 'var(--border-default)',
+                          backgroundColor: 'var(--bg-input)',
+                          color: item.isDestaque ? 'var(--color-danger)' : 'var(--text-primary)',
+                        }}
+                      />
                       <button
                         type="button"
-                        onClick={() => onRemoverItem(item.id)}
-                        className="rounded p-1 transition-colors"
-                        style={{ color: 'var(--color-danger)' }}
-                        title="Remover item"
+                        onClick={() => onAtualizarItem(item.id, 'isDestaque', !item.isDestaque)}
+                        className="rounded-lg p-1.5 transition-colors"
+                        style={{
+                          color: item.isDestaque ? 'var(--color-danger)' : 'var(--text-muted)',
+                          backgroundColor: item.isDestaque ? 'var(--color-danger-soft)' : 'transparent',
+                        }}
+                        title={item.isDestaque ? 'Remover destaque' : 'Destacar em vermelho'}
                       >
-                        <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                        <FontAwesomeIcon icon={faStar} className="text-xs" />
                       </button>
-                    )}
+                      {itens.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => onRemoverItem(item.id)}
+                          className="rounded-lg p-1.5 opacity-40 transition-opacity hover:opacity-100"
+                          style={{ color: 'var(--color-danger)' }}
+                          title="Remover item"
+                        >
+                          <FontAwesomeIcon icon={faTrash} className="text-xs" />
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="date"
+                      value={item.data || ''}
+                      onChange={(e) => onAtualizarItem(item.id, 'data', e.target.value)}
+                      className="w-36 rounded-lg border px-2 py-1 text-xs focus:outline-none"
+                      style={{
+                        borderColor: 'var(--border-default)',
+                        backgroundColor: 'var(--bg-surface-subtle)',
+                        color: 'var(--text-secondary)',
+                      }}
+                    />
                   </div>
-                  <input
-                    type="date"
-                    value={item.data || ''}
-                    onChange={(e) => onAtualizarItem(item.id, 'data', e.target.value)}
-                    className="w-36 rounded border px-2 py-0.5 text-xs focus:outline-none"
-                    style={{
-                      borderColor: 'var(--border-default)',
-                      backgroundColor: 'var(--bg-input)',
-                      color: 'var(--text-secondary)',
-                    }}
-                  />
-                </div>
-              </td>
+                </td>
 
-              {/* Células de preço por fornecedor */}
+                {/* Preços por fornecedor */}
+                {fornecedores.map((forn) => {
+                  const key = `${item.id}_${forn.id}`;
+                  const p = precos[key] || { valor: 0, desconto: 0 };
+                  return (
+                    <td
+                      key={forn.id}
+                      className="border-r px-3 py-3"
+                      style={{ borderColor: 'var(--border-soft)' }}
+                    >
+                      <div className="flex flex-col gap-1.5">
+                        <InputValor
+                          value={p.valor}
+                          onChange={(val) => onAtualizarPreco(item.id, forn.id, 'valor', val)}
+                          isRed={item.isDestaque}
+                        />
+                        <InputValor
+                          value={p.desconto}
+                          onChange={(val) => onAtualizarPreco(item.id, forn.id, 'desconto', val)}
+                          isRed
+                          prefix="Desc"
+                          placeholder="0,00"
+                        />
+                      </div>
+                    </td>
+                  );
+                })}
+
+                <td />
+              </tr>
+            ))}
+
+            {/* Linha VALOR TOTAL */}
+            <tr>
+              <td
+                className="border-r px-4 py-3 text-right font-bold"
+                style={{
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: 'var(--bg-surface-subtle)',
+                  color: 'var(--text-primary)',
+                }}
+              >
+                Valor Total
+              </td>
               {fornecedores.map((forn) => {
-                const key = `${item.id}_${forn.id}`;
-                const p = precos[key] || { valor: 0, desconto: 0 };
+                const total = calcularTotalFornecedor(forn.id);
                 return (
                   <td
                     key={forn.id}
-                    className="border-r px-1 py-1"
-                    style={{ borderColor: 'var(--border-soft)' }}
+                    className="border-r px-4 py-3 text-right"
+                    style={{
+                      borderColor: 'var(--border-soft)',
+                      backgroundColor: 'color-mix(in srgb, var(--color-danger) 8%, var(--bg-surface-subtle))',
+                      color: 'var(--color-danger)',
+                      fontWeight: 700,
+                      fontSize: '1rem',
+                    }}
                   >
-                    <CelulaPreco
-                      valor={p.valor}
-                      desconto={p.desconto}
-                      onChange={(campo, val) => onAtualizarPreco(item.id, forn.id, campo, val)}
-                    />
+                    {formatMoeda(total)}
                   </td>
                 );
               })}
-
-              <td />
+              <td style={{ backgroundColor: 'var(--bg-surface-subtle)' }} />
             </tr>
-          ))}
-
-          {/* Linha VALOR TOTAL */}
-          <tr style={{ backgroundColor: 'var(--bg-surface-subtle)' }}>
-            <td
-              className="border-r px-3 py-2 text-right text-sm font-bold"
-              style={{
-                borderColor: 'var(--border-soft)',
-                color: 'var(--text-primary)',
-              }}
-            >
-              Valor Total
-            </td>
-            {fornecedores.map((forn) => (
-              <td
-                key={forn.id}
-                className="border-r px-3 py-2 text-right"
-                style={{
-                  borderColor: 'var(--border-soft)',
-                  color: 'var(--color-danger)',
-                  fontWeight: 700,
-                }}
-              >
-                {formatMoeda(calcularTotalFornecedor(forn.id))}
-              </td>
-            ))}
-            <td />
-          </tr>
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
 
       {/* Botão adicionar item */}
       <div
-        className="border-t px-3 py-2"
-        style={{ borderColor: 'var(--border-soft)' }}
+        className="flex items-center gap-2 border-t px-4 py-3"
+        style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-subtle)' }}
       >
         <button
           type="button"
           onClick={onAdicionarItem}
-          className="flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+          className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-colors"
           style={{
-            backgroundColor: 'var(--bg-surface-subtle)',
+            backgroundColor: 'var(--bg-surface)',
             color: 'var(--text-secondary)',
+            border: '1px solid var(--border-default)',
           }}
         >
-          <FontAwesomeIcon icon={faPlus} />
+          <FontAwesomeIcon icon={faPlus} className="text-xs" style={{ color: 'var(--brand-primary)' }} />
           Adicionar item
         </button>
+        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          Use ★ para destacar itens em vermelho
+        </span>
       </div>
     </div>
   );

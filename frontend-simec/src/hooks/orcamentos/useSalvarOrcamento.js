@@ -5,6 +5,7 @@ import {
   updateOrcamento,
   getOrcamentoById,
 } from '@/services/api/orcamentosApi';
+import { getUnidades } from '@/services/api/unidadesApi';
 import { useToast } from '@/contexts/ToastContext';
 
 function tempId() {
@@ -34,7 +35,8 @@ export function useSalvarOrcamento() {
   const [titulo, setTitulo] = useState('');
   const [tipo, setTipo] = useState('PRODUTO');
   const [observacao, setObservacao] = useState('');
-  const [local, setLocal] = useState('');
+  const [unidadeId, setUnidadeId] = useState('');
+  const [unidades, setUnidades] = useState([]);
   const [fornecedores, setFornecedores] = useState([novoFornecedor(0)]);
   const [itens, setItens] = useState([novoItem(0)]);
   const [precos, setPrecos] = useState({});
@@ -42,6 +44,14 @@ export function useSalvarOrcamento() {
   const [loadingData, setLoadingData] = useState(false);
   const [errors, setErrors] = useState({});
 
+  // Carrega unidades disponíveis
+  useEffect(() => {
+    getUnidades()
+      .then((lista) => setUnidades(lista || []))
+      .catch(() => {});
+  }, []);
+
+  // Carrega dados ao editar
   useEffect(() => {
     if (!isEditing) return;
     setLoadingData(true);
@@ -50,7 +60,7 @@ export function useSalvarOrcamento() {
         setTitulo(orc.titulo || '');
         setTipo(orc.tipo || 'PRODUTO');
         setObservacao(orc.observacao || '');
-        setLocal(orc.local || '');
+        setUnidadeId(orc.unidadeId || '');
 
         const fList = (orc.fornecedores || []).map((f) => ({
           id: f.id,
@@ -168,7 +178,7 @@ export function useSalvarOrcamento() {
     titulo,
     tipo,
     observacao: observacao || null,
-    local: local || null,
+    unidadeId: unidadeId || null,
     fornecedores: fornecedores.map((f) => ({
       id: f.id,
       nome: f.nome,
@@ -198,19 +208,19 @@ export function useSalvarOrcamento() {
       if (isEditing) {
         await updateOrcamento(id, payload);
         addToast('Orçamento atualizado com sucesso.', 'success');
+        navigate(`/orcamentos/${id}`);
       } else {
         const criado = await createOrcamento(payload);
         addToast('Orçamento criado com sucesso.', 'success');
         navigate(`/orcamentos/${criado.id}`);
-        return;
       }
-      navigate(`/orcamentos/${id}`);
     } catch (err) {
       addToast(err?.response?.data?.message || 'Erro ao salvar orçamento.', 'error');
     } finally {
       setLoading(false);
     }
-  }, [titulo, tipo, observacao, local, fornecedores, itens, precos, isEditing, id, navigate, addToast]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [titulo, tipo, observacao, unidadeId, fornecedores, itens, precos, isEditing, id]);
 
   const cancelar = useCallback(() => navigate('/orcamentos'), [navigate]);
 
@@ -225,8 +235,9 @@ export function useSalvarOrcamento() {
     setTipo,
     observacao,
     setObservacao,
-    local,
-    setLocal,
+    unidadeId,
+    setUnidadeId,
+    unidades,
     fornecedores,
     itens,
     precos,
