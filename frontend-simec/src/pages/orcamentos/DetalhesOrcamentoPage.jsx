@@ -278,19 +278,17 @@ function DetalhesOrcamentoPage() {
                     <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                       {f.nome}
                     </span>
-                    <div className="ml-auto text-right">
-                      <p
-                        className="text-sm font-bold"
-                        style={{ color: selected ? '#16a34a' : 'var(--text-primary)' }}
-                      >
-                        {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
-                      </p>
-                      {f.formaPagamento && (
-                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {f.formaPagamento}
-                        </p>
-                      )}
-                    </div>
+                    {f.formaPagamento && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {f.formaPagamento}
+                      </span>
+                    )}
+                    <span
+                      className="ml-auto text-sm font-bold"
+                      style={{ color: selected ? '#16a34a' : 'var(--text-primary)' }}
+                    >
+                      {total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                    </span>
                   </label>
                 );
               })}
