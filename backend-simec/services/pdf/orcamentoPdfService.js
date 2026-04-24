@@ -8,17 +8,21 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const logoPath = path.resolve(__dirname, '../../assets/logo-simec.png');
 
-const COLORS = {
+const C = {
   slate900: '#1e293b',
   slate700: '#334155',
-  slate600: '#475569',
+  slate500: '#64748b',
   slate400: '#94a3b8',
   slate200: '#e2e8f0',
   slate100: '#f1f5f9',
-  white: '#ffffff',
-  red: '#dc2626',
+  slate50:  '#f8fafc',
+  white:    '#ffffff',
+  red:      '#dc2626',
   redLight: '#fee2e2',
+  redMid:   '#fca5a5',
 };
+
+const TIPO_LABEL = { PRODUTO: 'Produto', SERVICO: 'Serviço', MISTO: 'Misto' };
 
 function formatMoeda(valor) {
   return `R$ ${Number(valor || 0).toLocaleString('pt-BR', {
@@ -38,6 +42,18 @@ function safeText(v, fallback = '') {
   return v == null || v === '' ? fallback : String(v);
 }
 
+function cellRect(doc, x, y, w, h, { fill, stroke } = {}) {
+  doc.save();
+  if (fill && stroke) {
+    doc.rect(x, y, w, h).fillAndStroke(fill, stroke);
+  } else if (fill) {
+    doc.rect(x, y, w, h).fill(fill);
+  } else {
+    doc.rect(x, y, w, h).stroke(stroke || C.slate200);
+  }
+  doc.restore();
+}
+
 export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
   if (!orcamentoId) throw new Error('ORCAMENTO_ID_INVALIDO');
 
@@ -47,117 +63,150 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
       criadoPor: { select: { id: true, nome: true } },
       aprovadoPor: { select: { id: true, nome: true } },
       unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
-      fornecedores: {
-        orderBy: { ordem: 'asc' },
-        include: { precos: true },
-      },
-      itens: {
-        orderBy: { ordem: 'asc' },
-        include: { precos: true },
-      },
+      fornecedores: { orderBy: { ordem: 'asc' }, include: { precos: true } },
+      itens: { orderBy: { ordem: 'asc' }, include: { precos: true } },
     },
   });
 
   if (!orcamento) throw new Error('ORCAMENTO_NAO_ENCONTRADO');
-
   return orcamento;
 }
 
 export async function gerarPdfOrcamentoBuffer(orcamento, options = {}) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 40, bufferPages: true });
+    const doc = new PDFDocument({ size: 'A4', margin: 36, bufferPages: true });
     const chunks = [];
-    doc.on('data', (chunk) => chunks.push(chunk));
+    doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    const pageW = doc.page.width;
-    const marginX = 40;
-    const contentW = pageW - marginX * 2;
+    const marginX = 36;
+    const contentW = doc.page.width - marginX * 2;
 
-    _desenharOrcamento(doc, orcamento, { pageW, marginX, contentW, options });
+    _desenharOrcamento(doc, orcamento, { marginX, contentW });
 
     doc.end();
   });
 }
 
-function _desenharOrcamento(doc, orc, { pageW, marginX, contentW }) {
+// ─── Layout constants derived from a single source of truth ──────────────────
+
+function buildCols(contentW, nForn) {
+  const descW = Math.round(contentW * 0.34);
+  const dataW = Math.round(contentW * 0.09);
+  const leftW = descW + dataW;                            // header/payment/total left block
+  const fornW = Math.round((contentW - leftW) / Math.max(nForn, 1));
+  return { descW, dataW, leftW, fornW };
+}
+
+// ─── Main orchestrator ────────────────────────────────────────────────────────
+
+function _desenharOrcamento(doc, orc, { marginX, contentW }) {
   const fornecedores = orc.fornecedores || [];
   const itens = orc.itens || [];
   const nForn = fornecedores.length;
+  const cols = buildCols(contentW, nForn);
 
-  // ─── Cabeçalho ────────────────────────────────────────────────
-  const headerH = 64;
-  doc.save().rect(marginX, 30, contentW, headerH).stroke(COLORS.slate200).restore();
+  const startY = 32;
+  doc.y = startY;
 
-  // logo
-  if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, marginX + 6, 36, { fit: [50, 50] });
-  }
-
-  // título ORÇAMENTO
-  const titleX = marginX + 62;
-  const titleW = contentW * 0.38;
-  doc.font('Helvetica-Bold').fontSize(18).fillColor(COLORS.slate900)
-    .text('Orçamento', titleX, 50, { width: titleW, align: 'center' });
-
-  // colunas de fornecedor (numeradas)
-  if (nForn > 0) {
-    const colW = (contentW - titleX - titleW + marginX) / nForn;
-    const colStartX = marginX + titleW + 62;
-    const adjustedColW = (contentW - (titleW + 62)) / nForn;
-
-    for (let i = 0; i < nForn; i++) {
-      const cx = marginX + titleW + 62 + i * adjustedColW;
-      doc.save().rect(cx, 30, adjustedColW, headerH).stroke(COLORS.slate200).restore();
-      doc.font('Helvetica-Bold').fontSize(10).fillColor(COLORS.slate900)
-        .text(String(i + 1), cx, 38, { width: adjustedColW, align: 'center' });
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate700)
-        .text(safeText(fornecedores[i].nome), cx + 4, 54, {
-          width: adjustedColW - 8,
-          align: 'center',
-          lineBreak: false,
-          ellipsis: true,
-        });
-    }
-  }
-
-  doc.y = 30 + headerH + 4;
-
-  // ─── Forma de Pagamento ───────────────────────────────────────
-  _desenharLinhaFormaPagamento(doc, orc, fornecedores, { marginX, contentW });
-
-  // ─── Tabela de itens ──────────────────────────────────────────
-  _desenharTabelaItens(doc, orc, fornecedores, itens, { marginX, contentW });
-
-  // ─── Observação ───────────────────────────────────────────────
-  _desenharObservacao(doc, orc, { marginX, contentW });
-
-  // ─── Rodapé de aprovação ──────────────────────────────────────
-  _desenharRodapeAprovacao(doc, orc, { marginX, contentW, pageW });
+  _cabecalho(doc, orc, fornecedores, { marginX, contentW, startY, ...cols });
+  _linhaMetadados(doc, orc, { marginX, contentW });
+  _linhaFormaPagamento(doc, fornecedores, { marginX, contentW, ...cols });
+  _tabelaItens(doc, fornecedores, itens, { marginX, contentW, ...cols });
+  _observacao(doc, orc, { marginX, contentW });
+  _rodapeAssinatura(doc, orc, { marginX, contentW });
 }
 
-function _desenharLinhaFormaPagamento(doc, orc, fornecedores, { marginX, contentW }) {
+// ─── Cabeçalho ───────────────────────────────────────────────────────────────
+
+function _cabecalho(doc, orc, fornecedores, { marginX, contentW, startY, leftW, fornW }) {
+  const h = 68;
   const nForn = fornecedores.length;
-  const rowH = 28;
-  const labelW = contentW * 0.34;
-  const colW = nForn > 0 ? (contentW - labelW) / nForn : contentW - labelW;
+
+  // left block — background
+  cellRect(doc, marginX, startY, leftW, h, { fill: C.white, stroke: C.slate200 });
+
+  // logo
+  const logoSize = 48;
+  const logoY = startY + (h - logoSize) / 2;
+  if (fs.existsSync(logoPath)) {
+    doc.image(logoPath, marginX + 6, logoY, { fit: [logoSize, logoSize] });
+  }
+
+  // "ORÇAMENTO" label
+  const labelX = marginX + logoSize + 14;
+  const labelW = leftW - logoSize - 20;
+  doc
+    .font('Helvetica-Bold').fontSize(16).fillColor(C.slate900)
+    .text('Orçamento', labelX, startY + 16, { width: labelW, align: 'center' });
+  doc
+    .font('Helvetica').fontSize(8).fillColor(C.slate500)
+    .text(safeText(orc.titulo), labelX, startY + 37, { width: labelW, align: 'center', lineBreak: false, ellipsis: true });
+
+  // supplier columns
+  for (let i = 0; i < nForn; i++) {
+    const cx = marginX + leftW + i * fornW;
+    cellRect(doc, cx, startY, fornW, h, { fill: C.slate50, stroke: C.slate200 });
+
+    // number badge circle area
+    doc
+      .font('Helvetica-Bold').fontSize(13).fillColor(C.slate900)
+      .text(String(i + 1), cx, startY + 12, { width: fornW, align: 'center' });
+
+    doc
+      .font('Helvetica-Bold').fontSize(8).fillColor(C.slate700)
+      .text(safeText(fornecedores[i].nome, '—'), cx + 4, startY + 32, {
+        width: fornW - 8,
+        align: 'center',
+        lineBreak: false,
+        ellipsis: true,
+      });
+  }
+
+  doc.y = startY + h;
+}
+
+// ─── Linha de metadados (tipo · unidade · data) ───────────────────────────────
+
+function _linhaMetadados(doc, orc, { marginX, contentW }) {
+  const rowH = 20;
   const y = doc.y;
 
-  // label
-  doc.save()
-    .rect(marginX, y, labelW, rowH)
-    .fillAndStroke(COLORS.slate100, COLORS.slate200)
-    .restore();
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.slate700)
-    .text('FORMA DE PAGAMENTO', marginX + 4, y + 9, { width: labelW - 8 });
+  cellRect(doc, marginX, y, contentW, rowH, { fill: C.slate100, stroke: C.slate200 });
+
+  const tipo = TIPO_LABEL[orc.tipo] || orc.tipo || '';
+  const unidade = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema || '';
+  const criadoEm = formatData(orc.createdAt);
+
+  const parts = [tipo, unidade, criadoEm ? `Emitido em ${criadoEm}` : ''].filter(Boolean).join('   ·   ');
+
+  doc
+    .font('Helvetica').fontSize(8).fillColor(C.slate500)
+    .text(parts, marginX + 8, y + 6, { width: contentW - 16, align: 'center' });
+
+  doc.y = y + rowH;
+}
+
+// ─── Linha Forma de Pagamento ─────────────────────────────────────────────────
+
+function _linhaFormaPagamento(doc, fornecedores, { marginX, contentW, leftW, fornW }) {
+  const nForn = fornecedores.length;
+  const rowH = 26;
+  const y = doc.y;
+
+  cellRect(doc, marginX, y, leftW, rowH, { fill: C.slate100, stroke: C.slate200 });
+  doc
+    .font('Helvetica-Bold').fontSize(7.5).fillColor(C.slate700)
+    .text('FORMA DE PAGAMENTO', marginX + 8, y + 9, { width: leftW - 16 });
 
   for (let i = 0; i < nForn; i++) {
-    const cx = marginX + labelW + i * colW;
-    doc.save().rect(cx, y, colW, rowH).stroke(COLORS.slate200).restore();
-    doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate700)
+    const cx = marginX + leftW + i * fornW;
+    cellRect(doc, cx, y, fornW, rowH, { stroke: C.slate200 });
+    doc
+      .font('Helvetica').fontSize(8).fillColor(C.slate700)
       .text(safeText(fornecedores[i].formaPagamento, '—'), cx + 4, y + 9, {
-        width: colW - 8,
+        width: fornW - 8,
         align: 'center',
         lineBreak: false,
         ellipsis: true,
@@ -167,141 +216,145 @@ function _desenharLinhaFormaPagamento(doc, orc, fornecedores, { marginX, content
   doc.y = y + rowH;
 }
 
-function _desenharTabelaItens(doc, orc, fornecedores, itens, { marginX, contentW }) {
+// ─── Tabela de itens ──────────────────────────────────────────────────────────
+
+function _tabelaItens(doc, fornecedores, itens, { marginX, contentW, descW, dataW, leftW, fornW }) {
   const nForn = fornecedores.length;
-  const headerH = 22;
-  const descW = contentW * 0.30;
-  const dataW = contentW * 0.12;
-  const colW = nForn > 0 ? (contentW - descW - dataW) / nForn : 0;
+  const fornIds = fornecedores.map((f) => f.id);
+  const thH = 22;
 
-  // cabeçalho da tabela
-  const y0 = doc.y + 2;
-  doc.save().rect(marginX, y0, descW, headerH).fillAndStroke(COLORS.slate100, COLORS.slate200).restore();
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.slate700)
-    .text('DESCRIÇÃO', marginX + 4, y0 + 7, { width: descW - 8 });
+  // ── cabeçalho da tabela
+  const y0 = doc.y;
+  cellRect(doc, marginX, y0, descW, thH, { fill: C.slate100, stroke: C.slate200 });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.slate700)
+    .text('DESCRIÇÃO', marginX + 6, y0 + 7, { width: descW - 12 });
 
-  doc.save().rect(marginX + descW, y0, dataW, headerH).fillAndStroke(COLORS.slate100, COLORS.slate200).restore();
-  doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.slate700)
-    .text('Data', marginX + descW + 4, y0 + 7, { width: dataW - 8, align: 'center' });
+  cellRect(doc, marginX + descW, y0, dataW, thH, { fill: C.slate100, stroke: C.slate200 });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.slate700)
+    .text('DATA', marginX + descW + 4, y0 + 7, { width: dataW - 8, align: 'center' });
 
   for (let i = 0; i < nForn; i++) {
-    const cx = marginX + descW + dataW + i * colW;
-    doc.save().rect(cx, y0, colW, headerH).fillAndStroke(COLORS.slate100, COLORS.slate200).restore();
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(COLORS.slate700)
-      .text('Valor Unitário', cx + 4, y0 + 7, { width: colW - 8, align: 'center' });
+    const cx = marginX + leftW + i * fornW;
+    cellRect(doc, cx, y0, fornW, thH, { fill: C.slate100, stroke: C.slate200 });
+    doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.slate700)
+      .text('Valor Unitário', cx + 4, y0 + 7, { width: fornW - 8, align: 'right' });
   }
 
-  doc.y = y0 + headerH;
+  doc.y = y0 + thH;
 
-  // linhas de itens
-  const fornecedorIds = fornecedores.map((f) => f.id);
-
+  // ── linhas de itens
   for (const item of itens) {
-    const rowH = 24;
+    const rowH = 22;
     const ry = doc.y;
-    const textColor = item.isDestaque ? COLORS.red : COLORS.slate900;
-    const bgColor = item.isDestaque ? COLORS.redLight : COLORS.white;
+    const isRed = item.isDestaque;
+    const textColor = isRed ? C.red : C.slate900;
+    const bg = isRed ? C.redLight : C.white;
 
-    doc.save().rect(marginX, ry, descW, rowH).fillAndStroke(bgColor, COLORS.slate200).restore();
-    doc.font(item.isDestaque ? 'Helvetica-Bold' : 'Helvetica').fontSize(8).fillColor(textColor)
-      .text(safeText(item.descricao), marginX + 4, ry + 8, { width: descW - 8, lineBreak: false, ellipsis: true });
+    cellRect(doc, marginX, ry, descW, rowH, { fill: bg, stroke: C.slate200 });
+    doc.font(isRed ? 'Helvetica-Bold' : 'Helvetica').fontSize(8.5).fillColor(textColor)
+      .text(safeText(item.descricao), marginX + 6, ry + 7, { width: descW - 12, lineBreak: false, ellipsis: true });
 
-    doc.save().rect(marginX + descW, ry, dataW, rowH).fillAndStroke(bgColor, COLORS.slate200).restore();
-    doc.font('Helvetica').fontSize(8).fillColor(textColor)
-      .text(formatData(item.data), marginX + descW + 4, ry + 8, { width: dataW - 8, align: 'center' });
+    cellRect(doc, marginX + descW, ry, dataW, rowH, { fill: bg, stroke: C.slate200 });
+    doc.font('Helvetica').fontSize(8).fillColor(isRed ? C.red : C.slate500)
+      .text(formatData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center' });
 
     for (let i = 0; i < nForn; i++) {
-      const fornId = fornecedorIds[i];
+      const fornId = fornIds[i];
       const preco = item.precos?.find((p) => p.fornecedorId === fornId);
-      const cx = marginX + descW + dataW + i * colW;
+      const cx = marginX + leftW + i * fornW;
 
-      doc.save().rect(cx, ry, colW, rowH).fillAndStroke(bgColor, COLORS.slate200).restore();
+      cellRect(doc, cx, ry, fornW, rowH, { fill: bg, stroke: C.slate200 });
 
       if (preco) {
         const valor = Number(preco.valor || 0);
         const desconto = Number(preco.desconto || 0);
-        const exibir = valor > 0 ? formatMoeda(valor - desconto) : '—';
-        doc.font('Helvetica-Bold').fontSize(8).fillColor(textColor)
-          .text(exibir, cx + 4, ry + 8, { width: colW - 8, align: 'right' });
+        const net = valor - desconto;
+        doc.font('Helvetica-Bold').fontSize(8.5).fillColor(textColor)
+          .text(valor > 0 ? formatMoeda(net) : '—', cx + 4, ry + 7, { width: fornW - 8, align: 'right' });
       } else {
-        doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate400)
-          .text('—', cx + 4, ry + 8, { width: colW - 8, align: 'right' });
+        doc.font('Helvetica').fontSize(8.5).fillColor(C.slate400)
+          .text('—', cx + 4, ry + 7, { width: fornW - 8, align: 'right' });
       }
     }
 
     doc.y = ry + rowH;
   }
 
-  // linha VALOR TOTAL
+  // ── linha Valor Total
   const totalY = doc.y;
   const totalH = 26;
 
-  doc.save().rect(marginX, totalY, descW + dataW, totalH).fillAndStroke(COLORS.slate100, COLORS.slate200).restore();
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate900)
-    .text('Valor Total', marginX + 4, totalY + 9, { width: descW + dataW - 8, align: 'center' });
+  cellRect(doc, marginX, totalY, leftW, totalH, { fill: C.slate100, stroke: C.slate200 });
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(C.slate900)
+    .text('Valor Total', marginX + 6, totalY + 9, { width: leftW - 12, align: 'center' });
 
   for (let i = 0; i < nForn; i++) {
-    const fornId = fornecedorIds[i];
+    const fornId = fornIds[i];
     const total = itens.reduce((sum, item) => {
-      const preco = item.precos?.find((p) => p.fornecedorId === fornId);
-      if (!preco) return sum;
-      return sum + Number(preco.valor || 0) - Number(preco.desconto || 0);
+      const p = item.precos?.find((p) => p.fornecedorId === fornId);
+      if (!p) return sum;
+      return sum + Math.max(0, Number(p.valor || 0) - Number(p.desconto || 0));
     }, 0);
 
-    const cx = marginX + descW + dataW + i * colW;
-    doc.save().rect(cx, totalY, colW, totalH).fillAndStroke(COLORS.redLight, COLORS.slate200).restore();
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.red)
-      .text(formatMoeda(total), cx + 4, totalY + 9, { width: colW - 8, align: 'right' });
+    const cx = marginX + leftW + i * fornW;
+    cellRect(doc, cx, totalY, fornW, totalH, { fill: C.redLight, stroke: C.slate200 });
+    doc.font('Helvetica-Bold').fontSize(9).fillColor(C.red)
+      .text(formatMoeda(total), cx + 4, totalY + 9, { width: fornW - 8, align: 'right' });
   }
 
-  doc.y = totalY + totalH + 8;
+  doc.y = totalY + totalH;
 }
 
-function _desenharObservacao(doc, orc, { marginX, contentW }) {
+// ─── Observação ───────────────────────────────────────────────────────────────
+
+function _observacao(doc, orc, { marginX, contentW }) {
   if (!orc.observacao) return;
 
-  const y = doc.y + 4;
+  const y = doc.y + 16;
 
-  doc.save().rect(marginX, y, contentW, 20).fillAndStroke(COLORS.slate100, COLORS.slate200).restore();
-  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate900)
-    .text('Observação', marginX + 4, y + 6, { width: contentW - 8, align: 'center' });
+  // título da seção
+  cellRect(doc, marginX, y, contentW, 20, { fill: C.slate100, stroke: C.slate200 });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(C.slate700)
+    .text('OBSERVAÇÃO / JUSTIFICATIVA', marginX + 8, y + 6, { width: contentW - 16, align: 'center' });
 
-  const obsY = y + 20;
+  // corpo
+  const bodyY = y + 20;
   const obsText = safeText(orc.observacao);
-  const textHeight = doc.heightOfString(obsText, { width: contentW - 20, fontSize: 9 });
-  const obsH = Math.max(60, textHeight + 20);
+  const textH = doc.heightOfString(obsText, { width: contentW - 24 });
+  const bodyH = Math.max(52, textH + 20);
 
-  doc.save().rect(marginX, obsY, contentW, obsH).stroke(COLORS.slate200).restore();
-  doc.font('Helvetica').fontSize(9).fillColor(COLORS.slate700)
-    .text(obsText, marginX + 10, obsY + 10, { width: contentW - 20, align: 'center' });
+  cellRect(doc, marginX, bodyY, contentW, bodyH, { stroke: C.slate200 });
+  doc.font('Helvetica').fontSize(9).fillColor(C.slate700)
+    .text(obsText, marginX + 12, bodyY + 10, { width: contentW - 24 });
 
-  const unidadeNome = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema;
-  if (unidadeNome) {
-    doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate900)
-      .text(`Unidade: ${unidadeNome}`, marginX + 10, obsY + obsH - 20, { width: contentW - 20, align: 'center' });
-  }
-
-  doc.y = obsY + obsH + 12;
+  doc.y = bodyY + bodyH;
 }
 
-function _desenharRodapeAprovacao(doc, orc, { marginX, contentW }) {
-  const y = doc.y + 8;
+// ─── Rodapé de assinatura ─────────────────────────────────────────────────────
+
+function _rodapeAssinatura(doc, orc, { marginX, contentW }) {
+  const y = doc.y + 48;   // more breathing room
+  const lineLen = contentW * 0.36;
   const midX = marginX + contentW / 2;
 
-  doc.moveTo(marginX + 20, y).lineTo(midX - 20, y).lineWidth(0.5).strokeColor(COLORS.slate400).stroke();
+  // left line — aprovador
+  doc.moveTo(marginX + 16, y).lineTo(marginX + 16 + lineLen, y)
+    .lineWidth(0.75).strokeColor(C.slate400).stroke();
 
-  const aprovadorNome = orc.aprovadoPor?.nome || 'Luiz Dias Dutra';
-  doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate700)
-    .text(`Aprovado por:`, marginX + 20, y + 4, { width: 200, continued: false });
-  doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate700)
-    .text(aprovadorNome, marginX + contentW / 4 - 40, y + 14, { width: 200, align: 'center' });
+  const aprovadorNome = orc.aprovadoPor?.nome || '________________________________';
+  doc.font('Helvetica').fontSize(8).fillColor(C.slate500)
+    .text(aprovadorNome, marginX + 16, y + 4, { width: lineLen, align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.slate400)
+    .text('Aprovado por', marginX + 16, y + 16, { width: lineLen, align: 'center' });
 
-  doc.moveTo(midX + 20, y).lineTo(marginX + contentW - 20, y).lineWidth(0.5).strokeColor(COLORS.slate400).stroke();
-  doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate700)
-    .text('DATA:', midX + 20, y + 4);
+  // right line — data
+  const rightX = marginX + contentW - 16 - lineLen;
+  doc.moveTo(rightX, y).lineTo(rightX + lineLen, y)
+    .lineWidth(0.75).strokeColor(C.slate400).stroke();
 
-  if (orc.dataAprovacao) {
-    doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate700)
-      .text(formatData(orc.dataAprovacao), midX + 60, y + 4);
-  }
+  const dataTexto = orc.dataAprovacao ? formatData(orc.dataAprovacao) : '___/___/______';
+  doc.font('Helvetica').fontSize(8).fillColor(C.slate500)
+    .text(dataTexto, rightX, y + 4, { width: lineLen, align: 'center' });
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor(C.slate400)
+    .text('Data', rightX, y + 16, { width: lineLen, align: 'center' });
 }
