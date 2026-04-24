@@ -58,8 +58,11 @@ function buildCols(contentW, nForn) {
   const descW = Math.round(contentW * 0.36);
   const dataW = Math.round(contentW * 0.10);
   const leftW = descW + dataW;
-  const fornW = (contentW - leftW) / Math.max(nForn, 1); // sem arredondamento → colunas somam contentW exato
-  return { descW, dataW, leftW, fornW };
+  const n     = Math.max(nForn, 1);
+  const baseW = Math.floor((contentW - leftW) / n);
+  const lastW = (contentW - leftW) - baseW * (n - 1); // último recebe o resto → soma exata
+  const fornWidths = Array.from({ length: n }, (_, i) => (i === n - 1 ? lastW : baseW));
+  return { descW, dataW, leftW, fornW: baseW, fornWidths };
 }
 
 // ─── API ─────────────────────────────────────────────────────────────────────
@@ -177,10 +180,9 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
 
 // ─── 3. Linha de fornecedores (alinhada com colunas da tabela) ───────────────
 
-function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, leftW, fornW }) {
-  const nForn = fornecedores.length;
-  const rowH  = 36;
-  const y     = doc.y;
+function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, leftW, fornWidths }) {
+  const rowH = 36;
+  const y    = doc.y;
 
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
@@ -190,27 +192,26 @@ function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, 
       lineBreak: false,
     });
 
-  for (let i = 0; i < nForn; i++) {
-    const forn     = fornecedores[i];
-    const isAprv   = forn.id === fornecedorAprovadoId;
-    const cx       = marginX + leftW + i * fornW;
-    box(doc, cx, y, fornW, rowH, { fill: isAprv ? C.greenLight : C.gray50 });
+  let cx = marginX + leftW;
+  for (let i = 0; i < fornecedores.length; i++) {
+    const forn   = fornecedores[i];
+    const w      = fornWidths[i];
+    const isAprv = forn.id === fornecedorAprovadoId;
+    box(doc, cx, y, w, rowH, { fill: isAprv ? C.greenLight : C.gray50 });
 
-    // número ou checkmark se aprovado
     const numLabel = isAprv ? `✓ ${i + 1}` : String(i + 1);
     doc
-      .font('Helvetica-Bold').fontSize(13)
-      .fillColor(isAprv ? C.green : TEXT)
-      .text(numLabel, cx, y + 3, { width: fornW, align: 'center' });
-
+      .font('Helvetica-Bold').fontSize(13).fillColor(isAprv ? C.green : TEXT)
+      .text(numLabel, cx, y + 3, { width: w, align: 'center' });
     doc
       .font('Helvetica').fontSize(8.5).fillColor(isAprv ? C.green : C.gray600)
       .text(safe(forn.nome, '—'), cx + 4, y + 21, {
-        width: fornW - 8,
+        width: w - 8,
         align: 'center',
         lineBreak: false,
         ellipsis: true,
       });
+    cx += w;
   }
 
   doc.y = y + rowH;
@@ -218,27 +219,28 @@ function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, 
 
 // ─── 3. Forma de Pagamento ────────────────────────────────────────────────────
 
-function _formaPagamento(doc, fornecedores, { marginX, leftW, fornW }) {
-  const nForn = fornecedores.length;
-  const rowH  = 24;
-  const y     = doc.y;
+function _formaPagamento(doc, fornecedores, { marginX, leftW, fornWidths }) {
+  const rowH = 24;
+  const y    = doc.y;
 
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
     .font('Helvetica-Bold').fontSize(7.5).fillColor(TEXT)
     .text('FORMA DE PAGAMENTO', marginX + 8, y + 8, { width: leftW - 16 });
 
-  for (let i = 0; i < nForn; i++) {
-    const cx = marginX + leftW + i * fornW;
-    box(doc, cx, y, fornW, rowH);
+  let cx = marginX + leftW;
+  for (let i = 0; i < fornecedores.length; i++) {
+    const w = fornWidths[i];
+    box(doc, cx, y, w, rowH);
     doc
       .font('Helvetica').fontSize(8.5).fillColor(TEXT)
       .text(safe(fornecedores[i].formaPagamento, '—'), cx + 4, y + 7, {
-        width: fornW - 8,
+        width: w - 8,
         align: 'center',
         lineBreak: false,
         ellipsis: true,
       });
+    cx += w;
   }
 
   doc.y = y + rowH;
@@ -246,12 +248,11 @@ function _formaPagamento(doc, fornecedores, { marginX, leftW, fornW }) {
 
 // ─── 4. Tabela de itens ───────────────────────────────────────────────────────
 
-function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX, descW, dataW, leftW, fornW }) {
-  const nForn  = fornecedores.length;
-  const fornIds = fornecedores.map((f) => f.id);
-  const thH    = 20;
+function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX, descW, dataW, leftW, fornWidths }) {
+  const nForn = fornecedores.length;
+  const thH   = 20;
 
-  // cabeçalho
+  // ── cabeçalho ──
   const y0 = doc.y;
   box(doc, marginX,         y0, descW, thH, { fill: C.gray100 });
   box(doc, marginX + descW, y0, dataW, thH, { fill: C.gray100 });
@@ -260,22 +261,24 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
   doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT)
     .text('DATA', marginX + descW + 4, y0 + 6, { width: dataW - 8, align: 'center' });
 
+  let cx0 = marginX + leftW;
   for (let i = 0; i < nForn; i++) {
+    const w      = fornWidths[i];
     const isAprv = fornecedores[i].id === fornecedorAprovadoId;
-    const cx = marginX + leftW + i * fornW;
-    box(doc, cx, y0, fornW, thH, { fill: isAprv ? C.greenLight : C.gray100 });
+    box(doc, cx0, y0, w, thH, { fill: isAprv ? C.greenLight : C.gray100 });
     doc.font('Helvetica-Bold').fontSize(8).fillColor(isAprv ? C.green : TEXT)
-      .text('Valor Unitário', cx + 4, y0 + 6, { width: fornW - 8, align: 'center' });
+      .text('Valor Unitário', cx0 + 4, y0 + 6, { width: w - 8, align: 'center' });
+    cx0 += w;
   }
   doc.y = y0 + thH;
 
-  // linhas
+  // ── linhas de item ──
   for (const item of itens) {
-    const rowH = 22;
-    const ry   = doc.y;
+    const rowH  = 22;
+    const ry    = doc.y;
     const isRed = item.isDestaque;
-    const fg   = isRed ? C.red : TEXT;
-    const bg   = isRed ? C.redLight : C.white;
+    const fg    = isRed ? C.red : TEXT;
+    const bg    = isRed ? C.redLight : C.white;
 
     box(doc, marginX,         ry, descW, rowH, { fill: bg });
     box(doc, marginX + descW, ry, dataW, rowH, { fill: bg });
@@ -284,34 +287,37 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
     doc.font('Helvetica').fontSize(8).fillColor(isRed ? C.red : C.gray600)
       .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center' });
 
+    let cx = marginX + leftW;
     for (let i = 0; i < nForn; i++) {
+      const w      = fornWidths[i];
       const forn   = fornecedores[i];
       const isAprv = forn.id === fornecedorAprovadoId;
       const preco  = item.precos?.find((p) => p.fornecedorId === forn.id);
-      const cx     = marginX + leftW + i * fornW;
-      // se item é destaque (vermelho), prioriza vermelho; se coluna é aprovada, usa verde suave
       const cellBg = isRed ? C.redLight : (isAprv ? '#f0fdf4' : C.white);
-      box(doc, cx, ry, fornW, rowH, { fill: cellBg });
+      box(doc, cx, ry, w, rowH, { fill: cellBg });
 
-      const valor    = Number(preco?.valor    || 0);
-      const desconto = Number(preco?.desconto || 0);
-      const exibir   = valor > 0 ? fmt(valor - desconto) : '—';
+      const valor     = Number(preco?.valor    || 0);
+      const desconto  = Number(preco?.desconto || 0);
+      const exibir    = valor > 0 ? fmt(valor - desconto) : '—';
       const textColor = isRed ? C.red : (isAprv ? C.green : TEXT);
       doc.font('Helvetica-Bold').fontSize(9).fillColor(textColor)
-        .text(exibir, cx + 4, ry + 7, { width: fornW - 8, align: 'center' });
+        .text(exibir, cx + 4, ry + 7, { width: w - 8, align: 'center' });
+      cx += w;
     }
 
     doc.y = ry + rowH;
   }
 
-  // Valor Total
+  // ── Valor Total ──
   const totalY = doc.y;
   const totalH = 26;
   box(doc, marginX, totalY, leftW, totalH, { fill: C.gray100 });
   doc.font('Helvetica-Bold').fontSize(9.5).fillColor(TEXT)
     .text('Valor Total', marginX + 6, totalY + 9, { width: leftW - 12, align: 'center' });
 
+  let cx = marginX + leftW;
   for (let i = 0; i < nForn; i++) {
+    const w      = fornWidths[i];
     const forn   = fornecedores[i];
     const isAprv = forn.id === fornecedorAprovadoId;
     const total  = itens.reduce((sum, item) => {
@@ -319,10 +325,10 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
       return sum + (p ? Math.max(0, Number(p.valor || 0) - Number(p.desconto || 0)) : 0);
     }, 0);
 
-    const cx = marginX + leftW + i * fornW;
-    box(doc, cx, totalY, fornW, totalH, { fill: isAprv ? C.greenLight : C.redLight });
+    box(doc, cx, totalY, w, totalH, { fill: isAprv ? C.greenLight : C.redLight });
     doc.font('Helvetica-Bold').fontSize(9.5).fillColor(isAprv ? C.green : C.red)
-      .text(fmt(total), cx + 4, totalY + 9, { width: fornW - 8, align: 'center' });
+      .text(fmt(total), cx + 4, totalY + 9, { width: w - 8, align: 'center' });
+    cx += w;
   }
 
   doc.y = totalY + totalH;
