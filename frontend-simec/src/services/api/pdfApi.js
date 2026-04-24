@@ -98,3 +98,9 @@ export const exportarHistoricoEquipamentoPDF = (
     },
     fallbackFileName
   );
+
+export const exportarOrcamentoPDF = (orcamentoId) =>
+  baixarPdf(
+    { url: `/pdfs/orcamento/${orcamentoId}`, method: 'get' },
+    `orcamento_${orcamentoId.slice(-6).toUpperCase()}.pdf`
+  );
