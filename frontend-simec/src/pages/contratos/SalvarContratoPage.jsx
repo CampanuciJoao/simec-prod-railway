@@ -36,66 +36,56 @@ function SalvarContratoPage() {
 
   if (page.loading) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title={title}
-          subtitle={subtitle}
-          icon={faFileContract}
-          actions={headerActions}
-        />
-        <PageState loading />
+      <PageLayout padded>
+        <div className="flex flex-col gap-5">
+          <PageHeader title={title} subtitle={subtitle} icon={faFileContract} actions={headerActions} />
+          <PageState loading />
+        </div>
       </PageLayout>
     );
   }
 
   if (page.error) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title={title}
-          subtitle={subtitle}
-          icon={faFileContract}
-          actions={headerActions}
-        />
-        <PageState error={page.error} />
+      <PageLayout padded>
+        <div className="flex flex-col gap-5">
+          <PageHeader title={title} subtitle={subtitle} icon={faFileContract} actions={headerActions} />
+          <PageState error={page.error} />
+        </div>
       </PageLayout>
     );
   }
 
   if (page.isEditing && !page.initialData) {
     return (
-      <PageLayout background="slate" padded fullHeight>
-        <PageHeader
-          title="Editar Contrato"
-          subtitle="O contrato solicitado não foi encontrado."
-          icon={faFileContract}
-          actions={headerActions}
-        />
-        <PageState
-          isEmpty
-          emptyMessage="Contrato não encontrado."
-        />
+      <PageLayout padded>
+        <div className="flex flex-col gap-5">
+          <PageHeader title="Editar Contrato" subtitle="O contrato solicitado não foi encontrado." icon={faFileContract} actions={headerActions} />
+          <PageState isEmpty emptyMessage="Contrato não encontrado." />
+        </div>
       </PageLayout>
     );
   }
 
   return (
-    <PageLayout background="slate" padded fullHeight>
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        icon={faFileContract}
-        actions={headerActions}
-      />
+    <PageLayout padded>
+      <div className="flex flex-col gap-5">
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          icon={faFileContract}
+          actions={headerActions}
+        />
 
-      <ContratoForm
-        onSubmit={page.handleSave}
-        initialData={page.initialData}
-        isEditing={page.isEditing}
-        todosEquipamentos={page.equipamentos}
-        unidadesDisponiveis={page.unidades}
-        onCancel={page.goBack}
-      />
+        <ContratoForm
+          onSubmit={page.handleSave}
+          initialData={page.initialData}
+          isEditing={page.isEditing}
+          todosEquipamentos={page.equipamentos}
+          unidadesDisponiveis={page.unidades}
+          onCancel={page.goBack}
+        />
+      </div>
     </PageLayout>
   );
 }
