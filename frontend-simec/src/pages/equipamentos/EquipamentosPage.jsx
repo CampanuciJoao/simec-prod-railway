@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRotateRight,
@@ -29,6 +30,7 @@ import {
 function EquipamentosPage() {
   const page = useEquipamentosPage();
   const expansion = useEquipamentosExpansion('visaoGeral');
+  const location = useLocation();
 
   const isInitialLoading = page.loading && page.equipamentos.length === 0;
   const hasError = Boolean(page.error);
@@ -50,6 +52,12 @@ function EquipamentosPage() {
 
     statusFilter?.onChange(status);
   };
+
+  useEffect(() => {
+    const filtroStatus = location.state?.filtroStatus;
+    if (filtroStatus) aplicarFiltroStatus(filtroStatus);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <PageLayout padded fullHeight>

@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
@@ -228,6 +228,7 @@ function DashboardActionQueue({ resumo }) {
 
 function DashboardPage() {
   const { data, loading, error, recarregar } = useDashboard();
+  const navigate = useNavigate();
 
   const resumo = useMemo(() => {
     const totalEquipamentos = Number(data.totalEquipamentos || 0);
@@ -416,7 +417,12 @@ function DashboardPage() {
               }}
             >
               <div className="h-[260px] w-full max-w-[340px] sm:h-[300px] sm:max-w-[380px]">
-                <DonutChart data={data.statusEquipamentos} />
+                <DonutChart
+                  data={data.statusEquipamentos}
+                  onClickSegment={(label) =>
+                    navigate('/equipamentos', { state: { filtroStatus: label } })
+                  }
+                />
               </div>
             </div>
           </PageSection>

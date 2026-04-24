@@ -106,6 +106,7 @@ export function useEquipamentosPage() {
           { label: 'Em manutenção', value: 'EmManutencao' },
           { label: 'Inoperante', value: 'Inoperante' },
           { label: 'Uso limitado', value: 'UsoLimitado' },
+          { label: 'Desativado', value: 'Desativado' },
         ],
       },
     ],
@@ -149,6 +150,7 @@ export function useEquipamentosPage() {
         EmManutencao: 'Em manutenção',
         Inoperante: 'Inoperante',
         UsoLimitado: 'Uso limitado',
+        Desativado: 'Desativado',
       };
 
       filtrosAtivos.push({
