@@ -6,7 +6,6 @@ import { useToast } from '@/contexts/ToastContext';
 import { useSalvarSeguroPage } from '@/hooks/seguros/useSalvarSeguroPage';
 
 import SeguroForm from '@/components/seguros/SeguroForm';
-import SeguroAnexosSection from '@/components/seguros/SeguroAnexosSection';
 
 import {
   PageLayout,
@@ -62,15 +61,10 @@ function SalvarSeguroPage() {
         isEditing={page.isEditing}
         equipamentosDisponiveis={page.equipamentos}
         unidadesDisponiveis={page.unidades}
+        anexos={page.anexos}
+        onDelete={page.isEditing ? page.handleDelete : undefined}
+        onCancel={() => navigate('/seguros')}
       />
-
-      {page.isEditing && (
-        <SeguroAnexosSection
-          anexos={page.anexos}
-          onUpload={page.handleUpload}
-          onDelete={page.handleDelete}
-        />
-      )}
     </PageLayout>
   );
 }
