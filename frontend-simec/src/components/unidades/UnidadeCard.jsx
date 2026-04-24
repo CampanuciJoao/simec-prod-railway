@@ -82,7 +82,7 @@ function UnidadeCard({ unidade, onEdit, onDelete }) {
             {unidade.nomeSistema}
           </h4>
 
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
             <span
               className="inline-flex max-w-full items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
               style={{
@@ -97,6 +97,20 @@ function UnidadeCard({ unidade, onEdit, onDelete }) {
                 {unidade.nomeFantasia || 'Sem nome fantasia'}
               </span>
             </span>
+
+            {localizacao ? (
+              <span
+                className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold"
+                style={{
+                  backgroundColor: 'color-mix(in srgb, var(--brand-primary) 12%, transparent)',
+                  color: 'var(--brand-primary)',
+                  border: '1px solid color-mix(in srgb, var(--brand-primary) 22%, transparent)',
+                }}
+              >
+                <FontAwesomeIcon icon={faCity} />
+                {localizacao}
+              </span>
+            ) : null}
           </div>
         </div>
 

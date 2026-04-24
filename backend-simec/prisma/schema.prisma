@@ -43,6 +43,7 @@ model Tenant {
   historicoAtivoEventos HistoricoAtivoEvento[]
   authSessions         AuthSession[]
   passwordResetTokens  PasswordResetToken[]
+  orcamentos           Orcamento[]
 
   @@map("tenants")
 }
@@ -70,6 +71,7 @@ model Unidade {
   veiculos          Veiculo[]
   segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
   contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
+  orcamentos        Orcamento[]
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -97,6 +99,8 @@ model Usuario {
   manutencaoEventos    ManutencaoEvento[]
   authSessions         AuthSession[]
   passwordResetTokens  PasswordResetToken[]
+  orcamentosComoCriador   Orcamento[] @relation("OrcamentoCriador")
+  orcamentosComoAprovador Orcamento[] @relation("OrcamentoAprovador")
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -750,4 +754,77 @@ enum Role {
   superadmin
   admin
   user
+}
+
+model Orcamento {
+  id                   String    @id @default(uuid())
+  tenantId             String
+  titulo               String
+  tipo                 String    // PRODUTO | SERVICO | MISTO
+  status               String    @default("RASCUNHO") // RASCUNHO | PENDENTE | APROVADO | REJEITADO
+  observacao           String?
+  unidadeId            String?
+  criadoPorId          String
+  aprovadoPorId        String?
+  fornecedorAprovadoId String?
+  motivoRejeicao       String?
+  dataAprovacao        DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  criadoPor   Usuario   @relation("OrcamentoCriador", fields: [criadoPorId], references: [id])
+  aprovadoPor Usuario?  @relation("OrcamentoAprovador", fields: [aprovadoPorId], references: [id])
+  unidade     Unidade?  @relation(fields: [unidadeId], references: [id], onDelete: SetNull)
+  fornecedores OrcamentoFornecedor[]
+  itens        OrcamentoItem[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, tipo])
+  @@index([tenantId, criadoPorId])
+  @@index([tenantId, unidadeId])
+  @@map("orcamentos")
+}
+
+model OrcamentoFornecedor {
+  id             String  @id @default(uuid())
+  orcamentoId    String
+  nome           String
+  formaPagamento String?
+  ordem          Int
+
+  orcamento Orcamento          @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  precos    OrcamentoItemPreco[]
+
+  @@index([orcamentoId])
+  @@map("orcamento_fornecedores")
+}
+
+model OrcamentoItem {
+  id          String    @id @default(uuid())
+  orcamentoId String
+  descricao   String
+  data        DateTime?
+  ordem       Int
+  isDestaque  Boolean   @default(false)
+
+  orcamento Orcamento          @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  precos    OrcamentoItemPreco[]
+
+  @@index([orcamentoId])
+  @@map("orcamento_itens")
+}
+
+model OrcamentoItemPreco {
+  id           String  @id @default(uuid())
+  itemId       String
+  fornecedorId String
+  valor        Decimal @default(0) @db.Decimal(12, 2)
+  desconto     Decimal @default(0) @db.Decimal(12, 2)
+
+  item       OrcamentoItem       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  fornecedor OrcamentoFornecedor @relation(fields: [fornecedorId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, fornecedorId])
+  @@map("orcamento_item_precos")
 }

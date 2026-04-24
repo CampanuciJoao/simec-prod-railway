@@ -15,6 +15,10 @@ import {
   obterDadosPdfRelatorio,
   obterDadosPdfRelatorioPorIds,
 } from '../services/pdf/pdfQueryService.js';
+import {
+  obterDadosPdfOrcamento,
+  gerarPdfOrcamentoBuffer,
+} from '../services/pdf/orcamentoPdfService.js';
 
 const router = express.Router();
 
@@ -46,6 +50,8 @@ function mapErrorToResponse(res, error, fallbackMessage) {
     EQUIPAMENTO_NAO_ENCONTRADO: [404, 'Equipamento nao encontrado.'],
     OCORRENCIA_ID_INVALIDO: [400, 'O id da ocorrencia e obrigatorio.'],
     OCORRENCIA_NAO_ENCONTRADA: [404, 'Ocorrencia nao encontrada.'],
+    ORCAMENTO_ID_INVALIDO: [400, 'O id do orcamento e obrigatorio.'],
+    ORCAMENTO_NAO_ENCONTRADO: [404, 'Orcamento nao encontrado.'],
   };
 
   const [status, message] = knownStatus[error?.message] || [500, fallbackMessage];
@@ -152,6 +158,21 @@ router.get('/equipamentos/:id/historico', async (req, res) => {
   } catch (error) {
     console.error('[PDF_HISTORICO_ERROR]', error);
     return mapErrorToResponse(res, error, 'Erro ao gerar PDF do historico do equipamento.');
+  }
+});
+
+router.get('/orcamento/:id', async (req, res) => {
+  try {
+    const orcamento = await obterDadosPdfOrcamento({
+      tenantId: req.usuario.tenantId,
+      orcamentoId: req.params.id,
+    });
+    const buffer = await gerarPdfOrcamentoBuffer(orcamento, getPdfOptions(req));
+    const suffix = orcamento.id.slice(-6).toUpperCase();
+    return sendPdf(res, buffer, `orcamento_${suffix}.pdf`);
+  } catch (error) {
+    console.error('[PDF_ORCAMENTO_ERROR]', error);
+    return mapErrorToResponse(res, error, 'Erro ao gerar PDF do orçamento.');
   }
 });
 

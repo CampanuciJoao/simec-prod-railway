@@ -17,6 +17,9 @@ import {
   SalvarManutencaoPage,
   SalvarSeguroPage,
   SegurosPage,
+  OrcamentosPage,
+  SalvarOrcamentoPage,
+  DetalhesOrcamentoPage,
 } from '@/routes/lazyPages';
 
 function OperacionalRouteElements() {
@@ -64,6 +67,11 @@ function OperacionalRouteElements() {
         path="auditoria/manutencao/:id"
         element={<AuditoriaDetalhadaPage />}
       />
+
+      <Route path="orcamentos" element={<OrcamentosPage />} />
+      <Route path="orcamentos/novo" element={<SalvarOrcamentoPage />} />
+      <Route path="orcamentos/:id/editar" element={<SalvarOrcamentoPage />} />
+      <Route path="orcamentos/:id" element={<DetalhesOrcamentoPage />} />
     </>
   );
 }
