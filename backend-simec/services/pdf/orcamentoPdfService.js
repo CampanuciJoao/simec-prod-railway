@@ -161,7 +161,7 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW, fornW }) {
   const meta  = [tipo, und, data].filter(Boolean).join('   ·   ');
 
   doc
-    .font('Helvetica').fontSize(8).fillColor(C.gray600)
+    .font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
     .text(meta, marginX + leftW + 6, y + 11, {
       width: fornW * nForn - 12,
       align: 'right',
@@ -179,6 +179,12 @@ function _linhaFornecedores(doc, fornecedores, { marginX, leftW, fornW }) {
   const y     = doc.y;
 
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
+  doc
+    .font('Helvetica-Bold').fontSize(8).fillColor(C.gray600)
+    .text('Fornecedores / Prestadores', marginX + 8, y + 14, {
+      width: leftW - 16,
+      lineBreak: false,
+    });
 
   for (let i = 0; i < nForn; i++) {
     const cx = marginX + leftW + i * fornW;
@@ -312,7 +318,7 @@ function _tabelaItens(doc, fornecedores, itens, { marginX, descW, dataW, leftW, 
 function _observacao(doc, orc, { marginX, contentW }) {
   if (!orc.observacao) return;
 
-  const y = doc.y + 18;
+  const y = doc.y;
 
   // cabeçalho da seção
   box(doc, marginX, y, contentW, 20, { fill: C.gray100 });
