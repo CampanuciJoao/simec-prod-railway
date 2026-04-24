@@ -9,7 +9,8 @@ const STATUS_COLORS = {
   operante: '#10b981',
   inoperante: '#ef4444',
   emmanutencao: '#f59e0b',
-  usolimitado: '#3b82f6',
+  usolimitado: '#f97316',
+  desativado: '#94a3b8',
 };
 
 function getStatusColor(label) {
@@ -108,7 +109,7 @@ function EmptyChartState({ message }) {
   );
 }
 
-function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráfico.' }) {
+function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráfico.', onClickSegment }) {
   const [themeKey, setThemeKey] = useState(0);
 
   useEffect(() => {
@@ -201,11 +202,24 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
     };
   }, [themeKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const handleClick = onClickSegment
+    ? (event, elements) => {
+        if (!elements.length) return;
+        const index = elements[0].index;
+        const label = chartData?.labels?.[index];
+        if (label) onClickSegment(label);
+      }
+    : undefined;
+
   if (!chartData) {
     return <EmptyChartState message={emptyMessage} />;
   }
 
-  return <Doughnut key={themeKey} data={chartData} options={options} />;
+  return (
+    <div style={{ cursor: onClickSegment ? 'pointer' : 'default', width: '100%', height: '100%' }}>
+      <Doughnut key={themeKey} data={chartData} options={options} onClick={handleClick} />
+    </div>
+  );
 }
 
 DonutChart.propTypes = {
@@ -216,6 +230,7 @@ DonutChart.propTypes = {
     })
   ),
   emptyMessage: PropTypes.string,
+  onClickSegment: PropTypes.func,
 };
 
 export default DonutChart;
