@@ -12,9 +12,22 @@ function ContratoSelectionCard({
   renderLabel,
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
-      <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-        <FontAwesomeIcon icon={icon} className="text-slate-500" />
+    <div
+      className="rounded-2xl border p-4"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderColor: 'var(--border-soft)',
+        boxShadow: 'var(--shadow-sm)',
+      }}
+    >
+      <h4
+        className="mb-3 flex items-center gap-2 text-sm font-semibold"
+        style={{ color: 'var(--text-primary)' }}
+      >
+        <FontAwesomeIcon
+          icon={icon}
+          style={{ color: 'var(--text-muted)' }}
+        />
         {title}
       </h4>
 
@@ -27,21 +40,28 @@ function ContratoSelectionCard({
               return (
                 <label
                   key={item.id}
-                  className={[
-                    'flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition',
-                    checked
-                      ? 'border-blue-200 bg-blue-50'
-                      : 'border-slate-200 bg-slate-50 hover:bg-slate-100',
-                  ].join(' ')}
+                  className="flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition"
+                  style={{
+                    backgroundColor: checked
+                      ? 'var(--brand-primary-soft)'
+                      : 'var(--bg-surface-soft)',
+                    borderColor: checked
+                      ? 'var(--brand-primary)'
+                      : 'var(--border-soft)',
+                  }}
                 >
                   <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => onToggle(item.id)}
-                    className="mt-1 h-4 w-4 rounded border-slate-300"
+                    className="mt-1 h-4 w-4 rounded"
+                    style={{ accentColor: 'var(--brand-primary)' }}
                   />
 
-                  <div className="min-w-0 text-sm text-slate-700">
+                  <div
+                    className="min-w-0 text-sm"
+                    style={{ color: 'var(--text-secondary)' }}
+                  >
                     {renderLabel(item)}
                   </div>
                 </label>
@@ -49,7 +69,14 @@ function ContratoSelectionCard({
             })}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">
+          <div
+            className="rounded-xl border border-dashed p-6 text-center text-sm"
+            style={{
+              borderColor: 'var(--border-soft)',
+              backgroundColor: 'var(--bg-surface-soft)',
+              color: 'var(--text-muted)',
+            }}
+          >
             {emptyMessage}
           </div>
         )}

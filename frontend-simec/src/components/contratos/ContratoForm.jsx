@@ -156,7 +156,7 @@ function ContratoForm({
               <div>
                 <div className="font-medium">{unidade.nomeSistema}</div>
                 {unidade.nomeFantasia ? (
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                     {unidade.nomeFantasia}
                   </div>
                 ) : null}
@@ -178,7 +178,7 @@ function ContratoForm({
             renderLabel={(equipamento) => (
               <div>
                 <div className="font-medium">{equipamento.modelo}</div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                   Tag: {equipamento.tag || 'N/A'}
                 </div>
               </div>
