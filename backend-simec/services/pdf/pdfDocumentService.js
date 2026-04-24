@@ -410,13 +410,12 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
   if (resultado?.tipoRelatorio === 'inventarioEquipamentos') {
     drawSectionTitle(doc, 'Inventario de ativos');
     drawTable(doc, {
-      headers: ['Modelo', 'Serie / Tag', 'Fabricante', 'Registro ANVISA', 'Status', 'Unidade'],
-      columnWidths: [110, 90, 88, 88, 60, 59],
+      headers: ['Modelo', 'Serie / Tag', 'Fabricante', 'Status', 'Unidade'],
+      columnWidths: [125, 105, 100, 65, 100],
       rows: (resultado?.dados || []).map((item) => [
         safeText(item?.modelo),
         safeText(item?.tag),
         safeText(item?.fabricante),
-        safeText(item?.registroAnvisa),
         safeText(item?.status),
         safeText(item?.unidade?.nomeSistema),
       ]),
