@@ -446,10 +446,11 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
       );
       drawGroupHeader(doc, unidadeNome);
       drawTable(doc, {
-        headers: ['Modelo', 'Serie / Tag', 'Fabricante', 'Status'],
-        columnWidths: [175, 130, 120, 70],
+        headers: ['Modelo', 'Tipo', 'Serie / Tag', 'Fabricante', 'Status'],
+        columnWidths: [150, 75, 120, 95, 55],
         rows: itens.map((item) => [
           safeText(item?.modelo),
+          safeText(item?.tipo),
           safeText(item?.tag),
           safeText(item?.fabricante),
           safeText(item?.status),
