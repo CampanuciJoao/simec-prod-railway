@@ -233,13 +233,79 @@ function DetalhesOrcamentoPage() {
         message="Deseja enviar este orçamento para aprovação da diretoria? Você não poderá editá-lo após isso."
       />
 
-      <ModalConfirmacao
-        isOpen={p.aprovarModal.isOpen}
-        onClose={p.aprovarModal.closeModal}
-        onConfirm={p.handleAprovar}
-        title="Aprovar orçamento"
-        message={`Confirma a aprovação do orçamento "${orc.titulo}"?`}
-      />
+      {/* Modal aprovar com seleção de fornecedor */}
+      {p.aprovarModal.isOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'var(--overlay-bg)' }}
+        >
+          <div
+            className="w-full max-w-md rounded-3xl p-6 shadow-xl"
+            style={{ backgroundColor: 'var(--bg-surface)' }}
+          >
+            <h2 className="mb-1 text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              Aprovar orçamento
+            </h2>
+            <p className="mb-4 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Selecione o fornecedor aprovado para este orçamento:
+            </p>
+            <div className="flex flex-col gap-2 mb-5">
+              {(orc.fornecedores || []).map((f, i) => (
+                <label
+                  key={f.id}
+                  className="flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors"
+                  style={{
+                    borderColor: p.fornecedorAprovadoId === f.id
+                      ? 'var(--color-success, #16a34a)'
+                      : 'var(--border-default)',
+                    backgroundColor: p.fornecedorAprovadoId === f.id
+                      ? 'color-mix(in srgb, #16a34a 8%, transparent)'
+                      : 'var(--bg-surface-subtle)',
+                  }}
+                >
+                  <input
+                    type="radio"
+                    name="fornecedorAprovado"
+                    value={f.id}
+                    checked={p.fornecedorAprovadoId === f.id}
+                    onChange={() => p.setFornecedorAprovadoId(f.id)}
+                    className="accent-green-600"
+                  />
+                  <span className="font-semibold text-sm" style={{ color: 'var(--text-muted)' }}>
+                    {i + 1}.
+                  </span>
+                  <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {f.nome}
+                  </span>
+                  {f.formaPagamento && (
+                    <span className="ml-auto text-xs" style={{ color: 'var(--text-muted)' }}>
+                      {f.formaPagamento}
+                    </span>
+                  )}
+                </label>
+              ))}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => { p.aprovarModal.closeModal(); p.setFornecedorAprovadoId(''); }}
+                disabled={p.actionLoading}
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="success"
+                size="sm"
+                onClick={p.handleAprovar}
+                disabled={p.actionLoading || !p.fornecedorAprovadoId}
+              >
+                {p.actionLoading ? 'Aprovando...' : 'Confirmar Aprovação'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Modal rejeitar com campo de motivo */}
       {p.rejeitarModal.isOpen && (

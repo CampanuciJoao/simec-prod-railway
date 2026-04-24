@@ -158,10 +158,12 @@ router.post('/:id/enviar-aprovacao', async (req, res) => {
 
 router.post('/:id/aprovar', admin, async (req, res) => {
   try {
+    const { fornecedorAprovadoId } = req.body || {};
     const orcamento = await aprovarOrcamento({
       tenantId: req.usuario.tenantId,
       id: req.params.id,
       aprovadoPorId: req.usuario.id,
+      fornecedorAprovadoId: fornecedorAprovadoId || null,
     });
 
     await registrarLog({

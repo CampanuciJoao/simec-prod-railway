@@ -17,6 +17,7 @@ export function useDetalhesOrcamento() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [motivoRejeicao, setMotivoRejeicao] = useState('');
+  const [fornecedorAprovadoId, setFornecedorAprovadoId] = useState('');
   const rejeitarModal = useModal();
   const aprovarModal = useModal();
   const enviarModal = useModal();
@@ -54,16 +55,17 @@ export function useDetalhesOrcamento() {
   const handleAprovar = useCallback(async () => {
     setActionLoading(true);
     try {
-      const updated = await aprovarOrcamento(id);
+      const updated = await aprovarOrcamento(id, fornecedorAprovadoId || null);
       setOrcamento(updated);
       addToast('Orçamento aprovado com sucesso.', 'success');
       aprovarModal.closeModal();
+      setFornecedorAprovadoId('');
     } catch (err) {
       addToast(err?.response?.data?.message || 'Erro ao aprovar orçamento.', 'error');
     } finally {
       setActionLoading(false);
     }
-  }, [id, addToast, aprovarModal]);
+  }, [id, fornecedorAprovadoId, addToast, aprovarModal]);
 
   const handleRejeitar = useCallback(async () => {
     if (!motivoRejeicao.trim()) {
@@ -107,6 +109,8 @@ export function useDetalhesOrcamento() {
     actionLoading,
     motivoRejeicao,
     setMotivoRejeicao,
+    fornecedorAprovadoId,
+    setFornecedorAprovadoId,
     rejeitarModal,
     aprovarModal,
     enviarModal,

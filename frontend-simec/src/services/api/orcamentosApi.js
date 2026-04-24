@@ -21,8 +21,8 @@ export const deleteOrcamento = (id) =>
 export const enviarParaAprovacao = (id) =>
   api.post(`/orcamentos/${id}/enviar-aprovacao`).then((r) => r.data);
 
-export const aprovarOrcamento = (id) =>
-  api.post(`/orcamentos/${id}/aprovar`).then((r) => r.data);
+export const aprovarOrcamento = (id, fornecedorAprovadoId = null) =>
+  api.post(`/orcamentos/${id}/aprovar`, { fornecedorAprovadoId }).then((r) => r.data);
 
 export const rejeitarOrcamento = (id, motivoRejeicao) =>
   api.post(`/orcamentos/${id}/rejeitar`, { motivoRejeicao }).then((r) => r.data);

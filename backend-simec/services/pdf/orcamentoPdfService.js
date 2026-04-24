@@ -9,16 +9,18 @@ const __dirname = path.dirname(__filename);
 const logoPath = path.resolve(__dirname, '../../assets/logo-simec.png');
 
 const C = {
-  black:    '#000000',
-  ink:      '#1a1a1a',
-  gray600:  '#4b5563',
-  gray400:  '#9ca3af',
-  gray200:  '#e5e7eb',
-  gray100:  '#f3f4f6',
-  gray50:   '#f9fafb',
-  white:    '#ffffff',
-  red:      '#dc2626',
-  redLight: '#fee2e2',
+  black:      '#000000',
+  ink:        '#1a1a1a',
+  gray600:    '#4b5563',
+  gray400:    '#9ca3af',
+  gray200:    '#e5e7eb',
+  gray100:    '#f3f4f6',
+  gray50:     '#f9fafb',
+  white:      '#ffffff',
+  red:        '#dc2626',
+  redLight:   '#fee2e2',
+  green:      '#16a34a',
+  greenLight: '#dcfce7',
 };
 
 const BORDER = C.black;   // todas as bordas da tabela em preto
@@ -103,11 +105,13 @@ function _desenhar(doc, orc, { marginX, contentW }) {
 
   doc.y = 32;
 
+  const aprovadoId = orc.fornecedorAprovadoId || null;
+
   _cabecalhoTitulo(doc, { marginX, contentW });
   _linhaTituloOrcamento(doc, orc, { marginX, contentW, ...cols });
-  _linhaFornecedores(doc, fornecedores, { marginX, contentW, ...cols });
+  _linhaFornecedores(doc, fornecedores, aprovadoId, { marginX, contentW, ...cols });
   _formaPagamento(doc, fornecedores, { marginX, contentW, ...cols });
-  _tabelaItens(doc, fornecedores, itens, { marginX, contentW, ...cols });
+  _tabelaItens(doc, fornecedores, itens, aprovadoId, { marginX, contentW, ...cols });
   _observacao(doc, orc, { marginX, contentW });
   _assinatura(doc, orc, { marginX, contentW });
 }
@@ -173,7 +177,7 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
 
 // ─── 3. Linha de fornecedores (alinhada com colunas da tabela) ───────────────
 
-function _linhaFornecedores(doc, fornecedores, { marginX, leftW, fornW }) {
+function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, leftW, fornW }) {
   const nForn = fornecedores.length;
   const rowH  = 36;
   const y     = doc.y;
@@ -187,16 +191,21 @@ function _linhaFornecedores(doc, fornecedores, { marginX, leftW, fornW }) {
     });
 
   for (let i = 0; i < nForn; i++) {
-    const cx = marginX + leftW + i * fornW;
-    box(doc, cx, y, fornW, rowH, { fill: C.gray50 });
+    const forn     = fornecedores[i];
+    const isAprv   = forn.id === fornecedorAprovadoId;
+    const cx       = marginX + leftW + i * fornW;
+    box(doc, cx, y, fornW, rowH, { fill: isAprv ? C.greenLight : C.gray50 });
+
+    // número ou checkmark se aprovado
+    const numLabel = isAprv ? `✓ ${i + 1}` : String(i + 1);
+    doc
+      .font('Helvetica-Bold').fontSize(13)
+      .fillColor(isAprv ? C.green : TEXT)
+      .text(numLabel, cx, y + 3, { width: fornW, align: 'center' });
 
     doc
-      .font('Helvetica-Bold').fontSize(13).fillColor(TEXT)
-      .text(String(i + 1), cx, y + 3, { width: fornW, align: 'center' });
-
-    doc
-      .font('Helvetica').fontSize(8.5).fillColor(C.gray600)
-      .text(safe(fornecedores[i].nome, '—'), cx + 4, y + 21, {
+      .font('Helvetica').fontSize(8.5).fillColor(isAprv ? C.green : C.gray600)
+      .text(safe(forn.nome, '—'), cx + 4, y + 21, {
         width: fornW - 8,
         align: 'center',
         lineBreak: false,
@@ -237,7 +246,7 @@ function _formaPagamento(doc, fornecedores, { marginX, leftW, fornW }) {
 
 // ─── 4. Tabela de itens ───────────────────────────────────────────────────────
 
-function _tabelaItens(doc, fornecedores, itens, { marginX, descW, dataW, leftW, fornW }) {
+function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX, descW, dataW, leftW, fornW }) {
   const nForn  = fornecedores.length;
   const fornIds = fornecedores.map((f) => f.id);
   const thH    = 20;
@@ -252,10 +261,11 @@ function _tabelaItens(doc, fornecedores, itens, { marginX, descW, dataW, leftW, 
     .text('DATA', marginX + descW + 4, y0 + 6, { width: dataW - 8, align: 'center' });
 
   for (let i = 0; i < nForn; i++) {
+    const isAprv = fornecedores[i].id === fornecedorAprovadoId;
     const cx = marginX + leftW + i * fornW;
-    box(doc, cx, y0, fornW, thH, { fill: C.gray100 });
-    doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT)
-      .text('Valor Unitário', cx + 4, y0 + 6, { width: fornW - 8, align: 'right' });
+    box(doc, cx, y0, fornW, thH, { fill: isAprv ? C.greenLight : C.gray100 });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor(isAprv ? C.green : TEXT)
+      .text('Valor Unitário', cx + 4, y0 + 6, { width: fornW - 8, align: 'center' });
   }
   doc.y = y0 + thH;
 
@@ -275,16 +285,20 @@ function _tabelaItens(doc, fornecedores, itens, { marginX, descW, dataW, leftW, 
       .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center' });
 
     for (let i = 0; i < nForn; i++) {
-      const fornId = fornIds[i];
-      const preco  = item.precos?.find((p) => p.fornecedorId === fornId);
+      const forn   = fornecedores[i];
+      const isAprv = forn.id === fornecedorAprovadoId;
+      const preco  = item.precos?.find((p) => p.fornecedorId === forn.id);
       const cx     = marginX + leftW + i * fornW;
-      box(doc, cx, ry, fornW, rowH, { fill: bg });
+      // se item é destaque (vermelho), prioriza vermelho; se coluna é aprovada, usa verde suave
+      const cellBg = isRed ? C.redLight : (isAprv ? '#f0fdf4' : C.white);
+      box(doc, cx, ry, fornW, rowH, { fill: cellBg });
 
       const valor    = Number(preco?.valor    || 0);
       const desconto = Number(preco?.desconto || 0);
       const exibir   = valor > 0 ? fmt(valor - desconto) : '—';
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(fg)
-        .text(exibir, cx + 4, ry + 7, { width: fornW - 8, align: 'right' });
+      const textColor = isRed ? C.red : (isAprv ? C.green : TEXT);
+      doc.font('Helvetica-Bold').fontSize(9).fillColor(textColor)
+        .text(exibir, cx + 4, ry + 7, { width: fornW - 8, align: 'center' });
     }
 
     doc.y = ry + rowH;
@@ -298,16 +312,17 @@ function _tabelaItens(doc, fornecedores, itens, { marginX, descW, dataW, leftW, 
     .text('Valor Total', marginX + 6, totalY + 9, { width: leftW - 12, align: 'center' });
 
   for (let i = 0; i < nForn; i++) {
-    const fornId = fornIds[i];
+    const forn   = fornecedores[i];
+    const isAprv = forn.id === fornecedorAprovadoId;
     const total  = itens.reduce((sum, item) => {
-      const p = item.precos?.find((p) => p.fornecedorId === fornId);
+      const p = item.precos?.find((p) => p.fornecedorId === forn.id);
       return sum + (p ? Math.max(0, Number(p.valor || 0) - Number(p.desconto || 0)) : 0);
     }, 0);
 
     const cx = marginX + leftW + i * fornW;
-    box(doc, cx, totalY, fornW, totalH, { fill: C.redLight });
-    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(C.red)
-      .text(fmt(total), cx + 4, totalY + 9, { width: fornW - 8, align: 'right' });
+    box(doc, cx, totalY, fornW, totalH, { fill: isAprv ? C.greenLight : C.redLight });
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(isAprv ? C.green : C.red)
+      .text(fmt(total), cx + 4, totalY + 9, { width: fornW - 8, align: 'center' });
   }
 
   doc.y = totalY + totalH;

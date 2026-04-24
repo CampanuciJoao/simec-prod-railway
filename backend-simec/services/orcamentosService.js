@@ -1,9 +1,9 @@
 import prisma from './prismaService.js';
 
 const INCLUDE_COMPLETO = {
-  criadoPor: { select: { id: true, nome: true, email: true } },
+  criadoPor:   { select: { id: true, nome: true, email: true } },
   aprovadoPor: { select: { id: true, nome: true, email: true } },
-  unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
+  unidade:     { select: { id: true, nomeSistema: true, nomeFantasia: true } },
   fornecedores: {
     orderBy: { ordem: 'asc' },
     include: { precos: true },
@@ -240,8 +240,11 @@ export async function enviarParaAprovacao({ tenantId, id }) {
   });
 }
 
-export async function aprovarOrcamento({ tenantId, id, aprovadoPorId }) {
-  const orcamento = await prisma.orcamento.findFirst({ where: { id, tenantId } });
+export async function aprovarOrcamento({ tenantId, id, aprovadoPorId, fornecedorAprovadoId }) {
+  const orcamento = await prisma.orcamento.findFirst({
+    where: { id, tenantId },
+    include: { fornecedores: { select: { id: true } } },
+  });
 
   if (!orcamento) {
     const err = new Error('Orçamento não encontrado.');
@@ -255,9 +258,23 @@ export async function aprovarOrcamento({ tenantId, id, aprovadoPorId }) {
     throw err;
   }
 
+  if (fornecedorAprovadoId) {
+    const pertence = orcamento.fornecedores.some((f) => f.id === fornecedorAprovadoId);
+    if (!pertence) {
+      const err = new Error('Fornecedor selecionado não pertence a este orçamento.');
+      err.status = 400;
+      throw err;
+    }
+  }
+
   return prisma.orcamento.update({
     where: { id },
-    data: { status: 'APROVADO', aprovadoPorId, dataAprovacao: new Date() },
+    data: {
+      status: 'APROVADO',
+      aprovadoPorId,
+      fornecedorAprovadoId: fornecedorAprovadoId || null,
+      dataAprovacao: new Date(),
+    },
     include: INCLUDE_COMPLETO,
   });
 }

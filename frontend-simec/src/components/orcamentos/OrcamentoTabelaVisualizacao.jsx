@@ -1,3 +1,6 @@
+import { faCheck } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+
 function formatMoeda(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -8,6 +11,7 @@ function formatMoeda(valor) {
 function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
   const fornecedores = orcamento.fornecedores || [];
   const itens = orcamento.itens || [];
+  const aprovadoId = orcamento.fornecedorAprovadoId || null;
 
   return (
     <div className="overflow-x-auto rounded-xl border" style={{ borderColor: 'var(--border-soft)' }}>
@@ -39,46 +43,57 @@ function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
             >
               Data
             </th>
-            {fornecedores.map((f, i) => (
-              <th
-                key={f.id}
-                className="border-b border-r px-3 py-1.5 text-center text-xs"
-                style={{
-                  borderColor: 'var(--border-soft)',
-                  backgroundColor: 'var(--bg-surface-subtle)',
-                  minWidth: 140,
-                }}
-              >
-                <div
-                  className="font-bold text-base"
-                  style={{ color: 'var(--text-primary)' }}
+            {fornecedores.map((f, i) => {
+              const isAprv = f.id === aprovadoId;
+              return (
+                <th
+                  key={f.id}
+                  className="border-b border-r px-3 py-1.5 text-center text-xs"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: isAprv
+                      ? 'color-mix(in srgb, #16a34a 10%, transparent)'
+                      : 'var(--bg-surface-subtle)',
+                    minWidth: 140,
+                  }}
                 >
-                  {i + 1}
-                </div>
-                <div
-                  className="font-semibold text-sm"
-                  style={{ color: 'var(--text-secondary)' }}
-                >
-                  {f.nome}
-                </div>
-              </th>
-            ))}
+                  <div
+                    className="font-bold text-base flex items-center justify-center gap-1"
+                    style={{ color: isAprv ? '#16a34a' : 'var(--text-primary)' }}
+                  >
+                    {isAprv && <FontAwesomeIcon icon={faCheck} className="text-xs" />}
+                    {i + 1}
+                  </div>
+                  <div
+                    className="font-semibold text-sm"
+                    style={{ color: isAprv ? '#16a34a' : 'var(--text-secondary)' }}
+                  >
+                    {f.nome}
+                  </div>
+                </th>
+              );
+            })}
           </tr>
           {/* Linha de forma de pagamento */}
           <tr>
-            {fornecedores.map((f) => (
-              <th
-                key={f.id}
-                className="border-b border-r px-3 py-1 text-center text-xs"
-                style={{
-                  borderColor: 'var(--border-soft)',
-                  backgroundColor: 'var(--bg-surface-subtle)',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                {f.formaPagamento || '—'}
-              </th>
-            ))}
+            {fornecedores.map((f) => {
+              const isAprv = f.id === aprovadoId;
+              return (
+                <th
+                  key={f.id}
+                  className="border-b border-r px-3 py-1 text-center text-xs"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: isAprv
+                      ? 'color-mix(in srgb, #16a34a 10%, transparent)'
+                      : 'var(--bg-surface-subtle)',
+                    color: isAprv ? '#16a34a' : 'var(--text-muted)',
+                  }}
+                >
+                  {f.formaPagamento || '—'}
+                </th>
+              );
+            })}
           </tr>
         </thead>
 
@@ -108,6 +123,7 @@ function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
                 {item.data ? new Date(item.data).toLocaleDateString('pt-BR') : '—'}
               </td>
               {fornecedores.map((forn) => {
+                const isAprv = forn.id === aprovadoId;
                 const preco = (item.precos || []).find((p) => p.fornecedorId === forn.id);
                 const valor = preco ? Number(preco.valor || 0) : 0;
                 const desconto = preco ? Number(preco.desconto || 0) : 0;
@@ -116,10 +132,17 @@ function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
                 return (
                   <td
                     key={forn.id}
-                    className="border-r px-3 py-2 text-right"
+                    className="border-r px-3 py-2 text-center"
                     style={{
                       borderColor: 'var(--border-soft)',
-                      color: item.isDestaque ? 'var(--color-danger)' : 'var(--text-primary)',
+                      backgroundColor: isAprv
+                        ? 'color-mix(in srgb, #16a34a 6%, transparent)'
+                        : 'transparent',
+                      color: item.isDestaque
+                        ? 'var(--color-danger)'
+                        : isAprv
+                        ? '#16a34a'
+                        : 'var(--text-primary)',
                     }}
                   >
                     {valor > 0 ? (
@@ -149,15 +172,24 @@ function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
             >
               Valor Total
             </td>
-            {fornecedores.map((forn) => (
-              <td
-                key={forn.id}
-                className="border-r px-3 py-2 text-right font-bold text-base"
-                style={{ borderColor: 'var(--border-soft)', color: 'var(--color-danger)' }}
-              >
-                {formatMoeda(calcularTotalFornecedor(forn.id))}
-              </td>
-            ))}
+            {fornecedores.map((forn) => {
+              const isAprv = forn.id === aprovadoId;
+              return (
+                <td
+                  key={forn.id}
+                  className="border-r px-3 py-2 text-center font-bold text-base"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: isAprv
+                      ? 'color-mix(in srgb, #16a34a 10%, transparent)'
+                      : 'transparent',
+                    color: isAprv ? '#16a34a' : 'var(--color-danger)',
+                  }}
+                >
+                  {formatMoeda(calcularTotalFornecedor(forn.id))}
+                </td>
+              );
+            })}
           </tr>
         </tbody>
       </table>
