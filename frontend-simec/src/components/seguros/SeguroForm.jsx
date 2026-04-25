@@ -7,6 +7,7 @@ import { useSeguroForm } from '@/hooks/seguros/useSeguroForm';
 import { TIPO_SEGURO_OPTIONS, COBERTURA_FIELDS } from '@/utils/seguros';
 
 import {
+  CurrencyInput,
   DateInput,
   FormActions,
   FormSection,
@@ -105,7 +106,6 @@ function SeguroForm({
     <form onSubmit={handleSubmit} className="space-y-6">
       {error ? <PageState error={error} /> : null}
 
-      {/* INFORMAÇÕES DA APÓLICE */}
       <FormSection
         title="Informações da apólice"
         description="Identificação, vigência e seguradora."
@@ -138,14 +138,12 @@ function SeguroForm({
             required
           />
 
-          <Input
+          <CurrencyInput
             label="Prêmio total (R$)"
             name="premioTotal"
-            type="number"
-            value={formData.premioTotal ?? 0}
+            value={formData.premioTotal}
             onChange={handleChange}
-            placeholder="0"
-            min="0"
+            placeholder="R$ 0,00"
           />
 
           <DateInput
@@ -176,7 +174,6 @@ function SeguroForm({
         </ResponsiveGrid>
       </FormSection>
 
-      {/* VÍNCULO */}
       <FormSection
         title="Vínculo"
         description="Unidade e equipamento cobertos por esta apólice."
@@ -213,7 +210,6 @@ function SeguroForm({
         </ResponsiveGrid>
       </FormSection>
 
-      {/* COBERTURAS */}
       {coberturaFields.length > 0 ? (
         <FormSection
           title="Coberturas (LMI)"
@@ -223,16 +219,15 @@ function SeguroForm({
             {coberturaFields.map((fieldKey) => {
               const config = COBERTURA_FIELDS[fieldKey];
               if (!config) return null;
+
               return (
-                <Input
+                <CurrencyInput
                   key={fieldKey}
-                  label={config.label}
+                  label={`${config.label} (R$)`}
                   name={fieldKey}
-                  type="number"
-                  value={formData[fieldKey] ?? 0}
+                  value={formData[fieldKey]}
                   onChange={handleChange}
-                  placeholder="0"
-                  min="0"
+                  placeholder="R$ 0,00"
                 />
               );
             })}
@@ -240,13 +235,11 @@ function SeguroForm({
         </FormSection>
       ) : null}
 
-      {/* DOCUMENTOS */}
       <FormSection
         title="Documentos"
         description="Anexe a apólice e comprovantes."
       >
         <div className="space-y-3">
-          {/* Arquivos já salvos (somente na edição) */}
           {isEditing && anexos.length > 0 ? (
             <div className="flex flex-col gap-2">
               {anexos.map((anexo) => (
@@ -284,7 +277,6 @@ function SeguroForm({
             </div>
           ) : null}
 
-          {/* Arquivos pendentes (ainda não enviados) */}
           {pendingFiles.length > 0 ? (
             <div className="flex flex-col gap-2">
               {pendingFiles.map((file, index) => (
