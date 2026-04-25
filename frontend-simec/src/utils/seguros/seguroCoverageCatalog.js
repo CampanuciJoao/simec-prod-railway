@@ -65,7 +65,11 @@ export const COBERTURA_FIELDS = {
   },
   lmiPerdaLucroBruto: {
     key: 'lmiPerdaLucroBruto',
-    label: 'Perda de lucro bruto',
+    label: 'Lucros cessantes',
+  },
+  lmiVazamentoTanques: {
+    key: 'lmiVazamentoTanques',
+    label: 'Vazamento de tanques',
   },
 };
 
@@ -81,6 +85,8 @@ export const COBERTURAS_POR_TIPO = {
   [TIPO_SEGURO.PREDIAL]: [
     'lmiIncendio',
     'lmiDanosEletricos',
+    'lmiVazamentoTanques',
+    'lmiPerdaLucroBruto',
     'lmiVidros',
     'lmiVendaval',
     'lmiRoubo',
