@@ -2,7 +2,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
   faDownload,
-  faEye,
   faPen,
   faShieldAlt,
   faTrash,
@@ -146,7 +145,6 @@ function SeguroCard({
   status,
   isExpanded,
   onToggle,
-  onView,
   onEdit,
   onDelete,
 }) {
@@ -159,6 +157,25 @@ function SeguroCard({
   const stopAndRun = (event, callback) => {
     event.stopPropagation();
     callback?.();
+  };
+
+  const handleDownload = async (event) => {
+    event.stopPropagation();
+    if (!downloadUrl) return;
+    try {
+      const response = await fetch(downloadUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = blobUrl;
+      anchor.download = `apolice-${seguro.apoliceNumero || seguro.id}`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // silently ignore download errors
+    }
   };
 
   return (
@@ -201,21 +218,20 @@ function SeguroCard({
 
             <div className="flex shrink-0 flex-wrap items-center gap-2">
               {downloadUrl ? (
-                <a
-                  href={downloadUrl}
-                  download={`apolice-${seguro.apoliceNumero || seguro.id}`}
+                <button
+                  type="button"
                   className="ui-button ui-transition ui-brand-ring inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-semibold hover:-translate-y-[1px]"
                   style={{
                     backgroundColor: 'var(--button-secondary-bg)',
                     color: 'var(--button-secondary-text)',
                     borderColor: 'var(--button-secondary-border)',
                   }}
-                  onClick={(event) => event.stopPropagation()}
+                  onClick={handleDownload}
                   title="Baixar apólice"
                 >
                   <FontAwesomeIcon icon={faDownload} />
                   Apólice
-                </a>
+                </button>
               ) : null}
 
               <span
@@ -289,10 +305,6 @@ function SeguroCard({
           </div>
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-            <Button onClick={(event) => stopAndRun(event, onView)}>
-              <FontAwesomeIcon icon={faEye} />
-              Ver
-            </Button>
             <Button onClick={(event) => stopAndRun(event, onEdit)}>
               <FontAwesomeIcon icon={faPen} />
               Editar

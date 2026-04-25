@@ -18,7 +18,6 @@ function SegurosListSection({ seguros, getStatus, actions }) {
           status={getStatus(s)}
           isExpanded={expandedId === s.id}
           onToggle={handleToggle}
-          onView={() => actions.view(s.id)}
           onEdit={() => actions.edit(s.id)}
           onDelete={() => actions.delete(s)}
         />
