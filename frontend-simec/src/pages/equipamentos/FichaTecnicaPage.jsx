@@ -14,6 +14,7 @@ import {
 import {
   FichaTecnicaEventForm,
   FichaTecnicaTimeline,
+  FichaTecnicaCorretivaStepper,
 } from '@/components/equipamentos/ficha-tecnica';
 
 function FichaTecnicaPage() {
@@ -69,6 +70,18 @@ function FichaTecnicaPage() {
           onChange={page.handleEventoChange}
           onSubmit={page.handleSubmitEvento}
           onCancel={page.goBack}
+        />
+
+        <FichaTecnicaCorretivaStepper
+          corretivas={page.corretivas}
+          onAdicionarNota={page.handleAdicionarNotaCorretiva}
+          onAgendarVisita={page.handleAgendarVisita}
+          onResolverInternamente={page.handleResolverInternamente}
+          onConcluirAcao={page.handleConcluirAcaoCorretiva}
+          onImprimir={page.handleImprimirOS}
+          submittingId={page.submittingCorretivaId}
+          onRegistrarProblema={page.handleRegistrarProblema}
+          submittingNova={page.submittingNova}
         />
 
         <FichaTecnicaTimeline

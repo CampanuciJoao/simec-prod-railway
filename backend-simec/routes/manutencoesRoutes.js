@@ -146,6 +146,13 @@ router.post('/:id/concluir', async (req, res) => {
       observacao: req.body?.observacao,
       manutencaoRealizada: req.body?.manutencaoRealizada,
       equipamentoOperante: req.body?.equipamentoOperante,
+      // campos para agendar_visita
+      agendamentoDataInicioLocal: req.body?.agendamentoDataInicioLocal,
+      agendamentoHoraInicioLocal: req.body?.agendamentoHoraInicioLocal,
+      agendamentoDataFimLocal: req.body?.agendamentoDataFimLocal,
+      agendamentoHoraFimLocal: req.body?.agendamentoHoraFimLocal,
+      numeroChamado: req.body?.numeroChamado,
+      tecnicoResponsavel: req.body?.tecnicoResponsavel,
     });
 
     if (!resultado.ok) {

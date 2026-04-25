@@ -5,8 +5,14 @@ import {
   getOcorrenciasPorEquipamento,
   addOcorrencia,
   resolverOcorrencia,
+  addManutencao,
+  getManutencoesPorEquipamento,
+  addNotaAndamento,
+  concluirManutencao,
 } from '@/services/api';
 
+import { getPdfDataManutencao } from '@/services/api/pdfApi';
+import { exportarOSManutencaoPDFLazy } from '@/services/pdf/pdfExportService';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 
@@ -24,8 +30,11 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
 
   const [equipamento, setEquipamento] = useState(null);
   const [ocorrencias, setOcorrencias] = useState([]);
+  const [corretivas, setCorretivas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingCorretivaId, setSubmittingCorretivaId] = useState(null);
+  const [submittingNova, setSubmittingNova] = useState(false);
   const [itensExpandidos, setItensExpandidos] = useState(new Set());
   const [resolvendoId, setResolvendoId] = useState(null);
   const [dadosSolucao, setDadosSolucao] = useState({});
@@ -35,6 +44,7 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     if (!equipamentoId) {
       setEquipamento(null);
       setOcorrencias([]);
+      setCorretivas([]);
       setLoading(false);
       return;
     }
@@ -42,17 +52,20 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     setLoading(true);
 
     try {
-      const [equip, lista] = await Promise.all([
+      const [equip, lista, manutData] = await Promise.all([
         getEquipamentoById(equipamentoId),
         getOcorrenciasPorEquipamento(equipamentoId),
+        getManutencoesPorEquipamento(equipamentoId, { tipo: 'Corretiva', pageSize: 100 }),
       ]);
 
       setEquipamento(equip || null);
       setOcorrencias(Array.isArray(lista) ? lista : []);
+      setCorretivas(Array.isArray(manutData?.items) ? manutData.items : []);
     } catch (err) {
       addToast(getErrorMessage(err, 'Erro ao carregar dados.'), 'error');
       setEquipamento(null);
       setOcorrencias([]);
+      setCorretivas([]);
     } finally {
       setLoading(false);
     }
@@ -187,11 +200,114 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     setNovoEvento(NOVO_EVENTO_INICIAL);
   }, []);
 
+  const handleRegistrarProblema = useCallback(async () => {
+    setSubmittingNova(true);
+    try {
+      const nova = await addManutencao({
+        equipamentoId,
+        tipo: 'Corretiva',
+        descricaoProblemaServico: '',
+      });
+      addToast('OS corretiva criada. Adicione o descritivo e acompanhe pelo registro aberto.', 'success');
+      setCorretivas((prev) => [nova, ...prev]);
+      return true;
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Erro ao registrar problema.'), 'error');
+      return false;
+    } finally {
+      setSubmittingNova(false);
+    }
+  }, [equipamentoId, addToast]);
+
+  const handleAdicionarNotaCorretiva = useCallback(async (manutencaoId, nota) => {
+    setSubmittingCorretivaId(manutencaoId);
+    try {
+      const novaNota = await addNotaAndamento(manutencaoId, { nota });
+      addToast('Registro salvo.', 'success');
+      setCorretivas((prev) =>
+        prev.map((c) =>
+          c.id === manutencaoId
+            ? { ...c, notasAndamento: [novaNota, ...(c.notasAndamento || [])] }
+            : c
+        )
+      );
+      return true;
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Erro ao salvar registro.'), 'error');
+      return false;
+    } finally {
+      setSubmittingCorretivaId(null);
+    }
+  }, [addToast]);
+
+  const handleAgendarVisita = useCallback(async (manutencaoId, form) => {
+    setSubmittingCorretivaId(manutencaoId);
+    try {
+      const atualizada = await concluirManutencao(manutencaoId, {
+        acao: 'agendar_visita',
+        ...form,
+      });
+      addToast('Visita agendada com sucesso!', 'success');
+      setCorretivas((prev) => prev.map((c) => (c.id === manutencaoId ? atualizada : c)));
+      return true;
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Erro ao agendar visita.'), 'error');
+      return false;
+    } finally {
+      setSubmittingCorretivaId(null);
+    }
+  }, [addToast]);
+
+  const handleResolverInternamente = useCallback(async (manutencaoId, observacao) => {
+    setSubmittingCorretivaId(manutencaoId);
+    try {
+      const atualizada = await concluirManutencao(manutencaoId, {
+        acao: 'resolver_internamente',
+        observacao,
+      });
+      addToast('Problema resolvido e OS encerrada.', 'success');
+      setCorretivas((prev) => prev.map((c) => (c.id === manutencaoId ? atualizada : c)));
+      return true;
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Erro ao registrar resolucao.'), 'error');
+      return false;
+    } finally {
+      setSubmittingCorretivaId(null);
+    }
+  }, [addToast]);
+
+  const handleConcluirAcaoCorretiva = useCallback(async (manutencaoId, payload) => {
+    setSubmittingCorretivaId(manutencaoId);
+    try {
+      const atualizada = await concluirManutencao(manutencaoId, payload);
+      addToast('OS atualizada com sucesso!', 'success');
+      setCorretivas((prev) => prev.map((c) => (c.id === manutencaoId ? atualizada : c)));
+      return true;
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Erro ao atualizar OS.'), 'error');
+      return false;
+    } finally {
+      setSubmittingCorretivaId(null);
+    }
+  }, [addToast]);
+
+  const handleImprimirOS = useCallback(async (manutencaoId) => {
+    try {
+      const dados = await getPdfDataManutencao(manutencaoId);
+      await exportarOSManutencaoPDFLazy(dados);
+    } catch (err) {
+      addToast(getErrorMessage(err, 'Erro ao gerar PDF.'), 'error');
+    }
+  }, [addToast]);
+
   return {
     equipamento,
     ocorrencias,
+    corretivas,
     loading,
     submitting,
+    submittingCorretivaId,
+    submittingNova,
     novoEvento,
     itensExpandidos,
     resolvendoId,
@@ -205,5 +321,11 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     handleAbrirResolucao,
     handleCancelarResolucao,
     handleSalvarSolucao,
+    handleRegistrarProblema,
+    handleAdicionarNotaCorretiva,
+    handleAgendarVisita,
+    handleResolverInternamente,
+    handleConcluirAcaoCorretiva,
+    handleImprimirOS,
   };
 }

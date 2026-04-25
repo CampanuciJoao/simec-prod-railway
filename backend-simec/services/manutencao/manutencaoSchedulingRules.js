@@ -22,6 +22,17 @@ export function validarAgendamento({
   endTimeLocal,
   timezone,
 }) {
+  // Sem datas: OS Corretiva em triagem (Pendente), agendamento e opcional
+  if (!startDateLocal && !startTimeLocal && !endDateLocal && !endTimeLocal) {
+    return {
+      valid: true,
+      semAgendamento: true,
+      timezone: timezone || null,
+      startUtc: null,
+      endUtc: null,
+    };
+  }
+
   const startUtc = localDateTimeToUtc({
     dateLocal: startDateLocal,
     timeLocal: startTimeLocal,
@@ -57,6 +68,7 @@ export function validarAgendamento({
 
   return {
     valid: true,
+    semAgendamento: false,
     timezone,
     startUtc,
     endUtc,
@@ -122,14 +134,14 @@ export function montarPayloadPersistencia({
       typeof dados.custoTotal === 'number' ? dados.custoTotal : null,
     status: dados.status || 'Agendada',
 
-    agendamentoDataInicioLocal: dados.agendamentoDataInicioLocal,
-    agendamentoHoraInicioLocal: dados.agendamentoHoraInicioLocal,
-    agendamentoDataFimLocal: dados.agendamentoDataFimLocal,
-    agendamentoHoraFimLocal: dados.agendamentoHoraFimLocal,
-    agendamentoTimezone: agendamento.timezone,
+    agendamentoDataInicioLocal: dados.agendamentoDataInicioLocal || null,
+    agendamentoHoraInicioLocal: dados.agendamentoHoraInicioLocal || null,
+    agendamentoDataFimLocal: dados.agendamentoDataFimLocal || null,
+    agendamentoHoraFimLocal: dados.agendamentoHoraFimLocal || null,
+    agendamentoTimezone: agendamento.timezone || null,
 
-    dataHoraAgendamentoInicio: agendamento.startUtc,
-    dataHoraAgendamentoFim: agendamento.endUtc,
+    dataHoraAgendamentoInicio: agendamento.startUtc || null,
+    dataHoraAgendamentoFim: agendamento.endUtc || null,
   };
 }
 

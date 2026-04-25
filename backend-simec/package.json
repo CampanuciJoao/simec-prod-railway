@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "start:prod": "node server.js",
+    "start:prod": "npx prisma migrate deploy && node server.js",
     "seed": "node seed.js",
     "tenant:maintenance": "node scripts/tenantOperationalMaintenance.js",
     "prisma:generate": "npx prisma generate",
