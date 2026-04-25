@@ -262,13 +262,13 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
     const tenantId = req.usuario.tenantId;
 
     const seguro = await prisma.seguro.findFirst({
-      where: {
-        id,
-        tenantId,
-      },
+      where: { id, tenantId },
       select: {
         id: true,
         apoliceNumero: true,
+        equipamentoId: true,
+        unidadeId: true,
+        veiculoId: true,
       },
     });
 
@@ -281,57 +281,30 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 
     const atualizado = await prisma.seguro.update({
       where: {
-        tenantId_id: {
-          tenantId,
-          id,
-        },
+        tenantId_id: { tenantId, id },
       },
       data: {
         ...resto,
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,
 
-        equipamento:
-          equipamentoId === null
-            ? { disconnect: true }
-            : equipamentoId
-              ? {
-                  connect: {
-                    tenantId_id: {
-                      tenantId,
-                      id: equipamentoId,
-                    },
-                  },
-                }
-              : undefined,
+        equipamento: equipamentoId
+          ? { connect: { tenantId_id: { tenantId, id: equipamentoId } } }
+          : seguro.equipamentoId
+            ? { disconnect: { tenantId_id: { tenantId, id: seguro.equipamentoId } } }
+            : undefined,
 
-        unidade:
-          unidadeId === null
-            ? { disconnect: true }
-            : unidadeId
-              ? {
-                  connect: {
-                    tenantId_id: {
-                      tenantId,
-                      id: unidadeId,
-                    },
-                  },
-                }
-              : undefined,
+        unidade: unidadeId
+          ? { connect: { tenantId_id: { tenantId, id: unidadeId } } }
+          : seguro.unidadeId
+            ? { disconnect: { tenantId_id: { tenantId, id: seguro.unidadeId } } }
+            : undefined,
 
-        veiculo:
-          veiculoId === null
-            ? { disconnect: true }
-            : veiculoId
-              ? {
-                  connect: {
-                    tenantId_id: {
-                      tenantId,
-                      id: veiculoId,
-                    },
-                  },
-                }
-              : undefined,
+        veiculo: veiculoId
+          ? { connect: { tenantId_id: { tenantId, id: veiculoId } } }
+          : seguro.veiculoId
+            ? { disconnect: { tenantId_id: { tenantId, id: seguro.veiculoId } } }
+            : undefined,
       },
     });
 
