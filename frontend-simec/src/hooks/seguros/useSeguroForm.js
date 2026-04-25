@@ -51,7 +51,14 @@ export function useSeguroForm({
   }, []);
 
   const buildPayload = () => {
-    return sanitizeCoberturasByTipo(formData);
+    const base = sanitizeCoberturasByTipo(formData);
+
+    let tipoAlvo = 'EMPRESARIAL_GERAL';
+    if (base.equipamentoId) tipoAlvo = 'EQUIPAMENTO';
+    else if (base.veiculoId) tipoAlvo = 'VEICULO';
+    else if (base.unidadeId) tipoAlvo = 'UNIDADE';
+
+    return { ...base, tipoAlvo };
   };
 
   return {
