@@ -4,9 +4,11 @@ import {
   faDownload,
   faEye,
   faPen,
+  faShieldAlt,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 
+import api from '@/services/http/apiClient';
 import { Button, Card } from '@/components/ui';
 
 import {
@@ -22,8 +24,7 @@ import {
   getTipoVinculo,
 } from '@/utils/seguros/seguroFormatter';
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+const BACKEND_URL = (api.defaults.baseURL || '').replace(/\/api\/?$/, '');
 
 function formatarData(value) {
   if (!value) return 'N/A';
@@ -39,7 +40,7 @@ function formatarData(value) {
 function buildAttachmentUrl(path) {
   if (!path) return null;
   if (/^https?:\/\//i.test(path)) return path;
-  return `${API_BASE_URL}/${String(path).replace(/^\/+/, '')}`;
+  return `${BACKEND_URL}/${String(path).replace(/^\/+/, '')}`;
 }
 
 function SeguroInfoItem({ label, value, featured = false }) {
@@ -79,25 +80,63 @@ function SeguroCoberturasResumo({ coberturas }) {
     );
   }
 
+  const totalCoberto = coberturas.reduce((acc, c) => acc + c.value, 0);
+
   return (
-    <div className="flex flex-wrap gap-2">
-      {coberturas.map((cobertura) => (
+    <div className="space-y-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        {coberturas.map((cobertura) => (
+          <div
+            key={cobertura.key}
+            className="flex items-center justify-between rounded-xl border px-3 py-2.5"
+            style={{
+              borderColor: 'var(--border-soft)',
+              backgroundColor: 'var(--bg-surface-soft)',
+            }}
+          >
+            <div className="flex items-center gap-2 min-w-0">
+              <FontAwesomeIcon
+                icon={faShieldAlt}
+                className="shrink-0 text-xs"
+                style={{ color: 'var(--brand-primary)', opacity: 0.7 }}
+              />
+              <span
+                className="truncate text-xs font-medium"
+                style={{ color: 'var(--text-secondary)' }}
+              >
+                {cobertura.label}
+              </span>
+            </div>
+            <span
+              className="ml-3 shrink-0 text-sm font-bold tabular-nums"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              {formatarMoeda(cobertura.value)}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div
+        className="flex items-center justify-between rounded-xl border px-3 py-2"
+        style={{
+          borderColor: 'var(--brand-primary)',
+          backgroundColor: 'color-mix(in srgb, var(--brand-primary) 8%, transparent)',
+        }}
+      >
         <span
-          key={cobertura.key}
-          className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium"
-          style={{
-            borderColor: 'var(--border-soft)',
-            backgroundColor: 'var(--bg-surface-soft)',
-            color: 'var(--text-secondary)',
-          }}
-          title={`${cobertura.label}: ${formatarMoeda(cobertura.value)}`}
+          className="text-xs font-semibold uppercase tracking-wide"
+          style={{ color: 'var(--brand-primary)' }}
         >
-          <span>{cobertura.label}</span>
-          <strong style={{ color: 'var(--text-primary)' }}>
-            {formatarMoeda(cobertura.value)}
-          </strong>
+          Total coberto
         </span>
-      ))}
+        <span
+          className="text-sm font-bold tabular-nums"
+          style={{ color: 'var(--brand-primary)' }}
+        >
+          {formatarMoeda(totalCoberto)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -164,8 +203,7 @@ function SeguroCard({
               {downloadUrl ? (
                 <a
                   href={downloadUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
+                  download={`apolice-${seguro.apoliceNumero || seguro.id}`}
                   className="ui-button ui-transition ui-brand-ring inline-flex h-9 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-3 text-sm font-semibold hover:-translate-y-[1px]"
                   style={{
                     backgroundColor: 'var(--button-secondary-bg)',
@@ -173,10 +211,10 @@ function SeguroCard({
                     borderColor: 'var(--button-secondary-border)',
                   }}
                   onClick={(event) => event.stopPropagation()}
-                  title="Baixar apolice"
+                  title="Baixar apólice"
                 >
                   <FontAwesomeIcon icon={faDownload} />
-                  Apolice
+                  Apólice
                 </a>
               ) : null}
 
