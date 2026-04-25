@@ -166,7 +166,7 @@ router.get('/:id', async (req, res) => {
 // ==============================
 router.post('/', validate(seguroSchema), async (req, res) => {
   const dados = req.validatedData || req.body;
-  const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
+  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
@@ -201,6 +201,17 @@ router.post('/', validate(seguroSchema), async (req, res) => {
                 tenantId_id: {
                   tenantId,
                   id: unidadeId,
+                },
+              },
+            }
+          : undefined,
+
+        veiculo: veiculoId
+          ? {
+              connect: {
+                tenantId_id: {
+                  tenantId,
+                  id: veiculoId,
                 },
               },
             }
@@ -245,7 +256,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 router.put('/:id', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData || req.body;
-  const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
+  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
@@ -303,6 +314,20 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
                     tenantId_id: {
                       tenantId,
                       id: unidadeId,
+                    },
+                  },
+                }
+              : undefined,
+
+        veiculo:
+          veiculoId === null
+            ? { disconnect: true }
+            : veiculoId
+              ? {
+                  connect: {
+                    tenantId_id: {
+                      tenantId,
+                      id: veiculoId,
                     },
                   },
                 }
