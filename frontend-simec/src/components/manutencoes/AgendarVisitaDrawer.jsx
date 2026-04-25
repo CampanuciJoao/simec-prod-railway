@@ -48,7 +48,7 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
       open={isOpen}
       onClose={handleClose}
       title="Agendar visita tecnica"
-      subtitle="Defina a data, hora e responsavel pela visita ao equipamento."
+      subtitle="Defina a data, hora e responsavel pela visita."
       footer={
         <div className="flex justify-end gap-3">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
@@ -64,34 +64,42 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
         </div>
       }
     >
-      <div className="space-y-5">
+      <div className="space-y-6">
+        {/* Inicio */}
         <div>
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
-            Periodo da visita
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            Inicio previsto
           </p>
           <div className="grid grid-cols-2 gap-3">
             <DateInput
-              label="Data de inicio"
+              label="Data"
               value={form.agendamentoDataInicioLocal}
               onChange={(e) => handleChange('agendamentoDataInicioLocal', e.target.value)}
               required
             />
             <TimeInput
-              label="Hora inicial"
+              label="Hora"
               value={form.agendamentoHoraInicioLocal}
               onChange={(e) => handleChange('agendamentoHoraInicioLocal', e.target.value)}
               required
             />
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
+        </div>
+
+        {/* Fim */}
+        <div>
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            Termino previsto
+          </p>
+          <div className="grid grid-cols-2 gap-3">
             <DateInput
-              label="Data de termino"
+              label="Data"
               value={form.agendamentoDataFimLocal}
               onChange={(e) => handleChange('agendamentoDataFimLocal', e.target.value)}
               required
             />
             <TimeInput
-              label="Hora final"
+              label="Hora"
               value={form.agendamentoHoraFimLocal}
               onChange={(e) => handleChange('agendamentoHoraFimLocal', e.target.value)}
               required
@@ -99,9 +107,10 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
           </div>
         </div>
 
+        {/* Responsavel */}
         <div>
-          <p className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
-            Responsavel e chamado
+          <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+            Responsavel
           </p>
           <div className="space-y-3">
             <Input

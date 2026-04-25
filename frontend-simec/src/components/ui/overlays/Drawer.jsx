@@ -15,7 +15,7 @@ function Drawer({
     <>
       <div
         className={[
-          'fixed inset-0 z-40 bg-slate-950/40 transition-opacity',
+          'fixed inset-0 z-[85] bg-slate-950/40 transition-opacity',
           open
             ? 'pointer-events-auto opacity-100'
             : 'pointer-events-none opacity-0',
@@ -25,7 +25,7 @@ function Drawer({
 
       <aside
         className={[
-          'fixed right-0 top-0 z-50 flex h-screen flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300',
+          'fixed right-0 top-0 z-[90] flex h-screen flex-col border-l border-slate-200 bg-white shadow-2xl transition-transform duration-300',
           widthClass,
           open ? 'translate-x-0' : 'translate-x-full',
         ].join(' ')}
