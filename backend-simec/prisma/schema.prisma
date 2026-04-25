@@ -355,6 +355,7 @@ model Seguro {
   lmiColisao               Float?            @default(0)
   lmiDanosCausaExterna     Float?            @default(0)
   lmiPerdaLucroBruto       Float?            @default(0)
+  lmiVazamentoTanques      Float?            @default(0)
   premioTotal              Float?            @default(0) @map("premio_total")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)

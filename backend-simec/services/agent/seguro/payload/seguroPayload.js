@@ -8,8 +8,10 @@ function montarCoberturasDetalhadas(seguro) {
     { chave: 'Danos Materiais', valor: seguro.lmiDanosMateriais },
     { chave: 'Danos Morais', valor: seguro.lmiDanosMorais },
     { chave: 'Incêndio', valor: seguro.lmiIncendio },
+    { chave: 'Lucros cessantes', valor: seguro.lmiPerdaLucroBruto },
     { chave: 'Responsabilidade Civil', valor: seguro.lmiResponsabilidadeCivil },
     { chave: 'Roubo / Furto', valor: seguro.lmiRoubo },
+    { chave: 'Vazamento de Tanques', valor: seguro.lmiVazamentoTanques },
     { chave: 'Vidros', valor: seguro.lmiVidros },
     { chave: 'Vendaval', valor: seguro.lmiVendaval },
   ];
