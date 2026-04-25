@@ -17,7 +17,35 @@ export function getNomeUnidade(seguro) {
   return 'Não vinculado';
 }
 
+export function getAlvoSeguro(seguro) {
+  if (seguro?.equipamento?.modelo || seguro?.equipamento?.tag) {
+    return {
+      label: 'Equipamento',
+      value: [seguro.equipamento?.modelo, seguro.equipamento?.tag]
+        .filter(Boolean)
+        .join(' - '),
+    };
+  }
+
+  if (seguro?.veiculo?.placa || seguro?.veiculo?.modelo) {
+    return {
+      label: 'Veiculo',
+      value: [seguro.veiculo?.placa, seguro.veiculo?.modelo]
+        .filter(Boolean)
+        .join(' - '),
+    };
+  }
+
+  const unidade = getNomeUnidade(seguro);
+
+  return {
+    label: unidade === 'Não vinculado' ? 'Vinculo' : 'Unidade',
+    value: unidade,
+  };
+}
+
 export function getTipoVinculo(seguro) {
+  if (seguro?.veiculoId || seguro?.veiculo?.id) return 'Veiculo';
   if (seguro?.equipamentoId || seguro?.equipamento?.id) return 'Equipamento';
   if (seguro?.unidadeId || seguro?.unidade?.id) return 'Unidade';
   return 'Geral';
