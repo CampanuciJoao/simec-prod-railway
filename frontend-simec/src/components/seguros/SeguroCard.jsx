@@ -163,9 +163,10 @@ function SeguroCard({
     event.stopPropagation();
     if (!downloadUrl) return;
     try {
-      const response = await fetch(downloadUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      const response = await api.get(`/seguros/${seguro.id}/apolice`, {
+        responseType: 'blob',
+      });
+      const blobUrl = URL.createObjectURL(response.data);
       const anchor = document.createElement('a');
       anchor.href = blobUrl;
       anchor.download = `apolice-${seguro.apoliceNumero || seguro.id}`;
