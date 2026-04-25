@@ -22,7 +22,8 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
     form.agendamentoDataInicioLocal &&
     form.agendamentoHoraInicioLocal &&
     form.agendamentoDataFimLocal &&
-    form.agendamentoHoraFimLocal;
+    form.agendamentoHoraFimLocal &&
+    form.numeroChamado.trim();
 
   function handleClose() {
     setForm({
@@ -120,10 +121,11 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
               placeholder="Ex.: Carlos Silva / GE Servicos"
             />
             <Input
-              label="Chamado externo (opcional)"
+              label="Numero do chamado"
               value={form.numeroChamado}
               onChange={(e) => handleChange('numeroChamado', e.target.value)}
               placeholder="Ex.: GE-12345"
+              required
             />
           </div>
         </div>

@@ -151,7 +151,9 @@ export const agendarVisitaSchema = z
     agendamentoHoraFimLocal: z
       .string({ required_error: 'A hora final e obrigatoria.' })
       .regex(localTimeRegex, 'A hora final deve estar no formato HH:mm.'),
-    numeroChamado: z.string().trim().nullable().optional(),
+    numeroChamado: z
+      .string({ required_error: 'O numero do chamado e obrigatorio para agendar visita.' })
+      .min(1, 'O numero do chamado e obrigatorio para agendar visita.'),
     tecnicoResponsavel: z.string().trim().nullable().optional(),
     observacao: z.string().trim().nullable().optional(),
   })
