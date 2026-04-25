@@ -11,8 +11,7 @@ import {
   concluirManutencao,
 } from '@/services/api';
 
-import { getPdfDataManutencao } from '@/services/api/pdfApi';
-import { exportarOSManutencaoPDFLazy } from '@/services/pdf/pdfExportService';
+import { exportarOSManutencaoPDF } from '@/services/api/pdfApi';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 
@@ -293,8 +292,7 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
 
   const handleImprimirOS = useCallback(async (manutencaoId) => {
     try {
-      const dados = await getPdfDataManutencao(manutencaoId);
-      await exportarOSManutencaoPDFLazy(dados);
+      await exportarOSManutencaoPDF(manutencaoId);
     } catch (err) {
       addToast(getErrorMessage(err, 'Erro ao gerar PDF.'), 'error');
     }
