@@ -11,6 +11,7 @@ import {
   faChartBar,
   faLifeRing,
   faBuildingShield,
+  faFileInvoiceDollar,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const sidebarConfig = [
@@ -54,6 +55,11 @@ export const sidebarConfig = [
     label: 'Indicadores BI',
     path: '/bi',
     icon: faChartBar,
+  },
+  {
+    label: 'Orçamentos',
+    path: '/orcamentos',
+    icon: faFileInvoiceDollar,
   },
   {
     label: 'Relatorios',

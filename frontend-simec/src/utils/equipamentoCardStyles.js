@@ -8,6 +8,7 @@ export function getEquipamentoCardStyles(status) {
       backgroundColor: tone.soft,
       borderColor: tone.border,
       borderLeftColor: tone.strong,
+      boxShadow: '0 18px 40px rgba(15, 23, 42, 0.06)',
     },
     toggleStyle: {
       backgroundColor: 'var(--bg-surface)',
@@ -19,8 +20,8 @@ export function getEquipamentoCardStyles(status) {
       backgroundColor: 'var(--bg-surface)',
     },
     infoCardStyle: {
-      backgroundColor: 'var(--bg-surface)',
-      borderColor: tone.border,
+      backgroundColor: tone.soft,
+      borderColor: 'transparent',
     },
   };
 }

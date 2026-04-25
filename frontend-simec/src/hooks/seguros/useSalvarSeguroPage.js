@@ -53,14 +53,25 @@ export function useSalvarSeguroPage({ id, addToast, navigate }) {
   }, [fetchData]);
 
   const handleSave = useCallback(
-    async (formData) => {
+    async (formData, pendingFiles = []) => {
       try {
+        let saved;
+
         if (isEditing) {
-          await updateSeguro(id, formData);
+          saved = await updateSeguro(id, formData);
           addToast('Seguro atualizado com sucesso!', 'success');
         } else {
-          await addSeguro(formData);
+          saved = await addSeguro(formData);
           addToast('Seguro criado com sucesso!', 'success');
+        }
+
+        const savedId = saved?.id || id;
+        if (pendingFiles.length > 0 && savedId) {
+          for (const file of pendingFiles) {
+            const fd = new FormData();
+            fd.append('file', file);
+            await uploadAnexoSeguro(savedId, fd);
+          }
         }
 
         navigate('/seguros');

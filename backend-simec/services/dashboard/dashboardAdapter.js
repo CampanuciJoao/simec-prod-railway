@@ -81,6 +81,7 @@ export function adaptarDashboardResponse({
   statusEquipamentosGroups,
   manutencoesDosUltimos6Meses,
   alertasRecentes,
+  ocorrenciasPendentes,
 }) {
   return {
     equipamentosCount: totalEquipamentos,
@@ -88,6 +89,7 @@ export function adaptarDashboardResponse({
     contratosVencendoCount: contratosVencendo,
     alertasAtivos: alertasNaoVistosCount,
     alertasRecentes,
+    ocorrenciasPendentes: Array.isArray(ocorrenciasPendentes) ? ocorrenciasPendentes : [],
     statusEquipamentos: adaptarStatusEquipamentos(statusEquipamentosGroups),
     manutencoesPorTipoMes: adaptarManutencoesPorMes(manutencoesDosUltimos6Meses),
   };

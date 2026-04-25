@@ -40,12 +40,12 @@ function AuthLayout({ children }) {
                 </span>
 
                 <h1 className="text-4xl font-bold leading-tight xl:text-5xl">
-                  Gestao inteligente para engenharia clinica, ativos e manutencao.
+                  Gestão inteligente para engenharia clínica, ativos e manutenção.
                 </h1>
 
                 <p className="max-w-xl text-base leading-7 text-slate-300 xl:text-lg">
-                  Centralize a operacao, o historico tecnico, os contratos, os
-                  seguros e os indicadores em uma experiencia unica, clara e
+                  Centralize a operação, o histórico técnico, os contratos, os
+                  seguros e os indicadores em uma experiência única, clara e
                   pronta para crescer.
                 </p>
               </div>
@@ -53,10 +53,10 @@ function AuthLayout({ children }) {
               <div className="grid gap-5 md:grid-cols-3">
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
-                    Organizacao
+                    Organização
                   </div>
                   <div className="mt-2 text-sm font-semibold text-white">
-                    Equipamentos, agendas e historico tecnico em um unico lugar
+                    Equipamentos, agendas e histórico técnico em um único lugar
                   </div>
                 </div>
 
@@ -65,16 +65,16 @@ function AuthLayout({ children }) {
                     Controle
                   </div>
                   <div className="mt-2 text-sm font-semibold text-white">
-                    Alertas, rastreabilidade e governanca para a operacao
+                    Alertas, rastreabilidade e governança para a operação
                   </div>
                 </div>
 
                 <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
-                    Visao
+                    Visão
                   </div>
                   <div className="mt-2 text-sm font-semibold text-white">
-                    Leitura analitica para decisoes mais rapidas e seguras
+                    Leitura analítica para decisões mais rápidas e seguras
                   </div>
                 </div>
               </div>
@@ -82,7 +82,7 @@ function AuthLayout({ children }) {
 
             <div className="mt-10 max-w-xl rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-300 backdrop-blur">
               Uma plataforma desenhada para trazer mais previsibilidade,
-              padrao e confianca para a rotina da engenharia clinica.
+              padrão e confiança para a rotina da engenharia clínica.
             </div>
           </div>
         </section>

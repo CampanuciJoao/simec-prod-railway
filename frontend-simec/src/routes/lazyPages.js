@@ -95,3 +95,12 @@ export const SuperAdminTenantsPage = React.lazy(() =>
 export const SuperAdminHelpPage = React.lazy(() =>
   import('@/pages/superadmin/SuperAdminHelpPage')
 );
+export const OrcamentosPage = React.lazy(() =>
+  import('@/pages/orcamentos/OrcamentosPage')
+);
+export const SalvarOrcamentoPage = React.lazy(() =>
+  import('@/pages/orcamentos/SalvarOrcamentoPage')
+);
+export const DetalhesOrcamentoPage = React.lazy(() =>
+  import('@/pages/orcamentos/DetalhesOrcamentoPage')
+);

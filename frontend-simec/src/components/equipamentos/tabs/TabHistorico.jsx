@@ -9,12 +9,16 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  exportHistoricoAtivoByEquipamento,
   getHistoricoAtivoByEquipamento,
 } from '@/services/api';
-import { exportarHistoricoEquipamentoPDFLazy } from '@/services/pdf/pdfExportService';
+import { exportarHistoricoEquipamentoPDF } from '@/services/api/pdfApi';
 
 import { useToast } from '@/contexts/ToastContext';
+import { useAuth } from '@/contexts/AuthContext';
+import {
+  deleteHistoricoEvento,
+  updateHistoricoEvento,
+} from '@/services/api/historicoAtivoApi';
 import {
   buildHistoricoTimeline,
   mapFiltroHistoricoParaQuery,
@@ -28,13 +32,13 @@ import {
   DateInput,
   EmptyState,
   LoadingState,
-  PageSection,
   Select,
   StatusBadge,
 } from '@/components/ui';
 
 function TabHistorico({ equipamento }) {
   const { addToast } = useToast();
+  const { isAdmin } = useAuth();
 
   const [eventos, setEventos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,26 +131,35 @@ function TabHistorico({ equipamento }) {
   };
 
   const handleExportarPDF = () => {
-    exportHistoricoAtivoByEquipamento(equipamento.id, buildQueryParams({}))
-      .then((lista) => {
-        const timelineCompleta = buildHistoricoTimeline({
-          eventos: Array.isArray(lista) ? lista : [],
-        });
-
-        void exportarHistoricoEquipamentoPDFLazy(timelineCompleta.linhaDoTempo, {
-          modelo: equipamento?.modelo,
-          tag: equipamento?.tag,
-          unidade: equipamento?.unidade?.nomeSistema,
-          inicio: dataInicio,
-          fim: dataFim,
-          tipoFiltro: filtroTipo,
-        }).catch(() => {
-          addToast('Erro ao gerar o PDF do historico.', 'error');
-        });
-      })
+    void exportarHistoricoEquipamentoPDF(
+      equipamento.id,
+      buildQueryParams({}),
+      `auditoria_${equipamento?.tag || 'Equipamento'}.pdf`
+    )
       .catch(() => {
-        addToast('Erro ao exportar historico completo.', 'error');
+        addToast('Erro ao gerar o PDF do historico.', 'error');
       });
+  };
+
+  const handleDeleteEvento = async (eventoId) => {
+    try {
+      await deleteHistoricoEvento(equipamento.id, eventoId);
+      setEventos((prev) => prev.filter((e) => e.id !== eventoId));
+      addToast('Registro excluido do historico.', 'success');
+      carregarDados();
+    } catch {
+      addToast('Erro ao excluir registro.', 'error');
+    }
+  };
+
+  const handleEditEvento = async (eventoId, dados) => {
+    try {
+      await updateHistoricoEvento(equipamento.id, eventoId, dados);
+      addToast('Registro atualizado.', 'success');
+      carregarDados();
+    } catch {
+      addToast('Erro ao atualizar registro.', 'error');
+    }
   };
 
   const handleCarregarMais = async () => {
@@ -175,11 +188,7 @@ function TabHistorico({ equipamento }) {
   };
 
   return (
-    <PageSection
-      title="Historico do equipamento"
-      description="Historico unico do ativo com manutencoes, ocorrencias e mudancas relevantes."
-    >
-      <div className="space-y-5">
+    <div className="space-y-5">
         <div className="flex items-start gap-3">
           <span
             className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
@@ -328,6 +337,9 @@ function TabHistorico({ equipamento }) {
                 linhaDoTempo={linhaDoTempo}
                 itensExpandidos={itensExpandidos}
                 onToggleExpandir={toggleExpandir}
+                isAdmin={isAdmin}
+                onDeleteEvento={handleDeleteEvento}
+                onEditEvento={handleEditEvento}
               />
             )}
           </div>
@@ -425,8 +437,7 @@ function TabHistorico({ equipamento }) {
             ) : null}
           </div>
         ) : null}
-      </div>
-    </PageSection>
+    </div>
   );
 }
 

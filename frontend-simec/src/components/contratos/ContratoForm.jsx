@@ -24,6 +24,7 @@ const OPCOES_CATEGORIA = [
   'Manutenção Corretiva',
   'Manutenção Preventiva',
   'Full Service',
+  'Comodato',
 ];
 
 const OPCOES_STATUS = ['Ativo', 'Expirado', 'Cancelado'];
@@ -64,7 +65,7 @@ function ContratoForm({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       {error ? (
         <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
@@ -155,7 +156,7 @@ function ContratoForm({
               <div>
                 <div className="font-medium">{unidade.nomeSistema}</div>
                 {unidade.nomeFantasia ? (
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                     {unidade.nomeFantasia}
                   </div>
                 ) : null}
@@ -177,7 +178,7 @@ function ContratoForm({
             renderLabel={(equipamento) => (
               <div>
                 <div className="font-medium">{equipamento.modelo}</div>
-                <div className="mt-1 text-xs text-slate-500">
+                <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                   Tag: {equipamento.tag || 'N/A'}
                 </div>
               </div>

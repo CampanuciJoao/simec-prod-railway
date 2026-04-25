@@ -66,5 +66,20 @@ export function buscarResumoDashboard({
         link: true,
       },
     }),
+    prisma.ocorrencia.findMany({
+      where: { tenantId, resolvido: false },
+      orderBy: { data: 'desc' },
+      take: 8,
+      select: {
+        id: true,
+        titulo: true,
+        gravidade: true,
+        tipo: true,
+        data: true,
+        equipamento: {
+          select: { id: true, modelo: true, tag: true },
+        },
+      },
+    }),
   ]);
 }

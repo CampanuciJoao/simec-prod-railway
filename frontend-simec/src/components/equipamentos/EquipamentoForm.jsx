@@ -10,16 +10,34 @@ import {
   PageState,
   ResponsiveGrid,
   Select,
+  Textarea,
 } from '@/components/ui';
 
 import { useEquipamentoForm } from '@/hooks/equipamentos/useEquipamentoForm';
 
 const TIPOS = [
+  'Angiógrafo',
   'Arco Cirúrgico',
-  'Tomografia Computadorizada',
-  'Ressonância Magnética',
-  'Ultrassom',
+  'Bomba Injetora de Contraste',
+  'CR (Radiografia Computadorizada)',
+  'DR (Radiografia Digital)',
+  'Densitômetro Ósseo',
+  'Eletrocardiógrafo (ECG)',
+  'Ergômetro / Esteira',
+  'Fluoroscópio',
+  'Holter',
+  'Mamógrafo',
+  'Monitor Cardíaco',
+  'Monitor Multiparâmetros',
+  'PET-CT',
+  'Processadora de Filme',
   'Raio-X',
+  'Ressonância Magnética',
+  'SPECT / Cintilógrafo',
+  'Tomografia Computadorizada',
+  'Ultrassom',
+  'Ventilador Pulmonar',
+  'Outro',
 ];
 
 function EquipamentoForm({
@@ -31,6 +49,7 @@ function EquipamentoForm({
   const {
     formData,
     unidades,
+    fabricantes,
     loadingUnidades,
     submitting,
     error,
@@ -41,6 +60,15 @@ function EquipamentoForm({
     toggleSemPatrimonio,
     validate,
   } = useEquipamentoForm({ initialData, isEditing });
+
+  const normalizeFabricante = () => {
+    const raw = formData.fabricante || '';
+    const normalized = raw
+      .trim()
+      .toLowerCase()
+      .replace(/(?:^|\s)\S/g, (c) => c.toUpperCase());
+    if (normalized !== raw) handleChange('fabricante', normalized);
+  };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -55,8 +83,12 @@ function EquipamentoForm({
     try {
       setSubmitting(true);
       await onSubmit(formData);
-    } catch {
-      setError('Erro ao salvar equipamento.');
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        err?.message ||
+        'Erro ao salvar equipamento.';
+      setError(msg);
     } finally {
       setSubmitting(false);
     }
@@ -116,6 +148,24 @@ function EquipamentoForm({
             disabled={loadingUnidades}
             required
           />
+
+          <div>
+            <Input
+              label="Fabricante"
+              value={formData.fabricante}
+              onChange={(e) => handleChange('fabricante', e.target.value)}
+              onBlur={normalizeFabricante}
+              placeholder="Ex.: Siemens"
+              list="fabricantes-datalist"
+            />
+            {fabricantes.length > 0 && (
+              <datalist id="fabricantes-datalist">
+                {fabricantes.map((f) => (
+                  <option key={f} value={f} />
+                ))}
+              </datalist>
+            )}
+          </div>
         </ResponsiveGrid>
       </FormSection>
 
@@ -134,15 +184,6 @@ function EquipamentoForm({
           />
 
           <Input
-            label="Fabricante"
-            value={formData.fabricante}
-            onChange={(e) =>
-              handleChange('fabricante', e.target.value)
-            }
-            placeholder="Ex.: Siemens"
-          />
-
-          <Input
             label="Ano de fabricação"
             type="number"
             value={formData.anoFabricacao}
@@ -153,7 +194,35 @@ function EquipamentoForm({
             min="1900"
             max="2100"
           />
+
+          <Input
+            label="Localização"
+            value={formData.setor}
+            onChange={(e) => handleChange('setor', e.target.value)}
+            placeholder="Ex.: Sala de Raio-X, 2º andar"
+          />
+
+          <Select
+            label="Status"
+            value={formData.status}
+            onChange={(e) => handleChange('status', e.target.value)}
+            options={[
+              { value: 'Operante', label: 'Operante' },
+              { value: 'UsoLimitado', label: 'Uso Limitado' },
+              { value: 'EmManutencao', label: 'Em Manutenção' },
+              { value: 'Inoperante', label: 'Inoperante' },
+              { value: 'Desativado', label: 'Desativado' },
+            ]}
+          />
         </ResponsiveGrid>
+
+        <Textarea
+          label="Observações"
+          value={formData.observacoes}
+          onChange={(e) => handleChange('observacoes', e.target.value)}
+          placeholder="Informações adicionais sobre o equipamento..."
+          rows={3}
+        />
       </FormSection>
 
       {/* 🔹 PATRIMÔNIO */}

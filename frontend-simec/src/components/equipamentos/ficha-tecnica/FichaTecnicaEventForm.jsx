@@ -1,9 +1,10 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCircleInfo } from '@fortawesome/free-solid-svg-icons';
+import { faCircleInfo, faRotateLeft } from '@fortawesome/free-solid-svg-icons';
 
 import {
+  Button,
   FormActions,
   Input,
   PageSection,
@@ -29,6 +30,7 @@ function FichaTecnicaEventForm({
   onChange,
   onSubmit,
   onCancel,
+  onLimpar,
 }) {
   return (
     <PageSection
@@ -36,32 +38,47 @@ function FichaTecnicaEventForm({
       description="Cadastre observacoes operacionais, falhas percebidas, pequenos ajustes e inspecoes do equipamento."
     >
       <div className="space-y-5">
-        <div className="flex items-start gap-3 rounded-2xl border px-4 py-4">
-          <span
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
-            style={{
-              backgroundColor: 'var(--brand-primary-soft)',
-              color: 'var(--brand-primary)',
-            }}
-          >
-            <FontAwesomeIcon icon={faCircleInfo} />
-          </span>
+        <div className="flex items-start justify-between gap-3 rounded-2xl border px-4 py-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+              style={{
+                backgroundColor: 'var(--brand-primary-soft)',
+                color: 'var(--brand-primary)',
+              }}
+            >
+              <FontAwesomeIcon icon={faCircleInfo} />
+            </span>
 
-          <div className="min-w-0">
-            <p
-              className="text-sm font-semibold"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              Registro operacional rapido
-            </p>
-            <p
-              className="text-sm leading-6"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Use esta tela para registrar eventos leves. O historico completo do
-              ativo continua centralizado na aba Historico do equipamento.
-            </p>
+            <div className="min-w-0">
+              <p
+                className="text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                Registro operacional rapido
+              </p>
+              <p
+                className="text-sm leading-6"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Use esta tela para registrar eventos leves. O historico completo do
+                ativo continua centralizado na aba Historico do equipamento.
+              </p>
+            </div>
           </div>
+
+          {onLimpar && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={onLimpar}
+              disabled={submitting}
+            >
+              <FontAwesomeIcon icon={faRotateLeft} />
+              Limpar formulario
+            </Button>
+          )}
         </div>
 
         <form onSubmit={onSubmit} className="space-y-5">
@@ -154,6 +171,7 @@ FichaTecnicaEventForm.propTypes = {
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   onCancel: PropTypes.func,
+  onLimpar: PropTypes.func,
 };
 
 export default FichaTecnicaEventForm;

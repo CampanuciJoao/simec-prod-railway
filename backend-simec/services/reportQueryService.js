@@ -126,6 +126,7 @@ export async function buscarInventarioEquipamentos({
     select: {
       id: true,
       modelo: true,
+      tipo: true,
       tag: true,
       fabricante: true,
       registroAnvisa: true,

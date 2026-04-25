@@ -13,6 +13,7 @@ export async function obterDashboardService({ tenantId, userId }) {
     statusEquipamentosGroups,
     manutencoesDosUltimos6Meses,
     alertasRecentes,
+    ocorrenciasPendentes,
   ] = await buscarResumoDashboard({
     tenantId,
     userId,
@@ -30,6 +31,7 @@ export async function obterDashboardService({ tenantId, userId }) {
       statusEquipamentosGroups,
       manutencoesDosUltimos6Meses,
       alertasRecentes,
+      ocorrenciasPendentes,
     }),
   };
 }

@@ -3,8 +3,6 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
 
@@ -24,17 +22,17 @@ import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
 import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js';
 import pdfDataRoutes from './routes/pdfDataRoutes.js';
+import pdfRoutes from './routes/pdfRoutes.js';
 import superadminTenantsRoutes from './routes/superadminTenantsRoutes.js';
 import tenantSettingsRoutes from './routes/tenantSettingsRoutes.js';
 import helpRoutes from './routes/helpRoutes.js';
 import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
+import orcamentosRoutes from './routes/orcamentosRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
 import { iniciarJobsDeAlertas } from './services/queueService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { getFromR2 } from './services/uploads/fileStorageService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -72,7 +70,17 @@ app.use(
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+app.get('/uploads/*path', async (req, res) => {
+  const key = 'uploads/' + req.params.path;
+  try {
+    const obj = await getFromR2(key);
+    res.set('Content-Type', obj.ContentType || 'application/octet-stream');
+    obj.Body.pipe(res);
+  } catch {
+    res.status(404).json({ error: 'Arquivo não encontrado.' });
+  }
+});
 
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');
@@ -97,10 +105,12 @@ app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
 app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes);
 app.use('/api/pdf-data', pdfDataRoutes);
+app.use('/api/pdfs', pdfRoutes);
 app.use('/api/superadmin', superadminTenantsRoutes);
 app.use('/api/superadmin/help', superadminHelpRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
+app.use('/api/orcamentos', orcamentosRoutes);
 
 app.use('/api', (req, res) => {
   return res.status(404).json({

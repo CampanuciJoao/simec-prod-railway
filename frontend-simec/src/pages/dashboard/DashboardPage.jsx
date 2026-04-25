@@ -1,16 +1,15 @@
 import React, { useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
   faBell,
   faChartPie,
-  faClipboardList,
   faFileContract,
-  faGaugeHigh,
   faHospital,
   faRotateRight,
   faScrewdriverWrench,
+  faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useDashboard } from '@/hooks/dashboard/useDashboard';
@@ -25,75 +24,6 @@ import {
 import { AlertListItem } from '@/components/dashboard';
 import BarChart from '@/components/charts/BarChart';
 import DonutChart from '@/components/charts/DonutChart';
-
-function DashboardPrimaryCard({
-  icon,
-  title,
-  value,
-  helper,
-  emphasis = 'default',
-}) {
-  const emphasisMap = {
-    default: {
-      accent: 'var(--brand-primary)',
-      accentSurface: 'var(--brand-primary-soft)',
-    },
-    success: {
-      accent: 'var(--color-success)',
-      accentSurface: 'var(--color-success-soft)',
-    },
-    warning: {
-      accent: 'var(--color-warning)',
-      accentSurface: 'var(--color-warning-soft)',
-    },
-    danger: {
-      accent: 'var(--color-danger)',
-      accentSurface: 'var(--color-danger-soft)',
-    },
-  };
-
-  const palette = emphasisMap[emphasis] || emphasisMap.default;
-
-  return (
-    <div
-      className="rounded-3xl border p-5"
-      style={{
-        backgroundColor: 'var(--bg-surface)',
-        borderColor: 'var(--border-soft)',
-      }}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
-          style={{
-            backgroundColor: palette.accentSurface,
-            color: palette.accent,
-          }}
-        >
-          <FontAwesomeIcon icon={icon} />
-        </div>
-
-        <div className="min-w-0 flex-1">
-          <p
-            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            {title}
-          </p>
-          <p
-            className="mt-3 text-4xl font-bold leading-none tracking-tight"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {value}
-          </p>
-          <p className="mt-3 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>
-            {helper}
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
   const toneMap = {
@@ -155,69 +85,6 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
   );
 }
 
-function DashboardMetricPill({ label, value, helper, tone = 'default' }) {
-  const toneMap = {
-    default: {
-      bg: 'var(--bg-surface-subtle)',
-      border: 'var(--border-soft)',
-      text: 'var(--text-primary)',
-      value: 'var(--text-primary)',
-    },
-    success: {
-      bg: 'var(--color-success-soft)',
-      border: 'transparent',
-      text: 'var(--color-success)',
-      value: 'var(--color-success)',
-    },
-    warning: {
-      bg: 'var(--color-warning-soft)',
-      border: 'transparent',
-      text: 'var(--color-warning)',
-      value: 'var(--color-warning)',
-    },
-    danger: {
-      bg: 'var(--color-danger-soft)',
-      border: 'transparent',
-      text: 'var(--color-danger)',
-      value: 'var(--color-danger)',
-    },
-    info: {
-      bg: 'var(--brand-primary-soft)',
-      border: 'transparent',
-      text: 'var(--brand-primary)',
-      value: 'var(--brand-primary)',
-    },
-  };
-
-  const resolvedTone = toneMap[tone] || toneMap.default;
-
-  return (
-    <div
-      className="rounded-2xl border px-4 py-3"
-      style={{
-        backgroundColor: resolvedTone.bg,
-        borderColor: resolvedTone.border,
-      }}
-    >
-      <p
-        className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-        style={{ color: resolvedTone.text }}
-      >
-        {label}
-      </p>
-      <p
-        className="mt-2 text-xl font-bold leading-none"
-        style={{ color: resolvedTone.value }}
-      >
-        {value}
-      </p>
-      <p className="mt-2 text-sm leading-6" style={{ color: resolvedTone.text }}>
-        {helper}
-      </p>
-    </div>
-  );
-}
-
 function DashboardStatusList({ items = [] }) {
   if (!items.length) {
     return <InlineEmptyState message="Sem consolidacao de status disponivel." />;
@@ -251,6 +118,67 @@ function DashboardStatusList({ items = [] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+const GRAVIDADE_TONE = { alta: 'danger', media: 'warning', baixa: 'default' };
+const GRAVIDADE_LABEL = { alta: 'Alta', media: 'Media', baixa: 'Baixa' };
+const GRAVIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
+const MAX_OCORRENCIAS_VISIVEIS = 5;
+
+function ordenarOcorrencias(lista) {
+  return [...lista].sort(
+    (a, b) =>
+      (GRAVIDADE_ORDEM[a.gravidade] ?? 3) - (GRAVIDADE_ORDEM[b.gravidade] ?? 3)
+  );
+}
+
+function OcorrenciaPendenteItem({ ocorrencia }) {
+  const tone = GRAVIDADE_TONE[ocorrencia.gravidade] || 'default';
+
+  const toneColors = {
+    danger: { bg: 'var(--color-danger-soft)', text: 'var(--color-danger)' },
+    warning: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)' },
+    default: { bg: 'var(--bg-surface-soft)', text: 'var(--text-muted)' },
+  };
+
+  const colors = toneColors[tone];
+
+  return (
+    <Link
+      to={`/equipamentos/ficha-tecnica/${ocorrencia.equipamento?.id}`}
+      className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition hover:opacity-80"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div
+        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs"
+        style={{ backgroundColor: colors.bg, color: colors.text }}
+      >
+        <FontAwesomeIcon icon={faTriangleExclamation} />
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p
+          className="truncate text-sm font-medium"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          {ocorrencia.titulo}
+        </p>
+        <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+          {ocorrencia.equipamento?.modelo} · {ocorrencia.equipamento?.tag}
+        </p>
+      </div>
+
+      <span
+        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+        style={{ backgroundColor: colors.bg, color: colors.text }}
+      >
+        {GRAVIDADE_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
+      </span>
+    </Link>
   );
 }
 
@@ -300,6 +228,7 @@ function DashboardActionQueue({ resumo }) {
 
 function DashboardPage() {
   const { data, loading, error, recarregar } = useDashboard();
+  const navigate = useNavigate();
 
   const resumo = useMemo(() => {
     const totalEquipamentos = Number(data.totalEquipamentos || 0);
@@ -395,74 +324,51 @@ function DashboardPage() {
           }
         />
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(0,0.65fr)]">
-          <DashboardPrimaryCard
-            icon={faGaugeHigh}
-            title="Disponibilidade do parque"
-            value={`${resumo.disponibilidade}%`}
-            helper={`${resumo.ativos} ativos de ${resumo.totalEquipamentos} equipamentos monitorados.`}
-            emphasis={resumo.disponibilidade >= 85 ? 'success' : 'warning'}
-          />
-
-          <DashboardPrimaryCard
-            icon={faClipboardList}
-            title="Carga operacional recente"
-            value={resumo.manutencoesPeriodo}
-            helper={`Media de ${resumo.manutencaoMedia} ordens por periodo consolidado no painel.`}
-            emphasis={resumo.emManutencao > 0 ? 'warning' : 'default'}
-          />
-        </div>
-
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
           <PageSection
-            title="Fila de atencao"
-            description="Itens que ajudam a priorizar a operacao sem repetir o mesmo indicador em varios cards."
+            title="Ocorrencias pendentes"
+            description="Registros abertos que ainda nao receberam resolucao e precisam de atencao."
+            headerRight={
+              data.ocorrenciasPendentes.length > 0 ? (
+                <span
+                  className="rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{
+                    backgroundColor: 'var(--color-danger-soft)',
+                    color: 'var(--color-danger)',
+                  }}
+                >
+                  {data.ocorrenciasPendentes.length} abertas
+                </span>
+              ) : null
+            }
           >
-            <DashboardActionQueue resumo={resumo} />
-          </PageSection>
+            {data.ocorrenciasPendentes.length > 0 ? (() => {
+              const ordenadas = ordenarOcorrencias(data.ocorrenciasPendentes);
+              const visiveis = ordenadas.slice(0, MAX_OCORRENCIAS_VISIVEIS);
+              const restantes = ordenadas.length - visiveis.length;
 
-          <PageSection
-            title="Leitura do parque"
-            description="Distribuicao atual por status operacional e peso relativo no momento."
-          >
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-[minmax(220px,280px)_minmax(0,1fr)]">
-              <div
-                className="flex min-h-[260px] items-center justify-center rounded-3xl border p-4"
-                style={{
-                  borderColor: 'var(--border-soft)',
-                  backgroundColor: 'var(--bg-surface-soft)',
-                }}
-              >
-                <div className="h-[220px] w-full max-w-[280px]">
-                  <DonutChart data={data.statusEquipamentos} />
+              return (
+                <div className="space-y-2">
+                  {visiveis.map((oc) => (
+                    <OcorrenciaPendenteItem key={oc.id} ocorrencia={oc} />
+                  ))}
+                  {restantes > 0 ? (
+                    <p
+                      className="pt-1 text-center text-xs"
+                      style={{ color: 'var(--text-muted)' }}
+                    >
+                      e mais{' '}
+                      <strong style={{ color: 'var(--color-danger)' }}>
+                        {restantes}
+                      </strong>{' '}
+                      ocorrencia(s) pendente(s) — acesse cada equipamento para ver.
+                    </p>
+                  ) : null}
                 </div>
-              </div>
-
-              <DashboardStatusList items={resumo.principalStatus} />
-            </div>
-          </PageSection>
-        </div>
-
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
-          <PageSection
-            title="Historico de manutencoes"
-            description="Volume consolidado por periodo para leitura de tendencia e pressao operacional."
-          >
-            <div
-              className="rounded-3xl border p-3 sm:p-4"
-              style={{
-                borderColor: 'var(--border-soft)',
-                backgroundColor: 'var(--bg-surface-soft)',
-              }}
-            >
-              <div className="h-[280px] sm:h-[320px]">
-                <BarChart
-                  data={data.manutencoesPorTipo}
-                  datasetLabel="Ordens"
-                  emptyMessage="Sem manutencoes consolidadas para o periodo."
-                />
-              </div>
-            </div>
+              );
+            })() : (
+              <InlineEmptyState message="Nenhuma ocorrencia pendente. Parque sem registros em aberto." />
+            )}
           </PageSection>
 
           <PageSection
@@ -491,37 +397,58 @@ function DashboardPage() {
           </PageSection>
         </div>
 
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]">
+          <PageSection
+            title="Fila de atencao"
+            description="Itens que ajudam a priorizar a operacao sem repetir o mesmo indicador em varios cards."
+          >
+            <DashboardActionQueue resumo={resumo} />
+          </PageSection>
+
+          <PageSection
+            title="Leitura do parque"
+            description="Distribuicao atual por status operacional e peso relativo no momento."
+          >
+            <div
+              className="flex min-h-[320px] items-center justify-center rounded-3xl border p-5 sm:min-h-[360px] sm:p-6"
+              style={{
+                borderColor: 'var(--border-soft)',
+                backgroundColor: 'var(--bg-surface-soft)',
+              }}
+            >
+              <div className="h-[260px] w-full max-w-[340px] sm:h-[300px] sm:max-w-[380px]">
+                <DonutChart
+                  data={data.statusEquipamentos}
+                  onClickSegment={(label) =>
+                    navigate('/equipamentos', { state: { filtroStatus: label } })
+                  }
+                />
+              </div>
+            </div>
+          </PageSection>
+        </div>
+
         <PageSection
-          title="Resumo executivo"
-          description="Leituras-chave para orientar a proxima acao da equipe."
+          title="Historico de manutencoes"
+          description="Volume consolidado por periodo para leitura de tendencia e pressao operacional."
         >
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <DashboardMetricPill
-              label="Ativos operantes"
-              value={resumo.ativos}
-              helper="Equipamentos disponiveis para operacao."
-              tone="success"
-            />
-            <DashboardMetricPill
-              label="Intervencoes abertas"
-              value={resumo.emManutencao}
-              helper="Ordens que ainda exigem acompanhamento."
-              tone={resumo.emManutencao > 0 ? 'warning' : 'default'}
-            />
-            <DashboardMetricPill
-              label="Contratos em atencao"
-              value={resumo.contratosVencendo}
-              helper="Coberturas proximas do vencimento."
-              tone={resumo.contratosVencendo > 0 ? 'warning' : 'default'}
-            />
-            <DashboardMetricPill
-              label="Alertas criticos"
-              value={resumo.alertasCriticos}
-              helper="Casos que merecem priorizacao imediata."
-              tone={resumo.alertasCriticos > 0 ? 'danger' : 'info'}
-            />
+          <div
+            className="rounded-3xl border p-3 sm:p-4"
+            style={{
+              borderColor: 'var(--border-soft)',
+              backgroundColor: 'var(--bg-surface-soft)',
+            }}
+          >
+            <div className="h-[260px] sm:h-[300px]">
+              <BarChart
+                data={data.manutencoesPorTipo}
+                datasetLabel="Ordens"
+                emptyMessage="Sem manutencoes consolidadas para o periodo."
+              />
+            </div>
           </div>
         </PageSection>
+
       </div>
     </PageLayout>
   );

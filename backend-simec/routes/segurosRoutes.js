@@ -12,7 +12,10 @@ import {
   adicionarAnexos,
   removerAnexo,
 } from '../services/uploads/anexoService.js';
-import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
+import {
+  deleteStoredFile,
+  getFromR2,
+} from '../services/uploads/fileStorageService.js';
 
 const router = express.Router();
 
@@ -166,7 +169,7 @@ router.get('/:id', async (req, res) => {
 // ==============================
 router.post('/', validate(seguroSchema), async (req, res) => {
   const dados = req.validatedData || req.body;
-  const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
+  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
@@ -201,6 +204,17 @@ router.post('/', validate(seguroSchema), async (req, res) => {
                 tenantId_id: {
                   tenantId,
                   id: unidadeId,
+                },
+              },
+            }
+          : undefined,
+
+        veiculo: veiculoId
+          ? {
+              connect: {
+                tenantId_id: {
+                  tenantId,
+                  id: veiculoId,
                 },
               },
             }
@@ -245,19 +259,19 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 router.put('/:id', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData || req.body;
-  const { equipamentoId, unidadeId, dataInicio, dataFim, ...resto } = dados;
+  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
     const tenantId = req.usuario.tenantId;
 
     const seguro = await prisma.seguro.findFirst({
-      where: {
-        id,
-        tenantId,
-      },
+      where: { id, tenantId },
       select: {
         id: true,
         apoliceNumero: true,
+        equipamentoId: true,
+        unidadeId: true,
+        veiculoId: true,
       },
     });
 
@@ -270,43 +284,30 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 
     const atualizado = await prisma.seguro.update({
       where: {
-        tenantId_id: {
-          tenantId,
-          id,
-        },
+        tenantId_id: { tenantId, id },
       },
       data: {
         ...resto,
         dataInicio: dataInicio ? new Date(dataInicio) : undefined,
         dataFim: dataFim ? new Date(dataFim) : undefined,
 
-        equipamento:
-          equipamentoId === null
-            ? { disconnect: true }
-            : equipamentoId
-              ? {
-                  connect: {
-                    tenantId_id: {
-                      tenantId,
-                      id: equipamentoId,
-                    },
-                  },
-                }
-              : undefined,
+        equipamento: equipamentoId
+          ? { connect: { tenantId_id: { tenantId, id: equipamentoId } } }
+          : seguro.equipamentoId
+            ? { disconnect: { tenantId_id: { tenantId, id: seguro.equipamentoId } } }
+            : undefined,
 
-        unidade:
-          unidadeId === null
-            ? { disconnect: true }
-            : unidadeId
-              ? {
-                  connect: {
-                    tenantId_id: {
-                      tenantId,
-                      id: unidadeId,
-                    },
-                  },
-                }
-              : undefined,
+        unidade: unidadeId
+          ? { connect: { tenantId_id: { tenantId, id: unidadeId } } }
+          : seguro.unidadeId
+            ? { disconnect: { tenantId_id: { tenantId, id: seguro.unidadeId } } }
+            : undefined,
+
+        veiculo: veiculoId
+          ? { connect: { tenantId_id: { tenantId, id: veiculoId } } }
+          : seguro.veiculoId
+            ? { disconnect: { tenantId_id: { tenantId, id: seguro.veiculoId } } }
+            : undefined,
       },
     });
 
@@ -396,6 +397,47 @@ router.delete('/:id', admin, async (req, res) => {
   } catch (error) {
     console.error('[SEGURO_DELETE_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao excluir seguro.' });
+  }
+});
+
+// ==============================
+// DOWNLOAD APÓLICE (primeiro anexo)
+// ==============================
+router.get('/:id/apolice', async (req, res) => {
+  const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
+
+  try {
+    const seguro = await prisma.seguro.findFirst({
+      where: { id, tenantId },
+      select: {
+        apoliceNumero: true,
+        anexos: {
+          orderBy: { createdAt: 'desc' },
+          take: 1,
+          select: { path: true },
+        },
+      },
+    });
+
+    if (!seguro) {
+      return res.status(404).json({ message: 'Seguro não encontrado.' });
+    }
+
+    const anexo = seguro.anexos[0];
+    if (!anexo) {
+      return res.status(404).json({ message: 'Nenhum anexo cadastrado para este seguro.' });
+    }
+
+    const obj = await getFromR2(anexo.path);
+    const filename = `apolice-${seguro.apoliceNumero || id}.pdf`;
+
+    res.set('Content-Type', obj.ContentType || 'application/pdf');
+    res.set('Content-Disposition', `attachment; filename="${filename}"`);
+    obj.Body.pipe(res);
+  } catch (error) {
+    console.error('[SEGURO_DOWNLOAD_ERROR]', error);
+    return res.status(404).json({ message: 'Arquivo não encontrado.' });
   }
 });
 

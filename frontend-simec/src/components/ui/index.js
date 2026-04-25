@@ -26,6 +26,7 @@ export {
   Button,
   Card,
   Checkbox,
+  CurrencyInput,
   DateInput,
   FormFieldShell,
   Input,

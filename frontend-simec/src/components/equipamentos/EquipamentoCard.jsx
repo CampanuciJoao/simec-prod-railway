@@ -1,17 +1,35 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faBuilding,
-  faFileMedical,
-  faMicrochip,
-  faTag,
-} from '@fortawesome/free-solid-svg-icons';
+import { faFileMedical } from '@fortawesome/free-solid-svg-icons';
 
-import { Badge, Button, EntityCard, StatusBadge } from '@/components/ui';
+import { EntityCard } from '@/components/ui';
 import { StatusSelector } from '@/components/equipamentos';
 import EquipamentoCardExpanded from '@/components/equipamentos/EquipamentoCardExpanded';
 import { getEquipamentoCardStyles } from '@/utils/equipamentoCardStyles';
+
+function Col({ label, value, bold = false }) {
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <span
+        className="text-[10px] font-semibold uppercase tracking-widest"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        {label}
+      </span>
+      <span
+        className="truncate text-base"
+        title={value || '-'}
+        style={{
+          color: 'var(--text-primary)',
+          fontWeight: bold ? 700 : 600,
+        }}
+      >
+        {value || '—'}
+      </span>
+    </div>
+  );
+}
 
 function EquipamentoCard({
   equipamento,
@@ -23,12 +41,10 @@ function EquipamentoCard({
   onStatusUpdated,
   onRefresh,
 }) {
-  const { cardStyle, toggleStyle, expandedStyle, infoCardStyle } =
+  const { cardStyle, toggleStyle, expandedStyle } =
     getEquipamentoCardStyles(equipamento.status);
 
-  const handleToggle = () => {
-    onToggleExpandir(equipamento.id);
-  };
+  const handleToggle = () => onToggleExpandir(equipamento.id);
 
   const handleGoToFicha = (event) => {
     event.stopPropagation();
@@ -44,87 +60,35 @@ function EquipamentoCard({
       toggleStyle={toggleStyle}
       expandedStyle={expandedStyle}
       actions={
-        <Button
+        <button
           type="button"
-          variant="secondary"
-          size="sm"
           title="Abrir ficha tecnica"
           onClick={handleGoToFicha}
-          className="px-3 sm:px-4"
-          style={{
-            '--button-bg': 'var(--bg-surface)',
-            '--button-bg-hover': 'var(--bg-hover)',
-            '--button-text': 'var(--text-primary)',
-            '--button-border': 'var(--border-soft)',
-          }}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm transition-all hover:-translate-y-[1px]"
+          style={toggleStyle}
         >
           <FontAwesomeIcon icon={faFileMedical} />
-          <span className="hidden sm:inline">Ficha tecnica</span>
-        </Button>
+        </button>
       }
       summary={
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="slate">
-                <FontAwesomeIcon icon={faMicrochip} className="mr-1" />
-                Ativo
-              </Badge>
-              <StatusBadge value={equipamento.status || 'N/A'} />
-            </div>
+        <div className="grid w-full items-center gap-x-5 md:grid-cols-[minmax(0,1.05fr)_minmax(110px,0.8fr)_minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,0.9fr)_160px] lg:gap-x-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(120px,0.85fr)_minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.95fr)_170px] xl:gap-x-8">
+          <Col label="Modelo" value={equipamento.modelo} bold />
+          <Col label="Nº Série / Tag" value={equipamento.tag} />
+          <Col label="Tipo" value={equipamento.tipo} />
+          <Col label="Fabricante" value={equipamento.fabricante} />
+          <Col label="Unidade" value={equipamento.unidade?.nomeSistema} />
 
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <h3
-                className="break-words text-lg font-bold sm:text-xl"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {equipamento.modelo}
-              </h3>
-
-              <div
-                className="flex flex-wrap gap-x-4 gap-y-1 text-sm"
-                style={{ color: 'var(--text-muted)' }}
-              >
-                <span className="inline-flex items-center gap-2">
-                  <FontAwesomeIcon icon={faTag} className="text-xs" />
-                  {equipamento.tag || 'Sem tag'}
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <FontAwesomeIcon icon={faBuilding} className="text-xs" />
-                  {equipamento.unidade?.nomeSistema || 'Sem unidade'}
-                </span>
-                <span className="inline-flex items-center gap-2">
-                  <FontAwesomeIcon icon={faMicrochip} className="text-xs" />
-                  {equipamento.tipo || 'Sem tipo'}
-                </span>
-              </div>
-            </div>
-
-            <div
-              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm"
+          <div className="flex min-w-0 flex-col gap-0.5">
+            <span
+              className="text-[10px] font-semibold uppercase tracking-widest"
               style={{ color: 'var(--text-muted)' }}
             >
-              <span>Fabricante: {equipamento.fabricante || 'N/A'}</span>
-              <span>Patrimonio: {equipamento.numeroPatrimonio || 'N/A'}</span>
-            </div>
-          </div>
-
-          <div
-            className="w-full rounded-2xl border px-3 py-3 xl:w-auto xl:min-w-[250px]"
-            style={infoCardStyle}
-          >
-            <div
-              className="text-[11px] font-bold uppercase tracking-[0.14em]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Alterar status
-            </div>
-            <div className="mt-2">
-              <StatusSelector
-                equipamento={equipamento}
-                onSuccessUpdate={onStatusUpdated}
-              />
-            </div>
+              Status atual
+            </span>
+            <StatusSelector
+              equipamento={equipamento}
+              onSuccessUpdate={onStatusUpdated}
+            />
           </div>
         </div>
       }
@@ -147,6 +111,7 @@ EquipamentoCard.propTypes = {
     tag: PropTypes.string,
     tipo: PropTypes.string,
     status: PropTypes.string,
+    fabricante: PropTypes.string,
     unidade: PropTypes.shape({
       nomeSistema: PropTypes.string,
     }),

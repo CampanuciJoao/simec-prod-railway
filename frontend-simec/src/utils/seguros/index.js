@@ -9,6 +9,7 @@ export {
 
 export {
   formatarMoeda,
+  getAlvoSeguro,
   getNomeUnidade,
   getTipoVinculo,
   getTipoSeguroLabel,

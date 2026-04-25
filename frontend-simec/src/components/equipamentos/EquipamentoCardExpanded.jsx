@@ -1,10 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { Link } from 'react-router-dom';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileMedical } from '@fortawesome/free-solid-svg-icons';
 
-import { Button, ResponsiveTabs } from '@/components/ui';
+import { ResponsiveTabs } from '@/components/ui';
 import {
   TabAnexos,
   TabCobertura,
@@ -54,49 +51,6 @@ function EquipamentoCardExpanded({
         backgroundColor: 'var(--bg-surface)',
       }}
     >
-      <div
-        className="rounded-3xl border px-4 py-4 md:px-5"
-        style={{
-          borderColor: 'var(--border-soft)',
-          backgroundColor: 'var(--bg-surface-soft)',
-        }}
-      >
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="min-w-0">
-            <p
-              className="text-[11px] font-semibold uppercase tracking-[0.14em]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              Workspace do ativo
-            </p>
-            <h4
-              className="mt-1 text-lg font-bold"
-              style={{ color: 'var(--text-primary)' }}
-            >
-              {equipamento.modelo}
-            </h4>
-            <div
-              className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              <span>Tag: {equipamento.tag || 'N/A'}</span>
-              <span>Tipo: {equipamento.tipo || 'N/A'}</span>
-              <span>Unidade: {equipamento.unidade?.nomeSistema || 'N/A'}</span>
-              <span>Fabricante: {equipamento.fabricante || 'N/A'}</span>
-            </div>
-          </div>
-
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={() => onChangeTab(equipamento.id, 'fichaTecnica')}
-          >
-            <FontAwesomeIcon icon={faFileMedical} />
-            Ficha tecnica
-          </Button>
-        </div>
-      </div>
-
       <ResponsiveTabs
         tabs={TABS}
         activeTab={abaAtiva}

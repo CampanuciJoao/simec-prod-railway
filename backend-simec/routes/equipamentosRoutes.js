@@ -121,6 +121,21 @@ function buildEquipamentosOrderBy(sortBy, sortDirection) {
     : { modelo: 'asc' };
 }
 
+function agruparAnexosPorEquipamento(anexos = []) {
+  return anexos.reduce((acc, anexo) => {
+    if (!anexo?.equipamentoId) {
+      return acc;
+    }
+
+    if (!acc[anexo.equipamentoId]) {
+      acc[anexo.equipamentoId] = [];
+    }
+
+    acc[anexo.equipamentoId].push(anexo);
+    return acc;
+  }, {});
+}
+
 function isSameDateValue(a, b) {
   if (!a && !b) return true;
   if (!a || !b) return false;
@@ -282,29 +297,29 @@ router.get('/', async (req, res) => {
     const sortDirection =
       normalizarTextoOpcional(req.query?.sortDirection) || 'asc';
 
-    const [items, total, statusSummary, tipos, fabricantes] =
+    const [rawItems, total, statusSummary, tipos, fabricantes] =
       await Promise.all([
         prisma.equipamento.findMany({
           where,
-          include: {
-            unidade: {
-              select: {
-                id: true,
-                nomeSistema: true,
-              },
-            },
-            anexos: {
-              select: {
-                id: true,
-                nomeOriginal: true,
-                path: true,
-                tipoMime: true,
-                createdAt: true,
-              },
-              orderBy: {
-                createdAt: 'desc',
-              },
-            },
+          select: {
+            id: true,
+            tenantId: true,
+            tag: true,
+            modelo: true,
+            tipo: true,
+            setor: true,
+            fabricante: true,
+            anoFabricacao: true,
+            dataInstalacao: true,
+            status: true,
+            numeroPatrimonio: true,
+            registroAnvisa: true,
+            aeTitle: true,
+            telefoneSuporte: true,
+            observacoes: true,
+            unidadeId: true,
+            createdAt: true,
+            updatedAt: true,
           },
           orderBy: buildEquipamentosOrderBy(sortBy, sortDirection),
           take: pageSize,
@@ -349,6 +364,57 @@ router.get('/', async (req, res) => {
           },
         }),
       ]);
+
+    const unidadeIds = [
+      ...new Set(rawItems.map((item) => item.unidadeId).filter(Boolean)),
+    ];
+    const equipamentoIds = rawItems.map((item) => item.id).filter(Boolean);
+
+    const [unidades, anexos] = await Promise.all([
+      unidadeIds.length > 0
+        ? prisma.unidade.findMany({
+            where: {
+              tenantId,
+              id: {
+                in: unidadeIds,
+              },
+            },
+            select: {
+              id: true,
+              nomeSistema: true,
+            },
+          })
+        : [],
+      equipamentoIds.length > 0
+        ? prisma.anexo.findMany({
+            where: {
+              tenantId,
+              equipamentoId: {
+                in: equipamentoIds,
+              },
+            },
+            select: {
+              id: true,
+              equipamentoId: true,
+              nomeOriginal: true,
+              path: true,
+              tipoMime: true,
+              createdAt: true,
+            },
+            orderBy: {
+              createdAt: 'desc',
+            },
+          })
+        : [],
+    ]);
+
+    const unidadeMap = new Map(unidades.map((unidade) => [unidade.id, unidade]));
+    const anexosPorEquipamento = agruparAnexosPorEquipamento(anexos);
+    const items = rawItems.map((item) => ({
+      ...item,
+      unidade: unidadeMap.get(item.unidadeId) || null,
+      anexos: anexosPorEquipamento[item.id] || [],
+    }));
 
     const metricas = statusSummary.reduce(
       (acc, item) => {
@@ -498,6 +564,60 @@ router.get('/:id/historico/exportar', async (req, res) => {
 });
 
 // ==============================
+// PATCH / DELETE HISTORICO (admin)
+// ==============================
+router.patch('/:id/historico/:eventoId', admin, async (req, res) => {
+  const { id, eventoId } = req.params;
+  const tenantId = req.usuario.tenantId;
+  const { titulo, descricao } = req.body;
+
+  try {
+    const evento = await prisma.historicoAtivoEvento.findFirst({
+      where: { id: eventoId, equipamentoId: id, tenantId },
+    });
+
+    if (!evento) {
+      return res.status(404).json({ message: 'Registro de historico nao encontrado.' });
+    }
+
+    const atualizado = await prisma.historicoAtivoEvento.update({
+      where: { id: eventoId },
+      data: {
+        ...(titulo !== undefined ? { titulo: String(titulo).trim() } : {}),
+        ...(descricao !== undefined ? { descricao: String(descricao).trim() } : {}),
+      },
+    });
+
+    return res.json(atualizado);
+  } catch (error) {
+    console.error('[EQUIP_HISTORICO_PATCH_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao editar registro de historico.' });
+  }
+});
+
+router.delete('/:id/historico/:eventoId', admin, async (req, res) => {
+  const { id, eventoId } = req.params;
+  const tenantId = req.usuario.tenantId;
+
+  try {
+    const evento = await prisma.historicoAtivoEvento.findFirst({
+      where: { id: eventoId, equipamentoId: id, tenantId },
+    });
+
+    if (!evento) {
+      return res.status(404).json({ message: 'Registro de historico nao encontrado.' });
+    }
+
+    await prisma.historicoAtivoEvento.delete({ where: { id: eventoId } });
+
+    return res.json({ message: 'Registro excluido com sucesso.' });
+  } catch (error) {
+    console.error('[EQUIP_HISTORICO_DELETE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao excluir registro de historico.' });
+  }
+});
+
+// ==============================
 // POST CRIAR
 // ==============================
 router.post('/', validate(equipamentoSchema), async (req, res) => {
@@ -581,7 +701,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Já existe um equipamento com esse identificador único.',
+        message: 'Número de série (Tag) já está cadastrado para outro equipamento.',
       });
     }
 
@@ -601,6 +721,12 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
 router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData || req.body;
+  const motivoDesativacao = typeof req.body.motivoDesativacao === 'string'
+    ? req.body.motivoDesativacao.trim() || null
+    : null;
+  const motivoReativacao = typeof req.body.motivoReativacao === 'string'
+    ? req.body.motivoReativacao.trim() || null
+    : null;
   const { dataInstalacao, unidadeId, ...restante } = dados;
 
   try {
@@ -716,44 +842,46 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
     }
 
     if (restante.status && restante.status !== equipamento.status) {
-      await registrarEventoHistoricoAtivo({
-        tenantId,
-        equipamentoId: id,
-        tipoEvento: 'status_operacional_atualizado',
-        categoria: 'status_operacional',
-        subcategoria: 'mudanca_status',
-        titulo: 'Status operacional atualizado',
-        descricao: `Status alterado de ${equipamento.status} para ${restante.status}.`,
-        origem: 'usuario',
-        status: restante.status,
-        impactaAnalise: ['Inoperante', 'UsoLimitado'].includes(restante.status),
-        referenciaId: id,
-        referenciaTipo: 'equipamento',
-        metadata: {
-          statusAnterior: equipamento.status,
-          statusNovo: restante.status,
-        },
-      });
-    }
+      const isDesativando = restante.status === 'Desativado';
+      const isReativando = equipamento.status === 'Desativado' && restante.status !== 'Desativado';
 
-    if (camposAlterados.length > 0) {
-      await registrarEventoHistoricoAtivo({
-        tenantId,
-        equipamentoId: id,
-        tipoEvento: 'alteracao_cadastral',
-        categoria: 'alteracao_cadastral',
-        subcategoria: 'edicao_cadastro',
-        titulo: 'Cadastro do equipamento atualizado',
-        descricao: montarDescricaoAlteracaoCadastral(camposAlterados),
-        origem: 'usuario',
-        status: atualizado.status,
-        impactaAnalise: false,
-        referenciaId: id,
-        referenciaTipo: 'equipamento',
-        metadata: {
-          camposAlterados,
-        },
-      });
+      if (isDesativando) {
+        await registrarEventoHistoricoAtivo({
+          tenantId,
+          equipamentoId: id,
+          tipoEvento: 'equipamento_desativado',
+          categoria: 'status_operacional',
+          subcategoria: 'desativacao',
+          titulo: 'Equipamento desativado',
+          descricao: `Equipamento desativado.${motivoDesativacao ? ` Motivo: ${motivoDesativacao}` : ''}`,
+          origem: 'usuario',
+          status: restante.status,
+          impactaAnalise: true,
+          metadata: {
+            statusAnterior: equipamento.status,
+            statusNovo: restante.status,
+            motivoDesativacao,
+          },
+        });
+      } else if (isReativando) {
+        await registrarEventoHistoricoAtivo({
+          tenantId,
+          equipamentoId: id,
+          tipoEvento: 'equipamento_reativado',
+          categoria: 'status_operacional',
+          subcategoria: 'reativacao',
+          titulo: 'Equipamento reativado',
+          descricao: `Equipamento reativado com status "${restante.status}".${motivoReativacao ? ` Motivo: ${motivoReativacao}` : ''}`,
+          origem: 'usuario',
+          status: restante.status,
+          impactaAnalise: false,
+          metadata: {
+            statusAnterior: equipamento.status,
+            statusNovo: restante.status,
+            motivoReativacao,
+          },
+        });
+      }
     }
 
     const equipamentoCompleto = await buscarEquipamentoCompleto(tenantId, id);
@@ -764,7 +892,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Já existe um equipamento com esse identificador único.',
+        message: 'Número de série (Tag) já está cadastrado para outro equipamento.',
       });
     }
 
