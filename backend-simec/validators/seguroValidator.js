@@ -28,8 +28,19 @@ export const seguroSchema = z
     lmiDanosMorais: z.coerce.number().nonnegative().optional().default(0),
     lmiAPP: z.coerce.number().nonnegative().optional().default(0),
 
+    tipoSeguro: z
+      .enum(['EQUIPAMENTO', 'PREDIAL', 'AUTO', 'RESPONSABILIDADE_CIVIL', 'OUTRO'])
+      .optional()
+      .default('EQUIPAMENTO'),
+
+    tipoAlvo: z
+      .enum(['EQUIPAMENTO', 'UNIDADE', 'VEICULO', 'EMPRESARIAL_GERAL'])
+      .optional()
+      .default('EQUIPAMENTO'),
+
     equipamentoId: z.string().nullable().optional(),
     unidadeId: z.string().nullable().optional(),
+    veiculoId: z.string().nullable().optional(),
     cobertura: z.string().nullable().optional(),
 
     status: z

@@ -16,7 +16,15 @@ export function useSeguroForm({
 
   useEffect(() => {
     if (isEditing && initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        dataInicio: initialData.dataInicio
+          ? initialData.dataInicio.slice(0, 10)
+          : '',
+        dataFim: initialData.dataFim
+          ? initialData.dataFim.slice(0, 10)
+          : '',
+      });
     }
   }, [isEditing, initialData]);
 
@@ -43,7 +51,14 @@ export function useSeguroForm({
   }, []);
 
   const buildPayload = () => {
-    return sanitizeCoberturasByTipo(formData);
+    const base = sanitizeCoberturasByTipo(formData);
+
+    let tipoAlvo = 'EMPRESARIAL_GERAL';
+    if (base.equipamentoId) tipoAlvo = 'EQUIPAMENTO';
+    else if (base.veiculoId) tipoAlvo = 'VEICULO';
+    else if (base.unidadeId) tipoAlvo = 'UNIDADE';
+
+    return { ...base, tipoAlvo };
   };
 
   return {

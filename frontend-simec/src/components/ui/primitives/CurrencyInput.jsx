@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React from 'react';
 import PropTypes from 'prop-types';
 
 import FormFieldShell from '@/components/ui/primitives/FormFieldShell';
@@ -20,12 +20,21 @@ function formatCurrencyValue(value) {
 }
 
 function parseCurrencyValue(value) {
-  const digits = String(value || '').replace(/\D/g, '');
-  if (!digits) {
+  if (!value || typeof value !== 'string') {
     return 0;
   }
 
-  return Number(digits) / 100;
+  const normalized = value.replace(/\s/g, '').replace(/R\$/gi, '');
+  const hasDecimalSeparator = normalized.includes(',');
+
+  const numericText = hasDecimalSeparator
+    ? normalized.replace(/\./g, '').replace(',', '.')
+    : normalized.replace(/\./g, '');
+
+  const sanitized = numericText.replace(/[^\d.-]/g, '');
+  const parsed = Number(sanitized);
+
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function CurrencyInput({
@@ -44,7 +53,6 @@ function CurrencyInput({
   ...props
 }) {
   const inputId = id || name;
-  const inputRef = useRef(null);
 
   const handleFocus = (event) => {
     event.currentTarget.style.boxShadow = error
@@ -60,24 +68,12 @@ function CurrencyInput({
   };
 
   const handleChange = (event) => {
-    const numericValue = parseCurrencyValue(event.target.value);
-    const formattedValue = formatCurrencyValue(numericValue);
-
     onChange?.({
       target: {
         name,
-        value: numericValue,
+        value: parseCurrencyValue(event.target.value),
         type: 'number',
       },
-    });
-
-    requestAnimationFrame(() => {
-      const input = inputRef.current;
-      if (!input) return;
-
-      input.value = formattedValue;
-      const position = formattedValue.length;
-      input.setSelectionRange(position, position);
     });
   };
 
@@ -90,7 +86,6 @@ function CurrencyInput({
       htmlFor={inputId}
     >
       <input
-        ref={inputRef}
         id={inputId}
         name={name}
         type="text"
