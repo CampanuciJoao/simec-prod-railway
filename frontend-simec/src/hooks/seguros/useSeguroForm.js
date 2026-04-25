@@ -51,14 +51,45 @@ export function useSeguroForm({
   }, []);
 
   const buildPayload = () => {
-    const base = sanitizeCoberturasByTipo(formData);
+    const lmiFields = sanitizeCoberturasByTipo(formData);
+
+    const equipamentoId = formData.equipamentoId || null;
+    const unidadeId = formData.unidadeId || null;
+    const veiculoId = formData.veiculoId || null;
 
     let tipoAlvo = 'EMPRESARIAL_GERAL';
-    if (base.equipamentoId) tipoAlvo = 'EQUIPAMENTO';
-    else if (base.veiculoId) tipoAlvo = 'VEICULO';
-    else if (base.unidadeId) tipoAlvo = 'UNIDADE';
+    if (equipamentoId) tipoAlvo = 'EQUIPAMENTO';
+    else if (veiculoId) tipoAlvo = 'VEICULO';
+    else if (unidadeId) tipoAlvo = 'UNIDADE';
 
-    return { ...base, tipoAlvo };
+    return {
+      apoliceNumero: formData.apoliceNumero || '',
+      seguradora: formData.seguradora || '',
+      dataInicio: formData.dataInicio || '',
+      dataFim: formData.dataFim || '',
+      premioTotal: Number(formData.premioTotal) || 0,
+      status: formData.status || 'Ativo',
+      tipoSeguro: formData.tipoSeguro || 'EQUIPAMENTO',
+      tipoAlvo,
+      equipamentoId,
+      unidadeId,
+      veiculoId,
+      cobertura: formData.cobertura || null,
+      lmiIncendio: lmiFields.lmiIncendio,
+      lmiDanosEletricos: lmiFields.lmiDanosEletricos,
+      lmiRoubo: lmiFields.lmiRoubo,
+      lmiVidros: lmiFields.lmiVidros,
+      lmiColisao: lmiFields.lmiColisao,
+      lmiVendaval: lmiFields.lmiVendaval,
+      lmiDanosCausaExterna: lmiFields.lmiDanosCausaExterna,
+      lmiPerdaLucroBruto: lmiFields.lmiPerdaLucroBruto,
+      lmiVazamentoTanques: lmiFields.lmiVazamentoTanques,
+      lmiResponsabilidadeCivil: lmiFields.lmiResponsabilidadeCivil,
+      lmiDanosMateriais: lmiFields.lmiDanosMateriais,
+      lmiDanosCorporais: lmiFields.lmiDanosCorporais,
+      lmiDanosMorais: lmiFields.lmiDanosMorais,
+      lmiAPP: lmiFields.lmiAPP,
+    };
   };
 
   return {
