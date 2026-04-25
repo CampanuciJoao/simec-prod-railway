@@ -69,6 +69,7 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       dados: req.validatedData || req.body,
+      statusEquipamento: req.body?.statusEquipamento || null,
     });
 
     if (!resultado.ok) {

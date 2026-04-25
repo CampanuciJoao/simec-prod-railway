@@ -217,6 +217,8 @@ model Manutencao {
   descricaoProblemaServico String?          @map("descricao_problema_servico")
   tecnicoResponsavel       String?          @map("tecnico_responsavel")
   numeroChamado            String?          @map("numero_chamado")
+  solicitante              String?          @map("solicitante")
+  origemAbertura           String?          @map("origem_abertura")
 
   agendamentoDataInicioLocal String? @map("agendamento_data_inicio_local")
   agendamentoHoraInicioLocal String? @map("agendamento_hora_inicio_local")

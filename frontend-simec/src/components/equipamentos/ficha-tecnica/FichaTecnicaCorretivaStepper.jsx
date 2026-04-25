@@ -15,7 +15,7 @@ import {
 import { Badge, Button, Card, PageState, PageSection, Textarea } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
 import ConfirmacaoFinalManutencao from '@/components/manutencoes/ConfirmacaoFinalManutencao';
-import AgendarVisitaModal from '@/components/manutencoes/AgendarVisitaModal';
+import AgendarVisitaDrawer from '@/components/manutencoes/AgendarVisitaDrawer';
 
 const STATUS_LABEL = {
   Pendente: 'Em triagem',
@@ -84,8 +84,7 @@ function FichaTecnicaCorretivaItem({
   }
 
   async function handleAgendarVisita(form) {
-    const ok = await onAgendarVisita(item.id, form);
-    if (ok) setAgendarOpen(false);
+    return onAgendarVisita(item.id, form);
   }
 
   async function handleResolverInternamente() {
@@ -163,6 +162,8 @@ function FichaTecnicaCorretivaItem({
 
               <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
                 Aberta em {formatarDataHora(item.createdAt)}
+                {item.solicitante ? ` · Relatado por: ${item.solicitante}` : ''}
+                {item.origemAbertura ? ` · ${item.origemAbertura}` : ''}
                 {item.tecnicoResponsavel ? ` · Tecnico: ${item.tecnicoResponsavel}` : ''}
               </p>
             </div>
@@ -349,7 +350,7 @@ function FichaTecnicaCorretivaItem({
         ) : null}
       </Card>
 
-      <AgendarVisitaModal
+      <AgendarVisitaDrawer
         isOpen={agendarOpen}
         onClose={() => setAgendarOpen(false)}
         onConfirm={handleAgendarVisita}

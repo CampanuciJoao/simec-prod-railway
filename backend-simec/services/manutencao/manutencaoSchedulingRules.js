@@ -130,6 +130,8 @@ export function montarPayloadPersistencia({
     tecnicoResponsavel: dados.tecnicoResponsavel?.trim() || null,
     numeroChamado:
       dados.tipo === 'Corretiva' ? dados.numeroChamado?.trim() || null : null,
+    solicitante: dados.solicitante?.trim() || null,
+    origemAbertura: dados.origemAbertura?.trim() || null,
     custoTotal:
       typeof dados.custoTotal === 'number' ? dados.custoTotal : null,
     status: dados.status || 'Agendada',

@@ -14,8 +14,12 @@ import { getErrorMessage } from '@/utils/getErrorMessage';
 
 const NOVA_OCORRENCIA_INICIAL = {
   descricaoProblemaServico: '',
-  detalhe: '',
+  solicitante: '',
+  origemAbertura: '',
+  numeroChamado: '',
   tecnicoResponsavel: '',
+  statusEquipamento: '',
+  detalhe: '',
 };
 
 export function useEquipamentoFichaTecnica(equipamentoId) {
@@ -80,7 +84,11 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
           equipamentoId,
           tipo: 'Corretiva',
           descricaoProblemaServico: novaOcorrencia.descricaoProblemaServico.trim(),
+          solicitante: novaOcorrencia.solicitante.trim() || undefined,
+          origemAbertura: novaOcorrencia.origemAbertura || undefined,
+          numeroChamado: novaOcorrencia.numeroChamado.trim() || undefined,
           tecnicoResponsavel: novaOcorrencia.tecnicoResponsavel.trim() || undefined,
+          statusEquipamento: novaOcorrencia.statusEquipamento || undefined,
         });
 
         // Se informou detalhe adicional, registra como primeira nota de andamento

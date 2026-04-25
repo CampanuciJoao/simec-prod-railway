@@ -25,6 +25,8 @@ export const manutencaoSchemaTriagem = z.object({
   descricaoProblemaServico: z.string().trim().nullable().optional(),
   numeroChamado: z.string().trim().nullable().optional(),
   tecnicoResponsavel: z.string().trim().nullable().optional(),
+  solicitante: z.string().trim().nullable().optional(),
+  origemAbertura: z.string().trim().nullable().optional(),
 });
 
 // Agendamento completo: preventiva/calibracao/inspecao + corretiva com visita agendada
@@ -70,6 +72,8 @@ export const manutencaoSchema = z
       .optional(),
     tecnicoResponsavel: z.string().trim().nullable().optional(),
     numeroChamado: z.string().trim().nullable().optional(),
+    solicitante: z.string().trim().nullable().optional(),
+    origemAbertura: z.string().trim().nullable().optional(),
     custoTotal: z.number().nonnegative().nullable().optional(),
     status: z
       .enum([

@@ -169,6 +169,7 @@ export async function criarManutencaoService({
   tenantId,
   usuarioId,
   dados,
+  statusEquipamento = null,
 }) {
   const validacaoPayload = validarManutencaoPayload(dados);
 
@@ -249,6 +250,16 @@ export async function criarManutencaoService({
 
   const nova = await criarManutencao(payload);
 
+  // Atualiza status do equipamento se informado na abertura da OS
+  const statusEquipamentoAnterior = contexto.equipamento.status;
+  const STATUS_VALIDOS = ['Operante', 'Inoperante', 'UsoLimitado', 'EmManutencao'];
+  if (statusEquipamento && STATUS_VALIDOS.includes(statusEquipamento) && statusEquipamento !== statusEquipamentoAnterior) {
+    await prisma.equipamento.update({
+      where: { tenantId_id: { tenantId, id: nova.equipamentoId } },
+      data: { status: statusEquipamento },
+    });
+  }
+
   await registrarEventoManutencao({
     tenantId,
     manutencaoId: nova.id,
@@ -256,7 +267,7 @@ export async function criarManutencaoService({
     tipo: 'STATUS_BASE_EQUIPAMENTO',
     descricao: `Status base do equipamento registrado para a OS ${numeroOS}.`,
     metadata: {
-      statusAnterior: contexto.equipamento.status,
+      statusAnterior: statusEquipamentoAnterior,
       origem: 'criacao_os',
     },
   });
