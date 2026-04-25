@@ -2,9 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 
 import {
   getEquipamentoById,
-  getOcorrenciasPorEquipamento,
-  addOcorrencia,
-  resolverOcorrencia,
   addManutencao,
   getManutencoesPorEquipamento,
   addNotaAndamento,
@@ -15,34 +12,25 @@ import { exportarOSManutencaoPDF } from '@/services/api/pdfApi';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 
-const NOVO_EVENTO_INICIAL = {
-  titulo: '',
-  descricao: '',
-  tipo: 'Operacional',
-  tecnico: '',
-  origem: 'usuario',
-  gravidade: 'media',
+const NOVA_OCORRENCIA_INICIAL = {
+  descricaoProblemaServico: '',
+  detalhe: '',
+  tecnicoResponsavel: '',
 };
 
 export function useEquipamentoFichaTecnica(equipamentoId) {
   const { addToast } = useToast();
 
   const [equipamento, setEquipamento] = useState(null);
-  const [ocorrencias, setOcorrencias] = useState([]);
   const [corretivas, setCorretivas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submittingCorretivaId, setSubmittingCorretivaId] = useState(null);
-  const [submittingNova, setSubmittingNova] = useState(false);
-  const [itensExpandidos, setItensExpandidos] = useState(new Set());
-  const [resolvendoId, setResolvendoId] = useState(null);
-  const [dadosSolucao, setDadosSolucao] = useState({});
-  const [novoEvento, setNovoEvento] = useState(NOVO_EVENTO_INICIAL);
+  const [novaOcorrencia, setNovaOcorrencia] = useState(NOVA_OCORRENCIA_INICIAL);
 
   const carregarDados = useCallback(async () => {
     if (!equipamentoId) {
       setEquipamento(null);
-      setOcorrencias([]);
       setCorretivas([]);
       setLoading(false);
       return;
@@ -51,19 +39,16 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     setLoading(true);
 
     try {
-      const [equip, lista, manutData] = await Promise.all([
+      const [equip, manutData] = await Promise.all([
         getEquipamentoById(equipamentoId),
-        getOcorrenciasPorEquipamento(equipamentoId),
         getManutencoesPorEquipamento(equipamentoId, { tipo: 'Corretiva', pageSize: 100 }),
       ]);
 
       setEquipamento(equip || null);
-      setOcorrencias(Array.isArray(lista) ? lista : []);
       setCorretivas(Array.isArray(manutData?.items) ? manutData.items : []);
     } catch (err) {
       addToast(getErrorMessage(err, 'Erro ao carregar dados.'), 'error');
       setEquipamento(null);
-      setOcorrencias([]);
       setCorretivas([]);
     } finally {
       setLoading(false);
@@ -74,149 +59,60 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     carregarDados();
   }, [carregarDados]);
 
-  const toggleExpandir = useCallback((itemId) => {
-    setItensExpandidos((prev) => {
-      const next = new Set(prev);
-
-      if (next.has(itemId)) {
-        next.delete(itemId);
-      } else {
-        next.add(itemId);
-      }
-
-      return next;
-    });
-  }, []);
-
-  const handleEventoChange = useCallback((event) => {
+  const handleOcorrenciaChange = useCallback((event) => {
     const { name, value } = event.target;
-
-    setNovoEvento((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setNovaOcorrencia((prev) => ({ ...prev, [name]: value }));
   }, []);
 
-  const handleSubmitEvento = useCallback(
+  const handleSubmitOcorrencia = useCallback(
     async (event) => {
       event.preventDefault();
 
-      if (!novoEvento.titulo.trim()) {
-        addToast('Titulo do evento e obrigatorio.', 'error');
+      if (!novaOcorrencia.descricaoProblemaServico.trim()) {
+        addToast('Descricao do problema e obrigatoria.', 'error');
         return false;
       }
 
       setSubmitting(true);
 
       try {
-        const criado = await addOcorrencia({
+        const nova = await addManutencao({
           equipamentoId,
-          titulo: novoEvento.titulo.trim(),
-          descricao: novoEvento.descricao.trim(),
-          tipo: novoEvento.tipo,
-          tecnico: novoEvento.tecnico.trim(),
-          origem: novoEvento.origem,
-          gravidade: novoEvento.gravidade,
+          tipo: 'Corretiva',
+          descricaoProblemaServico: novaOcorrencia.descricaoProblemaServico.trim(),
+          tecnicoResponsavel: novaOcorrencia.tecnicoResponsavel.trim() || undefined,
         });
 
-        addToast('Evento registrado com sucesso!', 'success');
-        setNovoEvento(NOVO_EVENTO_INICIAL);
-        setOcorrencias((prev) => [criado, ...prev]);
-        setItensExpandidos((prev) => new Set(prev).add(criado.id));
+        // Se informou detalhe adicional, registra como primeira nota de andamento
+        if (novaOcorrencia.detalhe.trim()) {
+          try {
+            const nota = await addNotaAndamento(nova.id, {
+              nota: novaOcorrencia.detalhe.trim(),
+            });
+            nova.notasAndamento = [nota];
+          } catch {
+            // nota e opcional, nao bloqueia
+          }
+        }
+
+        addToast('Ocorrencia registrada. OS aberta para acompanhamento.', 'success');
+        setNovaOcorrencia(NOVA_OCORRENCIA_INICIAL);
+        setCorretivas((prev) => [nova, ...prev]);
 
         return true;
       } catch (err) {
-        addToast(getErrorMessage(err, 'Erro ao registrar evento.'), 'error');
+        addToast(getErrorMessage(err, 'Erro ao registrar ocorrencia.'), 'error');
         return false;
       } finally {
         setSubmitting(false);
       }
     },
-    [novoEvento, equipamentoId, addToast]
+    [novaOcorrencia, equipamentoId, addToast]
   );
 
-  const handleSolucaoChange = useCallback((ocorrenciaId, campo, valor) => {
-    setDadosSolucao((prev) => ({
-      ...prev,
-      [ocorrenciaId]: {
-        ...prev[ocorrenciaId],
-        [campo]: valor,
-      },
-    }));
+  const handleResetNovaOcorrencia = useCallback(() => {
+    setNovaOcorrencia(NOVA_OCORRENCIA_INICIAL);
   }, []);
-
-  const handleAbrirResolucao = useCallback((ocorrenciaId) => {
-    setResolvendoId(ocorrenciaId);
-  }, []);
-
-  const handleCancelarResolucao = useCallback(() => {
-    setResolvendoId(null);
-  }, []);
-
-  const handleSalvarSolucao = useCallback(
-    async (ocorrenciaId) => {
-      const payload = dadosSolucao[ocorrenciaId] || {};
-
-      if (!payload.solucao || !payload.solucao.trim()) {
-        addToast('Descreva a solucao.', 'error');
-        return false;
-      }
-
-      setSubmitting(true);
-
-      try {
-        const atualizada = await resolverOcorrencia(ocorrenciaId, {
-          solucao: payload.solucao.trim(),
-          tecnicoResolucao: String(payload.tecnicoResolucao || '').trim(),
-        });
-
-        addToast('Evento resolvido com sucesso!', 'success');
-
-        setOcorrencias((prev) =>
-          prev.map((item) => (item.id === ocorrenciaId ? atualizada : item))
-        );
-
-        setDadosSolucao((prev) => {
-          const next = { ...prev };
-          delete next[ocorrenciaId];
-          return next;
-        });
-
-        setResolvendoId(null);
-
-        return true;
-      } catch (err) {
-        addToast(getErrorMessage(err, 'Erro ao salvar solucao.'), 'error');
-        return false;
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [dadosSolucao, addToast]
-  );
-
-  const handleResetNovoEvento = useCallback(() => {
-    setNovoEvento(NOVO_EVENTO_INICIAL);
-  }, []);
-
-  const handleRegistrarProblema = useCallback(async () => {
-    setSubmittingNova(true);
-    try {
-      const nova = await addManutencao({
-        equipamentoId,
-        tipo: 'Corretiva',
-        descricaoProblemaServico: '',
-      });
-      addToast('OS corretiva criada. Adicione o descritivo e acompanhe pelo registro aberto.', 'success');
-      setCorretivas((prev) => [nova, ...prev]);
-      return true;
-    } catch (err) {
-      addToast(getErrorMessage(err, 'Erro ao registrar problema.'), 'error');
-      return false;
-    } finally {
-      setSubmittingNova(false);
-    }
-  }, [equipamentoId, addToast]);
 
   const handleAdicionarNotaCorretiva = useCallback(async (manutencaoId, nota) => {
     setSubmittingCorretivaId(manutencaoId);
@@ -300,26 +196,15 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
 
   return {
     equipamento,
-    ocorrencias,
     corretivas,
     loading,
     submitting,
     submittingCorretivaId,
-    submittingNova,
-    novoEvento,
-    itensExpandidos,
-    resolvendoId,
-    dadosSolucao,
+    novaOcorrencia,
     carregarDados,
-    toggleExpandir,
-    handleEventoChange,
-    handleSubmitEvento,
-    handleResetNovoEvento,
-    handleSolucaoChange,
-    handleAbrirResolucao,
-    handleCancelarResolucao,
-    handleSalvarSolucao,
-    handleRegistrarProblema,
+    handleOcorrenciaChange,
+    handleSubmitOcorrencia,
+    handleResetNovaOcorrencia,
     handleAdicionarNotaCorretiva,
     handleAgendarVisita,
     handleResolverInternamente,

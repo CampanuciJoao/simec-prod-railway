@@ -13,7 +13,6 @@ import {
 
 import {
   FichaTecnicaEventForm,
-  FichaTecnicaTimeline,
   FichaTecnicaCorretivaStepper,
 } from '@/components/equipamentos/ficha-tecnica';
 
@@ -36,10 +35,7 @@ function FichaTecnicaPage() {
       <PageLayout padded fullHeight>
         <div className="space-y-6">
           <PageHeader title="Ficha Tecnica" icon={faFileMedical} />
-          <PageState
-            isEmpty
-            emptyMessage="Equipamento nao encontrado."
-          />
+          <PageState isEmpty emptyMessage="Equipamento nao encontrado." />
         </div>
       </PageLayout>
     );
@@ -50,14 +46,10 @@ function FichaTecnicaPage() {
       <div className="space-y-6">
         <PageHeader
           title={`Ficha Tecnica: ${page.equipamento.modelo}`}
-          subtitle={`Tag: ${page.equipamento.tag || 'N/A'} | Registro rapido de eventos leves do equipamento`}
+          subtitle={`Tag: ${page.equipamento.tag || 'N/A'} | Registre ocorrencias e acompanhe o ciclo corretivo`}
           icon={faFileMedical}
           actions={
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={page.goBack}
-            >
+            <Button type="button" variant="secondary" onClick={page.goBack}>
               <FontAwesomeIcon icon={faArrowLeft} />
               Voltar
             </Button>
@@ -65,11 +57,12 @@ function FichaTecnicaPage() {
         />
 
         <FichaTecnicaEventForm
-          novoEvento={page.novoEvento}
+          novaOcorrencia={page.novaOcorrencia}
           submitting={page.submitting}
-          onChange={page.handleEventoChange}
-          onSubmit={page.handleSubmitEvento}
+          onChange={page.handleOcorrenciaChange}
+          onSubmit={page.handleSubmitOcorrencia}
           onCancel={page.goBack}
+          onLimpar={page.handleResetNovaOcorrencia}
         />
 
         <FichaTecnicaCorretivaStepper
@@ -80,21 +73,6 @@ function FichaTecnicaPage() {
           onConcluirAcao={page.handleConcluirAcaoCorretiva}
           onImprimir={page.handleImprimirOS}
           submittingId={page.submittingCorretivaId}
-          onRegistrarProblema={page.handleRegistrarProblema}
-          submittingNova={page.submittingNova}
-        />
-
-        <FichaTecnicaTimeline
-          ocorrencias={page.ocorrencias}
-          itensExpandidos={page.itensExpandidos}
-          dadosSolucao={page.dadosSolucao}
-          resolvendoId={page.resolvendoId}
-          submitting={page.submitting}
-          onToggleExpandir={page.toggleExpandir}
-          onChangeSolucao={page.handleSolucaoChange}
-          onAbrirResolucao={page.handleAbrirResolucao}
-          onCancelarResolucao={page.handleCancelarResolucao}
-          onSalvarSolucao={page.handleSalvarSolucao}
         />
       </div>
     </PageLayout>

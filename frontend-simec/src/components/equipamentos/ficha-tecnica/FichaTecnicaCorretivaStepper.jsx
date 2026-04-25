@@ -377,8 +377,6 @@ function FichaTecnicaCorretivaStepper({
   onConcluirAcao,
   onImprimir,
   submittingId,
-  onRegistrarProblema,
-  submittingNova,
 }) {
   const abertas = corretivas.filter((c) =>
     ['Pendente', 'Agendada', 'EmAndamento', 'AguardandoConfirmacao'].includes(c.status)
@@ -389,13 +387,8 @@ function FichaTecnicaCorretivaStepper({
 
   return (
     <PageSection
-      title={`Registros corretivos (${corretivas.length})`}
-      description="Cada registro acompanha o ciclo completo: da triagem inicial ate a conclusao da OS."
-      actions={
-        <Button type="button" onClick={onRegistrarProblema} disabled={submittingNova}>
-          {submittingNova ? 'Registrando...' : '+ Registrar problema'}
-        </Button>
-      }
+      title={`Ocorrencias corretivas (${corretivas.length})`}
+      description="Acompanhe o ciclo de cada ocorrencia: da triagem inicial ate a conclusao da OS."
     >
       {corretivas.length === 0 ? (
         <PageState isEmpty emptyMessage="Nenhum registro corretivo para este equipamento." />
@@ -454,8 +447,6 @@ FichaTecnicaCorretivaStepper.propTypes = {
   onConcluirAcao: PropTypes.func.isRequired,
   onImprimir: PropTypes.func.isRequired,
   submittingId: PropTypes.string,
-  onRegistrarProblema: PropTypes.func.isRequired,
-  submittingNova: PropTypes.bool,
 };
 
 export default FichaTecnicaCorretivaStepper;
