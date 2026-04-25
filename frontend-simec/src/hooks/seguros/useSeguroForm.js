@@ -16,7 +16,15 @@ export function useSeguroForm({
 
   useEffect(() => {
     if (isEditing && initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        dataInicio: initialData.dataInicio
+          ? initialData.dataInicio.slice(0, 10)
+          : '',
+        dataFim: initialData.dataFim
+          ? initialData.dataFim.slice(0, 10)
+          : '',
+      });
     }
   }, [isEditing, initialData]);
 
