@@ -26,15 +26,13 @@ export function useManutencoesPage() {
    */
   const selectFiltersConfig = useMemo(() => {
     const statusOptions = [
-      'Agendada',
-      'EmAndamento',
-      'AguardandoConfirmacao',
-      'Concluida',
-      'Cancelada',
-    ].map((item) => ({
-      value: item,
-      label: formatarLabel(item),
-    }));
+      { value: 'Pendente', label: 'Em Triagem' },
+      { value: 'Agendada', label: 'Agendada' },
+      { value: 'EmAndamento', label: 'Em Andamento' },
+      { value: 'AguardandoConfirmacao', label: 'Aguardando Confirmacao' },
+      { value: 'Concluida', label: 'Concluida' },
+      { value: 'Cancelada', label: 'Cancelada' },
+    ];
 
     const tipoOptions = ['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'].map(
       (item) => ({
@@ -184,7 +182,7 @@ export function useManutencoesPage() {
         }
 
         addToast('Ocorrencia registrada. OS aberta para acompanhamento.', 'success');
-        dataHook.refetch();
+        await dataHook.refetch();
         return true;
       } catch (err) {
         addToast(getErrorMessage(err, 'Erro ao registrar ocorrencia.'), 'error');

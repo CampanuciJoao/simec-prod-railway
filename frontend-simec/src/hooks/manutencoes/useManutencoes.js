@@ -59,7 +59,7 @@ export function useManutencoes() {
   });
 
   const [sortConfig, setSortConfig] = useState({
-    key: 'dataHoraAgendamentoInicio',
+    key: 'createdAt',
     direction: 'descending',
   });
 
