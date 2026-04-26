@@ -1,8 +1,8 @@
 import {
   getAgora,
-  criarDateUTCFromLocal,
+  localDateTimeToUtc as criarDateUTCFromLocal,
   getTenantTimezone,
-  isDataValida,
+  isValidDate as isDataValida,
 } from '../../../time/index.js';
 
 function formatarHoraNoTimezone(date, timeZone) {
