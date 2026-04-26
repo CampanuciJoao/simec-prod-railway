@@ -36,6 +36,7 @@ function ManutencoesPage() {
         <div className="space-y-6">
           <ManutencoesPageHeader
             onCreate={page.goToCreate}
+            onRegistrarOcorrencia={page.goToRegistrarOcorrencia}
           />
 
           {isLoading || hasError || isEmpty ? (

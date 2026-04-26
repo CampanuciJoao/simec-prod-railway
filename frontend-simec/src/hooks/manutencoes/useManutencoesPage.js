@@ -159,6 +159,10 @@ export function useManutencoesPage() {
     navigate('/manutencoes/agendar');
   }, [navigate]);
 
+  const goToRegistrarOcorrencia = useCallback(() => {
+    navigate('/os-corretiva/abrir');
+  }, [navigate]);
+
   /**
    * =========================
    * RETURN PADRONIZADO
@@ -187,5 +191,6 @@ export function useManutencoesPage() {
 
     // nav
     goToCreate,
+    goToRegistrarOcorrencia,
   };
 }
