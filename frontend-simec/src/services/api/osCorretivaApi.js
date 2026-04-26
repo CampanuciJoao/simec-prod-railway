@@ -15,6 +15,9 @@ export const adicionarNota = (id, data) =>
 export const agendarVisita = (id, data) =>
   api.post(`/os-corretiva/${id}/visitas`, data).then((res) => res.data);
 
+export const iniciarVisita = (id, visitaId) =>
+  api.post(`/os-corretiva/${id}/visitas/${visitaId}/iniciar`).then((res) => res.data);
+
 export const registrarResultadoVisita = (id, visitaId, data) =>
   api.post(`/os-corretiva/${id}/visitas/${visitaId}/resultado`, data).then((res) => res.data);
 

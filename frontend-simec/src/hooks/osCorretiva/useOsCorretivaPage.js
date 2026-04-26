@@ -10,35 +10,42 @@ export function useOsCorretivaPage() {
   const dataHook = useOsCorretiva();
   const deleteModal = useModal();
 
-  const selectFiltersConfig = useMemo(() => ({
-    tipo: {
+  // Array format expected by GlobalFilterBar
+  const selectFiltersConfig = useMemo(() => [
+    {
+      id: 'tipo',
       label: 'Tipo',
+      defaultLabel: 'Todos',
+      value: dataHook.filtros.tipo,
+      onChange: (value) => dataHook.handleFilterChange('tipo', value),
       options: [
-        { value: '', label: 'Todos' },
         { value: 'Ocorrencia', label: 'Ocorrência' },
         { value: 'Corretiva', label: 'Corretiva' },
       ],
     },
-    status: {
+    {
+      id: 'status',
       label: 'Status',
+      defaultLabel: 'Todos',
+      value: dataHook.filtros.status,
+      onChange: (value) => dataHook.handleFilterChange('status', value),
       options: [
-        { value: '', label: 'Todos' },
         { value: 'Aberta', label: 'Aberta' },
         { value: 'EmAndamento', label: 'Em andamento' },
         { value: 'AguardandoTerceiro', label: 'Aguardando terceiro' },
         { value: 'Concluida', label: 'Concluída' },
       ],
     },
-  }), []);
+  ], [dataHook.filtros, dataHook.handleFilterChange]);
 
   const activeFilters = useMemo(() => {
     const active = [];
     if (dataHook.filtros.tipo) {
-      const opt = selectFiltersConfig.tipo.options.find((o) => o.value === dataHook.filtros.tipo);
+      const opt = selectFiltersConfig.find((f) => f.id === 'tipo')?.options.find((o) => o.value === dataHook.filtros.tipo);
       active.push({ key: 'tipo', label: opt?.label || dataHook.filtros.tipo });
     }
     if (dataHook.filtros.status) {
-      const opt = selectFiltersConfig.status.options.find((o) => o.value === dataHook.filtros.status);
+      const opt = selectFiltersConfig.find((f) => f.id === 'status')?.options.find((o) => o.value === dataHook.filtros.status);
       active.push({ key: 'status', label: opt?.label || dataHook.filtros.status });
     }
     return active;

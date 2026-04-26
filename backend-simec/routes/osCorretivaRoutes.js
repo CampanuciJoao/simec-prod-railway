@@ -6,6 +6,7 @@ import {
   abrirOsCorretivaService,
   adicionarNotaOsCorretivaService,
   agendarVisitaTerceiroService,
+  iniciarVisitaTerceiroService,
   registrarResultadoVisitaService,
   concluirOsCorretivaService,
   excluirOsCorretivaService,
@@ -106,6 +107,22 @@ router.post('/:id/visitas', async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_VISITA_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao agendar visita.' });
+  }
+});
+
+router.post('/:id/visitas/:visitaId/iniciar', async (req, res) => {
+  try {
+    const resultado = await iniciarVisitaTerceiroService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      osId: req.params.id,
+      visitaId: req.params.visitaId,
+    });
+    if (!resultado.ok) return res.status(resultado.status).json({ message: resultado.message });
+    return res.json(adaptarOsCorretivaResponse(resultado.data));
+  } catch (error) {
+    console.error('[OS_CORRETIVA_INICIAR_VISITA_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao confirmar chegada do técnico.' });
   }
 });
 

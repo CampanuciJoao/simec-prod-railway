@@ -261,6 +261,37 @@ export async function agendarVisitaTerceiroService({ tenantId, usuarioId, osId, 
   return { ok: true, status: 201, data: osAtualizada };
 }
 
+// ─── Confirmar chegada do técnico (Agendada → EmExecucao) ────────────────────
+
+export async function iniciarVisitaTerceiroService({ tenantId, usuarioId, osId, visitaId }) {
+  const visita = await buscarVisitaPorId({ tenantId, visitaId });
+  if (!visita) return { ok: false, status: 404, message: 'Visita não encontrada.' };
+  if (visita.osCorretiva.id !== osId) {
+    return { ok: false, status: 422, message: 'Visita não pertence a esta OS.' };
+  }
+  if (visita.status !== 'Agendada') {
+    return { ok: false, status: 422, message: 'Só é possível confirmar chegada em visitas com status Agendada.' };
+  }
+
+  await atualizarVisita({
+    tenantId,
+    visitaId,
+    data: { status: 'EmExecucao', dataHoraInicioReal: new Date() },
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDIÇÃO',
+    entidade: 'VisitaTerceiro',
+    entidadeId: visitaId,
+    detalhes: `Chegada do técnico confirmada na visita da OS ${visita.osCorretiva.id}. Status: EmExecucao.`,
+  });
+
+  const osAtualizada = await buscarOsPorId({ tenantId, osId });
+  return { ok: true, data: osAtualizada };
+}
+
 // ─── Registrar resultado de visita ───────────────────────────────────────────
 
 export async function registrarResultadoVisitaService({ tenantId, usuarioId, osId, visitaId, dados }) {

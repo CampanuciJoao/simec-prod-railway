@@ -183,3 +183,9 @@ export async function atualizarVisita({ tenantId, visitaId, data }) {
     data,
   });
 }
+
+export async function contarVisitasEmExecucaoOuAgendadas({ tenantId, osId }) {
+  return prisma.visitaTerceiro.count({
+    where: { tenantId, osCorretivaId: osId, status: { in: ['Agendada', 'EmExecucao'] } },
+  });
+}

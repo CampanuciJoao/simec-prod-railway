@@ -25,10 +25,6 @@ function OsCorretivaListSection({
         onSearchChange={onSearchChange}
         searchPlaceholder="Buscar por OS, equipamento, solicitante..."
         selectFilters={selectFilters}
-        onFilterChange={(key, val) => {
-          const cfg = selectFilters[key];
-          if (cfg) cfg.onChange?.(val);
-        }}
       />
 
       {activeFilters.length > 0 && (
