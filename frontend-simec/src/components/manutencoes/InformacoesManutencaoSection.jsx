@@ -12,9 +12,22 @@ import {
   Input,
   PageSection,
   ResponsiveGrid,
+  Select,
   Textarea,
   TimeInput,
 } from '@/components/ui';
+
+const ORIGENS = [
+  { value: '', label: 'Nao informado' },
+  { value: 'usuario', label: 'Usuario / Operador' },
+  { value: 'tecnico', label: 'Tecnico de plantao' },
+  { value: 'enfermagem', label: 'Equipe de enfermagem' },
+  { value: 'medico', label: 'Equipe medica' },
+  { value: 'gestao', label: 'Gestao / Chefia' },
+  { value: 'sistema', label: 'Sistema / Alarme' },
+  { value: 'manutencao', label: 'Equipe de manutencao' },
+  { value: 'externo', label: 'Empresa / Tecnico externo' },
+];
 
 function montarAgendamentoResumo(formData) {
   const inicio = [formData?.agendamentoDataInicioLocal, formData?.agendamentoHoraInicioLocal]
@@ -50,6 +63,11 @@ function InformacoesManutencaoSection({
   const resumoAgendamento = montarAgendamentoResumo(formData);
   const mostrarResumo = Boolean(resumoEquipamento || resumoAgendamento);
   const isCorretiva = manutencao?.tipo === 'Corretiva';
+  const isPendente = manutencao?.status === 'Pendente';
+  const temAgendamento = Boolean(
+    formData?.agendamentoDataInicioLocal || formData?.agendamentoHoraInicioLocal
+  );
+  const mostrarCamposAgendamento = !isPendente && temAgendamento;
 
   return (
     <PageSection
@@ -107,49 +125,71 @@ function InformacoesManutencaoSection({
             value={formData.numeroChamado}
             onChange={onFormChange}
             disabled={camposPrincipaisBloqueados || submitting}
-            required={isCorretiva}
+            required={isCorretiva && !isPendente}
           />
         </ResponsiveGrid>
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
-            <DateInput
-              label="Data de inicio"
-              name="agendamentoDataInicioLocal"
-              value={formData.agendamentoDataInicioLocal}
+        {isPendente ? (
+          <ResponsiveGrid preset="form">
+            <Input
+              label="Solicitante"
+              name="solicitante"
+              value={formData.solicitante}
               onChange={onFormChange}
               disabled={camposPrincipaisBloqueados || submitting}
             />
 
-            <TimeInput
-              label="Hora inicial"
-              name="agendamentoHoraInicioLocal"
-              value={formData.agendamentoHoraInicioLocal}
+            <Select
+              label="Origem da abertura"
+              name="origemAbertura"
+              value={formData.origemAbertura}
               onChange={onFormChange}
               disabled={camposPrincipaisBloqueados || submitting}
-              required
+              options={ORIGENS}
+              placeholder=""
             />
+          </ResponsiveGrid>
+        ) : null}
+
+        {mostrarCamposAgendamento ? (
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <div className="space-y-4">
+              <DateInput
+                label="Data de inicio"
+                name="agendamentoDataInicioLocal"
+                value={formData.agendamentoDataInicioLocal}
+                onChange={onFormChange}
+                disabled={camposPrincipaisBloqueados || submitting}
+              />
+
+              <TimeInput
+                label="Hora inicial"
+                name="agendamentoHoraInicioLocal"
+                value={formData.agendamentoHoraInicioLocal}
+                onChange={onFormChange}
+                disabled={camposPrincipaisBloqueados || submitting}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <DateInput
+                label="Data de termino"
+                name="agendamentoDataFimLocal"
+                value={formData.agendamentoDataFimLocal}
+                onChange={onFormChange}
+                disabled={camposPrincipaisBloqueados || submitting}
+              />
+
+              <TimeInput
+                label="Hora final"
+                name="agendamentoHoraFimLocal"
+                value={formData.agendamentoHoraFimLocal}
+                onChange={onFormChange}
+                disabled={camposPrincipaisBloqueados || submitting}
+              />
+            </div>
           </div>
-
-          <div className="space-y-4">
-            <DateInput
-              label="Data de termino"
-              name="agendamentoDataFimLocal"
-              value={formData.agendamentoDataFimLocal}
-              onChange={onFormChange}
-              disabled={camposPrincipaisBloqueados || submitting}
-            />
-
-            <TimeInput
-              label="Hora final"
-              name="agendamentoHoraFimLocal"
-              value={formData.agendamentoHoraFimLocal}
-              onChange={onFormChange}
-              disabled={camposPrincipaisBloqueados || submitting}
-              required
-            />
-          </div>
-        </div>
+        ) : null}
 
         {!camposPrincipaisBloqueados ? (
           <div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">

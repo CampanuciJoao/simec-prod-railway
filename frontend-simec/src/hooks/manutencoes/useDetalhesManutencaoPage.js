@@ -28,6 +28,8 @@ function extrairFormInicial(manutencao) {
       descricaoProblemaServico: '',
       tecnicoResponsavel: '',
       numeroChamado: '',
+      solicitante: '',
+      origemAbertura: '',
       agendamentoDataInicioLocal: '',
       agendamentoHoraInicioLocal: '',
       agendamentoDataFimLocal: '',
@@ -39,6 +41,8 @@ function extrairFormInicial(manutencao) {
     descricaoProblemaServico: manutencao.descricaoProblemaServico || '',
     tecnicoResponsavel: manutencao.tecnicoResponsavel || '',
     numeroChamado: manutencao.numeroChamado || '',
+    solicitante: manutencao.solicitante || '',
+    origemAbertura: manutencao.origemAbertura || '',
     agendamentoDataInicioLocal:
       manutencao?.formulario?.agendamentoDataInicioLocal ||
       manutencao?.agendamentoLocal?.dataInicio ||
@@ -176,6 +180,8 @@ export function useDetalhesManutencaoPage() {
       descricaoProblemaServico: formData.descricaoProblemaServico,
       tecnicoResponsavel: formData.tecnicoResponsavel,
       numeroChamado: formData.numeroChamado,
+      solicitante: formData.solicitante || undefined,
+      origemAbertura: formData.origemAbertura || undefined,
       agendamentoDataInicioLocal: formData.agendamentoDataInicioLocal,
       agendamentoHoraInicioLocal: formData.agendamentoHoraInicioLocal,
       agendamentoDataFimLocal: formData.agendamentoDataFimLocal,
