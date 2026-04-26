@@ -116,7 +116,7 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
     });
 
     await tx.equipamento.update({
-      where: { tenantId_id: { tenantId, id: v.data.equipamentoId } },
+      where: { id: v.data.equipamentoId },
       data: { status: v.data.statusEquipamentoAbertura },
     });
 
@@ -333,7 +333,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
       });
 
       await tx.equipamento.update({
-        where: { tenantId_id: { tenantId, id: os.equipamentoId } },
+        where: { id: os.equipamentoId },
         data: { status: 'Operante' },
       });
     });
@@ -424,7 +424,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     });
 
     await tx.equipamento.update({
-      where: { tenantId_id: { tenantId, id: os.equipamentoId } },
+      where: { id: os.equipamentoId },
       data: { status: 'Operante' },
     });
   });
@@ -478,7 +478,7 @@ export async function excluirOsCorretivaService({ tenantId, usuarioId, osId }) {
   await prisma.$transaction(async (tx) => {
     // Reverte status do equipamento para Operante se a OS estava influenciando
     await tx.equipamento.update({
-      where: { tenantId_id: { tenantId, id: os.equipamentoId } },
+      where: { id: os.equipamentoId },
       data: { status: 'Operante' },
     });
 
