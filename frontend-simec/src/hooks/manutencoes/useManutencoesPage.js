@@ -12,7 +12,6 @@ function formatarLabel(valor) {
 
 export function useManutencoesPage() {
   const navigate = useNavigate();
-  const { addToast } = useToast();
   const dataHook = useManutencoes();
   const deleteModal = useModal();
 
