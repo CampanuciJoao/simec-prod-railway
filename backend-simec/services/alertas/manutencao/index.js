@@ -2,7 +2,7 @@
 // Descrição: orquestrador global dos alertas de manutenção
 
 import prisma from '../../prismaService.js';
-import { getAgora } from '../../timeService.js';
+import { getAgora } from '../../time/index.js';
 
 import {
   gerarAlertasAproximacaoInicio,

@@ -4,7 +4,7 @@ import {
   normalizarHora,
   normalizarDataRelativa,
 } from './normalizers.js';
-import { extrairDataUTC } from '../../../timeService.js';
+import { extrairDataUTC } from '../../../time/index.js';
 
 export const mensagemEhConfirmacaoCurta = (mensagem) => {
   const lower = mensagem

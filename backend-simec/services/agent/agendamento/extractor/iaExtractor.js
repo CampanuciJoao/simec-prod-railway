@@ -7,7 +7,7 @@ import {
   extrairCamposHeuristico,
   mensagemEhConfirmacaoCurta,
 } from './heuristicaExtractor.js';
-import { extrairDataUTC } from '../../../timeService.js';
+import { extrairDataUTC } from '../../../time/index.js';
 import {
   generateTextWithLlm,
   getLlmRuntimeInfo,

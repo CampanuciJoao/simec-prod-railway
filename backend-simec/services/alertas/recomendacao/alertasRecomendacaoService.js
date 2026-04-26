@@ -1,5 +1,5 @@
 import prisma from '../../prismaService.js';
-import { getAgora } from '../../timeService.js';
+import { getAgora } from '../../time/index.js';
 
 import {
   calcularScoreRisco,

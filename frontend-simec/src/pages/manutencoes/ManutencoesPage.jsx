@@ -54,7 +54,7 @@ function ManutencoesPage() {
     });
   }, [page.manutencoes, os.osCorretivas]);
 
-  const isLoading = (page.loading && page.manutencoes.length === 0) && (os.loading && os.osCorretivas.length === 0);
+  const isLoading = (page.loading || os.loading) && page.manutencoes.length === 0 && os.osCorretivas.length === 0;
   const hasError = Boolean(page.error);
   const isEmpty = !page.loading && !os.loading && !page.error && unifiedItems.length === 0;
 

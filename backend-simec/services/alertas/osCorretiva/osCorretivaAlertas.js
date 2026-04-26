@@ -1,5 +1,5 @@
 import prisma from '../../prismaService.js';
-import { getAgora } from '../../timeService.js';
+import { getAgora } from '../../time/index.js';
 import { buscarVisitasVencidasPorTenant } from './osCorretivaAlertRepository.js';
 import { gerarAlertaVisitaVencida } from './osCorretivaAlertRules.js';
 

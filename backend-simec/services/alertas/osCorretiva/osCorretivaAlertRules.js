@@ -21,7 +21,7 @@ export async function gerarAlertaVisitaVencida(tenantId, visita) {
   const payload = await criarPayloadBaseAlerta({
     id: alertaId,
     titulo: `Visita vencida – ${os?.numeroOS || 'OS'}`,
-    subtitulo: `${equipTag} | ${prestador} — confirmar resultado da visita`,
+    subtitulo: `${equipTag} | ${prestador} — prazo venceu, registrar resultado`,
     data: visita.dataHoraFimPrevista,
     prioridade: ALERT_PRIORIDADES.ALTA,
     tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,

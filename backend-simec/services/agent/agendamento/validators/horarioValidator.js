@@ -3,7 +3,7 @@ import {
   criarDateUTCFromLocal,
   getTenantTimezone,
   isDataValida,
-} from '../../../timeService.js';
+} from '../../../time/index.js';
 
 function formatarHoraNoTimezone(date, timeZone) {
   try {

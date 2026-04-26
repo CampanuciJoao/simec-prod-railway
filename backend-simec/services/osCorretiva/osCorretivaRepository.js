@@ -144,6 +144,11 @@ export async function atualizarOsCorretiva({ tenantId, osId, data }) {
 }
 
 export async function criarNotaOsCorretiva({ tenantId, osId, nota, autorId, tecnicoNome }) {
+  if (autorId) {
+    const usuario = await prisma.usuario.findFirst({ where: { tenantId, id: autorId }, select: { id: true } });
+    if (!usuario) throw new Error('Usuário não encontrado no tenant.');
+  }
+
   return prisma.notaAndamento.create({
     data: {
       tenant: { connect: { id: tenantId } },
@@ -151,7 +156,7 @@ export async function criarNotaOsCorretiva({ tenantId, osId, nota, autorId, tecn
       origem: 'manual',
       osCorretiva: { connect: { tenantId_id: { tenantId, id: osId } } },
       tecnicoNome,
-      ...(autorId ? { autor: { connect: { tenantId_id: { tenantId, id: autorId } } } } : {}),
+      ...(autorId ? { autor: { connect: { id: autorId } } } : {}),
     },
     include: { autor: { select: { nome: true } } },
   });

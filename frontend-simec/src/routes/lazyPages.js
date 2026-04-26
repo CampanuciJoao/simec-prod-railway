@@ -101,9 +101,6 @@ export const SalvarOrcamentoPage = React.lazy(() =>
 export const DetalhesOrcamentoPage = React.lazy(() =>
   import('@/pages/orcamentos/DetalhesOrcamentoPage')
 );
-export const OsCorretivaPage = React.lazy(() =>
-  import('@/pages/osCorretiva/OsCorretivaPage')
-);
 export const AbrirOsCorretivaPage = React.lazy(() =>
   import('@/pages/osCorretiva/AbrirOsCorretivaPage')
 );
