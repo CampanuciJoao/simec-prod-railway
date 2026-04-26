@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 // CONTEXT / HOOKS
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,23 +12,17 @@ import {
   ManutencoesPageHeader,
   ModalConfirmacaoManutencao,
 } from '@/components/manutencoes';
-import OsCorretivaCard from '@/components/osCorretiva/OsCorretivaCard';
 
 // UI
-import { PageLayout, PageState, PageSection, Button, ModalConfirmacao } from '@/components/ui';
+import { PageLayout, PageState, ModalConfirmacao } from '@/components/ui';
 
 function ManutencoesPage() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === 'admin';
 
   const page = useManutencoesPage();
-
   const os = useOsCorretiva();
   const osDeleteModal = useModal();
-
-  const isLoading = page.loading && page.manutencoes.length === 0;
-  const hasError = Boolean(page.error);
-  const isEmpty = !page.loading && !page.error && page.manutencoes.length === 0;
 
   const handleConfirmDeleteOs = async () => {
     const id = osDeleteModal.modalData?.id;
@@ -40,6 +34,46 @@ function ManutencoesPage() {
       // toast shown in hook
     }
   };
+
+  // Merge both lists with a discriminator and a common sort date, newest first
+  const unifiedItems = useMemo(() => {
+    const mItems = page.manutencoes.map((m) => ({
+      ...m,
+      _kind: 'manutencao',
+      _sortDate: m.dataHoraAgendamentoInicio || m.createdAt || '',
+    }));
+    const osItems = os.osCorretivas.map((o) => ({
+      ...o,
+      _kind: 'osCorretiva',
+      _sortDate: o.dataHoraAbertura || o.createdAt || '',
+    }));
+    return [...mItems, ...osItems].sort((a, b) => {
+      if (!a._sortDate) return 1;
+      if (!b._sortDate) return -1;
+      return new Date(b._sortDate) - new Date(a._sortDate);
+    });
+  }, [page.manutencoes, os.osCorretivas]);
+
+  const isLoading = (page.loading && page.manutencoes.length === 0) && (os.loading && os.osCorretivas.length === 0);
+  const hasError = Boolean(page.error);
+  const isEmpty = !page.loading && !os.loading && !page.error && unifiedItems.length === 0;
+
+  const combinedTotal = (page.pagination?.total ?? 0) + (os.pagination?.total ?? 0);
+  const combinedHasNextPage = Boolean(page.pagination?.hasNextPage || os.pagination?.hasNextPage);
+  const combinedLoadingMore = page.loadingMore || os.loadingMore;
+
+  const handleLoadMore = () => {
+    if (page.pagination?.hasNextPage) page.carregarMais();
+    if (os.pagination?.hasNextPage) os.carregarMais();
+  };
+
+  // Combined metricas: manutenções + OS corretivas counts
+  const combinedMetricas = useMemo(() => ({
+    total: (page.metricas?.total ?? 0) + (os.metricas?.total ?? 0),
+    aguardando: (page.metricas?.aguardando ?? 0) + (os.metricas?.abertas ?? 0) + (os.metricas?.emAndamento ?? 0),
+    concluidas: (page.metricas?.concluidas ?? 0) + (os.metricas?.concluidas ?? 0),
+    canceladas: page.metricas?.canceladas ?? 0,
+  }), [page.metricas, os.metricas]);
 
   return (
     <>
@@ -76,7 +110,7 @@ function ManutencoesPage() {
             />
           ) : (
             <ManutencoesListSection
-              manutencoes={page.manutencoes}
+              items={unifiedItems}
               searchTerm={page.searchTerm}
               onSearchChange={page.onSearchChange}
               selectFilters={page.selectFiltersConfig}
@@ -84,64 +118,15 @@ function ManutencoesPage() {
               onRemoveFilter={page.clearFilter}
               onClearAll={page.clearAllFilters}
               onDelete={(item) => page.deleteModal.openModal(item)}
+              onDeleteOs={(o) => osDeleteModal.openModal(o)}
               isAdmin={isAdmin}
-              metricas={page.metricas}
-              total={page.pagination?.total}
-              hasNextPage={page.pagination?.hasNextPage}
-              loadingMore={page.loadingMore}
-              onLoadMore={page.carregarMais}
+              metricas={combinedMetricas}
+              total={combinedTotal}
+              hasNextPage={combinedHasNextPage}
+              loadingMore={combinedLoadingMore}
+              onLoadMore={handleLoadMore}
             />
           )}
-
-          {/* ── Ocorrências e OS Corretivas ── */}
-          <PageSection>
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Ocorrências e OS Corretivas
-                </h2>
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  {os.metricas.total} registro{os.metricas.total !== 1 ? 's' : ''} —{' '}
-                  {os.metricas.abertas} aberta{os.metricas.abertas !== 1 ? 's' : ''},&nbsp;
-                  {os.metricas.emAndamento} em andamento,&nbsp;
-                  {os.metricas.aguardandoTerceiro} aguardando terceiro,&nbsp;
-                  {os.metricas.concluidas} concluída{os.metricas.concluidas !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
-
-            {os.loading && os.osCorretivas.length === 0 ? (
-              <PageState loading />
-            ) : os.error ? (
-              <PageState error={os.error} />
-            ) : os.osCorretivas.length === 0 ? (
-              <PageState isEmpty emptyMessage="Nenhuma ocorrência ou OS Corretiva registrada." />
-            ) : (
-              <div className="space-y-4">
-                {os.osCorretivas.map((item) => (
-                  <OsCorretivaCard
-                    key={item.id}
-                    os={item}
-                    isAdmin={isAdmin}
-                    onDelete={(o) => osDeleteModal.openModal(o)}
-                  />
-                ))}
-              </div>
-            )}
-
-            {os.pagination.hasNextPage && (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={os.carregarMais}
-                  disabled={os.loadingMore}
-                >
-                  {os.loadingMore ? 'Carregando...' : 'Carregar mais'}
-                </Button>
-              </div>
-            )}
-          </PageSection>
         </div>
       </PageLayout>
     </>
