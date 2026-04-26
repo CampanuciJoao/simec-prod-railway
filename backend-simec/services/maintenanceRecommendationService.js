@@ -172,7 +172,7 @@ export async function gerarRecomendacoesProativasDeManutencao() {
         data: new Date(),
         prioridade: analise.prioridade,
         tipo: 'Manutenção',
-        link: `/equipamentos/ficha-tecnica/${equipamento.id}`
+        link: `/equipamentos/detalhes/${equipamento.id}`
       },
       create: {
         id: idAlerta,
@@ -181,7 +181,7 @@ export async function gerarRecomendacoesProativasDeManutencao() {
         data: new Date(),
         prioridade: analise.prioridade,
         tipo: 'Manutenção',
-        link: `/equipamentos/ficha-tecnica/${equipamento.id}`
+        link: `/equipamentos/detalhes/${equipamento.id}`
       }
     });
 

@@ -1,7 +1,5 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFileMedical } from '@fortawesome/free-solid-svg-icons';
 
 import { EntityCard } from '@/components/ui';
 import { StatusSelector } from '@/components/equipamentos';
@@ -37,7 +35,6 @@ function EquipamentoCard({
   abaAtiva,
   onToggleExpandir,
   onTrocarAba,
-  onGoToFichaTecnica,
   onStatusUpdated,
   onRefresh,
 }) {
@@ -45,11 +42,6 @@ function EquipamentoCard({
     getEquipamentoCardStyles(equipamento.status);
 
   const handleToggle = () => onToggleExpandir(equipamento.id);
-
-  const handleGoToFicha = (event) => {
-    event.stopPropagation();
-    onGoToFichaTecnica(equipamento.id);
-  };
 
   return (
     <EntityCard
@@ -59,17 +51,6 @@ function EquipamentoCard({
       cardStyle={cardStyle}
       toggleStyle={toggleStyle}
       expandedStyle={expandedStyle}
-      actions={
-        <button
-          type="button"
-          title="Abrir ficha tecnica"
-          onClick={handleGoToFicha}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border text-sm transition-all hover:-translate-y-[1px]"
-          style={toggleStyle}
-        >
-          <FontAwesomeIcon icon={faFileMedical} />
-        </button>
-      }
       summary={
         <div className="grid w-full items-center gap-x-5 md:grid-cols-[minmax(0,1.05fr)_minmax(110px,0.8fr)_minmax(0,1.3fr)_minmax(0,0.85fr)_minmax(0,0.9fr)_160px] lg:gap-x-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(120px,0.85fr)_minmax(0,1.45fr)_minmax(0,0.9fr)_minmax(0,0.95fr)_170px] xl:gap-x-8">
           <Col label="Modelo" value={equipamento.modelo} bold />
@@ -120,7 +101,6 @@ EquipamentoCard.propTypes = {
   abaAtiva: PropTypes.string,
   onToggleExpandir: PropTypes.func.isRequired,
   onTrocarAba: PropTypes.func.isRequired,
-  onGoToFichaTecnica: PropTypes.func.isRequired,
   onStatusUpdated: PropTypes.func,
   onRefresh: PropTypes.func,
 };

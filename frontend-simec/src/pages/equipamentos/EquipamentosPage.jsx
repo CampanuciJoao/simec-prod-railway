@@ -159,8 +159,6 @@ function EquipamentosPage() {
             <EquipamentosList
               equipamentos={page.equipamentos}
               expansion={expansion}
-              onGoToFichaTecnica={page.goToFichaTecnica}
-              onOpenFullPage={page.goToDetalhes}
               onStatusUpdated={page.atualizarStatusLocalmente}
               onRefresh={page.refetch}
             />

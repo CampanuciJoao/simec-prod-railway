@@ -9,7 +9,6 @@ import {
   faMicrochip,
   faPenToSquare,
   faShieldAlt,
-  faTriangleExclamation,
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -22,21 +21,14 @@ import {
 } from '@/components/ui';
 import { formatarData } from '@/utils/timeUtils';
 import { useEquipamentoCobertura } from '@/hooks/equipamentos/useEquipamentoCobertura';
-import { useEquipamentoFichaTecnica } from '@/hooks/equipamentos/useEquipamentoFichaTecnica';
 
 function TabVisaoGeral({ equipamento, editHref }) {
   const { contratosRelacionados, segurosRelacionados } =
     useEquipamentoCobertura(equipamento);
-  const { ocorrencias, loading: loadingOcorrencias } =
-    useEquipamentoFichaTecnica(equipamento.id);
-
-  const ocorrenciasPendentes = (ocorrencias || []).filter(
-    (item) => !item.resolvido
-  ).length;
 
   return (
     <div className="space-y-6">
-      <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
+      <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
         <InfoCard
           icon={faBolt}
           label="Status operacional"
@@ -46,11 +38,6 @@ function TabVisaoGeral({ equipamento, editHref }) {
           icon={faBuilding}
           label="Unidade"
           value={equipamento.unidade?.nomeSistema || 'N/A'}
-        />
-        <InfoCard
-          icon={faTriangleExclamation}
-          label="Ocorrencias pendentes"
-          value={loadingOcorrencias ? '...' : ocorrenciasPendentes}
         />
         <InfoCard
           icon={faShieldAlt}

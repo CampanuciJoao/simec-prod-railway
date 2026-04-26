@@ -29,9 +29,6 @@ export const EquipamentosPage = React.lazy(() =>
 export const DetalhesEquipamentoPage = React.lazy(() =>
   import('@/pages/equipamentos/DetalhesEquipamentoPage')
 );
-export const FichaTecnicaPage = React.lazy(() =>
-  import('@/pages/equipamentos/FichaTecnicaPage')
-);
 export const SalvarEquipamentoPage = React.lazy(() =>
   import('@/pages/equipamentos/SalvarEquipamentoPage')
 );

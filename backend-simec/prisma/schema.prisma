@@ -31,7 +31,6 @@ model Tenant {
   alertas              Alerta[]
   alertasLidos         AlertaLidoPorUsuario[]
   logsAuditoria        LogAuditoria[]
-  ocorrencias          Ocorrencia[]
   anexos               Anexo[]
   notasAndamento       NotaAndamento[]
   emailsNotificacao    EmailNotificacao[]
@@ -138,7 +137,6 @@ model Equipamento {
   anexos            Anexo[]
   manutencoes       Manutencao[]
   osCorretivas      OsCorretiva[]
-  ocorrencias       Ocorrencia[]
   seguros           Seguro[]
   contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
   historicoEventos  HistoricoAtivoEvento[]
@@ -453,29 +451,6 @@ model LogAuditoria {
   @@index([tenantId, entidade, entidadeId, timestamp])
   @@index([tenantId, autorId, timestamp])
   @@map("log_auditoria")
-}
-
-model Ocorrencia {
-  id               String    @id @default(cuid())
-  tenantId         String
-  equipamentoId    String
-  titulo           String
-  descricao        String?
-  tipo             String
-  origem           String    @default("usuario")
-  gravidade        String    @default("media")
-  metadata         Json?
-  tecnico          String?
-  resolvido        Boolean   @default(false)
-  solucao          String?
-  tecnicoResolucao String?
-  data             DateTime  @default(now())
-  dataResolucao    DateTime?
-
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, equipamentoId, data(sort: Desc)])
 }
 
 model Anexo {

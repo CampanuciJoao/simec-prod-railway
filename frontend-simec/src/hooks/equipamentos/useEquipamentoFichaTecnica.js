@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 
 import {
   getEquipamentoById,
-  addManutencao,
   getManutencoesPorEquipamento,
   addNotaAndamento,
   concluirManutencao,
@@ -12,16 +11,6 @@ import { exportarOSManutencaoPDF } from '@/services/api/pdfApi';
 import { useToast } from '@/contexts/ToastContext';
 import { getErrorMessage } from '@/utils/getErrorMessage';
 
-const NOVA_OCORRENCIA_INICIAL = {
-  descricaoProblemaServico: '',
-  solicitante: '',
-  origemAbertura: '',
-  numeroChamado: '',
-  tecnicoResponsavel: '',
-  statusEquipamento: '',
-  detalhe: '',
-};
-
 export function useEquipamentoFichaTecnica(equipamentoId) {
   const { addToast } = useToast();
 
@@ -30,7 +19,6 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submittingCorretivaId, setSubmittingCorretivaId] = useState(null);
-  const [novaOcorrencia, setNovaOcorrencia] = useState(NOVA_OCORRENCIA_INICIAL);
 
   const carregarDados = useCallback(async () => {
     if (!equipamentoId) {
@@ -62,65 +50,6 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
   useEffect(() => {
     carregarDados();
   }, [carregarDados]);
-
-  const handleOcorrenciaChange = useCallback((event) => {
-    const { name, value } = event.target;
-    setNovaOcorrencia((prev) => ({ ...prev, [name]: value }));
-  }, []);
-
-  const handleSubmitOcorrencia = useCallback(
-    async (event) => {
-      event.preventDefault();
-
-      if (!novaOcorrencia.descricaoProblemaServico.trim()) {
-        addToast('Descricao do problema e obrigatoria.', 'error');
-        return false;
-      }
-
-      setSubmitting(true);
-
-      try {
-        const nova = await addManutencao({
-          equipamentoId,
-          tipo: 'Corretiva',
-          descricaoProblemaServico: novaOcorrencia.descricaoProblemaServico.trim(),
-          solicitante: novaOcorrencia.solicitante.trim() || undefined,
-          origemAbertura: novaOcorrencia.origemAbertura || undefined,
-          numeroChamado: novaOcorrencia.numeroChamado.trim() || undefined,
-          tecnicoResponsavel: novaOcorrencia.tecnicoResponsavel.trim() || undefined,
-          statusEquipamento: novaOcorrencia.statusEquipamento || undefined,
-        });
-
-        // Se informou detalhe adicional, registra como primeira nota de andamento
-        if (novaOcorrencia.detalhe.trim()) {
-          try {
-            const nota = await addNotaAndamento(nova.id, {
-              nota: novaOcorrencia.detalhe.trim(),
-            });
-            nova.notasAndamento = [nota];
-          } catch {
-            // nota e opcional, nao bloqueia
-          }
-        }
-
-        addToast('Ocorrencia registrada. OS aberta para acompanhamento.', 'success');
-        setNovaOcorrencia(NOVA_OCORRENCIA_INICIAL);
-        setCorretivas((prev) => [nova, ...prev]);
-
-        return true;
-      } catch (err) {
-        addToast(getErrorMessage(err, 'Erro ao registrar ocorrencia.'), 'error');
-        return false;
-      } finally {
-        setSubmitting(false);
-      }
-    },
-    [novaOcorrencia, equipamentoId, addToast]
-  );
-
-  const handleResetNovaOcorrencia = useCallback(() => {
-    setNovaOcorrencia(NOVA_OCORRENCIA_INICIAL);
-  }, []);
 
   const handleAdicionarNotaCorretiva = useCallback(async (manutencaoId, nota) => {
     setSubmittingCorretivaId(manutencaoId);
@@ -208,11 +137,7 @@ export function useEquipamentoFichaTecnica(equipamentoId) {
     loading,
     submitting,
     submittingCorretivaId,
-    novaOcorrencia,
     carregarDados,
-    handleOcorrenciaChange,
-    handleSubmitOcorrencia,
-    handleResetNovaOcorrencia,
     handleAdicionarNotaCorretiva,
     handleAgendarVisita,
     handleResolverInternamente,

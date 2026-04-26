@@ -9,7 +9,6 @@ import {
   DetalhesManutencaoPage,
   DetalhesSeguroPage,
   EquipamentosPage,
-  FichaTecnicaPage,
   ManutencoesPage,
   RelatoriosPage,
   SalvarContratoPage,
@@ -37,10 +36,6 @@ function OperacionalRouteElements() {
       <Route
         path="equipamentos/detalhes/:equipamentoId"
         element={<DetalhesEquipamentoPage />}
-      />
-      <Route
-        path="equipamentos/ficha-tecnica/:id"
-        element={<FichaTecnicaPage />}
       />
 
       <Route path="manutencoes" element={<ManutencoesPage />} />

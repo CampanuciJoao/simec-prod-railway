@@ -188,13 +188,6 @@ export function useEquipamentosPage() {
     navigate('/equipamentos/adicionar');
   }, [navigate]);
 
-  const goToFichaTecnica = useCallback(
-    (equipamentoId) => {
-      navigate(`/equipamentos/ficha-tecnica/${equipamentoId}`);
-    },
-    [navigate]
-  );
-
   const goToDetalhes = useCallback(
     (equipamentoId) => {
       navigate(`/equipamentos/detalhes/${equipamentoId}`);
@@ -218,7 +211,6 @@ export function useEquipamentosPage() {
     clearFilter,
     clearAllFilters,
     goToCreate,
-    goToFichaTecnica,
     goToDetalhes,
     atualizarStatusLocalmente,
     deleteModal,
