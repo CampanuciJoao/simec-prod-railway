@@ -32,10 +32,14 @@ function DetalhesOsCorretivaPage() {
   if (page.loading) return <PageLayout padded><PageState loading /></PageLayout>;
   if (page.error || !os) return <PageLayout padded><PageState error={page.error || 'OS não encontrada.'} /></PageLayout>;
 
-  // Visita com prazo vencido — libera registrar resultado
+  // Libera "Registrar resultado" 30 min antes do fim previsto ou quando já venceu
   const agora = new Date();
-  const visitaVencida = os.visitas?.find(
-    (v) => v.status === 'Agendada' && v.dataHoraFimPrevista && new Date(v.dataHoraFimPrevista) < agora
+  const JANELA_MS = 30 * 60 * 1000;
+  const visitaProximaOuVencida = os.visitas?.find(
+    (v) =>
+      v.status === 'Agendada' &&
+      v.dataHoraFimPrevista &&
+      new Date(v.dataHoraFimPrevista) - agora <= JANELA_MS
   );
 
   return (
@@ -127,11 +131,11 @@ function DetalhesOsCorretivaPage() {
                 )}
 
                 {/* Registrar resultado: liberado automaticamente quando o prazo da visita vence */}
-                {visitaVencida && (
+                {visitaProximaOuVencida && (
                   <Button
                     type="button"
                     variant="primary"
-                    onClick={() => page.resultadoModal.openModal({ visitaId: visitaVencida.id, visita: visitaVencida })}
+                    onClick={() => page.resultadoModal.openModal({ visitaId: visitaProximaOuVencida.id, visita: visitaProximaOuVencida })}
                   >
                     <FontAwesomeIcon icon={faCheck} />
                     Registrar resultado

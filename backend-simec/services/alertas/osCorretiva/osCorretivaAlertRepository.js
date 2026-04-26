@@ -1,5 +1,42 @@
 import prisma from '../../prismaService.js';
 
+const VISITA_SELECT = {
+  id: true,
+  osCorretivaId: true,
+  prestadorNome: true,
+  dataHoraInicioPrevista: true,
+  dataHoraFimPrevista: true,
+  osCorretiva: {
+    select: {
+      id: true,
+      numeroOS: true,
+      equipamento: { select: { tag: true, nome: true } },
+    },
+  },
+};
+
+export async function buscarVisitasComInicioProximo(tenantId, agora, horizonte) {
+  return prisma.visitaTerceiro.findMany({
+    where: {
+      tenantId,
+      status: 'Agendada',
+      dataHoraInicioPrevista: { gt: agora, lte: horizonte },
+    },
+    select: VISITA_SELECT,
+  });
+}
+
+export async function buscarVisitasComFimProximo(tenantId, agora, horizonte) {
+  return prisma.visitaTerceiro.findMany({
+    where: {
+      tenantId,
+      status: 'Agendada',
+      dataHoraFimPrevista: { gt: agora, lte: horizonte },
+    },
+    select: VISITA_SELECT,
+  });
+}
+
 export async function buscarVisitasVencidasPorTenant(tenantId, agora) {
   return prisma.visitaTerceiro.findMany({
     where: {
@@ -7,21 +44,7 @@ export async function buscarVisitasVencidasPorTenant(tenantId, agora) {
       status: 'Agendada',
       dataHoraFimPrevista: { lt: agora },
     },
-    select: {
-      id: true,
-      osCorretivaId: true,
-      prestadorNome: true,
-      dataHoraFimPrevista: true,
-      osCorretiva: {
-        select: {
-          id: true,
-          numeroOS: true,
-          equipamento: {
-            select: { tag: true, nome: true },
-          },
-        },
-      },
-    },
+    select: VISITA_SELECT,
   });
 }
 

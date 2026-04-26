@@ -1,18 +1,29 @@
 import prisma from '../../prismaService.js';
 import { getAgora } from '../../time/index.js';
 import { buscarVisitasVencidasPorTenant } from './osCorretivaAlertRepository.js';
-import { gerarAlertaVisitaVencida } from './osCorretivaAlertRules.js';
+import {
+  gerarAlertasVisitaInicioProximo,
+  gerarAlertasVisitaFimProximo,
+  gerarAlertaVisitaVencida,
+} from './osCorretivaAlertRules.js';
 
 async function processarTenant(tenant, agora) {
-  const visitas = await buscarVisitasVencidasPorTenant(tenant.id, agora);
+  const [inicioTotal, fimTotal, visitas] = await Promise.all([
+    gerarAlertasVisitaInicioProximo(tenant.id, agora),
+    gerarAlertasVisitaFimProximo(tenant.id, agora),
+    buscarVisitasVencidasPorTenant(tenant.id, agora),
+  ]);
 
-  const results = await Promise.all(
-    visitas.map((visita) => gerarAlertaVisitaVencida(tenant.id, visita))
+  const vencidaResults = await Promise.all(
+    visitas.map((v) => gerarAlertaVisitaVencida(tenant.id, v))
   );
+  const vencidaTotal = vencidaResults.reduce((acc, v) => acc + v, 0);
 
-  const total = results.reduce((acc, val) => acc + val, 0);
+  const total = inicioTotal + fimTotal + vencidaTotal;
 
-  console.log(`[ALERTA_OS_CORRETIVA][${tenant.id}] visitas vencidas=${total}`);
+  console.log(
+    `[ALERTA_OS_CORRETIVA][${tenant.id}] inicio_proximo=${inicioTotal} fim_proximo=${fimTotal} vencidas=${vencidaTotal}`
+  );
 
   return { total, afetou: total > 0 };
 }
