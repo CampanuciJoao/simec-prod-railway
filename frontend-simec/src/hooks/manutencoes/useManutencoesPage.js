@@ -2,6 +2,9 @@
 
 import { useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { addManutencao, addNotaAndamento } from '../../services/api';
+import { useToast } from '../../contexts/ToastContext';
+import { getErrorMessage } from '../../utils/getErrorMessage';
 import { useModal } from '../shared/useModal';
 import { useManutencoes } from './useManutencoes';
 
@@ -12,6 +15,7 @@ function formatarLabel(valor) {
 
 export function useManutencoesPage() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const dataHook = useManutencoes();
   const deleteModal = useModal();
 
@@ -154,6 +158,44 @@ export function useManutencoesPage() {
 
   /**
    * =========================
+   * REGISTRAR OCORRENCIA
+   * =========================
+   */
+  const registrarOcorrencia = useCallback(
+    async (form) => {
+      try {
+        const nova = await addManutencao({
+          equipamentoId: form.equipamentoId,
+          tipo: 'Corretiva',
+          descricaoProblemaServico: form.descricaoProblemaServico.trim(),
+          solicitante: form.solicitante?.trim() || undefined,
+          origemAbertura: form.origemAbertura || undefined,
+          numeroChamado: form.numeroChamado?.trim() || undefined,
+          tecnicoResponsavel: form.tecnicoResponsavel?.trim() || undefined,
+          statusEquipamento: form.statusEquipamento || undefined,
+        });
+
+        if (form.detalhe?.trim()) {
+          try {
+            await addNotaAndamento(nova.id, { nota: form.detalhe.trim() });
+          } catch {
+            // nota e opcional
+          }
+        }
+
+        addToast('Ocorrencia registrada. OS aberta para acompanhamento.', 'success');
+        dataHook.refetch();
+        return true;
+      } catch (err) {
+        addToast(getErrorMessage(err, 'Erro ao registrar ocorrencia.'), 'error');
+        return false;
+      }
+    },
+    [addToast, dataHook]
+  );
+
+  /**
+   * =========================
    * NAVIGATION
    * =========================
    */
@@ -189,5 +231,8 @@ export function useManutencoesPage() {
 
     // nav
     goToCreate,
+
+    // ocorrencia corretiva
+    registrarOcorrencia,
   };
 }

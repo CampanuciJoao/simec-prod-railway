@@ -228,6 +228,22 @@ export function useDetalhesManutencaoPage() {
     setCancelReason('');
   };
 
+  const handleAgendarVisita = async (form) => {
+    const ok = await concluirOS({
+      acao: 'agendar_visita',
+      ...form,
+    });
+    return Boolean(ok);
+  };
+
+  const handleResolverInternamente = async (observacao) => {
+    const ok = await concluirOS({
+      acao: 'resolver_internamente',
+      observacao,
+    });
+    return Boolean(ok);
+  };
+
   const handleConfirmacaoFinal = async () => {
     if (confirmMode === 'concluir') {
       await concluirOS({
@@ -291,6 +307,8 @@ export function useDetalhesManutencaoPage() {
     handleDeleteAnexo,
     handleCancelarManutencao,
     handleConfirmacaoFinal,
+    handleAgendarVisita,
+    handleResolverInternamente,
     cancelModal,
     deleteAnexoModal,
     refetch,

@@ -1,43 +1,30 @@
 import React from 'react';
 import PropTypes from 'prop-types';
+import { Link } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArrowUpRightFromSquare, faWrench } from '@fortawesome/free-solid-svg-icons';
 
-import { LoadingState } from '@/components/ui';
-import {
-  FichaTecnicaEventForm,
-  FichaTecnicaTimeline,
-} from '@/components/equipamentos/ficha-tecnica';
-import { useEquipamentoFichaTecnica } from '@/hooks/equipamentos/useEquipamentoFichaTecnica';
+import { PageSection } from '@/components/ui';
 
 function TabFichaTecnica({ equipamentoId }) {
-  const fichaTecnica = useEquipamentoFichaTecnica(equipamentoId);
-
-  if (fichaTecnica.loading) {
-    return <LoadingState message="Carregando ficha tecnica..." />;
-  }
-
   return (
-    <div className="space-y-6">
-      <FichaTecnicaEventForm
-        novoEvento={fichaTecnica.novoEvento}
-        submitting={fichaTecnica.submitting}
-        onChange={fichaTecnica.handleEventoChange}
-        onSubmit={fichaTecnica.handleSubmitEvento}
-        onLimpar={fichaTecnica.handleResetNovoEvento}
-      />
-
-      <FichaTecnicaTimeline
-        ocorrencias={fichaTecnica.ocorrencias}
-        itensExpandidos={fichaTecnica.itensExpandidos}
-        dadosSolucao={fichaTecnica.dadosSolucao}
-        resolvendoId={fichaTecnica.resolvendoId}
-        submitting={fichaTecnica.submitting}
-        onToggleExpandir={fichaTecnica.toggleExpandir}
-        onChangeSolucao={fichaTecnica.handleSolucaoChange}
-        onAbrirResolucao={fichaTecnica.handleAbrirResolucao}
-        onCancelarResolucao={fichaTecnica.handleCancelarResolucao}
-        onSalvarSolucao={fichaTecnica.handleSalvarSolucao}
-      />
-    </div>
+    <PageSection
+      title="Ocorrencias corretivas"
+      description="O registro e acompanhamento de ocorrencias corretivas esta centralizado no modulo de Manutencoes."
+    >
+      <Link
+        to={`/manutencoes?tipo=Corretiva&equipamentoId=${equipamentoId}`}
+        className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition"
+        style={{
+          backgroundColor: 'var(--brand-primary-soft)',
+          color: 'var(--brand-primary)',
+        }}
+      >
+        <FontAwesomeIcon icon={faWrench} />
+        Ver OS corretivas deste equipamento
+        <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-xs" />
+      </Link>
+    </PageSection>
   );
 }
 
