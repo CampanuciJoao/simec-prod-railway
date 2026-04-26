@@ -26,6 +26,15 @@ const STATUS_LABEL = {
   Cancelada: 'Cancelada',
 };
 
+const STATUS_BORDER_COLOR = {
+  Concluida: 'var(--color-success)',
+  Cancelada: 'var(--text-muted)',
+  EmAndamento: '#8b5cf6',
+  AguardandoConfirmacao: '#f97316',
+  Agendada: 'var(--brand-primary)',
+  Pendente: 'var(--color-warning)',
+};
+
 const STATUS_VARIANT = {
   Pendente: 'yellow',
   Agendada: 'blue',
@@ -116,7 +125,12 @@ function FichaTecnicaCorretivaItem({
 
   return (
     <>
-      <Card padded={false} className="overflow-hidden rounded-2xl" surface="default">
+      <Card
+        padded={false}
+        className="overflow-hidden rounded-2xl"
+        surface="default"
+        style={{ borderLeftWidth: '4px', borderLeftColor: STATUS_BORDER_COLOR[item.status] || 'var(--border-soft)' }}
+      >
         <button
           type="button"
           className="flex w-full items-start justify-between gap-4 px-4 py-4 text-left"
