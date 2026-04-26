@@ -76,7 +76,7 @@ function DetalhesOsCorretivaPage() {
         {/* Cabeçalho */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/os-corretiva">
+            <Link to="/manutencoes">
               <Button type="button" variant="secondary">
                 <FontAwesomeIcon icon={faArrowLeft} />
               </Button>

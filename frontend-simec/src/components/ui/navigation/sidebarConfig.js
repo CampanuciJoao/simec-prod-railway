@@ -50,7 +50,6 @@ export const sidebarConfig = [
     label: 'Manutencoes',
     path: '/manutencoes',
     icon: faWrench,
-    activePaths: ['/os-corretiva'],
   },
   {
     label: 'Indicadores BI',

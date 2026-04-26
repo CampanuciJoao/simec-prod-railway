@@ -160,7 +160,7 @@ export function useManutencoesPage() {
   }, [navigate]);
 
   const goToRegistrarOcorrencia = useCallback(() => {
-    navigate('/os-corretiva/abrir');
+    navigate('/manutencoes/ocorrencia/abrir');
   }, [navigate]);
 
   /**

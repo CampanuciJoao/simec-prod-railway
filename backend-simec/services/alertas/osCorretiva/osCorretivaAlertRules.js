@@ -26,7 +26,7 @@ export async function gerarAlertaVisitaVencida(tenantId, visita) {
     prioridade: ALERT_PRIORIDADES.ALTA,
     tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
     tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_VENCIDA,
-    link: `/os-corretiva/${os?.id}`,
+    link: `/manutencoes/ocorrencia/${os?.id}`,
   });
 
   const result = await upsertAlertaOsCorretiva(tenantId, alertaId, payload);

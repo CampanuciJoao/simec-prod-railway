@@ -12,7 +12,7 @@ function AbrirOsCorretivaPage() {
   return (
     <PageLayout padded>
       <div className="mb-6 flex items-center gap-3">
-        <Link to="/os-corretiva">
+        <Link to="/manutencoes">
           <Button type="button" variant="secondary">
             <FontAwesomeIcon icon={faArrowLeft} />
             Voltar

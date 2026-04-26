@@ -80,7 +80,7 @@ function OsCorretivaCard({ os, isAdmin, onDelete }) {
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <Link to={`/os-corretiva/${os.id}`}>
+              <Link to={`/manutencoes/ocorrencia/${os.id}`}>
                 <Button type="button" variant="primary">
                   <FontAwesomeIcon icon={faEye} />
                   Ver detalhes

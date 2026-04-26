@@ -48,7 +48,7 @@ export function useAbrirOsCorretivaPage() {
     try {
       const novaOs = await criarOsCorretiva(form);
       addToast(`OS ${novaOs.numeroOS} aberta com sucesso.`, 'success');
-      navigate(`/os-corretiva/${novaOs.id}`);
+      navigate(`/manutencoes/ocorrencia/${novaOs.id}`);
     } catch (err) {
       const msg = err?.response?.data?.message || 'Erro ao abrir OS Corretiva.';
       const fe = err?.response?.data?.fieldErrors || {};
