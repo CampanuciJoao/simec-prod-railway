@@ -1,6 +1,6 @@
 import React from 'react';
 import PropTypes from 'prop-types';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 function SidebarItem({
@@ -8,15 +8,21 @@ function SidebarItem({
   onClick,
   badgeCount = 0,
 }) {
+  const location = useLocation();
+
+  const isExtraActive = (item.activePaths || []).some((p) =>
+    location.pathname.startsWith(p)
+  );
+
   const navLinkClass = ({ isActive }) =>
     [
       'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all',
       'min-w-0 border',
-      isActive ? 'shadow-sm' : '',
+      isActive || isExtraActive ? 'shadow-sm' : '',
     ].join(' ');
 
   const getNavLinkStyle = ({ isActive }) => {
-    if (isActive) {
+    if (isActive || isExtraActive) {
       return {
         backgroundColor: 'var(--brand-primary)',
         color: 'var(--text-inverse)',
@@ -38,20 +44,20 @@ function SidebarItem({
       style={getNavLinkStyle}
       onClick={onClick}
       onMouseEnter={(e) => {
-        const isActive =
-          e.currentTarget.getAttribute('aria-current') === 'page';
+        const active =
+          e.currentTarget.getAttribute('aria-current') === 'page' || isExtraActive;
 
-        if (!isActive) {
+        if (!active) {
           e.currentTarget.style.backgroundColor = 'var(--bg-surface-subtle)';
           e.currentTarget.style.color = 'var(--text-primary)';
           e.currentTarget.style.borderColor = 'var(--border-soft)';
         }
       }}
       onMouseLeave={(e) => {
-        const isActive =
-          e.currentTarget.getAttribute('aria-current') === 'page';
+        const active =
+          e.currentTarget.getAttribute('aria-current') === 'page' || isExtraActive;
 
-        if (!isActive) {
+        if (!active) {
           e.currentTarget.style.backgroundColor = 'transparent';
           e.currentTarget.style.color = 'var(--text-sidebar-muted)';
           e.currentTarget.style.borderColor = 'transparent';
@@ -87,6 +93,7 @@ SidebarItem.propTypes = {
     label: PropTypes.string.isRequired,
     icon: PropTypes.object.isRequired,
     showBadge: PropTypes.bool,
+    activePaths: PropTypes.arrayOf(PropTypes.string),
   }).isRequired,
   onClick: PropTypes.func,
   badgeCount: PropTypes.number,
