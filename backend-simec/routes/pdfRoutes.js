@@ -19,6 +19,10 @@ import {
   obterDadosPdfOrcamento,
   gerarPdfOrcamentoBuffer,
 } from '../services/pdf/orcamentoPdfService.js';
+import {
+  obterDadosPdfOsCorretiva,
+  gerarPdfOsCorretivaBuffer,
+} from '../services/pdf/osCorretivaPdfService.js';
 
 const router = express.Router();
 
@@ -173,6 +177,23 @@ router.get('/orcamento/:id', async (req, res) => {
   } catch (error) {
     console.error('[PDF_ORCAMENTO_ERROR]', error);
     return mapErrorToResponse(res, error, 'Erro ao gerar PDF do orçamento.');
+  }
+});
+
+router.get('/os-corretiva/:id', async (req, res) => {
+  try {
+    const os = await obterDadosPdfOsCorretiva({
+      tenantId: req.usuario.tenantId,
+      osId: req.params.id,
+    });
+    const buffer = await gerarPdfOsCorretivaBuffer(os, getPdfOptions(req));
+    return sendPdf(res, buffer, `OS_CORT_${os.numeroOS || req.params.id}.pdf`);
+  } catch (error) {
+    console.error('[PDF_OS_CORRETIVA_ERROR]', error);
+    if (error.message === 'OS_NAO_ENCONTRADA') {
+      return res.status(404).json({ message: 'OS Corretiva não encontrada.' });
+    }
+    return res.status(500).json({ message: 'Erro ao gerar PDF da OS Corretiva.' });
   }
 });
 

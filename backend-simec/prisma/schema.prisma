@@ -44,6 +44,8 @@ model Tenant {
   authSessions         AuthSession[]
   passwordResetTokens  PasswordResetToken[]
   orcamentos           Orcamento[]
+  osCorretivas         OsCorretiva[]
+  visitasTerceiro      VisitaTerceiro[]
 
   @@map("tenants")
 }
@@ -96,6 +98,7 @@ model Usuario {
   alertasLidos         AlertaLidoPorUsuario[]
   logsDeAuditoria      LogAuditoria[]
   notasDeAndamento     NotaAndamento[]
+  osCorretivas         OsCorretiva[]
   manutencaoEventos    ManutencaoEvento[]
   authSessions         AuthSession[]
   passwordResetTokens  PasswordResetToken[]
@@ -134,6 +137,7 @@ model Equipamento {
   acessorios        Acessorio[]
   anexos            Anexo[]
   manutencoes       Manutencao[]
+  osCorretivas      OsCorretiva[]
   ocorrencias       Ocorrencia[]
   seguros           Seguro[]
   contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
@@ -504,19 +508,23 @@ model Anexo {
 }
 
 model NotaAndamento {
-  id           String   @id @default(uuid())
-  tenantId     String
-  nota         String
-  data         DateTime @default(now())
-  origem       String   @default("manual")
-  manutencaoId String   @map("manutencao_id")
-  autorId      String?  @map("autor_id")
+  id            String   @id @default(uuid())
+  tenantId      String
+  nota          String
+  data          DateTime @default(now())
+  origem        String   @default("manual")
+  manutencaoId  String?  @map("manutencao_id")
+  osCorretivaId String?  @map("os_corretiva_id")
+  autorId       String?  @map("autor_id")
+  tecnicoNome   String?  @map("tecnico_nome")
 
-  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autor      Usuario?   @relation(fields: [autorId], references: [id], onDelete: SetNull)
-  manutencao Manutencao @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor       Usuario?     @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  manutencao  Manutencao?  @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  osCorretiva OsCorretiva? @relation(fields: [tenantId, osCorretivaId], references: [tenantId, id], onDelete: Cascade)
 
   @@index([tenantId, manutencaoId, data])
+  @@index([tenantId, osCorretivaId, data])
   @@map("notas_andamento")
 }
 
@@ -830,4 +838,87 @@ model OrcamentoItemPreco {
 
   @@unique([itemId, fornecedorId])
   @@map("orcamento_item_precos")
+}
+
+// ─── OS Corretiva ────────────────────────────────────────────────────────────
+
+model OsCorretiva {
+  id                        String            @id @default(uuid())
+  tenantId                  String
+  numeroOS                  String            @map("numero_os")
+  equipamentoId             String            @map("equipamento_id")
+  solicitante               String
+  descricaoProblema         String            @map("descricao_problema") @db.Text
+  statusEquipamentoAbertura StatusEquipamento @map("status_equipamento_abertura")
+  dataHoraAbertura          DateTime          @default(now()) @map("data_hora_abertura")
+  status                    StatusOsCorretiva @default(Aberta)
+  tipo                      TipoOsCorretiva   @default(Ocorrencia)
+  dataHoraConclusao         DateTime?         @map("data_hora_conclusao")
+  observacoesFinais         String?           @map("observacoes_finais") @db.Text
+  autorId                   String?           @map("autor_id")
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento      @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  autor       Usuario?         @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  notas       NotaAndamento[]
+  visitas     VisitaTerceiro[]
+
+  @@unique([tenantId, numeroOS])
+  @@unique([tenantId, id])
+  @@index([tenantId, equipamentoId, status])
+  @@index([tenantId, status])
+  @@index([tenantId, tipo])
+  @@index([tenantId, dataHoraAbertura(sort: Desc)])
+  @@map("os_corretivas")
+}
+
+model VisitaTerceiro {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  osCorretivaId          String               @map("os_corretiva_id")
+  prestadorNome          String               @map("prestador_nome")
+  dataHoraInicioPrevista DateTime             @map("data_hora_inicio_prevista")
+  dataHoraFimPrevista    DateTime             @map("data_hora_fim_prevista")
+  dataHoraInicioReal     DateTime?            @map("data_hora_inicio_real")
+  dataHoraFimReal        DateTime?            @map("data_hora_fim_real")
+  status                 StatusVisitaTerceiro @default(Agendada)
+  resultado              ResultadoVisita?
+  observacoes            String?              @db.Text
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  osCorretiva OsCorretiva @relation(fields: [tenantId, osCorretivaId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, osCorretivaId])
+  @@index([tenantId, status])
+  @@map("visitas_terceiro")
+}
+
+enum StatusOsCorretiva {
+  Aberta
+  EmAndamento
+  AguardandoTerceiro
+  Concluida
+}
+
+enum TipoOsCorretiva {
+  Ocorrencia
+  Corretiva
+}
+
+enum StatusVisitaTerceiro {
+  Agendada
+  EmExecucao
+  Concluida
+  PrazoEstendido
+}
+
+enum ResultadoVisita {
+  Operante
+  PrazoEstendido
+  Pendente
 }

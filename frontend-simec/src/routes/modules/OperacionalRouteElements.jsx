@@ -20,6 +20,9 @@ import {
   OrcamentosPage,
   SalvarOrcamentoPage,
   DetalhesOrcamentoPage,
+  OsCorretivaPage,
+  AbrirOsCorretivaPage,
+  DetalhesOsCorretivaPage,
 } from '@/routes/lazyPages';
 
 function OperacionalRouteElements() {
@@ -72,6 +75,10 @@ function OperacionalRouteElements() {
       <Route path="orcamentos/novo" element={<SalvarOrcamentoPage />} />
       <Route path="orcamentos/:id/editar" element={<SalvarOrcamentoPage />} />
       <Route path="orcamentos/:id" element={<DetalhesOrcamentoPage />} />
+
+      <Route path="os-corretiva" element={<OsCorretivaPage />} />
+      <Route path="os-corretiva/abrir" element={<AbrirOsCorretivaPage />} />
+      <Route path="os-corretiva/:id" element={<DetalhesOsCorretivaPage />} />
     </>
   );
 }

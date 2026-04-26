@@ -12,6 +12,7 @@ import {
   faLifeRing,
   faBuildingShield,
   faFileInvoiceDollar,
+  faClipboardList,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const sidebarConfig = [
@@ -50,6 +51,11 @@ export const sidebarConfig = [
     label: 'Manutencoes',
     path: '/manutencoes',
     icon: faWrench,
+  },
+  {
+    label: 'OS Corretiva',
+    path: '/os-corretiva',
+    icon: faClipboardList,
   },
   {
     label: 'Indicadores BI',
