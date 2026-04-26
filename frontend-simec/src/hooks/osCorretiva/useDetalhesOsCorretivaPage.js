@@ -1,10 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   getOsCorretivaById,
   adicionarNota,
   agendarVisita,
-  iniciarVisita,
   registrarResultadoVisita,
   concluirOsCorretiva,
   downloadPdfOsCorretiva,
@@ -13,7 +11,6 @@ import { useModal } from '../shared/useModal';
 import { useToast } from '../../contexts/ToastContext';
 
 export function useDetalhesOsCorretivaPage(osId) {
-  const navigate = useNavigate();
   const { addToast } = useToast();
 
   const [os, setOs] = useState(null);
@@ -24,7 +21,6 @@ export function useDetalhesOsCorretivaPage(osId) {
 
   const notaModal = useModal();
   const visitaModal = useModal();
-  const confirmarChegadaModal = useModal();
   const resultadoModal = useModal();
   const concluirModal = useModal();
 
@@ -81,23 +77,6 @@ export function useDetalhesOsCorretivaPage(osId) {
       setSubmitting(false);
     }
   }, [osId, addToast, visitaModal, fetchOs]);
-
-  const handleConfirmarChegada = useCallback(async () => {
-    const visitaId = confirmarChegadaModal.modalData?.visitaId;
-    if (!visitaId) return;
-    setSubmitting(true);
-    try {
-      await iniciarVisita(osId, visitaId);
-      addToast('Chegada do técnico confirmada. Visita em execução.', 'success');
-      confirmarChegadaModal.closeModal();
-      await fetchOs();
-    } catch (err) {
-      const msg = err?.response?.data?.message || 'Erro ao confirmar chegada.';
-      addToast(msg, 'error');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [osId, addToast, confirmarChegadaModal, fetchOs]);
 
   const handleRegistrarResultado = useCallback(async (dados) => {
     const visitaId = resultadoModal.modalData?.visitaId;
@@ -157,12 +136,10 @@ export function useDetalhesOsCorretivaPage(osId) {
     fieldErrors,
     notaModal,
     visitaModal,
-    confirmarChegadaModal,
     resultadoModal,
     concluirModal,
     handleAdicionarNota,
     handleAgendarVisita,
-    handleConfirmarChegada,
     handleRegistrarResultado,
     handleConcluirOs,
     handleExportarPdf,

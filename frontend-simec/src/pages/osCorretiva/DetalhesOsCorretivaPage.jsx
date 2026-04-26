@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFilePdf, faPlus, faTruck, faCheck, faUserCheck } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faFilePdf, faPlus, faTruck, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
@@ -9,7 +9,7 @@ import AdicionarNotaModal from '@/components/osCorretiva/AdicionarNotaModal';
 import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTerceiroModal';
 import RegistrarResultadoVisitaModal from '@/components/osCorretiva/RegistrarResultadoVisitaModal';
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
-import { PageLayout, PageState, Button, ModalConfirmacao } from '@/components/ui';
+import { PageLayout, PageState, Button } from '@/components/ui';
 
 const STATUS_COLORS = {
   Aberta: '#2563eb',
@@ -32,10 +32,11 @@ function DetalhesOsCorretivaPage() {
   if (page.loading) return <PageLayout padded><PageState loading /></PageLayout>;
   if (page.error || !os) return <PageLayout padded><PageState error={page.error || 'OS não encontrada.'} /></PageLayout>;
 
-  // Visita aguardando chegada (ainda não confirmada)
-  const visitaAgendada = os.visitas?.find((v) => v.status === 'Agendada');
-  // Visita já em execução (chegada confirmada) — libera registrar resultado
-  const visitaEmExecucao = os.visitas?.find((v) => v.status === 'EmExecucao');
+  // Visita com prazo vencido — libera registrar resultado
+  const agora = new Date();
+  const visitaVencida = os.visitas?.find(
+    (v) => v.status === 'Agendada' && v.dataHoraFimPrevista && new Date(v.dataHoraFimPrevista) < agora
+  );
 
   return (
     <>
@@ -53,20 +54,6 @@ function DetalhesOsCorretivaPage() {
         onConfirm={page.handleAgendarVisita}
         submitting={page.submitting}
         fieldErrors={page.fieldErrors}
-      />
-
-      <ModalConfirmacao
-        isOpen={page.confirmarChegadaModal.isOpen}
-        onClose={page.confirmarChegadaModal.closeModal}
-        onConfirm={page.handleConfirmarChegada}
-        title="Confirmar chegada do técnico"
-        message={
-          visitaAgendada
-            ? `Confirmar que o técnico de ${visitaAgendada.prestadorNome} chegou e a visita está em execução?`
-            : 'Confirmar chegada do técnico e iniciar a visita?'
-        }
-        confirmText="Confirmar chegada"
-        submitting={page.submitting}
       />
 
       <RegistrarResultadoVisitaModal
@@ -139,24 +126,12 @@ function DetalhesOsCorretivaPage() {
                   </Button>
                 )}
 
-                {/* Confirmar chegada: apenas quando há visita Agendada */}
-                {visitaAgendada && !visitaEmExecucao && (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => page.confirmarChegadaModal.openModal({ visitaId: visitaAgendada.id })}
-                  >
-                    <FontAwesomeIcon icon={faUserCheck} />
-                    Confirmar chegada
-                  </Button>
-                )}
-
-                {/* Registrar resultado: apenas quando a visita está Em execução */}
-                {visitaEmExecucao && (
+                {/* Registrar resultado: liberado automaticamente quando o prazo da visita vence */}
+                {visitaVencida && (
                   <Button
                     type="button"
                     variant="primary"
-                    onClick={() => page.resultadoModal.openModal({ visitaId: visitaEmExecucao.id, visita: visitaEmExecucao })}
+                    onClick={() => page.resultadoModal.openModal({ visitaId: visitaVencida.id, visita: visitaVencida })}
                   >
                     <FontAwesomeIcon icon={faCheck} />
                     Registrar resultado

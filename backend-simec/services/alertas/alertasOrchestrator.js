@@ -3,6 +3,7 @@ import {
   gerarAlertasSeguro,
   gerarAlertasContrato,
   gerarAlertasRecomendacao,
+  gerarAlertasOsCorretiva,
 } from './index.js';
 
 import { onAlertasProcessados } from './alertasEventService.js';
@@ -83,25 +84,33 @@ export async function processarAlertasEEnviarNotificacoes() {
     gerarAlertasRecomendacao
   );
 
+  const osCorretivaResult = await executarEtapa(
+    'osCorretiva',
+    gerarAlertasOsCorretiva
+  );
+
   const manutencoes = manutencoesResult.total;
   const seguros = segurosResult.total;
   const contratos = contratosResult.total;
   const recomendacoes = recomendacoesResult.total;
+  const osCorretiva = osCorretivaResult.total;
 
   const ok =
     manutencoesResult.ok &&
     segurosResult.ok &&
     contratosResult.ok &&
-    recomendacoesResult.ok;
+    recomendacoesResult.ok &&
+    osCorretivaResult.ok;
 
   const totalGeral =
-    manutencoes + seguros + contratos + recomendacoes;
+    manutencoes + seguros + contratos + recomendacoes + osCorretiva;
 
   const tenantsAfetados = coletarTenantsUnicos(
     manutencoesResult,
     segurosResult,
     contratosResult,
-    recomendacoesResult
+    recomendacoesResult,
+    osCorretivaResult
   );
 
   if (tenantsAfetados.length > 0) {
@@ -111,7 +120,7 @@ export async function processarAlertasEEnviarNotificacoes() {
   }
 
   console.log(
-    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
+    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | osCorretiva=${osCorretiva} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
   );
 
   return {
@@ -121,6 +130,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     seguros,
     contratos,
     recomendacoes,
+    osCorretiva,
     tenantsAfetados,
     detalhes: {
       manutencoes: {
@@ -142,6 +152,11 @@ export async function processarAlertasEEnviarNotificacoes() {
         ok: recomendacoesResult.ok,
         total: recomendacoesResult.total,
         erro: recomendacoesResult.erro?.message || null,
+      },
+      osCorretiva: {
+        ok: osCorretivaResult.ok,
+        total: osCorretivaResult.total,
+        erro: osCorretivaResult.erro?.message || null,
       },
     },
   };
