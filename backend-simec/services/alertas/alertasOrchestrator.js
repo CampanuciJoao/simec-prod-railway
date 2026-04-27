@@ -3,9 +3,9 @@ import {
   gerarAlertasSeguro,
   gerarAlertasContrato,
   gerarAlertasRecomendacao,
-  gerarAlertasOsCorretiva,
 } from './index.js';
 
+import { gerarInsightsInteligentes } from './proactivityAgent.js';
 import { onAlertasProcessados } from './alertasEventService.js';
 
 /**
@@ -84,33 +84,33 @@ export async function processarAlertasEEnviarNotificacoes() {
     gerarAlertasRecomendacao
   );
 
-  const osCorretivaResult = await executarEtapa(
-    'osCorretiva',
-    gerarAlertasOsCorretiva
+  const insightsResult = await executarEtapa(
+    'insights_ia',
+    gerarInsightsInteligentes
   );
 
   const manutencoes = manutencoesResult.total;
   const seguros = segurosResult.total;
   const contratos = contratosResult.total;
   const recomendacoes = recomendacoesResult.total;
-  const osCorretiva = osCorretivaResult.total;
+  const insights = insightsResult.total;
 
   const ok =
     manutencoesResult.ok &&
     segurosResult.ok &&
     contratosResult.ok &&
     recomendacoesResult.ok &&
-    osCorretivaResult.ok;
+    insightsResult.ok;
 
   const totalGeral =
-    manutencoes + seguros + contratos + recomendacoes + osCorretiva;
+    manutencoes + seguros + contratos + recomendacoes + insights;
 
   const tenantsAfetados = coletarTenantsUnicos(
     manutencoesResult,
     segurosResult,
     contratosResult,
     recomendacoesResult,
-    osCorretivaResult
+    insightsResult
   );
 
   if (tenantsAfetados.length > 0) {
@@ -120,7 +120,7 @@ export async function processarAlertasEEnviarNotificacoes() {
   }
 
   console.log(
-    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | osCorretiva=${osCorretiva} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
+    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | insights_ia=${insights} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
   );
 
   return {
@@ -130,7 +130,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     seguros,
     contratos,
     recomendacoes,
-    osCorretiva,
+    insights,
     tenantsAfetados,
     detalhes: {
       manutencoes: {
@@ -153,10 +153,10 @@ export async function processarAlertasEEnviarNotificacoes() {
         total: recomendacoesResult.total,
         erro: recomendacoesResult.erro?.message || null,
       },
-      osCorretiva: {
-        ok: osCorretivaResult.ok,
-        total: osCorretivaResult.total,
-        erro: osCorretivaResult.erro?.message || null,
+      insights_ia: {
+        ok: insightsResult.ok,
+        total: insightsResult.total,
+        erro: insightsResult.erro?.message || null,
       },
     },
   };
