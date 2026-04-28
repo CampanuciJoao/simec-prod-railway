@@ -50,9 +50,17 @@ export function useAbrirOsCorretivaPage() {
       addToast(`OS ${novaOs.numeroOS} aberta com sucesso.`, 'success');
       navigate(`/manutencoes/ocorrencia/${novaOs.id}`);
     } catch (err) {
-      const msg = err?.response?.data?.message || 'Erro ao abrir OS Corretiva.';
-      const fe = err?.response?.data?.fieldErrors || {};
-      setFieldErrors(fe);
+      const status = err?.response?.status;
+      const data = err?.response?.data || {};
+
+      if (status === 409 && data.conflito?.id) {
+        addToast(data.message || 'Já existe uma OS aberta para este equipamento.', 'error');
+        navigate(`/manutencoes/ocorrencia/${data.conflito.id}`);
+        return;
+      }
+
+      const msg = data.message || 'Erro ao abrir OS Corretiva.';
+      setFieldErrors(data.fieldErrors || {});
       addToast(msg, 'error');
     } finally {
       setSubmitting(false);
