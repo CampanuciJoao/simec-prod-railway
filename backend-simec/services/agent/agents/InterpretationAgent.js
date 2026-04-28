@@ -6,6 +6,17 @@ const TERMOS_SEGURO = [
   'vencimento do seguro', 'vence o seguro', 'pdf do seguro', 'documento do seguro',
 ];
 
+const TERMOS_BATCH_AGENDAMENTO = [
+  'todos os equipamentos', 'todos equipamentos',
+  'em massa', 'em lote',
+  'equipamentos vencidos', 'os vencidas', 'manutencoes vencidas',
+  'equipamentos sem manutencao', 'sem manutencao recente',
+  'agendar para todos', 'abrir os para todos',
+  'equipamentos de risco', 'todos do setor', 'todos da unidade',
+  'equipamentos criticos', 'equipamentos criticos',
+  'manutencao em massa', 'agendamento em lote',
+];
+
 const TERMOS_AGENDAMENTO = [
   'agendar', 'marcar', 'abrir os', 'abrir uma os', 'abrir chamado',
   'nova manutencao', 'novo agendamento', 'quero agendar', 'preciso agendar',
@@ -41,6 +52,10 @@ function classificarHeuristica(msg) {
 
   if (TERMOS_SEGURO.some((t) => m.includes(t))) {
     return { intent: 'SEGURO', confianca: 0.9 };
+  }
+  // BATCH deve ser checado antes de AGENDAMENTO pois também contém termos de agendamento
+  if (TERMOS_BATCH_AGENDAMENTO.some((t) => m.includes(t))) {
+    return { intent: 'BATCH_AGENDAMENTO', confianca: 0.92 };
   }
   if (TERMOS_AGENDAMENTO.some((t) => m.includes(t))) {
     return { intent: 'AGENDAR_MANUTENCAO', confianca: 0.9 };
@@ -84,7 +99,8 @@ async function interpretarComLlm(mensagem) {
 }
 
 Valores possíveis para intent:
-- "AGENDAR_MANUTENCAO": criar, marcar, agendar ou abrir OS/chamado de manutenção
+- "BATCH_AGENDAMENTO": agendar/criar OS para múltiplos equipamentos de uma vez (em lote, em massa, todos os equipamentos de um setor/unidade, equipamentos vencidos, sem manutenção, de risco)
+- "AGENDAR_MANUTENCAO": criar, marcar, agendar ou abrir OS/chamado para um equipamento específico
 - "RELATORIO": consultar histórico, última manutenção, listas de um equipamento/unidade específico
 - "SEGURO": consultar apólice, seguradora, cobertura, vencimento, documento de seguro
 - "ANALYTICS": análises agregadas — top equipamentos por paradas, distribuição por setor/unidade, tendência mensal, backlog, equipamentos de risco alto
@@ -106,7 +122,7 @@ Mensagem: "${mensagem}"`;
   }
 }
 
-const INTENTS_VALIDOS = ['AGENDAR_MANUTENCAO', 'RELATORIO', 'SEGURO', 'ANALYTICS', 'OUTRO'];
+const INTENTS_VALIDOS = ['BATCH_AGENDAMENTO', 'AGENDAR_MANUTENCAO', 'RELATORIO', 'SEGURO', 'ANALYTICS', 'OUTRO'];
 
 export const InterpretationAgent = {
   nome: 'InterpretationAgent',

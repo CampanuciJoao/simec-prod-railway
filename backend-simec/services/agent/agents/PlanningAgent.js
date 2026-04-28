@@ -13,7 +13,7 @@ export const PlanningAgent = {
 
   async executar(contexto) {
     const { mensagem, sessoes, interpretacao } = contexto;
-    const { agendamento, relatorio, seguro } = sessoes;
+    const { agendamento, relatorio, seguro, batch } = sessoes;
     const intent = interpretacao?.intent || 'OUTRO';
 
     if (ehComandoReset(mensagem)) {
@@ -22,7 +22,7 @@ export const PlanningAgent = {
         dominio: null,
         sessao_alvo: null,
         acao_contexto: null,
-        cancelar_sessoes: [agendamento, relatorio, seguro].filter(Boolean),
+        cancelar_sessoes: [agendamento, relatorio, seguro, batch].filter(Boolean),
         raciocinio: 'Comando de reset detectado',
       };
       contexto.plano = plano;
@@ -50,6 +50,7 @@ export const PlanningAgent = {
       { sessao: agendamento, dominio: 'AGENDAMENTO' },
       { sessao: relatorio, dominio: 'RELATORIO' },
       { sessao: seguro, dominio: 'SEGURO' },
+      { sessao: batch, dominio: 'BATCH_AGENDAMENTO' },
     ];
 
     for (const { sessao, dominio } of verificacoes) {
@@ -72,6 +73,11 @@ export const PlanningAgent = {
 
     // Roteamento por intenção
     const mapa = {
+      BATCH_AGENDAMENTO: {
+        dominio: 'BATCH_AGENDAMENTO',
+        sessao_alvo: batch,
+        cancelar: [agendamento, relatorio, seguro].filter(Boolean),
+      },
       AGENDAR_MANUTENCAO: {
         dominio: 'AGENDAMENTO',
         sessao_alvo: agendamento,
@@ -105,6 +111,20 @@ export const PlanningAgent = {
     }
 
     // Continuar sessão aberta mesmo sem intenção clara
+    if (batch) {
+      const plano = {
+        acao: 'CONTINUAR_SESSAO',
+        dominio: 'BATCH_AGENDAMENTO',
+        sessao_alvo: batch,
+        acao_contexto: null,
+        cancelar_sessoes: [],
+        raciocinio: 'Sessão de agendamento em lote ativa — continuando contexto',
+      };
+      contexto.plano = plano;
+      adicionarAuditoria(contexto, { agente: 'PlanningAgent', ...plano });
+      return plano;
+    }
+
     if (agendamento) {
       const plano = {
         acao: 'CONTINUAR_SESSAO',

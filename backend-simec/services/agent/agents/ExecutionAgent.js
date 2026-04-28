@@ -2,6 +2,7 @@ import { AgendamentoService } from '../agendamento/agendamentoService.js';
 import { RelatorioService } from '../relatorio/relatorioService.js';
 import { SeguroService } from '../seguro/seguroService.js';
 import { AnalyticsService } from '../analytics/analyticsService.js';
+import { BatchAgendamentoService } from '../batch/batchAgendamentoService.js';
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { respostaAgente } from '../core/agentResponse.js';
 import { adicionarAuditoria } from '../orchestrator/AgentContext.js';
@@ -11,6 +12,7 @@ const SERVICOS = {
   RELATORIO: RelatorioService,
   SEGURO: SeguroService,
   ANALYTICS: AnalyticsService,
+  BATCH_AGENDAMENTO: BatchAgendamentoService,
 };
 
 async function cancelarSessao(sessao, mensagem) {
@@ -126,11 +128,18 @@ export const ExecutionAgent = {
     }
 
     try {
+      // BATCH_AGENDAMENTO recebe subtarefas como 5º argumento em sessões novas
+      const subtarefas =
+        plano.dominio === 'BATCH_AGENDAMENTO' && plano.acao === 'NOVA_SESSAO'
+          ? contexto.subtarefas
+          : null;
+
       const resultado = await servico.processar(
         mensagem,
         contextoUsuario,
         plano.sessao_alvo || null,
-        plano.acao_contexto || null
+        plano.acao_contexto || null,
+        subtarefas
       );
 
       contexto.resposta = resultado;

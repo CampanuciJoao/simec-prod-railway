@@ -11,10 +11,12 @@ export function criarContexto({ mensagem, usuarioId, usuarioNome, tenantId }) {
       agendamento: null,
       relatorio: null,
       seguro: null,
+      batch: null,
     },
     interpretacao: null,
     plano: null,
     validacao: null,
+    subtarefas: null,
     trilha: [],
     resposta: null,
   };

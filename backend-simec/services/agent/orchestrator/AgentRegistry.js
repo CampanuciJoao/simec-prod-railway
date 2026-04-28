@@ -1,4 +1,5 @@
 import { InterpretationAgent } from '../agents/InterpretationAgent.js';
+import { TaskDecomposerAgent } from '../agents/TaskDecomposerAgent.js';
 import { PlanningAgent } from '../agents/PlanningAgent.js';
 import { ValidationAgent } from '../agents/ValidationAgent.js';
 import { ExecutionAgent } from '../agents/ExecutionAgent.js';
@@ -6,6 +7,7 @@ import { AuditAgent } from '../agents/AuditAgent.js';
 
 const AGENTES = [
   InterpretationAgent,
+  TaskDecomposerAgent,
   PlanningAgent,
   ValidationAgent,
   ExecutionAgent,
