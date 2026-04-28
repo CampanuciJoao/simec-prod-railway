@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFilePdf, faPlus, faTruck, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faFilePdf, faClipboardList, faTruck, faCheck } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
@@ -118,8 +118,8 @@ function DetalhesOsCorretivaPage() {
             {!isConcluida && (
               <>
                 <Button type="button" variant="secondary" onClick={page.notaModal.openModal}>
-                  <FontAwesomeIcon icon={faPlus} />
-                  Nota
+                  <FontAwesomeIcon icon={faClipboardList} />
+                  Registrar andamento
                 </Button>
 
                 {/* Agendar visita: só disponível se não está aguardando terceiro */}

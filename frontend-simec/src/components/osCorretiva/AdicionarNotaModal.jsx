@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faStickyNote } from '@fortawesome/free-solid-svg-icons';
+import { faClipboardList } from '@fortawesome/free-solid-svg-icons';
 import { Drawer, Button, Textarea } from '@/components/ui';
 
 function AdicionarNotaModal({ isOpen, onClose, onConfirm, submitting, fieldErrors }) {
@@ -22,26 +22,26 @@ function AdicionarNotaModal({ isOpen, onClose, onConfirm, submitting, fieldError
     <Drawer
       open={isOpen}
       onClose={handleClose}
-      title="Adicionar nota de andamento"
-      subtitle="Registre uma ação realizada ou observação relevante"
+      title="Registrar andamento"
+      subtitle="Registre uma ação realizada ou observação relevante na OS"
       footer={
         <div className="flex gap-3">
           <Button type="button" variant="secondary" onClick={handleClose} disabled={submitting}>
             Cancelar
           </Button>
           <Button type="button" variant="primary" onClick={handleSubmit} disabled={submitting || !nota.trim()}>
-            <FontAwesomeIcon icon={faStickyNote} />
-            {submitting ? 'Salvando...' : 'Salvar nota'}
+            <FontAwesomeIcon icon={faClipboardList} />
+            {submitting ? 'Salvando...' : 'Registrar andamento'}
           </Button>
         </div>
       }
     >
       <div className="space-y-4 p-5">
         <Textarea
-          label="Texto da nota *"
+          label="Descrição do andamento *"
           value={nota}
           onChange={(e) => setNota(e.target.value)}
-          placeholder="Descreva a ação realizada ou observação relevante..."
+          placeholder="Descreva a ação realizada, o status atual ou qualquer observação relevante..."
           rows={8}
           maxLength={2000}
         />
