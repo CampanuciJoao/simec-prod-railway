@@ -90,10 +90,20 @@ function drawFooter(doc) {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
+    const W = doc.page.width;
     const fy = doc.page.height - 38;
+
     doc.font('Helvetica').fontSize(8).fillColor(C.muted);
     doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left' });
-    doc.text('SIMEC — Confidencial', 0, fy, { align: 'right', width: doc.page.width - 50 });
+    doc.text('SIMEC — Confidencial', 0, fy, { align: 'right', width: W - 50 });
+
+    // Assinatura ancorada no rodapé da última página
+    if (i === range.count - 1) {
+      const sigY = doc.page.height - doc.page.margins.bottom - 55;
+      doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(C.border).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor(C.muted)
+        .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
+    }
   }
 }
 
@@ -160,16 +170,6 @@ function timelineEvent(doc, evento, options) {
   doc.moveDown(0.3);
 }
 
-function assinaturaSection(doc) {
-  checkPageBreak(doc, 70);
-  doc.moveDown(1.5);
-  const W = doc.page.width;
-  const y = doc.y;
-
-  doc.moveTo(100, y + 30).lineTo(W - 100, y + 30).lineWidth(0.8).strokeColor(C.border).stroke();
-  doc.font('Helvetica').fontSize(8).fillColor(C.muted)
-    .text('Assinatura do Responsável Técnico', 100, y + 34, { align: 'center', width: W - 200 });
-}
 
 // ─── Query ─────────────────────────────────────────────────────────────────────
 
@@ -250,8 +250,6 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     for (const ev of timeline) {
       timelineEvent(doc, ev, { locale, timeZone });
     }
-
-    assinaturaSection(doc);
 
     drawFooter(doc);
     doc.end();
