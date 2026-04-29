@@ -2,7 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSave } from '@fortawesome/free-solid-svg-icons';
-import { Button, Card, Select, Textarea } from '@/components/ui';
+import { Button, Card, Input, Select, Textarea } from '@/components/ui';
 import { getEquipamentos } from '@/services/api/equipamentosApi';
 import { getUnidades } from '@/services/api';
 
@@ -113,18 +113,15 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
         </div>
 
         <div>
-          <label className="mb-1.5 block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-            Solicitante *
-          </label>
-          <input
+          <Input
+            label="Solicitante *"
             type="text"
-            className="input w-full"
             placeholder="Nome de quem relatou o problema"
             value={form.solicitante}
             onChange={(e) => onChange('solicitante', e.target.value)}
             maxLength={120}
+            error={fieldErrors.solicitante}
           />
-          <FieldError error={fieldErrors.solicitante} />
         </div>
 
         <div>
