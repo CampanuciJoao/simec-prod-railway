@@ -43,11 +43,11 @@ export function AlertasProvider({ children }) {
     try {
       const [resumo, recentes] = await Promise.all([
         getResumoAlertas(),
-        getAlertas({ limit: 8 }),
+        getAlertas({ pageSize: 8 }),
       ]);
 
       setNaoVistos(Number(resumo?.naoVistos || 0));
-      setAlertas(Array.isArray(recentes) ? recentes : []);
+      setAlertas(Array.isArray(recentes?.data) ? recentes.data : []);
     } catch (error) {
       console.error('[ALERTAS_CONTEXT_FETCH_ERROR]', error);
       setAlertas([]);
