@@ -1,4 +1,5 @@
 import { registrarLog } from '../logService.js';
+import { parsePositiveInt } from '../shared/textUtils.js';
 import prisma from '../prismaService.js';
 import {
   adaptarListaManutencoesResponse,
@@ -99,11 +100,6 @@ function descricaoHistoricoManutencao({
   return partes.join(' ');
 }
 
-function parsePositiveInt(value, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
 
 export async function listarManutencoesService({
   tenantId,

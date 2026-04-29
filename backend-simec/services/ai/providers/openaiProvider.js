@@ -1,52 +1,6 @@
 import axios from 'axios';
 import { AI_CONFIG } from '../config.js';
-
-function collectTextFromNode(node, buffer = []) {
-  if (!node) {
-    return buffer;
-  }
-
-  if (typeof node === 'string') {
-    buffer.push(node);
-    return buffer;
-  }
-
-  if (Array.isArray(node)) {
-    node.forEach((item) => collectTextFromNode(item, buffer));
-    return buffer;
-  }
-
-  if (typeof node === 'object') {
-    if (typeof node.text === 'string') {
-      buffer.push(node.text);
-    }
-
-    if (typeof node.output_text === 'string') {
-      buffer.push(node.output_text);
-    }
-
-    if (node.content) {
-      collectTextFromNode(node.content, buffer);
-    }
-
-    if (node.output) {
-      collectTextFromNode(node.output, buffer);
-    }
-  }
-
-  return buffer;
-}
-
-function extractOpenAIText(payload = {}) {
-  const directText = payload.output_text;
-
-  if (typeof directText === 'string' && directText.trim()) {
-    return directText.trim();
-  }
-
-  const text = collectTextFromNode(payload).join('\n').trim();
-  return text || null;
-}
+import { logLlmUsage } from '../llmUsageLogger.js';
 
 export const OpenAIProvider = {
   name: 'openai',
@@ -59,16 +13,18 @@ export const OpenAIProvider = {
     return AI_CONFIG.openai.model;
   },
 
-  async generateText(prompt) {
+  async generateText(prompt, { tenantId, feature } = {}) {
     if (!AI_CONFIG.openai.apiKey) {
       throw new Error('OPENAI_PROVIDER_UNAVAILABLE');
     }
 
     const response = await axios.post(
-      `${AI_CONFIG.openai.baseUrl}/responses`,
+      `${AI_CONFIG.openai.baseUrl}/chat/completions`,
       {
         model: AI_CONFIG.openai.model,
-        input: prompt,
+        messages: [{ role: 'user', content: prompt }],
+        response_format: { type: 'json_object' },
+        temperature: 0,
       },
       {
         headers: {
@@ -79,10 +35,22 @@ export const OpenAIProvider = {
       }
     );
 
-    const text = extractOpenAIText(response?.data);
+    const text = response?.data?.choices?.[0]?.message?.content?.trim();
 
     if (!text) {
       throw new Error('OPENAI_EMPTY_RESPONSE');
+    }
+
+    const usage = response?.data?.usage;
+    if (usage) {
+      logLlmUsage({
+        tenantId,
+        feature,
+        provider: 'openai',
+        model: AI_CONFIG.openai.model,
+        promptTokens: usage.prompt_tokens,
+        completionTokens: usage.completion_tokens,
+      });
     }
 
     return text;

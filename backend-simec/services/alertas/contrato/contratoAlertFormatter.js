@@ -10,9 +10,7 @@ export function buildContratoAlertId(tenantId, tipo, contratoId, label = '') {
 /**
  * 🔧 Helpers
  */
-function normalizarTexto(valor, fallback = 'N/A') {
-  return String(valor || fallback).trim();
-}
+import { normalizarParaExibicao as normalizarTexto } from '../../../shared/textUtils.js';
 
 function capitalizar(texto) {
   const str = String(texto || '').toLowerCase();

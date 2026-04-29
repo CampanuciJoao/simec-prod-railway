@@ -71,6 +71,16 @@ app.use(
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+app.get('/', (req, res) => {
+  res.send('API do SIMEC ativa e operante em tempo real!');
+});
+
+app.use('/api/auth', authRoutes);
+app.use('/api/agent', agentRoutes);
+
+app.use(proteger);
+
+// Endpoint protegido de arquivos — autenticação obrigatória, isolamento por tenant via R2 key
 app.get('/uploads/*path', async (req, res) => {
   const key = 'uploads/' + req.params.path;
   try {
@@ -81,15 +91,6 @@ app.get('/uploads/*path', async (req, res) => {
     res.status(404).json({ error: 'Arquivo não encontrado.' });
   }
 });
-
-app.get('/', (req, res) => {
-  res.send('API do SIMEC ativa e operante em tempo real!');
-});
-
-app.use('/api/auth', authRoutes);
-app.use('/api/agent', agentRoutes);
-
-app.use(proteger);
 
 app.use('/api/dashboard-data', dashboardRoutes);
 app.use('/api/users', userRoutes);

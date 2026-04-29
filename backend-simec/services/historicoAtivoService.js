@@ -454,3 +454,68 @@ export async function exportarHistoricoAtivoPorEquipamento({
     normalizarHistoricoAtivoEvento(evento, referencias)
   );
 }
+
+const HISTORICO_MODELS = {
+  manutencao: 'manutencao',
+  os_corretiva: 'osCorretiva',
+};
+
+const HISTORICO_SELECT = {
+  id: true,
+  tipoEvento: true,
+  titulo: true,
+  descricao: true,
+  origem: true,
+  status: true,
+  metadataJson: true,
+  dataEvento: true,
+  createdAt: true,
+};
+
+/**
+ * Busca eventos do histórico de uma entidade com paginação.
+ * Usado por manutencoesRoutes e osCorretivaRoutes.
+ */
+export async function buscarEventosHistorico({ tenantId, referenciaId, referenciaTipo, modelName, query = {} }) {
+  const pageSize = Math.min(Math.max(Number.parseInt(query.pageSize, 10) || 50, 1), 200);
+  const page = Math.max(Number.parseInt(query.page, 10) || 1, 1);
+  const offset = (page - 1) * pageSize;
+
+  const model = HISTORICO_MODELS[referenciaTipo];
+  if (!model) {
+    return { ok: false, status: 400, message: `Tipo de referência inválido: ${referenciaTipo}` };
+  }
+
+  const existe = await prisma[model].findFirst({
+    where: { tenantId, id: referenciaId },
+    select: { id: true },
+  });
+
+  if (!existe) {
+    return { ok: false, status: 404, message: 'Registro não encontrado.' };
+  }
+
+  const where = { tenantId, referenciaId, referenciaTipo };
+
+  const [eventos, total] = await Promise.all([
+    prisma.historicoAtivoEvento.findMany({
+      where,
+      orderBy: { dataEvento: 'asc' },
+      select: HISTORICO_SELECT,
+      skip: offset,
+      take: pageSize,
+    }),
+    prisma.historicoAtivoEvento.count({ where }),
+  ]);
+
+  return {
+    ok: true,
+    data: {
+      items: eventos,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    },
+  };
+}

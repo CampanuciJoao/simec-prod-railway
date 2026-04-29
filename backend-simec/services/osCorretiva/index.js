@@ -1,4 +1,5 @@
 import prisma from '../prismaService.js';
+import { parsePositiveInt } from '../shared/textUtils.js';
 import { registrarLog } from '../logService.js';
 import { registrarEventoHistoricoAtivo } from '../historicoAtivoService.js';
 import { enfileirarReprocessamentoAlertasDoTenant } from '../queueService.js';
@@ -31,11 +32,6 @@ function gerarNumeroOs({ tag, sequencia }) {
   return `OC-${tagClean}-${seq}`;
 }
 
-function parsePositiveInt(value, fallback) {
-  const parsed = Number.parseInt(value, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) return fallback;
-  return parsed;
-}
 
 async function reprocessarAlertas(tenantId) {
   try {

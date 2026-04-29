@@ -1,8 +1,6 @@
 import { buildAlertMetaManutencao } from './manutencaoAlertMeta.js';
 
-function normalizarTexto(valor, fallback = 'N/A') {
-  return String(valor || fallback).trim();
-}
+import { normalizarParaExibicao as normalizarTexto } from '../../../shared/textUtils.js';
 
 function normalizarTipoManutencao(manut) {
   return String(manut?.tipo || 'manutencao').toLowerCase();

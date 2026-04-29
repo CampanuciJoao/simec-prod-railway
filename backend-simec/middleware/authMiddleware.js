@@ -82,15 +82,6 @@ export const proteger = async (req, res, next) => {
       tenant: usuarioAtual.tenant,
     };
 
-    req.auth = {
-      userId: usuarioAtual.id,
-      nome: usuarioAtual.nome,
-      role: usuarioAtual.role,
-      email: usuarioAtual.email,
-      tenantId: usuarioAtual.tenantId,
-      tenant: usuarioAtual.tenant,
-    };
-
     return next();
   } catch (error) {
     console.error('[AUTH_MIDDLEWARE_ERROR]', error.message);

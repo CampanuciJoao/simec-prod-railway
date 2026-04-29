@@ -1,7 +1,4 @@
-function normalizarTexto(valor, fallback = null) {
-  if (valor === undefined || valor === null || valor === '') {
-    return fallback;
-  }
+import { normalizarParaExibicao as normalizarTexto } from '../../../shared/textUtils.js';
 
   return valor;
 }

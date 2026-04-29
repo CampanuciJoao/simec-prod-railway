@@ -81,7 +81,7 @@ test('proteger popula req.usuario quando token e tenant sao validos', async () =
 
   assert.equal(nextCalled, true);
   assert.equal(req.usuario.tenantId, 'tenant-1');
-  assert.equal(req.auth.role, 'admin');
+  assert.equal(req.usuario.role, 'admin');
 });
 
 test('proteger bloqueia usuario de tenant inativo', async () => {

@@ -1,5 +1,5 @@
 import prisma from '../prismaService.js';
-import { generateTextWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
+import { generateJsonWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
 import { ALERT_PRIORIDADES } from './alertTypes.js';
 
 const TIPOEVENTO_INSIGHT = 'INSIGHT_IA';
@@ -109,10 +109,8 @@ Valores possíveis para prioridade: "Alta", "Media", "Baixa".
 Gere apenas insights relevantes e práticos, em português.`;
 
   try {
-    const resposta = await generateTextWithLlm(prompt);
-    const match = resposta.match(/\[[\s\S]*\]/);
-    if (!match) return [];
-    return JSON.parse(match[0]);
+    const resultado = await generateJsonWithLlm(prompt);
+    return Array.isArray(resultado) ? resultado : [];
   } catch (err) {
     console.error('[PROACTIVITY_AGENT] Erro ao gerar insights:', err.message);
     return [];
@@ -184,17 +182,23 @@ export async function gerarInsightsInteligentes() {
 
   console.log(`[PROACTIVITY_AGENT] Processando ${tenants.length} tenant(s)...`);
 
+  const resultados = await Promise.allSettled(tenants.map(processarTenant));
+
   let totalCriados = 0;
   const tenantsAfetados = [];
 
-  for (const tenant of tenants) {
-    const criados = await processarTenant(tenant);
+  resultados.forEach((resultado, index) => {
+    if (resultado.status === 'rejected') {
+      console.error(`[PROACTIVITY_AGENT] Tenant ${tenants[index].id} falhou:`, resultado.reason?.message);
+      return;
+    }
+    const criados = resultado.value;
     if (criados > 0) {
       totalCriados += criados;
-      tenantsAfetados.push(tenant.id);
-      console.log(`[PROACTIVITY_AGENT] Tenant ${tenant.nome}: ${criados} insight(s) criado(s)`);
+      tenantsAfetados.push(tenants[index].id);
+      console.log(`[PROACTIVITY_AGENT] Tenant ${tenants[index].nome}: ${criados} insight(s) criado(s)`);
     }
-  }
+  });
 
   return { total: totalCriados, tenantsAfetados };
 }
