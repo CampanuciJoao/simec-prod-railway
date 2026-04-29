@@ -59,3 +59,17 @@ export async function generateTextWithLlm(prompt) {
     return fallbackProvider.generateText(prompt);
   }
 }
+
+/**
+ * Gera JSON estruturado via LLM com parse seguro.
+ * Os providers já retornam JSON válido via JSON mode — sem necessidade de regex.
+ */
+export async function generateJsonWithLlm(prompt) {
+  const text = await generateTextWithLlm(prompt);
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(`LLM_INVALID_JSON: resposta não é JSON válido. Recebido: ${text?.slice(0, 200)}`);
+  }
+}

@@ -1,7 +1,6 @@
 import express from 'express';
 
 import { proteger, admin } from '../middleware/authMiddleware.js';
-import prisma from '../services/prismaService.js';
 import validate from '../middleware/validate.js';
 import { manutencaoSchema } from '../validators/manutencaoValidator.js';
 
@@ -10,6 +9,7 @@ import {
   adicionarAnexos,
   removerAnexo,
 } from '../services/uploads/anexoService.js';
+import { buscarEventosHistorico } from '../services/historicoAtivoService.js';
 import { deleteStoredFile } from '../services/uploads/fileStorageService.js';
 
 import {
@@ -46,32 +46,15 @@ router.get('/', async (req, res) => {
 
 router.get('/:id/historico', async (req, res) => {
   try {
-    const { tenantId } = req.usuario;
-    const manutencaoId = req.params.id;
-
-    const existe = await prisma.manutencao.findFirst({
-      where: { tenantId, id: manutencaoId },
-      select: { id: true },
+    const resultado = await buscarEventosHistorico({
+      tenantId: req.usuario.tenantId,
+      referenciaId: req.params.id,
+      referenciaTipo: 'manutencao',
+      modelName: 'manutencao',
+      query: req.query,
     });
-    if (!existe) return res.status(404).json({ message: 'Manutenção não encontrada.' });
-
-    const eventos = await prisma.historicoAtivoEvento.findMany({
-      where: { tenantId, referenciaId: manutencaoId, referenciaTipo: 'manutencao' },
-      orderBy: { dataEvento: 'asc' },
-      select: {
-        id: true,
-        tipoEvento: true,
-        titulo: true,
-        descricao: true,
-        origem: true,
-        status: true,
-        metadataJson: true,
-        dataEvento: true,
-        createdAt: true,
-      },
-    });
-
-    return res.json({ items: eventos, total: eventos.length });
+    if (!resultado.ok) return res.status(resultado.status).json({ message: resultado.message });
+    return res.json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_HISTORICO_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar histórico.' });

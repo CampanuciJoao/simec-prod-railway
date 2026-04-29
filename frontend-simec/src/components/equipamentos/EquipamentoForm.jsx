@@ -32,6 +32,7 @@ const TIPOS = [
   'PET-CT',
   'Processadora de Filme',
   'Raio-X',
+  'Raio-X Móvel',
   'Ressonância Magnética',
   'SPECT / Cintilógrafo',
   'Tomografia Computadorizada',

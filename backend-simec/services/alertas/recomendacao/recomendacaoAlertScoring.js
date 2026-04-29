@@ -1,10 +1,4 @@
-export function normalizarTexto(texto = '') {
-  return String(texto || '')
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim();
-}
+import { normalizarTexto } from '../../../shared/textUtils.js';
 
 function parseMetadata(evento) {
   if (!evento) return null;

@@ -7,6 +7,7 @@ import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendaca
 import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
+import { logQueueState } from './services/redis/queueUtils.js';
 
 dotenv.config();
 
@@ -28,21 +29,6 @@ const alertasQueueEvents = new QueueEvents('alertas-fila', {
   connection,
 });
 
-async function logQueueState(prefix, queue) {
-  try {
-    const counts = await queue.getJobCounts(
-      'waiting',
-      'active',
-      'completed',
-      'failed',
-      'delayed',
-      'paused'
-    );
-    console.log(`[${prefix}]`, counts);
-  } catch (error) {
-    console.error(`[${prefix}] Erro ao inspecionar fila:`, error.message);
-  }
-}
 
 const alertasWorker = new Worker(
   'alertas-fila',

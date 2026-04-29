@@ -1,4 +1,5 @@
-import { generateTextWithLlm, getLlmRuntimeInfo } from '../../ai/llmService.js';
+import { generateJsonWithLlm, getLlmRuntimeInfo } from '../../ai/llmService.js';
+import { normalizarTexto } from '../../shared/textUtils.js';
 import { adicionarAuditoria } from '../orchestrator/AgentContext.js';
 
 const TERMOS_SEGURO = [
@@ -13,7 +14,7 @@ const TERMOS_BATCH_AGENDAMENTO = [
   'equipamentos sem manutencao', 'sem manutencao recente',
   'agendar para todos', 'abrir os para todos',
   'equipamentos de risco', 'todos do setor', 'todos da unidade',
-  'equipamentos criticos', 'equipamentos criticos',
+  'equipamentos criticos',
   'manutencao em massa', 'agendamento em lote',
 ];
 
@@ -32,28 +33,20 @@ const TERMOS_RELATORIO = [
 
 const TERMOS_ANALYTICS = [
   'mais paradas', 'mais corretivas', 'mais preventivas', 'mais manutencoes',
-  'top equipamentos', 'ranking', 'tendencia', 'tendência', 'por setor',
+  'top equipamentos', 'ranking', 'tendencia', 'tendencia', 'por setor',
   'por unidade', 'backlog', 'em aberto', 'quais tiveram mais', 'pior equipamento',
-  'melhor unidade', 'distribuicao', 'distribuição', 'comparar unidades',
-  'comparar setores', 'risco alto', 'equipamentos criticos', 'equipamentos críticos',
-  'mês a mês', 'mes a mes', 'evolucao mensal', 'evolução mensal',
+  'melhor unidade', 'distribuicao', 'distribuicao', 'comparar unidades',
+  'comparar setores', 'risco alto', 'equipamentos criticos',
+  'mes a mes', 'evolucao mensal',
 ];
 
-function normalizarMsg(msg = '') {
-  return msg
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .trim();
-}
-
 function classificarHeuristica(msg) {
-  const m = normalizarMsg(msg);
+  const m = normalizarTexto(msg);
 
   if (TERMOS_SEGURO.some((t) => m.includes(t))) {
     return { intent: 'SEGURO', confianca: 0.9 };
   }
-  // BATCH deve ser checado antes de AGENDAMENTO pois também contém termos de agendamento
+  // BATCH antes de AGENDAMENTO — contém termos de agendamento
   if (TERMOS_BATCH_AGENDAMENTO.some((t) => m.includes(t))) {
     return { intent: 'BATCH_AGENDAMENTO', confianca: 0.92 };
   }
@@ -70,21 +63,16 @@ function classificarHeuristica(msg) {
   return null;
 }
 
-function parsearJson(texto) {
-  try {
-    const match = texto.match(/\{[\s\S]*\}/);
-    if (!match) return null;
-    return JSON.parse(match[0]);
-  } catch {
-    return null;
-  }
+// Sanitiza a mensagem do usuário antes de interpolá-la no prompt
+function sanitizarMensagem(msg = '') {
+  return String(msg).replace(/"/g, '\\"').slice(0, 500);
 }
 
 async function interpretarComLlm(mensagem) {
   const llm = getLlmRuntimeInfo();
   if (!llm.available) return null;
 
-  const prompt = `Você é um agente de interpretação de tarefas hospitalares. Analise a mensagem e retorne APENAS um JSON com esta estrutura exata:
+  const prompt = `Você é um agente de interpretação de tarefas hospitalares. Analise a mensagem e retorne um JSON com esta estrutura:
 
 {
   "intent": "AGENDAR_MANUTENCAO",
@@ -99,23 +87,19 @@ async function interpretarComLlm(mensagem) {
 }
 
 Valores possíveis para intent:
-- "BATCH_AGENDAMENTO": agendar/criar OS para múltiplos equipamentos de uma vez (em lote, em massa, todos os equipamentos de um setor/unidade, equipamentos vencidos, sem manutenção, de risco)
-- "AGENDAR_MANUTENCAO": criar, marcar, agendar ou abrir OS/chamado para um equipamento específico
-- "RELATORIO": consultar histórico, última manutenção, listas de um equipamento/unidade específico
-- "SEGURO": consultar apólice, seguradora, cobertura, vencimento, documento de seguro
-- "ANALYTICS": análises agregadas — top equipamentos por paradas, distribuição por setor/unidade, tendência mensal, backlog, equipamentos de risco alto
+- "BATCH_AGENDAMENTO": agendar/criar OS para múltiplos equipamentos de uma vez
+- "AGENDAR_MANUTENCAO": criar/agendar OS para um equipamento específico
+- "RELATORIO": consultar histórico, última manutenção, listas
+- "SEGURO": consultar apólice, seguradora, cobertura, vencimento
+- "ANALYTICS": análises agregadas — top equipamentos, tendência, backlog
 - "OUTRO": saudação ou conversa sem ação clara
 
-Urgência:
-- "Alta": quebrou / parou / urgente / emergência
-- "Media": preventiva / revisão normal
-- "Baixa": planejamento futuro
+Urgência: "Alta" (quebrou/parou/urgente), "Media" (preventiva/revisão), "Baixa" (planejamento)
 
-Mensagem: "${mensagem}"`;
+Mensagem: "${sanitizarMensagem(mensagem)}"`;
 
   try {
-    const resposta = await generateTextWithLlm(prompt);
-    return parsearJson(resposta);
+    return await generateJsonWithLlm(prompt);
   } catch (err) {
     console.error('[INTERPRETATION_AGENT] Erro no LLM:', err.message);
     return null;

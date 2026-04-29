@@ -30,6 +30,8 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
       .catch(() => {});
   }, [selectedUnidade]);
 
+  const equipamentoSelecionado = equipamentos.find((eq) => eq.id === form.equipamentoId);
+
   const unidadesOptions = [
     { value: '', label: 'Selecione a unidade' },
     ...unidades.map((u) => ({ value: u.id, label: u.nomeSistema })),
@@ -37,12 +39,10 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
 
   const equipamentosOptions = [
     { value: '', label: selectedUnidade ? 'Selecione o equipamento' : 'Selecione a unidade primeiro' },
-    ...equipamentos.map((eq) => ({ value: eq.id, label: `${eq.modelo} (${eq.tag})` })),
-  ];
-
-  const statusOpts = [
-    { value: '', label: 'Selecione o status do equipamento' },
-    ...statusOptions,
+    ...equipamentos.map((eq) => ({
+      value: eq.id,
+      label: eq.tipo ? `${eq.modelo} (${eq.tag}) — ${eq.tipo}` : `${eq.modelo} (${eq.tag})`,
+    })),
   ];
 
   return (
@@ -66,24 +66,27 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
             options={equipamentosOptions}
             disabled={!selectedUnidade}
           />
+          {equipamentoSelecionado?.tipo && (
+            <p className="mt-1.5 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+              Tipo: <span style={{ color: 'var(--text-secondary)' }}>{equipamentoSelecionado.tipo}</span>
+            </p>
+          )}
           <FieldError error={fieldErrors.equipamentoId} />
         </div>
 
         <div>
-          <div>
-            <label className="mb-1.5 block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              Solicitante *
-            </label>
-            <input
-              type="text"
-              className="input w-full"
-              placeholder="Nome de quem relatou o problema"
-              value={form.solicitante}
-              onChange={(e) => onChange('solicitante', e.target.value)}
-              maxLength={120}
-            />
-            <FieldError error={fieldErrors.solicitante} />
-          </div>
+          <label className="mb-1.5 block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Solicitante *
+          </label>
+          <input
+            type="text"
+            className="input w-full"
+            placeholder="Nome de quem relatou o problema"
+            value={form.solicitante}
+            onChange={(e) => onChange('solicitante', e.target.value)}
+            maxLength={120}
+          />
+          <FieldError error={fieldErrors.solicitante} />
         </div>
 
         <div>
@@ -91,7 +94,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
             label="Status do equipamento na abertura *"
             value={form.statusEquipamentoAbertura}
             onChange={(e) => onChange('statusEquipamentoAbertura', e.target.value)}
-            options={statusOpts}
+            options={[{ value: '', label: 'Selecione' }, ...statusOptions]}
           />
           <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
             Este status será aplicado imediatamente ao equipamento no sistema.

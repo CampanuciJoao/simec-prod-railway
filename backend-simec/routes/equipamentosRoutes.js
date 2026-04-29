@@ -21,6 +21,7 @@ import {
   listarHistoricoAtivoPorEquipamento,
   registrarEventoHistoricoAtivo,
 } from '../services/historicoAtivoService.js';
+import { normalizarOpcional, normalizarTexto } from '../services/shared/textUtils.js';
 
 const router = express.Router();
 
@@ -30,11 +31,6 @@ function parseDate(date) {
   return date ? new Date(date) : null;
 }
 
-function normalizarTextoOpcional(value) {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-}
 
 function parsePositiveInt(value, fallback) {
   const parsed = Number.parseInt(value, 10);
@@ -47,11 +43,11 @@ function buildEquipamentosWhereClause(tenantId, query = {}) {
     tenantId,
   };
 
-  const status = normalizarTextoOpcional(query?.status);
-  const tipo = normalizarTextoOpcional(query?.tipo);
-  const fabricante = normalizarTextoOpcional(query?.fabricante);
-  const unidadeId = normalizarTextoOpcional(query?.unidadeId);
-  const search = normalizarTextoOpcional(query?.search);
+  const status = normalizarOpcional(query?.status);
+  const tipo = normalizarOpcional(query?.tipo);
+  const fabricante = normalizarOpcional(query?.fabricante);
+  const unidadeId = normalizarOpcional(query?.unidadeId);
+  const search = normalizarOpcional(query?.search);
 
   if (status) where.status = status;
   if (tipo) where.tipo = tipo;

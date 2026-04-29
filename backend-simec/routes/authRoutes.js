@@ -9,6 +9,7 @@ import {
   refreshAuthSessionService,
   resetPasswordService,
 } from '../services/auth/authService.js';
+import { checkRateLimit, resetRateLimit } from '../services/redis/rateLimiter.js';
 
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -35,44 +36,6 @@ function buildAttemptKey(req, mode) {
   return `${mode}:${ip}:${tenant}:${username}`;
 }
 
-function getAttemptState(attemptBuckets, key, windowMs) {
-  const now = Date.now();
-  const current = attemptBuckets.get(key);
-
-  if (!current || current.expiresAt <= now) {
-    const fresh = {
-      count: 0,
-      expiresAt: now + windowMs,
-    };
-    attemptBuckets.set(key, fresh);
-    return fresh;
-  }
-
-  return current;
-}
-
-function clearAttemptState(attemptBuckets, key) {
-  attemptBuckets.delete(key);
-}
-
-function respondIfRateLimited(res, attemptState, maxAttempts) {
-  if (attemptState.count < maxAttempts) {
-    return false;
-  }
-
-  const retryAfterSeconds = Math.ceil(
-    Math.max(0, attemptState.expiresAt - Date.now()) / 1000
-  );
-
-  res.status(429).json({
-    message:
-      'Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente.',
-    retryAfterSeconds,
-  });
-
-  return true;
-}
-
 function setRefreshCookie(res, refreshToken) {
   res.cookie?.(REFRESH_TOKEN_COOKIE, refreshToken, getRefreshCookieOptions());
 }
@@ -86,7 +49,6 @@ function clearRefreshCookie(res) {
 
 export function buildAuthRouter(services = {}) {
   const router = express.Router();
-  const attemptBuckets = new Map();
   const authServices = {
     autenticarUsuarioService,
     forgotPasswordService,
@@ -97,15 +59,17 @@ export function buildAuthRouter(services = {}) {
   };
 
   router.post('/login', async (req, res) => {
-    const attemptKey = buildAttemptKey(req, 'login');
-    const attemptState = getAttemptState(
-      attemptBuckets,
-      attemptKey,
-      LOGIN_WINDOW_MS
-    );
+    const key = buildAttemptKey(req, 'login');
+    const { limited, retryAfterSeconds } = await checkRateLimit(key, {
+      maxAttempts: LOGIN_MAX_ATTEMPTS,
+      windowMs: LOGIN_WINDOW_MS,
+    });
 
-    if (respondIfRateLimited(res, attemptState, LOGIN_MAX_ATTEMPTS)) {
-      return;
+    if (limited) {
+      return res.status(429).json({
+        message: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente.',
+        retryAfterSeconds,
+      });
     }
 
     try {
@@ -118,36 +82,31 @@ export function buildAuthRouter(services = {}) {
       });
 
       if (!resultado.ok) {
-        attemptState.count += 1;
-        attemptBuckets.set(attemptKey, attemptState);
-
-        return res.status(resultado.status).json({
-          message: resultado.message,
-        });
+        return res.status(resultado.status).json({ message: resultado.message });
       }
 
-      clearAttemptState(attemptBuckets, attemptKey);
+      await resetRateLimit(key);
       setRefreshCookie(res, resultado.refreshToken);
 
       return res.status(resultado.status).json(resultado.data);
     } catch (error) {
       console.error('[AUTH_LOGIN_ERROR]', error);
-      return res.status(500).json({
-        message: 'Erro interno do servidor.',
-      });
+      return res.status(500).json({ message: 'Erro interno do servidor.' });
     }
   });
 
   router.post('/forgot-password', async (req, res) => {
-    const attemptKey = buildAttemptKey(req, 'forgot-password');
-    const attemptState = getAttemptState(
-      attemptBuckets,
-      attemptKey,
-      RESET_WINDOW_MS
-    );
+    const key = buildAttemptKey(req, 'forgot-password');
+    const { limited, retryAfterSeconds } = await checkRateLimit(key, {
+      maxAttempts: RESET_MAX_ATTEMPTS,
+      windowMs: RESET_WINDOW_MS,
+    });
 
-    if (respondIfRateLimited(res, attemptState, RESET_MAX_ATTEMPTS)) {
-      return;
+    if (limited) {
+      return res.status(429).json({
+        message: 'Muitas tentativas em pouco tempo. Aguarde alguns minutos antes de tentar novamente.',
+        retryAfterSeconds,
+      });
     }
 
     try {
@@ -158,17 +117,11 @@ export function buildAuthRouter(services = {}) {
         appBaseUrl: process.env.FRONTEND_URL,
       });
 
-      clearAttemptState(attemptBuckets, attemptKey);
-      return res.status(resultado.status).json({
-        message: resultado.message,
-      });
+      await resetRateLimit(key);
+      return res.status(resultado.status).json({ message: resultado.message });
     } catch (error) {
       console.error('[AUTH_FORGOT_PASSWORD_ERROR]', error);
-      attemptState.count += 1;
-      attemptBuckets.set(attemptKey, attemptState);
-      return res.status(500).json({
-        message: 'Erro interno do servidor.',
-      });
+      return res.status(500).json({ message: 'Erro interno do servidor.' });
     }
   });
 
@@ -179,14 +132,10 @@ export function buildAuthRouter(services = {}) {
         senha: req.body?.senha,
       });
 
-      return res.status(resultado.status).json({
-        message: resultado.message,
-      });
+      return res.status(resultado.status).json({ message: resultado.message });
     } catch (error) {
       console.error('[AUTH_RESET_PASSWORD_ERROR]', error);
-      return res.status(500).json({
-        message: 'Erro interno do servidor.',
-      });
+      return res.status(500).json({ message: 'Erro interno do servidor.' });
     }
   });
 
@@ -198,17 +147,11 @@ export function buildAuthRouter(services = {}) {
       );
 
       return res.status(resultado.status).json(
-        resultado.ok
-          ? resultado.data
-          : {
-              message: resultado.message,
-            }
+        resultado.ok ? resultado.data : { message: resultado.message }
       );
     } catch (error) {
       console.error('[AUTH_REFRESH_ERROR]', error);
-      return res.status(500).json({
-        message: 'Erro interno do servidor.',
-      });
+      return res.status(500).json({ message: 'Erro interno do servidor.' });
     }
   });
 
@@ -221,14 +164,10 @@ export function buildAuthRouter(services = {}) {
 
       clearRefreshCookie(res);
 
-      return res.status(resultado.status).json({
-        message: resultado.message,
-      });
+      return res.status(resultado.status).json({ message: resultado.message });
     } catch (error) {
       console.error('[AUTH_LOGOUT_ERROR]', error);
-      return res.status(500).json({
-        message: 'Erro interno do servidor.',
-      });
+      return res.status(500).json({ message: 'Erro interno do servidor.' });
     }
   });
 

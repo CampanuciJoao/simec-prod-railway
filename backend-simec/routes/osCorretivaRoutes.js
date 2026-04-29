@@ -1,6 +1,13 @@
 import express from 'express';
 import { proteger, admin } from '../middleware/authMiddleware.js';
-import prisma from '../services/prismaService.js';
+import validate from '../middleware/validate.js';
+import {
+  abrirOsSchema,
+  notaAndamentoSchema,
+  agendarVisitaSchema,
+  registrarResultadoSchema,
+  concluirOsSchema,
+} from '../validators/osCorretivaValidator.js';
 import {
   listarOsCorretivasService,
   obterOsCorretivaDetalhadaService,
@@ -16,6 +23,7 @@ import {
   adaptarOsCorretivaResponse,
   adaptarListaOsCorretivasResponse,
 } from '../services/osCorretivaResponseAdapter.js';
+import { buscarEventosHistorico } from '../services/historicoAtivoService.js';
 
 const router = express.Router();
 router.use(proteger);
@@ -36,32 +44,15 @@ router.get('/', async (req, res) => {
 
 router.get('/:id/historico', async (req, res) => {
   try {
-    const { tenantId } = req.usuario;
-    const osId = req.params.id;
-
-    const existe = await prisma.osCorretiva.findFirst({
-      where: { tenantId, id: osId },
-      select: { id: true },
+    const resultado = await buscarEventosHistorico({
+      tenantId: req.usuario.tenantId,
+      referenciaId: req.params.id,
+      referenciaTipo: 'os_corretiva',
+      modelName: 'osCorretiva',
+      query: req.query,
     });
-    if (!existe) return res.status(404).json({ message: 'OS Corretiva não encontrada.' });
-
-    const eventos = await prisma.historicoAtivoEvento.findMany({
-      where: { tenantId, referenciaId: osId, referenciaTipo: 'os_corretiva' },
-      orderBy: { dataEvento: 'asc' },
-      select: {
-        id: true,
-        tipoEvento: true,
-        titulo: true,
-        descricao: true,
-        origem: true,
-        status: true,
-        metadataJson: true,
-        dataEvento: true,
-        createdAt: true,
-      },
-    });
-
-    return res.json({ items: eventos, total: eventos.length });
+    if (!resultado.ok) return res.status(resultado.status).json({ message: resultado.message });
+    return res.json(resultado.data);
   } catch (error) {
     console.error('[OS_CORRETIVA_HISTORICO_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar histórico.' });
@@ -82,12 +73,12 @@ router.get('/:id', async (req, res) => {
   }
 });
 
-router.post('/', async (req, res) => {
+router.post('/', validate(abrirOsSchema), async (req, res) => {
   try {
     const resultado = await abrirOsCorretivaService({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      dados: req.body,
+      dados: req.validatedData,
     });
     if (!resultado.ok) {
       return res.status(resultado.status).json({
@@ -103,13 +94,13 @@ router.post('/', async (req, res) => {
   }
 });
 
-router.post('/:id/notas', async (req, res) => {
+router.post('/:id/notas', validate(notaAndamentoSchema), async (req, res) => {
   try {
     const resultado = await adicionarNotaOsCorretivaService({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       osId: req.params.id,
-      dados: req.body,
+      dados: req.validatedData,
     });
     if (!resultado.ok) {
       return res.status(resultado.status).json({
@@ -124,13 +115,13 @@ router.post('/:id/notas', async (req, res) => {
   }
 });
 
-router.post('/:id/visitas', async (req, res) => {
+router.post('/:id/visitas', validate(agendarVisitaSchema), async (req, res) => {
   try {
     const resultado = await agendarVisitaTerceiroService({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       osId: req.params.id,
-      dados: req.body,
+      dados: req.validatedData,
     });
     if (!resultado.ok) {
       return res.status(resultado.status).json({
@@ -161,14 +152,14 @@ router.post('/:id/visitas/:visitaId/iniciar', async (req, res) => {
   }
 });
 
-router.post('/:id/visitas/:visitaId/resultado', async (req, res) => {
+router.post('/:id/visitas/:visitaId/resultado', validate(registrarResultadoSchema), async (req, res) => {
   try {
     const resultado = await registrarResultadoVisitaService({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       visitaId: req.params.visitaId,
-      dados: req.body,
+      dados: req.validatedData,
     });
     if (!resultado.ok) {
       return res.status(resultado.status).json({
@@ -183,13 +174,13 @@ router.post('/:id/visitas/:visitaId/resultado', async (req, res) => {
   }
 });
 
-router.post('/:id/concluir', async (req, res) => {
+router.post('/:id/concluir', validate(concluirOsSchema), async (req, res) => {
   try {
     const resultado = await concluirOsCorretivaService({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       osId: req.params.id,
-      dados: req.body,
+      dados: req.validatedData,
     });
     if (!resultado.ok) return res.status(resultado.status).json({ message: resultado.message });
     return res.json(adaptarOsCorretivaResponse(resultado.data));
