@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faPaperclip, faXmark, faCloudArrowUp } from '@fortawesome/free-solid-svg-icons';
 
 import { useSeguroForm } from '@/hooks/seguros/useSeguroForm';
 import { TIPO_SEGURO_OPTIONS, COBERTURA_FIELDS } from '@/utils/seguros';
@@ -76,12 +76,34 @@ function SeguroForm({
   } = useSeguroForm({ initialData, isEditing, equipamentosDisponiveis });
 
   const [pendingFiles, setPendingFiles] = useState([]);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
+
+  const ACCEPTED_EXTENSIONS = /\.(pdf|jpe?g|png|docx?)$/i;
+
+  const addFiles = useCallback((files) => {
+    const valid = files.filter((f) => ACCEPTED_EXTENSIONS.test(f.name));
+    if (valid.length) setPendingFiles((prev) => [...prev, ...valid]);
+  }, []);
 
   const handleFileAdd = (e) => {
-    const files = Array.from(e.target.files || []);
-    if (!files.length) return;
-    setPendingFiles((prev) => [...prev, ...files]);
+    addFiles(Array.from(e.target.files || []));
     e.target.value = '';
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    addFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false);
   };
 
   const handleFileRemove = (index) => {
@@ -289,24 +311,42 @@ function SeguroForm({
             </div>
           ) : null}
 
-          <label
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-4 py-2 text-sm font-medium transition hover:opacity-80"
+          <div
+            onDrop={handleDrop}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors"
             style={{
-              borderColor: 'var(--border-soft)',
-              backgroundColor: 'var(--bg-surface-soft)',
-              color: 'var(--text-secondary)',
+              borderColor: isDragOver ? 'var(--brand-primary)' : 'var(--border-soft)',
+              backgroundColor: isDragOver ? 'var(--brand-primary-soft)' : 'var(--bg-surface-soft)',
             }}
           >
-            <FontAwesomeIcon icon={faPaperclip} />
-            Anexar documento
-            <input
-              type="file"
-              className="hidden"
-              multiple
-              onChange={handleFileAdd}
-              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            <FontAwesomeIcon
+              icon={faCloudArrowUp}
+              className="text-3xl"
+              style={{ color: isDragOver ? 'var(--brand-primary)' : 'var(--text-muted)' }}
             />
-          </label>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Arraste um arquivo aqui ou{' '}
+              <label
+                className="cursor-pointer font-medium underline-offset-2 hover:underline"
+                style={{ color: 'var(--brand-primary)' }}
+              >
+                clique para selecionar
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  multiple
+                  onChange={handleFileAdd}
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                />
+              </label>
+            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              PDF, JPG, PNG, DOC, DOCX
+            </p>
+          </div>
         </div>
       </FormSection>
 
