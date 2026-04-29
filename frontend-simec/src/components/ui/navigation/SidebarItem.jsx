@@ -38,20 +38,16 @@ function SidebarItem({
       style={getNavLinkStyle}
       onClick={onClick}
       onMouseEnter={(e) => {
-        const isActive =
-          e.currentTarget.getAttribute('aria-current') === 'page';
-
-        if (!isActive) {
+        const active = e.currentTarget.getAttribute('aria-current') === 'page';
+        if (!active) {
           e.currentTarget.style.backgroundColor = 'var(--bg-surface-subtle)';
           e.currentTarget.style.color = 'var(--text-primary)';
           e.currentTarget.style.borderColor = 'var(--border-soft)';
         }
       }}
       onMouseLeave={(e) => {
-        const isActive =
-          e.currentTarget.getAttribute('aria-current') === 'page';
-
-        if (!isActive) {
+        const active = e.currentTarget.getAttribute('aria-current') === 'page';
+        if (!active) {
           e.currentTarget.style.backgroundColor = 'transparent';
           e.currentTarget.style.color = 'var(--text-sidebar-muted)';
           e.currentTarget.style.borderColor = 'transparent';

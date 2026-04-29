@@ -4,6 +4,7 @@ import dotenv from 'dotenv';
 import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasOrchestrator.js';
 import { processarAlertasManutencaoDoTenant } from './services/alertas/manutencao/index.js';
 import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
+import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 
@@ -79,6 +80,11 @@ const alertasWorker = new Worker(
         contratos: 0,
         recomendacoes: Number(recomendacoes?.total || 0),
       };
+    }
+
+    if (job?.name === 'cleanup-retencao-dados') {
+      const result = await executarCleanupCompleto();
+      return { ok: true, ...result };
     }
 
     return processarAlertasEEnviarNotificacoes();

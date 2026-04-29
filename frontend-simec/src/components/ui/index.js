@@ -30,6 +30,7 @@ export {
   DateInput,
   FormFieldShell,
   Input,
+  Pagination,
   Select,
   Textarea,
   TimeInput,

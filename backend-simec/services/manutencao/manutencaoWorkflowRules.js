@@ -1,7 +1,7 @@
 import { extrairLocalDateTimeFromIso } from './manutencaoSchedulingRules.js';
 
 export function validarAcaoWorkflow(acao) {
-  return ['concluir', 'prorrogar', 'cancelar'].includes(acao);
+  return ['concluir', 'prorrogar', 'cancelar', 'agendar_visita', 'resolver_internamente'].includes(acao);
 }
 
 export function validarStatusParaAcao({
@@ -10,8 +10,30 @@ export function validarStatusParaAcao({
 }) {
   const status = String(statusAtual || '');
 
+  if (acao === 'agendar_visita') {
+    if (status !== 'Pendente') {
+      return {
+        ok: false,
+        status: 409,
+        message: `Nao e possivel agendar visita em uma OS com status "${status}". A OS deve estar Pendente.`,
+      };
+    }
+    return { ok: true };
+  }
+
+  if (acao === 'resolver_internamente') {
+    if (status !== 'Pendente') {
+      return {
+        ok: false,
+        status: 409,
+        message: `Nao e possivel resolver internamente uma OS com status "${status}". A OS deve estar Pendente.`,
+      };
+    }
+    return { ok: true };
+  }
+
   if (acao === 'cancelar') {
-    const permitidos = ['Agendada', 'EmAndamento', 'AguardandoConfirmacao'];
+    const permitidos = ['Agendada', 'EmAndamento', 'AguardandoConfirmacao', 'Pendente'];
 
     if (!permitidos.includes(status)) {
       return {
@@ -95,6 +117,15 @@ export function montarWorkflowPayload({
   manutencaoRealizada,
   equipamentoOperante,
   statusEquipamentoAnterior,
+  // campos exclusivos de agendar_visita
+  agendamentoDataInicioLocal,
+  agendamentoHoraInicioLocal,
+  agendamentoDataFimLocal,
+  agendamentoHoraFimLocal,
+  agendamentoStartUtc,
+  agendamentoEndUtc,
+  numeroChamado,
+  tecnicoResponsavel,
 }) {
   if (!validarAcaoWorkflow(acao)) {
     return {
@@ -111,6 +142,63 @@ export function montarWorkflowPayload({
 
   if (!validacaoStatus.ok) {
     return validacaoStatus;
+  }
+
+  // Tratar acoes exclusivas de OS Pendente antes da validacao operacional
+  if (acao === 'agendar_visita') {
+    const dataFormatada = `${agendamentoDataInicioLocal} ${agendamentoHoraInicioLocal}`;
+    const notaTexto = [
+      `Visita agendada para ${dataFormatada}.`,
+      String(observacao || '').trim(),
+    ].filter(Boolean).join(' ');
+
+    return {
+      ok: true,
+      updateData: {
+        status: 'Agendada',
+        agendamentoDataInicioLocal,
+        agendamentoHoraInicioLocal,
+        agendamentoDataFimLocal,
+        agendamentoHoraFimLocal,
+        agendamentoTimezone: timezone,
+        dataHoraAgendamentoInicio: agendamentoStartUtc,
+        dataHoraAgendamentoFim: agendamentoEndUtc,
+        ...(numeroChamado ? { numeroChamado } : {}),
+        ...(tecnicoResponsavel ? { tecnicoResponsavel } : {}),
+      },
+      detalheLog: `OS ${manutencaoAtual.numeroOS} agendada para ${dataFormatada}. Status: Pendente → Agendada.${tecnicoResponsavel ? ` Técnico: ${tecnicoResponsavel}.` : ''}`,
+      notaOperacional: notaTexto,
+      equipamentoStatus: null,
+      historicoTitulo: `OS ${manutencaoAtual.numeroOS} visita agendada`,
+      historicoDescricao: notaTexto,
+    };
+  }
+
+  if (acao === 'resolver_internamente') {
+    if (!String(observacao || '').trim()) {
+      return {
+        ok: false,
+        status: 400,
+        message: 'Descreva como o problema foi resolvido.',
+      };
+    }
+
+    const agora = new Date();
+    const notaTexto = `Resolvido internamente sem visita tecnica. ${String(observacao).trim()}`;
+
+    return {
+      ok: true,
+      updateData: {
+        status: 'Concluida',
+        dataConclusao: agora,
+        dataFimReal: agora,
+      },
+      detalheLog: `OS ${manutencaoAtual.numeroOS} resolvida internamente. Status: Pendente → Concluída. Resolução: ${String(observacao).trim()}`,
+      notaOperacional: notaTexto,
+      equipamentoStatus: 'Operante',
+      historicoTitulo: `OS ${manutencaoAtual.numeroOS} resolvida internamente`,
+      historicoDescricao: notaTexto,
+    };
   }
 
   const erroSelecao = validarSelecaoOperacional({
@@ -145,7 +233,7 @@ export function montarWorkflowPayload({
 
     updateData.status = 'Cancelada';
     equipamentoStatus = statusEquipamentoAnterior || null;
-    detalheLog = `OS ${manutencaoAtual.numeroOS} cancelada.`;
+    detalheLog = `OS ${manutencaoAtual.numeroOS} cancelada. Status: ${manutencaoAtual.status} → Cancelada. Motivo: ${String(observacao).trim()}`;
     notaOperacional = `Cancelamento registrado. Motivo: ${String(observacao).trim()}`;
     historicoTitulo = `OS ${manutencaoAtual.numeroOS} cancelada`;
     historicoDescricao = [
@@ -198,7 +286,7 @@ export function montarWorkflowPayload({
     updateData.status = 'Concluida';
     updateData.dataConclusao = parsedConclusao;
     updateData.dataFimReal = parsedConclusao;
-    detalheLog = `OS ${manutencaoAtual.numeroOS} concluida.`;
+    detalheLog = `OS ${manutencaoAtual.numeroOS} concluída. Status: ${manutencaoAtual.status} → Concluída. Manutenção realizada: ${manutencaoRealizada ? 'Sim' : 'Não'}. Equipamento: Operante.${observacao ? ` Obs: ${String(observacao).trim()}` : ''}`;
     equipamentoStatus = 'Operante';
     historicoTitulo = `OS ${manutencaoAtual.numeroOS} concluida`;
     historicoDescricao = [
@@ -268,7 +356,7 @@ export function montarWorkflowPayload({
   updateData.agendamentoHoraFimLocal = localPrevisao.timeLocal;
   updateData.dataHoraAgendamentoFim = localPrevisao.utcDate;
 
-  detalheLog = `OS ${manutencaoAtual.numeroOS} prorrogada.`;
+  detalheLog = `OS ${manutencaoAtual.numeroOS} prorrogada. Status: ${manutencaoAtual.status} → EmAndamento. Nova previsão: ${localPrevisao.dateLocal} ${localPrevisao.timeLocal}. Motivo: ${String(observacao).trim()}`;
   equipamentoStatus = 'EmManutencao';
   historicoTitulo = `OS ${manutencaoAtual.numeroOS} prorrogada`;
   historicoDescricao = [

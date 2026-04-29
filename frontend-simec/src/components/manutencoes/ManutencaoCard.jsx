@@ -24,9 +24,21 @@ function getTipoLabel(tipo) {
   return tipo ? String(tipo).replace(/([A-Z])/g, ' $1').trim() : '-';
 }
 
+const STATUS_BORDER = {
+  Concluida: 'var(--color-success)',
+  Cancelada: 'var(--text-muted)',
+  EmAndamento: '#8b5cf6',
+  AguardandoConfirmacao: '#f97316',
+  Agendada: 'var(--brand-primary)',
+  Pendente: 'var(--color-warning)',
+};
+
 function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
   return (
-    <Card className="rounded-3xl p-5">
+    <Card
+      className="rounded-3xl p-5"
+      style={{ borderLeftWidth: '4px', borderLeftColor: STATUS_BORDER[manutencao.status] || 'var(--border-soft)' }}
+    >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">

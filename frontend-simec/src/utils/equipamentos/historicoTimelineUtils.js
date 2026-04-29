@@ -31,6 +31,7 @@ function getDescricaoPrincipal(item, metadata, referenciaDetalhes) {
   return (
     item.descricao ||
     referenciaDetalhes?.descricaoProblemaServico ||
+    referenciaDetalhes?.descricaoProblema ||
     referenciaDetalhes?.descricao ||
     referenciaDetalhes?.solucao ||
     metadata?.observacao ||
@@ -77,6 +78,18 @@ function getResumoOperacional(item, metadata, referenciaDetalhes) {
     });
   }
 
+  if (referenciaDetalhes?.solicitante) {
+    resumo.push({ label: 'Solicitante', value: referenciaDetalhes.solicitante });
+  }
+
+  if (referenciaDetalhes?.dataHoraAbertura) {
+    resumo.push({ label: 'Abertura', value: formatarDataHora(referenciaDetalhes.dataHoraAbertura) });
+  }
+
+  if (referenciaDetalhes?.dataHoraConclusao) {
+    resumo.push({ label: 'Conclusão', value: formatarDataHora(referenciaDetalhes.dataHoraConclusao) });
+  }
+
   if (metadata?.equipamentoOperante === true) {
     resumo.push({ label: 'Resultado', value: 'Equipamento operante' });
   }
@@ -88,11 +101,19 @@ function getResumoOperacional(item, metadata, referenciaDetalhes) {
   return resumo;
 }
 
-function getDetalhesComplementares(item, metadata) {
+function getDetalhesComplementares(item, metadata, referenciaDetalhes) {
   const detalhes = [];
 
-  if (metadata?.numeroOS) {
-    detalhes.push({ label: 'OS', value: metadata.numeroOS });
+  if (referenciaDetalhes?.numeroOS || metadata?.numeroOS) {
+    detalhes.push({ label: 'OS', value: referenciaDetalhes?.numeroOS || metadata.numeroOS });
+  }
+
+  if (referenciaDetalhes?.tipo) {
+    detalhes.push({ label: 'Tipo', value: referenciaDetalhes.tipo });
+  }
+
+  if (referenciaDetalhes?.status) {
+    detalhes.push({ label: 'Status OS', value: referenciaDetalhes.status });
   }
 
   if (metadata?.numeroChamado) {
@@ -145,7 +166,7 @@ function mapHistoricoEvento(item) {
     referenciaDetalhes,
     metadata,
     impactaAnalise: Boolean(item.impactaAnalise),
-    detalhesComplementares: getDetalhesComplementares(item, metadata),
+    detalhesComplementares: getDetalhesComplementares(item, metadata, referenciaDetalhes),
     resumoOperacional: getResumoOperacional(item, metadata, referenciaDetalhes),
     anexos,
     notasAndamento,
@@ -156,9 +177,17 @@ function mapHistoricoEvento(item) {
 
 function getTituloGrupo(eventosSorted) {
   const primeiro = eventosSorted[0];
+  const ultimo = eventosSorted[eventosSorted.length - 1];
+
+  if (primeiro.referenciaTipo === 'os_corretiva') {
+    const numeroOS = ultimo.referenciaDetalhes?.numeroOS || primeiro.referenciaDetalhes?.numeroOS || primeiro.metadata?.numeroOS;
+    return numeroOS ? `OS ${numeroOS}` : primeiro.titulo;
+  }
+
   if (primeiro.categoriaBase === 'manutencao' && primeiro.metadata?.numeroOS) {
     return `OS ${primeiro.metadata.numeroOS}`;
   }
+
   if (primeiro.categoriaBase === 'ocorrencia') {
     return (
       primeiro.referenciaDetalhes?.titulo ||

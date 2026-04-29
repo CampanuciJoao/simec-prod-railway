@@ -1,5 +1,5 @@
 import prisma from '../../prismaService.js';
-import { getAgora } from '../../timeService.js';
+import { getAgora } from '../../time/index.js';
 
 import {
   calcularScoreRisco,
@@ -109,7 +109,7 @@ async function processarTenant(tenant, agoraUtc) {
           prioridade: definirPrioridade(metricas.scoreFinal),
           tipoCategoria: ALERT_CATEGORIAS.RECOMENDACAO,
           tipoEvento: ALERT_EVENTOS.RECOM_PREVENTIVA,
-          link: `/equipamentos/ficha-tecnica/${equipamento.id}`,
+          link: `/equipamentos/detalhes/${equipamento.id}`,
 
           contexto: {
             equipamentoId: equipamento.id,

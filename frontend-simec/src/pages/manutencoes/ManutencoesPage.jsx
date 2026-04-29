@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 
 // CONTEXT / HOOKS
 import { useAuth } from '@/contexts/AuthContext';
 import { useManutencoesPage } from '@/hooks/manutencoes/useManutencoesPage';
+import { useOsCorretiva } from '@/hooks/osCorretiva/useOsCorretiva';
+import { useModal } from '@/hooks/shared/useModal';
 
 // DOMAIN
 import {
@@ -12,16 +14,66 @@ import {
 } from '@/components/manutencoes';
 
 // UI
-import { PageLayout, PageState } from '@/components/ui';
+import { PageLayout, PageState, ModalConfirmacao, Pagination } from '@/components/ui';
 
 function ManutencoesPage() {
   const { usuario } = useAuth();
-  const page = useManutencoesPage();
+  const isAdmin = usuario?.role === 'admin';
 
-  const isLoading = page.loading && page.manutencoes.length === 0;
+  const page = useManutencoesPage();
+  const os = useOsCorretiva();
+  const osDeleteModal = useModal();
+
+  const handleConfirmDeleteOs = async () => {
+    const id = osDeleteModal.modalData?.id;
+    if (!id) return;
+    try {
+      await os.removerOs(id);
+      osDeleteModal.closeModal();
+    } catch {
+      // toast shown in hook
+    }
+  };
+
+  // Merge both lists with a discriminator and a common sort date, newest first
+  const unifiedItems = useMemo(() => {
+    const mItems = page.manutencoes.map((m) => ({
+      ...m,
+      _kind: 'manutencao',
+      _sortDate: m.dataHoraAgendamentoInicio || m.createdAt || '',
+    }));
+    const osItems = os.osCorretivas.map((o) => ({
+      ...o,
+      _kind: 'osCorretiva',
+      _sortDate: o.dataHoraAbertura || o.createdAt || '',
+    }));
+    return [...mItems, ...osItems].sort((a, b) => {
+      if (!a._sortDate) return 1;
+      if (!b._sortDate) return -1;
+      return new Date(b._sortDate) - new Date(a._sortDate);
+    });
+  }, [page.manutencoes, os.osCorretivas]);
+
+  const isLoading = (page.loading || os.loading) && page.manutencoes.length === 0 && os.osCorretivas.length === 0;
   const hasError = Boolean(page.error);
-  const isEmpty =
-    !page.loading && !page.error && page.manutencoes.length === 0;
+  const isEmpty = !page.loading && !os.loading && !page.error && unifiedItems.length === 0;
+
+  const combinedTotal = (page.pagination?.total ?? 0) + (os.pagination?.total ?? 0);
+  const combinedHasNextPage = Boolean(page.pagination?.hasNextPage || os.pagination?.hasNextPage);
+  const combinedLoadingMore = page.loadingMore || os.loadingMore;
+
+  const handleLoadMore = () => {
+    if (page.pagination?.hasNextPage) page.carregarMais();
+    if (os.pagination?.hasNextPage) os.carregarMais();
+  };
+
+  // Combined metricas: manutenções + OS corretivas counts
+  const combinedMetricas = useMemo(() => ({
+    total: (page.metricas?.total ?? 0) + (os.metricas?.total ?? 0),
+    aguardando: (page.metricas?.aguardando ?? 0) + (os.metricas?.abertas ?? 0) + (os.metricas?.emAndamento ?? 0),
+    concluidas: (page.metricas?.concluidas ?? 0) + (os.metricas?.concluidas ?? 0),
+    canceladas: page.metricas?.canceladas ?? 0,
+  }), [page.metricas, os.metricas]);
 
   return (
     <>
@@ -32,9 +84,22 @@ function ManutencoesPage() {
         manutencao={page.deleteModal.modalData}
       />
 
+      <ModalConfirmacao
+        isOpen={osDeleteModal.isOpen}
+        onClose={osDeleteModal.closeModal}
+        onConfirm={handleConfirmDeleteOs}
+        title="Excluir OS Corretiva"
+        message={`Deseja excluir a OS ${osDeleteModal.modalData?.numeroOS}? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        isDestructive
+      />
+
       <PageLayout padded fullHeight>
         <div className="space-y-6">
-          <ManutencoesPageHeader onCreate={page.goToCreate} />
+          <ManutencoesPageHeader
+            onCreate={page.goToCreate}
+            onRegistrarOcorrencia={page.goToRegistrarOcorrencia}
+          />
 
           {isLoading || hasError || isEmpty ? (
             <PageState
@@ -44,22 +109,37 @@ function ManutencoesPage() {
               emptyMessage="Nenhuma manutenção encontrada."
             />
           ) : (
-            <ManutencoesListSection
-              manutencoes={page.manutencoes}
-              searchTerm={page.searchTerm}
-              onSearchChange={page.onSearchChange}
-              selectFilters={page.selectFiltersConfig}
-              activeFilters={page.activeFilters}
-              onRemoveFilter={page.clearFilter}
-              onClearAll={page.clearAllFilters}
-              onDelete={(item) => page.deleteModal.openModal(item)}
-              isAdmin={usuario?.role === 'admin'}
-              metricas={page.metricas}
-              total={page.pagination?.total}
-              hasNextPage={page.pagination?.hasNextPage}
-              loadingMore={page.loadingMore}
-              onLoadMore={page.carregarMais}
-            />
+            <div className="space-y-4">
+              <ManutencoesListSection
+                items={unifiedItems}
+                searchTerm={page.searchTerm}
+                onSearchChange={page.onSearchChange}
+                selectFilters={page.selectFiltersConfig}
+                activeFilters={page.activeFilters}
+                onRemoveFilter={page.clearFilter}
+                onClearAll={page.clearAllFilters}
+                onDelete={(item) => page.deleteModal.openModal(item)}
+                onDeleteOs={(o) => osDeleteModal.openModal(o)}
+                isAdmin={isAdmin}
+                metricas={combinedMetricas}
+                total={combinedTotal}
+                hasNextPage={combinedHasNextPage}
+                loadingMore={combinedLoadingMore}
+                onLoadMore={handleLoadMore}
+              />
+
+              {/* Paginação IBM Maximo style — troca de página sem append */}
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {combinedTotal > 0 ? `${combinedTotal} ordem(ns) no total` : ''}
+                </p>
+                <Pagination
+                  page={page.pagination?.page ?? 1}
+                  totalPages={page.pagination?.totalPages ?? 1}
+                  onPageChange={page.goToPage}
+                />
+              </div>
+            </div>
           )}
         </div>
       </PageLayout>

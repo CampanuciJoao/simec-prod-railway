@@ -29,9 +29,6 @@ export const EquipamentosPage = React.lazy(() =>
 export const DetalhesEquipamentoPage = React.lazy(() =>
   import('@/pages/equipamentos/DetalhesEquipamentoPage')
 );
-export const FichaTecnicaPage = React.lazy(() =>
-  import('@/pages/equipamentos/FichaTecnicaPage')
-);
 export const SalvarEquipamentoPage = React.lazy(() =>
   import('@/pages/equipamentos/SalvarEquipamentoPage')
 );
@@ -103,4 +100,10 @@ export const SalvarOrcamentoPage = React.lazy(() =>
 );
 export const DetalhesOrcamentoPage = React.lazy(() =>
   import('@/pages/orcamentos/DetalhesOrcamentoPage')
+);
+export const AbrirOsCorretivaPage = React.lazy(() =>
+  import('@/pages/osCorretiva/AbrirOsCorretivaPage')
+);
+export const DetalhesOsCorretivaPage = React.lazy(() =>
+  import('@/pages/osCorretiva/DetalhesOsCorretivaPage')
 );

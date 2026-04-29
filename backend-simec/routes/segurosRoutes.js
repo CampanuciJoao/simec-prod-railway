@@ -101,41 +101,132 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
   return unidade;
 }
 
+// ─── Helpers de paginação e filtros ──────────────────────────────────────────
+
+function buildStatusWhereSeguro(status) {
+  if (!status) return null;
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const em30Dias = new Date(hoje);
+  em30Dias.setDate(em30Dias.getDate() + 30);
+
+  switch (status) {
+    case 'Cancelado':
+      return { status: 'Cancelado' };
+    case 'Expirado':
+      return { OR: [{ status: 'Expirado' }, { status: 'Ativo', dataFim: { lt: hoje } }] };
+    case 'Vence em breve':
+      return { status: { not: 'Cancelado' }, dataFim: { gte: hoje, lt: em30Dias } };
+    case 'Ativo':
+      return { status: { notIn: ['Cancelado', 'Expirado'] }, dataFim: { gte: em30Dias } };
+    default:
+      return null;
+  }
+}
+
+function buildSeguroWhere({ tenantId, status, seguradora, unidade, tipoSeguro, search }) {
+  const conditions = [{ tenantId }];
+
+  const statusFilter = buildStatusWhereSeguro(status);
+  if (statusFilter) conditions.push(statusFilter);
+  if (seguradora) conditions.push({ seguradora });
+  if (tipoSeguro) conditions.push({ tipoSeguro });
+  if (unidade) conditions.push({ unidade: { nomeSistema: unidade } });
+
+  if (search) {
+    conditions.push({
+      OR: [
+        { apoliceNumero: { contains: search, mode: 'insensitive' } },
+        { seguradora: { contains: search, mode: 'insensitive' } },
+        { unidade: { nomeSistema: { contains: search, mode: 'insensitive' } } },
+        { equipamento: { modelo: { contains: search, mode: 'insensitive' } } },
+        { equipamento: { tag: { contains: search, mode: 'insensitive' } } },
+      ],
+    });
+  }
+
+  return conditions.length === 1 ? conditions[0] : { AND: conditions };
+}
+
+async function contarMetricasSeguros(tenantId) {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const em30Dias = new Date(hoje);
+  em30Dias.setDate(em30Dias.getDate() + 30);
+
+  const [total, ativos, vencendo, vencidos] = await Promise.all([
+    prisma.seguro.count({ where: { tenantId } }),
+    prisma.seguro.count({
+      where: {
+        tenantId,
+        status: { notIn: ['Cancelado', 'Expirado'] },
+        dataFim: { gte: em30Dias },
+      },
+    }),
+    prisma.seguro.count({
+      where: {
+        tenantId,
+        status: { not: 'Cancelado' },
+        dataFim: { gte: hoje, lt: em30Dias },
+      },
+    }),
+    prisma.seguro.count({
+      where: {
+        tenantId,
+        OR: [{ status: 'Expirado' }, { status: 'Ativo', dataFim: { lt: hoje } }],
+      },
+    }),
+  ]);
+
+  return { total, ativos, vencendo, vencidos };
+}
+
+const SEGURO_INCLUDE = {
+  equipamento: {
+    select: { id: true, modelo: true, tag: true, tipo: true },
+  },
+  unidade: {
+    select: { id: true, nomeSistema: true, nomeFantasia: true },
+  },
+  anexos: {
+    orderBy: { createdAt: 'desc' },
+  },
+};
+
 // ==============================
-// GET LISTAR
+// GET LISTAR (paginado)
 // ==============================
 router.get('/', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
 
-    const seguros = await prisma.seguro.findMany({
-      where: { tenantId },
-      include: {
-        equipamento: {
-          select: {
-            id: true,
-            modelo: true,
-            tag: true,
-            tipo: true,
-          },
-        },
-        unidade: {
-          select: {
-            id: true,
-            nomeSistema: true,
-            nomeFantasia: true,
-          },
-        },
-        anexos: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-      },
-      orderBy: { dataFim: 'asc' },
-    });
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 15));
+    const { status, seguradora, unidade, tipoSeguro, search } = req.query;
 
-    return res.json(seguros);
+    const where = buildSeguroWhere({ tenantId, status, seguradora, unidade, tipoSeguro, search });
+
+    const [data, total, metricas] = await Promise.all([
+      prisma.seguro.findMany({
+        where,
+        include: SEGURO_INCLUDE,
+        orderBy: { dataFim: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.seguro.count({ where }),
+      contarMetricasSeguros(tenantId),
+    ]);
+
+    return res.json({
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      metricas,
+    });
   } catch (error) {
     console.error('[SEGURO_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar seguros.' });

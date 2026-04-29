@@ -1,7 +1,7 @@
 import api from '../http/apiClient';
 
-export const getContratos = () =>
-  api.get('/contratos').then((res) => res.data);
+export const getContratos = (params = {}) =>
+  api.get('/contratos', { params }).then((res) => res.data);
 
 export const getContratoById = (id) =>
   api.get(`/contratos/${id}`).then((res) => res.data);

@@ -70,6 +70,7 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
 
   const style = getAlertaVisual(alerta);
   const isRecomendacao = alerta.tipo === 'Recomendação';
+  const isAguardandoConfirmacao = alerta.tipoEvento === 'MANUT_CONFIRMACAO';
 
   const dataFormatada = alerta.data ? formatarData(alerta.data) : '-';
   const subtituloRenderizado = montarSubtitulo(alerta, timezone, locale);
@@ -158,16 +159,22 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                   </span>
                 ) : null}
 
-                <span
-                  className={[
-                    'rounded-md px-2 py-1 text-[10px] font-black uppercase',
-                    alerta.status === 'NaoVisto'
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-600',
-                  ].join(' ')}
-                >
-                  {alerta.status === 'NaoVisto' ? 'Não visto' : 'Visto'}
-                </span>
+                {isAguardandoConfirmacao ? (
+                  <span className="rounded-md bg-orange-100 px-2 py-1 text-[10px] font-black uppercase text-orange-700">
+                    Acao necessaria
+                  </span>
+                ) : (
+                  <span
+                    className={[
+                      'rounded-md px-2 py-1 text-[10px] font-black uppercase',
+                      alerta.status === 'NaoVisto'
+                        ? 'bg-slate-900 text-white'
+                        : 'bg-slate-100 text-slate-600',
+                    ].join(' ')}
+                  >
+                    {alerta.status === 'NaoVisto' ? 'Não visto' : 'Visto'}
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -182,7 +189,7 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
               Detalhes
             </Link>
 
-            {alerta.status === 'Visto' ? (
+            {isAguardandoConfirmacao ? null : alerta.status === 'Visto' ? (
               <button
                 type="button"
                 onClick={() => onUpdateStatus(alerta.id, 'NaoVisto')}

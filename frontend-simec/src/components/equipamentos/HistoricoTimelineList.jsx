@@ -7,7 +7,7 @@ import {
   faCommentDots,
   faCalendarCheck,
   faCircleInfo,
-  faExternalLinkAlt,
+  faArrowUpRightFromSquare,
   faFileArrowDown,
   faPaperclip,
   faFilePen,
@@ -21,7 +21,6 @@ import {
 
 import {
   Badge,
-  Button,
   Card,
   ExpandableTimelineItem,
   ModalConfirmacao,
@@ -131,6 +130,49 @@ AdminEventoActions.propTypes = {
   onEdit: PropTypes.func.isRequired,
 };
 
+const ACTION_LINK_STYLE = {
+  color: 'var(--brand-primary)',
+  backgroundColor: 'var(--brand-primary-soft)',
+};
+
+function buildItemAction(item) {
+  if (item.referenciaTipo === 'os_corretiva' && item.referenciaId) {
+    return (
+      <Link
+        to={`/manutencoes/ocorrencia/${item.referenciaId}`}
+        title="Ver OS / Ocorrência"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span
+          className="inline-flex h-8 w-8 items-center justify-center rounded-xl transition hover:opacity-75"
+          style={ACTION_LINK_STYLE}
+        >
+          <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-xs" />
+        </span>
+      </Link>
+    );
+  }
+
+  if (item.referenciaTipo === 'manutencao' && item.referenciaId) {
+    return (
+      <Link
+        to={`/manutencoes/detalhes/${item.referenciaId}`}
+        title="Ver manutenção"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span
+          className="inline-flex h-8 w-8 items-center justify-center rounded-xl transition hover:opacity-75"
+          style={ACTION_LINK_STYLE}
+        >
+          <FontAwesomeIcon icon={faArrowUpRightFromSquare} className="text-xs" />
+        </span>
+      </Link>
+    );
+  }
+
+  return null;
+}
+
 function HistoricoTimelineList({
   linhaDoTempo = [],
   itensExpandidos,
@@ -198,6 +240,7 @@ function HistoricoTimelineList({
             borderClassName={getTimelineBorderClass(item)}
             expanded={expandido}
             onToggle={() => onToggleExpandir(item.uniqueId)}
+            actions={buildItemAction(item)}
           >
             <div className="space-y-4">
               {item.eventos?.length > 1 ? (
@@ -442,14 +485,6 @@ function HistoricoTimelineList({
                 </Card>
               ) : null}
 
-              {item.referenciaTipo === 'manutencao' && item.referenciaId ? (
-                <Link to={`/manutencoes/detalhes/${item.referenciaId}`}>
-                  <Button type="button" variant="secondary">
-                    <FontAwesomeIcon icon={faExternalLinkAlt} />
-                    Abrir manutencao
-                  </Button>
-                </Link>
-              ) : null}
             </div>
           </ExpandableTimelineItem>
         );

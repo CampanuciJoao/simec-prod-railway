@@ -201,6 +201,7 @@ export async function listarManutencoes({
   pageSize = 20,
   sortBy = 'dataHoraAgendamentoInicio',
   sortDirection = 'desc',
+  incluirNotas = false,
 }) {
   const whereClause = { tenantId };
 
@@ -293,7 +294,9 @@ export async function listarManutencoes({
 
   const queryBase = {
     where: whereClause,
-    include: getManutencaoBaseInclude(),
+    include: incluirNotas
+      ? getManutencaoDetalhesInclude(tenantId)
+      : getManutencaoBaseInclude(),
     orderBy,
   };
 
@@ -460,6 +463,13 @@ export async function criarNotaAndamento({
             tenantId,
             id: manutencaoId,
           },
+        },
+      },
+    },
+    include: {
+      autor: {
+        select: {
+          nome: true,
         },
       },
     },

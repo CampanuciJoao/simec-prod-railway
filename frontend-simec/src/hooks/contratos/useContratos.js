@@ -1,179 +1,86 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import debounce from 'lodash/debounce';
+
 import { getContratos, getUnidades, deleteContrato } from '../../services/api';
-import { getDynamicStatus } from '../../utils/contratos';
+export { getDynamicStatus } from '../../utils/contratos';
 
-function normalizarTexto(valor) {
-  return String(valor || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .trim();
-}
+const PAGE_SIZE = 10;
 
-function compareValues(a, b, direction = 'ascending') {
-  const dir = direction === 'descending' ? -1 : 1;
-
-  const valorA = a ?? '';
-  const valorB = b ?? '';
-
-  if (typeof valorA === 'number' && typeof valorB === 'number') {
-    return valorA > valorB ? dir : valorA < valorB ? -dir : 0;
-  }
-
-  const dataA =
-    valorA instanceof Date
-      ? valorA.getTime()
-      : typeof valorA === 'string' && !Number.isNaN(Date.parse(valorA))
-        ? new Date(valorA).getTime()
-        : null;
-
-  const dataB =
-    valorB instanceof Date
-      ? valorB.getTime()
-      : typeof valorB === 'string' && !Number.isNaN(Date.parse(valorB))
-        ? new Date(valorB).getTime()
-        : null;
-
-  if (dataA !== null && dataB !== null) {
-    return dataA > dataB ? dir : dataA < dataB ? -dir : 0;
-  }
-
-  const textoA = normalizarTexto(valorA);
-  const textoB = normalizarTexto(valorB);
-
-  return textoA > textoB ? dir : textoA < textoB ? -dir : 0;
-}
-
-function getSortValue(contrato, key) {
-  switch (key) {
-    case 'numeroContrato':
-      return contrato?.numeroContrato;
-    case 'fornecedor':
-      return contrato?.fornecedor;
-    case 'categoria':
-      return contrato?.categoria;
-    case 'status':
-      return getDynamicStatus(contrato);
-    case 'dataInicio':
-      return contrato?.dataInicio;
-    case 'dataFim':
-      return contrato?.dataFim;
-    default:
-      return contrato?.[key];
-  }
-}
+const FILTROS_INICIAL = { categoria: '', status: '', unidade: '' };
 
 export function useContratos() {
-  const [contratosOriginais, setContratosOriginais] = useState([]);
+  const [contratos, setContratos] = useState([]);
+  const [metricas, setMetricas] = useState({ total: 0, ativos: 0, vencendo: 0, expirados: 0 });
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filtros, setFiltros] = useState({
-    categoria: '',
-    status: '',
-    unidade: '',
-  });
-  const [sortConfig, setSortConfig] = useState({
-    key: 'dataFim',
-    direction: 'ascending',
-  });
+  const [filtros, setFiltros] = useState(FILTROS_INICIAL);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1, total: 0 });
 
-  const fetchData = useCallback(async () => {
+  const paramsRef = useRef({ page: 1, search: '', filtros: FILTROS_INICIAL });
+
+  useEffect(() => {
+    getUnidades()
+      .then((data) => setUnidades(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  const fetchPage = useCallback(async (page, search, filt) => {
+    setLoading(true);
+    setError('');
     try {
-      setLoading(true);
-      setError('');
+      const res = await getContratos({
+        page,
+        pageSize: PAGE_SIZE,
+        search: search || undefined,
+        status: filt.status || undefined,
+        categoria: filt.categoria || undefined,
+        unidade: filt.unidade || undefined,
+      });
 
-      const [contratosData, unidadesData] = await Promise.all([
-        getContratos(),
-        getUnidades(),
-      ]);
-
-      setContratosOriginais(Array.isArray(contratosData) ? contratosData : []);
-      setUnidades(Array.isArray(unidadesData) ? unidadesData : []);
+      setContratos(Array.isArray(res.data) ? res.data : []);
+      setMetricas(res.metricas ?? { total: 0, ativos: 0, vencendo: 0, expirados: 0 });
+      setPagination({ page: res.page, totalPages: res.totalPages, total: res.total });
     } catch (err) {
-      setError(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Falha ao carregar contratos.'
-      );
-      setContratosOriginais([]);
-      setUnidades([]);
+      setError(err?.response?.data?.message || err?.message || 'Erro ao carregar contratos.');
+      setContratos([]);
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const debouncedFetch = useMemo(
+    () => debounce((page, search, filt) => fetchPage(page, search, filt), 300),
+    [fetchPage]
+  );
+
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    paramsRef.current = { page: 1, search: searchTerm, filtros };
+    debouncedFetch(1, searchTerm, filtros);
+    return () => debouncedFetch.cancel();
+  }, [searchTerm, filtros, debouncedFetch]);
 
-  const contratosFiltrados = useMemo(() => {
-    const termo = normalizarTexto(searchTerm);
+  const goToPage = useCallback(
+    (newPage) => {
+      paramsRef.current = { ...paramsRef.current, page: newPage };
+      fetchPage(newPage, paramsRef.current.search, paramsRef.current.filtros);
+    },
+    [fetchPage]
+  );
 
-    return contratosOriginais.filter((contrato) => {
-      if (termo) {
-        const camposBusca = [
-          contrato?.numeroContrato,
-          contrato?.fornecedor,
-          contrato?.categoria,
-          getDynamicStatus(contrato),
-          ...(contrato?.unidadesCobertas || []).map((u) => u?.nomeSistema),
-        ];
-
-        const textoBusca = normalizarTexto(camposBusca.filter(Boolean).join(' '));
-
-        if (!textoBusca.includes(termo)) {
-          return false;
-        }
-      }
-
-      if (filtros.categoria && contrato?.categoria !== filtros.categoria) {
-        return false;
-      }
-
-      if (filtros.status && getDynamicStatus(contrato) !== filtros.status) {
-        return false;
-      }
-
-      if (filtros.unidade) {
-        const possuiUnidade = contrato?.unidadesCobertas?.some(
-          (u) => String(u.id) === String(filtros.unidade)
-        );
-
-        if (!possuiUnidade) {
-          return false;
-        }
-      }
-
-      return true;
-    });
-  }, [contratosOriginais, searchTerm, filtros]);
-
-  const contratos = useMemo(() => {
-    const items = [...contratosFiltrados];
-
-    if (!sortConfig?.key) {
-      return items;
-    }
-
-    return items.sort((a, b) => {
-      const valA = getSortValue(a, sortConfig.key);
-      const valB = getSortValue(b, sortConfig.key);
-
-      return compareValues(valA, valB, sortConfig.direction);
-    });
-  }, [contratosFiltrados, sortConfig]);
-
-  const removerContrato = useCallback(async (id) => {
-    await deleteContrato(id);
-
-    setContratosOriginais((prev) => prev.filter((item) => item.id !== id));
-  }, []);
+  const removerContrato = useCallback(
+    async (id) => {
+      await deleteContrato(id);
+      const { page, search, filtros: filt } = paramsRef.current;
+      await fetchPage(page, search, filt);
+    },
+    [fetchPage]
+  );
 
   return {
     contratos,
-    contratosOriginais,
+    metricas,
     unidadesDisponiveis: unidades,
     loading,
     error,
@@ -181,9 +88,12 @@ export function useContratos() {
     setSearchTerm,
     filtros,
     setFiltros,
-    sortConfig,
-    setSortConfig,
+    pagination,
+    goToPage,
     removerContrato,
-    refetch: fetchData,
+    refetch: () => {
+      const { page, search, filtros: filt } = paramsRef.current;
+      return fetchPage(page, search, filt);
+    },
   };
 }

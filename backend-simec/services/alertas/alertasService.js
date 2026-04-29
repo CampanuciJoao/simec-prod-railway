@@ -1,5 +1,6 @@
 import {
-  listarAlertasDoUsuario,
+  listarAlertasPaginado,
+  contarMetricasAlertas,
   contarAlertasNaoVistosDoUsuario,
   buscarAlertaPorId,
   buscarUsuarioDoTenant,
@@ -12,69 +13,45 @@ import { adaptarAlertaStatus, adaptarListaAlertas } from './alertasAdapter.js';
 
 const STATUS_VALIDOS = new Set(['Visto', 'NaoVisto']);
 
-export async function listarAlertasService({ tenantId, userId, limit = null }) {
-  const alertas = await listarAlertasDoUsuario({ tenantId, userId, limit });
+export async function listarAlertasService({ tenantId, userId, page = 1, pageSize = 25, filtros = {} }) {
+  const [paginado, metricas] = await Promise.all([
+    listarAlertasPaginado({ tenantId, userId, page, pageSize, filtros }),
+    contarMetricasAlertas({ tenantId, userId }),
+  ]);
 
-  return {
-    ok: true,
-    data: adaptarListaAlertas(alertas),
-  };
-}
-
-export async function resumirAlertasService({ tenantId, userId }) {
-  const naoVistos = await contarAlertasNaoVistosDoUsuario({
-    tenantId,
-    userId,
-  });
+  const totalPages = Math.ceil(paginado.total / pageSize) || 1;
 
   return {
     ok: true,
     data: {
-      naoVistos,
+      data: adaptarListaAlertas(paginado.data),
+      total: paginado.total,
+      page,
+      pageSize,
+      totalPages,
+      metricas,
     },
   };
 }
 
-export async function atualizarStatusAlertaService({
-  tenantId,
-  userId,
-  alertaId,
-  status,
-}) {
+export async function resumirAlertasService({ tenantId, userId }) {
+  const naoVistos = await contarAlertasNaoVistosDoUsuario({ tenantId, userId });
+  return { ok: true, data: { naoVistos } };
+}
+
+export async function atualizarStatusAlertaService({ tenantId, userId, alertaId, status }) {
   if (!STATUS_VALIDOS.has(status)) {
-    return {
-      ok: false,
-      status: 400,
-      message: "Status invalido. Use 'Visto' ou 'NaoVisto'.",
-    };
+    return { ok: false, status: 400, message: "Status invalido. Use 'Visto' ou 'NaoVisto'." };
   }
 
   const alerta = await buscarAlertaPorId({ tenantId, alertaId });
-
-  if (!alerta) {
-    return {
-      ok: false,
-      status: 404,
-      message: 'Alerta nao encontrado.',
-    };
-  }
+  if (!alerta) return { ok: false, status: 404, message: 'Alerta nao encontrado.' };
 
   const usuario = await buscarUsuarioDoTenant({ tenantId, userId });
-
-  if (!usuario) {
-    return {
-      ok: false,
-      status: 401,
-      message: 'Usuario invalido para este tenant.',
-    };
-  }
+  if (!usuario) return { ok: false, status: 401, message: 'Usuario invalido para este tenant.' };
 
   const visto = status === 'Visto';
-  const leituraExistente = await buscarLeituraAlerta({
-    tenantId,
-    alertaId,
-    userId,
-  });
+  const leituraExistente = await buscarLeituraAlerta({ tenantId, alertaId, userId });
 
   if (leituraExistente) {
     await atualizarLeituraAlerta({ alertaId, userId, visto });
@@ -82,14 +59,6 @@ export async function atualizarStatusAlertaService({
     await criarLeituraAlerta({ tenantId, alertaId, userId, visto });
   }
 
-  const alertaAtualizado = await buscarAlertaFormatado({
-    tenantId,
-    alertaId,
-    userId,
-  });
-
-  return {
-    ok: true,
-    data: adaptarAlertaStatus(alertaAtualizado),
-  };
+  const alertaAtualizado = await buscarAlertaFormatado({ tenantId, alertaId, userId });
+  return { ok: true, data: adaptarAlertaStatus(alertaAtualizado) };
 }

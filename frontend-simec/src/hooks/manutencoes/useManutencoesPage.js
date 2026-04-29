@@ -22,15 +22,13 @@ export function useManutencoesPage() {
    */
   const selectFiltersConfig = useMemo(() => {
     const statusOptions = [
-      'Agendada',
-      'EmAndamento',
-      'AguardandoConfirmacao',
-      'Concluida',
-      'Cancelada',
-    ].map((item) => ({
-      value: item,
-      label: formatarLabel(item),
-    }));
+      { value: 'Pendente', label: 'Em Triagem' },
+      { value: 'Agendada', label: 'Agendada' },
+      { value: 'EmAndamento', label: 'Em Andamento' },
+      { value: 'AguardandoConfirmacao', label: 'Aguardando Confirmacao' },
+      { value: 'Concluida', label: 'Concluida' },
+      { value: 'Cancelada', label: 'Cancelada' },
+    ];
 
     const tipoOptions = ['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'].map(
       (item) => ({
@@ -161,6 +159,10 @@ export function useManutencoesPage() {
     navigate('/manutencoes/agendar');
   }, [navigate]);
 
+  const goToRegistrarOcorrencia = useCallback(() => {
+    navigate('/manutencoes/ocorrencia/abrir');
+  }, [navigate]);
+
   /**
    * =========================
    * RETURN PADRONIZADO
@@ -183,11 +185,15 @@ export function useManutencoesPage() {
     sortConfig: dataHook.controles.sortConfig,
     requestSort: dataHook.controles.requestSort,
 
+    // paginação IBM Maximo style
+    goToPage: dataHook.goToPage,
+
     // modal
     deleteModal,
     handleConfirmDelete,
 
     // nav
     goToCreate,
+    goToRegistrarOcorrencia,
   };
 }

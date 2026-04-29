@@ -32,3 +32,9 @@ export const deleteAnexoManutencao = (manutencaoId, anexoId) =>
 
 export const addNotaAndamento = (manutencaoId, notaData) =>
   api.post(`/manutencoes/${manutencaoId}/notas`, notaData).then((res) => res.data);
+
+export const getManutencoesPorEquipamento = (equipamentoId, params = {}) =>
+  api.get('/manutencoes', { params: { equipamentoId, ...params } }).then((res) => res.data);
+
+export const getHistoricoManutencao = (id) =>
+  api.get(`/manutencoes/${id}/historico`).then((res) => res.data);

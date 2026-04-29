@@ -5,7 +5,6 @@ import { ResponsiveTabs } from '@/components/ui';
 import {
   TabAnexos,
   TabCobertura,
-  TabFichaTecnica,
   TabHistorico,
   TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
@@ -13,7 +12,6 @@ import {
 const TABS = [
   { id: 'visaoGeral', label: 'Visao geral' },
   { id: 'historico', label: 'Historico' },
-  { id: 'fichaTecnica', label: 'Ficha tecnica' },
   { id: 'anexos', label: 'Anexos' },
   { id: 'cobertura', label: 'Cobertura' },
 ];
@@ -31,7 +29,6 @@ function EquipamentoCardExpanded({
         editHref={`/equipamentos/editar/${equipamento.id}`}
       />
     ),
-    fichaTecnica: <TabFichaTecnica equipamentoId={equipamento.id} />,
     anexos: (
       <TabAnexos
         equipamentoId={equipamento.id}

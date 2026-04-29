@@ -19,7 +19,7 @@ import {
 import { registrarLog } from '../logService.js';
 import { enviarEmail } from '../emailService.js';
 
-export const ACCESS_TOKEN_TTL = '15m';
+export const ACCESS_TOKEN_TTL = '2h';
 export const REFRESH_TOKEN_COOKIE = 'simec_refresh_token';
 const RESET_TOKEN_TTL_MINUTES = 30;
 const REFRESH_TOKEN_TTL_DAYS = 14;

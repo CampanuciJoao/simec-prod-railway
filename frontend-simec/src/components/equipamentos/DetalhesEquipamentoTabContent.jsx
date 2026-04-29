@@ -3,7 +3,6 @@ import React from 'react';
 import {
   TabAnexos,
   TabCobertura,
-  TabFichaTecnica,
   TabHistorico,
   TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
@@ -21,7 +20,6 @@ function DetalhesEquipamentoTabContent({
         editHref={`/equipamentos/editar/${equipamentoId}`}
       />
     ),
-    fichaTecnica: <TabFichaTecnica equipamentoId={equipamentoId} />,
     anexos: (
       <TabAnexos
         equipamentoId={equipamentoId}

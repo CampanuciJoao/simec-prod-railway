@@ -76,6 +76,21 @@ function normalizarReferenciaManutencao(manutencao) {
   };
 }
 
+function normalizarReferenciaOsCorretiva(os) {
+  if (!os) return null;
+
+  return {
+    id: os.id,
+    numeroOS: os.numeroOS,
+    tipo: os.tipo,
+    status: os.status,
+    solicitante: os.solicitante || null,
+    descricaoProblema: os.descricaoProblema || null,
+    dataHoraAbertura: toIsoOrNull(os.dataHoraAbertura),
+    dataHoraConclusao: toIsoOrNull(os.dataHoraConclusao),
+  };
+}
+
 function normalizarReferenciaOcorrencia(ocorrencia) {
   if (!ocorrencia) return null;
 
@@ -97,24 +112,28 @@ async function carregarReferenciasHistorico(db, eventos = [], tenantId) {
   const manutencaoIds = [
     ...new Set(
       eventos
-        .filter(
-          (evento) => evento.referenciaTipo === 'manutencao' && evento.referenciaId
-        )
-        .map((evento) => evento.referenciaId)
+        .filter((e) => e.referenciaTipo === 'manutencao' && e.referenciaId)
+        .map((e) => e.referenciaId)
     ),
   ];
 
   const ocorrenciaIds = [
     ...new Set(
       eventos
-        .filter(
-          (evento) => evento.referenciaTipo === 'ocorrencia' && evento.referenciaId
-        )
-        .map((evento) => evento.referenciaId)
+        .filter((e) => e.referenciaTipo === 'ocorrencia' && e.referenciaId)
+        .map((e) => e.referenciaId)
     ),
   ];
 
-  const [manutencoes, ocorrencias] = await Promise.all([
+  const osCorretivaIds = [
+    ...new Set(
+      eventos
+        .filter((e) => e.referenciaTipo === 'os_corretiva' && e.referenciaId)
+        .map((e) => e.referenciaId)
+    ),
+  ];
+
+  const [manutencoes, ocorrencias, osCorretivas] = await Promise.all([
     manutencaoIds.length
       ? db.manutencao.findMany({
           where: {
@@ -193,20 +212,32 @@ async function carregarReferenciasHistorico(db, eventos = [], tenantId) {
           },
         })
       : [],
+    osCorretivaIds.length
+      ? db.osCorretiva.findMany({
+          where: { tenantId, id: { in: osCorretivaIds } },
+          select: {
+            id: true,
+            numeroOS: true,
+            tipo: true,
+            status: true,
+            solicitante: true,
+            descricaoProblema: true,
+            dataHoraAbertura: true,
+            dataHoraConclusao: true,
+          },
+        })
+      : [],
   ]);
 
   return {
     manutencoes: new Map(
-      manutencoes.map((manutencao) => [
-        manutencao.id,
-        normalizarReferenciaManutencao(manutencao),
-      ])
+      manutencoes.map((m) => [m.id, normalizarReferenciaManutencao(m)])
     ),
     ocorrencias: new Map(
-      ocorrencias.map((ocorrencia) => [
-        ocorrencia.id,
-        normalizarReferenciaOcorrencia(ocorrencia),
-      ])
+      ocorrencias.map((o) => [o.id, normalizarReferenciaOcorrencia(o)])
+    ),
+    osCorretivas: new Map(
+      osCorretivas.map((os) => [os.id, normalizarReferenciaOsCorretiva(os)])
     ),
   };
 }
@@ -217,6 +248,8 @@ export function normalizarHistoricoAtivoEvento(evento, referencias = null) {
       ? referencias?.manutencoes?.get(evento.referenciaId) || null
       : evento.referenciaTipo === 'ocorrencia'
       ? referencias?.ocorrencias?.get(evento.referenciaId) || null
+      : evento.referenciaTipo === 'os_corretiva'
+      ? referencias?.osCorretivas?.get(evento.referenciaId) || null
       : null;
 
   return {

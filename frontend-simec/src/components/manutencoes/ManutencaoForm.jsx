@@ -81,7 +81,6 @@ function ManutencaoForm({
             onChange={(event) => handleChange('tipo', event.target.value)}
             options={[
               { value: 'Preventiva', label: 'Preventiva' },
-              { value: 'Corretiva', label: 'Corretiva' },
               { value: 'Calibracao', label: 'Calibracao' },
               { value: 'Inspecao', label: 'Inspecao' },
             ]}

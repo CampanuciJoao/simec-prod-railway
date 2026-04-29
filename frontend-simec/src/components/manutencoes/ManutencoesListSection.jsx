@@ -17,9 +17,10 @@ import {
 } from '@/components/ui';
 
 import { ManutencaoCard } from '@/components/manutencoes';
+import OsCorretivaCard from '@/components/osCorretiva/OsCorretivaCard';
 
 function ManutencoesListSection({
-  manutencoes,
+  items,
   searchTerm,
   onSearchChange,
   selectFilters,
@@ -27,6 +28,7 @@ function ManutencoesListSection({
   onRemoveFilter,
   onClearAll,
   onDelete,
+  onDeleteOs,
   isAdmin,
   metricas,
   total,
@@ -86,20 +88,29 @@ function ManutencoesListSection({
         />
 
         <div className="space-y-4">
-          {manutencoes.map((manutencao) => (
-            <ManutencaoCard
-              key={manutencao.id}
-              manutencao={manutencao}
-              isAdmin={isAdmin}
-              onDelete={onDelete}
-            />
-          ))}
+          {items.map((item) =>
+            item._kind === 'osCorretiva' ? (
+              <OsCorretivaCard
+                key={`os-${item.id}`}
+                os={item}
+                isAdmin={isAdmin}
+                onDelete={onDeleteOs}
+              />
+            ) : (
+              <ManutencaoCard
+                key={`m-${item.id}`}
+                manutencao={item}
+                isAdmin={isAdmin}
+                onDelete={onDelete}
+              />
+            )
+          )}
         </div>
 
         <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
           <span>
-            Exibindo <strong>{manutencoes.length}</strong> de{' '}
-            <strong>{total ?? manutencoes.length}</strong> manutenção(ões).
+            Exibindo <strong>{items.length}</strong> de{' '}
+            <strong>{total ?? items.length}</strong> registro(s).
           </span>
 
           {hasNextPage ? (
@@ -119,7 +130,7 @@ function ManutencoesListSection({
 }
 
 ManutencoesListSection.propTypes = {
-  manutencoes: PropTypes.array.isRequired,
+  items: PropTypes.array.isRequired,
   searchTerm: PropTypes.string,
   onSearchChange: PropTypes.func.isRequired,
   selectFilters: PropTypes.array,
@@ -127,6 +138,7 @@ ManutencoesListSection.propTypes = {
   onRemoveFilter: PropTypes.func.isRequired,
   onClearAll: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
+  onDeleteOs: PropTypes.func.isRequired,
   isAdmin: PropTypes.bool,
   metricas: PropTypes.object,
   total: PropTypes.number,

@@ -30,8 +30,8 @@ model Tenant {
   seguros              Seguro[]
   alertas              Alerta[]
   alertasLidos         AlertaLidoPorUsuario[]
+  alertasHistorico     AlertaHistorico[]
   logsAuditoria        LogAuditoria[]
-  ocorrencias          Ocorrencia[]
   anexos               Anexo[]
   notasAndamento       NotaAndamento[]
   emailsNotificacao    EmailNotificacao[]
@@ -44,6 +44,8 @@ model Tenant {
   authSessions         AuthSession[]
   passwordResetTokens  PasswordResetToken[]
   orcamentos           Orcamento[]
+  osCorretivas         OsCorretiva[]
+  visitasTerceiro      VisitaTerceiro[]
 
   @@map("tenants")
 }
@@ -96,6 +98,7 @@ model Usuario {
   alertasLidos         AlertaLidoPorUsuario[]
   logsDeAuditoria      LogAuditoria[]
   notasDeAndamento     NotaAndamento[]
+  osCorretivas         OsCorretiva[]
   manutencaoEventos    ManutencaoEvento[]
   authSessions         AuthSession[]
   passwordResetTokens  PasswordResetToken[]
@@ -134,7 +137,7 @@ model Equipamento {
   acessorios        Acessorio[]
   anexos            Anexo[]
   manutencoes       Manutencao[]
-  ocorrencias       Ocorrencia[]
+  osCorretivas      OsCorretiva[]
   seguros           Seguro[]
   contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
   historicoEventos  HistoricoAtivoEvento[]
@@ -214,17 +217,19 @@ model Manutencao {
   numeroOS                 String           @map("numero_os")
   tipo                     TipoManutencao   @default(Preventiva) @map("tipo_manutencao")
   status                   StatusManutencao @default(Agendada)
-  descricaoProblemaServico String           @map("descricao_problema_servico")
+  descricaoProblemaServico String?          @map("descricao_problema_servico")
   tecnicoResponsavel       String?          @map("tecnico_responsavel")
   numeroChamado            String?          @map("numero_chamado")
+  solicitante              String?          @map("solicitante")
+  origemAbertura           String?          @map("origem_abertura")
 
-  agendamentoDataInicioLocal String  @map("agendamento_data_inicio_local")
-  agendamentoHoraInicioLocal String  @map("agendamento_hora_inicio_local")
-  agendamentoDataFimLocal    String  @map("agendamento_data_fim_local")
-  agendamentoHoraFimLocal    String  @map("agendamento_hora_fim_local")
-  agendamentoTimezone        String  @map("agendamento_timezone")
+  agendamentoDataInicioLocal String? @map("agendamento_data_inicio_local")
+  agendamentoHoraInicioLocal String? @map("agendamento_hora_inicio_local")
+  agendamentoDataFimLocal    String? @map("agendamento_data_fim_local")
+  agendamentoHoraFimLocal    String? @map("agendamento_hora_fim_local")
+  agendamentoTimezone        String? @map("agendamento_timezone")
 
-  dataHoraAgendamentoInicio DateTime  @map("data_hora_agendamento_inicio")
+  dataHoraAgendamentoInicio DateTime? @map("data_hora_agendamento_inicio")
   dataHoraAgendamentoFim    DateTime? @map("data_hora_agendamento_fim")
 
   dataInicioReal DateTime? @map("data_inicio_real")
@@ -431,6 +436,34 @@ model AlertaLidoPorUsuario {
   @@map("alertas_lidos_por_usuario")
 }
 
+// Arquivo de auditoria: preserva alertas removidos pela retenção automática.
+// IBM Maximo / MaintainX: toda ação do sistema deve ser rastreável.
+model AlertaHistorico {
+  id            String   @id @default(uuid())
+  tenantId      String
+  alertaId      String   @map("alerta_id")
+  titulo        String
+  subtitulo     String?
+  tipo          String
+  tipoCategoria String?  @map("tipo_categoria")
+  tipoEvento    String?  @map("tipo_evento")
+  prioridade    String
+  link          String?
+  numeroOS      String?  @map("numero_os")
+  dataAlerta    DateTime @map("data_alerta")
+  dataArquivado DateTime @default(now()) @map("data_arquivado")
+  motivoArquivo String   @default("retencao_automatica") @map("motivo_arquivo")
+  metadataJson  String?  @db.Text @map("metadata_json")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dataAlerta(sort: Desc)])
+  @@index([tenantId, tipo, dataAlerta(sort: Desc)])
+  @@index([tenantId, prioridade, dataAlerta(sort: Desc)])
+  @@index([tenantId, dataArquivado(sort: Desc)])
+  @@map("alertas_historico")
+}
+
 model LogAuditoria {
   id         String   @id @default(uuid())
   tenantId   String
@@ -447,29 +480,6 @@ model LogAuditoria {
   @@index([tenantId, entidade, entidadeId, timestamp])
   @@index([tenantId, autorId, timestamp])
   @@map("log_auditoria")
-}
-
-model Ocorrencia {
-  id               String    @id @default(cuid())
-  tenantId         String
-  equipamentoId    String
-  titulo           String
-  descricao        String?
-  tipo             String
-  origem           String    @default("usuario")
-  gravidade        String    @default("media")
-  metadata         Json?
-  tecnico          String?
-  resolvido        Boolean   @default(false)
-  solucao          String?
-  tecnicoResolucao String?
-  data             DateTime  @default(now())
-  dataResolucao    DateTime?
-
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
-
-  @@index([tenantId, equipamentoId, data(sort: Desc)])
 }
 
 model Anexo {
@@ -502,19 +512,23 @@ model Anexo {
 }
 
 model NotaAndamento {
-  id           String   @id @default(uuid())
-  tenantId     String
-  nota         String
-  data         DateTime @default(now())
-  origem       String   @default("manual")
-  manutencaoId String   @map("manutencao_id")
-  autorId      String?  @map("autor_id")
+  id            String   @id @default(uuid())
+  tenantId      String
+  nota          String
+  data          DateTime @default(now())
+  origem        String   @default("manual")
+  manutencaoId  String?  @map("manutencao_id")
+  osCorretivaId String?  @map("os_corretiva_id")
+  autorId       String?  @map("autor_id")
+  tecnicoNome   String?  @map("tecnico_nome")
 
-  tenant     Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autor      Usuario?   @relation(fields: [autorId], references: [id], onDelete: SetNull)
-  manutencao Manutencao @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor       Usuario?     @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  manutencao  Manutencao?  @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  osCorretiva OsCorretiva? @relation(fields: [tenantId, osCorretivaId], references: [tenantId, id], onDelete: Cascade)
 
   @@index([tenantId, manutencaoId, data])
+  @@index([tenantId, osCorretivaId, data])
   @@map("notas_andamento")
 }
 
@@ -828,4 +842,87 @@ model OrcamentoItemPreco {
 
   @@unique([itemId, fornecedorId])
   @@map("orcamento_item_precos")
+}
+
+// ─── OS Corretiva ────────────────────────────────────────────────────────────
+
+model OsCorretiva {
+  id                        String            @id @default(uuid())
+  tenantId                  String
+  numeroOS                  String            @map("numero_os")
+  equipamentoId             String            @map("equipamento_id")
+  solicitante               String
+  descricaoProblema         String            @map("descricao_problema") @db.Text
+  statusEquipamentoAbertura StatusEquipamento @map("status_equipamento_abertura")
+  dataHoraAbertura          DateTime          @default(now()) @map("data_hora_abertura")
+  status                    StatusOsCorretiva @default(Aberta)
+  tipo                      TipoOsCorretiva   @default(Ocorrencia)
+  dataHoraConclusao         DateTime?         @map("data_hora_conclusao")
+  observacoesFinais         String?           @map("observacoes_finais") @db.Text
+  autorId                   String?           @map("autor_id")
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento      @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  autor       Usuario?         @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  notas       NotaAndamento[]
+  visitas     VisitaTerceiro[]
+
+  @@unique([tenantId, numeroOS])
+  @@unique([tenantId, id])
+  @@index([tenantId, equipamentoId, status])
+  @@index([tenantId, status])
+  @@index([tenantId, tipo])
+  @@index([tenantId, dataHoraAbertura(sort: Desc)])
+  @@map("os_corretivas")
+}
+
+model VisitaTerceiro {
+  id                     String               @id @default(uuid())
+  tenantId               String
+  osCorretivaId          String               @map("os_corretiva_id")
+  prestadorNome          String               @map("prestador_nome")
+  dataHoraInicioPrevista DateTime             @map("data_hora_inicio_prevista")
+  dataHoraFimPrevista    DateTime             @map("data_hora_fim_prevista")
+  dataHoraInicioReal     DateTime?            @map("data_hora_inicio_real")
+  dataHoraFimReal        DateTime?            @map("data_hora_fim_real")
+  status                 StatusVisitaTerceiro @default(Agendada)
+  resultado              ResultadoVisita?
+  observacoes            String?              @db.Text
+  createdAt              DateTime             @default(now())
+  updatedAt              DateTime             @updatedAt
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  osCorretiva OsCorretiva @relation(fields: [tenantId, osCorretivaId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, id])
+  @@index([tenantId, osCorretivaId])
+  @@index([tenantId, status])
+  @@map("visitas_terceiro")
+}
+
+enum StatusOsCorretiva {
+  Aberta
+  EmAndamento
+  AguardandoTerceiro
+  Concluida
+}
+
+enum TipoOsCorretiva {
+  Ocorrencia
+  Corretiva
+}
+
+enum StatusVisitaTerceiro {
+  Agendada
+  EmExecucao
+  Concluida
+  PrazoEstendido
+}
+
+enum ResultadoVisita {
+  Operante
+  PrazoEstendido
+  Pendente
 }

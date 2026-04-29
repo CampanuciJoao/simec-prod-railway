@@ -66,20 +66,32 @@ export function buscarResumoDashboard({
         link: true,
       },
     }),
-    prisma.ocorrencia.findMany({
-      where: { tenantId, resolvido: false },
-      orderBy: { data: 'desc' },
+    prisma.osCorretiva.findMany({
+      where: {
+        tenantId,
+        status: { not: 'Concluida' },
+      },
+      orderBy: { dataHoraAbertura: 'desc' },
       take: 8,
       select: {
         id: true,
-        titulo: true,
-        gravidade: true,
+        descricaoProblema: true,
         tipo: true,
-        data: true,
+        status: true,
+        dataHoraAbertura: true,
         equipamento: {
           select: { id: true, modelo: true, tag: true },
         },
       },
-    }),
+    }).then((rows) =>
+      rows.map((r) => ({
+        id: r.id,
+        titulo: r.descricaoProblema,
+        gravidade: r.status,
+        tipo: r.tipo,
+        data: r.dataHoraAbertura,
+        equipamento: r.equipamento,
+      }))
+    ),
   ]);
 }

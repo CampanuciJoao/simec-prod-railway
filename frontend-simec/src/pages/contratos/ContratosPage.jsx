@@ -5,6 +5,7 @@ import {
   ModalConfirmacao,
   PageLayout,
   PageState,
+  Pagination,
 } from '@/components/ui';
 
 import {
@@ -19,7 +20,7 @@ function ContratosPage() {
 
   const isLoading = page.loading && page.contratos.length === 0;
   const hasError = !!page.error;
-  const isEmpty = !page.loading && !page.error && page.contratos.length === 0;
+  const isEmpty = !page.loading && !page.error && page.pagination.total === 0;
 
   return (
     <>
@@ -63,16 +64,29 @@ function ContratosPage() {
               emptyMessage="Nenhum contrato encontrado."
             />
           ) : (
-            <ContratosListSection
-              contratos={page.contratos}
-              expandidos={page.expandidos}
-              toggleExpandir={page.toggleExpandir}
-              uploadingId={page.uploadingId}
-              handleUploadArquivo={page.handleUploadArquivo}
-              handleDeleteAnexo={page.handleDeleteAnexo}
-              goToEdit={page.goToEdit}
-              onAskDelete={page.deleteModal.openModal}
-            />
+            <div className="space-y-4">
+              <ContratosListSection
+                contratos={page.contratos}
+                expandidos={page.expandidos}
+                toggleExpandir={page.toggleExpandir}
+                uploadingId={page.uploadingId}
+                handleUploadArquivo={page.handleUploadArquivo}
+                handleDeleteAnexo={page.handleDeleteAnexo}
+                goToEdit={page.goToEdit}
+                onAskDelete={page.deleteModal.openModal}
+              />
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {page.pagination.total} contrato(s) no total
+                </p>
+                <Pagination
+                  page={page.pagination.page}
+                  totalPages={page.pagination.totalPages}
+                  onPageChange={page.goToPage}
+                />
+              </div>
+            </div>
           )}
         </div>
       </PageLayout>

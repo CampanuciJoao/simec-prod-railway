@@ -12,6 +12,7 @@ export function useSegurosPage() {
 
   const {
     seguros,
+    metricas,
     unidadesDisponiveis,
     loading,
     error,
@@ -19,6 +20,8 @@ export function useSegurosPage() {
     setSearchTerm,
     filtros,
     setFiltros,
+    pagination,
+    goToPage,
     removerSeguro,
     getNomeUnidade,
     getStatusDinamico,
@@ -34,9 +37,7 @@ export function useSegurosPage() {
       addToast('Seguro excluído com sucesso!', 'success');
     } catch (err) {
       addToast(
-        err?.response?.data?.message ||
-          err?.message ||
-          'Erro ao excluir seguro.',
+        err?.response?.data?.message || err?.message || 'Erro ao excluir seguro.',
         'error'
       );
     } finally {
@@ -48,10 +49,7 @@ export function useSegurosPage() {
     () =>
       [...new Set((seguros || []).map((s) => s.seguradora).filter(Boolean))]
         .sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'))
-        .map((seguradora) => ({
-          value: seguradora,
-          label: seguradora,
-        })),
+        .map((seguradora) => ({ value: seguradora, label: seguradora })),
     [seguros]
   );
 
@@ -65,11 +63,7 @@ export function useSegurosPage() {
   );
 
   const tipoSeguroOptions = useMemo(
-    () =>
-      TIPO_SEGURO_OPTIONS.map((item) => ({
-        value: item.value,
-        label: item.label,
-      })),
+    () => TIPO_SEGURO_OPTIONS.map((item) => ({ value: item.value, label: item.label })),
     []
   );
 
@@ -90,8 +84,7 @@ export function useSegurosPage() {
         id: 'seguradora',
         label: 'Seguradora',
         value: filtros.seguradora,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, seguradora: value })),
+        onChange: (value) => setFiltros((prev) => ({ ...prev, seguradora: value })),
         options: seguradorasOptions,
         defaultLabel: 'Todas seguradoras',
       },
@@ -99,8 +92,7 @@ export function useSegurosPage() {
         id: 'status',
         label: 'Status',
         value: filtros.status,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, status: value })),
+        onChange: (value) => setFiltros((prev) => ({ ...prev, status: value })),
         options: statusOptions,
         defaultLabel: 'Todos os status',
       },
@@ -108,8 +100,7 @@ export function useSegurosPage() {
         id: 'unidade',
         label: 'Unidade',
         value: filtros.unidade,
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, unidade: value })),
+        onChange: (value) => setFiltros((prev) => ({ ...prev, unidade: value })),
         options: unidadesOptions,
         defaultLabel: 'Todas as unidades',
       },
@@ -117,109 +108,47 @@ export function useSegurosPage() {
         id: 'tipoSeguro',
         label: 'Tipo de seguro',
         value: filtros.tipoSeguro || '',
-        onChange: (value) =>
-          setFiltros((prev) => ({ ...prev, tipoSeguro: value })),
+        onChange: (value) => setFiltros((prev) => ({ ...prev, tipoSeguro: value })),
         options: tipoSeguroOptions,
         defaultLabel: 'Todos os tipos',
       },
     ],
-    [
-      filtros,
-      setFiltros,
-      seguradorasOptions,
-      statusOptions,
-      unidadesOptions,
-      tipoSeguroOptions,
-    ]
+    [filtros, setFiltros, seguradorasOptions, statusOptions, unidadesOptions, tipoSeguroOptions]
   );
 
-  const metricas = useMemo(() => {
-    const total = seguros.length;
-    const ativos = seguros.filter((s) => getStatusDinamico(s) === 'Ativo').length;
-    const vencendo = seguros.filter(
-      (s) => getStatusDinamico(s) === 'Vence em breve'
-    ).length;
-    const vencidos = seguros.filter(
-      (s) => getStatusDinamico(s) === 'Expirado'
-    ).length;
-
-    return {
-      total,
-      ativos,
-      vencendo,
-      vencidos,
-    };
-  }, [seguros, getStatusDinamico]);
-
-  const activeFilters = useMemo(() => {
-    return [
-      searchTerm
-        ? {
-            key: 'searchTerm',
-            label: `Busca: ${searchTerm}`,
-            value: searchTerm,
-          }
-        : null,
-      filtros.seguradora
-        ? {
-            key: 'seguradora',
-            label: `Seguradora: ${filtros.seguradora}`,
-            value: filtros.seguradora,
-          }
-        : null,
-      filtros.status
-        ? {
-            key: 'status',
-            label: `Status: ${filtros.status}`,
-            value: filtros.status,
-          }
-        : null,
-      filtros.unidade
-        ? {
-            key: 'unidade',
-            label: `Unidade: ${filtros.unidade}`,
-            value: filtros.unidade,
-          }
-        : null,
-      filtros.tipoSeguro
-        ? {
-            key: 'tipoSeguro',
-            label: `Tipo: ${
-              tipoSeguroOptions.find((item) => item.value === filtros.tipoSeguro)
-                ?.label || filtros.tipoSeguro
-            }`,
-            value: filtros.tipoSeguro,
-          }
-        : null,
-    ].filter(Boolean);
-  }, [searchTerm, filtros, tipoSeguroOptions]);
+  const activeFilters = useMemo(
+    () =>
+      [
+        searchTerm ? { key: 'searchTerm', label: `Busca: ${searchTerm}`, value: searchTerm } : null,
+        filtros.seguradora ? { key: 'seguradora', label: `Seguradora: ${filtros.seguradora}`, value: filtros.seguradora } : null,
+        filtros.status ? { key: 'status', label: `Status: ${filtros.status}`, value: filtros.status } : null,
+        filtros.unidade ? { key: 'unidade', label: `Unidade: ${filtros.unidade}`, value: filtros.unidade } : null,
+        filtros.tipoSeguro
+          ? {
+              key: 'tipoSeguro',
+              label: `Tipo: ${tipoSeguroOptions.find((item) => item.value === filtros.tipoSeguro)?.label || filtros.tipoSeguro}`,
+              value: filtros.tipoSeguro,
+            }
+          : null,
+      ].filter(Boolean),
+    [searchTerm, filtros, tipoSeguroOptions]
+  );
 
   const clearFilter = (key) => {
-    if (key === 'searchTerm') {
-      setSearchTerm('');
-      return;
-    }
-
+    if (key === 'searchTerm') { setSearchTerm(''); return; }
     setFiltros((prev) => ({ ...prev, [key]: '' }));
   };
 
   const clearAllFilters = () => {
     setSearchTerm('');
-    setFiltros({
-      seguradora: '',
-      status: '',
-      unidade: '',
-      tipoSeguro: '',
-    });
+    setFiltros({ seguradora: '', status: '', unidade: '', tipoSeguro: '' });
   };
 
-  const onSearchChange = (event) => {
-    setSearchTerm(event.target.value);
-  };
+  const onSearchChange = (event) => setSearchTerm(event.target.value);
 
   const filtrarPorStatus = (status) => {
-    clearAllFilters();
-    setFiltros((prev) => ({ ...prev, status }));
+    setSearchTerm('');
+    setFiltros({ seguradora: '', status, unidade: '', tipoSeguro: '' });
   };
 
   return {
@@ -227,6 +156,8 @@ export function useSegurosPage() {
     loading,
     error,
     metricas,
+    pagination,
+    goToPage,
     searchTerm,
     onSearchChange,
     selectFiltersConfig,

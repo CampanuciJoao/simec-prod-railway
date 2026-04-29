@@ -1,3 +1,4 @@
+export { default as AgendarVisitaDrawer } from './AgendarVisitaDrawer';
 export { default as ConfirmacaoFinalManutencao } from './ConfirmacaoFinalManutencao';
 export { default as DetalhesManutencaoPageHeader } from './DetalhesManutencaoPageHeader';
 export { default as HistoricoEAnexosManutencaoSection } from './HistoricoEAnexosManutencaoSection';

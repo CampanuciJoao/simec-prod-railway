@@ -49,7 +49,9 @@ export function montarTituloFim(manut) {
 }
 
 export function montarTituloConfirmacao(manut) {
-  return montarTituloFim(manut);
+  const tipo = normalizarTipoManutencao(manut);
+  const unidade = normalizarUnidade(manut);
+  return `Manutencao ${tipo} aguarda sua confirmacao na unidade ${unidade}`;
 }
 
 export function montarSubtituloBase(manut) {

@@ -143,6 +143,25 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
+    // Job diário de limpeza de dados antigos (03:00 UTC)
+    const repeatables2 = await queue.getRepeatableJobs();
+    for (const job of repeatables2) {
+      if (job.name === 'cleanup-retencao-dados') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'cleanup-retencao-dados',
+      {},
+      {
+        jobId: 'cleanup-retencao-dados',
+        repeat: { cron: '0 3 * * *' },
+        removeOnComplete: 10,
+        removeOnFail: 10,
+      }
+    );
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {

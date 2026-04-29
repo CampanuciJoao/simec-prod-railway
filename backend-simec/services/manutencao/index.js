@@ -123,6 +123,7 @@ export async function listarManutencoesService({
     pageSize,
     sortBy: filters?.sortBy || 'dataHoraAgendamentoInicio',
     sortDirection: filters?.sortDirection === 'asc' ? 'asc' : 'desc',
+    incluirNotas: !!filters?.equipamentoId,
   });
 
   return {
@@ -168,6 +169,7 @@ export async function criarManutencaoService({
   tenantId,
   usuarioId,
   dados,
+  statusEquipamento = null,
 }) {
   const validacaoPayload = validarManutencaoPayload(dados);
 
@@ -207,20 +209,22 @@ export async function criarManutencaoService({
     };
   }
 
-  const conflito = await existeConflitoAgendamento({
-    tenantId,
-    equipamentoId: dadosValidados.equipamentoId,
-    startUtc: agendamento.startUtc,
-    endUtc: agendamento.endUtc,
-  });
+  if (!agendamento.semAgendamento) {
+    const conflito = await existeConflitoAgendamento({
+      tenantId,
+      equipamentoId: dadosValidados.equipamentoId,
+      startUtc: agendamento.startUtc,
+      endUtc: agendamento.endUtc,
+    });
 
-  if (conflito) {
-    return {
-      ok: false,
-      status: 409,
-      message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
-      conflito,
-    };
+    if (conflito) {
+      return {
+        ok: false,
+        status: 409,
+        message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
+        conflito,
+      };
+    }
   }
 
   const totalTenant = await contarManutencoesDoTenant(tenantId);
@@ -231,8 +235,13 @@ export async function criarManutencaoService({
     sequencia: totalTenant + 1,
   });
 
+  // Corretiva sem agendamento nasce como Pendente (triagem)
+  const statusInicial = agendamento.semAgendamento && dadosValidados.tipo === 'Corretiva'
+    ? 'Pendente'
+    : (dadosValidados.status || 'Agendada');
+
   const payload = montarPayloadPersistencia({
-    dados: dadosValidados,
+    dados: { ...dadosValidados, status: statusInicial },
     agendamento,
     tenantId,
     equipamentoId: dadosValidados.equipamentoId,
@@ -241,6 +250,16 @@ export async function criarManutencaoService({
 
   const nova = await criarManutencao(payload);
 
+  // Atualiza status do equipamento se informado na abertura da OS
+  const statusEquipamentoAnterior = contexto.equipamento.status;
+  const STATUS_VALIDOS = ['Operante', 'Inoperante', 'UsoLimitado', 'EmManutencao'];
+  if (statusEquipamento && STATUS_VALIDOS.includes(statusEquipamento) && statusEquipamento !== statusEquipamentoAnterior) {
+    await prisma.equipamento.update({
+      where: { tenantId_id: { tenantId, id: nova.equipamentoId } },
+      data: { status: statusEquipamento },
+    });
+  }
+
   await registrarEventoManutencao({
     tenantId,
     manutencaoId: nova.id,
@@ -248,7 +267,7 @@ export async function criarManutencaoService({
     tipo: 'STATUS_BASE_EQUIPAMENTO',
     descricao: `Status base do equipamento registrado para a OS ${numeroOS}.`,
     metadata: {
-      statusAnterior: contexto.equipamento.status,
+      statusAnterior: statusEquipamentoAnterior,
       origem: 'criacao_os',
     },
   });
@@ -357,21 +376,23 @@ export async function atualizarManutencaoService({
     };
   }
 
-  const conflito = await existeConflitoAgendamento({
-    tenantId,
-    equipamentoId: dadosValidados.equipamentoId,
-    startUtc: agendamento.startUtc,
-    endUtc: agendamento.endUtc,
-    manutencaoIdIgnorar: manutencaoId,
-  });
+  if (!agendamento.semAgendamento) {
+    const conflito = await existeConflitoAgendamento({
+      tenantId,
+      equipamentoId: dadosValidados.equipamentoId,
+      startUtc: agendamento.startUtc,
+      endUtc: agendamento.endUtc,
+      manutencaoIdIgnorar: manutencaoId,
+    });
 
-  if (conflito) {
-    return {
-      ok: false,
-      status: 409,
-      message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
-      conflito,
-    };
+    if (conflito) {
+      return {
+        ok: false,
+        status: 409,
+        message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
+        conflito,
+      };
+    }
   }
 
   const payload = montarPayloadPersistencia({
@@ -388,13 +409,28 @@ export async function atualizarManutencaoService({
     payload,
   });
 
+  const alteracoes = [];
+  if (dadosValidados.tecnicoResponsavel !== manutencaoAtual.tecnicoResponsavel) {
+    const anterior = manutencaoAtual.tecnicoResponsavel || 'não definido';
+    const novo = dadosValidados.tecnicoResponsavel || 'não definido';
+    alteracoes.push(`Técnico: "${anterior}" → "${novo}"`);
+  }
+  if (dadosValidados.agendamentoDataInicioLocal !== manutencaoAtual.agendamentoDataInicioLocal) {
+    alteracoes.push(`Início: ${manutencaoAtual.agendamentoDataInicioLocal || '—'} → ${dadosValidados.agendamentoDataInicioLocal}`);
+  }
+  if (dadosValidados.agendamentoDataFimLocal !== manutencaoAtual.agendamentoDataFimLocal) {
+    alteracoes.push(`Fim: ${manutencaoAtual.agendamentoDataFimLocal || '—'} → ${dadosValidados.agendamentoDataFimLocal}`);
+  }
+
   await registrarLog({
     tenantId,
     usuarioId,
     acao: 'EDIÇÃO',
     entidade: 'Manutenção',
     entidadeId: atualizada.id,
-    detalhes: `OS ${atualizada.numeroOS} atualizada.`,
+    detalhes: alteracoes.length > 0
+      ? `OS ${atualizada.numeroOS} atualizada. ${alteracoes.join('. ')}.`
+      : `OS ${atualizada.numeroOS} atualizada.`,
   });
 
   await registrarEventoHistoricoAtivo({
@@ -491,6 +527,13 @@ export async function concluirManutencaoComAcaoService({
   observacao,
   manutencaoRealizada,
   equipamentoOperante,
+  // campos para agendar_visita
+  agendamentoDataInicioLocal,
+  agendamentoHoraInicioLocal,
+  agendamentoDataFimLocal,
+  agendamentoHoraFimLocal,
+  numeroChamado,
+  tecnicoResponsavel,
 }) {
   if (!validarAcaoWorkflow(acao)) {
     return {
@@ -522,6 +565,68 @@ export async function concluirManutencaoComAcaoService({
     return contexto;
   }
 
+  // Para agendar_visita, validar e converter datas antes de montar workflow
+  let agendamentoStartUtc = null;
+  let agendamentoEndUtc = null;
+
+  if (acao === 'agendar_visita') {
+    const { validarAgendarVisitaPayload } = await import('../../validators/manutencaoValidator.js');
+    const validacaoAgendamento = validarAgendarVisitaPayload({
+      agendamentoDataInicioLocal,
+      agendamentoHoraInicioLocal,
+      agendamentoDataFimLocal,
+      agendamentoHoraFimLocal,
+      numeroChamado,
+      tecnicoResponsavel,
+      observacao,
+    });
+
+    if (!validacaoAgendamento.ok) {
+      return {
+        ok: false,
+        status: 400,
+        message: validacaoAgendamento.message,
+        fieldErrors: validacaoAgendamento.fieldErrors,
+      };
+    }
+
+    const agendamento = validarAgendamento({
+      startDateLocal: agendamentoDataInicioLocal,
+      startTimeLocal: agendamentoHoraInicioLocal,
+      endDateLocal: agendamentoDataFimLocal,
+      endTimeLocal: agendamentoHoraFimLocal,
+      timezone: contexto.timezone,
+    });
+
+    if (!agendamento.valid) {
+      return {
+        ok: false,
+        status: 400,
+        message: montarMensagemErroAgendamento(agendamento.code),
+      };
+    }
+
+    const conflito = await existeConflitoAgendamento({
+      tenantId,
+      equipamentoId: manutencaoAtual.equipamentoId,
+      startUtc: agendamento.startUtc,
+      endUtc: agendamento.endUtc,
+      manutencaoIdIgnorar: manutencaoId,
+    });
+
+    if (conflito) {
+      return {
+        ok: false,
+        status: 409,
+        message: `Já existe uma manutenção conflitante para esse equipamento: OS ${conflito.numeroOS}.`,
+        conflito,
+      };
+    }
+
+    agendamentoStartUtc = agendamento.startUtc;
+    agendamentoEndUtc = agendamento.endUtc;
+  }
+
   const workflow = montarWorkflowPayload({
     manutencaoAtual,
     acao,
@@ -539,6 +644,14 @@ export async function concluirManutencaoComAcaoService({
       (manutencaoAtual.status === 'Agendada'
         ? manutencaoAtual.equipamento?.status || null
         : null),
+    agendamentoDataInicioLocal,
+    agendamentoHoraInicioLocal,
+    agendamentoDataFimLocal,
+    agendamentoHoraFimLocal,
+    agendamentoStartUtc,
+    agendamentoEndUtc,
+    numeroChamado,
+    tecnicoResponsavel,
   });
 
   if (!workflow.ok) {

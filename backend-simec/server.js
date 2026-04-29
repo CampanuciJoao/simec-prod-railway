@@ -19,7 +19,6 @@ import segurosRoutes from './routes/segurosRoutes.js';
 import auditoriaRoutes from './routes/auditoriaRoutes.js';
 import unidadesRoutes from './routes/unidadesRoutes.js';
 import emailsNotificacaoRoutes from './routes/emailsNotificacaoRoutes.js';
-import ocorrenciasRoutes from './routes/ocorrenciasRoutes.js';
 import biRoutes from './routes/biRoutes.js';
 import pdfDataRoutes from './routes/pdfDataRoutes.js';
 import pdfRoutes from './routes/pdfRoutes.js';
@@ -28,6 +27,7 @@ import tenantSettingsRoutes from './routes/tenantSettingsRoutes.js';
 import helpRoutes from './routes/helpRoutes.js';
 import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
 import orcamentosRoutes from './routes/orcamentosRoutes.js';
+import osCorretivaRoutes from './routes/osCorretivaRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
@@ -102,7 +102,6 @@ app.use('/api/seguros', segurosRoutes);
 app.use('/api/auditoria', auditoriaRoutes);
 app.use('/api/unidades', unidadesRoutes);
 app.use('/api/emails-notificacao', emailsNotificacaoRoutes);
-app.use('/api/ocorrencias', ocorrenciasRoutes);
 app.use('/api/bi', biRoutes);
 app.use('/api/pdf-data', pdfDataRoutes);
 app.use('/api/pdfs', pdfRoutes);
@@ -111,6 +110,7 @@ app.use('/api/superadmin/help', superadminHelpRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);
+app.use('/api/os-corretiva', osCorretivaRoutes);
 
 app.use('/api', (req, res) => {
   return res.status(404).json({
