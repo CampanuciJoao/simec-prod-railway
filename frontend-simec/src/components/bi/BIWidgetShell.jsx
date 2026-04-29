@@ -1,97 +1,74 @@
-import React from 'react';
+import React, { forwardRef } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import {
-  faDownLong,
-  faExpand,
-  faCompress,
-  faUpLong,
-} from '@fortawesome/free-solid-svg-icons';
+import { faExpand, faCompress, faGripVertical } from '@fortawesome/free-solid-svg-icons';
 
-function ActionButton({ title, onClick, disabled, icon }) {
+const BIWidgetShell = forwardRef(function BIWidgetShell(
+  { title, description, expanded = false, onToggleExpand, children, style, className, onMouseDown, onMouseUp, onTouchEnd, ...rest },
+  ref
+) {
   return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      disabled={disabled}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border transition disabled:cursor-not-allowed disabled:opacity-40"
-      style={{
-        borderColor: 'var(--border-soft)',
-        backgroundColor: 'var(--bg-surface)',
-        color: 'var(--text-secondary)',
-      }}
-    >
-      <FontAwesomeIcon icon={icon} />
-    </button>
-  );
-}
-
-function BIWidgetShell({
-  title,
-  description,
-  expanded = false,
-  canMoveUp = false,
-  canMoveDown = false,
-  onToggleExpand,
-  onMoveUp,
-  onMoveDown,
-  children,
-}) {
-  return (
-    <section
-      className="rounded-2xl border shadow-sm"
-      style={{
-        borderColor: 'var(--border-soft)',
-        backgroundColor: 'var(--bg-surface)',
-      }}
+    <div
+      ref={ref}
+      style={style}
+      className={className}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
+      onTouchEnd={onTouchEnd}
+      {...rest}
     >
       <div
-        className="flex flex-col gap-4 border-b px-5 py-4 sm:flex-row sm:items-start sm:justify-between"
-        style={{ borderColor: 'var(--border-soft)' }}
+        className="flex h-full flex-col overflow-hidden rounded-2xl border shadow-sm"
+        style={{
+          borderColor: 'var(--border-soft)',
+          backgroundColor: 'var(--bg-surface)',
+        }}
       >
-        <div className="min-w-0">
-          <h2
-            className="text-base font-semibold"
-            style={{ color: 'var(--text-primary)' }}
-          >
-            {title}
-          </h2>
-          {description ? (
-            <p
-              className="mt-1 text-sm"
+        <div
+          className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
+          style={{ borderColor: 'var(--border-soft)' }}
+        >
+          <div className="flex min-w-0 items-start gap-2">
+            <FontAwesomeIcon
+              icon={faGripVertical}
+              className="mt-0.5 shrink-0 text-xs opacity-30"
               style={{ color: 'var(--text-muted)' }}
+            />
+            <div className="min-w-0">
+              <h2
+                className="text-base font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                {title}
+              </h2>
+              {description ? (
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {description}
+                </p>
+              ) : null}
+            </div>
+          </div>
+
+          {onToggleExpand && (
+            <button
+              type="button"
+              title={expanded ? 'Recolher widget' : 'Expandir widget'}
+              onClick={onToggleExpand}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition"
+              style={{
+                borderColor: 'var(--border-soft)',
+                backgroundColor: 'var(--bg-surface)',
+                color: 'var(--text-secondary)',
+              }}
             >
-              {description}
-            </p>
-          ) : null}
+              <FontAwesomeIcon icon={expanded ? faCompress : faExpand} />
+            </button>
+          )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-2">
-          <ActionButton
-            title="Mover para cima"
-            onClick={onMoveUp}
-            disabled={!canMoveUp}
-            icon={faUpLong}
-          />
-
-          <ActionButton
-            title="Mover para baixo"
-            onClick={onMoveDown}
-            disabled={!canMoveDown}
-            icon={faDownLong}
-          />
-
-          <ActionButton
-            title={expanded ? 'Recolher widget' : 'Expandir widget'}
-            onClick={onToggleExpand}
-            icon={expanded ? faCompress : faExpand}
-          />
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </div>
-
-      <div className={expanded ? 'p-5' : 'p-5'}>{children}</div>
-    </section>
+    </div>
   );
-}
+});
 
 export default BIWidgetShell;
