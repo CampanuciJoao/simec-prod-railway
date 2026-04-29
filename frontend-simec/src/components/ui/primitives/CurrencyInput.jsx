@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 
 import FormFieldShell from '@/components/ui/primitives/FormFieldShell';
@@ -53,28 +53,35 @@ function CurrencyInput({
   ...props
 }) {
   const inputId = id || name;
+  const [localValue, setLocalValue] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
 
   const handleFocus = (event) => {
+    const num = Number(value);
+    const editable =
+      !value || Number.isNaN(num) || num === 0
+        ? ''
+        : num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    setLocalValue(editable);
+    setIsFocused(true);
     event.currentTarget.style.boxShadow = error
       ? '0 0 0 4px var(--color-danger-soft)'
       : '0 0 0 4px var(--brand-primary-soft)';
-
     onFocus?.(event);
   };
 
   const handleBlur = (event) => {
+    setIsFocused(false);
     event.currentTarget.style.boxShadow = 'none';
+    const parsed = parseCurrencyValue(localValue);
+    onChange?.({ target: { name, value: parsed, type: 'number' } });
     onBlur?.(event);
   };
 
   const handleChange = (event) => {
-    onChange?.({
-      target: {
-        name,
-        value: parseCurrencyValue(event.target.value),
-        type: 'number',
-      },
-    });
+    const raw = event.target.value;
+    setLocalValue(raw);
+    onChange?.({ target: { name, value: parseCurrencyValue(raw), type: 'number' } });
   };
 
   return (
@@ -90,7 +97,7 @@ function CurrencyInput({
         name={name}
         type="text"
         inputMode="decimal"
-        value={formatCurrencyValue(value)}
+        value={isFocused ? localValue : formatCurrencyValue(value)}
         onChange={handleChange}
         onFocus={handleFocus}
         onBlur={handleBlur}
