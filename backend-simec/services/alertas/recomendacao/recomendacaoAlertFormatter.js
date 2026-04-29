@@ -3,7 +3,7 @@ export const JANELA_DIAS = 90;
 /**
  * 🔧 Helpers
  */
-import { normalizarParaExibicao as normalizarTexto } from '../../../shared/textUtils.js';
+import { normalizarParaExibicao as normalizarTexto } from '../../shared/textUtils.js';
 
 function formatarNumero(valor) {
   return Number(valor || 0);

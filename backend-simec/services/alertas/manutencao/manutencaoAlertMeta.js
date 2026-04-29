@@ -1,4 +1,4 @@
-import { normalizarParaExibicao as normalizarTexto } from '../../../shared/textUtils.js';
+import { normalizarParaExibicao as normalizarTexto } from '../../shared/textUtils.js';
 
   return valor;
 }
