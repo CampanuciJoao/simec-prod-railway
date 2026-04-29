@@ -1,13 +1,13 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faPaperclip,
   faFilePdf,
   faFileImage,
   faFileLines,
   faTrashAlt,
   faDownload,
+  faCloudArrowUp,
 } from '@fortawesome/free-solid-svg-icons';
 
 function getAttachmentIcon(filename = '', mimeType = '') {
@@ -15,10 +15,7 @@ function getAttachmentIcon(filename = '', mimeType = '') {
   const mime = String(mimeType || '').toLowerCase();
 
   if (mime.includes('pdf') || nome.endsWith('.pdf')) {
-    return {
-      icon: faFilePdf,
-      iconClassName: 'text-red-500',
-    };
+    return { icon: faFilePdf, iconClassName: 'text-red-500' };
   }
 
   if (
@@ -28,22 +25,17 @@ function getAttachmentIcon(filename = '', mimeType = '') {
     nome.endsWith('.jpeg') ||
     nome.endsWith('.webp')
   ) {
-    return {
-      icon: faFileImage,
-      iconClassName: 'text-emerald-500',
-    };
+    return { icon: faFileImage, iconClassName: 'text-emerald-500' };
   }
 
-  return {
-    icon: faFileLines,
-    iconClassName: 'text-slate-500',
-  };
+  return { icon: faFileLines, iconClassName: 'text-slate-500' };
 }
 
 function CompactAttachmentList({
   attachments = [],
-  uploadLabel = 'Anexar arquivo',
+  uploadLabel = 'clique para selecionar',
   emptyMessage = 'Nenhum anexo.',
+  accept = '.pdf,.jpg,.jpeg,.png,.doc,.docx',
   isUploading = false,
   isDeleting = false,
   multiple = false,
@@ -54,50 +46,87 @@ function CompactAttachmentList({
   className = '',
 }) {
   const inputRef = useRef(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
-  const handleOpenFileDialog = () => {
-    if (isUploading) return;
-    inputRef.current?.click();
-  };
-
-  const handleInputChange = async (event) => {
-    const files = Array.from(event.target.files || []);
-
-    if (!files.length || typeof onUpload !== 'function') {
-      event.target.value = '';
-      return;
-    }
-
+  const dispatchFiles = useCallback(async (files) => {
+    if (!files.length || typeof onUpload !== 'function') return;
     try {
       await onUpload(multiple ? files : files[0]);
     } finally {
-      event.target.value = '';
+      if (inputRef.current) inputRef.current.value = '';
     }
+  }, [onUpload, multiple]);
+
+  const handleInputChange = async (e) => {
+    await dispatchFiles(Array.from(e.target.files || []));
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    if (isUploading) return;
+    await dispatchFiles(Array.from(e.dataTransfer.files));
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    if (!isUploading) setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false);
   };
 
   return (
     <div className={['space-y-3', className].join(' ')}>
-      <div>
-        <button
-          type="button"
-          onClick={handleOpenFileDialog}
-          disabled={isUploading}
-          className="inline-flex items-center gap-2 rounded-lg px-2 py-1 text-sm font-medium text-blue-600 transition hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <FontAwesomeIcon icon={faPaperclip} />
-          {isUploading ? 'Enviando...' : uploadLabel}
-        </button>
-
-        <input
-          ref={inputRef}
-          type="file"
-          className="hidden"
-          multiple={multiple}
-          onChange={handleInputChange}
-          disabled={isUploading}
+      {/* Drop zone */}
+      <div
+        onDrop={handleDrop}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors"
+        style={{
+          borderColor: isDragOver ? 'var(--brand-primary)' : 'var(--border-soft)',
+          backgroundColor: isDragOver ? 'var(--brand-primary-soft)' : 'var(--bg-surface-soft)',
+          opacity: isUploading ? 0.6 : 1,
+          cursor: isUploading ? 'not-allowed' : 'default',
+        }}
+      >
+        <FontAwesomeIcon
+          icon={faCloudArrowUp}
+          className="text-3xl"
+          style={{ color: isDragOver ? 'var(--brand-primary)' : 'var(--text-muted)' }}
         />
+
+        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+          {isUploading ? 'Enviando...' : (
+            <>
+              Arraste um arquivo aqui ou{' '}
+              <label
+                className="cursor-pointer font-medium underline-offset-2 hover:underline"
+                style={{ color: isUploading ? 'var(--text-muted)' : 'var(--brand-primary)', pointerEvents: isUploading ? 'none' : 'auto' }}
+              >
+                {uploadLabel}
+                <input
+                  ref={inputRef}
+                  type="file"
+                  className="hidden"
+                  multiple={multiple}
+                  accept={accept}
+                  onChange={handleInputChange}
+                  disabled={isUploading}
+                />
+              </label>
+            </>
+          )}
+        </p>
+
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          PDF, JPG, PNG, DOC, DOCX
+        </p>
       </div>
 
+      {/* File list */}
       {attachments.length > 0 ? (
         <div className="space-y-2">
           {attachments.map((attachment) => {
@@ -166,6 +195,7 @@ CompactAttachmentList.propTypes = {
   attachments: PropTypes.array,
   uploadLabel: PropTypes.string,
   emptyMessage: PropTypes.string,
+  accept: PropTypes.string,
   isUploading: PropTypes.bool,
   isDeleting: PropTypes.bool,
   multiple: PropTypes.bool,
