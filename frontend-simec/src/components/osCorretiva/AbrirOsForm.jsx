@@ -75,6 +75,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
       <form onSubmit={onSubmit} className="space-y-5">
         <Select
           label="Unidade"
+          placeholder=""
           value={selectedUnidade}
           onChange={(e) => {
             setSelectedUnidade(e.target.value);
@@ -88,6 +89,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
           <div>
             <Select
               label="Tipo"
+              placeholder=""
               value={selectedTipo}
               onChange={(e) => {
                 setSelectedTipo(e.target.value);
@@ -100,6 +102,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
           <div className="col-span-2">
             <Select
               label="Equipamento *"
+              placeholder=""
               value={form.equipamentoId}
               onChange={(e) => onChange('equipamentoId', e.target.value)}
               options={equipamentosOptions}
@@ -127,6 +130,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
         <div>
           <Select
             label="Status do equipamento na abertura *"
+            placeholder=""
             value={form.statusEquipamentoAbertura}
             onChange={(e) => onChange('statusEquipamentoAbertura', e.target.value)}
             options={statusOptions}
