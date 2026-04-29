@@ -63,6 +63,8 @@ function getSortValue(contrato, key) {
   }
 }
 
+const PAGE_SIZE_CONTRATOS = 10;
+
 export function useContratos() {
   const [contratosOriginais, setContratosOriginais] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -74,6 +76,7 @@ export function useContratos() {
     status: '',
     unidade: '',
   });
+  const [page, setPage] = useState(1);
   const [sortConfig, setSortConfig] = useState({
     key: 'dataFim',
     direction: 'ascending',
@@ -165,18 +168,29 @@ export function useContratos() {
     });
   }, [contratosFiltrados, sortConfig]);
 
+  // Reset to page 1 when filters/search/sort change
+  useEffect(() => { setPage(1); }, [searchTerm, filtros, sortConfig]);
+
+  const contratosPaginados = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE_CONTRATOS;
+    return contratos.slice(start, start + PAGE_SIZE_CONTRATOS);
+  }, [contratos, page]);
+
+  const totalPages = Math.ceil(contratos.length / PAGE_SIZE_CONTRATOS) || 1;
+
   const removerContrato = useCallback(async (id) => {
     await deleteContrato(id);
-
     setContratosOriginais((prev) => prev.filter((item) => item.id !== id));
   }, []);
 
   return {
-    contratos,
+    contratos: contratosPaginados,
     contratosOriginais,
     unidadesDisponiveis: unidades,
     loading,
     error,
+    pagination: { page, totalPages, total: contratos.length },
+    goToPage: setPage,
     searchTerm,
     setSearchTerm,
     filtros,

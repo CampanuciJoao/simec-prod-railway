@@ -71,6 +71,8 @@ function compareValues(a, b, direction = 'ascending') {
   return normalizeText(valueA).localeCompare(normalizeText(valueB), 'pt-BR') * dir;
 }
 
+const PAGE_SIZE_SEGUROS = 15;
+
 export function useSeguros() {
   const [segurosOriginais, setSegurosOriginais] = useState([]);
   const [unidades, setUnidades] = useState([]);
@@ -83,6 +85,7 @@ export function useSeguros() {
     status: '',
     unidade: '',
   });
+  const [page, setPage] = useState(1);
 
   const [sortConfig, setSortConfig] = useState({
     key: 'dataFim',
@@ -175,6 +178,16 @@ export function useSeguros() {
     return items;
   }, [segurosOriginais, searchTerm, filtros, sortConfig]);
 
+  // Reset to page 1 whenever filters/search change
+  useEffect(() => { setPage(1); }, [searchTerm, filtros, sortConfig]);
+
+  const segurosPaginados = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE_SEGUROS;
+    return seguros.slice(start, start + PAGE_SIZE_SEGUROS);
+  }, [seguros, page]);
+
+  const totalPages = Math.ceil(seguros.length / PAGE_SIZE_SEGUROS) || 1;
+
   const removerSeguro = useCallback(
     async (id) => {
       await deleteSeguro(id);
@@ -184,7 +197,7 @@ export function useSeguros() {
   );
 
   return {
-    seguros,
+    seguros: segurosPaginados,
     segurosOriginais,
     unidadesDisponiveis: unidades,
     loading,
@@ -195,6 +208,8 @@ export function useSeguros() {
     setFiltros,
     sortConfig,
     setSortConfig,
+    pagination: { page, totalPages, total: seguros.length },
+    goToPage: setPage,
     removerSeguro,
     refetch: fetchData,
     getNomeUnidade: getNomeUnidadeSeguro,

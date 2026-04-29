@@ -8,6 +8,7 @@ import {
   PageHeader,
   PageLayout,
   PageState,
+  Pagination,
 } from '@/components/ui';
 
 import {
@@ -26,10 +27,6 @@ function AlertasPage() {
   const hasError = Boolean(page.error);
   const isEmpty = !page.loading && page.alertasFiltrados.length === 0;
 
-  const totalRecomendacoes = page.alertas.filter(
-    (a) => a.tipo === 'Recomendação'
-  ).length;
-
   return (
     <PageLayout background="slate" padded fullHeight>
       <div className="space-y-6">
@@ -41,24 +38,12 @@ function AlertasPage() {
 
         <AlertasKpiGrid
           metricas={page.metricas}
-          totalRecomendacoes={totalRecomendacoes}
+          totalRecomendacoes={page.metricas.recomendacoes}
           onClearAll={page.clearAllFilters}
-          onFilterNaoVistos={buildQuickFilterHandler(page, {
-            filterId: 'status',
-            value: 'NaoVisto',
-          })}
-          onFilterVistos={buildQuickFilterHandler(page, {
-            filterId: 'status',
-            value: 'Visto',
-          })}
-          onFilterCriticos={buildQuickFilterHandler(page, {
-            filterId: 'prioridade',
-            value: 'Alta',
-          })}
-          onFilterRecomendacoes={buildQuickFilterHandler(page, {
-            filterId: 'tipo',
-            value: 'Recomendação',
-          })}
+          onFilterNaoVistos={buildQuickFilterHandler(page, { filterId: 'status', value: 'NaoVisto' })}
+          onFilterVistos={buildQuickFilterHandler(page, { filterId: 'status', value: 'Visto' })}
+          onFilterCriticos={buildQuickFilterHandler(page, { filterId: 'prioridade', value: 'Alta' })}
+          onFilterRecomendacoes={buildQuickFilterHandler(page, { filterId: 'tipo', value: 'Recomendação' })}
         />
 
         <div className="mb-6">
@@ -81,20 +66,32 @@ function AlertasPage() {
         ) : hasError ? (
           <PageState error="Erro ao carregar alertas." />
         ) : isEmpty ? (
-          <PageState
-            isEmpty
-            emptyMessage="Nenhum alerta encontrado para os critérios selecionados."
-          />
+          <PageState isEmpty emptyMessage="Nenhum alerta encontrado para os critérios selecionados." />
         ) : (
-          <div className="flex flex-col gap-4">
-            {page.alertasFiltrados.map((alerta) => (
-              <AlertaItem
-                key={alerta.id}
-                alerta={alerta}
-                onUpdateStatus={page.updateStatus}
-                onDismiss={page.dismissAlerta}
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4">
+              {page.alertasFiltrados.map((alerta) => (
+                <AlertaItem
+                  key={alerta.id}
+                  alerta={alerta}
+                  onUpdateStatus={page.updateStatus}
+                  onDismiss={page.dismissAlerta}
+                />
+              ))}
+            </div>
+
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                {page.pagination.total > 0
+                  ? `${page.pagination.total} alerta(s) no total`
+                  : ''}
+              </p>
+              <Pagination
+                page={page.pagination.page}
+                totalPages={page.pagination.totalPages}
+                onPageChange={page.goToPage}
               />
-            ))}
+            </div>
           </div>
         )}
 

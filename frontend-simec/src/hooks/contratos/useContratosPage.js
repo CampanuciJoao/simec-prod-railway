@@ -24,6 +24,8 @@ export function useContratosPage() {
     setSearchTerm,
     filtros,
     setFiltros,
+    pagination,
+    goToPage,
     removerContrato,
     refetch,
   } = useContratos();
@@ -268,6 +270,8 @@ export function useContratosPage() {
     contratos,
     loading,
     error,
+    pagination,
+    goToPage,
     searchTerm,
     onSearchChange,
     selectFiltersConfig,

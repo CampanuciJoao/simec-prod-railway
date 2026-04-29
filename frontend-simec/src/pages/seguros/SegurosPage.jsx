@@ -5,6 +5,7 @@ import {
   ModalConfirmacao,
   PageLayout,
   PageState,
+  Pagination,
 } from '@/components/ui';
 
 import {
@@ -19,7 +20,7 @@ function SegurosPage() {
 
   const isLoading = page.loading && page.seguros.length === 0;
   const hasError = !!page.error;
-  const isEmpty = !page.loading && !page.error && page.seguros.length === 0;
+  const isEmpty = !page.loading && !page.error && page.pagination.total === 0;
 
   return (
     <>
@@ -60,15 +61,28 @@ function SegurosPage() {
               isEmpty={isEmpty}
             />
           ) : (
-            <SegurosListSection
-              seguros={page.seguros}
-              getStatus={page.getStatusDinamico}
-              actions={{
-                view: page.goToDetails,
-                edit: page.goToEdit,
-                delete: page.deleteModal.openModal,
-              }}
-            />
+            <div className="space-y-4">
+              <SegurosListSection
+                seguros={page.seguros}
+                getStatus={page.getStatusDinamico}
+                actions={{
+                  view: page.goToDetails,
+                  edit: page.goToEdit,
+                  delete: page.deleteModal.openModal,
+                }}
+              />
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {page.pagination.total} seguro(s) no total
+                </p>
+                <Pagination
+                  page={page.pagination.page}
+                  totalPages={page.pagination.totalPages}
+                  onPageChange={page.goToPage}
+                />
+              </div>
+            </div>
           )}
         </div>
       </PageLayout>
