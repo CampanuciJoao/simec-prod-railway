@@ -25,6 +25,10 @@ export async function buscarSegurosAtivosPorTenant(tenantId) {
       tenantId,
       status: { in: ['Ativo', 'Vigente'] },
     },
+    include: {
+      equipamento: true,
+      unidade: true,
+    },
   });
 }
 

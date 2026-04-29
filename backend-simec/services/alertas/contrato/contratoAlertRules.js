@@ -71,13 +71,13 @@ export async function gerarAlertaVencimentoContrato(
       alertaId,
       await criarPayloadBaseAlerta({
         id: alertaId,
-        titulo: montarTituloContratoVencido(),
+        titulo: montarTituloContratoVencido(contrato),
         subtitulo: montarSubtituloContrato(contrato),
         data: contrato.dataFim,
         prioridade: ALERT_PRIORIDADES.ALTA,
         tipoCategoria: ALERT_CATEGORIAS.CONTRATO,
         tipoEvento: ALERT_EVENTOS.CONTRATO_VENCIDO,
-        link: '/contratos',
+        link: `/contratos/detalhes/${contrato.id}`,
 
         contexto: {
           contratoId: contrato.id,
@@ -125,13 +125,13 @@ export async function gerarAlertaVencimentoContrato(
         alertaId,
         await criarPayloadBaseAlerta({
           id: alertaId,
-          titulo: montarTituloContratoVence(ponto.texto),
+          titulo: montarTituloContratoVence(contrato, ponto.texto),
           subtitulo: montarSubtituloContrato(contrato),
           data: contrato.dataFim,
           prioridade: ponto.prioridade,
           tipoCategoria: ALERT_CATEGORIAS.CONTRATO,
           tipoEvento: ALERT_EVENTOS.CONTRATO_VENCE,
-          link: '/contratos',
+          link: `/contratos/detalhes/${contrato.id}`,
 
           contexto: {
             contratoId: contrato.id,

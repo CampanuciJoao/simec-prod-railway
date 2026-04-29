@@ -20,12 +20,17 @@ function capitalizar(texto) {
 /**
  * 🟢 TÍTULOS
  */
-export function montarTituloContratoVencido() {
-  return 'Contrato vencido';
+function resolverAlvoContrato(contrato) {
+  if (contrato?.fornecedor) return `"${contrato.fornecedor}"`;
+  return `Nº ${contrato?.numeroContrato || 'S/N'}`;
 }
 
-export function montarTituloContratoVence(texto) {
-  return `Contrato vence ${texto}`;
+export function montarTituloContratoVencido(contrato) {
+  return `Contrato ${resolverAlvoContrato(contrato)} vencido`;
+}
+
+export function montarTituloContratoVence(contrato, texto) {
+  return `Contrato ${resolverAlvoContrato(contrato)} vence ${texto}`;
 }
 
 /**
