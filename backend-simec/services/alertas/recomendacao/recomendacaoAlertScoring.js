@@ -1,4 +1,4 @@
-import { normalizarTexto } from '../../../shared/textUtils.js';
+import { normalizarTexto } from '../../shared/textUtils.js';
 
 function parseMetadata(evento) {
   if (!evento) return null;

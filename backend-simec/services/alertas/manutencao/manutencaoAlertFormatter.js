@@ -1,6 +1,6 @@
 import { buildAlertMetaManutencao } from './manutencaoAlertMeta.js';
 
-import { normalizarParaExibicao as normalizarTexto } from '../../../shared/textUtils.js';
+import { normalizarParaExibicao as normalizarTexto } from '../../shared/textUtils.js';
 
 function normalizarTipoManutencao(manut) {
   return String(manut?.tipo || 'manutencao').toLowerCase();
