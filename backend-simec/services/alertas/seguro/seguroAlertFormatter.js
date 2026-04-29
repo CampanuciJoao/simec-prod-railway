@@ -9,8 +9,8 @@ export function buildSeguroAlertId(tenantId, tipo, seguroId, label = '') {
 }
 
 function resolverAlvoSeguro(seguro) {
-  if (seguro?.unidade?.nomeSistema) return `unidade "${seguro.unidade.nomeSistema}"`;
-  if (seguro?.equipamento?.modelo) return `equipamento "${seguro.equipamento.modelo}"`;
+  if (seguro?.unidade?.nomeSistema) return `unidade ${seguro.unidade.nomeSistema}`;
+  if (seguro?.equipamento?.modelo) return `equipamento ${seguro.equipamento.modelo}`;
   return `apólice ${seguro?.apoliceNumero || 'S/N'}`;
 }
 

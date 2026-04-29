@@ -2,9 +2,16 @@ import { buildAlertMetaManutencao } from './manutencaoAlertMeta.js';
 
 import { normalizarParaExibicao as normalizarTexto } from '../../shared/textUtils.js';
 
+const TIPO_LABEL = {
+  Preventiva: 'Preventiva',
+  Corretiva: 'Corretiva',
+  Calibracao: 'Calibração',
+  Inspecao: 'Inspeção',
+};
+
 function normalizarTipoManutencao(manut) {
-  const tipo = String(manut?.tipo || 'manutencao').toLowerCase();
-  return tipo.charAt(0).toUpperCase() + tipo.slice(1);
+  const tipo = manut?.tipo || '';
+  return TIPO_LABEL[tipo] || tipo;
 }
 
 function normalizarEquipamento(manut) {
@@ -26,14 +33,14 @@ export function montarTituloProximidadeInicio(manut, minutos) {
   const equipamento = normalizarEquipamento(manut);
   const unidade = normalizarUnidade(manut);
   const janela = formatarJanelaTempo(minutos);
-  return `Manutenção de ${tipo} no equipamento "${equipamento}" começa em ${janela} na unidade "${unidade}"`;
+  return `Manutenção de ${tipo} no equipamento ${equipamento} começa em ${janela} na unidade ${unidade}`;
 }
 
 export function montarTituloInicio(manut) {
   const tipo = normalizarTipoManutencao(manut);
   const equipamento = normalizarEquipamento(manut);
   const unidade = normalizarUnidade(manut);
-  return `Manutenção de ${tipo} no equipamento "${equipamento}" iniciou na unidade "${unidade}"`;
+  return `Manutenção de ${tipo} no equipamento ${equipamento} iniciou na unidade ${unidade}`;
 }
 
 export function montarTituloProximidadeFim(manut, minutos) {
@@ -41,21 +48,21 @@ export function montarTituloProximidadeFim(manut, minutos) {
   const equipamento = normalizarEquipamento(manut);
   const unidade = normalizarUnidade(manut);
   const janela = formatarJanelaTempo(minutos);
-  return `Manutenção de ${tipo} no equipamento "${equipamento}" termina em ${janela} na unidade "${unidade}"`;
+  return `Manutenção de ${tipo} no equipamento ${equipamento} termina em ${janela} na unidade ${unidade}`;
 }
 
 export function montarTituloFim(manut) {
   const tipo = normalizarTipoManutencao(manut);
   const equipamento = normalizarEquipamento(manut);
   const unidade = normalizarUnidade(manut);
-  return `Manutenção de ${tipo} no equipamento "${equipamento}" encerrou na unidade "${unidade}"`;
+  return `Manutenção de ${tipo} no equipamento ${equipamento} encerrou na unidade ${unidade}`;
 }
 
 export function montarTituloConfirmacao(manut) {
   const tipo = normalizarTipoManutencao(manut);
   const equipamento = normalizarEquipamento(manut);
   const unidade = normalizarUnidade(manut);
-  return `Manutenção de ${tipo} no equipamento "${equipamento}" aguarda confirmação na unidade "${unidade}"`;
+  return `Manutenção de ${tipo} no equipamento ${equipamento} aguarda confirmação na unidade ${unidade}`;
 }
 
 export function montarSubtituloBase(manut) {
