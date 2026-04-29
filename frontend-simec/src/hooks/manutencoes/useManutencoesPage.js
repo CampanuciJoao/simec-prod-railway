@@ -185,6 +185,9 @@ export function useManutencoesPage() {
     sortConfig: dataHook.controles.sortConfig,
     requestSort: dataHook.controles.requestSort,
 
+    // paginação IBM Maximo style
+    goToPage: dataHook.goToPage,
+
     // modal
     deleteModal,
     handleConfirmDelete,

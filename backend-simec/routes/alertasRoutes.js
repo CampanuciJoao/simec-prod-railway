@@ -1,6 +1,7 @@
 import express from 'express';
 
 import { proteger } from '../middleware/authMiddleware.js';
+import prisma from '../services/prismaService.js';
 import {
   listarAlertasService,
   resumirAlertasService,
@@ -52,6 +53,54 @@ router.get('/resumo', async (req, res) => {
   } catch (error) {
     console.error('[ALERTA_RESUMO_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar resumo de alertas.' });
+  }
+});
+
+// ==============================
+// GET /historico — log de auditoria (alertas arquivados)
+// IBM Maximo: rastreabilidade completa de todos os alertas gerados
+// ==============================
+router.get('/historico', async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const page     = Math.max(1, parseInt(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 25));
+
+    const where = { tenantId };
+
+    if (req.query.tipo)       where.tipo       = req.query.tipo;
+    if (req.query.prioridade) where.prioridade = req.query.prioridade;
+    if (req.query.dataInicio) where.dataAlerta = { ...where.dataAlerta, gte: new Date(req.query.dataInicio) };
+    if (req.query.dataFim)    where.dataAlerta = { ...where.dataAlerta, lte: new Date(req.query.dataFim) };
+
+    if (req.query.search) {
+      where.OR = [
+        { titulo:    { contains: req.query.search, mode: 'insensitive' } },
+        { subtitulo: { contains: req.query.search, mode: 'insensitive' } },
+        { numeroOS:  { contains: req.query.search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [data, total] = await Promise.all([
+      prisma.alertaHistorico.findMany({
+        where,
+        orderBy: { dataAlerta: 'desc' },
+        skip:  (page - 1) * pageSize,
+        take:  pageSize,
+      }),
+      prisma.alertaHistorico.count({ where }),
+    ]);
+
+    return res.json({
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+    });
+  } catch (error) {
+    console.error('[ALERTA_HISTORICO_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar histórico de alertas.' });
   }
 });
 

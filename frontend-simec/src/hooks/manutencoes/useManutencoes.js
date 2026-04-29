@@ -48,6 +48,7 @@ export function useManutencoes() {
     page: 1,
     pageSize: PAGE_SIZE,
     total: 0,
+    totalPages: 1,
     hasNextPage: false,
   });
 
@@ -104,10 +105,13 @@ export function useManutencoes() {
             canceladas: 0,
           }
         );
+        const total = data?.total || items.length;
+        const pageSize = data?.pageSize || PAGE_SIZE;
         setPagination({
           page: data?.page || page,
-          pageSize: data?.pageSize || PAGE_SIZE,
-          total: data?.total || items.length,
+          pageSize,
+          total,
+          totalPages: Math.max(1, Math.ceil(total / pageSize)),
           hasNextPage: Boolean(data?.hasNextPage),
         });
       } catch (err) {
@@ -205,12 +209,16 @@ export function useManutencoes() {
 
   const carregarMais = useCallback(async () => {
     if (loadingMore || !pagination.hasNextPage) return;
-
-    await fetchManutencoes({
-      page: pagination.page + 1,
-      append: true,
-    });
+    await fetchManutencoes({ page: pagination.page + 1, append: true });
   }, [fetchManutencoes, loadingMore, pagination]);
+
+  // Paginação tradicional (IBM Maximo style) — troca de página sem append
+  const goToPage = useCallback(
+    (newPage) => {
+      fetchManutencoes({ page: newPage, append: false });
+    },
+    [fetchManutencoes]
+  );
 
   const controles = useMemo(
     () => ({
@@ -234,6 +242,7 @@ export function useManutencoes() {
     unidadesDisponiveis,
     pagination,
     carregarMais,
+    goToPage,
     removerManutencao,
     refetch: () => fetchManutencoes({ page: 1, append: false }),
     controles,

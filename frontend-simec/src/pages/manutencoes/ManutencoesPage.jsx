@@ -14,7 +14,7 @@ import {
 } from '@/components/manutencoes';
 
 // UI
-import { PageLayout, PageState, ModalConfirmacao } from '@/components/ui';
+import { PageLayout, PageState, ModalConfirmacao, Pagination } from '@/components/ui';
 
 function ManutencoesPage() {
   const { usuario } = useAuth();
@@ -109,23 +109,37 @@ function ManutencoesPage() {
               emptyMessage="Nenhuma manutenção encontrada."
             />
           ) : (
-            <ManutencoesListSection
-              items={unifiedItems}
-              searchTerm={page.searchTerm}
-              onSearchChange={page.onSearchChange}
-              selectFilters={page.selectFiltersConfig}
-              activeFilters={page.activeFilters}
-              onRemoveFilter={page.clearFilter}
-              onClearAll={page.clearAllFilters}
-              onDelete={(item) => page.deleteModal.openModal(item)}
-              onDeleteOs={(o) => osDeleteModal.openModal(o)}
-              isAdmin={isAdmin}
-              metricas={combinedMetricas}
-              total={combinedTotal}
-              hasNextPage={combinedHasNextPage}
-              loadingMore={combinedLoadingMore}
-              onLoadMore={handleLoadMore}
-            />
+            <div className="space-y-4">
+              <ManutencoesListSection
+                items={unifiedItems}
+                searchTerm={page.searchTerm}
+                onSearchChange={page.onSearchChange}
+                selectFilters={page.selectFiltersConfig}
+                activeFilters={page.activeFilters}
+                onRemoveFilter={page.clearFilter}
+                onClearAll={page.clearAllFilters}
+                onDelete={(item) => page.deleteModal.openModal(item)}
+                onDeleteOs={(o) => osDeleteModal.openModal(o)}
+                isAdmin={isAdmin}
+                metricas={combinedMetricas}
+                total={combinedTotal}
+                hasNextPage={combinedHasNextPage}
+                loadingMore={combinedLoadingMore}
+                onLoadMore={handleLoadMore}
+              />
+
+              {/* Paginação IBM Maximo style — troca de página sem append */}
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+                  {combinedTotal > 0 ? `${combinedTotal} ordem(ns) no total` : ''}
+                </p>
+                <Pagination
+                  page={page.pagination?.page ?? 1}
+                  totalPages={page.pagination?.totalPages ?? 1}
+                  onPageChange={page.goToPage}
+                />
+              </div>
+            </div>
           )}
         </div>
       </PageLayout>

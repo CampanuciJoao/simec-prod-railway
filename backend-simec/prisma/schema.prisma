@@ -30,6 +30,7 @@ model Tenant {
   seguros              Seguro[]
   alertas              Alerta[]
   alertasLidos         AlertaLidoPorUsuario[]
+  alertasHistorico     AlertaHistorico[]
   logsAuditoria        LogAuditoria[]
   anexos               Anexo[]
   notasAndamento       NotaAndamento[]
@@ -433,6 +434,34 @@ model AlertaLidoPorUsuario {
   @@id([alertaId, usuarioId])
   @@index([tenantId, usuarioId, visto])
   @@map("alertas_lidos_por_usuario")
+}
+
+// Arquivo de auditoria: preserva alertas removidos pela retenção automática.
+// IBM Maximo / MaintainX: toda ação do sistema deve ser rastreável.
+model AlertaHistorico {
+  id            String   @id @default(uuid())
+  tenantId      String
+  alertaId      String   @map("alerta_id")
+  titulo        String
+  subtitulo     String?
+  tipo          String
+  tipoCategoria String?  @map("tipo_categoria")
+  tipoEvento    String?  @map("tipo_evento")
+  prioridade    String
+  link          String?
+  numeroOS      String?  @map("numero_os")
+  dataAlerta    DateTime @map("data_alerta")
+  dataArquivado DateTime @default(now()) @map("data_arquivado")
+  motivoArquivo String   @default("retencao_automatica") @map("motivo_arquivo")
+  metadataJson  String?  @db.Text @map("metadata_json")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, dataAlerta(sort: Desc)])
+  @@index([tenantId, tipo, dataAlerta(sort: Desc)])
+  @@index([tenantId, prioridade, dataAlerta(sort: Desc)])
+  @@index([tenantId, dataArquivado(sort: Desc)])
+  @@map("alertas_historico")
 }
 
 model LogAuditoria {
