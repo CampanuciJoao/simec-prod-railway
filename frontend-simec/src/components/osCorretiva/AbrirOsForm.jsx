@@ -53,8 +53,17 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
     ...unidades.map((u) => ({ value: u.id, label: u.nomeSistema })),
   ];
 
+  const semApelidos = selectedUnidade && equipamentos.length > 0 && apelidos.length === 0;
+
   const apelidosOptions = [
-    { value: '', label: selectedUnidade ? 'Todos os apelidos' : 'Selecione a unidade' },
+    {
+      value: '',
+      label: !selectedUnidade
+        ? 'Selecione a unidade'
+        : semApelidos
+        ? 'Nenhum apelido cadastrado'
+        : 'Todos os apelidos',
+    },
     ...apelidos.map((a) => ({ value: a, label: a })),
   ];
 
@@ -99,7 +108,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
                 onChange('equipamentoId', '');
               }}
               options={apelidosOptions}
-              disabled={!selectedUnidade}
+              disabled={!selectedUnidade || semApelidos}
             />
           </div>
           <div className="col-span-2">
