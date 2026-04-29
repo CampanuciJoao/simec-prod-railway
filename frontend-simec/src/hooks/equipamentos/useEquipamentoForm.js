@@ -10,6 +10,7 @@ const ESTADO_INICIAL = {
   tipo: '',
   setor: '',
   unidadeId: '',
+  apelido: '',
   fabricante: '',
   anoFabricacao: '',
   dataInstalacao: '',

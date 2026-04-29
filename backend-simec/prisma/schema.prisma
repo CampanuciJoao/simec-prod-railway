@@ -119,6 +119,7 @@ model Equipamento {
   modelo           String
   tipo             String?
   setor            String?
+  apelido          String?
   fabricante       String?
   anoFabricacao    String?           @map("ano_fabricacao")
   dataInstalacao   DateTime?         @map("data_instalacao")

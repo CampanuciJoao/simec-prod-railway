@@ -49,6 +49,7 @@ export const equipamentoSchema = z.object({
     .enum(['Operante', 'Inoperante', 'EmManutencao', 'UsoLimitado', 'Desativado'])
     .default('Operante'),
 
+  apelido: optionalTextSchema,
   numeroPatrimonio: optionalTextSchema,
   fabricante: fabricanteSchema,
   dataInstalacao: optionalTextSchema,

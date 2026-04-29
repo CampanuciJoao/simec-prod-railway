@@ -150,6 +150,13 @@ function EquipamentoForm({
             required
           />
 
+          <Input
+            label="Apelido"
+            value={formData.apelido}
+            onChange={(e) => handleChange('apelido', e.target.value)}
+            placeholder="Ex.: Tomógrafo da UTI"
+          />
+
           <div>
             <Input
               label="Fabricante"
