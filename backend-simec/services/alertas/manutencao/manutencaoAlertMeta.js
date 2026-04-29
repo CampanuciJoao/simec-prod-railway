@@ -9,12 +9,8 @@ export function buildAlertMetaManutencao(manut, extra = {}) {
   return {
     subtituloBase: extra.subtituloBase || subtituloBaseDefault,
     numeroOS: normalizarTexto(manut.numeroOS),
-    dataHoraAgendamentoInicio: normalizarTexto(
-      manut.dataHoraAgendamentoInicio
-    ),
-    dataHoraAgendamentoFim: normalizarTexto(
-      manut.dataHoraAgendamentoFim
-    ),
+    dataHoraAgendamentoInicio: manut.dataHoraAgendamentoInicio ?? null,
+    dataHoraAgendamentoFim: manut.dataHoraAgendamentoFim ?? null,
     ...extra,
   };
 }
