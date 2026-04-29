@@ -73,13 +73,13 @@ export async function gerarAlertaVencimentoSeguro(
       alertaId,
       await criarPayloadBaseAlerta({
         id: alertaId,
-        titulo: montarTituloSeguroVencido(),
+        titulo: montarTituloSeguroVencido(seguro),
         subtitulo: montarSubtituloSeguro(seguro),
         data: seguro.dataFim,
         prioridade: ALERT_PRIORIDADES.ALTA,
         tipoCategoria: ALERT_CATEGORIAS.SEGURO,
         tipoEvento: ALERT_EVENTOS.SEGURO_VENCIDO,
-        link: '/seguros',
+        link: `/seguros/detalhes/${seguro.id}`,
 
         contexto: {
           seguroId: seguro.id,
@@ -127,13 +127,13 @@ export async function gerarAlertaVencimentoSeguro(
         alertaId,
         await criarPayloadBaseAlerta({
           id: alertaId,
-          titulo: montarTituloSeguroVence(ponto.texto),
+          titulo: montarTituloSeguroVence(seguro, ponto.texto),
           subtitulo: montarSubtituloSeguro(seguro),
           data: seguro.dataFim,
           prioridade: ponto.prioridade,
           tipoCategoria: ALERT_CATEGORIAS.SEGURO,
           tipoEvento: ALERT_EVENTOS.SEGURO_VENCE,
-          link: '/seguros',
+          link: `/seguros/detalhes/${seguro.id}`,
 
           contexto: {
             seguroId: seguro.id,

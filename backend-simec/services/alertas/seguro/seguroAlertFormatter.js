@@ -8,16 +8,21 @@ export function buildSeguroAlertId(tenantId, tipo, seguroId, label = '') {
   return `tenant-${safeTenant}-${safeTipo}-${safeId}${safeLabel}`;
 }
 
-export function montarTituloSeguroVencido() {
-  return 'Seguro vencido';
+function resolverAlvoSeguro(seguro) {
+  if (seguro?.unidade?.nomeSistema) return `unidade "${seguro.unidade.nomeSistema}"`;
+  if (seguro?.equipamento?.modelo) return `equipamento "${seguro.equipamento.modelo}"`;
+  return `apólice ${seguro?.apoliceNumero || 'S/N'}`;
+}
+
+export function montarTituloSeguroVencido(seguro) {
+  return `Seguro da ${resolverAlvoSeguro(seguro)} vencido`;
 }
 
 export function montarSubtituloSeguro(seguro) {
-  // 🔥 evita undefined quebrando UI
   const apolice = seguro?.apoliceNumero || 'N/A';
   return `Apólice Nº ${apolice}`;
 }
 
-export function montarTituloSeguroVence(texto) {
-  return `Seguro vence ${texto}`;
+export function montarTituloSeguroVence(seguro, texto) {
+  return `Seguro da ${resolverAlvoSeguro(seguro)} vence ${texto}`;
 }
