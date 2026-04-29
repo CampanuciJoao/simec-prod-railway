@@ -97,32 +97,122 @@ async function buscarContratoCompleto(tenantId, id) {
   });
 }
 
+// ─── Helpers de paginação e filtros ──────────────────────────────────────────
+
+function buildStatusWhereContrato(status) {
+  if (!status) return null;
+
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const em30Dias = new Date(hoje);
+  em30Dias.setDate(em30Dias.getDate() + 30);
+
+  switch (status) {
+    case 'Cancelado':
+      return { status: 'Cancelado' };
+    case 'Expirado':
+      return { OR: [{ status: 'Expirado' }, { status: 'Ativo', dataFim: { lt: hoje } }] };
+    case 'Vence em breve':
+      return { status: 'Ativo', dataFim: { gte: hoje, lt: em30Dias } };
+    case 'Ativo':
+      return { status: 'Ativo', dataFim: { gte: em30Dias } };
+    default:
+      return null;
+  }
+}
+
+function buildContratoWhere({ tenantId, status, categoria, unidade, search }) {
+  const conditions = [{ tenantId }];
+
+  const statusFilter = buildStatusWhereContrato(status);
+  if (statusFilter) conditions.push(statusFilter);
+  if (categoria) conditions.push({ categoria });
+  if (unidade) conditions.push({ unidadesCobertas: { some: { id: unidade, tenantId } } });
+
+  if (search) {
+    conditions.push({
+      OR: [
+        { numeroContrato: { contains: search, mode: 'insensitive' } },
+        { fornecedor: { contains: search, mode: 'insensitive' } },
+        { categoria: { contains: search, mode: 'insensitive' } },
+        { unidadesCobertas: { some: { nomeSistema: { contains: search, mode: 'insensitive' } } } },
+      ],
+    });
+  }
+
+  return conditions.length === 1 ? conditions[0] : { AND: conditions };
+}
+
+async function contarMetricasContratos(tenantId) {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+  const em30Dias = new Date(hoje);
+  em30Dias.setDate(em30Dias.getDate() + 30);
+
+  const [total, ativos, vencendo, expirados] = await Promise.all([
+    prisma.contrato.count({ where: { tenantId } }),
+    prisma.contrato.count({
+      where: { tenantId, status: 'Ativo', dataFim: { gte: em30Dias } },
+    }),
+    prisma.contrato.count({
+      where: { tenantId, status: 'Ativo', dataFim: { gte: hoje, lt: em30Dias } },
+    }),
+    prisma.contrato.count({
+      where: {
+        tenantId,
+        OR: [{ status: 'Expirado' }, { status: 'Ativo', dataFim: { lt: hoje } }],
+      },
+    }),
+  ]);
+
+  return { total, ativos, vencendo, expirados };
+}
+
+const CONTRATO_INCLUDE = {
+  unidadesCobertas: {
+    select: { id: true, nomeSistema: true },
+  },
+  equipamentosCobertos: {
+    select: { id: true, modelo: true, tag: true },
+  },
+  anexos: {
+    orderBy: { createdAt: 'desc' },
+  },
+};
+
 // ==============================
-// GET LISTAR
+// GET LISTAR (paginado)
 // ==============================
 router.get('/', async (req, res) => {
   try {
-    const contratos = await prisma.contrato.findMany({
-      where: {
-        tenantId: req.usuario.tenantId,
-      },
-      include: {
-        unidadesCobertas: {
-          select: { id: true, nomeSistema: true },
-        },
-        equipamentosCobertos: {
-          select: { id: true, modelo: true, tag: true },
-        },
-        anexos: {
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
-      },
-      orderBy: { dataFim: 'asc' },
-    });
+    const tenantId = req.usuario.tenantId;
 
-    return res.json(contratos);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 10));
+    const { status, categoria, unidade, search } = req.query;
+
+    const where = buildContratoWhere({ tenantId, status, categoria, unidade, search });
+
+    const [data, total, metricas] = await Promise.all([
+      prisma.contrato.findMany({
+        where,
+        include: CONTRATO_INCLUDE,
+        orderBy: { dataFim: 'asc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.contrato.count({ where }),
+      contarMetricasContratos(tenantId),
+    ]);
+
+    return res.json({
+      data,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil(total / pageSize)),
+      metricas,
+    });
   } catch (error) {
     console.error('[CONTRATO_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar contratos.' });

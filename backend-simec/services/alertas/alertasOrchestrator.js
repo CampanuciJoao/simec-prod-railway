@@ -59,35 +59,25 @@ function coletarTenantsUnicos(...results) {
 }
 
 /**
- * Orquestrador principal
+ * Orquestrador principal — todos os geradores rodam em paralelo.
+ * `executarEtapa` já captura erros internamente, então Promise.all nunca rejeita.
  */
 export async function processarAlertasEEnviarNotificacoes() {
-  console.log('[ALERTAS] Iniciando processamento...');
+  console.log('[ALERTAS] Iniciando processamento paralelo...');
 
-  const manutencoesResult = await executarEtapa(
-    'manutencoes',
-    gerarAlertasManutencao
-  );
-
-  const segurosResult = await executarEtapa(
-    'seguros',
-    gerarAlertasSeguro
-  );
-
-  const contratosResult = await executarEtapa(
-    'contratos',
-    gerarAlertasContrato
-  );
-
-  const recomendacoesResult = await executarEtapa(
-    'recomendacoes',
-    gerarAlertasRecomendacao
-  );
-
-  const insightsResult = await executarEtapa(
-    'insights_ia',
-    gerarInsightsInteligentes
-  );
+  const [
+    manutencoesResult,
+    segurosResult,
+    contratosResult,
+    recomendacoesResult,
+    insightsResult,
+  ] = await Promise.all([
+    executarEtapa('manutencoes', gerarAlertasManutencao),
+    executarEtapa('seguros', gerarAlertasSeguro),
+    executarEtapa('contratos', gerarAlertasContrato),
+    executarEtapa('recomendacoes', gerarAlertasRecomendacao),
+    executarEtapa('insights_ia', gerarInsightsInteligentes),
+  ]);
 
   const manutencoes = manutencoesResult.total;
   const seguros = segurosResult.total;

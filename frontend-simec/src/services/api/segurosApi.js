@@ -1,7 +1,7 @@
 import api from '../http/apiClient';
 
-export const getSeguros = () =>
-  api.get('/seguros').then((res) => res.data);
+export const getSeguros = (params = {}) =>
+  api.get('/seguros', { params }).then((res) => res.data);
 
 export const getSeguroById = (id) =>
   api.get(`/seguros/${id}`).then((res) => res.data);
