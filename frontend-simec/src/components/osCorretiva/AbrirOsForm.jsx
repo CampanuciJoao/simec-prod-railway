@@ -15,7 +15,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
   const [unidades, setUnidades] = useState([]);
   const [equipamentos, setEquipamentos] = useState([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
-  const [selectedTipo, setSelectedTipo] = useState('');
+  const [selectedApelido, setSelectedApelido] = useState('');
 
   useEffect(() => {
     getUnidades().then((data) => setUnidades(Array.isArray(data) ? data : [])).catch(() => {});
@@ -24,7 +24,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
   useEffect(() => {
     if (!selectedUnidade) {
       setEquipamentos([]);
-      setSelectedTipo('');
+      setSelectedApelido('');
       return;
     }
     getEquipamentos({ unidadeId: selectedUnidade, pageSize: 200 })
@@ -35,27 +35,27 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
       .catch(() => {});
   }, [selectedUnidade]);
 
-  const tipos = useMemo(() => {
+  const apelidos = useMemo(() => {
     const seen = new Set();
     return equipamentos
-      .map((eq) => eq.tipo)
-      .filter((t) => t && !seen.has(t) && seen.add(t))
+      .map((eq) => eq.apelido)
+      .filter((a) => a && !seen.has(a) && seen.add(a))
       .sort();
   }, [equipamentos]);
 
   const equipamentosFiltrados = useMemo(() => {
-    if (!selectedTipo) return equipamentos;
-    return equipamentos.filter((eq) => eq.tipo === selectedTipo);
-  }, [equipamentos, selectedTipo]);
+    if (!selectedApelido) return equipamentos;
+    return equipamentos.filter((eq) => eq.apelido === selectedApelido);
+  }, [equipamentos, selectedApelido]);
 
   const unidadesOptions = [
     { value: '', label: 'Selecione a unidade' },
     ...unidades.map((u) => ({ value: u.id, label: u.nomeSistema })),
   ];
 
-  const tiposOptions = [
-    { value: '', label: selectedUnidade ? 'Todos os tipos' : 'Selecione a unidade' },
-    ...tipos.map((t) => ({ value: t, label: t })),
+  const apelidosOptions = [
+    { value: '', label: selectedUnidade ? 'Todos os apelidos' : 'Selecione a unidade' },
+    ...apelidos.map((a) => ({ value: a, label: a })),
   ];
 
   const equipamentosOptions = [
@@ -65,9 +65,12 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
         ? 'Selecione a unidade primeiro'
         : equipamentosFiltrados.length === 0
         ? 'Nenhum equipamento encontrado'
-        : 'Selecione o equipamento',
+        : 'Selecione pelo nº de série',
     },
-    ...equipamentosFiltrados.map((eq) => ({ value: eq.id, label: `${eq.modelo} (${eq.tag})` })),
+    ...equipamentosFiltrados.map((eq) => ({
+      value: eq.id,
+      label: eq.apelido ? `${eq.tag} — ${eq.apelido}` : `${eq.tag} (${eq.modelo})`,
+    })),
   ];
 
   return (
@@ -79,7 +82,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
           value={selectedUnidade}
           onChange={(e) => {
             setSelectedUnidade(e.target.value);
-            setSelectedTipo('');
+            setSelectedApelido('');
             onChange('equipamentoId', '');
           }}
           options={unidadesOptions}
@@ -88,14 +91,14 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
         <div className="grid grid-cols-3 gap-3">
           <div>
             <Select
-              label="Tipo"
+              label="Apelido"
               placeholder=""
-              value={selectedTipo}
+              value={selectedApelido}
               onChange={(e) => {
-                setSelectedTipo(e.target.value);
+                setSelectedApelido(e.target.value);
                 onChange('equipamentoId', '');
               }}
-              options={tiposOptions}
+              options={apelidosOptions}
               disabled={!selectedUnidade}
             />
           </div>
