@@ -47,7 +47,12 @@ router.get('/', async (req, res) => {
 
     if (autorId) whereClause.autorId = autorId;
     if (acao) whereClause.acao = acao;
-    if (entidade) whereClause.entidade = entidade;
+    if (entidade) {
+      whereClause.entidade = entidade;
+    } else if (req.query.entidades) {
+      const lista = req.query.entidades.split(',').map((e) => e.trim()).filter(Boolean);
+      if (lista.length > 0) whereClause.entidade = { in: lista };
+    }
     if (entidadeId) whereClause.entidadeId = entidadeId;
 
     if (dataInicio || dataFim) {

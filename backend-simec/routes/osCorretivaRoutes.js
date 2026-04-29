@@ -1,5 +1,6 @@
 import express from 'express';
 import { proteger, admin } from '../middleware/authMiddleware.js';
+import prisma from '../services/prismaService.js';
 import {
   listarOsCorretivasService,
   obterOsCorretivaDetalhadaService,
@@ -30,6 +31,40 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao listar OS Corretivas.' });
+  }
+});
+
+router.get('/:id/historico', async (req, res) => {
+  try {
+    const { tenantId } = req.usuario;
+    const osId = req.params.id;
+
+    const existe = await prisma.osCorretiva.findFirst({
+      where: { tenantId, id: osId },
+      select: { id: true },
+    });
+    if (!existe) return res.status(404).json({ message: 'OS Corretiva não encontrada.' });
+
+    const eventos = await prisma.historicoAtivoEvento.findMany({
+      where: { tenantId, referenciaId: osId, referenciaTipo: 'os_corretiva' },
+      orderBy: { dataEvento: 'asc' },
+      select: {
+        id: true,
+        tipoEvento: true,
+        titulo: true,
+        descricao: true,
+        origem: true,
+        status: true,
+        metadataJson: true,
+        dataEvento: true,
+        createdAt: true,
+      },
+    });
+
+    return res.json({ items: eventos, total: eventos.length });
+  } catch (error) {
+    console.error('[OS_CORRETIVA_HISTORICO_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar histórico.' });
   }
 });
 

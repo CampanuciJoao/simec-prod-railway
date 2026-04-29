@@ -166,7 +166,7 @@ export function montarWorkflowPayload({
         ...(numeroChamado ? { numeroChamado } : {}),
         ...(tecnicoResponsavel ? { tecnicoResponsavel } : {}),
       },
-      detalheLog: `OS ${manutencaoAtual.numeroOS} visita agendada para ${dataFormatada}.`,
+      detalheLog: `OS ${manutencaoAtual.numeroOS} agendada para ${dataFormatada}. Status: Pendente → Agendada.${tecnicoResponsavel ? ` Técnico: ${tecnicoResponsavel}.` : ''}`,
       notaOperacional: notaTexto,
       equipamentoStatus: null,
       historicoTitulo: `OS ${manutencaoAtual.numeroOS} visita agendada`,
@@ -193,7 +193,7 @@ export function montarWorkflowPayload({
         dataConclusao: agora,
         dataFimReal: agora,
       },
-      detalheLog: `OS ${manutencaoAtual.numeroOS} resolvida internamente.`,
+      detalheLog: `OS ${manutencaoAtual.numeroOS} resolvida internamente. Status: Pendente → Concluída. Resolução: ${String(observacao).trim()}`,
       notaOperacional: notaTexto,
       equipamentoStatus: 'Operante',
       historicoTitulo: `OS ${manutencaoAtual.numeroOS} resolvida internamente`,
@@ -233,7 +233,7 @@ export function montarWorkflowPayload({
 
     updateData.status = 'Cancelada';
     equipamentoStatus = statusEquipamentoAnterior || null;
-    detalheLog = `OS ${manutencaoAtual.numeroOS} cancelada.`;
+    detalheLog = `OS ${manutencaoAtual.numeroOS} cancelada. Status: ${manutencaoAtual.status} → Cancelada. Motivo: ${String(observacao).trim()}`;
     notaOperacional = `Cancelamento registrado. Motivo: ${String(observacao).trim()}`;
     historicoTitulo = `OS ${manutencaoAtual.numeroOS} cancelada`;
     historicoDescricao = [
@@ -286,7 +286,7 @@ export function montarWorkflowPayload({
     updateData.status = 'Concluida';
     updateData.dataConclusao = parsedConclusao;
     updateData.dataFimReal = parsedConclusao;
-    detalheLog = `OS ${manutencaoAtual.numeroOS} concluida.`;
+    detalheLog = `OS ${manutencaoAtual.numeroOS} concluída. Status: ${manutencaoAtual.status} → Concluída. Manutenção realizada: ${manutencaoRealizada ? 'Sim' : 'Não'}. Equipamento: Operante.${observacao ? ` Obs: ${String(observacao).trim()}` : ''}`;
     equipamentoStatus = 'Operante';
     historicoTitulo = `OS ${manutencaoAtual.numeroOS} concluida`;
     historicoDescricao = [
@@ -356,7 +356,7 @@ export function montarWorkflowPayload({
   updateData.agendamentoHoraFimLocal = localPrevisao.timeLocal;
   updateData.dataHoraAgendamentoFim = localPrevisao.utcDate;
 
-  detalheLog = `OS ${manutencaoAtual.numeroOS} prorrogada.`;
+  detalheLog = `OS ${manutencaoAtual.numeroOS} prorrogada. Status: ${manutencaoAtual.status} → EmAndamento. Nova previsão: ${localPrevisao.dateLocal} ${localPrevisao.timeLocal}. Motivo: ${String(observacao).trim()}`;
   equipamentoStatus = 'EmManutencao';
   historicoTitulo = `OS ${manutencaoAtual.numeroOS} prorrogada`;
   historicoDescricao = [

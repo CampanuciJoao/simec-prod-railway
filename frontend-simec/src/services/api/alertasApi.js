@@ -11,3 +11,6 @@ export const updateStatusAlerta = (alertaId, status) =>
 
 export const dismissAlerta = (alertaId) =>
   updateStatusAlerta(alertaId, 'Visto');
+
+export const getHistoricoAlertas = (params = {}) =>
+  api.get('/alertas/historico', { params }).then((res) => res.data);

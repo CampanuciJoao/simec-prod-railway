@@ -42,32 +42,50 @@ router.get('/indicadores', async (req, res) => {
     const inicioAno = startOfYear(agora);
     const fimAno = endOfYear(agora);
 
-    const [manutencoes, totalEquipamentos] = await Promise.all([
+    const [manutencoes, totalEquipamentos, osConcluidasAno, backlogManutencoes, backlogOsCorretivas, preventivasAno] = await Promise.all([
       prisma.manutencao.findMany({
         where: {
           tenantId,
           status: 'Concluida',
-          dataConclusao: {
-            gte: inicioAno,
-            lte: fimAno,
-          },
+          dataConclusao: { gte: inicioAno, lte: fimAno },
         },
         include: {
-          equipamento: {
-            include: {
-              unidade: true,
-            },
-          },
+          equipamento: { include: { unidade: true } },
         },
-        orderBy: {
-          dataConclusao: 'desc',
-        },
+        orderBy: { dataConclusao: 'desc' },
       }),
 
-      prisma.equipamento.count({
+      prisma.equipamento.count({ where: { tenantId } }),
+
+      // MTTR: OS Corretivas concluídas no ano
+      prisma.osCorretiva.findMany({
         where: {
           tenantId,
+          status: 'Concluida',
+          dataHoraConclusao: { gte: inicioAno, lte: fimAno },
         },
+        select: { dataHoraAbertura: true, dataHoraConclusao: true },
+      }),
+
+      // Backlog: manutenções em aberto
+      prisma.manutencao.count({
+        where: { tenantId, status: { notIn: ['Concluida', 'Cancelada'] } },
+      }),
+
+      // Backlog: OS corretivas em aberto
+      prisma.osCorretiva.count({
+        where: { tenantId, status: { not: 'Concluida' } },
+      }),
+
+      // Conformidade PM: preventivas concluídas no ano
+      prisma.manutencao.findMany({
+        where: {
+          tenantId,
+          tipo: 'Preventiva',
+          status: 'Concluida',
+          dataConclusao: { gte: inicioAno, lte: fimAno },
+        },
+        select: { dataConclusao: true, dataHoraAgendamentoFim: true },
       }),
     ]);
 
@@ -125,6 +143,29 @@ router.get('/indicadores', async (req, res) => {
       (m) => m.tipo === 'Corretiva'
     ).length;
 
+    // MTTR (Mean Time To Repair) — média em horas das OS corretivas concluídas
+    let mttrHoras = null;
+    if (osConcluidasAno.length > 0) {
+      const totalMinutos = osConcluidasAno.reduce((acc, os) => {
+        if (!os.dataHoraAbertura || !os.dataHoraConclusao) return acc;
+        return acc + differenceInMinutes(new Date(os.dataHoraConclusao), new Date(os.dataHoraAbertura));
+      }, 0);
+      mttrHoras = Math.round((totalMinutos / osConcluidasAno.length / 60) * 10) / 10;
+    }
+
+    // Conformidade PM — % preventivas concluídas dentro do prazo agendado
+    let conformidadePM = null;
+    if (preventivasAno.length > 0) {
+      const noPrazo = preventivasAno.filter((m) => {
+        if (!m.dataConclusao || !m.dataHoraAgendamentoFim) return false;
+        return new Date(m.dataConclusao) <= new Date(m.dataHoraAgendamentoFim);
+      }).length;
+      conformidadePM = Math.round((noPrazo / preventivasAno.length) * 100);
+    }
+
+    // Backlog — ordens em aberto agora (manutenções + OS corretivas)
+    const backlog = backlogManutencoes + backlogOsCorretivas;
+
     const rankingDowntime = Object.values(statsEquip)
       .sort((a, b) => b.horasParado - a.horasParado)
       .slice(0, 10);
@@ -144,6 +185,11 @@ router.get('/indicadores', async (req, res) => {
         preventivas: manutencoesPreventivas,
         corretivas: manutencoesCorretivas,
         totalManutencoesConcluidas: manutencoes.length,
+      },
+      kpis: {
+        mttrHoras,
+        conformidadePM,
+        backlog,
       },
       rankingDowntime,
       rankingFrequencia,

@@ -29,6 +29,7 @@ function DetalhesOsCorretivaPage() {
   const { os } = page;
   const isConcluida = os?.status === 'Concluida';
 
+
   if (page.loading) return <PageLayout padded><PageState loading /></PageLayout>;
   if (page.error || !os) return <PageLayout padded><PageState error={page.error || 'OS não encontrada.'} /></PageLayout>;
 

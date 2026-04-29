@@ -52,12 +52,12 @@ export function buildResumoCards(dados, rankingDowntime, rankingUnidades) {
   const preventivas = toNumber(dados?.resumoGeral?.preventivas);
   const corretivas = toNumber(dados?.resumoGeral?.corretivas);
 
-  const totalDowntimeHoras = somarDowntimeHoras(
-    rankingDowntime,
-    'horasParado'
-  );
-
+  const totalDowntimeHoras = somarDowntimeHoras(rankingDowntime, 'horasParado');
   const unidadeCritica = rankingUnidades.length > 0 ? rankingUnidades[0] : null;
+
+  const mttrHoras = dados?.kpis?.mttrHoras ?? null;
+  const conformidadePM = dados?.kpis?.conformidadePM ?? null;
+  const backlog = dados?.kpis?.backlog ?? null;
 
   return {
     totalAtivos,
@@ -65,10 +65,10 @@ export function buildResumoCards(dados, rankingDowntime, rankingUnidades) {
     corretivas,
     downtimeAcumulado: formatarDowntime(totalDowntimeHoras),
     unidadeCritica: unidadeCritica
-      ? {
-          nome: unidadeCritica.nome,
-          downtime: formatarDowntime(unidadeCritica.horasParado),
-        }
+      ? { nome: unidadeCritica.nome, downtime: formatarDowntime(unidadeCritica.horasParado) }
       : null,
+    mttr: mttrHoras !== null ? `${mttrHoras}h` : '—',
+    conformidadePM: conformidadePM !== null ? `${conformidadePM}%` : '—',
+    backlog: backlog !== null ? backlog : '—',
   };
 }

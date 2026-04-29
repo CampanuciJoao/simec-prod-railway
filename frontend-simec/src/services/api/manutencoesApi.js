@@ -35,3 +35,6 @@ export const addNotaAndamento = (manutencaoId, notaData) =>
 
 export const getManutencoesPorEquipamento = (equipamentoId, params = {}) =>
   api.get('/manutencoes', { params: { equipamentoId, ...params } }).then((res) => res.data);
+
+export const getHistoricoManutencao = (id) =>
+  api.get(`/manutencoes/${id}/historico`).then((res) => res.data);

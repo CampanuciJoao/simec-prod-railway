@@ -29,3 +29,6 @@ export const excluirOsCorretiva = (id) =>
 
 export const downloadPdfOsCorretiva = (id) =>
   api.get(`/pdfs/os-corretiva/${id}`, { responseType: 'blob' });
+
+export const getHistoricoOsCorretiva = (id) =>
+  api.get(`/os-corretiva/${id}/historico`).then((res) => res.data);

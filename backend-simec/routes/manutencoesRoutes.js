@@ -1,6 +1,7 @@
 import express from 'express';
 
 import { proteger, admin } from '../middleware/authMiddleware.js';
+import prisma from '../services/prismaService.js';
 import validate from '../middleware/validate.js';
 import { manutencaoSchema } from '../validators/manutencaoValidator.js';
 
@@ -40,6 +41,40 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('[MANUTENCAO_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar manutenções.' });
+  }
+});
+
+router.get('/:id/historico', async (req, res) => {
+  try {
+    const { tenantId } = req.usuario;
+    const manutencaoId = req.params.id;
+
+    const existe = await prisma.manutencao.findFirst({
+      where: { tenantId, id: manutencaoId },
+      select: { id: true },
+    });
+    if (!existe) return res.status(404).json({ message: 'Manutenção não encontrada.' });
+
+    const eventos = await prisma.historicoAtivoEvento.findMany({
+      where: { tenantId, referenciaId: manutencaoId, referenciaTipo: 'manutencao' },
+      orderBy: { dataEvento: 'asc' },
+      select: {
+        id: true,
+        tipoEvento: true,
+        titulo: true,
+        descricao: true,
+        origem: true,
+        status: true,
+        metadataJson: true,
+        dataEvento: true,
+        createdAt: true,
+      },
+    });
+
+    return res.json({ items: eventos, total: eventos.length });
+  } catch (error) {
+    console.error('[MANUTENCAO_HISTORICO_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar histórico.' });
   }
 });
 
@@ -185,10 +220,19 @@ router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
       files: req.files,
     });
 
-    const atualizada = await buscarManutencaoPorId({
-      tenantId,
-      manutencaoId,
-    });
+    const atualizada = await buscarManutencaoPorId({ tenantId, manutencaoId });
+
+    const nomes = (req.files || []).map((f) => f.originalname).join(', ');
+    if (nomes) {
+      await registrarLog({
+        tenantId,
+        usuarioId,
+        acao: 'UPLOAD',
+        entidade: 'Manutenção',
+        entidadeId: manutencaoId,
+        detalhes: `Anexo(s) adicionado(s) à OS ${atualizada?.numeroOS || manutencaoId}: ${nomes}.`,
+      });
+    }
 
     return res.status(201).json(adaptarManutencaoResponse(atualizada));
   } catch (error) {
@@ -199,12 +243,30 @@ router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
 
 router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
+    const tenantId = req.usuario.tenantId;
+    const usuarioId = req.usuario.id;
+    const manutencaoId = req.params.id;
+    const anexoId = req.params.anexoId;
+
+    // Fetch name before deletion for audit
+    const manutBefore = await buscarManutencaoPorId({ tenantId, manutencaoId });
+    const anexoBefore = (manutBefore?.anexos || []).find((a) => a.id === anexoId);
+
     await removerAnexo({
       resource: 'manutencoes',
-      tenantId: req.usuario.tenantId,
-      usuarioId: req.usuario.id,
-      entityId: req.params.id,
-      anexoId: req.params.anexoId,
+      tenantId,
+      usuarioId,
+      entityId: manutencaoId,
+      anexoId,
+    });
+
+    await registrarLog({
+      tenantId,
+      usuarioId,
+      acao: 'EXCLUSÃO',
+      entidade: 'Manutenção',
+      entidadeId: manutencaoId,
+      detalhes: `Anexo removido da OS ${manutBefore?.numeroOS || manutencaoId}: ${anexoBefore?.nomeOriginal || anexoId}.`,
     });
 
     return res.status(204).send();

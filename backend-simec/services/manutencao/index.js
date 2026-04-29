@@ -409,13 +409,28 @@ export async function atualizarManutencaoService({
     payload,
   });
 
+  const alteracoes = [];
+  if (dadosValidados.tecnicoResponsavel !== manutencaoAtual.tecnicoResponsavel) {
+    const anterior = manutencaoAtual.tecnicoResponsavel || 'não definido';
+    const novo = dadosValidados.tecnicoResponsavel || 'não definido';
+    alteracoes.push(`Técnico: "${anterior}" → "${novo}"`);
+  }
+  if (dadosValidados.agendamentoDataInicioLocal !== manutencaoAtual.agendamentoDataInicioLocal) {
+    alteracoes.push(`Início: ${manutencaoAtual.agendamentoDataInicioLocal || '—'} → ${dadosValidados.agendamentoDataInicioLocal}`);
+  }
+  if (dadosValidados.agendamentoDataFimLocal !== manutencaoAtual.agendamentoDataFimLocal) {
+    alteracoes.push(`Fim: ${manutencaoAtual.agendamentoDataFimLocal || '—'} → ${dadosValidados.agendamentoDataFimLocal}`);
+  }
+
   await registrarLog({
     tenantId,
     usuarioId,
     acao: 'EDIÇÃO',
     entidade: 'Manutenção',
     entidadeId: atualizada.id,
-    detalhes: `OS ${atualizada.numeroOS} atualizada.`,
+    detalhes: alteracoes.length > 0
+      ? `OS ${atualizada.numeroOS} atualizada. ${alteracoes.join('. ')}.`
+      : `OS ${atualizada.numeroOS} atualizada.`,
   });
 
   await registrarEventoHistoricoAtivo({
