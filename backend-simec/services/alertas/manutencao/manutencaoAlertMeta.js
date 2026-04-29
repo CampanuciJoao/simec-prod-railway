@@ -1,8 +1,5 @@
 import { normalizarParaExibicao as normalizarTexto } from '../../shared/textUtils.js';
 
-  return valor;
-}
-
 export function buildAlertMetaManutencao(manut, extra = {}) {
   const modelo = manut.equipamento?.modelo || 'Equipamento';
   const tag = manut.equipamento?.tag || 'Sem TAG';
