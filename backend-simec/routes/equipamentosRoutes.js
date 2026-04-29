@@ -289,9 +289,9 @@ router.get('/', async (req, res) => {
     const pageSize = Math.min(parsePositiveInt(req.query?.pageSize, 20), 500);
     const skip = (page - 1) * pageSize;
     const where = buildEquipamentosWhereClause(tenantId, req.query);
-    const sortBy = normalizarTextoOpcional(req.query?.sortBy) || 'modelo';
+    const sortBy = normalizarOpcional(req.query?.sortBy) || 'modelo';
     const sortDirection =
-      normalizarTextoOpcional(req.query?.sortDirection) || 'asc';
+      normalizarOpcional(req.query?.sortDirection) || 'asc';
 
     const [rawItems, total, statusSummary, tipos, fabricantes] =
       await Promise.all([
@@ -477,10 +477,10 @@ router.get('/:id/historico', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
     const equipamentoId = req.params.id;
-    const categoria = normalizarTextoOpcional(req.query?.categoria);
-    const subcategoria = normalizarTextoOpcional(req.query?.subcategoria);
-    const dataInicio = normalizarTextoOpcional(req.query?.dataInicio);
-    const dataFim = normalizarTextoOpcional(req.query?.dataFim);
+    const categoria = normalizarOpcional(req.query?.categoria);
+    const subcategoria = normalizarOpcional(req.query?.subcategoria);
+    const dataInicio = normalizarOpcional(req.query?.dataInicio);
+    const dataFim = normalizarOpcional(req.query?.dataFim);
     const limit = req.query?.limit;
     const offset = req.query?.offset;
 
@@ -522,10 +522,10 @@ router.get('/:id/historico/exportar', async (req, res) => {
   try {
     const tenantId = req.usuario.tenantId;
     const equipamentoId = req.params.id;
-    const categoria = normalizarTextoOpcional(req.query?.categoria);
-    const subcategoria = normalizarTextoOpcional(req.query?.subcategoria);
-    const dataInicio = normalizarTextoOpcional(req.query?.dataInicio);
-    const dataFim = normalizarTextoOpcional(req.query?.dataFim);
+    const categoria = normalizarOpcional(req.query?.categoria);
+    const subcategoria = normalizarOpcional(req.query?.subcategoria);
+    const dataInicio = normalizarOpcional(req.query?.dataInicio);
+    const dataFim = normalizarOpcional(req.query?.dataFim);
 
     const equipamento = await prisma.equipamento.findFirst({
       where: {
