@@ -21,7 +21,7 @@ function capitalizar(texto) {
  * 🟢 TÍTULOS
  */
 function resolverAlvoContrato(contrato) {
-  if (contrato?.fornecedor) return `"${contrato.fornecedor}"`;
+  if (contrato?.fornecedor) return contrato.fornecedor;
   return `Nº ${contrato?.numeroContrato || 'S/N'}`;
 }
 
