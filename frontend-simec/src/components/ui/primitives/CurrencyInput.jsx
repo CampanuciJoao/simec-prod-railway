@@ -20,21 +20,27 @@ function formatCurrencyValue(value) {
 }
 
 function parseCurrencyValue(value) {
-  if (!value || typeof value !== 'string') {
-    return 0;
+  if (!value || typeof value !== 'string') return 0;
+
+  const cleaned = value.replace(/\s/g, '').replace(/R\$\s*/gi, '');
+
+  if (cleaned.includes(',')) {
+    // pt-BR: pontos são separadores de milhar, vírgula é decimal
+    const result = parseFloat(cleaned.replace(/\./g, '').replace(',', '.'));
+    return Number.isNaN(result) ? 0 : result;
   }
 
-  const normalized = value.replace(/\s/g, '').replace(/R\$/gi, '');
-  const hasDecimalSeparator = normalized.includes(',');
+  const dotCount = (cleaned.match(/\./g) || []).length;
 
-  const numericText = hasDecimalSeparator
-    ? normalized.replace(/\./g, '').replace(',', '.')
-    : normalized.replace(/\./g, '');
+  if (dotCount <= 1) {
+    // Sem ponto ou com único ponto: trata como separador decimal (ex: "4201.65")
+    const result = parseFloat(cleaned.replace(/[^\d.-]/g, ''));
+    return Number.isNaN(result) ? 0 : result;
+  }
 
-  const sanitized = numericText.replace(/[^\d.-]/g, '');
-  const parsed = Number(sanitized);
-
-  return Number.isNaN(parsed) ? 0 : parsed;
+  // Múltiplos pontos sem vírgula: todos são separadores de milhar (ex: "4.201.000")
+  const result = parseFloat(cleaned.replace(/\./g, '').replace(/[^\d-]/g, ''));
+  return Number.isNaN(result) ? 0 : result;
 }
 
 function CurrencyInput({
@@ -58,10 +64,12 @@ function CurrencyInput({
 
   const handleFocus = (event) => {
     const num = Number(value);
+    // Sem separador de milhar durante a edição — evita ambiguidade entre
+    // ponto de milhar e ponto decimal (ex: "4201,65" em vez de "4.201,65")
     const editable =
       !value || Number.isNaN(num) || num === 0
         ? ''
-        : num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        : num.toFixed(2).replace('.', ',');
     setLocalValue(editable);
     setIsFocused(true);
     event.currentTarget.style.boxShadow = error
