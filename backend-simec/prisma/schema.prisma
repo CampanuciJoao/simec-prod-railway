@@ -364,6 +364,7 @@ model Seguro {
   lmiVazamentoTanques      Float?            @default(0)
   premioTotal              Float?            @default(0) @map("premio_total")
   seguroAnteriorId         String?           @map("seguro_anterior_id")
+  motivoCancelamento       String?           @map("motivo_cancelamento")
 
   tenant         Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   anexos         Anexo[]

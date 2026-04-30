@@ -26,5 +26,8 @@ export const deleteAnexoSeguro = (seguroId, anexoId) =>
 export const renovarSeguro = (id, seguroData) =>
   api.post(`/seguros/${id}/renovar`, seguroData).then((res) => res.data);
 
+export const cancelarSeguro = (id, motivo) =>
+  api.post(`/seguros/${id}/cancelar`, { motivo }).then((res) => res.data);
+
 export const getSeguroHistorico = (id) =>
   api.get(`/seguros/${id}/historico`).then((res) => res.data);

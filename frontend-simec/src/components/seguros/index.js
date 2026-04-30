@@ -4,6 +4,7 @@ export { default as SegurosMetricsSection } from './SegurosMetricsSection';
 export { default as SegurosListSection } from './SegurosListSection';
 export { default as SegurosActiveFiltersBar } from './SegurosActiveFiltersBar';
 export { default as SeguroForm } from './SeguroForm';
+export { default as CancelarSeguroModal } from './CancelarSeguroModal';
 
 // ===== PRIVATE (não exportar por padrão) =====
 // SeguroCard → usado dentro de SegurosListSection
