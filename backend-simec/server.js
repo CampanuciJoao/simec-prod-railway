@@ -84,12 +84,11 @@ app.use((req, res, next) => {
   next();
 });
 
-// Request timing — adds X-Response-Time header and logs slow requests
+// Request timing — loga requests lentos (setHeader não pode ser chamado no evento finish)
 app.use((req, res, next) => {
   const start = process.hrtime.bigint();
   res.on('finish', () => {
     const ms = Number(process.hrtime.bigint() - start) / 1_000_000;
-    res.setHeader('X-Response-Time', `${ms.toFixed(1)}ms`);
     if (ms > 2000) {
       console.warn(`[SLOW_REQUEST] ${req.method} ${req.originalUrl} — ${ms.toFixed(0)}ms`);
     }
