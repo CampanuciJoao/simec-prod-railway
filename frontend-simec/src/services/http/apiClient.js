@@ -63,7 +63,19 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        refreshPromise ??= refreshClient.post('/auth/refresh');
+        if (!refreshPromise) {
+          const REFRESH_TIMEOUT_MS = 8_000;
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error('Refresh token timeout')),
+              REFRESH_TIMEOUT_MS
+            )
+          );
+          refreshPromise = Promise.race([
+            refreshClient.post('/auth/refresh'),
+            timeoutPromise,
+          ]);
+        }
         const refreshResponse = await refreshPromise;
         refreshPromise = null;
 

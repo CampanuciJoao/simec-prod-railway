@@ -8,12 +8,26 @@ import {
 import { gerarInsightsInteligentes } from './proactivityAgent.js';
 import { onAlertasProcessados } from './alertasEventService.js';
 
+const ETAPA_TIMEOUT_MS = 90_000;
+
+function withTimeout(promise, ms, nome) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error(`Etapa "${nome}" excedeu ${ms / 1000}s`)),
+        ms
+      )
+    ),
+  ]);
+}
+
 /**
- * Executa uma etapa com tratamento de erro padronizado
+ * Executa uma etapa com tratamento de erro padronizado e timeout de 90s.
  */
 async function executarEtapa(nome, fn) {
   try {
-    const result = await fn();
+    const result = await withTimeout(fn(), ETAPA_TIMEOUT_MS, nome);
 
     const total =
       typeof result === 'number'

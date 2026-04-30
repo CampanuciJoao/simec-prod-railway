@@ -57,6 +57,15 @@ async function garantirStatusBaseDoEquipamento(tx, tenantId, manut) {
   });
 }
 
+const EQUIPAMENTO_SELECT = {
+  select: {
+    modelo: true,
+    tag: true,
+    status: true,
+    unidade: { select: { nomeSistema: true } },
+  },
+};
+
 export async function buscarManutencoesAgendadasFuturas(tenantId, agora) {
   return prisma.manutencao.findMany({
     where: {
@@ -64,9 +73,7 @@ export async function buscarManutencoesAgendadasFuturas(tenantId, agora) {
       status: 'Agendada',
       dataHoraAgendamentoInicio: { gt: agora },
     },
-    include: {
-      equipamento: { include: { unidade: true } },
-    },
+    include: { equipamento: EQUIPAMENTO_SELECT },
     orderBy: { dataHoraAgendamentoInicio: 'asc' },
   });
 }
@@ -81,9 +88,7 @@ export async function buscarManutencoesParaInicioAutomatico(tenantId, agora) {
       dataHoraAgendamentoInicio: { lte: margemInicio },
       dataHoraAgendamentoFim: { not: null, gt: agora },
     },
-    include: {
-      equipamento: { include: { unidade: true } },
-    },
+    include: { equipamento: EQUIPAMENTO_SELECT },
   });
 }
 
@@ -94,9 +99,7 @@ export async function buscarManutencoesComFimProximo(tenantId, agora) {
       status: { in: ['Agendada', 'EmAndamento'] },
       dataHoraAgendamentoFim: { not: null, gt: agora },
     },
-    include: {
-      equipamento: { include: { unidade: true } },
-    },
+    include: { equipamento: EQUIPAMENTO_SELECT },
     orderBy: { dataHoraAgendamentoFim: 'asc' },
   });
 }
@@ -108,9 +111,7 @@ export async function buscarManutencoesParaConfirmacao(tenantId, agora) {
       status: { in: ['Agendada', 'EmAndamento'] },
       dataHoraAgendamentoFim: { not: null, lte: agora },
     },
-    include: {
-      equipamento: { include: { unidade: true } },
-    },
+    include: { equipamento: EQUIPAMENTO_SELECT },
     orderBy: { dataHoraAgendamentoFim: 'asc' },
   });
 }

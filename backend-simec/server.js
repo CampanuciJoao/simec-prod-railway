@@ -114,6 +114,7 @@ app.use('/api/orcamentos', orcamentosRoutes);
 app.use('/api/os-corretiva', osCorretivaRoutes);
 
 app.use('/api', (req, res) => {
+  console.warn(`[404] ${req.method} ${req.originalUrl} — rota não encontrada`);
   return res.status(404).json({
     message: 'Rota da API nao encontrada.',
   });

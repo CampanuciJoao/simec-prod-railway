@@ -76,14 +76,7 @@ export function montarSubtituloConfirmacaoFallback() {
   return 'O horario agendado terminou. Confirme se a manutencao foi concluida ou prorrogada.';
 }
 
-export function buildAlertId(tenantId, tipo, manutId, label = '') {
-  const safeTenant = String(tenantId).trim();
-  const safeTipo = String(tipo).trim().toLowerCase();
-  const safeId = String(manutId).trim();
-  const safeLabel = label ? `-${String(label).trim().toLowerCase()}` : '';
-
-  return `tenant-${safeTenant}-${safeTipo}-${safeId}${safeLabel}`;
-}
+export { buildAlertId } from '../alertIdBuilder.js';
 
 export function montarPayloadAlertaManutencaoBase(manut) {
   const subtituloBase = montarSubtituloBase(manut);
