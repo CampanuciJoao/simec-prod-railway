@@ -29,26 +29,20 @@ async function buscarSeguroCompleto(tenantId, id) {
     },
     include: {
       anexos: {
-        orderBy: {
-          createdAt: 'desc',
-        },
+        orderBy: { createdAt: 'desc' },
       },
       equipamento: {
-        select: {
-          id: true,
-          modelo: true,
-          tag: true,
-          tipo: true,
-        },
+        select: { id: true, modelo: true, tag: true, tipo: true },
       },
       unidade: {
-        select: {
-          id: true,
-          nomeSistema: true,
-          nomeFantasia: true,
-          cidade: true,
-          estado: true,
-        },
+        select: { id: true, nomeSistema: true, nomeFantasia: true, cidade: true, estado: true },
+      },
+      seguroAnterior: {
+        select: { id: true, apoliceNumero: true, status: true, dataInicio: true, dataFim: true },
+      },
+      renovacoes: {
+        select: { id: true, apoliceNumero: true, status: true, dataInicio: true, dataFim: true },
+        orderBy: { dataInicio: 'desc' },
       },
     },
   });
@@ -617,6 +611,72 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
     }
 
     return next(error);
+  }
+});
+
+// ==============================
+// POST CANCELAR
+// Cancela um seguro ativo registrando o motivo no histórico de auditoria.
+// Não remove o registro — fica acessível via GET /seguros/:id/historico.
+// ==============================
+router.post('/:id/cancelar', async (req, res) => {
+  const { id } = req.params;
+  const { motivo } = req.body;
+  const tenantId = req.usuario.tenantId;
+
+  try {
+    const seguro = await prisma.seguro.findFirst({
+      where: { id, tenantId },
+      select: {
+        id: true,
+        status: true,
+        apoliceNumero: true,
+        unidade: { select: { nomeSistema: true } },
+        equipamento: { select: { modelo: true } },
+      },
+    });
+
+    if (!seguro) {
+      return res.status(404).json({ message: 'Seguro não encontrado.' });
+    }
+    if (seguro.status === 'Cancelado') {
+      return res.status(409).json({ message: 'Este seguro já está cancelado.' });
+    }
+    if (seguro.status === 'Substituido') {
+      return res.status(409).json({ message: 'Seguros substituídos por renovação não podem ser cancelados.' });
+    }
+
+    await prisma.seguro.update({
+      where: { tenantId_id: { tenantId, id } },
+      data: {
+        status: 'Cancelado',
+        motivoCancelamento: motivo?.trim() || null,
+      },
+    });
+
+    const alvoDesc = seguro.unidade?.nomeSistema
+      ? `unidade ${seguro.unidade.nomeSistema}`
+      : seguro.equipamento?.modelo
+        ? `equipamento ${seguro.equipamento.modelo}`
+        : `apólice ${seguro.apoliceNumero}`;
+
+    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const motivoLog = motivo?.trim() ? ` Motivo: ${motivo.trim()}.` : '';
+
+    await registrarLog({
+      tenantId,
+      usuarioId: req.usuario.id,
+      acao: 'CANCELAMENTO',
+      entidade: 'Seguro',
+      entidadeId: id,
+      detalhes: `Apólice ${seguro.apoliceNumero} (${alvoDesc}) cancelada em ${dataFormatada}.${motivoLog}`,
+    });
+
+    const seguroAtualizado = await buscarSeguroCompleto(tenantId, id);
+    return res.json(seguroAtualizado);
+  } catch (error) {
+    console.error('[SEGURO_CANCELAR_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao cancelar seguro.' });
   }
 });
 
