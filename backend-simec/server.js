@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import { createServer } from 'http';
 import { Server } from 'socket.io';
+import os from 'os';
 
 import authRoutes from './routes/authRoutes.js';
 import agentRoutes from './routes/agentRoutes.js';
@@ -68,11 +69,50 @@ app.use(
   })
 );
 
+// Security headers (manual equivalent of helmet.js)
+app.use((req, res, next) => {
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  res.set('X-XSS-Protection', '0'); // modern browsers ignore this; CSP is the real guard
+  res.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  res.set(
+    'Content-Security-Policy',
+    "default-src 'self'; script-src 'self'; object-src 'none'; frame-ancestors 'none';"
+  );
+  res.removeHeader('X-Powered-By');
+  next();
+});
+
+// Request timing — adds X-Response-Time header and logs slow requests
+app.use((req, res, next) => {
+  const start = process.hrtime.bigint();
+  res.on('finish', () => {
+    const ms = Number(process.hrtime.bigint() - start) / 1_000_000;
+    res.setHeader('X-Response-Time', `${ms.toFixed(1)}ms`);
+    if (ms > 2000) {
+      console.warn(`[SLOW_REQUEST] ${req.method} ${req.originalUrl} — ${ms.toFixed(0)}ms`);
+    }
+  });
+  next();
+});
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');
+});
+
+app.get('/api/health', (req, res) => {
+  const uptimeSeconds = process.uptime();
+  res.json({
+    status: 'ok',
+    uptime: uptimeSeconds,
+    memory: process.memoryUsage(),
+    load: os.loadavg(),
+    timestamp: new Date().toISOString(),
+  });
 });
 
 app.use('/api/auth', authRoutes);

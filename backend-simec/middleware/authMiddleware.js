@@ -1,6 +1,28 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../services/prismaService.js';
 
+// 60-second TTL cache — eliminates one DB round-trip per authenticated request
+const USER_CACHE_TTL_MS = 60_000;
+const userCache = new Map(); // key: userId → { data, expiresAt }
+
+function getCachedUser(userId) {
+  const entry = userCache.get(userId);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    userCache.delete(userId);
+    return null;
+  }
+  return entry.data;
+}
+
+function setCachedUser(userId, data) {
+  userCache.set(userId, { data, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+}
+
+export function invalidateUserCache(userId) {
+  userCache.delete(userId);
+}
+
 export const proteger = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -34,26 +56,30 @@ export const proteger = async (req, res, next) => {
       });
     }
 
-    const usuarioAtual = await prisma.usuario.findUnique({
-      where: {
-        id: decoded.id,
-      },
-      include: {
-        tenant: {
-          select: {
-            id: true,
-            nome: true,
-            slug: true,
-            timezone: true,
-            locale: true,
-            ativo: true,
-            contatoNome: true,
-            contatoEmail: true,
-            contatoTelefone: true,
+    let usuarioAtual = getCachedUser(decoded.id);
+
+    if (!usuarioAtual) {
+      usuarioAtual = await prisma.usuario.findUnique({
+        where: { id: decoded.id },
+        include: {
+          tenant: {
+            select: {
+              id: true,
+              nome: true,
+              slug: true,
+              timezone: true,
+              locale: true,
+              ativo: true,
+              contatoNome: true,
+              contatoEmail: true,
+              contatoTelefone: true,
+            },
           },
         },
-      },
-    });
+      });
+
+      if (usuarioAtual) setCachedUser(decoded.id, usuarioAtual);
+    }
 
     if (!usuarioAtual) {
       return res.status(401).json({

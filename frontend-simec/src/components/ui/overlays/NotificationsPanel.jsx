@@ -31,6 +31,7 @@ function NotificationsPanel({
   alertas = [],
   loading = false,
   contadorNaoVistos = 0,
+  sseConnected = false,
   onToggle,
   onClose,
   onOpenAlert,
@@ -69,7 +70,16 @@ function NotificationsPanel({
           <div className="fixed inset-x-3 bottom-3 z-50 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl md:absolute md:inset-x-auto md:bottom-auto md:right-0 md:mt-3 md:w-[420px] md:max-w-[calc(100vw-32px)]">
             <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
               <div className="min-w-0">
-                <h3 className="text-sm font-bold text-slate-900">Notificações</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-slate-900">Notificações</h3>
+                  <span
+                    title={sseConnected ? 'Tempo real ativo' : 'Tempo real desconectado'}
+                    className={[
+                      'h-2 w-2 shrink-0 rounded-full',
+                      sseConnected ? 'bg-green-500' : 'bg-slate-300',
+                    ].join(' ')}
+                  />
+                </div>
                 <p className="text-xs text-slate-500">
                   {contadorNaoVistos} não visto(s)
                 </p>
@@ -202,6 +212,7 @@ NotificationsPanel.propTypes = {
   alertas: PropTypes.array,
   loading: PropTypes.bool,
   contadorNaoVistos: PropTypes.number,
+  sseConnected: PropTypes.bool,
   onToggle: PropTypes.func.isRequired,
   onClose: PropTypes.func.isRequired,
   onOpenAlert: PropTypes.func.isRequired,
