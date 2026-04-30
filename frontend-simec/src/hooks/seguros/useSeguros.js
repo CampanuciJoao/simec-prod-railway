@@ -28,7 +28,7 @@ export function getStatusDinamicoSeguro(seguro) {
 
 const PAGE_SIZE = 15;
 
-const FILTROS_INICIAL = { seguradora: '', status: '', unidade: '', tipoSeguro: '' };
+const FILTROS_INICIAL = { seguradora: '', status: 'Ativo', unidade: '', tipoSeguro: '' };
 
 export function useSeguros() {
   const [seguros, setSeguros] = useState([]);
