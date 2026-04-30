@@ -32,9 +32,10 @@ function getStoredToken() {
 }
 
 export function AlertasProvider({ children }) {
-  const [alertas, setAlertas]     = useState([]);
-  const [naoVistos, setNaoVistos] = useState(0);
-  const [loading, setLoading]     = useState(true);
+  const [alertas, setAlertas]         = useState([]);
+  const [naoVistos, setNaoVistos]     = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [sseConnected, setSseConnected] = useState(false);
 
   const auth          = useAuth?.();
   const usuario       = auth?.usuario || auth?.user || null;
@@ -84,6 +85,10 @@ export function AlertasProvider({ children }) {
     const es  = new EventSource(url, { withCredentials: true });
     esRef.current = es;
 
+    es.addEventListener('open', () => setSseConnected(true));
+
+    es.addEventListener('error', () => setSseConnected(false));
+
     es.addEventListener('message', (e) => {
       try {
         const msg = JSON.parse(e.data);
@@ -99,6 +104,7 @@ export function AlertasProvider({ children }) {
     return () => {
       es.close();
       esRef.current = null;
+      setSseConnected(false);
     };
   }, [isAuthenticated, authLoading, usuario?.id, carregarAlertas]);
 
@@ -186,11 +192,12 @@ export function AlertasProvider({ children }) {
       alertas,
       naoVistos,
       loading,
+      sseConnected,
       updateStatus,
       dismissAlerta,
       refetchAlertas: carregarAlertas,
     }),
-    [alertas, naoVistos, loading, updateStatus, dismissAlerta, carregarAlertas]
+    [alertas, naoVistos, loading, sseConnected, updateStatus, dismissAlerta, carregarAlertas]
   );
 
   return (

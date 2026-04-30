@@ -460,6 +460,7 @@ model AlertaHistorico {
 
   @@index([tenantId, dataAlerta(sort: Desc)])
   @@index([tenantId, tipo, dataAlerta(sort: Desc)])
+  @@index([tenantId, tipoCategoria, dataAlerta(sort: Desc)])
   @@index([tenantId, prioridade, dataAlerta(sort: Desc)])
   @@index([tenantId, dataArquivado(sort: Desc)])
   @@map("alertas_historico")

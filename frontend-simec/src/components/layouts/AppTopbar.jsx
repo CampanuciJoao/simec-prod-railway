@@ -19,6 +19,7 @@ function AppTopbar({
   alertas,
   alertasLoading,
   contadorNaoVistos,
+  sseConnected,
   alertsRef,
   onOpenMenu,
   onToggleAlerts,
@@ -77,6 +78,7 @@ function AppTopbar({
                 alertas={alertas}
                 loading={alertasLoading}
                 contadorNaoVistos={contadorNaoVistos}
+                sseConnected={sseConnected}
                 onToggle={onToggleAlerts}
                 onClose={onCloseAlerts}
                 onOpenAlert={onOpenAlert}
@@ -109,6 +111,7 @@ AppTopbar.propTypes = {
   alertas: PropTypes.array,
   alertasLoading: PropTypes.bool,
   contadorNaoVistos: PropTypes.number,
+  sseConnected: PropTypes.bool,
   alertsRef: PropTypes.oneOfType([
     PropTypes.func,
     PropTypes.shape({ current: PropTypes.any }),

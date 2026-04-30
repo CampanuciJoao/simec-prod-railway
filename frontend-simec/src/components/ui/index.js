@@ -45,6 +45,7 @@ export {
   CompactAttachmentList,
   AttachmentSection,
   InlineEmptyState,
+  SkeletonList,
 } from './feedback';
 
 // =========================

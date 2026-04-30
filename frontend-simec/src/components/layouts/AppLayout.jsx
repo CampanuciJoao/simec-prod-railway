@@ -28,6 +28,7 @@ function AppLayout() {
     alertas = [],
     naoVistos = 0,
     loading: alertasLoading,
+    sseConnected = false,
     updateStatus,
     dismissAlerta,
   } = useAlertas();
@@ -162,6 +163,7 @@ function AppLayout() {
             alertas={alertas}
             alertasLoading={alertasLoading}
             contadorNaoVistos={contadorNaoVistos}
+            sseConnected={sseConnected}
             alertsRef={alertsRef}
             onOpenMenu={handleOpenMobileMenu}
             onToggleAlerts={handleToggleAlerts}
