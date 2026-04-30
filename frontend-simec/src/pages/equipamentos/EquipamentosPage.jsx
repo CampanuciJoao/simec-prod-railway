@@ -19,6 +19,7 @@ import {
   PageLayout,
   PageSection,
   PageState,
+  SkeletonList,
 } from '@/components/ui';
 
 import {
@@ -102,57 +103,56 @@ function EquipamentosPage() {
           onClearAll={page.clearAllFilters}
         />
 
-        {shouldShowState ? (
+        {isInitialLoading ? (
+          <SkeletonList rows={7} cols={5} />
+        ) : hasError ? (
           <PageSection>
-            <PageState
-              loading={isInitialLoading}
-              error={page.error || ''}
-              isEmpty={isEmpty}
-              emptyMessage="Nenhum equipamento encontrado."
-            />
+            <PageState error={page.error || ''} />
 
-            {hasError ? (
-              <div
-                className="mt-5 flex flex-col gap-4 rounded-3xl border p-4 md:flex-row md:items-center md:justify-between"
-                style={{
-                  borderColor: 'var(--border-soft)',
-                  backgroundColor: 'var(--bg-surface-soft)',
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <div
-                    className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
-                    style={{
-                      backgroundColor: 'var(--color-danger-soft)',
-                      color: 'var(--color-danger)',
-                    }}
-                  >
-                    <FontAwesomeIcon icon={faTriangleExclamation} />
-                  </div>
-
-                  <div className="min-w-0">
-                    <p
-                      className="text-sm font-semibold"
-                      style={{ color: 'var(--text-primary)' }}
-                    >
-                      A lista nao carregou como esperado
-                    </p>
-                    <p
-                      className="mt-1 text-sm"
-                      style={{ color: 'var(--text-muted)' }}
-                    >
-                      Mantive filtros e acoes do modulo disponiveis para voce
-                      tentar novamente sem perder contexto.
-                    </p>
-                  </div>
+            <div
+              className="mt-5 flex flex-col gap-4 rounded-3xl border p-4 md:flex-row md:items-center md:justify-between"
+              style={{
+                borderColor: 'var(--border-soft)',
+                backgroundColor: 'var(--bg-surface-soft)',
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                  style={{
+                    backgroundColor: 'var(--color-danger-soft)',
+                    color: 'var(--color-danger)',
+                  }}
+                >
+                  <FontAwesomeIcon icon={faTriangleExclamation} />
                 </div>
 
-                <Button type="button" variant="secondary" onClick={page.refetch}>
-                  <FontAwesomeIcon icon={faArrowRotateRight} />
-                  Tentar novamente
-                </Button>
+                <div className="min-w-0">
+                  <p
+                    className="text-sm font-semibold"
+                    style={{ color: 'var(--text-primary)' }}
+                  >
+                    A lista nao carregou como esperado
+                  </p>
+                  <p
+                    className="mt-1 text-sm"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Mantive filtros e acoes do modulo disponiveis para voce
+                    tentar novamente sem perder contexto.
+                  </p>
+                </div>
               </div>
-            ) : null}
+
+              <Button type="button" variant="secondary" onClick={page.refetch}>
+                <FontAwesomeIcon icon={faArrowRotateRight} />
+                Tentar novamente
+              </Button>
+            </div>
+          </PageSection>
+        ) : isEmpty ? (
+          <PageSection>
+            <PageState isEmpty emptyMessage="Nenhum equipamento encontrado." />
           </PageSection>
         ) : (
           <div className="space-y-4">

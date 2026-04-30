@@ -1,4 +1,5 @@
 import express from 'express';
+import jwt from 'jsonwebtoken';
 
 import {
   REFRESH_TOKEN_COOKIE,
@@ -10,6 +11,7 @@ import {
   resetPasswordService,
 } from '../services/auth/authService.js';
 import { checkRateLimit, resetRateLimit } from '../services/redis/rateLimiter.js';
+import { invalidateUserCache } from '../middleware/authMiddleware.js';
 
 const LOGIN_WINDOW_MS = 10 * 60 * 1000;
 const LOGIN_MAX_ATTEMPTS = 5;
@@ -157,6 +159,17 @@ export function buildAuthRouter(services = {}) {
 
   router.post('/logout', async (req, res) => {
     try {
+      // Invalidate the server-side user cache so the next request goes to DB
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith('Bearer ')) {
+        try {
+          const decoded = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
+          if (decoded?.id) invalidateUserCache(decoded.id);
+        } catch {
+          // expired/invalid token — cache will expire on its own TTL
+        }
+      }
+
       const cookies = parseCookies(req);
       const resultado = await authServices.logoutAuthSessionService(
         cookies[REFRESH_TOKEN_COOKIE]
