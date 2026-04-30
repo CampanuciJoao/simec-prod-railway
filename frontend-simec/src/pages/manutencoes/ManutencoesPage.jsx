@@ -14,7 +14,7 @@ import {
 } from '@/components/manutencoes';
 
 // UI
-import { PageLayout, PageState, ModalConfirmacao, Pagination } from '@/components/ui';
+import { PageLayout, PageState, ModalConfirmacao, Pagination, SkeletonList } from '@/components/ui';
 
 function ManutencoesPage() {
   const { usuario } = useAuth();
@@ -101,9 +101,10 @@ function ManutencoesPage() {
             onRegistrarOcorrencia={page.goToRegistrarOcorrencia}
           />
 
-          {isLoading || hasError || isEmpty ? (
+          {isLoading ? (
+            <SkeletonList rows={6} cols={4} />
+          ) : hasError || isEmpty ? (
             <PageState
-              loading={isLoading}
               error={page.error?.message || page.error || ''}
               isEmpty={isEmpty}
               emptyMessage="Nenhuma manutenção encontrada."

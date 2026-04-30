@@ -9,6 +9,7 @@ import {
   PageLayout,
   PageState,
   Pagination,
+  SkeletonList,
 } from '@/components/ui';
 
 import {
@@ -62,7 +63,7 @@ function AlertasPage() {
         />
 
         {isInitialLoading ? (
-          <PageState loading />
+          <SkeletonList rows={5} cols={3} />
         ) : hasError ? (
           <PageState error="Erro ao carregar alertas." />
         ) : isEmpty ? (

@@ -6,6 +6,7 @@ import {
   PageLayout,
   PageState,
   Pagination,
+  SkeletonList,
 } from '@/components/ui';
 
 import {
@@ -56,9 +57,10 @@ function ContratosPage() {
             onClearAll={page.clearAllFilters}
           />
 
-          {isLoading || hasError || isEmpty ? (
+          {isLoading ? (
+            <SkeletonList rows={6} cols={4} />
+          ) : hasError || isEmpty ? (
             <PageState
-              loading={isLoading}
               error={page.error || ''}
               isEmpty={isEmpty}
               emptyMessage="Nenhum contrato encontrado."
