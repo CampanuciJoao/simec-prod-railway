@@ -70,6 +70,7 @@ function SegurosPage() {
                 actions={{
                   view: page.goToDetails,
                   edit: page.goToEdit,
+                  renovar: page.goToRenovar,
                   delete: page.deleteModal.openModal,
                 }}
               />
