@@ -15,14 +15,12 @@ export const AuthContext = createContext(null);
 
 function parseJwtPayload(token) {
   try {
-    const payload = token.split('.')[1];
-    if (!payload) return null;
-
-    const normalized = payload.replace(/-/g, '+').replace(/_/g, '/');
-    const decoded = window.atob(normalized);
-    return JSON.parse(decoded);
-  } catch (error) {
-    console.error('[AUTH_CONTEXT_JWT_PARSE_ERROR]', error);
+    if (!token || typeof token !== 'string') return null;
+    const parts = token.split('.');
+    if (parts.length !== 3) return null;
+    const normalized = parts[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(window.atob(normalized));
+  } catch {
     return null;
   }
 }

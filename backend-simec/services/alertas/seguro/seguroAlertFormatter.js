@@ -1,12 +1,4 @@
-export function buildSeguroAlertId(tenantId, tipo, seguroId, label = '') {
-  // 🔥 padroniza e evita problemas com caracteres
-  const safeTenant = String(tenantId).trim();
-  const safeTipo = String(tipo).trim().toLowerCase();
-  const safeId = String(seguroId).trim();
-  const safeLabel = label ? `-${String(label).trim().toLowerCase()}` : '';
-
-  return `tenant-${safeTenant}-${safeTipo}-${safeId}${safeLabel}`;
-}
+export { buildAlertId as buildSeguroAlertId } from '../alertIdBuilder.js';
 
 function resolverAlvoSeguro(seguro) {
   if (seguro?.unidade?.nomeSistema) return `unidade ${seguro.unidade.nomeSistema}`;

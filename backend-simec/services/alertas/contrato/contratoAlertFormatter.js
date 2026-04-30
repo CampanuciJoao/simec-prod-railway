@@ -1,11 +1,4 @@
-export function buildContratoAlertId(tenantId, tipo, contratoId, label = '') {
-  const safeTenant = String(tenantId).trim();
-  const safeTipo = String(tipo).trim().toLowerCase();
-  const safeId = String(contratoId).trim();
-  const safeLabel = label ? `-${String(label).trim().toLowerCase()}` : '';
-
-  return `tenant-${safeTenant}-${safeTipo}-${safeId}${safeLabel}`;
-}
+export { buildAlertId as buildContratoAlertId } from '../alertIdBuilder.js';
 
 /**
  * 🔧 Helpers
