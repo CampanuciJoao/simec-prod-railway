@@ -200,28 +200,30 @@ function DetalhesSeguroPage() {
       <div className="flex flex-col gap-5">
         <PageSection title="Informações">
           <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs opacity-50">Seguradora</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs opacity-50 uppercase tracking-wide">Seguradora</span>
               <span className="text-sm font-medium">{seguro.seguradora}</span>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs opacity-50">Status</span>
-              <StatusBadge status={seguro.status} />
+            <div className="flex flex-col gap-1">
+              <span className="text-xs opacity-50 uppercase tracking-wide">Status</span>
+              <div className="w-fit">
+                <StatusBadge status={seguro.status} />
+              </div>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs opacity-50">Vínculo</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs opacity-50 uppercase tracking-wide">Vínculo</span>
               <span className="text-sm">{getNomeUnidade(seguro) || getTipoVinculo(seguro)}</span>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs opacity-50">Tipo</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs opacity-50 uppercase tracking-wide">Tipo de seguro</span>
               <span className="text-sm">{getTipoSeguroLabel(seguro.tipoSeguro)}</span>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs opacity-50">Prêmio total</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs opacity-50 uppercase tracking-wide">Prêmio total</span>
               <span className="text-sm font-medium">{formatarMoeda(seguro.premioTotal)}</span>
             </div>
-            <div className="flex flex-col gap-0.5">
-              <span className="text-xs opacity-50">Vigência</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs opacity-50 uppercase tracking-wide">Vigência</span>
               <span className="text-sm">
                 {seguro.dataInicio ? new Date(seguro.dataInicio).toLocaleDateString('pt-BR') : '—'}
                 {' → '}
