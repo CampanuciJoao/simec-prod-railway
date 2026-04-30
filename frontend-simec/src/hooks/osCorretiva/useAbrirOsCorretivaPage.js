@@ -4,6 +4,7 @@ import { criarOsCorretiva } from '../../services/api/osCorretivaApi';
 import { useToast } from '../../contexts/ToastContext';
 
 const STATUS_OPTIONS = [
+  { value: '', label: 'Selecione o status' },
   { value: 'Operante', label: 'Operante' },
   { value: 'Inoperante', label: 'Inoperante' },
   { value: 'EmManutencao', label: 'Em manutenção' },
