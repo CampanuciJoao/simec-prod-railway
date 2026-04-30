@@ -4,7 +4,8 @@ import {
   faDownload,
   faPen,
   faShieldAlt,
-  faTrash,
+  faRotate,
+  faArrowUpRightFromSquare,
 } from '@fortawesome/free-solid-svg-icons';
 
 import api from '@/services/http/apiClient';
@@ -145,8 +146,9 @@ function SeguroCard({
   status,
   isExpanded,
   onToggle,
+  onDetails,
   onEdit,
-  onDelete,
+  onRenovar,
 }) {
   const coberturas = getCoberturasAtivas(seguro);
   const alvo = getAlvoSeguro(seguro);
@@ -306,16 +308,19 @@ function SeguroCard({
           </div>
 
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-            <Button onClick={(event) => stopAndRun(event, onEdit)}>
+            {['Ativo', 'Vigente'].includes(status) && (
+              <Button variant="secondary" onClick={(event) => stopAndRun(event, onRenovar)}>
+                <FontAwesomeIcon icon={faRotate} />
+                Renovar
+              </Button>
+            )}
+            <Button variant="secondary" onClick={(event) => stopAndRun(event, onEdit)}>
               <FontAwesomeIcon icon={faPen} />
               Editar
             </Button>
-            <Button
-              variant="danger"
-              onClick={(event) => stopAndRun(event, onDelete)}
-            >
-              <FontAwesomeIcon icon={faTrash} />
-              Excluir
+            <Button onClick={(event) => stopAndRun(event, onDetails)}>
+              <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+              Detalhes
             </Button>
           </div>
         </div>

@@ -172,5 +172,6 @@ export function useSegurosPage() {
     goToCreate: () => navigate('/seguros/adicionar'),
     goToEdit: (id) => navigate(`/seguros/editar/${id}`),
     goToDetails: (id) => navigate(`/seguros/detalhes/${id}`),
+    goToRenovar: (id) => navigate(`/seguros/renovar/${id}`),
   };
 }
