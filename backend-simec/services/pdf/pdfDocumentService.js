@@ -497,7 +497,7 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
   drawSectionTitle(doc, 'Linha do tempo');
   drawTable(doc, {
     headers: ['Data', 'Categoria', 'Evento / OS', 'Responsavel', 'Status'],
-    columnWidths: [95, 75, 200, 75, 50],
+    columnWidths: [95, 75, 180, 75, 70],
     rows: buildHistoricoRows(payload?.eventos || [], locale, timeZone),
   });
 
