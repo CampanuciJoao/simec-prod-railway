@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { useSeguros } from './useSeguros';
-import { useModal } from '../shared/useModal';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { TIPO_SEGURO_OPTIONS } from '../../utils/seguros';
 
 export function useSegurosPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const { isAdmin } = useAuth();
 
   const {
     seguros,
@@ -23,25 +24,28 @@ export function useSegurosPage() {
     pagination,
     goToPage,
     removerSeguro,
+    cancelarItem,
     getNomeUnidade,
     getStatusDinamico,
   } = useSeguros();
 
-  const deleteModal = useModal();
-
-  const confirmarExclusao = async () => {
-    if (!deleteModal.modalData?.id) return;
-
+  const handleCancelar = async (id, motivo) => {
     try {
-      await removerSeguro(deleteModal.modalData.id);
+      await cancelarItem(id, motivo);
+      addToast('Apólice cancelada com sucesso.', 'success');
+    } catch (err) {
+      addToast(err?.response?.data?.message || err?.message || 'Erro ao cancelar seguro.', 'error');
+      throw err;
+    }
+  };
+
+  const handleExcluirSeguro = async (id) => {
+    try {
+      await removerSeguro(id);
       addToast('Seguro excluído com sucesso!', 'success');
     } catch (err) {
-      addToast(
-        err?.response?.data?.message || err?.message || 'Erro ao excluir seguro.',
-        'error'
-      );
-    } finally {
-      deleteModal.closeModal();
+      addToast(err?.response?.data?.message || err?.message || 'Erro ao excluir seguro.', 'error');
+      throw err;
     }
   };
 
@@ -165,13 +169,13 @@ export function useSegurosPage() {
     clearFilter,
     clearAllFilters,
     filtrarPorStatus,
-    deleteModal,
-    confirmarExclusao,
     getNomeUnidade,
     getStatusDinamico,
+    isAdmin,
+    handleCancelar,
+    handleExcluirSeguro,
     goToCreate: () => navigate('/seguros/adicionar'),
     goToEdit: (id) => navigate(`/seguros/editar/${id}`),
-    goToDetails: (id) => navigate(`/seguros/detalhes/${id}`),
     goToRenovar: (id) => navigate(`/seguros/renovar/${id}`),
   };
 }

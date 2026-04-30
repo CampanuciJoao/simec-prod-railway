@@ -2,7 +2,6 @@ import { useSegurosPage } from '@/hooks/seguros/useSegurosPage';
 
 import {
   GlobalFilterBar,
-  ModalConfirmacao,
   PageLayout,
   PageState,
   Pagination,
@@ -24,17 +23,7 @@ function SegurosPage() {
   const isEmpty = !page.loading && !page.error && page.pagination.total === 0;
 
   return (
-    <>
-      <ModalConfirmacao
-        isOpen={page.deleteModal.isOpen}
-        onClose={page.deleteModal.closeModal}
-        onConfirm={page.confirmarExclusao}
-        title="Excluir seguro"
-        message="Tem certeza?"
-        isDestructive
-      />
-
-      <PageLayout background="slate" padded fullHeight>
+    <PageLayout background="slate" padded fullHeight>
         <div className="space-y-6">
           <SegurosPageHeader onCreate={page.goToCreate} />
 
@@ -67,11 +56,12 @@ function SegurosPage() {
               <SegurosListSection
                 seguros={page.seguros}
                 getStatus={page.getStatusDinamico}
+                isAdmin={page.isAdmin}
                 actions={{
-                  view: page.goToDetails,
                   edit: page.goToEdit,
                   renovar: page.goToRenovar,
-                  delete: page.deleteModal.openModal,
+                  cancelar: page.handleCancelar,
+                  excluir: page.handleExcluirSeguro,
                 }}
               />
 
@@ -89,7 +79,6 @@ function SegurosPage() {
           )}
         </div>
       </PageLayout>
-    </>
   );
 }
 

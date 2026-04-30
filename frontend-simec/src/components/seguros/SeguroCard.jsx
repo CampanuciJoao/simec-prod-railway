@@ -1,15 +1,21 @@
+import { useState, useEffect } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
+  faChevronUp,
   faDownload,
   faPen,
   faShieldAlt,
   faRotate,
-  faArrowUpRightFromSquare,
+  faBan,
+  faTrash,
+  faClockRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 
 import api from '@/services/http/apiClient';
+import { getSeguroHistorico } from '@/services/api';
 import { Button, Card } from '@/components/ui';
+import CancelarSeguroModal from './CancelarSeguroModal';
 
 import {
   getStatusBadgeClass,
@@ -146,15 +152,62 @@ function SeguroCard({
   status,
   isExpanded,
   onToggle,
-  onDetails,
   onEdit,
   onRenovar,
+  onCancelar,
+  onExcluir,
+  isAdmin,
 }) {
   const coberturas = getCoberturasAtivas(seguro);
   const alvo = getAlvoSeguro(seguro);
   const vigencia = `${formatarData(seguro.dataInicio)} ate ${formatarData(seguro.dataFim)}`;
   const primeiroAnexo = seguro.anexos?.[0] || null;
   const downloadUrl = buildAttachmentUrl(primeiroAnexo?.path);
+
+  const [showCancelarModal, setShowCancelarModal] = useState(false);
+  const [cancelando, setCancelando] = useState(false);
+  const [confirmandoExclusao, setConfirmandoExclusao] = useState(false);
+  const [excluindo, setExcluindo] = useState(false);
+  const [historico, setHistorico] = useState([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(false);
+  const [showHistorico, setShowHistorico] = useState(false);
+  const [historicoFetched, setHistoricoFetched] = useState(false);
+
+  const isAtivo = ['Ativo', 'Vigente'].includes(status);
+
+  useEffect(() => {
+    if (!isExpanded || historicoFetched) return;
+    setLoadingHistorico(true);
+    getSeguroHistorico(seguro.id)
+      .then((data) => {
+        setHistorico(Array.isArray(data) ? data.slice(1) : []);
+        setHistoricoFetched(true);
+      })
+      .catch(() => {
+        setHistoricoFetched(true);
+      })
+      .finally(() => setLoadingHistorico(false));
+  }, [isExpanded, historicoFetched, seguro.id]);
+
+  const handleCancelarCard = async (motivo) => {
+    setCancelando(true);
+    try {
+      await onCancelar(motivo);
+      setShowCancelarModal(false);
+    } finally {
+      setCancelando(false);
+    }
+  };
+
+  const handleExcluirCard = async () => {
+    setExcluindo(true);
+    try {
+      await onExcluir();
+    } finally {
+      setExcluindo(false);
+      setConfirmandoExclusao(false);
+    }
+  };
 
   const stopAndRun = (event, callback) => {
     event.stopPropagation();
@@ -182,6 +235,15 @@ function SeguroCard({
   };
 
   return (
+    <>
+    {showCancelarModal && (
+      <CancelarSeguroModal
+        apoliceNumero={seguro.apoliceNumero}
+        onConfirm={handleCancelarCard}
+        onClose={() => setShowCancelarModal(false)}
+        loading={cancelando}
+      />
+    )}
     <Card
       className={`border-l-4 ${getRowHighlightClass(status)}`}
       surface="soft"
@@ -307,8 +369,60 @@ function SeguroCard({
             <SeguroCoberturasResumo coberturas={coberturas} />
           </div>
 
+          {historico.length > 0 && (
+            <div className="mt-5">
+              <button
+                type="button"
+                className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+                onClick={(e) => stopAndRun(e, () => setShowHistorico((v) => !v))}
+              >
+                <FontAwesomeIcon icon={faClockRotateLeft} />
+                Histórico de apólices ({historico.length})
+                <FontAwesomeIcon icon={showHistorico ? faChevronUp : faChevronDown} className="text-[10px]" />
+              </button>
+
+              {showHistorico && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {historico.map((item) => {
+                    const dInicio = item.dataInicio ? new Date(item.dataInicio).toLocaleDateString('pt-BR', { timeZone: 'UTC' }) : '—';
+                    const dFim    = item.dataFim    ? new Date(item.dataFim).toLocaleDateString('pt-BR', { timeZone: 'UTC' })    : '—';
+                    return (
+                      <div
+                        key={item.id}
+                        className="rounded-xl border px-3 py-2.5 text-xs"
+                        style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+                      >
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
+                          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>
+                            Apólice {item.apoliceNumero}
+                          </span>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 font-semibold ${getStatusBadgeClass(item.status)}`}
+                          >
+                            {item.status}
+                          </span>
+                        </div>
+                        <p className="mt-1 opacity-60">Vigência: {dInicio} → {dFim}</p>
+                        {item.motivoCancelamento && (
+                          <p className="mt-1 rounded px-2 py-1" style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}>
+                            Cancelado — {item.motivoCancelamento}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {loadingHistorico && (
+            <p className="mt-4 text-xs" style={{ color: 'var(--text-muted)' }}>Carregando histórico...</p>
+          )}
+
           <div className="mt-5 flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
-            {['Ativo', 'Vigente'].includes(status) && (
+            {isAtivo && (
               <Button variant="secondary" onClick={(event) => stopAndRun(event, onRenovar)}>
                 <FontAwesomeIcon icon={faRotate} />
                 Renovar
@@ -318,14 +432,40 @@ function SeguroCard({
               <FontAwesomeIcon icon={faPen} />
               Editar
             </Button>
-            <Button onClick={(event) => stopAndRun(event, onDetails)}>
-              <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-              Detalhes
-            </Button>
+            {isAtivo && (
+              <Button variant="secondary" onClick={(event) => stopAndRun(event, () => setShowCancelarModal(true))}>
+                <FontAwesomeIcon icon={faBan} />
+                Cancelar
+              </Button>
+            )}
+            {isAdmin && !confirmandoExclusao && (
+              <Button variant="danger" onClick={(event) => stopAndRun(event, () => setConfirmandoExclusao(true))}>
+                <FontAwesomeIcon icon={faTrash} />
+                Excluir
+              </Button>
+            )}
+            {isAdmin && confirmandoExclusao && (
+              <div
+                className="flex items-center gap-2 rounded-xl border px-3 py-1.5"
+                style={{ borderColor: 'var(--color-danger)', backgroundColor: 'var(--color-danger-soft)' }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <span className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>
+                  Confirmar exclusão?
+                </span>
+                <Button variant="danger" onClick={(event) => stopAndRun(event, handleExcluirCard)} disabled={excluindo}>
+                  {excluindo ? 'Excluindo...' : 'Sim'}
+                </Button>
+                <Button variant="secondary" onClick={(event) => stopAndRun(event, () => setConfirmandoExclusao(false))}>
+                  Não
+                </Button>
+              </div>
+            )}
           </div>
         </div>
       ) : null}
     </Card>
+    </>
   );
 }
 
