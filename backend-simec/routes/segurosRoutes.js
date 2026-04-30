@@ -101,6 +101,38 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
   return unidade;
 }
 
+async function verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId }) {
+  const inicio = new Date(dataInicio);
+  const fim    = new Date(dataFim);
+
+  const alvos = [];
+  if (unidadeId)     alvos.push({ campo: 'prédio',      where: { unidadeId } });
+  if (equipamentoId) alvos.push({ campo: 'equipamento', where: { equipamentoId } });
+
+  for (const { campo, where } of alvos) {
+    const conflito = await prisma.seguro.findFirst({
+      where: {
+        tenantId,
+        ...where,
+        status: { in: ['Ativo', 'Vigente'] },
+        id: excluirId ? { not: excluirId } : undefined,
+        // Sobreposição real — toque de fronteira (renovação) é permitido
+        dataInicio: { lt: fim },
+        dataFim:    { gt: inicio },
+      },
+      select: { id: true, apoliceNumero: true },
+    });
+
+    if (conflito) {
+      const error = new Error(
+        `Já existe um seguro ativo cobrindo este ${campo} no mesmo período (Apólice ${conflito.apoliceNumero || conflito.id}).`
+      );
+      error.status = 409;
+      throw error;
+    }
+  }
+}
+
 // ─── Helpers de paginação e filtros ──────────────────────────────────────────
 
 function buildStatusWhereSeguro(status) {
@@ -267,6 +299,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
+    await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: null });
 
     const novoSeguro = await prisma.seguro.create({
       data: {
@@ -372,6 +405,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
+    await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: id });
 
     const atualizado = await prisma.seguro.update({
       where: {
@@ -583,6 +617,158 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
     }
 
     return next(error);
+  }
+});
+
+// ==============================
+// POST RENOVAR
+// Cria nova apólice, registra histórico dos anexos anteriores e marca o seguro
+// antigo como Substituido — operação atômica via transaction.
+// ==============================
+router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
+  const { id } = req.params;
+  const dados = req.validatedData || req.body;
+  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
+
+  try {
+    const tenantId = req.usuario.tenantId;
+
+    const seguroAntigo = await prisma.seguro.findFirst({
+      where: { id, tenantId },
+      include: {
+        anexos: { select: { id: true, path: true, nomeOriginal: true } },
+        unidade: { select: { nomeSistema: true } },
+        equipamento: { select: { modelo: true, tag: true } },
+      },
+    });
+
+    if (!seguroAntigo) {
+      return res.status(404).json({ message: 'Seguro não encontrado.' });
+    }
+    if (!['Ativo', 'Vigente'].includes(seguroAntigo.status)) {
+      return res.status(409).json({ message: 'Apenas seguros ativos podem ser renovados.' });
+    }
+
+    await validarEquipamentoDoTenant(tenantId, equipamentoId);
+    await validarUnidadeDoTenant(tenantId, unidadeId);
+    await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: id });
+
+    const alvoDesc = seguroAntigo.unidade?.nomeSistema
+      ? `unidade ${seguroAntigo.unidade.nomeSistema}`
+      : seguroAntigo.equipamento?.modelo
+        ? `equipamento ${seguroAntigo.equipamento.modelo}`
+        : `apólice ${seguroAntigo.apoliceNumero}`;
+
+    const anexosAntigos = seguroAntigo.anexos
+      .map((a) => a.nomeOriginal || a.path)
+      .join(', ') || 'nenhum';
+
+    const novoSeguro = await prisma.$transaction(async (tx) => {
+      const criado = await tx.seguro.create({
+        data: {
+          ...resto,
+          dataInicio: new Date(dataInicio),
+          dataFim: new Date(dataFim),
+          seguroAnteriorId: id,
+          tenant: { connect: { id: tenantId } },
+          equipamento: equipamentoId
+            ? { connect: { tenantId_id: { tenantId, id: equipamentoId } } }
+            : undefined,
+          unidade: unidadeId
+            ? { connect: { tenantId_id: { tenantId, id: unidadeId } } }
+            : undefined,
+          veiculo: veiculoId
+            ? { connect: { tenantId_id: { tenantId, id: veiculoId } } }
+            : undefined,
+        },
+      });
+
+      await tx.seguro.update({
+        where: { tenantId_id: { tenantId, id } },
+        data: { status: 'Substituido' },
+      });
+
+      return criado;
+    });
+
+    const dataRenovacao = new Date().toLocaleDateString('pt-BR');
+
+    await Promise.all([
+      registrarLog({
+        tenantId,
+        usuarioId: req.usuario.id,
+        acao: 'RENOVAÇÃO',
+        entidade: 'Seguro',
+        entidadeId: id,
+        detalhes: `Apólice ${seguroAntigo.apoliceNumero} (${alvoDesc}) substituída pela apólice ${novoSeguro.apoliceNumero} em ${dataRenovacao}. Documentos anteriores: ${anexosAntigos}.`,
+      }),
+      registrarLog({
+        tenantId,
+        usuarioId: req.usuario.id,
+        acao: 'CRIAÇÃO',
+        entidade: 'Seguro',
+        entidadeId: novoSeguro.id,
+        detalhes: `Apólice ${novoSeguro.apoliceNumero} criada como renovação da apólice ${seguroAntigo.apoliceNumero} em ${dataRenovacao}.`,
+      }),
+    ]);
+
+    const seguroCompleto = await buscarSeguroCompleto(tenantId, novoSeguro.id);
+    return res.status(201).json(seguroCompleto || novoSeguro);
+  } catch (error) {
+    console.error('[SEGURO_RENOVAR_ERROR]', error);
+
+    if (error.code === 'P2002') {
+      return res.status(409).json({ message: 'Este número de apólice já está cadastrado.' });
+    }
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return res.status(500).json({ message: 'Erro ao renovar seguro.' });
+  }
+});
+
+// ==============================
+// GET HISTÓRICO DE RENOVAÇÕES
+// Retorna a cadeia completa de apólices anteriores a partir de qualquer seguro.
+// ==============================
+router.get('/:id/historico', async (req, res) => {
+  const { id } = req.params;
+  const tenantId = req.usuario.tenantId;
+
+  try {
+    const cadeia = [];
+    let seguroAtualId = id;
+
+    // Percorre a cadeia de renovações via seguroAnteriorId
+    while (seguroAtualId) {
+      const seguro = await prisma.seguro.findFirst({
+        where: { id: seguroAtualId, tenantId },
+        select: {
+          id: true,
+          apoliceNumero: true,
+          seguradora: true,
+          dataInicio: true,
+          dataFim: true,
+          status: true,
+          premioTotal: true,
+          seguroAnteriorId: true,
+          cobertura: true,
+          unidade: { select: { id: true, nomeSistema: true } },
+          equipamento: { select: { id: true, modelo: true, tag: true } },
+          anexos: { select: { id: true, nomeOriginal: true, path: true, createdAt: true }, orderBy: { createdAt: 'desc' } },
+        },
+      });
+
+      if (!seguro) break;
+
+      cadeia.push(seguro);
+      seguroAtualId = seguro.seguroAnteriorId;
+    }
+
+    return res.json(cadeia);
+  } catch (error) {
+    console.error('[SEGURO_HISTORICO_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar histórico do seguro.' });
   }
 });
 

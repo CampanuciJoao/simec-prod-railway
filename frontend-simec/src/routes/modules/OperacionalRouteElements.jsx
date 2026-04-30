@@ -15,6 +15,7 @@ import {
   SalvarEquipamentoPage,
   SalvarManutencaoPage,
   SalvarSeguroPage,
+  RenovarSeguroPage,
   SegurosPage,
   OrcamentosPage,
   SalvarOrcamentoPage,
@@ -51,6 +52,7 @@ function OperacionalRouteElements() {
       <Route path="seguros" element={<SegurosPage />} />
       <Route path="seguros/adicionar" element={<SalvarSeguroPage />} />
       <Route path="seguros/editar/:id" element={<SalvarSeguroPage />} />
+      <Route path="seguros/renovar/:id" element={<RenovarSeguroPage />} />
       <Route path="seguros/detalhes/:id" element={<DetalhesSeguroPage />} />
 
       <Route path="relatorios" element={<RelatoriosPage />} />

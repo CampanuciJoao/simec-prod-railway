@@ -141,7 +141,7 @@ export function useSegurosPage() {
 
   const clearAllFilters = () => {
     setSearchTerm('');
-    setFiltros({ seguradora: '', status: '', unidade: '', tipoSeguro: '' });
+    setFiltros({ seguradora: '', status: 'Ativo', unidade: '', tipoSeguro: '' });
   };
 
   const onSearchChange = (event) => setSearchTerm(event.target.value);

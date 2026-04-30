@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { faShieldAlt } from '@fortawesome/free-solid-svg-icons';
+import { faShieldAlt, faRotate, faPen } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { useDetalhesSeguroPage } from '@/hooks/seguros/useDetalhesSeguroPage';
 
@@ -73,9 +74,21 @@ function DetalhesSeguroPage() {
         title={`Apólice ${seguro.apoliceNumero}`}
         icon={faShieldAlt}
         actions={
-          <Button variant="secondary" onClick={() => navigate('/seguros')}>
-            Voltar
-          </Button>
+          <div className="flex gap-2">
+            {['Ativo', 'Vigente'].includes(seguro.status) && (
+              <Button variant="primary" onClick={() => navigate(`/seguros/renovar/${seguro.id}`)}>
+                <FontAwesomeIcon icon={faRotate} />
+                Renovar
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => navigate(`/seguros/editar/${seguro.id}`)}>
+              <FontAwesomeIcon icon={faPen} />
+              Editar
+            </Button>
+            <Button variant="secondary" onClick={() => navigate('/seguros')}>
+              Voltar
+            </Button>
+          </div>
         }
       />
 

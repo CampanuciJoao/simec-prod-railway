@@ -3,6 +3,7 @@ import prisma from '../prismaService.js';
 const RETENCAO_ALERTAS_DIAS   = 90;
 const RETENCAO_SESSOES_DIAS   = 30;
 const RETENCAO_MENSAGENS_DIAS = 60;
+const RETENCAO_SEGUROS_ANOS   = 5;
 
 const BATCH_ARQUIVO = 500;
 
@@ -111,26 +112,46 @@ export async function limparMensagensOrfas() {
   return result.count;
 }
 
+export async function limparSegurosAntigos() {
+  const corte = new Date();
+  corte.setFullYear(corte.getFullYear() - RETENCAO_SEGUROS_ANOS);
+
+  const result = await prisma.seguro.deleteMany({
+    where: {
+      status: { in: ['Expirado', 'Cancelado', 'Substituido'] },
+      dataFim: { lt: corte },
+    },
+  });
+
+  console.log(
+    `[CLEANUP] Seguros antigos removidos: ${result.count} (dataFim anterior a ${corte.toISOString().slice(0, 10)})`
+  );
+  return result.count;
+}
+
 export async function executarCleanupCompleto() {
   console.log('[CLEANUP] Iniciando rotina de retenção de dados...');
 
-  const [alertas, sessoes, mensagens] = await Promise.allSettled([
+  const [alertas, sessoes, mensagens, seguros] = await Promise.allSettled([
     limparAlertasAntigos(),
     limparSessoesAgente(),
     limparMensagensOrfas(),
+    limparSegurosAntigos(),
   ]);
 
   const totalAlerts  = alertas.status  === 'fulfilled' ? alertas.value  : 0;
   const totalSessoes = sessoes.status  === 'fulfilled' ? sessoes.value  : 0;
   const totalMsgs    = mensagens.status === 'fulfilled' ? mensagens.value : 0;
+  const totalSeguros = seguros.status  === 'fulfilled' ? seguros.value  : 0;
 
-  if (alertas.status   === 'rejected') console.error('[CLEANUP] Erro em alertas:',   alertas.reason?.message);
-  if (sessoes.status   === 'rejected') console.error('[CLEANUP] Erro em sessões:',   sessoes.reason?.message);
+  if (alertas.status  === 'rejected') console.error('[CLEANUP] Erro em alertas:',  alertas.reason?.message);
+  if (sessoes.status  === 'rejected') console.error('[CLEANUP] Erro em sessões:',  sessoes.reason?.message);
   if (mensagens.status === 'rejected') console.error('[CLEANUP] Erro em mensagens:', mensagens.reason?.message);
+  if (seguros.status  === 'rejected') console.error('[CLEANUP] Erro em seguros:',  seguros.reason?.message);
 
   console.log(
-    `[CLEANUP] Concluído | alertas=${totalAlerts} | sessões=${totalSessoes} | mensagens=${totalMsgs}`
+    `[CLEANUP] Concluído | alertas=${totalAlerts} | sessões=${totalSessoes} | mensagens=${totalMsgs} | seguros=${totalSeguros}`
   );
 
-  return { alertas: totalAlerts, sessoes: totalSessoes, mensagens: totalMsgs };
+  return { alertas: totalAlerts, sessoes: totalSessoes, mensagens: totalMsgs, seguros: totalSeguros };
 }

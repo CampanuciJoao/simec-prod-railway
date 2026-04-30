@@ -59,6 +59,9 @@ export const SalvarSeguroPage = React.lazy(() =>
 export const DetalhesSeguroPage = React.lazy(() =>
   import('@/pages/seguros/DetalhesSeguroPage')
 );
+export const RenovarSeguroPage = React.lazy(() =>
+  import('@/pages/seguros/RenovarSeguroPage')
+);
 export const RelatoriosPage = React.lazy(() =>
   import('@/pages/relatorios/RelatoriosPage')
 );
