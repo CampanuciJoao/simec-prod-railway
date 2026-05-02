@@ -30,20 +30,20 @@ const DashboardCard = forwardRef(function DashboardCard(
         {/* Header com drag handle */}
         <div
           className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
-          style={{ borderColor: 'var(--border-soft)' }}
+          style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--bg-sidebar-hover)' }}
         >
           <div className="flex items-start gap-2 min-w-0">
             <FontAwesomeIcon
               icon={faGripVertical}
               className="mt-0.5 shrink-0 text-xs opacity-30"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: 'var(--text-sidebar)' }}
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>
+              <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-sidebar)' }}>
                 {title}
               </p>
               {description && (
-                <p className="mt-0.5 text-xs leading-snug line-clamp-1" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-0.5 text-xs leading-snug line-clamp-1" style={{ color: 'var(--text-sidebar-muted)', opacity: 0.7 }}>
                   {description}
                 </p>
               )}

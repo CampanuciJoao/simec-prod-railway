@@ -25,23 +25,23 @@ const BIWidgetShell = forwardRef(function BIWidgetShell(
       >
         <div
           className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
-          style={{ borderColor: 'var(--border-soft)' }}
+          style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--bg-sidebar-hover)' }}
         >
           <div className="flex min-w-0 items-start gap-2">
             <FontAwesomeIcon
               icon={faGripVertical}
               className="mt-0.5 shrink-0 text-xs opacity-30"
-              style={{ color: 'var(--text-muted)' }}
+              style={{ color: 'var(--text-sidebar)' }}
             />
             <div className="min-w-0">
               <h2
                 className="text-base font-semibold"
-                style={{ color: 'var(--text-primary)' }}
+                style={{ color: 'var(--text-sidebar)' }}
               >
                 {title}
               </h2>
               {description ? (
-                <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-sidebar-muted)', opacity: 0.7 }}>
                   {description}
                 </p>
               ) : null}
@@ -55,9 +55,9 @@ const BIWidgetShell = forwardRef(function BIWidgetShell(
               onClick={onToggleExpand}
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition"
               style={{
-                borderColor: 'var(--border-soft)',
-                backgroundColor: 'var(--bg-surface)',
-                color: 'var(--text-secondary)',
+                borderColor: 'rgba(255,255,255,0.15)',
+                backgroundColor: 'rgba(255,255,255,0.08)',
+                color: 'var(--text-sidebar)',
               }}
             >
               <FontAwesomeIcon icon={expanded ? faCompress : faExpand} />
