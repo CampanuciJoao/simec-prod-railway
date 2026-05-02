@@ -124,8 +124,8 @@ function sectionTitle(doc, text) {
 function infoRow(doc, label, value) {
   checkPageBreak(doc, 12);
   const W = doc.page.width;
-  const col2X = 170;
-  const col2W = W - 50 - col2X; // 595 - 50 - 170 = 375
+  const col2X = 148;
+  const col2W = W - 50 - col2X; // 595 - 50 - 148 = 397
   const y = doc.y;
 
   doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
