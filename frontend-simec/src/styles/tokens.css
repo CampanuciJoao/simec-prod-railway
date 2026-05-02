@@ -32,6 +32,11 @@
 }
 
 :root[data-theme='light'] {
+  --card-header-bg: #f3f7fc;
+  --card-header-border: #e2eaf4;
+  --card-header-text: #0f172a;
+  --card-header-text-muted: #70839c;
+
   --bg-app: #f6f8fc;
   --bg-app-muted: #eef3f8;
 
@@ -97,6 +102,11 @@
 }
 
 :root[data-theme='dark'] {
+  --card-header-bg: #08111f;
+  --card-header-border: #182338;
+  --card-header-text: #dbe7fb;
+  --card-header-text-muted: rgba(219, 231, 251, 0.6);
+
   --bg-app: #0b1220;
   --bg-app-muted: #111b2d;
 
