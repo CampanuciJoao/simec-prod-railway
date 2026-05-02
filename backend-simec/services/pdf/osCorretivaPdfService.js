@@ -241,10 +241,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     infoRow(doc, 'Solicitante', os.solicitante);
     infoRow(doc, 'Abertura', fmt(os.dataHoraAbertura, locale, timeZone));
     infoRow(doc, 'Aberta por', os.autor?.nome || 'N/A');
-    doc.moveDown(0.2);
-    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Descrição do problema:', 54, doc.y);
-    doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.descricaoProblema), 54, doc.y + 2, { width: doc.page.width - 108 });
-    doc.moveDown(0.2);
+    infoRow(doc, 'Descrição do problema', os.descricaoProblema);
 
     if (os.status === 'Concluida' && os.dataHoraConclusao) {
       infoRow(doc, 'Conclusão', fmt(os.dataHoraConclusao, locale, timeZone));
