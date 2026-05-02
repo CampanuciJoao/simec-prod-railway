@@ -122,21 +122,25 @@ function sectionTitle(doc, text) {
 }
 
 function infoRow(doc, label, value) {
-  checkPageBreak(doc, 12);
+  checkPageBreak(doc, 18);
   const W = doc.page.width;
-  const col2X = 148;
-  const col2W = W - 50 - col2X; // 595 - 50 - 148 = 397
+  const rightX = W - 50; // 545
   const y = doc.y;
+  const textY = y + 3;
 
+  // Label em negrito
   doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
-    .text(`${label}:`, 54, y, { width: col2X - 58, lineBreak: false });
+    .text(`${label}:`, 54, textY, { lineBreak: false });
 
-  // Reset y antes do valor para evitar movimento "para cima" que causa página extra
-  doc.y = y;
+  // Valor logo após o label, na mesma linha
   doc.font('Helvetica').fontSize(8.5).fillColor(C.dark)
-    .text(safe(value), col2X, y, { width: col2W, lineBreak: false });
+    .text(` ${safe(value)}`, { lineBreak: false });
 
-  doc.y = y + 12;
+  // Linha de formulário da margem esquerda até a direita
+  const lineY = y + 16;
+  doc.moveTo(54, lineY).lineTo(rightX, lineY).lineWidth(0.5).strokeColor(C.border).stroke();
+
+  doc.y = lineY + 5;
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
