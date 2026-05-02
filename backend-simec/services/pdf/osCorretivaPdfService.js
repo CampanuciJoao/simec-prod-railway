@@ -109,7 +109,7 @@ function drawFooter(doc) {
 
 function sectionTitle(doc, text) {
   checkPageBreak(doc, 28);
-  doc.moveDown(0.4);
+  doc.moveDown(0.2);
   const y = doc.y;
   doc.save().rect(50, y, doc.page.width - 100, 18).fill(C.bg).restore();
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark).text(text, 54, y + 4);
@@ -119,8 +119,8 @@ function sectionTitle(doc, text) {
 function infoRow(doc, label, value) {
   checkPageBreak(doc, 16);
   const W = doc.page.width;
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text(`${label}:`, 54, doc.y, { continued: true, width: 140 });
-  doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(` ${safe(value)}`, { width: W - 210 });
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text(`${label}:`, 54, doc.y, { continued: true, width: 130 });
+  doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(` ${safe(value)}`, { width: W - 54 - 130 - 14, lineBreak: false });
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
@@ -165,9 +165,9 @@ function timelineEvent(doc, evento, options) {
   const eventHeight = doc.y - y;
   doc.save().rect(x, y, 3, Math.max(eventHeight, 12)).fill(cor).restore();
 
-  doc.moveDown(0.6);
-  doc.moveTo(x + 8, doc.y - 3).lineTo(W - 50, doc.y - 3).lineWidth(0.4).strokeColor(C.light).stroke();
   doc.moveDown(0.3);
+  doc.moveTo(x + 8, doc.y - 2).lineTo(W - 50, doc.y - 2).lineWidth(0.4).strokeColor(C.light).stroke();
+  doc.moveDown(0.15);
 }
 
 
@@ -201,7 +201,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: 110, bottom: 60, left: 50, right: 50 },
+      margins: { top: 110, bottom: 48, left: 50, right: 50 },
       bufferPages: true,
     });
 
@@ -219,7 +219,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
       : os.equipamento?.tag);
     infoRow(doc, 'Unidade / Setor', os.equipamento?.unidade?.nomeSistema || os.equipamento?.setor);
     infoRow(doc, 'Fabricante', os.equipamento?.fabricante);
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
     highlightBadge(doc, 'Status na abertura da OS', STATUS_EQ[os.statusEquipamentoAbertura] || os.statusEquipamentoAbertura, '#b45309');
     highlightBadge(doc, 'Status atual do equipamento', STATUS_EQ[os.equipamento?.status] || os.equipamento?.status, os.status === 'Concluida' ? '#16a34a' : '#b45309');
 
@@ -230,16 +230,17 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     infoRow(doc, 'Solicitante', os.solicitante);
     infoRow(doc, 'Abertura', fmt(os.dataHoraAbertura, locale, timeZone));
     infoRow(doc, 'Aberta por', os.autor?.nome || 'N/A');
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
     doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Descrição do problema:', 54, doc.y);
     doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.descricaoProblema), 54, doc.y + 2, { width: doc.page.width - 108 });
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
 
     if (os.status === 'Concluida' && os.dataHoraConclusao) {
       infoRow(doc, 'Conclusão', fmt(os.dataHoraConclusao, locale, timeZone));
       if (os.observacoesFinais) {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Observações finais:', 54, doc.y);
         doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.observacoesFinais), 54, doc.y + 2, { width: doc.page.width - 108 });
+        doc.moveDown(0.1);
       }
     }
 
