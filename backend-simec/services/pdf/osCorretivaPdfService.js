@@ -92,7 +92,7 @@ function drawFooter(doc) {
     doc.switchToPage(range.start + i);
     const W = doc.page.width;
 
-    // Assinatura primeiro (y menor) para evitar movimento "para cima" que cria página extra
+    // Assinatura primeiro (y menor)
     if (i === range.count - 1) {
       const sigY = doc.page.height - doc.page.margins.bottom - 52;
       doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(C.border).stroke();
@@ -100,11 +100,15 @@ function drawFooter(doc) {
         .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
     }
 
-    // Número da página por último (y maior)
-    const fy = doc.page.height - 28;
+    // Número da página no canto direito do rodapé
+    const fy = doc.page.height - doc.page.margins.bottom - 10;
     doc.font('Helvetica').fontSize(8).fillColor(C.muted)
-      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left', width: W - 100 });
+      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'right', width: W - 100 });
   }
+
+  // Garante que doc.y fique em posição segura para não criar página extra no doc.end()
+  doc.switchToPage(range.start + range.count - 1);
+  doc.y = doc.page.margins.top;
 }
 
 function sectionTitle(doc, text) {
