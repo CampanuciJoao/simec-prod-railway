@@ -78,7 +78,8 @@ function drawHeader(doc, os, options) {
   doc.font('Helvetica').fontSize(7.5).fillColor(C.border).text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
   doc.font('Helvetica').fontSize(8).fillColor(C.border).text(`Gerado em: ${fmt(new Date(), locale, timeZone)}`, 0, 20, { align: 'right', width: W - 14, lineBreak: false });
 
-  const titulo = `Ordem de Serviço Corretiva — Nº ${os.numeroOS}`;
+  const tipoOS = (os.visitas && os.visitas.length > 0) ? 'Corretiva' : 'Ocorrência';
+  const titulo = `Ordem de Serviço ${tipoOS} — Nº ${os.numeroOS}`;
   doc.font('Helvetica-Bold').fontSize(13).fillColor(C.black).text(titulo, 50, 66, { align: 'center', width: W - 100 });
 
   const sepY = 90;
