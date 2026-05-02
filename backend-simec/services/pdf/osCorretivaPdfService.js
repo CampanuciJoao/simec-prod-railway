@@ -92,19 +92,19 @@ function drawFooter(doc) {
     doc.switchToPage(range.start + i);
     const W = doc.page.width;
     const fy = doc.page.height - 38;
-
     doc.font('Helvetica').fontSize(8).fillColor(C.muted);
     doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left' });
     doc.text('SIMEC — Confidencial', 0, fy, { align: 'right', width: W - 50 });
-
-    // Assinatura ancorada no rodapé da última página
-    if (i === range.count - 1) {
-      const sigY = doc.page.height - doc.page.margins.bottom - 55;
-      doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(C.border).stroke();
-      doc.font('Helvetica').fontSize(8).fillColor(C.muted)
-        .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
-    }
   }
+}
+
+function drawSignature(doc) {
+  checkPageBreak(doc, 50);
+  const W = doc.page.width;
+  doc.moveDown(1.2);
+  doc.moveTo(100, doc.y).lineTo(W - 100, doc.y).lineWidth(0.8).strokeColor(C.border).stroke();
+  doc.font('Helvetica').fontSize(8).fillColor(C.muted)
+    .text('Assinatura do Responsável Técnico', 100, doc.y + 5, { align: 'center', width: W - 200 });
 }
 
 function sectionTitle(doc, text) {
@@ -117,10 +117,17 @@ function sectionTitle(doc, text) {
 }
 
 function infoRow(doc, label, value) {
-  checkPageBreak(doc, 16);
+  checkPageBreak(doc, 14);
   const W = doc.page.width;
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text(`${label}:`, 54, doc.y, { continued: true, width: 130 });
-  doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(` ${safe(value)}`, { width: W - 54 - 130 - 14, lineBreak: false });
+  const labelW = 126;
+  const valueX = 54 + labelW;          // 180
+  const valueW = W - 50 - valueX;      // 595 - 50 - 180 = 365 (até a margem direita)
+  const y = doc.y;
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
+    .text(`${label}:`, 54, y, { width: labelW, lineBreak: false });
+  doc.font('Helvetica').fontSize(8.5).fillColor(C.dark)
+    .text(safe(value), valueX, y, { width: valueW, lineBreak: false });
+  doc.y = y + 13;
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
@@ -252,6 +259,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
       timelineEvent(doc, ev, { locale, timeZone });
     }
 
+    drawSignature(doc);
     drawFooter(doc);
     doc.end();
   });
