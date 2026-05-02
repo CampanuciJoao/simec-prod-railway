@@ -94,8 +94,7 @@ function drawFooter(doc) {
     const fy = doc.page.height - 38;
 
     doc.font('Helvetica').fontSize(8).fillColor(C.muted);
-    doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left' });
-    doc.text('SIMEC — Confidencial', 0, fy, { align: 'right', width: W - 50 });
+    doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left', width: W - 100 });
 
     // Assinatura ancorada no rodapé da última página
     if (i === range.count - 1) {
@@ -117,14 +116,21 @@ function sectionTitle(doc, text) {
 }
 
 function infoRow(doc, label, value) {
-  checkPageBreak(doc, 14);
+  checkPageBreak(doc, 12);
   const W = doc.page.width;
-  const labelW = 126;
-  const valueW = W - 50 - 54 - labelW; // 595 - 50 - 54 - 126 = 365
+  const col2X = 170;
+  const col2W = W - 50 - col2X; // 595 - 50 - 170 = 375
+  const y = doc.y;
+
   doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
-    .text(`${label}:`, 54, doc.y, { continued: true, width: labelW });
+    .text(`${label}:`, 54, y, { width: col2X - 58, lineBreak: false });
+
+  // Reset y antes do valor para evitar movimento "para cima" que causa página extra
+  doc.y = y;
   doc.font('Helvetica').fontSize(8.5).fillColor(C.dark)
-    .text(safe(value), { width: valueW });
+    .text(safe(value), col2X, y, { width: col2W, lineBreak: false });
+
+  doc.y = y + 12;
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
