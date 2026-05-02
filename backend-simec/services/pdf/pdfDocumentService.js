@@ -82,7 +82,7 @@ function drawHeader(doc, title, options = {}) {
     .font('Helvetica')
     .fontSize(7.5)
     .fillColor(COLORS.slate300)
-    .text('Sistema de Manutencao de Equipamentos', textX, 30);
+    .text('Sistema de Gestão de Equipamentos de Radiologia', textX, 30);
 
   doc
     .font('Helvetica')
@@ -106,33 +106,32 @@ function drawHeader(doc, title, options = {}) {
   doc.y = sepY + 14;
 }
 
-function drawFooter(doc, prefix = 'SIMEC') {
+function drawFooter(doc) {
   const range = doc.bufferedPageRange();
-  const lastPage = range.start + range.count - 1;
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const W = doc.page.width;
 
-  for (let index = 0; index < range.count; index += 1) {
-    doc.switchToPage(range.start + index);
-    const footerY = doc.page.height - 40;
+    if (i === range.count - 1) {
+      const sigY = doc.page.height - doc.page.margins.bottom - 52;
+      doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(COLORS.slate300).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate500)
+        .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
+    }
 
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor(COLORS.slate500)
-      .text(`${prefix} - Pagina ${index + 1} de ${range.count}`, 50, footerY, {
-        align: 'center',
-        lineBreak: false,
-      });
+    const fy = doc.page.height - doc.page.margins.bottom - 10;
+    doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate500)
+      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'right', width: W - 100 });
   }
 
-  // Restaura cursor dentro da margem para evitar página em branco extra no doc.end()
-  doc.switchToPage(lastPage);
-  doc.y = doc.page.height - doc.page.margins.bottom;
+  doc.switchToPage(range.start + range.count - 1);
+  doc.y = doc.page.margins.top;
 }
 
 function createDocument(title, options = {}) {
   const doc = new PDFDocument({
     size: 'A4',
-    margin: 50,
+    margins: { top: 110, bottom: 48, left: 50, right: 50 },
     bufferPages: true,
   });
 
@@ -146,8 +145,8 @@ function createDocument(title, options = {}) {
   return doc;
 }
 
-function finalizeDocument(doc, prefix) {
-  drawFooter(doc, prefix);
+function finalizeDocument(doc) {
+  drawFooter(doc);
 
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -186,21 +185,28 @@ function drawGroupHeader(doc, title) {
 }
 
 function drawSectionTitle(doc, title) {
-  ensureSpace(doc, 36);
-
+  ensureSpace(doc, 28);
+  doc.moveDown(0.8);
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const y = doc.y;
 
-  doc.save().rect(x, y, w, 22).fill(COLORS.slate100).restore();
+  doc.save().rect(x, y, w, 18).fill(COLORS.slate100).restore();
 
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(10)
-    .fillColor(COLORS.slate900)
-    .text(title, x + 8, y + 6, { lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate700)
+    .text(title, x + 4, y + 4);
 
-  doc.y = y + 30;
+  doc.y = y + 22;
+}
+
+function infoRow(doc, label, value) {
+  ensureSpace(doc, 12);
+  const y = doc.y;
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.slate500)
+    .text(`${label}:`, 54, y, { lineBreak: false });
+  doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.slate700)
+    .text(` ${safeText(value)}`, { lineBreak: false });
+  doc.y = y + 11;
 }
 
 function drawInfoGrid(doc, items = [], columns = 2) {
@@ -419,7 +425,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
     ]),
   });
 
-  return finalizeDocument(doc, 'Relatorio BI SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
@@ -472,7 +478,7 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
     });
   }
 
-  return finalizeDocument(doc, 'Relatorios SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) {
@@ -481,18 +487,14 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Contexto do equipamento');
-  drawInfoGrid(doc, [
-    { label: 'Equipamento', value: payload?.equipamento?.modelo },
-    { label: 'Numero de serie (TAG)', value: payload?.equipamento?.tag },
-    { label: 'Unidade', value: payload?.equipamento?.unidade },
-    {
-      label: 'Periodo',
-      value:
-        payload?.filtros?.dataInicio || payload?.filtros?.dataFim
-          ? `${safeText(payload?.filtros?.dataInicio, 'Inicio')} ate ${safeText(payload?.filtros?.dataFim, 'Hoje')}`
-          : 'Historico completo',
-    },
-  ]);
+  infoRow(doc, 'Equipamento', payload?.equipamento?.modelo);
+  infoRow(doc, 'Número de série (TAG)', payload?.equipamento?.tag);
+  infoRow(doc, 'Unidade', payload?.equipamento?.unidade);
+  infoRow(doc, 'Período',
+    payload?.filtros?.dataInicio || payload?.filtros?.dataFim
+      ? `${safeText(payload?.filtros?.dataInicio, 'Início')} até ${safeText(payload?.filtros?.dataFim, 'Hoje')}`
+      : 'Histórico completo',
+  );
 
   drawSectionTitle(doc, 'Linha do tempo');
   drawTable(doc, {
@@ -501,7 +503,7 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
     rows: buildHistoricoRows(payload?.eventos || [], locale, timeZone),
   });
 
-  return finalizeDocument(doc, 'Auditoria SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
@@ -509,23 +511,15 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
 
-  drawSectionTitle(doc, 'Informacoes do equipamento');
-  drawInfoGrid(doc, [
-    { label: 'Modelo', value: manutencao?.equipamento?.modelo },
-    { label: 'Numero de serie / TAG', value: manutencao?.equipamento?.tag },
-    {
-      label: 'Unidade',
-      value:
-        manutencao?.equipamento?.unidade?.nomeSistema ||
-        manutencao?.equipamento?.unidade?.nome ||
-        'N/A',
-    },
-    { label: 'Tipo', value: manutencao?.tipo },
-    { label: 'Numero do chamado', value: manutencao?.numeroChamado },
-    { label: 'Status atual', value: manutencao?.status },
-  ]);
+  drawSectionTitle(doc, 'Informações do equipamento');
+  infoRow(doc, 'Modelo', manutencao?.equipamento?.modelo);
+  infoRow(doc, 'Número de série / TAG', manutencao?.equipamento?.tag);
+  infoRow(doc, 'Unidade', manutencao?.equipamento?.unidade?.nomeSistema || manutencao?.equipamento?.unidade?.nome || 'N/A');
+  infoRow(doc, 'Tipo', manutencao?.tipo);
+  infoRow(doc, 'Número do chamado', manutencao?.numeroChamado);
+  infoRow(doc, 'Status atual', manutencao?.status);
 
-  drawSectionTitle(doc, 'Cronograma e execucao real');
+  drawSectionTitle(doc, 'Cronograma e execução real');
   drawTable(doc, {
     headers: ['Etapa', 'Data/Hora planejada', 'Data/Hora real'],
     columnWidths: [120, 185, 190],
@@ -543,10 +537,10 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
     ],
   });
 
-  drawSectionTitle(doc, 'Descricao do problema / servico');
-  drawParagraph(doc, manutencao?.descricaoProblemaServico || 'Nenhuma descricao informada.');
+  drawSectionTitle(doc, 'Descrição do problema / serviço');
+  infoRow(doc, 'Descrição', manutencao?.descricaoProblemaServico || 'Nenhuma descrição informada.');
 
-  drawSectionTitle(doc, 'Historico do chamado / notas tecnicas');
+  drawSectionTitle(doc, 'Histórico do chamado / notas técnicas');
   drawTable(doc, {
     headers: ['Data/Hora', 'Responsavel', 'Nota / andamento'],
     columnWidths: [100, 130, 265],
@@ -557,26 +551,7 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
     ]),
   });
 
-  ensureSpace(doc, 90);
-  const signatureY = doc.y + 30;
-  doc
-    .moveTo(50, signatureY)
-    .lineTo(230, signatureY)
-    .strokeColor(COLORS.slate500)
-    .stroke();
-  doc
-    .moveTo(320, signatureY)
-    .lineTo(545, signatureY)
-    .stroke();
-
-  doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLORS.slate700)
-    .text('Responsavel tecnico', 50, signatureY + 6)
-    .text('Assinatura unidade / cliente', 320, signatureY + 6);
-
-  return finalizeDocument(doc, 'OS SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
@@ -585,51 +560,33 @@ export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Equipamento');
-  drawInfoGrid(doc, [
-    { label: 'Modelo', value: ocorrencia.equipamento?.modelo },
-    { label: 'Numero de serie / TAG', value: ocorrencia.equipamento?.tag },
-    { label: 'Unidade', value: ocorrencia.equipamento?.unidade?.nomeSistema },
-  ], 3);
+  infoRow(doc, 'Modelo', ocorrencia.equipamento?.modelo);
+  infoRow(doc, 'Número de série / TAG', ocorrencia.equipamento?.tag);
+  infoRow(doc, 'Unidade', ocorrencia.equipamento?.unidade?.nomeSistema);
 
-  drawSectionTitle(doc, 'Identificacao do registro');
-  drawInfoGrid(doc, [
-    { label: 'Identificador unico', value: ocorrencia.id },
-    { label: 'Data do registro', value: formatDateTime(ocorrencia.data, locale, timeZone) },
-    { label: 'Tipo', value: ocorrencia.tipo },
-    { label: 'Gravidade', value: String(ocorrencia.gravidade || 'media').toUpperCase() },
-    { label: 'Origem', value: ocorrencia.origem || 'usuario' },
-    { label: 'Tecnico responsavel', value: ocorrencia.tecnico || 'N/A' },
-    { label: 'Status', value: ocorrencia.resolvido ? 'Resolvido' : 'Pendente' },
-    ocorrencia.resolvido
-      ? { label: 'Data resolucao', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) }
-      : { label: 'Aguardando', value: 'Sem resolucao registrada' },
-  ]);
+  drawSectionTitle(doc, 'Identificação do registro');
+  infoRow(doc, 'Identificador', ocorrencia.id);
+  infoRow(doc, 'Data do registro', formatDateTime(ocorrencia.data, locale, timeZone));
+  infoRow(doc, 'Tipo', ocorrencia.tipo);
+  infoRow(doc, 'Gravidade', String(ocorrencia.gravidade || 'media').toUpperCase());
+  infoRow(doc, 'Origem', ocorrencia.origem || 'usuário');
+  infoRow(doc, 'Técnico responsável', ocorrencia.tecnico || 'N/A');
+  infoRow(doc, 'Status', ocorrencia.resolvido ? 'Resolvido' : 'Pendente');
+  infoRow(doc, ocorrencia.resolvido ? 'Data resolução' : 'Aguardando',
+    ocorrencia.resolvido ? formatDateTime(ocorrencia.dataResolucao, locale, timeZone) : 'Sem resolução registrada');
 
-  drawSectionTitle(doc, 'Titulo');
-  drawParagraph(doc, ocorrencia.titulo);
+  drawSectionTitle(doc, 'Título');
+  infoRow(doc, 'Título', ocorrencia.titulo);
 
-  drawSectionTitle(doc, 'Descricao');
-  drawParagraph(doc, ocorrencia.descricao || 'Sem descricao informada.');
+  drawSectionTitle(doc, 'Descrição');
+  infoRow(doc, 'Descrição', ocorrencia.descricao || 'Sem descrição informada.');
 
   if (ocorrencia.resolvido) {
-    drawSectionTitle(doc, 'Resolucao');
-    drawInfoGrid(doc, [
-      { label: 'Resolvido por', value: ocorrencia.tecnicoResolucao || 'N/A' },
-      { label: 'Data', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) },
-    ]);
-    drawParagraph(doc, ocorrencia.solucao || '-');
+    drawSectionTitle(doc, 'Resolução');
+    infoRow(doc, 'Resolvido por', ocorrencia.tecnicoResolucao || 'N/A');
+    infoRow(doc, 'Data', formatDateTime(ocorrencia.dataResolucao, locale, timeZone));
+    infoRow(doc, 'Solução', ocorrencia.solucao || '-');
   }
 
-  ensureSpace(doc, 90);
-  const signatureY = doc.y + 30;
-  doc.moveTo(50, signatureY).lineTo(230, signatureY).strokeColor(COLORS.slate500).stroke();
-  doc.moveTo(320, signatureY).lineTo(545, signatureY).stroke();
-  doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLORS.slate700)
-    .text('Tecnico responsavel', 50, signatureY + 6)
-    .text('Responsavel pela unidade', 320, signatureY + 6);
-
-  return finalizeDocument(doc, 'Ocorrencia SIMEC');
+  return finalizeDocument(doc);
 }
