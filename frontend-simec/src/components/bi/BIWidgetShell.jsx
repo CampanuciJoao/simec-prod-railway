@@ -25,23 +25,23 @@ const BIWidgetShell = forwardRef(function BIWidgetShell(
       >
         <div
           className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
-          style={{ backgroundColor: 'var(--bg-sidebar)', borderColor: 'var(--bg-sidebar-hover)' }}
+          style={{ backgroundColor: 'var(--card-header-bg)', borderColor: 'var(--card-header-border)' }}
         >
           <div className="flex min-w-0 items-start gap-2">
             <FontAwesomeIcon
               icon={faGripVertical}
-              className="mt-0.5 shrink-0 text-xs opacity-30"
-              style={{ color: 'var(--text-sidebar)' }}
+              className="mt-0.5 shrink-0 text-xs opacity-25"
+              style={{ color: 'var(--card-header-text)' }}
             />
             <div className="min-w-0">
               <h2
                 className="text-base font-semibold"
-                style={{ color: 'var(--text-sidebar)' }}
+                style={{ color: 'var(--card-header-text)' }}
               >
                 {title}
               </h2>
               {description ? (
-                <p className="mt-1 text-sm" style={{ color: 'var(--text-sidebar-muted)', opacity: 0.7 }}>
+                <p className="mt-1 text-sm" style={{ color: 'var(--card-header-text-muted)' }}>
                   {description}
                 </p>
               ) : null}
@@ -53,11 +53,11 @@ const BIWidgetShell = forwardRef(function BIWidgetShell(
               type="button"
               title={expanded ? 'Recolher widget' : 'Expandir widget'}
               onClick={onToggleExpand}
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition hover:opacity-80"
               style={{
-                borderColor: 'rgba(255,255,255,0.15)',
-                backgroundColor: 'rgba(255,255,255,0.08)',
-                color: 'var(--text-sidebar)',
+                borderColor: 'var(--card-header-border)',
+                backgroundColor: 'var(--bg-surface)',
+                color: 'var(--card-header-text)',
               }}
             >
               <FontAwesomeIcon icon={expanded ? faCompress : faExpand} />

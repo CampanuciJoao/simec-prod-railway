@@ -28,22 +28,22 @@ function PageSection({
         {hasHeader ? (
           <div
             className="flex flex-col gap-3 px-6 py-4 sm:flex-row sm:items-center sm:justify-between"
-            style={{ backgroundColor: 'var(--bg-sidebar)' }}
+            style={{ backgroundColor: 'var(--card-header-bg)', borderBottom: '1px solid var(--card-header-border)' }}
           >
             <div className="min-w-0">
               {title ? (
-                <h2 className="text-sm font-semibold tracking-wide" style={{ color: 'var(--text-sidebar)' }}>
+                <h2 className="text-sm font-semibold tracking-wide" style={{ color: 'var(--card-header-text)' }}>
                   {title}
                 </h2>
               ) : null}
               {description ? (
-                <p className="mt-0.5 text-xs leading-snug" style={{ color: 'var(--text-sidebar-muted)', opacity: 0.65 }}>
+                <p className="mt-0.5 text-xs leading-snug" style={{ color: 'var(--card-header-text-muted)' }}>
                   {description}
                 </p>
               ) : null}
             </div>
             {resolvedHeaderRight ? (
-              <div className="page-section-dark-actions shrink-0">{resolvedHeaderRight}</div>
+              <div className="card-header-actions shrink-0">{resolvedHeaderRight}</div>
             ) : null}
           </div>
         ) : null}
