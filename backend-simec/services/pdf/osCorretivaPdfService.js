@@ -114,7 +114,7 @@ function drawFooter(doc) {
 
 function sectionTitle(doc, text) {
   checkPageBreak(doc, 28);
-  doc.moveDown(0.2);
+  doc.moveDown(0.8);
   const y = doc.y;
   doc.save().rect(50, y, doc.page.width - 100, 18).fill(C.bg).restore();
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark).text(text, 54, y + 4);
@@ -122,25 +122,16 @@ function sectionTitle(doc, text) {
 }
 
 function infoRow(doc, label, value) {
-  checkPageBreak(doc, 18);
-  const W = doc.page.width;
-  const rightX = W - 50; // 545
+  checkPageBreak(doc, 12);
   const y = doc.y;
-  const textY = y + 3;
 
-  // Label em negrito
   doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
-    .text(`${label}:`, 54, textY, { lineBreak: false });
+    .text(`${label}:`, 54, y, { lineBreak: false });
 
-  // Valor logo após o label, na mesma linha
   doc.font('Helvetica').fontSize(8.5).fillColor(C.dark)
     .text(` ${safe(value)}`, { lineBreak: false });
 
-  // Linha de formulário da margem esquerda até a direita
-  const lineY = y + 16;
-  doc.moveTo(54, lineY).lineTo(rightX, lineY).lineWidth(0.5).strokeColor(C.border).stroke();
-
-  doc.y = lineY + 5;
+  doc.y = y + 11;
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
