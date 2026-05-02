@@ -120,14 +120,11 @@ function infoRow(doc, label, value) {
   checkPageBreak(doc, 14);
   const W = doc.page.width;
   const labelW = 126;
-  const valueX = 54 + labelW;          // 180
-  const valueW = W - 50 - valueX;      // 595 - 50 - 180 = 365 (até a margem direita)
-  const y = doc.y;
+  const valueW = W - 50 - 54 - labelW; // 595 - 50 - 54 - 126 = 365
   doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
-    .text(`${label}:`, 54, y, { width: labelW, lineBreak: false });
+    .text(`${label}:`, 54, doc.y, { continued: true, width: labelW });
   doc.font('Helvetica').fontSize(8.5).fillColor(C.dark)
-    .text(safe(value), valueX, y, { width: valueW, lineBreak: false });
-  doc.y = y + 13;
+    .text(safe(value), { width: valueW });
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
