@@ -75,8 +75,20 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
 
 // ─── Ocorrências ──────────────────────────────────────────────────────────────
 
-const GRAVIDADE_TONE  = { alta: 'danger', media: 'warning', baixa: 'default' };
-const GRAVIDADE_LABEL = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+const STATUS_OS_LABEL = {
+  Aberta:             'Aberta',
+  EmAndamento:        'Em andamento',
+  AguardandoTerceiro: 'Ag. terceiro',
+  Concluida:          'Concluída',
+};
+
+const STATUS_OS_TONE = {
+  Aberta:             'warning',
+  EmAndamento:        'info',
+  AguardandoTerceiro: 'warning',
+  Concluida:          'success',
+};
+
 const GRAVIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
 
 function ordenarOcorrencias(lista) {
@@ -84,17 +96,19 @@ function ordenarOcorrencias(lista) {
 }
 
 function OcorrenciaPendenteItem({ ocorrencia }) {
-  const tone = GRAVIDADE_TONE[ocorrencia.gravidade] || 'default';
+  const tone = STATUS_OS_TONE[ocorrencia.gravidade] || 'default';
   const toneColors = {
     danger:  { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)'  },
     warning: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)' },
+    info:    { bg: 'var(--brand-primary-soft)', text: 'var(--brand-primary)' },
+    success: { bg: 'var(--color-success-soft)', text: 'var(--color-success)' },
     default: { bg: 'var(--bg-surface-soft)',    text: 'var(--text-muted)'    },
   };
   const colors = toneColors[tone];
 
   return (
     <Link
-      to={`/equipamentos/ficha-tecnica/${ocorrencia.equipamento?.id}`}
+      to={`/manutencoes/ocorrencia/${ocorrencia.id}`}
       className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition hover:opacity-80"
       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-soft)' }}
     >
@@ -114,7 +128,7 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
         className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
         style={{ backgroundColor: colors.bg, color: colors.text }}
       >
-        {GRAVIDADE_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
+        {STATUS_OS_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
       </span>
     </Link>
   );
