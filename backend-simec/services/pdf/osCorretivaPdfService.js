@@ -91,18 +91,19 @@ function drawFooter(doc) {
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
     const W = doc.page.width;
-    const fy = doc.page.height - 38;
 
-    doc.font('Helvetica').fontSize(8).fillColor(C.muted);
-    doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left', width: W - 100 });
-
-    // Assinatura ancorada no rodapé da última página
+    // Assinatura primeiro (y menor) para evitar movimento "para cima" que cria página extra
     if (i === range.count - 1) {
       const sigY = doc.page.height - doc.page.margins.bottom - 52;
       doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(C.border).stroke();
       doc.font('Helvetica').fontSize(8).fillColor(C.muted)
         .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
     }
+
+    // Número da página por último (y maior)
+    const fy = doc.page.height - 28;
+    doc.font('Helvetica').fontSize(8).fillColor(C.muted)
+      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left', width: W - 100 });
   }
 }
 
