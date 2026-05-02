@@ -53,22 +53,22 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
 
   return (
     <div
-      className="rounded-2xl border px-4 py-4"
+      className="rounded-xl border px-3 py-3"
       style={{ backgroundColor: 'var(--bg-surface-soft)', borderColor: 'var(--border-soft)' }}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <div
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm"
           style={{ backgroundColor: t.iconSurface, color: t.iconText }}
         >
           <FontAwesomeIcon icon={icon} />
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</p>
-          <p className="mt-2 text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</p>
-          <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>{helper}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+          <p className="text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{value}</p>
         </div>
       </div>
+      <p className="mt-2 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
     </div>
   );
 }
@@ -169,7 +169,7 @@ function FilaAtencao({ resumo }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-2 gap-2">
       {items.map((item) => <DashboardMiniStat key={item.label} {...item} />)}
     </div>
   );
