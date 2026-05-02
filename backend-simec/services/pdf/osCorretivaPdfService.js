@@ -92,19 +92,19 @@ function drawFooter(doc) {
     doc.switchToPage(range.start + i);
     const W = doc.page.width;
     const fy = doc.page.height - 38;
+
     doc.font('Helvetica').fontSize(8).fillColor(C.muted);
     doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left' });
     doc.text('SIMEC — Confidencial', 0, fy, { align: 'right', width: W - 50 });
-  }
-}
 
-function drawSignature(doc) {
-  checkPageBreak(doc, 50);
-  const W = doc.page.width;
-  doc.moveDown(1.2);
-  doc.moveTo(100, doc.y).lineTo(W - 100, doc.y).lineWidth(0.8).strokeColor(C.border).stroke();
-  doc.font('Helvetica').fontSize(8).fillColor(C.muted)
-    .text('Assinatura do Responsável Técnico', 100, doc.y + 5, { align: 'center', width: W - 200 });
+    // Assinatura ancorada no rodapé da última página
+    if (i === range.count - 1) {
+      const sigY = doc.page.height - doc.page.margins.bottom - 52;
+      doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(C.border).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor(C.muted)
+        .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
+    }
+  }
 }
 
 function sectionTitle(doc, text) {
@@ -259,7 +259,6 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
       timelineEvent(doc, ev, { locale, timeZone });
     }
 
-    drawSignature(doc);
     drawFooter(doc);
     doc.end();
   });
