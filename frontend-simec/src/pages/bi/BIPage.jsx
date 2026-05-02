@@ -130,6 +130,7 @@ function BIPage() {
             <PageSection
               title="Widgets analíticos"
               description="Os gráficos priorizam leitura executiva rápida, com foco em downtime, criticidade e recorrência operacional."
+              darkHeader
             >
               <PageState
                 loading={page.loading}
@@ -142,6 +143,7 @@ function BIPage() {
             <PageSection
               title="Widgets analíticos"
               description="Arraste os widgets para reorganizar. Redimensione pelas bordas."
+              darkHeader
               headerRight={
                 <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
                   <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
