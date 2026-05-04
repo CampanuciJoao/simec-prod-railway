@@ -235,7 +235,7 @@ function DashboardPage() {
       <div className="space-y-4">
         <PageHeader
           title="Dashboard"
-
+          subtitle="Visão geral da operação, alertas e indicadores do parque de equipamentos."
           icon={faChartPie}
           actions={
             <div className="flex gap-2">
