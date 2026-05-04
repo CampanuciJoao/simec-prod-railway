@@ -20,21 +20,21 @@ function AuthLayout({ children }) {
 
   return (
     <div
-      className="min-h-screen"
+      className="h-screen overflow-hidden"
       style={{
         background:
           'radial-gradient(circle at top left, rgba(14,165,233,0.16), transparent 34%), linear-gradient(180deg, #08111f 0%, #0f172a 42%, #111827 100%)',
       }}
     >
-      <div className="grid min-h-screen w-full grid-cols-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
+      <div className="grid h-full w-full grid-cols-1 lg:grid-cols-[minmax(0,1.08fr)_minmax(420px,0.92fr)]">
         <section className="relative hidden overflow-hidden border-r border-white/10 lg:flex">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(59,130,246,0.2),transparent_28%),radial-gradient(circle_at_80%_18%,rgba(16,185,129,0.14),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.14),transparent_26%)]" />
 
-          <div className="relative z-10 flex h-full w-full flex-col justify-between px-12 py-12 text-white xl:px-16">
-            <div className="max-w-2xl space-y-12">
-              <img src={logoSimec} alt="SIMEC" className="max-w-[220px]" />
+          <div className="relative z-10 flex h-full w-full flex-col justify-between px-12 py-10 text-white xl:px-16">
+            <div className="max-w-2xl space-y-10">
+              <img src={logoSimec} alt="SIMEC" className="max-w-[200px]" />
 
-              <div className="space-y-5">
+              <div className="space-y-4">
                 <span className="inline-flex rounded-full border border-sky-300/30 bg-sky-400/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-100">
                   Plataforma SIMEC
                 </span>
@@ -50,8 +50,8 @@ function AuthLayout({ children }) {
                 </p>
               </div>
 
-              <div className="grid gap-5 md:grid-cols-3">
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+              <div className="grid gap-4 md:grid-cols-3">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
                     Organização
                   </div>
@@ -60,7 +60,7 @@ function AuthLayout({ children }) {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
                     Controle
                   </div>
@@ -69,7 +69,7 @@ function AuthLayout({ children }) {
                   </div>
                 </div>
 
-                <div className="rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+                <div className="rounded-3xl border border-white/10 bg-white/5 p-4 backdrop-blur">
                   <div className="text-xs uppercase tracking-wide text-slate-400">
                     Visão
                   </div>
@@ -80,14 +80,14 @@ function AuthLayout({ children }) {
               </div>
             </div>
 
-            <div className="mt-10 max-w-xl rounded-3xl border border-white/10 bg-white/5 p-5 text-sm leading-6 text-slate-300 backdrop-blur">
+            <div className="max-w-xl rounded-3xl border border-white/10 bg-white/5 p-4 text-sm leading-6 text-slate-300 backdrop-blur">
               Uma plataforma desenhada para trazer mais previsibilidade,
               padrão e confiança para a rotina da engenharia clínica.
             </div>
           </div>
         </section>
 
-        <section className="flex items-center justify-center px-4 py-8 sm:px-6 lg:px-10">
+        <section className="flex h-full items-center justify-center overflow-hidden px-4 py-6 sm:px-6 lg:px-10">
           <div className="w-full max-w-lg">{children}</div>
         </section>
       </div>
