@@ -24,6 +24,8 @@ function ContratoRow({
   onToggleExpandir,
   onUploadArquivo,
   onDeleteAnexo,
+  exportandoPdfId,
+  onExportarPdf,
   onEdit,
   onDelete,
   uploadingId,
@@ -144,6 +146,8 @@ function ContratoRow({
           uploadingId={uploadingId}
           onUploadArquivo={onUploadArquivo}
           onDeleteAnexo={onDeleteAnexo}
+          exportandoPdfId={exportandoPdfId}
+          onExportarPdf={onExportarPdf}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -158,6 +162,8 @@ ContratoRow.propTypes = {
   onToggleExpandir: PropTypes.func.isRequired,
   onUploadArquivo: PropTypes.func.isRequired,
   onDeleteAnexo: PropTypes.func.isRequired,
+  exportandoPdfId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onExportarPdf: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   uploadingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

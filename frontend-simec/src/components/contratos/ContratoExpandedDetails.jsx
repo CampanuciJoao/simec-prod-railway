@@ -7,6 +7,8 @@ import {
   faPaperclip,
   faEdit,
   faTrashAlt,
+  faFilePdf,
+  faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { Button } from '@/components/ui';
@@ -20,6 +22,8 @@ function ContratoExpandedDetails({
   uploadingId,
   onUploadArquivo,
   onDeleteAnexo,
+  exportandoPdfId,
+  onExportarPdf,
   onEdit,
   onDelete,
 }) {
@@ -184,6 +188,21 @@ function ContratoExpandedDetails({
           type="button"
           variant="secondary"
           size="sm"
+          onClick={() => onExportarPdf(contrato)}
+          disabled={exportandoPdfId === contrato.id}
+          title="Exportar contrato em PDF"
+        >
+          <FontAwesomeIcon
+            icon={exportandoPdfId === contrato.id ? faSpinner : faFilePdf}
+            spin={exportandoPdfId === contrato.id}
+          />
+          {exportandoPdfId === contrato.id ? 'Gerando...' : 'Exportar PDF'}
+        </Button>
+
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
           onClick={() => onEdit(contrato.id)}
         >
           <FontAwesomeIcon icon={faEdit} />
@@ -209,6 +228,8 @@ ContratoExpandedDetails.propTypes = {
   uploadingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onUploadArquivo: PropTypes.func.isRequired,
   onDeleteAnexo: PropTypes.func.isRequired,
+  exportandoPdfId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onExportarPdf: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
 };

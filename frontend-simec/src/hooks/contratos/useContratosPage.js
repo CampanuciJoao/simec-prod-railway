@@ -7,6 +7,7 @@ import { useToast } from '../../contexts/ToastContext';
 import {
   uploadAnexoContrato,
   deleteAnexoContrato,
+  exportarContratoPDF,
 } from '../../services/api';
 
 export function useContratosPage() {
@@ -32,6 +33,7 @@ export function useContratosPage() {
   const deleteModal = useModal();
   const [expandidos, setExpandidos] = useState({});
   const [uploadingId, setUploadingId] = useState(null);
+  const [exportandoPdfId, setExportandoPdfId] = useState(null);
 
   const toggleExpandir = useCallback((contratoId) => {
     setExpandidos((prev) => ({ ...prev, [contratoId]: !prev[contratoId] }));
@@ -66,6 +68,21 @@ export function useContratosPage() {
       }
     },
     [addToast, refetch]
+  );
+
+  const handleExportarPdf = useCallback(
+    async (contrato) => {
+      if (exportandoPdfId) return;
+      setExportandoPdfId(contrato.id);
+      try {
+        await exportarContratoPDF(contrato.id);
+      } catch {
+        addToast('Erro ao gerar PDF do contrato.', 'error');
+      } finally {
+        setExportandoPdfId(null);
+      }
+    },
+    [exportandoPdfId, addToast]
   );
 
   const handleDeleteAnexo = useCallback(
@@ -203,6 +220,8 @@ export function useContratosPage() {
     uploadingId,
     handleUploadArquivo,
     handleDeleteAnexo,
+    exportandoPdfId,
+    handleExportarPdf,
     refetch,
   };
 }

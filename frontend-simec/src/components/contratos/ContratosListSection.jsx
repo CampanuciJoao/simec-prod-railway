@@ -11,6 +11,8 @@ function ContratosListSection({
   uploadingId,
   handleUploadArquivo,
   handleDeleteAnexo,
+  exportandoPdfId,
+  onExportarPdf,
   goToEdit,
   onAskDelete,
 }) {
@@ -28,6 +30,8 @@ function ContratosListSection({
             onToggleExpandir={toggleExpandir}
             onUploadArquivo={handleUploadArquivo}
             onDeleteAnexo={handleDeleteAnexo}
+            exportandoPdfId={exportandoPdfId}
+            onExportarPdf={onExportarPdf}
             onEdit={goToEdit}
             onDelete={onAskDelete}
             uploadingId={uploadingId}
@@ -45,6 +49,8 @@ ContratosListSection.propTypes = {
   uploadingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   handleUploadArquivo: PropTypes.func.isRequired,
   handleDeleteAnexo: PropTypes.func.isRequired,
+  exportandoPdfId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onExportarPdf: PropTypes.func.isRequired,
   goToEdit: PropTypes.func.isRequired,
   onAskDelete: PropTypes.func.isRequired,
 };

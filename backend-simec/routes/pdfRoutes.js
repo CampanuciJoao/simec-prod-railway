@@ -23,6 +23,8 @@ import {
   obterDadosPdfOsCorretiva,
   gerarPdfOsCorretivaBuffer,
 } from '../services/pdf/osCorretivaPdfService.js';
+import { obterDadosPdfContrato } from '../services/pdf/contratosPdfService.js';
+import { gerarPdfContratoBuffer } from '../services/pdf/pdfDocumentService.js';
 
 const router = express.Router();
 
@@ -194,6 +196,27 @@ router.get('/os-corretiva/:id', async (req, res) => {
       return res.status(404).json({ message: 'OS Corretiva não encontrada.' });
     }
     return res.status(500).json({ message: 'Erro ao gerar PDF da OS Corretiva.' });
+  }
+});
+
+router.get('/contrato/:id', async (req, res) => {
+  try {
+    const contrato = await obterDadosPdfContrato({
+      tenantId: req.usuario.tenantId,
+      contratoId: req.params.id,
+    });
+    const buffer = await gerarPdfContratoBuffer(contrato, getPdfOptions(req));
+    const suffix = contrato.numeroContrato || req.params.id.slice(-6).toUpperCase();
+    return sendPdf(res, buffer, `contrato_${suffix}.pdf`);
+  } catch (error) {
+    console.error('[PDF_CONTRATO_ERROR]', error);
+    if (error.message === 'CONTRATO_NAO_ENCONTRADO') {
+      return res.status(404).json({ message: 'Contrato não encontrado.' });
+    }
+    if (error.message === 'CONTRATO_ID_INVALIDO') {
+      return res.status(400).json({ message: 'ID do contrato inválido.' });
+    }
+    return res.status(500).json({ message: 'Erro ao gerar PDF do contrato.' });
   }
 });
 

@@ -104,3 +104,9 @@ export const exportarOrcamentoPDF = (orcamentoId) =>
     { url: `/pdfs/orcamento/${orcamentoId}`, method: 'get' },
     `orcamento_${orcamentoId.slice(-6).toUpperCase()}.pdf`
   );
+
+export const exportarContratoPDF = (contratoId) =>
+  baixarPdf(
+    { url: `/pdfs/contrato/${contratoId}`, method: 'get' },
+    `contrato_${contratoId}.pdf`
+  );

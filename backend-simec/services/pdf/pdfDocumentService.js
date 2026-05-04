@@ -554,6 +554,45 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
   return finalizeDocument(doc);
 }
 
+export async function gerarPdfContratoBuffer(contrato, options = {}) {
+  const { locale, timeZone } = options;
+  const title = `CONTRATO Nº ${safeText(contrato?.numeroContrato, 'SEM NUMERO')}`;
+  const doc = createDocument(title, options);
+
+  drawSectionTitle(doc, 'Dados do contrato');
+  drawInfoGrid(doc, [
+    { label: 'Nº do Contrato', value: contrato?.numeroContrato },
+    { label: 'Categoria', value: contrato?.categoria },
+    { label: 'Fornecedor', value: contrato?.fornecedor },
+    { label: 'Status', value: contrato?.status },
+    { label: 'Vigência - Início', value: formatDate(contrato?.dataInicio, locale, timeZone) },
+    { label: 'Vigência - Fim', value: formatDate(contrato?.dataFim, locale, timeZone) },
+  ]);
+
+  drawSectionTitle(doc, 'Unidades cobertas');
+  drawTable(doc, {
+    headers: ['Unidade'],
+    columnWidths: [495],
+    rows: (contrato?.unidadesCobertas || []).map((u) => [safeText(u?.nomeSistema)]),
+    emptyMessage: 'Nenhuma unidade vinculada.',
+  });
+
+  drawSectionTitle(doc, 'Equipamentos vinculados');
+  drawTable(doc, {
+    headers: ['Modelo', 'Tag', 'Unidade', 'Status'],
+    columnWidths: [185, 100, 145, 65],
+    rows: (contrato?.equipamentosCobertos || []).map((e) => [
+      safeText(e?.modelo),
+      safeText(e?.tag),
+      safeText(e?.unidade?.nomeSistema),
+      safeText(e?.status),
+    ]),
+    emptyMessage: 'Nenhum equipamento vinculado.',
+  });
+
+  return finalizeDocument(doc);
+}
+
 export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
   const title = 'REGISTRO DE OCORRENCIA';
   const doc = createDocument(title, options);
