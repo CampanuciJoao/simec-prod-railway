@@ -85,6 +85,62 @@ export const exportarRelatorioCSV = (relatorio, nomeArquivo) => {
             ];
             break;
             
+        case 'equipamentosServicos': {
+            tituloRelatorio = 'Relatório de Equipamentos e Serviços Vinculados';
+            headers = [
+                'Unidade', 'Modelo', 'Tipo', 'Tag', 'Status', 'Fabricante',
+                'Setor', 'Nº Patrimônio', 'Registro ANVISA',
+                'Qtd. Contratos', 'Nº(s) Contrato', 'Fornecedor(es)', 'Vencimento Contrato',
+                'Qtd. Seguros', 'Nº Apólice(s)', 'Seguradora(s)', 'Vencimento Seguro',
+                'Total Manutenções', 'Última Manutenção (Tipo)', 'Data Última Manutenção',
+            ];
+
+            const fmt = (dt) => dt ? formatarData(dt) : 'N/A';
+            const join = (arr) => arr.length > 0 ? arr.join(' | ') : 'Nenhum';
+
+            dadosFormatados = dados.map((eq) => {
+                const contratos = eq.contratosCobertos || [];
+                const seguros = eq.seguros || [];
+                const manutencoes = eq.manutencoes || [];
+
+                const segurosAtivos = seguros.filter(
+                    (s) => s.status === 'Ativo' || s.status === 'Vigente'
+                );
+                const ultimaManutencao = manutencoes.find((m) => m.dataConclusao);
+
+                return [
+                    escapeCSV(eq.unidade?.nomeSistema || 'N/A'),
+                    escapeCSV(eq.modelo),
+                    escapeCSV(eq.tipo || 'N/A'),
+                    escapeCSV(eq.tag || 'N/A'),
+                    escapeCSV(eq.status),
+                    escapeCSV(eq.fabricante || 'N/A'),
+                    escapeCSV(eq.setor || 'N/A'),
+                    escapeCSV(eq.numeroPatrimonio || 'N/A'),
+                    escapeCSV(eq.registroAnvisa || 'N/A'),
+                    escapeCSV(contratos.length),
+                    escapeCSV(join(contratos.map((c) => c.numeroContrato))),
+                    escapeCSV(join([...new Set(contratos.map((c) => c.fornecedor).filter(Boolean))])),
+                    escapeCSV(join(contratos.map((c) => fmt(c.dataFim)))),
+                    escapeCSV(segurosAtivos.length),
+                    escapeCSV(join(segurosAtivos.map((s) => s.apoliceNumero))),
+                    escapeCSV(join([...new Set(segurosAtivos.map((s) => s.seguradora).filter(Boolean))])),
+                    escapeCSV(join(segurosAtivos.map((s) => fmt(s.dataFim)))),
+                    escapeCSV(manutencoes.length),
+                    escapeCSV(ultimaManutencao?.tipo || 'N/A'),
+                    escapeCSV(ultimaManutencao ? fmt(ultimaManutencao.dataConclusao) : 'N/A'),
+                ];
+            });
+
+            filtrosUtilizados = [
+                { label: 'Unidade', value: filtros.unidadeId || 'Todas' },
+                { label: 'Tipo', value: filtros.tipo || 'Todos' },
+                { label: 'Fabricante', value: filtros.fabricante || 'Todos' },
+                { label: 'Status', value: filtros.status || 'Todos' },
+            ];
+            break;
+        }
+
         default:
             console.error(`Tipo de relatório desconhecido: ${tipoRelatorio}`);
             return;
