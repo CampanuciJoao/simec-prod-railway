@@ -578,17 +578,30 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
   });
 
   drawSectionTitle(doc, 'Equipamentos vinculados');
-  drawTable(doc, {
-    headers: ['Modelo', 'Tag', 'Unidade', 'Status'],
-    columnWidths: [185, 100, 145, 65],
-    rows: (contrato?.equipamentosCobertos || []).map((e) => [
-      safeText(e?.modelo),
-      safeText(e?.tag),
-      safeText(e?.unidade?.nomeSistema),
-      safeText(e?.status),
-    ]),
-    emptyMessage: 'Nenhum equipamento vinculado.',
-  });
+  const equipamentos = contrato?.equipamentosCobertos || [];
+  if (equipamentos.length === 0) {
+    drawTable(doc, {
+      headers: ['Modelo', 'Tag', 'Status'],
+      columnWidths: [255, 175, 65],
+      rows: [],
+      emptyMessage: 'Nenhum equipamento vinculado.',
+    });
+  } else {
+    const grupos = {};
+    for (const eq of equipamentos) {
+      const key = eq?.unidade?.nomeSistema || 'Sem unidade';
+      if (!grupos[key]) grupos[key] = [];
+      grupos[key].push(eq);
+    }
+    for (const [unidadeNome, itens] of Object.entries(grupos)) {
+      drawGroupHeader(doc, unidadeNome);
+      drawTable(doc, {
+        headers: ['Modelo', 'Tag', 'Status'],
+        columnWidths: [255, 175, 65],
+        rows: itens.map((e) => [safeText(e?.modelo), safeText(e?.tag), safeText(e?.status)]),
+      });
+    }
+  }
 
   return finalizeDocument(doc);
 }
