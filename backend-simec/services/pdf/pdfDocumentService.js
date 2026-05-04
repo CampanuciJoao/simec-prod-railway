@@ -166,7 +166,7 @@ function ensureSpace(doc, neededHeight = 32) {
 }
 
 function drawGroupHeader(doc, title) {
-  ensureSpace(doc, 28);
+  ensureSpace(doc, 80);
 
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -185,7 +185,7 @@ function drawGroupHeader(doc, title) {
 }
 
 function drawSectionTitle(doc, title) {
-  ensureSpace(doc, 28);
+  ensureSpace(doc, 60);
   doc.moveDown(0.8);
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
