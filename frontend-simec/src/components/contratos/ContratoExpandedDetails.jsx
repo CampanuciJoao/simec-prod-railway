@@ -1,18 +1,16 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faHospital,
   faMicrochip,
   faPaperclip,
-  faUpload,
-  faFilePdf,
-  faExternalLinkAlt,
   faEdit,
   faTrashAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { Button } from '@/components/ui';
+import CompactAttachmentList from '@/components/ui/feedback/CompactAttachmentList';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -25,6 +23,21 @@ function ContratoExpandedDetails({
   onEdit,
   onDelete,
 }) {
+  const handleUpload = useCallback(
+    (file) => onUploadArquivo(contrato.id, file),
+    [contrato.id, onUploadArquivo]
+  );
+
+  const handleDelete = useCallback(
+    (attachment) => onDeleteAnexo(contrato.id, attachment.id),
+    [contrato.id, onDeleteAnexo]
+  );
+
+  const getAttachmentUrl = useCallback(
+    (attachment) => `${API_BASE_URL}/${attachment.path}`,
+    []
+  );
+
   return (
     <div className="border-t border-slate-200 bg-slate-50/70 p-5">
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr]">
@@ -91,62 +104,15 @@ function ContratoExpandedDetails({
           Documentos do contrato
         </h5>
 
-        <div className="flex flex-col gap-3">
-          {contrato.anexos?.length > 0 ? (
-            contrato.anexos.map((anexo) => (
-              <div
-                key={anexo.id}
-                className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <a
-                  href={`${API_BASE_URL}/${anexo.path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 no-underline hover:underline"
-                >
-                  <FontAwesomeIcon icon={faFilePdf} />
-                  <span>{anexo.nomeOriginal}</span>
-                  <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" />
-                </a>
-
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteAnexo(contrato.id, anexo.id);
-                  }}
-                >
-                  <FontAwesomeIcon icon={faTrashAlt} />
-                  Remover
-                </Button>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm italic text-slate-400">
-              Nenhum documento anexado.
-            </p>
-          )}
-
-          <div>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-              <FontAwesomeIcon
-                icon={faUpload}
-                spin={uploadingId === contrato.id}
-              />
-              {uploadingId === contrato.id
-                ? 'Enviando...'
-                : 'Enviar documento'}
-
-              <input
-                type="file"
-                hidden
-                onChange={(e) => onUploadArquivo(contrato.id, e)}
-              />
-            </label>
-          </div>
-        </div>
+        <CompactAttachmentList
+          attachments={contrato.anexos || []}
+          uploadLabel="clique para selecionar"
+          emptyMessage="Nenhum documento anexado."
+          isUploading={uploadingId === contrato.id}
+          onUpload={handleUpload}
+          onDelete={handleDelete}
+          getAttachmentUrl={getAttachmentUrl}
+        />
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
