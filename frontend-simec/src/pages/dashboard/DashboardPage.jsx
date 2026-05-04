@@ -235,7 +235,7 @@ function DashboardPage() {
       <div className="space-y-4">
         <PageHeader
           title="Dashboard"
-          subtitle="Arraste os cards para reorganizar. Redimensione pelas bordas."
+
           icon={faChartPie}
           actions={
             <div className="flex gap-2">
