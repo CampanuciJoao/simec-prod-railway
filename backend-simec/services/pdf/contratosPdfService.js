@@ -14,17 +14,13 @@ export async function obterDadosPdfContrato({ tenantId, contratoId }) {
       dataInicio: true,
       dataFim: true,
       status: true,
-      unidadesCobertas: {
-        select: { id: true, nomeSistema: true },
-        orderBy: { nomeSistema: 'asc' },
-      },
       equipamentosCobertos: {
         select: {
           id: true,
           modelo: true,
           tag: true,
           status: true,
-          unidade: { select: { nomeSistema: true } },
+          unidade: { select: { nomeSistema: true, cnpj: true } },
         },
         orderBy: [
           { unidade: { nomeSistema: 'asc' } },

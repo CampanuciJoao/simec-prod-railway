@@ -165,7 +165,7 @@ function ensureSpace(doc, neededHeight = 32) {
   doc.addPage();
 }
 
-function drawGroupHeader(doc, title) {
+function drawGroupHeader(doc, title, rightText = null) {
   ensureSpace(doc, 80);
 
   const x = doc.page.margins.left;
@@ -180,6 +180,14 @@ function drawGroupHeader(doc, title) {
     .fontSize(9)
     .fillColor(COLORS.slate700)
     .text(title, x + 12, y + 5, { lineBreak: false });
+
+  if (rightText) {
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor(COLORS.slate500)
+      .text(rightText, x + 12, y + 6, { width: w - 24, align: 'right', lineBreak: false });
+  }
 
   doc.y = y + 24;
 }
@@ -569,14 +577,6 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
     { label: 'Vigência - Fim', value: formatDate(contrato?.dataFim, locale, timeZone) },
   ]);
 
-  drawSectionTitle(doc, 'Unidades cobertas');
-  drawTable(doc, {
-    headers: ['Unidade'],
-    columnWidths: [495],
-    rows: (contrato?.unidadesCobertas || []).map((u) => [safeText(u?.nomeSistema)]),
-    emptyMessage: 'Nenhuma unidade vinculada.',
-  });
-
   drawSectionTitle(doc, 'Equipamentos vinculados');
   const equipamentos = contrato?.equipamentosCobertos || [];
   if (equipamentos.length === 0) {
@@ -590,11 +590,14 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
     const grupos = {};
     for (const eq of equipamentos) {
       const key = eq?.unidade?.nomeSistema || 'Sem unidade';
-      if (!grupos[key]) grupos[key] = [];
-      grupos[key].push(eq);
+      if (!grupos[key]) {
+        grupos[key] = { cnpj: eq?.unidade?.cnpj || null, itens: [] };
+      }
+      grupos[key].itens.push(eq);
     }
-    for (const [unidadeNome, itens] of Object.entries(grupos)) {
-      drawGroupHeader(doc, unidadeNome);
+    for (const [unidadeNome, { cnpj, itens }] of Object.entries(grupos)) {
+      const rightText = cnpj ? `CNPJ: ${cnpj}` : null;
+      drawGroupHeader(doc, unidadeNome, rightText);
       drawTable(doc, {
         headers: ['Modelo', 'Tag', 'Status'],
         columnWidths: [255, 175, 65],
