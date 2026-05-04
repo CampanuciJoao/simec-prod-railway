@@ -183,7 +183,7 @@ function TabCobertura({ equipamento }) {
                   </div>
 
                   <div className="mt-4 flex justify-end">
-                    <Link to={`/seguros/detalhes/${seguro.id}`}>
+                    <Link to={`/seguros/editar/${seguro.id}`}>
                       <Button type="button" variant="secondary">
                         <FontAwesomeIcon icon={faArrowRight} />
                         Abrir apolice
