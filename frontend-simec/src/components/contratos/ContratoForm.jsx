@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -54,6 +54,19 @@ function ContratoForm({
     todosEquipamentos,
     onSubmit,
   });
+
+  const equipamentosAgrupados = useMemo(() => {
+    const selecionadas = unidadesDisponiveis.filter((u) =>
+      formData.unidadesCobertasIds.includes(u.id)
+    );
+    return selecionadas
+      .map((u) => ({
+        id: u.id,
+        label: u.nomeSistema,
+        items: equipamentosFiltrados.filter((e) => e.unidadeId === u.id),
+      }))
+      .filter((g) => g.items.length > 0);
+  }, [formData.unidadesCobertasIds, unidadesDisponiveis, equipamentosFiltrados]);
 
   const handleCancelClick = () => {
     if (onCancel) {
@@ -168,6 +181,7 @@ function ContratoForm({
             title="Equipamentos cobertos"
             icon={faMicrochip}
             items={equipamentosFiltrados}
+            groups={equipamentosAgrupados}
             selectedIds={formData.equipamentosCobertosIds}
             onToggle={handleToggleEquipamento}
             emptyMessage={
