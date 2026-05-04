@@ -39,11 +39,30 @@ function ContratoExpandedDetails({
   );
 
   return (
-    <div className="border-t border-slate-200 bg-slate-50/70 p-5">
+    <div
+      className="border-t p-5"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface-subtle)',
+      }}
+    >
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <FontAwesomeIcon icon={faHospital} className="text-slate-500" />
+        {/* Unidades cobertas */}
+        <div
+          className="rounded-xl border p-4"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <h5
+            className="mb-3 flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <FontAwesomeIcon
+              icon={faHospital}
+              style={{ color: 'var(--text-muted)' }}
+            />
             Unidades cobertas
           </h5>
 
@@ -52,22 +71,40 @@ function ContratoExpandedDetails({
               contrato.unidadesCobertas.map((unidade) => (
                 <span
                   key={unidade.id}
-                  className="inline-flex rounded-full bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
+                  className="inline-flex rounded-full px-3 py-1 text-sm font-medium shadow-sm ring-1"
+                  style={{
+                    backgroundColor: 'var(--bg-surface-soft)',
+                    color: 'var(--text-secondary)',
+                    ringColor: 'var(--border-soft)',
+                  }}
                 >
                   {unidade.nomeSistema}
                 </span>
               ))
             ) : (
-              <p className="text-sm italic text-slate-400">
+              <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>
                 Nenhuma unidade vinculada.
               </p>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <FontAwesomeIcon icon={faMicrochip} className="text-slate-500" />
+        {/* Equipamentos vinculados */}
+        <div
+          className="rounded-xl border p-4"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <h5
+            className="mb-3 flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <FontAwesomeIcon
+              icon={faMicrochip}
+              style={{ color: 'var(--text-muted)' }}
+            />
             Equipamentos vinculados ({contrato.equipamentosCobertos?.length || 0})
           </h5>
 
@@ -77,20 +114,34 @@ function ContratoExpandedDetails({
                 {contrato.equipamentosCobertos.map((equipamento) => (
                   <div
                     key={equipamento.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg border px-3 py-2"
+                    style={{
+                      backgroundColor: 'var(--bg-surface-soft)',
+                      borderColor: 'var(--border-soft)',
+                    }}
                   >
-                    <span className="text-sm font-medium text-slate-800">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
                       {equipamento.modelo}
                     </span>
 
-                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-semibold ring-1"
+                      style={{
+                        backgroundColor: 'var(--bg-elevated)',
+                        color: 'var(--text-secondary)',
+                        ringColor: 'var(--border-soft)',
+                      }}
+                    >
                       {equipamento.tag}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm italic text-slate-400">
+              <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>
                 Sem equipamentos específicos.
               </p>
             )}
@@ -98,9 +149,22 @@ function ContratoExpandedDetails({
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <FontAwesomeIcon icon={faPaperclip} className="text-slate-500" />
+      {/* Documentos */}
+      <div
+        className="mt-5 rounded-xl border p-4"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: 'var(--border-soft)',
+        }}
+      >
+        <h5
+          className="mb-3 flex items-center gap-2 text-sm font-semibold"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <FontAwesomeIcon
+            icon={faPaperclip}
+            style={{ color: 'var(--text-muted)' }}
+          />
           Documentos do contrato
         </h5>
 
