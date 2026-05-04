@@ -6,6 +6,8 @@ import {
   faPlus,
   faMicrochip,
   faTriangleExclamation,
+  faFileArrowDown,
+  faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useEquipamentosPage } from '@/hooks/equipamentos/useEquipamentosPage';
@@ -77,10 +79,26 @@ function EquipamentosPage() {
           subtitle="Acompanhe, filtre e gerencie os equipamentos cadastrados"
           icon={faMicrochip}
           actions={
-            <Button type="button" onClick={page.goToCreate}>
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Adicionar equipamento</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={page.handleExportar}
+                disabled={page.exportando}
+                title="Exportar equipamentos e serviços vinculados (CSV)"
+              >
+                <FontAwesomeIcon
+                  icon={page.exportando ? faSpinner : faFileArrowDown}
+                  spin={page.exportando}
+                />
+                <span>{page.exportando ? 'Exportando...' : 'Exportar'}</span>
+              </Button>
+
+              <Button type="button" onClick={page.goToCreate}>
+                <FontAwesomeIcon icon={faPlus} />
+                <span>Adicionar equipamento</span>
+              </Button>
+            </div>
           }
         />
 

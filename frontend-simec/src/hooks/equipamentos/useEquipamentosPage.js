@@ -2,6 +2,8 @@ import { useMemo, useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { useEquipamentos } from './useEquipamentos';
+import { gerarRelatorio } from '../../services/api';
+import { exportarRelatorioCSV } from '../../utils/exportUtils';
 
 export function useEquipamentosPage() {
   const navigate = useNavigate();
@@ -24,6 +26,7 @@ export function useEquipamentosPage() {
   } = useEquipamentos();
 
   const [equipamentoParaExcluir, setEquipamentoParaExcluir] = useState(null);
+  const [exportando, setExportando] = useState(false);
 
   const deleteModal = useMemo(
     () => ({
@@ -184,6 +187,33 @@ export function useEquipamentosPage() {
     [controles]
   );
 
+  const handleExportar = useCallback(async () => {
+    if (exportando) return;
+    setExportando(true);
+    try {
+      const relatorio = await gerarRelatorio({
+        tipoRelatorio: 'equipamentosServicos',
+        unidadeId: controles.filtros.unidadeId || null,
+        tipo: controles.filtros.tipo || null,
+        fabricante: controles.filtros.fabricante || null,
+        status: controles.filtros.status || null,
+      });
+
+      if (!relatorio?.dados?.length) {
+        addToast('Nenhum equipamento encontrado para exportar.', 'warning');
+        return;
+      }
+
+      const data = new Date().toISOString().slice(0, 10);
+      exportarRelatorioCSV(relatorio, `equipamentos-servicos-${data}`);
+      addToast(`${relatorio.total} equipamento(s) exportado(s).`, 'success');
+    } catch {
+      addToast('Erro ao gerar exportação. Tente novamente.', 'error');
+    } finally {
+      setExportando(false);
+    }
+  }, [exportando, controles.filtros, addToast]);
+
   const goToCreate = useCallback(() => {
     navigate('/equipamentos/adicionar');
   }, [navigate]);
@@ -216,5 +246,7 @@ export function useEquipamentosPage() {
     deleteModal,
     handleConfirmDelete,
     openDeleteModal: deleteModal.openModal,
+    exportando,
+    handleExportar,
   };
 }
