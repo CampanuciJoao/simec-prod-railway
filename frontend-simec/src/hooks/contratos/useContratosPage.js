@@ -50,8 +50,7 @@ export function useContratosPage() {
   }, [deleteModal, removerContrato, addToast]);
 
   const handleUploadArquivo = useCallback(
-    async (contratoId, event) => {
-      const file = event.target.files?.[0];
+    async (contratoId, file) => {
       if (!file) return;
       const formData = new FormData();
       formData.append('file', file);
@@ -64,7 +63,6 @@ export function useContratosPage() {
         addToast(err?.response?.data?.message || 'Erro ao enviar documento.', 'error');
       } finally {
         setUploadingId(null);
-        event.target.value = '';
       }
     },
     [addToast, refetch]
