@@ -263,10 +263,6 @@ export function calcularScoreRisco({
     scoreBase += maiorGrupo * 2.5;
   }
 
-  if (equipamento?.status === 'Inoperante') scoreBase += 8;
-  if (equipamento?.status === 'EmManutencao') scoreBase += 4;
-  if (equipamento?.status === 'UsoLimitado') scoreBase += 3;
-
   const pesoTipo = obterPesoTipoEquipamento(
     equipamento?.tipo,
     equipamento?.modelo
@@ -311,8 +307,11 @@ export function definirNivelRisco(scoreFinal) {
 }
 
 export function deveRecomendar({ metricas }) {
+  const totalEventos = metricas.ocorrencias + metricas.corretivas;
+  if (totalEventos < 2) return false;
+
   return (
-    metricas.scoreFinal >= 12 ||
+    metricas.scoreFinal >= 20 ||
     metricas.corretivas >= 2 ||
     metricas.ocorrencias >= 3 ||
     metricas.maiorReincidencia >= 2
