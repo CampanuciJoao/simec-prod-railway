@@ -95,16 +95,14 @@ function DetalhesOrcamentoPage() {
                 </>
               )}
 
-              {(orc.status === 'PENDENTE' || orc.status === 'APROVADO') && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => exportarOrcamentoPDF(orc.id)}
-                >
-                  <FontAwesomeIcon icon={faFilePdf} className="mr-2" />
-                  Baixar PDF
-                </Button>
-              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => exportarOrcamentoPDF(orc.id)}
+              >
+                <FontAwesomeIcon icon={faFilePdf} className="mr-2" />
+                {orc.status === 'RASCUNHO' ? 'Preview PDF' : 'Baixar PDF'}
+              </Button>
             </div>
           }
         />
