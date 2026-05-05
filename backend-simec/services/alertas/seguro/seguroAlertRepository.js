@@ -53,25 +53,21 @@ export async function buscarConflitosCoberturaPorTenant(tenantId) {
     },
   });
 
-  // Separa em grupos distintos para evitar falso conflito entre
-  // seguro de prédio e seguro de equipamento na mesma unidade.
-  const porEquipamento = new Map(); // seguros com equipamentoId
-  const porPredio      = new Map(); // seguros sem equipamentoId (cobertura de prédio)
+  // Conflito só é relevante por equipamento: mesmo equipamento coberto duas vezes.
+  // Múltiplos seguros por unidade são permitidos (containers, objetos distintos etc.).
+  const porEquipamento = new Map();
 
   for (const s of seguros) {
     if (s.equipamentoId) {
       if (!porEquipamento.has(s.equipamentoId)) porEquipamento.set(s.equipamentoId, []);
       porEquipamento.get(s.equipamentoId).push(s);
-    } else if (s.unidadeId) {
-      if (!porPredio.has(s.unidadeId)) porPredio.set(s.unidadeId, []);
-      porPredio.get(s.unidadeId).push(s);
     }
   }
 
   const conflitos = [];
   const visto = new Set();
 
-  for (const lista of [...porEquipamento.values(), ...porPredio.values()]) {
+  for (const lista of porEquipamento.values()) {
     for (let i = 0; i < lista.length; i++) {
       for (let j = i + 1; j < lista.length; j++) {
         const a = lista[i];
