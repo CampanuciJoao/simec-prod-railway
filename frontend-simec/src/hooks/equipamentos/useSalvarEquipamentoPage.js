@@ -79,7 +79,7 @@ export function useSalvarEquipamentoPage() {
   };
 
   const goBackToEquipamentos = useCallback(() => {
-    navigate('/equipamentos');
+    navigate('/equipamentos', { state: { restoreFilters: true } });
   }, [navigate]);
 
   return {
