@@ -76,7 +76,8 @@ export function useSalvarSeguroPage({ id, addToast, navigate }) {
 
         navigate('/seguros');
       } catch (err) {
-        addToast('Erro ao salvar seguro.', 'error');
+        const msg = err?.response?.data?.message || 'Erro ao salvar seguro.';
+        addToast(msg, 'error');
         throw err;
       }
     },
