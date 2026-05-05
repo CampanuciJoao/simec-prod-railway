@@ -302,6 +302,7 @@ router.get('/', async (req, res) => {
             tenantId: true,
             tag: true,
             modelo: true,
+            apelido: true,
             tipo: true,
             setor: true,
             fabricante: true,
