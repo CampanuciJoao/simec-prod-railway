@@ -24,6 +24,9 @@ export const registrarResultadoVisita = (id, visitaId, data) =>
 export const concluirOsCorretiva = (id, data) =>
   api.post(`/os-corretiva/${id}/concluir`, data).then((res) => res.data);
 
+export const cancelarOsCorretiva = (id, motivoCancelamento) =>
+  api.post(`/os-corretiva/${id}/cancelar`, { motivoCancelamento }).then((res) => res.data);
+
 export const excluirOsCorretiva = (id) =>
   api.delete(`/os-corretiva/${id}`).then((res) => res.data);
 

@@ -2,7 +2,7 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faFolderOpen, faStickyNote, faTruck, faClipboardCheck, faCheckCircle,
+  faFolderOpen, faStickyNote, faTruck, faClipboardCheck, faCheckCircle, faBan,
 } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
@@ -14,6 +14,7 @@ const TIPO_CONFIG = {
   visita_agendada: { icon: faTruck, color: '#7c3aed', label: 'Visita agendada' },
   resultado_visita: { icon: faClipboardCheck, color: '#059669', label: 'Resultado da visita' },
   conclusao: { icon: faCheckCircle, color: '#16a34a', label: 'Conclusão' },
+  cancelamento: { icon: faBan, color: '#6b7280', label: 'Cancelamento' },
 };
 
 function TimelineItem({ evento }) {

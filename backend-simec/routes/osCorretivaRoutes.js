@@ -17,6 +17,7 @@ import {
   iniciarVisitaTerceiroService,
   registrarResultadoVisitaService,
   concluirOsCorretivaService,
+  cancelarOsCorretivaService,
   excluirOsCorretivaService,
 } from '../services/osCorretiva/index.js';
 import {
@@ -187,6 +188,22 @@ router.post('/:id/concluir', validate(concluirOsSchema), async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_CONCLUIR_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao concluir OS Corretiva.' });
+  }
+});
+
+router.post('/:id/cancelar', async (req, res) => {
+  try {
+    const resultado = await cancelarOsCorretivaService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      osId: req.params.id,
+      motivoCancelamento: req.body?.motivoCancelamento,
+    });
+    if (!resultado.ok) return res.status(resultado.status).json({ message: resultado.message });
+    return res.json(adaptarOsCorretivaResponse(resultado.data));
+  } catch (error) {
+    console.error('[OS_CORRETIVA_CANCELAR_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao cancelar OS Corretiva.' });
   }
 });
 

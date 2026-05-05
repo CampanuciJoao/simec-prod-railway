@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFilePdf, faClipboardList, faTruck, faCheck } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faFilePdf, faClipboardList, faTruck, faCheck, faBan } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
@@ -9,6 +9,7 @@ import AdicionarNotaModal from '@/components/osCorretiva/AdicionarNotaModal';
 import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTerceiroModal';
 import RegistrarResultadoVisitaModal from '@/components/osCorretiva/RegistrarResultadoVisitaModal';
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
+import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
 import { PageLayout, PageState, Button } from '@/components/ui';
 
 const STATUS_COLORS = {
@@ -16,6 +17,7 @@ const STATUS_COLORS = {
   EmAndamento: '#8b5cf6',
   AguardandoTerceiro: '#f97316',
   Concluida: '#16a34a',
+  Cancelada: '#6b7280',
 };
 
 const TIPO_COLORS = {
@@ -27,7 +29,7 @@ function DetalhesOsCorretivaPage() {
   const { id } = useParams();
   const page = useDetalhesOsCorretivaPage(id);
   const { os } = page;
-  const isConcluida = os?.status === 'Concluida';
+  const isEncerrada = os?.status === 'Concluida' || os?.status === 'Cancelada';
 
 
   if (page.loading) return <PageLayout padded><PageState loading /></PageLayout>;
@@ -77,6 +79,13 @@ function DetalhesOsCorretivaPage() {
         submitting={page.submitting}
       />
 
+      <CancelarOsModal
+        isOpen={page.cancelarModal.isOpen}
+        onClose={page.cancelarModal.closeModal}
+        onConfirm={page.handleCancelarOs}
+        submitting={page.submitting}
+      />
+
       <PageLayout padded>
         {/* Cabeçalho */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -116,7 +125,7 @@ function DetalhesOsCorretivaPage() {
               Exportar PDF
             </Button>
 
-            {!isConcluida && (
+            {!isEncerrada && (
               <>
                 <Button type="button" variant="secondary" onClick={page.notaModal.openModal}>
                   <FontAwesomeIcon icon={faClipboardList} />
@@ -150,6 +159,11 @@ function DetalhesOsCorretivaPage() {
                     Concluir OS
                   </Button>
                 )}
+
+                <Button type="button" variant="danger" onClick={page.cancelarModal.openModal}>
+                  <FontAwesomeIcon icon={faBan} />
+                  Cancelar OS
+                </Button>
               </>
             )}
           </div>

@@ -866,6 +866,8 @@ model OsCorretiva {
   tipo                      TipoOsCorretiva   @default(Ocorrencia)
   dataHoraConclusao         DateTime?         @map("data_hora_conclusao")
   observacoesFinais         String?           @map("observacoes_finais") @db.Text
+  motivoCancelamento        String?           @map("motivo_cancelamento") @db.Text
+  dataHoraCancelamento      DateTime?         @map("data_hora_cancelamento")
   autorId                   String?           @map("autor_id")
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
@@ -914,6 +916,7 @@ enum StatusOsCorretiva {
   EmAndamento
   AguardandoTerceiro
   Concluida
+  Cancelada
 }
 
 enum TipoOsCorretiva {
