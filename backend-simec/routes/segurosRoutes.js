@@ -98,19 +98,16 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
 async function verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId }) {
   const inicio = new Date(dataInicio);
   const fim    = new Date(dataFim);
+  const excluirWhere = excluirId ? { id: { not: excluirId } } : {};
 
-  const alvos = [];
-  if (unidadeId)     alvos.push({ campo: 'prédio',      where: { unidadeId } });
-  if (equipamentoId) alvos.push({ campo: 'equipamento', where: { equipamentoId } });
-
-  for (const { campo, where } of alvos) {
+  if (equipamentoId) {
+    // Seguro de equipamento: conflita somente com outro seguro do mesmo equipamento
     const conflito = await prisma.seguro.findFirst({
       where: {
         tenantId,
-        ...where,
+        equipamentoId,
         status: { in: ['Ativo', 'Vigente'] },
-        id: excluirId ? { not: excluirId } : undefined,
-        // Sobreposição real — toque de fronteira (renovação) é permitido
+        ...excluirWhere,
         dataInicio: { lt: fim },
         dataFim:    { gt: inicio },
       },
@@ -119,7 +116,32 @@ async function verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamento
 
     if (conflito) {
       const error = new Error(
-        `Já existe um seguro ativo cobrindo este ${campo} no mesmo período (Apólice ${conflito.apoliceNumero || conflito.id}).`
+        `Já existe um seguro ativo cobrindo este equipamento no mesmo período (Apólice ${conflito.apoliceNumero || conflito.id}).`
+      );
+      error.status = 409;
+      throw error;
+    }
+    return;
+  }
+
+  if (unidadeId) {
+    // Seguro de prédio: conflita somente com outro seguro de prédio (sem equipamento vinculado)
+    const conflito = await prisma.seguro.findFirst({
+      where: {
+        tenantId,
+        unidadeId,
+        equipamentoId: null,
+        status: { in: ['Ativo', 'Vigente'] },
+        ...excluirWhere,
+        dataInicio: { lt: fim },
+        dataFim:    { gt: inicio },
+      },
+      select: { id: true, apoliceNumero: true },
+    });
+
+    if (conflito) {
+      const error = new Error(
+        `Já existe um seguro ativo cobrindo este prédio no mesmo período (Apólice ${conflito.apoliceNumero || conflito.id}).`
       );
       error.status = 409;
       throw error;
