@@ -1,5 +1,5 @@
 import { useMemo, useCallback, useState, useEffect } from 'react';
-import { useNavigate, useNavigationType } from 'react-router-dom';
+import { useNavigate, useNavigationType, useLocation } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { useEquipamentos } from './useEquipamentos';
 
@@ -18,9 +18,12 @@ export function useEquipamentosPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
   const navigationType = useNavigationType();
+  const location = useLocation();
 
   const initialState = useMemo(() => {
-    if (navigationType === 'POP') return lerFiltrosSalvos() ?? {};
+    const shouldRestore =
+      navigationType === 'POP' || location.state?.restoreFilters === true;
+    if (shouldRestore) return lerFiltrosSalvos() ?? {};
     sessionStorage.removeItem(SESSION_KEY);
     return {};
   // eslint-disable-next-line react-hooks/exhaustive-deps
