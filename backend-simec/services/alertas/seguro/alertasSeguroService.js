@@ -2,6 +2,7 @@ import prisma from '../../prismaService.js';
 import { getAgora } from '../../time/index.js';
 import { buscarSegurosAtivosPorTenant, buscarConflitosCoberturaPorTenant } from './seguroAlertRepository.js';
 import { gerarAlertaVencimentoSeguro, gerarAlertaConflitoCobertura } from './seguroAlertRules.js';
+import { ALERT_EVENTOS } from '../alertTypes.js';
 
 /**
  * Processa um tenant
@@ -13,6 +14,11 @@ async function processarTenant(tenant, agoraUtc) {
     buscarSegurosAtivosPorTenant(tenant.id),
     buscarConflitosCoberturaPorTenant(tenant.id),
   ]);
+
+  // Remove alertas de conflito obsoletos antes de recriar apenas os válidos
+  await prisma.alerta.deleteMany({
+    where: { tenantId: tenant.id, tipoEvento: ALERT_EVENTOS.SEGURO_CONFLITO },
+  });
 
   const [vencimentoResults, conflitoResults] = await Promise.all([
     Promise.all(
