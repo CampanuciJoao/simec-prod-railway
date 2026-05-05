@@ -150,21 +150,17 @@ function _desenhar(doc, orc, { marginX, contentW }) {
 // ─── 1. Linha "Orçamento" (full width, com logo) ─────────────────────────────
 
 function _cabecalhoTitulo(doc, { marginX, contentW }) {
-  const rowH   = 56;
+  const rowH   = 48;
   const startY = doc.y;
-  const logoSize = 44;
 
   box(doc, marginX, startY, contentW, rowH);
 
-  if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, marginX + 8, startY + (rowH - logoSize) / 2, { fit: [logoSize, logoSize] });
-  }
-
   doc
     .font('Helvetica-Bold').fontSize(22).fillColor(TEXT)
-    .text('Orçamento', marginX + logoSize + 16, startY + 17, {
-      width: contentW - logoSize - 24,
+    .text('Orçamento', marginX, startY + 13, {
+      width: contentW,
       align: 'center',
+      lineBreak: false,
     });
 
   doc.y = startY + rowH;
@@ -191,9 +187,8 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
   // célula direita: metadados com borda própria
   box(doc, marginX + leftW, y, rightW, rowH, { fill: C.gray50 });
   const tipo  = TIPO_LABEL[orc.tipo] || orc.tipo || '';
-  const und   = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema || '';
-  const data  = fmtData(orc.createdAt);
-  const meta  = [tipo, und, data].filter(Boolean).join('   ·   ');
+  const und   = orc.unidade?.nomeSistema || orc.unidade?.nomeFantasia || '';
+  const meta  = [tipo, und].filter(Boolean).join('   ·   ');
 
   doc
     .font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
@@ -201,6 +196,7 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
       width: rightW - 12,
       align: 'right',
       lineBreak: false,
+      ellipsis: true,
     });
 
   doc.y = y + rowH;
@@ -254,7 +250,7 @@ function _formaPagamento(doc, fornecedores, { marginX, leftW, fornWidths }) {
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
     .font('Helvetica-Bold').fontSize(7.5).fillColor(TEXT)
-    .text('FORMA DE PAGAMENTO', marginX + 8, y + 8, { width: leftW - 16 });
+    .text('FORMA DE PAGAMENTO', marginX + 8, y + 8, { width: leftW - 16, lineBreak: false });
 
   let cx = marginX + leftW;
   for (let i = 0; i < fornecedores.length; i++) {
@@ -285,9 +281,9 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
   box(doc, marginX,         y0, descW, thH, { fill: C.gray100 });
   box(doc, marginX + descW, y0, dataW, thH, { fill: C.gray100 });
   doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT)
-    .text('DESCRIÇÃO', marginX + 6, y0 + 6, { width: descW - 12 });
+    .text('DESCRIÇÃO', marginX + 6, y0 + 6, { width: descW - 12, lineBreak: false });
   doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT)
-    .text('DATA', marginX + descW + 4, y0 + 6, { width: dataW - 8, align: 'center' });
+    .text('DATA', marginX + descW + 4, y0 + 6, { width: dataW - 8, align: 'center', lineBreak: false });
 
   let cx0 = marginX + leftW;
   for (let i = 0; i < nForn; i++) {
@@ -313,7 +309,7 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
     doc.font(isRed ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(fg)
       .text(safe(item.descricao), marginX + 6, ry + 7, { width: descW - 12, lineBreak: false, ellipsis: true });
     doc.font('Helvetica').fontSize(8).fillColor(isRed ? C.red : C.gray600)
-      .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center' });
+      .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center', lineBreak: false });
 
     let cx = marginX + leftW;
     for (let i = 0; i < nForn; i++) {
