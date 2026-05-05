@@ -194,7 +194,7 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
     .font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
     .text(meta, marginX + leftW + 6, y + 11, {
       width: rightW - 12,
-      align: 'right',
+      align: 'center',
       lineBreak: false,
       ellipsis: true,
     });
