@@ -62,7 +62,7 @@ export function useSalvarEquipamentoPage() {
         addToast('Equipamento cadastrado com sucesso!', 'success');
       }
 
-      navigate('/equipamentos');
+      navigate(-1);
       return true;
     } catch (apiError) {
       const errorMessage = getErrorMessage(
