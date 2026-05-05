@@ -25,7 +25,7 @@ function SalvarOrcamentoPage() {
 
   const unidadeOptions = p.unidades.map((u) => ({
     value: u.id,
-    label: u.nomeFantasia || u.nomeSistema,
+    label: u.cnpj ? `${u.nomeSistema} — ${u.cnpj}` : u.nomeSistema,
   }));
 
   return (
