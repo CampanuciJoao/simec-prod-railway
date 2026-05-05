@@ -457,6 +457,71 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
   return { ok: true, data: completa };
 }
 
+// ─── Cancelar OS ─────────────────────────────────────────────────────────────
+
+export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, motivoCancelamento }) {
+  if (!motivoCancelamento?.trim()) {
+    return { ok: false, status: 400, message: 'O motivo do cancelamento é obrigatório.' };
+  }
+
+  const os = await buscarOsResumo({ tenantId, osId });
+  if (!os) return { ok: false, status: 404, message: 'OS Corretiva não encontrada.' };
+
+  if (os.status === 'Concluida') {
+    return { ok: false, status: 422, message: 'Não é possível cancelar uma OS já concluída.' };
+  }
+  if (os.status === 'Cancelada') {
+    return { ok: false, status: 422, message: 'Esta OS já está cancelada.' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.osCorretiva.update({
+      where: { tenantId_id: { tenantId, id: osId } },
+      data: {
+        status: 'Cancelada',
+        motivoCancelamento: motivoCancelamento.trim(),
+        dataHoraCancelamento: new Date(),
+      },
+    });
+
+    await tx.equipamento.update({
+      where: { id: os.equipamentoId },
+      data: { status: 'Operante' },
+    });
+  });
+
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: os.equipamentoId,
+    tipoEvento: 'os_corretiva_cancelada',
+    categoria: 'manutencao',
+    subcategoria: os.tipo,
+    titulo: `OS ${os.numeroOS} cancelada`,
+    descricao: motivoCancelamento.trim(),
+    origem: 'usuario',
+    status: 'Cancelada',
+    impactaAnalise: false,
+    referenciaId: osId,
+    referenciaTipo: 'os_corretiva',
+    metadata: { motivoCancelamento: motivoCancelamento.trim() },
+    dataEvento: new Date(),
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDIÇÃO',
+    entidade: 'OsCorretiva',
+    entidadeId: osId,
+    detalhes: `OS ${os.numeroOS} cancelada. Motivo: ${motivoCancelamento.trim()}. Equipamento revertido para Operante.`,
+  });
+
+  await reprocessarAlertas(tenantId);
+
+  const completa = await buscarOsPorId({ tenantId, osId });
+  return { ok: true, data: completa };
+}
+
 // ─── Excluir OS (admin only) ──────────────────────────────────────────────────
 
 export async function excluirOsCorretivaService({ tenantId, usuarioId, osId }) {

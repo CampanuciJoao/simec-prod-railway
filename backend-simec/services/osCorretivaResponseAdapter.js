@@ -3,6 +3,7 @@ const STATUS_OS_LABELS = {
   EmAndamento: 'Em andamento',
   AguardandoTerceiro: 'Aguardando terceiro',
   Concluida: 'Concluída',
+  Cancelada: 'Cancelada',
 };
 
 const TIPO_OS_LABELS = {
@@ -132,6 +133,16 @@ function buildTimeline(os) {
       titulo: 'OS concluída — Equipamento Operante',
       descricao: os.observacoesFinais || 'Manutenção corretiva encerrada.',
       meta: { statusFinal: 'Operante' },
+    });
+  }
+
+  if (os.status === 'Cancelada' && os.dataHoraCancelamento) {
+    eventos.push({
+      tipo: 'cancelamento',
+      dataHora: os.dataHoraCancelamento,
+      titulo: 'OS cancelada',
+      descricao: os.motivoCancelamento || 'OS cancelada sem motivo registrado.',
+      meta: { motivoCancelamento: os.motivoCancelamento },
     });
   }
 
