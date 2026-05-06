@@ -70,7 +70,9 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
 
   const style = getAlertaVisual(alerta);
   const isRecomendacao = alerta.tipo === 'Recomendação';
-  const isAguardandoConfirmacao = alerta.tipoEvento === 'MANUT_CONFIRMACAO';
+  const isAguardandoConfirmacao =
+    alerta.tipoEvento === 'MANUT_CONFIRMACAO' ||
+    alerta.tipoEvento === 'OS_CORRETIVA_VISITA_CONFIRMACAO';
 
   const dataFormatada = alerta.data ? formatarData(alerta.data) : '-';
   const subtituloRenderizado = montarSubtitulo(alerta, timezone, locale);
