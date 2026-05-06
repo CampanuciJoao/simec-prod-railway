@@ -79,6 +79,7 @@ export const registrarResultadoSchema = z.object({
     errorMap: () => ({ message: 'Resultado inválido.' }),
   }),
   observacoes: z.string().max(2000).optional(),
+  dataHoraFimReal: z.string().datetime({ message: 'Data/hora de conclusão inválida.' }).optional(),
   novaDataHoraInicioPrevista: z.string().datetime().optional(),
   novaDataHoraFimPrevista: z.string().datetime().optional(),
 }).superRefine((data, ctx) => {
