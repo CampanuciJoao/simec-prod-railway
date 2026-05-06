@@ -80,8 +80,8 @@ export function useDetalhesOsCorretivaPage(osId) {
     }
   }, [osId, addToast, visitaModal, fetchOs]);
 
-  const handleRegistrarResultado = useCallback(async (dados) => {
-    const visitaId = resultadoModal.modalData?.visitaId;
+  const handleRegistrarResultado = useCallback(async (dados, visitaIdOverride) => {
+    const visitaId = visitaIdOverride || resultadoModal.modalData?.visitaId;
     if (!visitaId) return;
     setSubmitting(true);
     setFieldErrors({});

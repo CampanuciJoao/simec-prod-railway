@@ -307,6 +307,8 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
   if (!os) return { ok: false, status: 404, message: 'OS não encontrada.' };
 
   if (v.data.resultado === 'Operante') {
+    const dataFimReal = v.data.dataHoraFimReal ? new Date(v.data.dataHoraFimReal) : new Date();
+
     // Encerra a visita e a OS
     await prisma.$transaction(async (tx) => {
       await tx.visitaTerceiro.update({
@@ -315,7 +317,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
           status: 'Concluida',
           resultado: 'Operante',
           observacoes: v.data.observacoes || null,
-          dataHoraFimReal: new Date(),
+          dataHoraFimReal: dataFimReal,
         },
       });
 
@@ -323,7 +325,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
         where: { tenantId_id: { tenantId, id: osId } },
         data: {
           status: 'Concluida',
-          dataHoraConclusao: new Date(),
+          dataHoraConclusao: dataFimReal,
           observacoesFinais: v.data.observacoes || null,
         },
       });

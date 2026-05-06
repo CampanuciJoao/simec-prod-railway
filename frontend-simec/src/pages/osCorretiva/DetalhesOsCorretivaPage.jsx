@@ -7,7 +7,7 @@ import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
 import AdicionarNotaModal from '@/components/osCorretiva/AdicionarNotaModal';
 import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTerceiroModal';
-import RegistrarResultadoVisitaModal from '@/components/osCorretiva/RegistrarResultadoVisitaModal';
+import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/ConfirmacaoFinalVisitaCorretiva';
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
 import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
 import { PageLayout, PageState, Button } from '@/components/ui';
@@ -61,15 +61,6 @@ function DetalhesOsCorretivaPage() {
         onConfirm={page.handleAgendarVisita}
         submitting={page.submitting}
         fieldErrors={page.fieldErrors}
-      />
-
-      <RegistrarResultadoVisitaModal
-        isOpen={page.resultadoModal.isOpen}
-        onClose={page.resultadoModal.closeModal}
-        onConfirm={page.handleRegistrarResultado}
-        submitting={page.submitting}
-        fieldErrors={page.fieldErrors}
-        visita={page.resultadoModal.modalData}
       />
 
       <ConcluirOsModal
@@ -140,18 +131,6 @@ function DetalhesOsCorretivaPage() {
                   </Button>
                 )}
 
-                {/* Registrar resultado: liberado automaticamente quando o prazo da visita vence */}
-                {visitaProximaOuVencida && (
-                  <Button
-                    type="button"
-                    variant="primary"
-                    onClick={() => page.resultadoModal.openModal({ visitaId: visitaProximaOuVencida.id, visita: visitaProximaOuVencida })}
-                  >
-                    <FontAwesomeIcon icon={faCheck} />
-                    Registrar resultado
-                  </Button>
-                )}
-
                 {/* Concluir OS: apenas quando não há visita pendente */}
                 {os.status !== 'AguardandoTerceiro' && (
                   <Button type="button" variant="success" onClick={page.concluirModal.openModal}>
@@ -180,6 +159,17 @@ function DetalhesOsCorretivaPage() {
             />
           </div>
         </div>
+
+        {visitaProximaOuVencida && !isEncerrada && (
+          <div className="mt-6">
+            <ConfirmacaoFinalVisitaCorretiva
+              visita={visitaProximaOuVencida}
+              onConfirm={(dados) => page.handleRegistrarResultado(dados, visitaProximaOuVencida.id)}
+              submitting={page.submitting}
+              fieldErrors={page.fieldErrors}
+            />
+          </div>
+        )}
       </PageLayout>
     </>
   );
