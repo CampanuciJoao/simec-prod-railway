@@ -1,5 +1,6 @@
 import { faCheck } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { formatarData } from '@/utils/timeUtils';
 
 function formatMoeda(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', {
@@ -120,7 +121,7 @@ function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
                 className="border-r px-3 py-2 text-center"
                 style={{ borderColor: 'var(--border-soft)', color: 'var(--text-secondary)' }}
               >
-                {item.data ? new Date(item.data).toLocaleDateString('pt-BR') : '—'}
+                {item.data ? formatarData(item.data) : '—'}
               </td>
               {fornecedores.map((forn) => {
                 const isAprv = forn.id === aprovadoId;

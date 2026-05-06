@@ -8,6 +8,7 @@ import { proteger, admin } from '../middleware/authMiddleware.js';
 import validate from '../middleware/validate.js';
 import { seguroSchema } from '../validators/seguroValidator.js';
 import { uploadFor } from '../middleware/uploadMiddleware.js';
+import { formatarDataHoraTenant } from '../services/shared/dateFormatter.js';
 import {
   adicionarAnexos,
   removerAnexo,
@@ -659,7 +660,7 @@ router.post('/:id/cancelar', async (req, res) => {
         ? `equipamento ${seguro.equipamento.modelo}`
         : `apólice ${seguro.apoliceNumero}`;
 
-    const dataFormatada = new Date().toLocaleDateString('pt-BR');
+    const dataFormatada = formatarDataHoraTenant(new Date(), req.usuario.tenant?.timezone || 'UTC');
     const motivoLog = motivo?.trim() ? ` Motivo: ${motivo.trim()}.` : '';
 
     await registrarLog({
@@ -750,7 +751,7 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
       return criado;
     });
 
-    const dataRenovacao = new Date().toLocaleDateString('pt-BR');
+    const dataRenovacao = formatarDataHoraTenant(new Date(), req.usuario.tenant?.timezone || 'UTC');
 
     await Promise.all([
       registrarLog({

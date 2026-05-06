@@ -25,7 +25,8 @@ export function obterEstadoAnteriorSeguro(sessaoExistente) {
 
 export function construirRespostaAcaoContextualSeguro(
   acaoContextual,
-  estadoAnterior
+  estadoAnterior,
+  tenantTimezone = 'UTC'
 ) {
   if (acaoContextual.action === ACTIONS.CANCELAR_ACAO) {
     return respostaPadrao(
@@ -108,7 +109,7 @@ export function construirRespostaAcaoContextualSeguro(
   }
 
   if (acaoContextual.action === ACTIONS.MOSTRAR_VENCIMENTO) {
-    const vencimentoFormatado = formatarDataBR(estadoAnterior.vencimento);
+    const vencimentoFormatado = formatarDataBR(estadoAnterior.vencimento, tenantTimezone);
 
     return respostaPadrao(
       vencimentoFormatado
@@ -124,7 +125,7 @@ export function construirRespostaAcaoContextualSeguro(
   }
 
   if (acaoContextual.action === ACTIONS.MOSTRAR_DADOS_APOLICE) {
-    const vencimentoFormatado = formatarDataBR(estadoAnterior.vencimento);
+    const vencimentoFormatado = formatarDataBR(estadoAnterior.vencimento, tenantTimezone);
 
     return respostaPadrao(
       `Apólice ${estadoAnterior.numeroApolice || 'N/A'}, seguradora ${estadoAnterior.seguradora || 'N/A'}${vencimentoFormatado ? `, vencimento em ${vencimentoFormatado}` : ''}.`,

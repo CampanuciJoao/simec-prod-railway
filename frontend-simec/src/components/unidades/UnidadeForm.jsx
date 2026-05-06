@@ -9,6 +9,7 @@ import {
 } from '@/components/ui';
 
 import { useUnidadeForm } from '@/hooks/unidades/useUnidadeForm';
+import { labelTimezone, UF_TIMEZONE_MAP } from '@/utils/ufTimezoneMap';
 
 const ESTADOS = [
   { value: 'AC', label: 'Acre' },
@@ -38,6 +39,16 @@ const ESTADOS = [
   { value: 'SP', label: 'São Paulo' },
   { value: 'SE', label: 'Sergipe' },
   { value: 'TO', label: 'Tocantins' },
+];
+
+const TIMEZONE_OPTIONS = [
+  ...Object.entries(UF_TIMEZONE_MAP)
+    .reduce((acc, [, tz]) => {
+      if (!acc.includes(tz)) acc.push(tz);
+      return acc;
+    }, [])
+    .sort()
+    .map((tz) => ({ value: tz, label: labelTimezone(tz) })),
 ];
 
 function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
@@ -86,7 +97,7 @@ function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
 
       <FormSection
         title="Endereço"
-        description="Use o CEP para adiantar cidade, estado, bairro e logradouro."
+        description="Use o CEP para adiantar cidade, estado, bairro, logradouro e fuso horário automaticamente."
       >
         <ResponsiveGrid cols={{ base: 1, md: 2, xl: 3 }}>
           <Input
@@ -143,6 +154,26 @@ function UnidadeForm({ onSubmit, initialData, isEditing, onCancel }) {
             hint="Use para bloco, sala, recepção ou referência interna."
           />
         </ResponsiveGrid>
+      </FormSection>
+
+      <FormSection
+        title="Fuso horário"
+        description="Detectado automaticamente pelo estado. Altere somente se a unidade operar em fuso diferente do padrão estadual."
+      >
+        <div className="max-w-sm">
+          <Select
+            label="Fuso horário da unidade"
+            value={formData.timezone}
+            onChange={(e) => handleChange('timezone', e.target.value)}
+            options={TIMEZONE_OPTIONS}
+            placeholder="Detectado pelo estado"
+            hint={
+              formData.timezone
+                ? `Horários de agendamento e manutenção serão exibidos neste fuso.`
+                : 'Informe o estado ou o CEP para detectar automaticamente.'
+            }
+          />
+        </div>
       </FormSection>
 
       <FormActions

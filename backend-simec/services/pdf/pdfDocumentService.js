@@ -22,7 +22,7 @@ const COLORS = {
   blue: '#2563eb',
 };
 
-function formatDate(value, locale = 'pt-BR', timeZone = 'America/Cuiaba') {
+function formatDate(value, locale = 'pt-BR', timeZone = 'UTC') {
   if (!value) return 'N/A';
 
   const parsed = new Date(value);
@@ -36,7 +36,7 @@ function formatDate(value, locale = 'pt-BR', timeZone = 'America/Cuiaba') {
   }).format(parsed);
 }
 
-function formatDateTime(value, locale = 'pt-BR', timeZone = 'America/Cuiaba') {
+function formatDateTime(value, locale = 'pt-BR', timeZone = 'UTC') {
   if (!value) return 'N/A';
 
   const parsed = new Date(value);

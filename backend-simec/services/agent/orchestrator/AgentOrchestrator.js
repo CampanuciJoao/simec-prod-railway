@@ -18,9 +18,9 @@ async function carregarSessoes(tenantId, sessionKey) {
   return { agendamento, relatorio, seguro, batch };
 }
 
-export async function RoteadorAgente({ mensagem, usuarioId, usuarioNome, tenantId }) {
+export async function RoteadorAgente({ mensagem, usuarioId, usuarioNome, tenantId, tenantTimezone = 'UTC' }) {
   try {
-    const contexto = criarContexto({ mensagem, usuarioId, usuarioNome, tenantId });
+    const contexto = criarContexto({ mensagem, usuarioId, usuarioNome, tenantId, tenantTimezone });
 
     await AgentSessionRepository.expirarSessoesAntigas(tenantId, contexto.sessionKey);
 

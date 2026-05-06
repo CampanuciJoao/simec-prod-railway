@@ -6,6 +6,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
+import { useUnidadeTimezone } from '@/hooks/useTenantTimezone';
 
 const TIPO_CONFIG = {
   abertura: { icon: faFolderOpen, color: '#2563eb', label: 'Abertura' },
@@ -17,8 +18,9 @@ const TIPO_CONFIG = {
   cancelamento: { icon: faBan, color: '#6b7280', label: 'Cancelamento' },
 };
 
-function TimelineItem({ evento }) {
+function TimelineItem({ evento, timezone }) {
   const cfg = TIPO_CONFIG[evento.tipo] || TIPO_CONFIG.nota;
+  const fmt = (iso) => formatarDataHora(iso, { timeZone: timezone });
 
   return (
     <div className="flex gap-4">
@@ -36,14 +38,16 @@ function TimelineItem({ evento }) {
       {/* Conteúdo */}
       <div className="pb-6 min-w-0 flex-1">
         <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--text-muted)' }}>
-          {formatarDataHora(evento.dataHora)}
+          {fmt(evento.dataHora)}
         </p>
         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {evento.titulo}
         </p>
-        {evento.descricao && (
+        {(evento.descricao || (evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista)) && (
           <p className="mt-1 text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
-            {evento.descricao}
+            {evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista
+              ? `Previsão: ${fmt(evento.meta.dataHoraInicioPrevista)} até ${fmt(evento.meta.dataHoraFimPrevista)}`
+              : evento.descricao}
           </p>
         )}
       </div>
@@ -51,7 +55,9 @@ function TimelineItem({ evento }) {
   );
 }
 
-function OsCorretivaTimeline({ timeline }) {
+function OsCorretivaTimeline({ timeline, timezone: tzProp }) {
+  const tz = useUnidadeTimezone({ timezone: tzProp });
+
   if (!timeline || timeline.length === 0) {
     return (
       <Card className="rounded-3xl p-6">
@@ -69,7 +75,7 @@ function OsCorretivaTimeline({ timeline }) {
       </h2>
       <div>
         {timeline.map((evento, idx) => (
-          <TimelineItem key={idx} evento={evento} />
+          <TimelineItem key={idx} evento={evento} timezone={tz} />
         ))}
       </div>
     </Card>
@@ -78,6 +84,7 @@ function OsCorretivaTimeline({ timeline }) {
 
 OsCorretivaTimeline.propTypes = {
   timeline: PropTypes.array.isRequired,
+  timezone: PropTypes.string,
 };
 
 export default OsCorretivaTimeline;

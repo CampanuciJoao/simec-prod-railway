@@ -11,6 +11,18 @@ import {
 
 import { useToast } from '@/contexts/ToastContext';
 import { Button, Input, PageSection, ResponsiveGrid, Select } from '@/components/ui';
+import { labelTimezone, UF_TIMEZONE_MAP } from '@/utils/ufTimezoneMap';
+
+const TIMEZONE_OPTIONS = [
+  { value: '', label: 'Padrão da empresa' },
+  ...Object.entries(UF_TIMEZONE_MAP)
+    .reduce((acc, [, tz]) => {
+      if (!acc.includes(tz)) acc.push(tz);
+      return acc;
+    }, [])
+    .sort()
+    .map((tz) => ({ value: tz, label: labelTimezone(tz) })),
+];
 
 function UsuarioForm({
   onSubmit,
@@ -26,6 +38,7 @@ function UsuarioForm({
     senha: '',
     confirmaSenha: '',
     role: 'user',
+    timezone: '',
   });
 
   const [senhaVisivel, setSenhaVisivel] = useState(false);
@@ -40,6 +53,7 @@ function UsuarioForm({
         username: initialData.username || '',
         email: initialData.email || '',
         role: initialData.role || 'user',
+        timezone: initialData.timezone || '',
         senha: '',
         confirmaSenha: '',
       });
@@ -73,6 +87,7 @@ function UsuarioForm({
       nome: formData.nome.trim(),
       email: formData.email.trim(),
       role: formData.role,
+      timezone: formData.timezone || null,
     };
 
     if (formData.senha) {
@@ -170,7 +185,7 @@ function UsuarioForm({
           </div>
         </ResponsiveGrid>
 
-        <div className="max-w-md">
+        <ResponsiveGrid cols={{ base: 1, md: 2 }}>
           <Select
             label="Perfil de acesso"
             name="role"
@@ -181,7 +196,17 @@ function UsuarioForm({
             <option value="user">Usuario padrao</option>
             <option value="admin">Administrador</option>
           </Select>
-        </div>
+
+          <Select
+            label="Fuso horário pessoal"
+            name="timezone"
+            value={formData.timezone}
+            onChange={handleChange}
+            options={TIMEZONE_OPTIONS}
+            disabled={isSubmitting}
+            hint="Se definido, sobrepõe o fuso da empresa para este usuário."
+          />
+        </ResponsiveGrid>
 
         <div className="flex flex-wrap gap-3">
           <Button type="submit" disabled={isSubmitting}>

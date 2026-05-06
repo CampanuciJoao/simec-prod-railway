@@ -347,7 +347,7 @@ export async function obterDadosPdfOcorrencia({ tenantId, ocorrenciaId }) {
     include: {
       equipamento: {
         include: {
-          unidade: { select: { nomeSistema: true } },
+          unidade: { select: { nomeSistema: true, timezone: true } },
         },
       },
     },
@@ -376,6 +376,7 @@ export async function obterDadosPdfHistoricoEquipamento({
         select: {
           id: true,
           nomeSistema: true,
+          timezone: true,
         },
       },
     },
@@ -400,6 +401,7 @@ export async function obterDadosPdfHistoricoEquipamento({
       modelo: equipamento.modelo,
       tag: equipamento.tag,
       unidade: equipamento.unidade?.nomeSistema || null,
+      unidadeTimezone: equipamento.unidade?.timezone || null,
     },
     filtros: {
       categoria,

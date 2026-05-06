@@ -29,6 +29,7 @@ export const RelatorioService = {
       usuarioId = null,
       usuarioNome = null,
       requestId = null,
+      tenantTimezone = 'UTC',
     } = contextoUsuario;
     const logContext = {
       requestId,
@@ -158,6 +159,7 @@ export const RelatorioService = {
             contexto.equipamentoNome ||
             contexto.modelo ||
             contexto.tipoEquipamento,
+          tenantTimezone,
         });
 
         const payload = construirPayloadConsultaUnica(manutencao, respostaTexto);
@@ -203,6 +205,7 @@ export const RelatorioService = {
           contexto.equipamentoNome ||
           contexto.modelo ||
           contexto.tipoEquipamento,
+        tenantTimezone,
       });
 
       const payload = construirPayloadLista(manutencoes, filtros, respostaTexto);
