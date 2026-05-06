@@ -1,8 +1,11 @@
 import {
   buscarVisitasComInicioProximo,
+  buscarVisitasParaInicioAutomatico,
   buscarVisitasComFimProximo,
   buscarVisitasVencidasPorTenant,
+  buscarVisitasParaConfirmacao,
   upsertAlertaOsCorretiva,
+  atualizarStatusVisitaParaEmExecucao,
 } from './osCorretivaAlertRepository.js';
 import {
   criarPayloadBaseAlerta,
@@ -13,8 +16,9 @@ import {
 import { onAlertasProcessados } from '../alertasEventService.js';
 
 const PONTOS_INICIO = [
-  { limiar: 10, prioridade: ALERT_PRIORIDADES.ALTA, label: '10min' },
-  { limiar: 60, prioridade: ALERT_PRIORIDADES.MEDIA, label: '1h' },
+  { limiar: 10,   prioridade: ALERT_PRIORIDADES.ALTA,  label: '10min' },
+  { limiar: 60,   prioridade: ALERT_PRIORIDADES.MEDIA, label: '1h'    },
+  { limiar: 1440, prioridade: ALERT_PRIORIDADES.BAIXA, label: '24h'   },
 ];
 
 const PONTOS_FIM = [
@@ -149,4 +153,82 @@ export async function gerarAlertaVisitaVencida(tenantId, visita) {
   }
 
   return 1;
+}
+
+export async function iniciarVisitasAutomaticamente(tenantId, agora) {
+  const visitas = await buscarVisitasParaInicioAutomatico(tenantId, agora);
+  let total = 0;
+
+  for (const visita of visitas) {
+    await atualizarStatusVisitaParaEmExecucao(tenantId, visita.id);
+
+    const os = visita.osCorretiva;
+    const prestador = visita.prestadorNome || 'Terceiro';
+    const alertaId = `os-corretiva-visita-iniciada-${tenantId}-${visita.id}`;
+
+    const result = await upsertAlertaOsCorretiva(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
+        titulo: `Visita iniciada – ${os?.numeroOS || 'OS'}`,
+        subtitulo: `${equipTag(visita)} | ${prestador} — técnico em campo`,
+        subtituloBase: `${equipTag(visita)} | ${prestador}`,
+        numeroOS: os?.numeroOS || null,
+        data: agora,
+        dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+        dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
+        prioridade: ALERT_PRIORIDADES.MEDIA,
+        tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
+        tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_INICIADA,
+        link: `/manutencoes/ocorrencia/${os?.id}`,
+      })
+    );
+
+    if (result.created || result.updated) {
+      await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+    }
+
+    total++;
+  }
+
+  return total;
+}
+
+export async function moverVisitasParaConfirmacao(tenantId, agora) {
+  const visitas = await buscarVisitasParaConfirmacao(tenantId, agora);
+  let total = 0;
+
+  for (const visita of visitas) {
+    const os = visita.osCorretiva;
+    const prestador = visita.prestadorNome || 'Terceiro';
+    const alertaId = `os-corretiva-visita-confirmacao-${tenantId}-${visita.id}`;
+
+    const result = await upsertAlertaOsCorretiva(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
+        titulo: `Visita aguarda resultado – ${os?.numeroOS || 'OS'}`,
+        subtitulo: `${equipTag(visita)} | ${prestador} — prazo encerrado, registrar resultado`,
+        subtituloBase: `${equipTag(visita)} | ${prestador}`,
+        numeroOS: os?.numeroOS || null,
+        data: agora,
+        dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+        dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
+        prioridade: ALERT_PRIORIDADES.ALTA,
+        tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
+        tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_CONFIRMACAO,
+        link: `/manutencoes/ocorrencia/${os?.id}`,
+      })
+    );
+
+    if (result.created || result.updated) {
+      await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+    }
+
+    total++;
+  }
+
+  return total;
 }

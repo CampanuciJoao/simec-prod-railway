@@ -3,14 +3,18 @@ import { getAgora } from '../../time/index.js';
 import { buscarVisitasVencidasPorTenant } from './osCorretivaAlertRepository.js';
 import {
   gerarAlertasVisitaInicioProximo,
+  iniciarVisitasAutomaticamente,
   gerarAlertasVisitaFimProximo,
   gerarAlertaVisitaVencida,
+  moverVisitasParaConfirmacao,
 } from './osCorretivaAlertRules.js';
 
 async function processarTenant(tenant, agora) {
-  const [inicioTotal, fimTotal, visitas] = await Promise.all([
+  const [inicioTotal, iniciadasTotal, fimTotal, confirmacaoTotal, visitas] = await Promise.all([
     gerarAlertasVisitaInicioProximo(tenant.id, agora),
+    iniciarVisitasAutomaticamente(tenant.id, agora),
     gerarAlertasVisitaFimProximo(tenant.id, agora),
+    moverVisitasParaConfirmacao(tenant.id, agora),
     buscarVisitasVencidasPorTenant(tenant.id, agora),
   ]);
 
@@ -19,10 +23,10 @@ async function processarTenant(tenant, agora) {
   );
   const vencidaTotal = vencidaResults.reduce((acc, v) => acc + v, 0);
 
-  const total = inicioTotal + fimTotal + vencidaTotal;
+  const total = inicioTotal + iniciadasTotal + fimTotal + confirmacaoTotal + vencidaTotal;
 
   console.log(
-    `[ALERTA_OS_CORRETIVA][${tenant.id}] inicio_proximo=${inicioTotal} fim_proximo=${fimTotal} vencidas=${vencidaTotal}`
+    `[ALERTA_OS_CORRETIVA][${tenant.id}] inicio_proximo=${inicioTotal} iniciadas=${iniciadasTotal} fim_proximo=${fimTotal} confirmacao=${confirmacaoTotal} vencidas=${vencidaTotal}`
   );
 
   return { total, afetou: total > 0 };

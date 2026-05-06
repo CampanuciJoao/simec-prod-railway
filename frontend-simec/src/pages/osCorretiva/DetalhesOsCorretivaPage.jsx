@@ -35,14 +35,14 @@ function DetalhesOsCorretivaPage() {
   if (page.loading) return <PageLayout padded><PageState loading /></PageLayout>;
   if (page.error || !os) return <PageLayout padded><PageState error={page.error || 'OS não encontrada.'} /></PageLayout>;
 
-  // Libera "Registrar resultado" 30 min antes do fim previsto ou quando já venceu
+  // Libera "Registrar resultado": visita EmExecucao, ou Agendada com fim <= 30min
   const agora = new Date();
   const JANELA_MS = 30 * 60 * 1000;
   const visitaProximaOuVencida = os.visitas?.find(
     (v) =>
-      v.status === 'Agendada' &&
       v.dataHoraFimPrevista &&
-      new Date(v.dataHoraFimPrevista) - agora <= JANELA_MS
+      (v.status === 'EmExecucao' ||
+        (v.status === 'Agendada' && new Date(v.dataHoraFimPrevista) - agora <= JANELA_MS))
   );
 
   return (
