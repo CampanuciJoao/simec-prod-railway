@@ -105,6 +105,7 @@ export const proteger = async (req, res, next) => {
       role: usuarioAtual.role,
       email: usuarioAtual.email,
       tenantId: usuarioAtual.tenantId,
+      timezone: usuarioAtual.timezone || null,
       tenant: usuarioAtual.tenant,
     };
 

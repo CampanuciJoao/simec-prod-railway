@@ -15,4 +15,5 @@ export const unidadeSchema = z.object({
   cidade: z.string().optional().nullable(),
   estado: z.string().length(2, "Use a sigla do estado (Ex: SP)").optional().nullable(),
   cep: z.string().transform(v => v.replace(/\D/g, '')).optional().nullable(),
+  timezone: z.string().optional().nullable(),
 });

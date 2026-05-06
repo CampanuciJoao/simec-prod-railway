@@ -91,6 +91,7 @@ model Usuario {
   nome      String
   senha     String
   role      Role     @default(user)
+  timezone  String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

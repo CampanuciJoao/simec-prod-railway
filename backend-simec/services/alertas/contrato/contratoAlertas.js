@@ -8,7 +8,7 @@ import { gerarAlertaVencimentoContrato } from './contratoAlertRules.js';
  * 🔧 Processa um tenant
  */
 async function processarTenant(tenant, agoraUtc) {
-  const timezone = tenant.timezone || 'America/Campo_Grande';
+  const timezone = tenant.timezone || 'UTC';
 
   const contratos = await buscarContratosAtivosPorTenant(tenant.id);
 

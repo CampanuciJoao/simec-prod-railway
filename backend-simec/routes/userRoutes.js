@@ -23,6 +23,7 @@ router.get('/', async (req, res) => {
         email: true,
         nome: true,
         role: true,
+        timezone: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -39,7 +40,7 @@ router.get('/', async (req, res) => {
 });
 
 router.post('/', async (req, res) => {
-  const { username, email, senha, nome, role = 'user' } = req.body;
+  const { username, email, senha, nome, role = 'user', timezone = null } = req.body;
 
   if (!username || !email || !senha || !nome) {
     return res.status(400).json({
@@ -87,6 +88,7 @@ router.post('/', async (req, res) => {
         senha: senhaHash,
         nome: String(nome).trim(),
         role,
+        timezone: timezone || null,
       },
     });
 
@@ -118,7 +120,7 @@ router.post('/', async (req, res) => {
 
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { nome, role, senha, email } = req.body;
+  const { nome, role, senha, email, timezone } = req.body;
 
   if (!nome || !role || !email) {
     return res.status(400).json({
@@ -162,6 +164,7 @@ router.put('/:id', async (req, res) => {
       nome: String(nome).trim(),
       email: emailNormalizado,
       role,
+      timezone: timezone || null,
     };
 
     if (senha) {

@@ -30,10 +30,10 @@ const router = express.Router();
 
 router.use(proteger);
 
-function getPdfOptions(req) {
+function getPdfOptions(req, unidadeTimezone = null) {
   return {
     locale: req.usuario?.tenant?.locale || 'pt-BR',
-    timeZone: req.usuario?.tenant?.timezone || 'America/Cuiaba',
+    timeZone: unidadeTimezone || req.usuario?.tenant?.timezone || 'UTC',
   };
 }
 
@@ -85,7 +85,10 @@ router.get('/manutencao/:id', async (req, res) => {
       tenantId: req.usuario.tenantId,
       manutencaoId: req.params.id,
     });
-    const buffer = await gerarPdfOSManutencaoBuffer(manutencao, getPdfOptions(req));
+    const buffer = await gerarPdfOSManutencaoBuffer(
+      manutencao,
+      getPdfOptions(req, manutencao.equipamento?.unidade?.timezone)
+    );
     const fileName = `OS_${manutencao.numeroOS || 'SEM_NUMERO'}.pdf`;
 
     return sendPdf(res, buffer, fileName);
@@ -134,7 +137,10 @@ router.get('/ocorrencia/:id', async (req, res) => {
       tenantId: req.usuario.tenantId,
       ocorrenciaId: req.params.id,
     });
-    const buffer = await gerarPdfOcorrenciaBuffer(ocorrencia, getPdfOptions(req));
+    const buffer = await gerarPdfOcorrenciaBuffer(
+      ocorrencia,
+      getPdfOptions(req, ocorrencia.equipamento?.unidade?.timezone)
+    );
     const tag = ocorrencia.equipamento?.tag || 'EQ';
     const suffix = ocorrencia.id.slice(-6).toUpperCase();
     return sendPdf(res, buffer, `ocorrencia_${tag}_${suffix}.pdf`);
@@ -156,7 +162,7 @@ router.get('/equipamentos/:id/historico', async (req, res) => {
     });
     const buffer = await gerarPdfHistoricoEquipamentoBuffer(
       payload,
-      getPdfOptions(req)
+      getPdfOptions(req, payload.equipamento?.unidadeTimezone)
     );
     const fileName = `auditoria_${payload?.equipamento?.tag || 'Equipamento'}.pdf`;
 
@@ -188,7 +194,10 @@ router.get('/os-corretiva/:id', async (req, res) => {
       tenantId: req.usuario.tenantId,
       osId: req.params.id,
     });
-    const buffer = await gerarPdfOsCorretivaBuffer(os, getPdfOptions(req));
+    const buffer = await gerarPdfOsCorretivaBuffer(
+      os,
+      getPdfOptions(req, os.equipamento?.unidade?.timezone)
+    );
     return sendPdf(res, buffer, `OS_CORT_${os.numeroOS || req.params.id}.pdf`);
   } catch (error) {
     console.error('[PDF_OS_CORRETIVA_ERROR]', error);

@@ -1,6 +1,7 @@
 import { faEye, faPencil, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import OrcamentoStatusBadge from './OrcamentoStatusBadge';
+import { formatarData } from '@/utils/timeUtils';
 
 const TIPO_LABEL = { PRODUTO: 'Produto', SERVICO: 'Serviço', MISTO: 'Misto' };
 
@@ -9,7 +10,7 @@ function OrcamentoRow({ orcamento, onVerDetalhes, onEditar, onExcluir }) {
     .map((f) => f.nome)
     .join(', ');
 
-  const dataFormatada = new Date(orcamento.createdAt).toLocaleDateString('pt-BR');
+  const dataFormatada = formatarData(orcamento.createdAt);
 
   return (
     <tr

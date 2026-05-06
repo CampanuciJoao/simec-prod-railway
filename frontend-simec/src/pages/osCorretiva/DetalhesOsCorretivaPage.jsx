@@ -174,7 +174,10 @@ function DetalhesOsCorretivaPage() {
             <OsEquipamentoCard os={os} />
           </div>
           <div className="lg:col-span-2">
-            <OsCorretivaTimeline timeline={os.timeline || []} />
+            <OsCorretivaTimeline
+              timeline={os.timeline || []}
+              timezone={os.equipamento?.unidade?.timezone}
+            />
           </div>
         </div>
       </PageLayout>

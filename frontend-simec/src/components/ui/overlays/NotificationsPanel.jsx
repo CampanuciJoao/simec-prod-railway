@@ -10,21 +10,8 @@ import {
   faEye,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
-
-function formatarDataCurta(data) {
-  if (!data) return '-';
-
-  try {
-    return new Date(data).toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return '-';
-  }
-}
+import { formatarDataHora } from '@/utils/timeUtils';
+import { useTenantTimezone } from '@/hooks/useTenantTimezone';
 
 function NotificationsPanel({
   open = false,
@@ -38,6 +25,7 @@ function NotificationsPanel({
   onMarkAsRead,
   onDismiss,
 }) {
+  const tz = useTenantTimezone();
   const alertasRecentes = Array.isArray(alertas) ? alertas.slice(0, 8) : [];
 
   return (
@@ -148,7 +136,7 @@ function NotificationsPanel({
                         <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-slate-400 sm:gap-3">
                           <span className="inline-flex items-center gap-1">
                             <FontAwesomeIcon icon={faClock} />
-                            {formatarDataCurta(alerta.data)}
+                            {formatarDataHora(alerta.data, { timeZone: tz })}
                           </span>
 
                           {alerta.tipo ? (

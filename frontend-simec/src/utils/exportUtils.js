@@ -20,7 +20,7 @@ function escapeCSV(str) {
  * @param {object} relatorio - O objeto de resultado completo vindo da API.
  * @param {string} nomeArquivo - O nome do arquivo a ser baixado (sem a extensão .csv).
  */
-export const exportarRelatorioCSV = (relatorio, nomeArquivo) => {
+export const exportarRelatorioCSV = (relatorio, nomeArquivo, timezone = 'UTC') => {
     if (!relatorio || !relatorio.dados || relatorio.dados.length === 0) {
         console.error("Não há dados para exportar.");
         // Idealmente, a página que chama já fez essa verificação, mas é uma boa prática ter aqui também.
@@ -149,7 +149,7 @@ export const exportarRelatorioCSV = (relatorio, nomeArquivo) => {
     // --- Montagem do Conteúdo do CSV ---
     let csvContent = [];
     csvContent.push(`"${tituloRelatorio}"`);
-    csvContent.push(`"Gerado em: ${new Date().toLocaleString('pt-BR')}"`);
+    csvContent.push(`"Gerado em: ${formatarDataHora(new Date().toISOString(), { timeZone: timezone })}"`);
     csvContent.push(''); 
     csvContent.push('"Filtros Aplicados:"');
     filtrosUtilizados.forEach(filtro => {

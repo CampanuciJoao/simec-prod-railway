@@ -33,6 +33,7 @@ import {
   getTipoVinculo,
   getTipoSeguroLabel,
 } from '@/utils/seguros/seguroFormatter';
+import { formatarData } from '@/utils/timeUtils';
 
 const STATUS_BADGE = {
   Ativo:      { label: 'Ativo',       bg: 'var(--color-success-soft)', color: 'var(--color-success)' },
@@ -55,8 +56,8 @@ function StatusBadge({ status }) {
 }
 
 function HistoricoItem({ item }) {
-  const dataInicio = item.dataInicio ? new Date(item.dataInicio).toLocaleDateString('pt-BR') : '—';
-  const dataFim    = item.dataFim    ? new Date(item.dataFim).toLocaleDateString('pt-BR')    : '—';
+  const dataInicio = item.dataInicio ? formatarData(item.dataInicio) : '—';
+  const dataFim    = item.dataFim    ? formatarData(item.dataFim)    : '—';
 
   return (
     <div
@@ -225,9 +226,9 @@ function DetalhesSeguroPage() {
             <div className="flex flex-col gap-1">
               <span className="text-xs opacity-50 uppercase tracking-wide">Vigência</span>
               <span className="text-sm">
-                {seguro.dataInicio ? new Date(seguro.dataInicio).toLocaleDateString('pt-BR') : '—'}
+                {seguro.dataInicio ? formatarData(seguro.dataInicio) : '—'}
                 {' → '}
-                {seguro.dataFim ? new Date(seguro.dataFim).toLocaleDateString('pt-BR') : '—'}
+                {seguro.dataFim ? formatarData(seguro.dataFim) : '—'}
               </span>
             </div>
           </ResponsiveGrid>

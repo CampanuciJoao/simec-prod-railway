@@ -24,12 +24,15 @@ import { OrcamentoStatusBadge, OrcamentoTabelaVisualizacao } from '@/components/
 import { useDetalhesOrcamento } from '@/hooks/orcamentos/useDetalhesOrcamento';
 import { useAuth } from '@/contexts/AuthContext';
 import { exportarOrcamentoPDF } from '@/services/api/pdfApi';
+import { formatarData, formatarDataHora } from '@/utils/timeUtils';
+import { useTenantTimezone } from '@/hooks/useTenantTimezone';
 
 const TIPO_LABEL = { PRODUTO: 'Produto', SERVICO: 'Serviço', MISTO: 'Misto' };
 
 function DetalhesOrcamentoPage() {
   const navigate = useNavigate();
   const { usuario } = useAuth();
+  const tz = useTenantTimezone();
   const isAdmin = usuario?.role === 'admin' || usuario?.role === 'superadmin';
   const p = useDetalhesOrcamento();
 
@@ -141,7 +144,7 @@ function DetalhesOrcamentoPage() {
                 Data
               </p>
               <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
-                {new Date(orc.createdAt).toLocaleDateString('pt-BR')}
+                {formatarData(orc.createdAt)}
               </p>
             </div>
             {orc.aprovadoPor && (
@@ -153,7 +156,7 @@ function DetalhesOrcamentoPage() {
                   {orc.aprovadoPor.nome}
                   {orc.dataAprovacao && (
                     <span className="ml-2 font-normal" style={{ color: 'var(--text-muted)' }}>
-                      em {new Date(orc.dataAprovacao).toLocaleDateString('pt-BR')}
+                      em {formatarDataHora(orc.dataAprovacao, { timeZone: tz })}
                     </span>
                   )}
                 </p>
@@ -210,7 +213,7 @@ function DetalhesOrcamentoPage() {
                   style={{ borderColor: 'var(--border-default)', color: 'var(--text-muted)' }}
                 >
                   {orc.dataAprovacao
-                    ? new Date(orc.dataAprovacao).toLocaleDateString('pt-BR')
+                    ? formatarDataHora(orc.dataAprovacao, { timeZone: tz })
                     : '_____________'}
                 </div>
                 <p className="mt-1 text-center text-xs" style={{ color: 'var(--text-muted)' }}>

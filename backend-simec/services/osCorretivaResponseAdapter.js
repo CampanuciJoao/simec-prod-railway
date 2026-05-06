@@ -111,8 +111,14 @@ function buildTimeline(os) {
       tipo: 'visita_agendada',
       dataHora: visita.createdAt,
       titulo: `Visita agendada — ${visita.prestadorNome}`,
-      descricao: `Previsão: ${new Date(visita.dataHoraInicioPrevista).toLocaleString('pt-BR')} até ${new Date(visita.dataHoraFimPrevista).toLocaleString('pt-BR')}`,
-      meta: { visitaId: visita.id, prestadorNome: visita.prestadorNome, status: visita.status },
+      descricao: null,
+      meta: {
+        visitaId: visita.id,
+        prestadorNome: visita.prestadorNome,
+        status: visita.status,
+        dataHoraInicioPrevista: visita.dataHoraInicioPrevista,
+        dataHoraFimPrevista: visita.dataHoraFimPrevista,
+      },
     });
 
     if (visita.resultado) {

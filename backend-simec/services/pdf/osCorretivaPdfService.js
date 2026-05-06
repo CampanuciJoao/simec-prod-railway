@@ -207,7 +207,7 @@ export async function obterDadosPdfOsCorretiva({ tenantId, osId }) {
 
 export function gerarPdfOsCorretivaBuffer(os, options = {}) {
   return new Promise((resolve, reject) => {
-    const { locale = 'pt-BR', timeZone = 'America/Sao_Paulo' } = options;
+    const { locale = 'pt-BR', timeZone = 'UTC' } = options;
     const chunks = [];
 
     const doc = new PDFDocument({

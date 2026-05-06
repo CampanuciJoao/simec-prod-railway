@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { buscarEnderecoPorCep } from '@/services/api';
+import { timezoneParaUF } from '@/utils/ufTimezoneMap';
 
 const INITIAL_STATE = {
   nomeSistema: '',
@@ -13,16 +14,15 @@ const INITIAL_STATE = {
   cidade: '',
   estado: '',
   cep: '',
+  timezone: '',
 };
 
 const CEP_IDLE_HINT =
-  'Informe o CEP para preencher cidade, estado, bairro e logradouro automaticamente.';
+  'Informe o CEP para preencher cidade, estado, bairro, logradouro e fuso horário automaticamente.';
 
 function formatarCep(value) {
   const digits = String(value || '').replace(/\D/g, '').slice(0, 8);
-
   if (digits.length <= 5) return digits;
-
   return `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
@@ -38,6 +38,7 @@ export function useUnidadeForm({ initialData, isEditing }) {
         ...INITIAL_STATE,
         ...initialData,
         cep: formatarCep(initialData.cep),
+        timezone: initialData.timezone || timezoneParaUF(initialData.estado) || '',
       });
       return;
     }
@@ -50,10 +51,18 @@ export function useUnidadeForm({ initialData, isEditing }) {
   const handleChange = useCallback((field, value) => {
     const nextValue = field === 'cep' ? formatarCep(value) : value;
 
-    setFormData((prev) => ({
-      ...prev,
-      [field]: nextValue,
-    }));
+    setFormData((prev) => {
+      const next = { ...prev, [field]: nextValue };
+
+      // Ao mudar estado manualmente, sugere timezone correspondente
+      // mas só se o timezone não tiver sido editado manualmente antes
+      if (field === 'estado' && nextValue) {
+        const tz = timezoneParaUF(nextValue);
+        if (tz) next.timezone = tz;
+      }
+
+      return next;
+    });
 
     if (field === 'cep') {
       setCepStatus('idle');
@@ -83,6 +92,8 @@ export function useUnidadeForm({ initialData, isEditing }) {
 
     buscarEnderecoPorCep(cepDigits, { signal: controller.signal })
       .then((endereco) => {
+        const tz = timezoneParaUF(endereco.estado);
+
         setFormData((prev) => ({
           ...prev,
           cep: formatarCep(endereco.cep || prev.cep),
@@ -90,10 +101,14 @@ export function useUnidadeForm({ initialData, isEditing }) {
           bairro: endereco.bairro || prev.bairro,
           cidade: endereco.cidade || prev.cidade,
           estado: endereco.estado || prev.estado,
+          timezone: tz || prev.timezone,
         }));
+
         setCepStatus('success');
         setCepHint(
-          'Endereço sugerido pelo CEP. Complete apenas número e complemento, se necessário.'
+          tz
+            ? 'Endereço e fuso horário detectados pelo CEP. Complete apenas número e complemento, se necessário.'
+            : 'Endereço sugerido pelo CEP. Complete apenas número e complemento, se necessário.'
         );
       })
       .catch((error) => {
