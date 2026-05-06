@@ -10,7 +10,7 @@ const VISITA_SELECT = {
     select: {
       id: true,
       numeroOS: true,
-      equipamento: { select: { tag: true, nome: true } },
+      equipamento: { select: { tag: true, modelo: true } },
     },
   },
 };

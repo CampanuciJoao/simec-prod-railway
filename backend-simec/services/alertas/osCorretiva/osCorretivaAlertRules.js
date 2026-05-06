@@ -24,7 +24,7 @@ const PONTOS_FIM = [
 
 function equipTag(visita) {
   const eq = visita.osCorretiva?.equipamento;
-  return eq?.tag || eq?.nome || 'Equipamento';
+  return eq?.modelo || eq?.tag || 'Equipamento';
 }
 
 export async function gerarAlertasVisitaInicioProximo(tenantId, agora) {
@@ -48,7 +48,11 @@ export async function gerarAlertasVisitaInicioProximo(tenantId, agora) {
             id: alertaId,
             titulo: `Visita prestes a iniciar – ${os?.numeroOS || 'OS'}`,
             subtitulo: `${equipTag(visita)} | ${prestador} — início em ~${ponto.limiar}min`,
+            subtituloBase: `${equipTag(visita)} | ${prestador}`,
+            numeroOS: os?.numeroOS || null,
             data: visita.dataHoraInicioPrevista,
+            dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+            dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
             prioridade: ponto.prioridade,
             tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
             tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_INICIO_PROXIMO,
@@ -90,7 +94,11 @@ export async function gerarAlertasVisitaFimProximo(tenantId, agora) {
             id: alertaId,
             titulo: `Visita se aproximando do fim – ${os?.numeroOS || 'OS'}`,
             subtitulo: `${equipTag(visita)} | ${prestador} — encerra em ~${ponto.limiar}min`,
+            subtituloBase: `${equipTag(visita)} | ${prestador}`,
+            numeroOS: os?.numeroOS || null,
             data: visita.dataHoraFimPrevista,
+            dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+            dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
             prioridade: ponto.prioridade,
             tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
             tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_FIM_PROXIMO,
@@ -124,7 +132,11 @@ export async function gerarAlertaVisitaVencida(tenantId, visita) {
       id: alertaId,
       titulo: `Visita vencida – ${os?.numeroOS || 'OS'}`,
       subtitulo: `${equipTag(visita)} | ${prestador} — prazo venceu, registrar resultado`,
+      subtituloBase: `${equipTag(visita)} | ${prestador}`,
+      numeroOS: os?.numeroOS || null,
       data: visita.dataHoraFimPrevista,
+      dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+      dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
       prioridade: ALERT_PRIORIDADES.ALTA,
       tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
       tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_VENCIDA,
