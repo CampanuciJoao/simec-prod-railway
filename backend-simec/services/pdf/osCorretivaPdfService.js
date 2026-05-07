@@ -243,7 +243,9 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     infoRow(doc, 'Aberta por', os.autor?.nome || 'N/A');
     infoRow(doc, 'Descrição do problema', os.descricaoProblema);
 
-    if (os.status === 'Concluida' && os.dataHoraConclusao) {
+    const concluidaViaVisita = (os.visitas || []).some(v => v.resultado);
+
+  if (os.status === 'Concluida' && os.dataHoraConclusao && !concluidaViaVisita) {
       infoRow(doc, 'Conclusão', fmt(os.dataHoraConclusao, locale, timeZone));
       if (os.observacoesFinais) {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Observações finais:', 54, doc.y);
@@ -255,7 +257,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     // ── Timeline
     sectionTitle(doc, 'TIMELINE CRONOLÓGICA');
 
-    const timeline = buildTimeline(os);
+    const timeline = buildTimeline(os, timeZone);
     for (const ev of timeline) {
       timelineEvent(doc, ev, { locale, timeZone });
     }
@@ -265,7 +267,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
   });
 }
 
-function buildTimeline(os) {
+function buildTimeline(os, timeZone = 'UTC') {
   const eventos = [];
 
   eventos.push({
@@ -286,8 +288,8 @@ function buildTimeline(os) {
   }
 
   for (const visita of os.visitas || []) {
-    const inicio = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraInicioPrevista));
-    const fim = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraFimPrevista));
+    const inicio = new Intl.DateTimeFormat('pt-BR', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraInicioPrevista));
+    const fim = new Intl.DateTimeFormat('pt-BR', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraFimPrevista));
 
     eventos.push({
       tipo: 'visita_agendada',
