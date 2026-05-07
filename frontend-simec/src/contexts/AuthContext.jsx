@@ -92,7 +92,7 @@ export function AuthProvider({ children }) {
     setStorage(hydrated);
     setUsuario(hydrated.usuario);
     setTenant(hydrated.tenant || null);
-    // Hierarquia: usuário → tenant → UTC
+    // Hierarquia: usuario -> tenant -> UTC
     setDefaultTimezone(hydrated.usuario?.timezone || hydrated.tenant?.timezone);
     return hydrated;
   }, []);
@@ -112,7 +112,8 @@ export function AuthProvider({ children }) {
         if (active) {
           setUsuario(storedData.usuario);
           setTenant(storedData.tenant || null);
-          setDefaultTimezone(storedData.tenant?.timezone);
+          // Hierarquia: usuario -> tenant -> UTC
+          setDefaultTimezone(storedData.usuario?.timezone || storedData.tenant?.timezone);
           setLoading(false);
         }
         return;
@@ -126,7 +127,8 @@ export function AuthProvider({ children }) {
           setStorage(hydrated);
           setUsuario(hydrated.usuario);
           setTenant(hydrated.tenant || null);
-          setDefaultTimezone(hydrated.tenant?.timezone);
+          // Hierarquia: usuario -> tenant -> UTC
+          setDefaultTimezone(hydrated.usuario?.timezone || hydrated.tenant?.timezone);
         }
       } catch (error) {
         console.error('[AUTH_CONTEXT_REFRESH_BOOTSTRAP_ERROR]', error);
