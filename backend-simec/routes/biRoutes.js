@@ -17,22 +17,47 @@ function toDateOrNull(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
+// Preventivas e corretivas agendadas: paradas durante a janela do agendamento
 function calcularHorasParado(manutencao) {
-  const inicio =
-    toDateOrNull(manutencao.dataInicioReal) ||
-    toDateOrNull(manutencao.dataHoraAgendamentoInicio);
-
+  const inicio = toDateOrNull(manutencao.dataHoraAgendamentoInicio);
   const fim =
     toDateOrNull(manutencao.dataFimReal) ||
-    toDateOrNull(manutencao.dataConclusao) ||
-    toDateOrNull(manutencao.dataHoraAgendamentoFim);
+    toDateOrNull(manutencao.dataConclusao);
 
-  if (!inicio || !fim || fim < inicio) {
+  if (!inicio || !fim || fim <= inicio) {
     return 0;
   }
 
-  const minutos = differenceInMinutes(fim, inicio);
-  return Math.max(0, minutos) / 60;
+  return Math.max(0, differenceInMinutes(fim, inicio)) / 60;
+}
+
+// OS Corretivas: downtime depende do status do equipamento na abertura
+function calcularHorasParadoOsCorretiva(os) {
+  const conclusao = toDateOrNull(os.dataHoraConclusao);
+  if (!conclusao) return 0;
+
+  if (os.statusEquipamentoAbertura === 'Inoperante') {
+    const abertura = toDateOrNull(os.dataHoraAbertura);
+    if (!abertura) return 0;
+    return Math.max(0, differenceInMinutes(conclusao, abertura)) / 60;
+  }
+
+  // UsoLimitado ou Operante: conta apenas durante visitas concluídas
+  const visitas = (os.visitas || []).filter(v => v.resultado);
+  if (!visitas.length) return 0;
+
+  let totalMinutos = 0;
+  for (const visita of visitas) {
+    const inicio =
+      toDateOrNull(visita.dataHoraInicioReal) ||
+      toDateOrNull(visita.dataHoraInicioPrevista);
+    const fim =
+      toDateOrNull(visita.dataHoraFimReal) || conclusao;
+    if (inicio && fim && fim > inicio) {
+      totalMinutos += differenceInMinutes(fim, inicio);
+    }
+  }
+  return Math.max(0, totalMinutos) / 60;
 }
 
 router.get('/indicadores', async (req, res) => {
@@ -42,7 +67,7 @@ router.get('/indicadores', async (req, res) => {
     const inicioAno = startOfYear(agora);
     const fimAno = endOfYear(agora);
 
-    const [manutencoes, totalEquipamentos, osConcluidasAno, backlogManutencoes, backlogOsCorretivas, preventivasAno] = await Promise.all([
+    const [manutencoes, osCorretivas, totalEquipamentos, osConcluidasAno, backlogManutencoes, backlogOsCorretivas, preventivasAno] = await Promise.all([
       prisma.manutencao.findMany({
         where: {
           tenantId,
@@ -53,6 +78,27 @@ router.get('/indicadores', async (req, res) => {
           equipamento: { include: { unidade: true } },
         },
         orderBy: { dataConclusao: 'desc' },
+      }),
+
+      prisma.osCorretiva.findMany({
+        where: {
+          tenantId,
+          status: 'Concluida',
+          dataHoraConclusao: { gte: inicioAno, lte: fimAno },
+        },
+        include: {
+          equipamento: { include: { unidade: true } },
+          visitas: {
+            where: { resultado: { not: null } },
+            select: {
+              dataHoraInicioPrevista: true,
+              dataHoraFimPrevista: true,
+              dataHoraInicioReal: true,
+              dataHoraFimReal: true,
+              resultado: true,
+            },
+          },
+        },
       }),
 
       prisma.equipamento.count({ where: { tenantId } }),
@@ -92,56 +138,64 @@ router.get('/indicadores', async (req, res) => {
     const statsEquip = {};
     const statsUnidade = {};
 
-    for (const m of manutencoes) {
-      if (!m.equipamento || !m.equipamento.unidade) {
-        continue;
-      }
-
-      const eId = m.equipamentoId;
-      const uId = m.equipamento.unidadeId;
-      const uNome = m.equipamento.unidade.nomeSistema;
-
+    function garantirStatsEquip(eId, equip) {
       if (!statsEquip[eId]) {
         statsEquip[eId] = {
           equipamentoId: eId,
-          modelo: m.equipamento.modelo,
-          tag: m.equipamento.tag,
-          unidadeId: uId,
-          unidade: uNome,
+          modelo: equip.modelo,
+          tag: equip.tag,
+          unidadeId: equip.unidadeId,
+          unidade: equip.unidade?.nomeSistema || 'N/A',
           corretivas: 0,
           preventivas: 0,
           horasParado: 0,
         };
       }
+    }
 
+    function garantirStatsUnidade(uId, uNome) {
       if (!statsUnidade[uId]) {
-        statsUnidade[uId] = {
-          unidadeId: uId,
-          nome: uNome,
-          horasParado: 0,
-        };
-      }
-
-      if (m.tipo === 'Corretiva') {
-        statsEquip[eId].corretivas += 1;
-      } else if (m.tipo === 'Preventiva') {
-        statsEquip[eId].preventivas += 1;
-      }
-
-      {
-        const horasValidas = calcularHorasParado(m);
-        statsEquip[eId].horasParado += horasValidas;
-        statsUnidade[uId].horasParado += horasValidas;
+        statsUnidade[uId] = { unidadeId: uId, nome: uNome, horasParado: 0 };
       }
     }
 
-    const manutencoesPreventivas = manutencoes.filter(
-      (m) => m.tipo === 'Preventiva'
-    ).length;
+    for (const m of manutencoes) {
+      if (!m.equipamento?.unidade) continue;
 
-    const manutencoesCorretivas = manutencoes.filter(
-      (m) => m.tipo === 'Corretiva'
-    ).length;
+      const eId = m.equipamentoId;
+      const uId = m.equipamento.unidadeId;
+      const uNome = m.equipamento.unidade.nomeSistema;
+
+      garantirStatsEquip(eId, m.equipamento);
+      garantirStatsUnidade(uId, uNome);
+
+      if (m.tipo === 'Corretiva') statsEquip[eId].corretivas += 1;
+      else if (m.tipo === 'Preventiva') statsEquip[eId].preventivas += 1;
+
+      const horas = calcularHorasParado(m);
+      statsEquip[eId].horasParado += horas;
+      statsUnidade[uId].horasParado += horas;
+    }
+
+    for (const os of osCorretivas) {
+      if (!os.equipamento?.unidade) continue;
+
+      const eId = os.equipamentoId;
+      const uId = os.equipamento.unidadeId;
+      const uNome = os.equipamento.unidade.nomeSistema;
+
+      garantirStatsEquip(eId, os.equipamento);
+      garantirStatsUnidade(uId, uNome);
+
+      statsEquip[eId].corretivas += 1;
+
+      const horas = calcularHorasParadoOsCorretiva(os);
+      statsEquip[eId].horasParado += horas;
+      statsUnidade[uId].horasParado += horas;
+    }
+
+    const manutencoesPreventivas = manutencoes.filter(m => m.tipo === 'Preventiva').length;
+    const manutencoesCorretivas = manutencoes.filter(m => m.tipo === 'Corretiva').length + osCorretivas.length;
 
     // MTTR (Mean Time To Repair) — média em horas das OS corretivas concluídas
     let mttrHoras = null;
@@ -163,7 +217,6 @@ router.get('/indicadores', async (req, res) => {
       conformidadePM = Math.round((noPrazo / preventivasAno.length) * 100);
     }
 
-    // Backlog — ordens em aberto agora (manutenções + OS corretivas)
     const backlog = backlogManutencoes + backlogOsCorretivas;
 
     const rankingDowntime = Object.values(statsEquip)
@@ -184,7 +237,7 @@ router.get('/indicadores', async (req, res) => {
         totalAtivos: totalEquipamentos,
         preventivas: manutencoesPreventivas,
         corretivas: manutencoesCorretivas,
-        totalManutencoesConcluidas: manutencoes.length,
+        totalManutencoesConcluidas: manutencoes.length + osCorretivas.length,
       },
       kpis: {
         mttrHoras,
