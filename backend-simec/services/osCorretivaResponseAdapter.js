@@ -92,7 +92,15 @@ function buildTimeline(os) {
 
   const visitas = os.visitas || [];
 
-  // If promoted to Corretiva, mark the moment (first visit creation)
+  // Identifica a visita que encerrou a OS (última com resultado, quando OS está Concluída)
+  const visitasConcluidas = visitas.filter(v => v.resultado);
+  const visitaConclusiva =
+    os.status === 'Concluida' && visitasConcluidas.length > 0
+      ? visitasConcluidas.reduce((latest, v) =>
+          new Date(v.updatedAt) > new Date(latest.updatedAt) ? v : latest
+        )
+      : null;
+
   if (os.tipo === 'Corretiva' && visitas.length > 0) {
     const primeiraVisita = visitas.reduce((a, b) =>
       new Date(a.createdAt) < new Date(b.createdAt) ? a : b
@@ -122,17 +130,27 @@ function buildTimeline(os) {
     });
 
     if (visita.resultado) {
+      const isConclusiva = visitaConclusiva?.id === visita.id;
       eventos.push({
         tipo: 'resultado_visita',
         dataHora: visita.updatedAt,
         titulo: `Resultado da visita — ${STATUS_VISITA_LABELS[visita.status] || visita.status}`,
         descricao: visita.observacoes || `Resultado: ${visita.resultado}`,
-        meta: { visitaId: visita.id, resultado: visita.resultado },
+        meta: {
+          visitaId: visita.id,
+          resultado: visita.resultado,
+          ...(isConclusiva && {
+            isConclusive: true,
+            dataHoraAberturaOs: os.dataHoraAbertura,
+            dataHoraConclusaoOs: os.dataHoraConclusao,
+          }),
+        },
       });
     }
   }
 
-  if (os.status === 'Concluida' && os.dataHoraConclusao) {
+  // Evento de conclusão só aparece quando a OS foi encerrada sem visita (ex: resolução interna)
+  if (os.status === 'Concluida' && os.dataHoraConclusao && !visitaConclusiva) {
     eventos.push({
       tipo: 'conclusao',
       dataHora: os.dataHoraConclusao,
