@@ -51,6 +51,27 @@ function classificarHeuristica(mensagem) {
     'corretivas',
   ];
 
+  const termosOsCorretiva = [
+    'ocorrencia',
+    'ocorrência',
+    'os corretiva',
+    'ordem corretiva',
+    'manutencao corretiva',
+    'manutenção corretiva',
+    'abrir ocorrencia',
+    'abrir ocorrência',
+    'registrar ocorrencia',
+    'registrar ocorrência',
+    'equipamento parou',
+    'equipamento nao funciona',
+    'equipamento quebrou',
+    'agendar visita',
+    'visita tecnica',
+    'visita técnica',
+    'visita de terceiro',
+    'prestador',
+  ];
+
   const termosAgendamento = [
     'agendar',
     'marcar',
@@ -70,6 +91,10 @@ function classificarHeuristica(mensagem) {
 
   if (termosRelatorio.some((t) => msg.includes(t))) {
     return 'RELATORIO';
+  }
+
+  if (termosOsCorretiva.some((t) => msg.includes(t))) {
+    return 'OS_CORRETIVA';
   }
 
   if (termosAgendamento.some((t) => msg.includes(t))) {
@@ -92,6 +117,7 @@ function extrairCategoriaValida(texto = '') {
     'AGENDAR_MANUTENCAO',
     'RELATORIO',
     'SEGURO',
+    'OS_CORRETIVA',
     'OUTRO',
   ];
 
@@ -123,16 +149,20 @@ export async function classificarIntencao(mensagem) {
 Voce e um triador de tarefas hospitalares.
 Classifique a mensagem do usuario em apenas uma categoria:
 
-- AGENDAR_MANUTENCAO: quando o usuario quer criar, marcar, agendar ou abrir uma manutencao
+- AGENDAR_MANUTENCAO: quando o usuario quer criar, marcar ou agendar uma manutencao preventiva, calibracao ou inspecao
 - RELATORIO: quando o usuario quer consultar historico, ultima manutencao, listas, relatorios ou periodos
 - SEGURO: quando o usuario quer consultar seguro, apolice, seguradora, cobertura, vigencia, vencimento ou documento da apolice
+- OS_CORRETIVA: quando o usuario quer registrar uma ocorrencia, relatar que um equipamento quebrou ou parou de funcionar, abrir OS corretiva, ou agendar visita de terceiro/prestador para um equipamento com problema
 - OUTRO: saudacao ou conversa sem acao clara
 
 Regras importantes:
 - "quando foi a ultima preventiva em Coxim?" = RELATORIO
 - "quais preventivas no ultimo ano?" = RELATORIO
 - "marcar uma preventiva para amanha" = AGENDAR_MANUTENCAO
-- "abrir uma corretiva" = AGENDAR_MANUTENCAO
+- "abrir uma corretiva" = OS_CORRETIVA
+- "registrar ocorrencia no tomografo" = OS_CORRETIVA
+- "agendar visita de terceiro" = OS_CORRETIVA
+- "equipamento parou de funcionar" = OS_CORRETIVA
 - "me traga o seguro da unidade sede" = SEGURO
 - "qual o vencimento da apolice de Coxim?" = SEGURO
 - "me mostre a cobertura do seguro" = SEGURO
@@ -143,6 +173,7 @@ Responda APENAS com uma das categorias:
 AGENDAR_MANUTENCAO
 RELATORIO
 SEGURO
+OS_CORRETIVA
 OUTRO
 `;
 

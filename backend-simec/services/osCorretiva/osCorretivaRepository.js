@@ -128,6 +128,47 @@ export async function existeOsAbertaParaEquipamento({ tenantId, equipamentoId, i
   return prisma.osCorretiva.findFirst({ where, select: { id: true, numeroOS: true } });
 }
 
+export async function listarOsAbertasPorEquipamento({ tenantId, equipamentoId }) {
+  return prisma.osCorretiva.findMany({
+    where: {
+      tenantId,
+      equipamentoId,
+      status: { in: ['Aberta', 'EmAndamento', 'AguardandoTerceiro'] },
+    },
+    select: {
+      id: true,
+      numeroOS: true,
+      status: true,
+      tipo: true,
+      descricaoProblema: true,
+      dataHoraAbertura: true,
+    },
+    orderBy: { dataHoraAbertura: 'asc' },
+  });
+}
+
+export async function buscarConflitoVisitaPorEquipamento({ tenantId, equipamentoId, inicioUtc, fimUtc, ignorarVisitaId = null }) {
+  const where = {
+    tenantId,
+    status: { in: ['Agendada', 'EmExecucao'] },
+    osCorretiva: { equipamentoId },
+    dataHoraInicioPrevista: { lt: fimUtc },
+    dataHoraFimPrevista: { gt: inicioUtc },
+  };
+  if (ignorarVisitaId) where.id = { not: ignorarVisitaId };
+
+  return prisma.visitaTerceiro.findFirst({
+    where,
+    select: {
+      id: true,
+      prestadorNome: true,
+      dataHoraInicioPrevista: true,
+      dataHoraFimPrevista: true,
+      osCorretiva: { select: { numeroOS: true } },
+    },
+  });
+}
+
 export async function contarOsDoTenant(tenantId) {
   return prisma.osCorretiva.count({ where: { tenantId } });
 }

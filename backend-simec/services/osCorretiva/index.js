@@ -8,14 +8,13 @@ import {
   buscarOsPorId,
   buscarOsResumo,
   listarOsCorretivas,
-  existeOsAbertaParaEquipamento,
   contarOsDoTenant,
-  criarOsCorretiva,
   atualizarOsCorretiva,
   criarNotaOsCorretiva,
   criarVisitaTerceiro,
   buscarVisitaPorId,
   atualizarVisita,
+  buscarConflitoVisitaPorEquipamento,
 } from './osCorretivaRepository.js';
 
 import {
@@ -81,16 +80,6 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
 
   if (equipamento.status === 'Desativado') {
     return { ok: false, status: 422, message: 'Não é possível abrir OS para equipamento desativado.' };
-  }
-
-  const osAberta = await existeOsAbertaParaEquipamento({ tenantId, equipamentoId: v.data.equipamentoId });
-  if (osAberta) {
-    return {
-      ok: false,
-      status: 409,
-      message: `Já existe uma OS Corretiva aberta para este equipamento: ${osAberta.numeroOS}.`,
-      conflito: { numeroOS: osAberta.numeroOS, id: osAberta.id },
-    };
   }
 
   const total = await contarOsDoTenant(tenantId);
@@ -205,6 +194,34 @@ export async function agendarVisitaTerceiroService({ tenantId, usuarioId, osId, 
   if (!os) return { ok: false, status: 404, message: 'OS Corretiva não encontrada.' };
   if (os.status === 'Concluida') {
     return { ok: false, status: 422, message: 'Não é possível agendar visita em OS concluída.' };
+  }
+
+  const inicioUtc = new Date(v.data.dataHoraInicioPrevista);
+  const fimUtc = new Date(v.data.dataHoraFimPrevista);
+
+  const conflito = await buscarConflitoVisitaPorEquipamento({
+    tenantId,
+    equipamentoId: os.equipamentoId,
+    inicioUtc,
+    fimUtc,
+  });
+
+  if (conflito) {
+    const inicio = conflito.dataHoraInicioPrevista.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const fim = conflito.dataHoraFimPrevista.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const data = conflito.dataHoraInicioPrevista.toLocaleDateString('pt-BR');
+    return {
+      ok: false,
+      status: 409,
+      message: `Já existe uma visita agendada para este equipamento nesse horário (${conflito.osCorretiva.numeroOS} — ${conflito.prestadorNome}, ${data} das ${inicio} às ${fim}). Por favor, escolha outro horário.`,
+      conflito: {
+        visitaId: conflito.id,
+        numeroOS: conflito.osCorretiva.numeroOS,
+        prestadorNome: conflito.prestadorNome,
+        dataHoraInicioPrevista: conflito.dataHoraInicioPrevista,
+        dataHoraFimPrevista: conflito.dataHoraFimPrevista,
+      },
+    };
   }
 
   const visita = await criarVisitaTerceiro({
