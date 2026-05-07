@@ -64,7 +64,7 @@ export async function buscarVisitasComFimProximo(tenantId, agora, horizonte) {
   return prisma.visitaTerceiro.findMany({
     where: {
       tenantId,
-      status: 'Agendada',
+      status: 'EmExecucao',
       dataHoraFimPrevista: { gt: agora, lte: horizonte },
     },
     select: VISITA_SELECT,
