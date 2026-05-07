@@ -46,6 +46,7 @@ model Tenant {
   orcamentos           Orcamento[]
   osCorretivas         OsCorretiva[]
   visitasTerceiro      VisitaTerceiro[]
+  gehcSaudeSnapshots   GehcSaudeSnapshot[]
 
   @@map("tenants")
 }
@@ -147,6 +148,9 @@ model Equipamento {
   riskScore     Int?
   riskLevel     String?
   riskUpdatedAt DateTime?
+
+  gehcAssetId        String?  @map("gehc_asset_id")
+  gehcSaudeSnapshots GehcSaudeSnapshot[]
 
   @@unique([tenantId, tag])
   @@unique([tenantId, aeTitle])
@@ -651,6 +655,31 @@ enum AgentStep {
   AGUARDANDO_CONFIRMACAO
   FINALIZADO
   CANCELADO
+}
+
+model GehcSaudeSnapshot {
+  id            String   @id @default(uuid())
+  tenantId      String
+  equipamentoId String   @map("equipamento_id")
+  capturedAt    DateTime @default(now()) @map("captured_at")
+
+  heliumLevelPct     Float?  @map("helium_level_pct")
+  heliumPressurePsi  Float?  @map("helium_pressure_psi")
+  compressorStatus   String? @map("compressor_status")
+  coolantFlowGpm     Float?  @map("coolant_flow_gpm")
+  coolantTempC       Float?  @map("coolant_temp_c")
+  cryocoolerStatus   String? @map("cryocooler_status")
+  magnetOnline       Boolean? @map("magnet_online")
+  equipmentOnline    Boolean? @map("equipment_online")
+
+  rawJson String? @db.Text @map("raw_json")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, equipamentoId, capturedAt(sort: Desc)])
+  @@index([tenantId, capturedAt(sort: Desc)])
+  @@map("gehc_saude_snapshots")
 }
 
 model AgentSession {
