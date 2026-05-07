@@ -3,6 +3,7 @@ import {
   gerarAlertasSeguro,
   gerarAlertasContrato,
   gerarAlertasRecomendacao,
+  gerarAlertasOsCorretiva,
 } from './index.js';
 
 import { gerarInsightsInteligentes } from './proactivityAgent.js';
@@ -22,9 +23,6 @@ function withTimeout(promise, ms, nome) {
   ]);
 }
 
-/**
- * Executa uma etapa com tratamento de erro padronizado e timeout de 90s.
- */
 async function executarEtapa(nome, fn) {
   try {
     const result = await withTimeout(fn(), ETAPA_TIMEOUT_MS, nome);
@@ -38,7 +36,7 @@ async function executarEtapa(nome, fn) {
       ? result.tenantsAfetados
       : [];
 
-    console.log(`[ALERTAS] ${nome} concluído | total=${total}`);
+    console.log(`[ALERTAS] ${nome} concluido | total=${total}`);
 
     return {
       ok: true,
@@ -72,10 +70,6 @@ function coletarTenantsUnicos(...results) {
   return [...tenantsSet];
 }
 
-/**
- * Orquestrador principal — todos os geradores rodam em paralelo.
- * `executarEtapa` já captura erros internamente, então Promise.all nunca rejeita.
- */
 export async function processarAlertasEEnviarNotificacoes() {
   console.log('[ALERTAS] Iniciando processamento paralelo...');
 
@@ -84,12 +78,14 @@ export async function processarAlertasEEnviarNotificacoes() {
     segurosResult,
     contratosResult,
     recomendacoesResult,
+    osCorretivaResult,
     insightsResult,
   ] = await Promise.all([
     executarEtapa('manutencoes', gerarAlertasManutencao),
     executarEtapa('seguros', gerarAlertasSeguro),
     executarEtapa('contratos', gerarAlertasContrato),
     executarEtapa('recomendacoes', gerarAlertasRecomendacao),
+    executarEtapa('os_corretiva', gerarAlertasOsCorretiva),
     executarEtapa('insights_ia', gerarInsightsInteligentes),
   ]);
 
@@ -97,6 +93,7 @@ export async function processarAlertasEEnviarNotificacoes() {
   const seguros = segurosResult.total;
   const contratos = contratosResult.total;
   const recomendacoes = recomendacoesResult.total;
+  const osCorretiva = osCorretivaResult.total;
   const insights = insightsResult.total;
 
   const ok =
@@ -104,16 +101,18 @@ export async function processarAlertasEEnviarNotificacoes() {
     segurosResult.ok &&
     contratosResult.ok &&
     recomendacoesResult.ok &&
+    osCorretivaResult.ok &&
     insightsResult.ok;
 
   const totalGeral =
-    manutencoes + seguros + contratos + recomendacoes + insights;
+    manutencoes + seguros + contratos + recomendacoes + osCorretiva + insights;
 
   const tenantsAfetados = coletarTenantsUnicos(
     manutencoesResult,
     segurosResult,
     contratosResult,
     recomendacoesResult,
+    osCorretivaResult,
     insightsResult
   );
 
@@ -124,7 +123,7 @@ export async function processarAlertasEEnviarNotificacoes() {
   }
 
   console.log(
-    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | insights_ia=${insights} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
+    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | os_corretiva=${osCorretiva} | insights_ia=${insights} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
   );
 
   return {
@@ -134,6 +133,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     seguros,
     contratos,
     recomendacoes,
+    osCorretiva,
     insights,
     tenantsAfetados,
     detalhes: {
@@ -156,6 +156,11 @@ export async function processarAlertasEEnviarNotificacoes() {
         ok: recomendacoesResult.ok,
         total: recomendacoesResult.total,
         erro: recomendacoesResult.erro?.message || null,
+      },
+      os_corretiva: {
+        ok: osCorretivaResult.ok,
+        total: osCorretivaResult.total,
+        erro: osCorretivaResult.erro?.message || null,
       },
       insights_ia: {
         ok: insightsResult.ok,
