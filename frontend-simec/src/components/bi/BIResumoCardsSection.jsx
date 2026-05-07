@@ -61,9 +61,9 @@ function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {
       <ResponsiveGrid cols={{ base: 1, sm: 3 }}>
         <InteractiveKpiCard
           icon={faStopwatch}
-          title="MTTR médio"
+          title="Tempo médio de resolução"
           value={resumoCards.mttr}
-          subtitle="Tempo médio de reparo (OS corretivas)"
+          subtitle="Da abertura até a conclusão (OS corretivas)"
           tone="red"
         />
 
