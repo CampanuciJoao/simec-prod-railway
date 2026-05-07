@@ -22,6 +22,18 @@ function TimelineItem({ evento, timezone }) {
   const cfg = TIPO_CONFIG[evento.tipo] || TIPO_CONFIG.nota;
   const fmt = (iso) => formatarDataHora(iso, { timeZone: timezone });
 
+  const descricaoTexto = (() => {
+    if (evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista) {
+      return `Previsão: ${fmt(evento.meta.dataHoraInicioPrevista)} até ${fmt(evento.meta.dataHoraFimPrevista)}`;
+    }
+    return evento.descricao || null;
+  })();
+
+  const resumoOs =
+    evento.meta?.isConclusive && evento.meta?.dataHoraAberturaOs
+      ? `OS aberta em ${fmt(evento.meta.dataHoraAberturaOs)} — encerrada em ${fmt(evento.meta.dataHoraConclusaoOs)}`
+      : null;
+
   return (
     <div className="flex gap-4">
       {/* Ícone */}
@@ -43,11 +55,14 @@ function TimelineItem({ evento, timezone }) {
         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {evento.titulo}
         </p>
-        {(evento.descricao || (evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista)) && (
+        {descricaoTexto && (
           <p className="mt-1 text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
-            {evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista
-              ? `Previsão: ${fmt(evento.meta.dataHoraInicioPrevista)} até ${fmt(evento.meta.dataHoraFimPrevista)}`
-              : evento.descricao}
+            {descricaoTexto}
+          </p>
+        )}
+        {resumoOs && (
+          <p className="mt-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            {resumoOs}
           </p>
         )}
       </div>
