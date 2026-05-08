@@ -2,6 +2,7 @@ import prisma from '../prismaService.js';
 import { scrapeEquipamentoSaude } from './gehcScraper.js';
 import { processarAlertasGehc } from './gehcAlertRepository.js';
 import { descobrirEquipamentosGehc } from './gehcDiscovery.js';
+import { obterTokensGehc } from './gehcAuthService.js';
 import {
   fetchEquipmentHealth,
   fetchAssetConnectivity,
@@ -15,6 +16,17 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
   if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
     console.warn('[GEHC_MONITOR] GEHC_LOGIN/GEHC_PASSWORD não configurados — pulando monitoramento.');
     return;
+  }
+
+  // Obtém tokens via auth service se não foram passados explicitamente
+  if ((!accessToken || !idToken) && tenantId) {
+    try {
+      const tokens = await obterTokensGehc(tenantId);
+      accessToken = tokens.accessToken;
+      idToken     = tokens.idToken;
+    } catch (err) {
+      console.warn(`[GEHC_MONITOR] Não foi possível obter tokens (${err.message}) — usando Playwright como fallback.`);
+    }
   }
 
   // Discovery automático: vincula RMs GE ainda sem gehcAssetId

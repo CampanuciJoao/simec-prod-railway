@@ -162,6 +162,52 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
+    // Job GEHC: monitoramento de saúde das RMs GE a cada 4 horas
+    if (process.env.GEHC_LOGIN && process.env.GEHC_PASSWORD) {
+      const repeatables3 = await queue.getRepeatableJobs();
+      for (const job of repeatables3) {
+        if (job.name === 'gehc-monitorar-saude') {
+          await queue.removeRepeatableByKey(job.key);
+        }
+      }
+
+      await queue.add(
+        'gehc-monitorar-saude',
+        {},
+        {
+          jobId: 'gehc-monitorar-saude',
+          repeat: { every: 2 * 60 * 60 * 1000 },
+          removeOnComplete: 20,
+          removeOnFail: 20,
+        }
+      );
+
+      console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 2h.');
+
+      // Sync completo de contratos, OS e utilização — uma vez por dia às 02:00 UTC
+      const repeatables4 = await queue.getRepeatableJobs();
+      for (const job of repeatables4) {
+        if (job.name === 'gehc-sync-dados') {
+          await queue.removeRepeatableByKey(job.key);
+        }
+      }
+
+      await queue.add(
+        'gehc-sync-dados',
+        {},
+        {
+          jobId: 'gehc-sync-dados',
+          repeat: { cron: '0 2 * * *' },
+          removeOnComplete: 10,
+          removeOnFail: 10,
+        }
+      );
+
+      console.log('[QUEUE] Job GEHC (gehc-sync-dados) agendado diariamente às 02:00 UTC.');
+    } else {
+      console.log('[QUEUE] GEHC_LOGIN/GEHC_PASSWORD não configurados — jobs GEHC não agendados.');
+    }
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {

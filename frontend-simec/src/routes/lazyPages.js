@@ -80,6 +80,9 @@ export const TenantSettingsPage = React.lazy(() =>
 export const LogAuditoriaPage = React.lazy(() =>
   import('@/pages/auditoria/LogAuditoriaPage')
 );
+export const IntegracoesPage = React.lazy(() =>
+  import('@/pages/gerenciamento/IntegracoesPage')
+);
 export const AuditoriaDetalhadaPage = React.lazy(() =>
   import('@/pages/auditoria/AuditoriaDetalhadaPage')
 );
