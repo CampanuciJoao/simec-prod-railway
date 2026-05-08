@@ -1,15 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
-  faBell,
   faChartPie,
-  faFileContract,
-  faHospital,
+  faHeartPulse,
   faRotateRight,
-  faScrewdriverWrench,
   faTriangleExclamation,
   faTableCells,
 } from '@fortawesome/free-solid-svg-icons';
@@ -37,6 +34,8 @@ import { AlertListItem } from '@/components/dashboard';
 import DashboardCard from '@/components/dashboard/DashboardCard';
 import BarChart from '@/components/charts/BarChart';
 import DonutChart from '@/components/charts/DonutChart';
+import { getGehcStatus } from '@/services/api/gehcApi';
+import { formatarDataHora } from '@/utils/timeUtils';
 
 const ResponsiveGrid = WidthProvider(Responsive);
 
@@ -134,43 +133,64 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
   );
 }
 
-// ─── Fila de atenção ──────────────────────────────────────────────────────────
+// ─── Saúde das RMs GE ─────────────────────────────────────────────────────────
 
-function FilaAtencao({ resumo }) {
-  const items = [
-    {
-      icon: faBell,
-      label: 'Alertas ativos',
-      value: resumo.alertasAtivos,
-      helper: resumo.alertasCriticos > 0 ? `${resumo.alertasCriticos} em prioridade alta` : 'Nenhum alerta crítico',
-      tone: resumo.alertasCriticos > 0 ? 'danger' : 'default',
-    },
-    {
-      icon: faScrewdriverWrench,
-      label: 'OS em andamento',
-      value: resumo.emManutencao,
-      helper: 'Ordens abertas que pressionam a disponibilidade.',
-      tone: resumo.emManutencao > 0 ? 'warning' : 'default',
-    },
-    {
-      icon: faFileContract,
-      label: 'Cobertura em atenção',
-      value: resumo.contratosVencendo,
-      helper: 'Contratos que pedem acompanhamento de vigência.',
-      tone: resumo.contratosVencendo > 0 ? 'warning' : 'default',
-    },
-    {
-      icon: faHospital,
-      label: 'Ativos restritos',
-      value: resumo.inativos,
-      helper: 'Equipamentos fora de operação ou em uso limitado.',
-      tone: resumo.inativos > 0 ? 'danger' : 'success',
-    },
-  ];
+function SaudeRMs() {
+  const [snapshots, setSnapshots] = useState([]);
+  const [configurado, setConfigurado] = useState(true);
+
+  useEffect(() => {
+    getGehcStatus()
+      .then((res) => {
+        setConfigurado(res.credenciais?.configurado ?? false);
+        setSnapshots(res.ultimosSnapshots ?? []);
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!configurado) {
+    return (
+      <InlineEmptyState message="Integração GE não configurada.">
+        <Link to="/gerenciamento/integracoes" className="text-xs underline" style={{ color: 'var(--brand-primary)' }}>
+          Configurar agora
+        </Link>
+      </InlineEmptyState>
+    );
+  }
+
+  if (!snapshots.length) {
+    return <InlineEmptyState message="Nenhuma captura de saúde ainda. Execute o monitor na tela de integrações." />;
+  }
 
   return (
-    <div className="grid grid-cols-2 gap-2">
-      {items.map((item) => <DashboardMiniStat key={item.label} {...item} />)}
+    <div className="space-y-2 overflow-auto">
+      {snapshots.map((s, i) => (
+        <div key={i} className="rounded-2xl border px-4 py-2.5" style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatarDataHora(s.capturedAt)}</p>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+            {s.heliumLevelPct != null && (
+              <span style={{ color: s.heliumLevelPct < 30 ? 'var(--color-danger)' : s.heliumLevelPct < 70 ? 'var(--color-warning)' : 'var(--color-success)', fontWeight: 600 }}>
+                Hélio: {s.heliumLevelPct}%
+              </span>
+            )}
+            {s.heliumPressurePsi != null && <span>Pressão: {s.heliumPressurePsi} PSI</span>}
+            {s.compressorStatus && (
+              <span style={{ color: s.compressorStatus === 'ON' ? 'var(--text-muted)' : 'var(--color-danger)', fontWeight: s.compressorStatus !== 'ON' ? 600 : 400 }}>
+                Compressor: {s.compressorStatus}
+              </span>
+            )}
+            {s.coolantTempC != null && <span>Temp: {s.coolantTempC}°C</span>}
+            {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
+              <span style={{ color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                {s.equipmentOnline ? 'Online' : 'Offline'}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -331,13 +351,18 @@ function DashboardPage() {
             )}
           </DashboardCard>
 
-          {/* Fila de atenção */}
+          {/* Saúde das RMs GE */}
           <DashboardCard
             key="fila"
-            title="Fila de atenção"
-            description="Itens que ajudam a priorizar a operação."
+            title="Saúde das RMs GE"
+            description="Último snapshot de hélio, pressão e compressor."
+            headerRight={
+              <Link to="/gerenciamento/integracoes" style={{ color: 'var(--brand-primary)' }} className="text-xs">
+                <FontAwesomeIcon icon={faHeartPulse} className="mr-1" />Ver integrações
+              </Link>
+            }
           >
-            <FilaAtencao resumo={resumo} />
+            <SaudeRMs />
           </DashboardCard>
 
           {/* Leitura do parque */}
