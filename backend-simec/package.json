@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
+    "postinstall": "npx playwright install --with-deps chromium",
     "start": "node scripts/migrate.mjs && node server.js",
     "start:prod": "node scripts/migrate.mjs && node server.js",
     "pretest": "prisma generate",
