@@ -47,6 +47,12 @@ export const exportarBIPDF = () =>
     'BI_ESTRATEGICO_SIMEC.pdf'
   );
 
+export const exportarUtilizacaoGehcPDF = (meses = 12) =>
+  baixarPdf(
+    { url: '/pdfs/gehc-utilizacao', method: 'get', params: { meses } },
+    `utilizacao_ge_${new Date().getFullYear()}.pdf`
+  );
+
 export const exportarOcorrenciaPDF = (ocorrenciaId) =>
   baixarPdf(
     { url: `/pdfs/ocorrencia/${ocorrenciaId}`, method: 'get' },

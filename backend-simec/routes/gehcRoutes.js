@@ -661,5 +661,123 @@ router.delete('/alertas/suspensoes/:id', admin, async (req, res) => {
   }
 });
 
+// ─── GET /api/gehc/bi/utilizacao ─────────────────────────────────────────────
+// BI de utilização GE: agrega exames e pacientes por unidade → equipamento → mês
+router.get('/bi/utilizacao', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const meses = Math.min(Number(req.query.meses) || 12, 36);
+
+  const inicio = new Date();
+  inicio.setMonth(inicio.getMonth() - meses);
+  inicio.setDate(1);
+  inicio.setHours(0, 0, 0, 0);
+
+  try {
+    const registros = await prisma.gehcUtilizacaoMensal.findMany({
+      where: { tenantId, mesReferencia: { gte: inicio } },
+      orderBy: { mesReferencia: 'asc' },
+      include: {
+        equipamento: {
+          select: {
+            id: true, apelido: true, modelo: true, tag: true,
+            unidadeId: true,
+            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
+          },
+        },
+      },
+    });
+
+    function diasNoMes(date) {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+
+    // Agrupa por unidade → equipamento
+    const unidadeMap = new Map();
+
+    for (const r of registros) {
+      const eq = r.equipamento;
+      if (!eq) continue;
+      const unidade = eq.unidade;
+      const uid = eq.unidadeId;
+
+      if (!unidadeMap.has(uid)) {
+        unidadeMap.set(uid, {
+          unidadeId: uid,
+          nome: unidade?.nomeFantasia || unidade?.nomeSistema || uid,
+          equipamentos: new Map(),
+        });
+      }
+
+      const uNode = unidadeMap.get(uid);
+      if (!uNode.equipamentos.has(eq.id)) {
+        uNode.equipamentos.set(eq.id, {
+          equipamentoId: eq.id,
+          nome: eq.apelido || eq.modelo || eq.tag,
+          tag: eq.tag,
+          meses: [],
+        });
+      }
+
+      const dias = diasNoMes(r.mesReferencia);
+      uNode.equipamentos.get(eq.id).meses.push({
+        mes:           r.mesReferencia.toISOString().slice(0, 7),
+        exames:        r.examesTotal        ?? null,
+        pacientes:     r.pacientesTotal     ?? null,
+        duracaoMedia:  r.duracaoMediaMin    ?? null,
+        uptime:        r.uptimeContrato     ?? null,
+        mediaExamesDia: r.examesTotal != null ? +(r.examesTotal / dias).toFixed(1) : null,
+      });
+    }
+
+    // Calcula totais
+    const unidades = [...unidadeMap.values()].map(u => {
+      const equipamentos = [...u.equipamentos.values()].map(eq => {
+        const totalExames    = eq.meses.reduce((a, m) => a + (m.exames    ?? 0), 0);
+        const totalPacientes = eq.meses.reduce((a, m) => a + (m.pacientes ?? 0), 0);
+        const uptimes = eq.meses.filter(m => m.uptime != null).map(m => m.uptime);
+        return {
+          ...eq,
+          totalExames,
+          totalPacientes,
+          mediaExamesDia: eq.meses.length
+            ? +(eq.meses.filter(m => m.mediaExamesDia != null).reduce((a, m) => a + m.mediaExamesDia, 0) / eq.meses.filter(m => m.mediaExamesDia != null).length).toFixed(1)
+            : null,
+          uptimeMedio: uptimes.length ? +(uptimes.reduce((a, v) => a + v, 0) / uptimes.length).toFixed(1) : null,
+        };
+      });
+
+      const totalExames    = equipamentos.reduce((a, e) => a + e.totalExames,    0);
+      const totalPacientes = equipamentos.reduce((a, e) => a + e.totalPacientes, 0);
+      const uptimes = equipamentos.map(e => e.uptimeMedio).filter(v => v != null);
+
+      return {
+        unidadeId:    u.unidadeId,
+        nome:         u.nome,
+        totalExames,
+        totalPacientes,
+        uptimeMedio: uptimes.length ? +(uptimes.reduce((a, v) => a + v, 0) / uptimes.length).toFixed(1) : null,
+        equipamentos,
+      };
+    });
+
+    const totalExames    = unidades.reduce((a, u) => a + u.totalExames,    0);
+    const totalPacientes = unidades.reduce((a, u) => a + u.totalPacientes, 0);
+    const uptimesGlobal  = unidades.map(u => u.uptimeMedio).filter(v => v != null);
+
+    res.json({
+      periodo: { meses, inicio: inicio.toISOString().slice(0, 7) },
+      totais: {
+        exames:    totalExames,
+        pacientes: totalPacientes,
+        uptimeMedio: uptimesGlobal.length ? +(uptimesGlobal.reduce((a, v) => a + v, 0) / uptimesGlobal.length).toFixed(1) : null,
+      },
+      unidades,
+    });
+  } catch (err) {
+    console.error('[GEHC_BI_UTILIZACAO]', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
 

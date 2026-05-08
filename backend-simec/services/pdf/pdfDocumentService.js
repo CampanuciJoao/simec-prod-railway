@@ -609,6 +609,52 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
   return finalizeDocument(doc);
 }
 
+export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
+  const title = 'RELATORIO DE UTILIZACAO GE HEALTHCARE';
+  const doc = createDocument(title, options);
+  const { locale, timeZone } = options;
+
+  const { periodo, totais, unidades = [] } = payload;
+
+  drawSectionTitle(doc, 'Resumo geral');
+  infoRow(doc, 'Periodo', `Ultimos ${periodo?.meses ?? 12} meses`);
+  infoRow(doc, 'Total de exames', safeText(totais?.exames));
+  infoRow(doc, 'Total de pacientes', safeText(totais?.pacientes));
+  infoRow(doc, 'Uptime medio (contrato)', totais?.uptimeMedio != null ? `${totais.uptimeMedio}%` : 'N/A');
+
+  for (const unidade of unidades) {
+    drawSectionTitle(doc, `Unidade: ${safeText(unidade.nome)}`);
+    infoRow(doc, 'Total de exames', safeText(unidade.totalExames));
+    infoRow(doc, 'Total de pacientes', safeText(unidade.totalPacientes));
+    infoRow(doc, 'Uptime medio', unidade.uptimeMedio != null ? `${unidade.uptimeMedio}%` : 'N/A');
+
+    for (const eq of unidade.equipamentos ?? []) {
+      drawGroupHeader(doc, `${safeText(eq.nome)} — ${safeText(eq.tag)}`);
+      infoRow(doc, 'Total de exames', safeText(eq.totalExames));
+      infoRow(doc, 'Media exames/dia', eq.mediaExamesDia != null ? safeText(eq.mediaExamesDia) : 'N/A');
+      infoRow(doc, 'Uptime medio', eq.uptimeMedio != null ? `${eq.uptimeMedio}%` : 'N/A');
+
+      const rows = (eq.meses ?? []).map(m => [
+        m.mes ?? '—',
+        m.exames        != null ? String(m.exames)                          : '—',
+        m.pacientes     != null ? String(m.pacientes)                       : '—',
+        m.mediaExamesDia != null ? `${m.mediaExamesDia}/dia`                : '—',
+        m.duracaoMedia  != null ? `${m.duracaoMedia} min`                   : '—',
+        m.uptime        != null ? `${m.uptime}%`                            : '—',
+      ]);
+
+      drawTable(doc, {
+        headers:      ['Mes', 'Exames', 'Pacientes', 'Media/dia', 'Duracao', 'Uptime'],
+        columnWidths: [70, 55, 65, 65, 65, 55],
+        rows,
+        emptyMessage: 'Sem dados de utilizacao para este equipamento.',
+      });
+    }
+  }
+
+  return finalizeDocument(doc);
+}
+
 export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
   const title = 'RELATORIO DE SAUDE DO ATIVO';
   const doc = createDocument(title, options);

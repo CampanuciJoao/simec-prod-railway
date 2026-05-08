@@ -6,6 +6,7 @@ import {
   gerarPdfOcorrenciaBuffer,
   gerarPdfOSManutencaoBuffer,
   gerarPdfRelatorioBuffer,
+  gerarPdfUtilizacaoGehcBuffer,
 } from '../services/pdf/pdfDocumentService.js';
 import {
   obterDadosPdfBI,
@@ -226,6 +227,98 @@ router.get('/contrato/:id', async (req, res) => {
       return res.status(400).json({ message: 'ID do contrato inválido.' });
     }
     return res.status(500).json({ message: 'Erro ao gerar PDF do contrato.' });
+  }
+});
+
+// ─── GET /pdfs/gehc-utilizacao ───────────────────────────────────────────────
+router.get('/gehc-utilizacao', async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const meses = Math.min(Number(req.query.meses) || 12, 36);
+
+    const inicio = new Date();
+    inicio.setMonth(inicio.getMonth() - meses);
+    inicio.setDate(1);
+    inicio.setHours(0, 0, 0, 0);
+
+    const registros = await prisma.gehcUtilizacaoMensal.findMany({
+      where: { tenantId, mesReferencia: { gte: inicio } },
+      orderBy: { mesReferencia: 'asc' },
+      include: {
+        equipamento: {
+          select: {
+            id: true, apelido: true, modelo: true, tag: true, unidadeId: true,
+            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
+          },
+        },
+      },
+    });
+
+    function diasNoMes(date) {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+
+    const unidadeMap = new Map();
+    for (const r of registros) {
+      const eq = r.equipamento;
+      if (!eq) continue;
+      const uid = eq.unidadeId;
+      if (!unidadeMap.has(uid)) {
+        unidadeMap.set(uid, {
+          nome: eq.unidade?.nomeFantasia || eq.unidade?.nomeSistema || uid,
+          equipamentos: new Map(),
+        });
+      }
+      const uNode = unidadeMap.get(uid);
+      if (!uNode.equipamentos.has(eq.id)) {
+        uNode.equipamentos.set(eq.id, { nome: eq.apelido || eq.modelo || eq.tag, tag: eq.tag, meses: [] });
+      }
+      const dias = diasNoMes(r.mesReferencia);
+      uNode.equipamentos.get(eq.id).meses.push({
+        mes: r.mesReferencia.toISOString().slice(0, 7),
+        exames: r.examesTotal ?? null,
+        pacientes: r.pacientesTotal ?? null,
+        duracaoMedia: r.duracaoMediaMin ?? null,
+        uptime: r.uptimeContrato ?? null,
+        mediaExamesDia: r.examesTotal != null ? +(r.examesTotal / dias).toFixed(1) : null,
+      });
+    }
+
+    const unidades = [...unidadeMap.values()].map(u => {
+      const equipamentos = [...u.equipamentos.values()].map(eq => {
+        const totalExames = eq.meses.reduce((a, m) => a + (m.exames ?? 0), 0);
+        const totalPacientes = eq.meses.reduce((a, m) => a + (m.pacientes ?? 0), 0);
+        const mediasValidas = eq.meses.filter(m => m.mediaExamesDia != null);
+        const uptimes = eq.meses.filter(m => m.uptime != null).map(m => m.uptime);
+        return {
+          ...eq,
+          totalExames, totalPacientes,
+          mediaExamesDia: mediasValidas.length ? +(mediasValidas.reduce((a, m) => a + m.mediaExamesDia, 0) / mediasValidas.length).toFixed(1) : null,
+          uptimeMedio: uptimes.length ? +(uptimes.reduce((a, v) => a + v, 0) / uptimes.length).toFixed(1) : null,
+        };
+      });
+      const totalExames = equipamentos.reduce((a, e) => a + e.totalExames, 0);
+      const totalPacientes = equipamentos.reduce((a, e) => a + e.totalPacientes, 0);
+      const uptimes = equipamentos.map(e => e.uptimeMedio).filter(v => v != null);
+      return {
+        nome: u.nome, totalExames, totalPacientes,
+        uptimeMedio: uptimes.length ? +(uptimes.reduce((a, v) => a + v, 0) / uptimes.length).toFixed(1) : null,
+        equipamentos,
+      };
+    });
+
+    const totais = {
+      exames: unidades.reduce((a, u) => a + u.totalExames, 0),
+      pacientes: unidades.reduce((a, u) => a + u.totalPacientes, 0),
+      uptimeMedio: unidades.map(u => u.uptimeMedio).filter(v => v != null).reduce((a, v, _i, arr) => a + v / arr.length, 0) || null,
+    };
+
+    const buffer = await gerarPdfUtilizacaoGehcBuffer({ periodo: { meses }, totais, unidades }, getPdfOptions(req));
+    const ano = new Date().getFullYear();
+    return sendPdf(res, buffer, `utilizacao_ge_${ano}.pdf`);
+  } catch (err) {
+    console.error('[PDF_GEHC_UTILIZACAO]', err.message);
+    return res.status(500).json({ message: 'Erro ao gerar PDF de utilização GE.' });
   }
 });
 
