@@ -319,45 +319,32 @@ export async function fetchAssetConnectivity({ systemId, accessToken, idToken })
 
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
 
-// Variantes da query de ativos — tentadas em ordem até uma funcionar
-const ASSET_FIELDS = `
-  id
-  equipmentId
-  systemId
-  model
-  modality
-  productDescription
-`;
+// Variantes do campo raiz — tentadas em ordem até uma funcionar
+// assetsV2 não existe; candidatos baseados nos outros endpoints do CDX API
+const ASSET_FIELDS = `id equipmentId systemId model modality productDescription`;
 
 const QUERY_ASSETS_VARIANTS = [
-  // V1: sem wrapper intermediário — assetsV2 é lista direta
-  `query getAssets { assetsV2 { ${ASSET_FIELDS} } }`,
-  // V2: wrapper "assets" sem alias
-  `query getAssets { assetsV2 { assets { ${ASSET_FIELDS} } } }`,
-  // V3: wrapper "nodes" (padrão Relay)
-  `query getAssets { assetsV2 { nodes { ${ASSET_FIELDS} } } }`,
-  // V4: wrapper "edges > node" (padrão Relay completo)
-  `query getAssets { assetsV2 { edges { node { ${ASSET_FIELDS} } } } }`,
+  { q: `query { assets { id equipmentId systemId model modality productDescription } }`,                   extract: d => Array.isArray(d?.assets) ? d.assets : null },
+  { q: `query { assets { items { id equipmentId systemId model modality productDescription } } }`,         extract: d => d?.assets?.items ?? null },
+  { q: `query { assets { nodes { id equipmentId systemId model modality productDescription } } }`,         extract: d => d?.assets?.nodes ?? null },
+  { q: `query { myEquipment { items { id equipmentId systemId model modality productDescription } } }`,    extract: d => d?.myEquipment?.items ?? null },
+  { q: `query { myEquipment { id equipmentId systemId model modality productDescription } }`,              extract: d => Array.isArray(d?.myEquipment) ? d.myEquipment : null },
+  { q: `query { equipmentList { id equipmentId systemId model modality productDescription } }`,            extract: d => Array.isArray(d?.equipmentList) ? d.equipmentList : null },
 ];
 
 export async function fetchAllAssets({ accessToken, idToken }) {
-  for (const q of QUERY_ASSETS_VARIANTS) {
+  for (const { q, extract } of QUERY_ASSETS_VARIANTS) {
     try {
       const data = await query(q, {}, { accessToken, idToken });
-      // Cada variante tem estrutura diferente — tenta extrair o array
-      const result =
-        data?.assetsV2?.assets ??
-        data?.assetsV2?.nodes ??
-        data?.assetsV2?.edges?.map(e => e.node) ??
-        (Array.isArray(data?.assetsV2) ? data.assetsV2 : null);
+      const result = extract(data);
       if (result !== null) {
-        console.log(`[GEHC_GQL] fetchAllAssets OK com query variant: ${q.slice(0, 60)}...`);
+        console.log(`[GEHC_GQL] fetchAllAssets OK: ${q.slice(0, 70)}`);
         return result;
       }
     } catch (err) {
-      console.warn(`[GEHC_GQL] fetchAllAssets variante falhou: ${err.message.slice(0, 100)}`);
+      console.warn(`[GEHC_GQL] fetchAllAssets variante falhou (${q.slice(8, 30)}): ${err.message.slice(0, 120)}`);
     }
   }
-  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam.');
+  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam — verificar schema CDX.');
   return [];
 }
