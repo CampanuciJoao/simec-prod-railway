@@ -322,6 +322,7 @@ router.get('/', async (req, res) => {
             unidadeId: true,
             createdAt: true,
             updatedAt: true,
+            gehcAssetId: true,
           },
           orderBy: buildEquipamentosOrderBy(sortBy, sortDirection),
           take: pageSize,
