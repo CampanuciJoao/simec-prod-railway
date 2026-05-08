@@ -319,41 +319,45 @@ export async function fetchAssetConnectivity({ systemId, accessToken, idToken })
 
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
 
-const QUERY_ASSETS = `
-  query getAssets {
-    assetsV2 {
-      items: assets {
-        id
-        equipmentId
-        systemId
-        model
-        modality
-        productDescription
-        installDate
-        connectivityEnabled
-        displayHealthSection
-        physicalLocationAccount {
-          accountName
-          city
-          region
-          country
-        }
-        physicalLocationAddress {
-          accountName
-          city
-          country
-        }
-        manufacturing { manufacturer }
-        lifecycle {
-          status
-          endOfGuaranteedService { endOfServiceLifeDate }
-        }
-      }
-    }
-  }
+// Variantes da query de ativos — tentadas em ordem até uma funcionar
+const ASSET_FIELDS = `
+  id
+  equipmentId
+  systemId
+  model
+  modality
+  productDescription
 `;
 
+const QUERY_ASSETS_VARIANTS = [
+  // V1: sem wrapper intermediário — assetsV2 é lista direta
+  `query getAssets { assetsV2 { ${ASSET_FIELDS} } }`,
+  // V2: wrapper "assets" sem alias
+  `query getAssets { assetsV2 { assets { ${ASSET_FIELDS} } } }`,
+  // V3: wrapper "nodes" (padrão Relay)
+  `query getAssets { assetsV2 { nodes { ${ASSET_FIELDS} } } }`,
+  // V4: wrapper "edges > node" (padrão Relay completo)
+  `query getAssets { assetsV2 { edges { node { ${ASSET_FIELDS} } } } }`,
+];
+
 export async function fetchAllAssets({ accessToken, idToken }) {
-  const data = await query(QUERY_ASSETS, {}, { accessToken, idToken });
-  return data?.assetsV2?.items ?? [];
+  for (const q of QUERY_ASSETS_VARIANTS) {
+    try {
+      const data = await query(q, {}, { accessToken, idToken });
+      // Cada variante tem estrutura diferente — tenta extrair o array
+      const result =
+        data?.assetsV2?.assets ??
+        data?.assetsV2?.nodes ??
+        data?.assetsV2?.edges?.map(e => e.node) ??
+        (Array.isArray(data?.assetsV2) ? data.assetsV2 : null);
+      if (result !== null) {
+        console.log(`[GEHC_GQL] fetchAllAssets OK com query variant: ${q.slice(0, 60)}...`);
+        return result;
+      }
+    } catch (err) {
+      console.warn(`[GEHC_GQL] fetchAllAssets variante falhou: ${err.message.slice(0, 100)}`);
+    }
+  }
+  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam.');
+  return [];
 }
