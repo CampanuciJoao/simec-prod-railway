@@ -11,6 +11,20 @@ import {
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
+function temDadosDeSaude(snapshot) {
+  if (!snapshot) return false;
+
+  return [
+    snapshot.heliumLevelPct,
+    snapshot.heliumPressurePsi,
+    snapshot.compressorStatus,
+    snapshot.coolantTempC,
+    snapshot.coolantFlowGpm,
+    snapshot.cryocoolerStatus,
+    snapshot.magnetOnline,
+  ].some((value) => value !== null && value !== undefined);
+}
+
 export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, accessToken = null, idToken = null } = {}) {
   // Obtém tokens via auth service se não foram passados explicitamente
   if ((!accessToken || !idToken) && tenantId) {
@@ -74,8 +88,8 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       }
 
       const [healthData, connectivityData] = await Promise.allSettled([
-        fetchEquipmentHealth({ systemId: eq.gehcSystemId, accessToken, idToken }),
-        fetchAssetConnectivity({ systemId: eq.gehcSystemId, accessToken, idToken }),
+        fetchEquipmentHealth({ systemId: eq.gehcSystemId, accessToken, idToken, tenantId: eq.tenantId }),
+        fetchAssetConnectivity({ systemId: eq.gehcSystemId, accessToken, idToken, tenantId: eq.tenantId }),
       ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
 
       const snapshot = {
@@ -84,13 +98,20 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       };
       delete snapshot._raw;
 
+      if (!temDadosDeSaude(snapshot)) {
+        console.warn(
+          `[GEHC_MONITOR] ${nome}: leitura de saúde vazia — snapshot ignorado para não gravar captura sem métricas.`
+        );
+        continue;
+      }
+
       // Enriquece com uptime/utilização
       let uptimeData     = null;
       let utilizacaoData = null;
       if (accessToken && idToken) {
         [uptimeData, utilizacaoData] = await Promise.allSettled([
-          fetchUptimeData({ assetId: eq.gehcAssetId, accessToken, idToken }),
-          fetchUtilizationData({ assetId: eq.gehcAssetId, accessToken, idToken }),
+          fetchUptimeData({ assetId: eq.gehcAssetId, accessToken, idToken, tenantId: eq.tenantId }),
+          fetchUtilizationData({ assetId: eq.gehcAssetId, accessToken, idToken, tenantId: eq.tenantId }),
         ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
       }
 

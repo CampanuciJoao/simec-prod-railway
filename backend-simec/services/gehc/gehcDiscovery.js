@@ -45,7 +45,7 @@ async function listarRmsGe(tenantId) {
     );
   }
 
-  const assetsGe = await fetchAllAssets(tokens);
+  const assetsGe = await fetchAllAssets({ ...tokens, tenantId });
   const rmsGe = assetsGe.filter(a => {
     const texto = `${a.modality ?? ''} ${a.model ?? ''} ${a.productDescription ?? ''}`.toUpperCase();
     return texto.includes('MR') || texto.includes('RM') || texto.includes('RESSONANCIA') ||
@@ -159,7 +159,7 @@ export async function vincularEquipamentoManual(tenantId, equipamentoId, gehcAss
   let gehcSystemId = null;
   try {
     const tokens = await obterTokensGehc(tenantId);
-    const assets = await fetchAllAssets(tokens);
+    const assets = await fetchAllAssets({ ...tokens, tenantId });
     const found  = assets.find(a => a.id === gehcAssetId || a.equipmentId === gehcAssetId);
     gehcSystemId = found?.systemId ?? null;
   } catch {

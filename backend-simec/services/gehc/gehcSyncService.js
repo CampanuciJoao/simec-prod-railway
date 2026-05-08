@@ -11,7 +11,7 @@ import {
 // ─── Sync de contrato/cobertura ───────────────────────────────────────────────
 
 async function sincronizarContrato(tenantId, equipamentoId, assetId, tokens) {
-  const coverage = await fetchAssetCoverage({ assetId, ...tokens });
+  const coverage = await fetchAssetCoverage({ assetId, tenantId, ...tokens });
   if (!coverage) return null;
 
   const contrato = coverage.coverage?.contractDetails ?? {};
@@ -43,7 +43,7 @@ async function sincronizarContrato(tenantId, equipamentoId, assetId, tokens) {
 // ─── Sync de histórico de OS ──────────────────────────────────────────────────
 
 async function sincronizarOrdensServico(tenantId, equipamentoId, assetId, tokens) {
-  const items = await fetchServiceHistory({ assetId, ...tokens, maxRows: 100 });
+  const items = await fetchServiceHistory({ assetId, tenantId, ...tokens, maxRows: 100 });
   if (!items?.length) return 0;
 
   let novas = 0;
@@ -87,8 +87,8 @@ async function sincronizarOrdensServico(tenantId, equipamentoId, assetId, tokens
 
 async function sincronizarUtilizacao(tenantId, equipamentoId, assetId, tokens) {
   const [uptime, utilizacao] = await Promise.allSettled([
-    fetchUptimeData({ assetId, ...tokens }),
-    fetchUtilizationData({ assetId, ...tokens, diasRetroativos: 365 }),
+    fetchUptimeData({ assetId, tenantId, ...tokens }),
+    fetchUtilizationData({ assetId, tenantId, ...tokens, diasRetroativos: 365 }),
   ]).then(r => r.map(res => res.status === 'fulfilled' ? res.value : null));
 
   const mesesUptime = uptime?.uptimeMonthlyAggregates ?? [];

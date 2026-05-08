@@ -60,7 +60,7 @@ router.get('/status', async (req, res) => {
         ? { configurado: true, capturedAt: temToken.capturedAt, expiresAt: temToken.expiresAt }
         : { configurado: false },
       ultimosSnapshots: ultimosSnapshots.map(s => ({
-        equipamento:       s.equipamento?.apelido || s.equipamento?.tag,
+        equipamento:       s.equipamento?.apelido || s.equipamento?.modelo || s.equipamento?.tag,
         capturedAt:        s.capturedAt,
         heliumLevelPct:    s.heliumLevelPct,
         heliumPressurePsi: s.heliumPressurePsi,

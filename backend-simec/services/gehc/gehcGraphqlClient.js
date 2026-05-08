@@ -1,19 +1,6 @@
-import prisma from '../prismaService.js';
+import { invalidarTokensGehc, obterTokensGehc } from './gehcAuthService.js';
 
-const CDX_URL     = 'https://cx-us-prd-services.cloud.gehealthcare.com/la-prd-shared-services-cdx-api-gateway';
-const REFRESH_URL = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
-
-// ─── Auth ─────────────────────────────────────────────────────────────────────
-
-async function refreshTokens(refreshToken) {
-  const res = await fetch(REFRESH_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-  });
-  if (!res.ok) throw new Error(`RefreshToken falhou: ${res.status}`);
-  return res.json();
-}
+const CDX_URL = 'https://cx-us-prd-services.cloud.gehealthcare.com/la-prd-shared-services-cdx-api-gateway';
 
 function buildHeaders(accessToken, idToken) {
   return {
@@ -26,7 +13,41 @@ function buildHeaders(accessToken, idToken) {
   };
 }
 
-async function query(graphqlQuery, variables, { accessToken, idToken }) {
+function ehErroDeAutenticacaoGehc(status, body = '', errors = []) {
+  if (status === 401 || status === 403) return true;
+
+  const bodyText = String(body || '').toLowerCase();
+  if (
+    bodyText.includes('jwt expired') ||
+    bodyText.includes('authentication_error') ||
+    bodyText.includes('unauthorized')
+  ) {
+    return true;
+  }
+
+  return errors.some((error) => {
+    const message = String(error?.message || '').toLowerCase();
+    const code = String(error?.extensions?.code || '').toUpperCase();
+    return (
+      message.includes('jwt expired') ||
+      message.includes('unauthorized') ||
+      code === 'AUTHENTICATION_ERROR'
+    );
+  });
+}
+
+async function repetirComNovosTokens(graphqlQuery, variables, tenantId) {
+  console.warn(`[GEHC_GQL] Token expirado para tenant ${tenantId} — renovando autenticação e repetindo query.`);
+  await invalidarTokensGehc(tenantId);
+  const novosTokens = await obterTokensGehc(tenantId);
+  return query(graphqlQuery, variables, {
+    ...novosTokens,
+    tenantId,
+    retryingAuth: true,
+  });
+}
+
+async function query(graphqlQuery, variables, { accessToken, idToken, tenantId = null, retryingAuth = false }) {
   let res;
   try {
     res = await fetch(CDX_URL, {
@@ -40,11 +61,19 @@ async function query(graphqlQuery, variables, { accessToken, idToken }) {
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    if (!retryingAuth && tenantId && ehErroDeAutenticacaoGehc(res.status, body)) {
+      return repetirComNovosTokens(graphqlQuery, variables, tenantId);
+    }
     throw new Error(`GE API HTTP ${res.status}: ${body.slice(0, 200)}`);
   }
 
   const json = await res.json();
-  if (json.errors) throw new Error(json.errors[0]?.message ?? 'GraphQL error');
+  if (json.errors) {
+    if (!retryingAuth && tenantId && ehErroDeAutenticacaoGehc(res.status, '', json.errors)) {
+      return repetirComNovosTokens(graphqlQuery, variables, tenantId);
+    }
+    throw new Error(json.errors[0]?.message ?? 'GraphQL error');
+  }
   return json.data;
 }
 
@@ -96,7 +125,7 @@ const QUERY_SERVICE_EVENTS = `
   }
 `;
 
-export async function fetchServiceHistory({ assetId, accessToken, idToken, maxRows = 200 }) {
+export async function fetchServiceHistory({ assetId, accessToken, idToken, tenantId = null, maxRows = 200 }) {
   const allItems = [];
   let cursorMark = '';
   const rows = 50;
@@ -113,7 +142,7 @@ export async function fetchServiceHistory({ assetId, accessToken, idToken, maxRo
         pageOffset: { cursorMark, rows },
         sort: { requestedDateTime: 'desc' },
       },
-    }, { accessToken, idToken });
+    }, { accessToken, idToken, tenantId });
 
     const items = data?.collection?.items ?? [];
     allItems.push(...items);
@@ -145,8 +174,8 @@ const QUERY_UPTIME = `
   }
 `;
 
-export async function fetchUptimeData({ assetId, accessToken, idToken }) {
-  const data = await query(QUERY_UPTIME, { assetId }, { accessToken, idToken });
+export async function fetchUptimeData({ assetId, accessToken, idToken, tenantId = null }) {
+  const data = await query(QUERY_UPTIME, { assetId }, { accessToken, idToken, tenantId });
   return data?.uptime ?? null;
 }
 
@@ -181,7 +210,7 @@ const QUERY_UTILIZATION = `
   }
 `;
 
-export async function fetchUtilizationData({ assetId, accessToken, idToken, diasRetroativos = 90 }) {
+export async function fetchUtilizationData({ assetId, accessToken, idToken, tenantId = null, diasRetroativos = 90 }) {
   const endDate   = new Date();
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - diasRetroativos);
@@ -195,7 +224,7 @@ export async function fetchUtilizationData({ assetId, accessToken, idToken, dias
         startDate: startDate.toISOString(),
       },
     },
-  }, { accessToken, idToken });
+  }, { accessToken, idToken, tenantId });
 
   return data?.utilization ?? null;
 }
@@ -234,8 +263,8 @@ const QUERY_COVERAGE = `
   }
 `;
 
-export async function fetchAssetCoverage({ assetId, accessToken, idToken }) {
-  const data = await query(QUERY_COVERAGE, { assetId }, { accessToken, idToken });
+export async function fetchAssetCoverage({ assetId, accessToken, idToken, tenantId = null }) {
+  const data = await query(QUERY_COVERAGE, { assetId }, { accessToken, idToken, tenantId });
   return data?.asset ?? null;
 }
 
@@ -290,8 +319,8 @@ const QUERY_ASSET_CONNECTIVITY = `
   }
 `;
 
-export async function fetchEquipmentHealth({ systemId, accessToken, idToken }) {
-  const data = await query(QUERY_EQUIPMENT_HEALTH, { systemId }, { accessToken, idToken });
+export async function fetchEquipmentHealth({ systemId, accessToken, idToken, tenantId = null }) {
+  const data = await query(QUERY_EQUIPMENT_HEALTH, { systemId }, { accessToken, idToken, tenantId });
   const h = data?.equipmentHealth;
   if (!h) return null;
 
@@ -309,8 +338,8 @@ export async function fetchEquipmentHealth({ systemId, accessToken, idToken }) {
   };
 }
 
-export async function fetchAssetConnectivity({ systemId, accessToken, idToken }) {
-  const data = await query(QUERY_ASSET_CONNECTIVITY, { systemId }, { accessToken, idToken });
+export async function fetchAssetConnectivity({ systemId, accessToken, idToken, tenantId = null }) {
+  const data = await query(QUERY_ASSET_CONNECTIVITY, { systemId }, { accessToken, idToken, tenantId });
   const c = data?.assetConnectivity;
   if (!c) return null;
   return {
@@ -323,7 +352,7 @@ export async function fetchAssetConnectivity({ systemId, accessToken, idToken })
 // Schema: assets(queryContext: {pageOffset: {cursorMark, rows}}) { totalRows nextCursorMark assets { ... } }
 // Confirmado via engenharia reversa (introspection desabilitada no CDX).
 
-export async function fetchAllAssets({ accessToken, idToken, maxRows = 500 }) {
+export async function fetchAllAssets({ accessToken, idToken, tenantId = null, maxRows = 500 }) {
   const allAssets = [];
   let cursorMark = '';
   const rows = 100;
@@ -338,7 +367,7 @@ export async function fetchAllAssets({ accessToken, idToken, maxRows = 500 }) {
         }
       }`,
       {},
-      { accessToken, idToken }
+      { accessToken, idToken, tenantId }
     );
 
     const page = data?.assets?.assets ?? [];
