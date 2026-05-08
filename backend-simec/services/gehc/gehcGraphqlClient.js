@@ -22,15 +22,27 @@ function buildHeaders(accessToken, idToken) {
     'idtoken':       idToken,
     'Origin':        'https://www.gehealthcare.com.br',
     'Referer':       'https://www.gehealthcare.com.br/',
+    'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
   };
 }
 
 async function query(graphqlQuery, variables, { accessToken, idToken }) {
-  const res = await fetch(CDX_URL, {
-    method:  'POST',
-    headers: buildHeaders(accessToken, idToken),
-    body:    JSON.stringify({ query: graphqlQuery, variables }),
-  });
+  let res;
+  try {
+    res = await fetch(CDX_URL, {
+      method:  'POST',
+      headers: buildHeaders(accessToken, idToken),
+      body:    JSON.stringify({ query: graphqlQuery, variables }),
+    });
+  } catch (err) {
+    throw new Error(`GE API inacessível: ${err.message}`);
+  }
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`GE API HTTP ${res.status}: ${body.slice(0, 200)}`);
+  }
+
   const json = await res.json();
   if (json.errors) throw new Error(json.errors[0]?.message ?? 'GraphQL error');
   return json.data;
