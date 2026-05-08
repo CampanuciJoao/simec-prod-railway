@@ -12,11 +12,6 @@ import {
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
 export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, accessToken = null, idToken = null } = {}) {
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    console.warn('[GEHC_MONITOR] GEHC_LOGIN/GEHC_PASSWORD não configurados — pulando monitoramento.');
-    return;
-  }
-
   // Obtém tokens via auth service se não foram passados explicitamente
   if ((!accessToken || !idToken) && tenantId) {
     try {
