@@ -106,11 +106,18 @@ export async function capturarTokensViaPlaywright(tenantId) {
 
   const CDX_HOST = 'cx-us-prd-services.cloud.gehealthcare.com';
 
-  // Estratégia 1: interceptar requests de saída para a API CDX — o SPA envia
-  // accesstoken e idtoken nos headers de todas as chamadas GraphQL
+  // Estratégia 1: interceptar requests de saída para a API CDX
   page.on('request', (request) => {
     if (!request.url().includes(CDX_HOST)) return;
     const h = request.headers();
+    // Loga o corpo da requisição para revelar a query GraphQL real do portal
+    const body = request.postData();
+    if (body) {
+      try {
+        const parsed = JSON.parse(body);
+        console.log('[GEHC_AUTH] CDX query capturada:', JSON.stringify({ operationName: parsed.operationName, query: parsed.query?.slice(0, 300) }));
+      } catch { /* ignorar */ }
+    }
     if (h['accesstoken'] && h['idtoken']) {
       console.log('[GEHC_AUTH] Tokens capturados via header de request CDX.');
       resolveToken({ accessToken: h['accesstoken'], idToken: h['idtoken'], refreshToken: null, expiresAt: null });
