@@ -39,7 +39,7 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
     }
   }
 
-  if (compressorStatus && compressorStatus !== 'LIGADO') {
+  if (compressorStatus && compressorStatus !== 'ON') {
     alertas.push({
       evento: ALERT_EVENTOS.GEHC_COMPRESSOR_OFF,
       prioridade: ALERT_PRIORIDADES.ALTA,
