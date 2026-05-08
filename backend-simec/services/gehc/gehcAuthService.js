@@ -178,9 +178,14 @@ export async function capturarTokensViaPlaywright(tenantId) {
     await page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }).catch(() => {});
 
     // Força o SPA a chamar a API CDX navegando para a lista de equipamentos
-    // — isso dispara requisições GraphQL com os tokens nos headers
     await page.goto('https://www.gehealthcare.com.br/myequipment', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     console.log('[GEHC_AUTH] Navegando para myequipment para forçar chamadas à API CDX...');
+
+    // Aguarda networkidle para que o SPA faça TODAS as chamadas GraphQL (incluindo listagem de equipamentos)
+    // antes de capturar os tokens — o listener de 'request' loga cada query CDX feita neste período
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
+      console.log('[GEHC_AUTH] networkidle timeout — prosseguindo com tokens já capturados.');
+    });
 
     const tokensCaptured = await Promise.race([
       tokenPromise,
