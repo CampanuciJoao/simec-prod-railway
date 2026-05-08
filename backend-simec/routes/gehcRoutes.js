@@ -392,7 +392,7 @@ router.get('/equipamento/:equipamentoId/historico/grafico', async (req, res) => 
   const { inicio, fim } = req.query;
 
   const dataInicio = inicio ? new Date(inicio) : new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
-  const dataFim    = fim    ? new Date(fim)    : new Date();
+  const dataFim    = fim    ? new Date(fim + 'T23:59:59.999Z') : new Date();
 
   try {
     const snapshots = await prisma.gehcSaudeSnapshot.findMany({
@@ -456,7 +456,7 @@ router.get('/equipamento/:equipamentoId/historico', async (req, res) => {
     tenantId,
     equipamentoId,
     ...(inicio || fim
-      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim) }) } }
+      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim + 'T23:59:59.999Z') }) } }
       : {}),
   };
 
@@ -493,7 +493,7 @@ router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
     tenantId,
     equipamentoId,
     ...(inicio || fim
-      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim) }) } }
+      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim + 'T23:59:59.999Z') }) } }
       : {}),
   };
 
@@ -541,7 +541,7 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
     tenantId,
     equipamentoId,
     ...(inicio || fim
-      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim) }) } }
+      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim + 'T23:59:59.999Z') }) } }
       : {}),
   };
 
