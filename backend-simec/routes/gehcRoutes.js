@@ -7,7 +7,6 @@ import { sincronizarDadosGehc } from '../services/gehc/gehcSyncService.js';
 import { capturarTokensViaPlaywright, invalidarTokensGehc } from '../services/gehc/gehcAuthService.js';
 
 const router = express.Router();
-router.use(proteger);
 
 // ─── GET /api/gehc/status ─────────────────────────────────────────────────────
 router.get('/status', async (req, res) => {
