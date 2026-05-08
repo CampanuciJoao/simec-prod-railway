@@ -2,6 +2,9 @@ import { invalidarTokensGehc, obterTokensGehc } from './gehcAuthService.js';
 
 const CDX_URL = 'https://cx-us-prd-services.cloud.gehealthcare.com/la-prd-shared-services-cdx-api-gateway';
 
+// Deduplicação de renovação de tokens por tenant — evita múltiplos Playwright simultâneos
+const renovacaoPorTenant = new Map();
+
 function buildHeaders(accessToken, idToken) {
   return {
     'Content-Type':  'application/json',
@@ -38,8 +41,18 @@ function ehErroDeAutenticacaoGehc(status, body = '', errors = []) {
 
 async function repetirComNovosTokens(graphqlQuery, variables, tenantId) {
   console.warn(`[GEHC_GQL] Token expirado para tenant ${tenantId} — renovando autenticação e repetindo query.`);
-  await invalidarTokensGehc(tenantId);
-  const novosTokens = await obterTokensGehc(tenantId);
+
+  if (!renovacaoPorTenant.has(tenantId)) {
+    const renovacao = (async () => {
+      await invalidarTokensGehc(tenantId);
+      return obterTokensGehc(tenantId);
+    })().finally(() => renovacaoPorTenant.delete(tenantId));
+    renovacaoPorTenant.set(tenantId, renovacao);
+  } else {
+    console.log(`[GEHC_GQL] Aguardando renovação de token já em andamento para tenant ${tenantId}.`);
+  }
+
+  const novosTokens = await renovacaoPorTenant.get(tenantId);
   return query(graphqlQuery, variables, {
     ...novosTokens,
     tenantId,
