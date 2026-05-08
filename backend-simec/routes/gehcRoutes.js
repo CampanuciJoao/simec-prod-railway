@@ -4,7 +4,13 @@ import { proteger, admin } from '../middleware/authMiddleware.js';
 import { descobrirEquipamentosGehc, vincularEquipamentoManual, desvincularEquipamento } from '../services/gehc/gehcDiscovery.js';
 import { monitorarSaudeGehc, obterUltimoSnapshotGehc } from '../services/gehc/gehcMonitor.js';
 import { sincronizarDadosGehc } from '../services/gehc/gehcSyncService.js';
-import { capturarTokensViaPlaywright, invalidarTokensGehc } from '../services/gehc/gehcAuthService.js';
+import {
+  capturarTokensViaPlaywright,
+  invalidarTokensGehc,
+  salvarCredenciais,
+  removerCredenciais,
+  temCredenciaisConfiguradas,
+} from '../services/gehc/gehcAuthService.js';
 
 const router = express.Router();
 
@@ -32,7 +38,7 @@ router.get('/status', async (req, res) => {
           take: 10,
           include: { equipamento: { select: { tag: true, apelido: true, modelo: true } } },
         }),
-        prisma.gehcToken.findUnique({ where: { tenantId }, select: { capturedAt: true, expiresAt: true } }),
+        prisma.gehcToken.findUnique({ where: { tenantId }, select: { capturedAt: true, expiresAt: true, gehcLogin: true, accessToken: true } }),
       ]);
 
     res.json({
@@ -40,7 +46,8 @@ router.get('/status', async (req, res) => {
       rmsSeVinculo: semVinculo,
       snapshots: { total: totalSnapshots },
       alertasAtivos,
-      auth: temToken
+      credenciais: { configurado: !!(temToken?.gehcLogin || process.env.GEHC_LOGIN) },
+      auth: temToken?.accessToken
         ? { configurado: true, capturedAt: temToken.capturedAt, expiresAt: temToken.expiresAt }
         : { configurado: false },
       ultimosSnapshots: ultimosSnapshots.map(s => ({
@@ -59,12 +66,34 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// ─── POST /api/gehc/credenciais ───────────────────────────────────────────────
+router.post('/credenciais', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { login, password } = req.body;
+  if (!login || !password) return res.status(400).json({ error: 'login e password são obrigatórios.' });
+  try {
+    await salvarCredenciais(tenantId, login, password);
+    res.json({ ok: true, mensagem: 'Credenciais salvas. Clique em "Vincular equipamentos" para autenticar.' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /api/gehc/credenciais ─────────────────────────────────────────────
+router.delete('/credenciais', admin, async (req, res) => {
+  try {
+    await removerCredenciais(req.usuario.tenantId);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST /api/gehc/auth ──────────────────────────────────────────────────────
-// Força login e captura de tokens (normalmente automático)
 router.post('/auth', admin, async (req, res) => {
   const tenantId = req.usuario.tenantId;
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    return res.status(503).json({ error: 'GEHC_LOGIN e GEHC_PASSWORD não configurados.' });
+  if (!(await temCredenciaisConfiguradas(tenantId))) {
+    return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
   try {
     await capturarTokensViaPlaywright(tenantId);
@@ -75,7 +104,6 @@ router.post('/auth', admin, async (req, res) => {
 });
 
 // ─── DELETE /api/gehc/auth ────────────────────────────────────────────────────
-// Invalida tokens (força novo login na próxima operação)
 router.delete('/auth', admin, async (req, res) => {
   await invalidarTokensGehc(req.usuario.tenantId);
   res.json({ ok: true });
@@ -84,8 +112,8 @@ router.delete('/auth', admin, async (req, res) => {
 // ─── POST /api/gehc/discovery ─────────────────────────────────────────────────
 router.post('/discovery', admin, async (req, res) => {
   const tenantId = req.usuario.tenantId;
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    return res.status(503).json({ error: 'GEHC_LOGIN e GEHC_PASSWORD não configurados.' });
+  if (!(await temCredenciaisConfiguradas(tenantId))) {
+    return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
   try {
     console.log(`[GEHC_ROUTE] Discovery iniciado para tenant ${tenantId}`);
@@ -114,8 +142,8 @@ router.post('/discovery', admin, async (req, res) => {
 // ─── POST /api/gehc/monitor ───────────────────────────────────────────────────
 router.post('/monitor', admin, async (req, res) => {
   const tenantId = req.usuario.tenantId;
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    return res.status(503).json({ error: 'Credenciais GE não configuradas.' });
+  if (!(await temCredenciaisConfiguradas(tenantId))) {
+    return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
   try {
     await monitorarSaudeGehc({ tenantId });
@@ -129,8 +157,8 @@ router.post('/monitor', admin, async (req, res) => {
 // Sincroniza contratos, OS, utilização e uptime de todos os equipamentos vinculados
 router.post('/sync', admin, async (req, res) => {
   const tenantId = req.usuario.tenantId;
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    return res.status(503).json({ error: 'Credenciais GE não configuradas.' });
+  if (!(await temCredenciaisConfiguradas(tenantId))) {
+    return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
   try {
     console.log(`[GEHC_ROUTE] Sync iniciado para tenant ${tenantId}`);
