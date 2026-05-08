@@ -56,15 +56,15 @@ if (!firstOutput.includes('P3005')) {
   process.exit(first.status ?? 1);
 }
 
-console.log('[migrate] P3005 detectado — realizando baseline das migrations existentes...');
+// P3005 significa que o banco foi criado via db push (sem _prisma_migrations).
+// Nesse caso o schema já está atualizado, então fazemos baseline de TODAS as
+// migrations para registrar o histórico. O migrate deploy seguinte não encontra
+// nada pendente e encerra com sucesso.
+console.log('[migrate] P3005 detectado — realizando baseline de todas as migrations...');
 
 const migrations = getMigrationNames();
 
-// Baseline todas EXCETO a ultima — a ultima precisa ter seu SQL executado pelo deploy.
-// Se houver mais de uma migration nova, ajuste o slice abaixo.
-const toBaseline = migrations.slice(0, -1);
-
-for (const name of toBaseline) {
+for (const name of migrations) {
   const r = run(`npx prisma migrate resolve --applied "${name}"`, { silent: true });
   const out = (r.stdout ?? '') + (r.stderr ?? '');
   if (r.status === 0 || out.includes('already recorded')) {
@@ -74,7 +74,7 @@ for (const name of toBaseline) {
   }
 }
 
-console.log(`[migrate] Baseline concluido. Executando SQL da migration: ${migrations.at(-1)}`);
+console.log('[migrate] Baseline concluido. Verificando migrations pendentes...');
 
 const second = run('npx prisma migrate deploy');
 process.exit(second.status ?? 0);

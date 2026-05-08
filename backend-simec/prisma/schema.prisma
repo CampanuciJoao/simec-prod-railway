@@ -46,6 +46,11 @@ model Tenant {
   orcamentos           Orcamento[]
   osCorretivas         OsCorretiva[]
   visitasTerceiro      VisitaTerceiro[]
+  gehcSaudeSnapshots   GehcSaudeSnapshot[]
+  gehcToken            GehcToken?
+  gehcContratos        GehcContrato[]
+  gehcOrdensServico    GehcOrdemServico[]
+  gehcUtilizacao       GehcUtilizacaoMensal[]
 
   @@map("tenants")
 }
@@ -147,6 +152,13 @@ model Equipamento {
   riskScore     Int?
   riskLevel     String?
   riskUpdatedAt DateTime?
+
+  gehcAssetId        String?  @map("gehc_asset_id")
+  gehcSystemId       String?  @map("gehc_system_id")
+  gehcSaudeSnapshots GehcSaudeSnapshot[]
+  gehcContrato       GehcContrato?
+  gehcOrdensServico  GehcOrdemServico[]
+  gehcUtilizacao     GehcUtilizacaoMensal[]
 
   @@unique([tenantId, tag])
   @@unique([tenantId, aeTitle])
@@ -651,6 +663,118 @@ enum AgentStep {
   AGUARDANDO_CONFIRMACAO
   FINALIZADO
   CANCELADO
+}
+
+model GehcSaudeSnapshot {
+  id            String   @id @default(uuid())
+  tenantId      String
+  equipamentoId String   @map("equipamento_id")
+  capturedAt    DateTime @default(now()) @map("captured_at")
+
+  heliumLevelPct     Float?  @map("helium_level_pct")
+  heliumPressurePsi  Float?  @map("helium_pressure_psi")
+  compressorStatus   String? @map("compressor_status")
+  coolantFlowGpm     Float?  @map("coolant_flow_gpm")
+  coolantTempC       Float?  @map("coolant_temp_c")
+  cryocoolerStatus   String? @map("cryocooler_status")
+  magnetOnline       Boolean? @map("magnet_online")
+  equipmentOnline    Boolean? @map("equipment_online")
+
+  rawJson String? @db.Text @map("raw_json")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, equipamentoId, capturedAt(sort: Desc)])
+  @@index([tenantId, capturedAt(sort: Desc)])
+  @@map("gehc_saude_snapshots")
+}
+
+// ─── GE Health Cloud — Auth tokens ───────────────────────────────────────────
+model GehcToken {
+  id           String    @id @default(uuid())
+  tenantId     String    @unique
+  accessToken  String    @db.Text @map("access_token")
+  idToken      String    @db.Text @map("id_token")
+  refreshToken String?   @db.Text @map("refresh_token")
+  expiresAt    DateTime? @map("expires_at")
+  capturedAt   DateTime  @default(now()) @map("captured_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("gehc_tokens")
+}
+
+// ─── GE Health Cloud — Contrato/Cobertura por equipamento ────────────────────
+model GehcContrato {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  equipamentoId      String    @map("equipamento_id")
+  contractName       String?   @map("contract_name")
+  contractStatus     String?   @map("contract_status")
+  contractStart      DateTime? @map("contract_start")
+  contractExpiration DateTime? @map("contract_expiration")
+  warrantyStatus     String?   @map("warranty_status")
+  warrantyExpiration DateTime? @map("warranty_expiration")
+  entitlements       String?   @db.Text
+  assetCoverageType  String?   @map("asset_coverage_type")
+  rawJson            String?   @db.Text @map("raw_json")
+  sincronizadoEm     DateTime  @default(now()) @map("sincronizado_em")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, equipamentoId])
+  @@index([tenantId])
+  @@map("gehc_contratos")
+}
+
+// ─── GE Health Cloud — Ordens de Serviço (histórico) ─────────────────────────
+model GehcOrdemServico {
+  id                 String    @id @default(uuid())
+  tenantId           String
+  equipamentoId      String    @map("equipamento_id")
+  gehcServiceId      String    @map("gehc_service_id")
+  problemDescription String?   @db.Text @map("problem_description")
+  trackingNumber     String?   @map("tracking_number")
+  serviceTypeCode    String?   @map("service_type_code")
+  serviceStateCode   String?   @map("service_state_code")
+  requestedAt        DateTime? @map("requested_at")
+  scheduledDate      DateTime? @map("scheduled_date")
+  engineerName       String?   @map("engineer_name")
+  correctiveAction   String?   @db.Text @map("corrective_action")
+  rawJson            String?   @db.Text @map("raw_json")
+  sincronizadoEm     DateTime  @default(now()) @map("sincronizado_em")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([gehcServiceId])
+  @@index([tenantId, equipamentoId, requestedAt(sort: Desc)])
+  @@map("gehc_ordens_servico")
+}
+
+// ─── GE Health Cloud — Utilização e Uptime mensais ───────────────────────────
+model GehcUtilizacaoMensal {
+  id              String   @id @default(uuid())
+  tenantId        String
+  equipamentoId   String   @map("equipamento_id")
+  mesReferencia   DateTime @map("mes_referencia")
+  pacientesTotal  Int?     @map("pacientes_total")
+  examesTotal     Int?     @map("exames_total")
+  duracaoMediaMin Float?   @map("duracao_media_min")
+  uptimeContrato  Float?   @map("uptime_contrato")
+  uptimeClock     Float?   @map("uptime_clock")
+  sincronizadoEm  DateTime @default(now()) @map("sincronizado_em")
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, equipamentoId, mesReferencia])
+  @@index([tenantId, equipamentoId, mesReferencia(sort: Desc)])
+  @@map("gehc_utilizacao_mensal")
 }
 
 model AgentSession {

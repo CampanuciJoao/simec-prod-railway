@@ -5,6 +5,8 @@ import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasO
 import { processarAlertasManutencaoDoTenant } from './services/alertas/manutencao/index.js';
 import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
 import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
+import { monitorarSaudeGehc } from './services/gehc/gehcMonitor.js';
+import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -71,6 +73,46 @@ const alertasWorker = new Worker(
     if (job?.name === 'cleanup-retencao-dados') {
       const result = await executarCleanupCompleto();
       return { ok: true, ...result };
+    }
+
+    if (job?.name === 'gehc-monitorar-saude') {
+      const tenants = await prisma.tenant.findMany({
+        where: { ativo: true },
+        select: { id: true },
+      });
+
+      const resultados = [];
+      for (const tenant of tenants) {
+        try {
+          await monitorarSaudeGehc({ tenantId: tenant.id });
+          resultados.push({ tenantId: tenant.id, ok: true });
+        } catch (err) {
+          console.error(`[GEHC_WORKER] Erro tenant ${tenant.id}:`, err.message);
+          resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+        }
+      }
+
+      return { ok: true, tenants: resultados.length, resultados };
+    }
+
+    if (job?.name === 'gehc-sync-dados') {
+      const tenants = await prisma.tenant.findMany({
+        where: { ativo: true },
+        select: { id: true },
+      });
+
+      const resultados = [];
+      for (const tenant of tenants) {
+        try {
+          const r = await sincronizarDadosGehc({ tenantId: tenant.id });
+          resultados.push({ tenantId: tenant.id, ok: true, total: r?.total ?? 0 });
+        } catch (err) {
+          console.error(`[GEHC_SYNC_WORKER] Erro tenant ${tenant.id}:`, err.message);
+          resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+        }
+      }
+
+      return { ok: true, tenants: resultados.length, resultados };
     }
 
     return processarAlertasEEnviarNotificacoes();
