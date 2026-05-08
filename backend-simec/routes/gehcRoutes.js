@@ -590,5 +590,76 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
   }
 });
 
+// ─── GET /api/gehc/alertas/suspensoes ────────────────────────────────────────
+// Lista suspensões ativas (não expiradas) do tenant
+router.get('/alertas/suspensoes', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  try {
+    const suspensoes = await prisma.gehcAlertaSuspensao.findMany({
+      where: { tenantId, suspensoAte: { gt: new Date() } },
+      orderBy: { suspensoAte: 'asc' },
+    });
+
+    // Enriquece com nome do equipamento
+    const equipIds = [...new Set(suspensoes.map(s => s.equipamentoId).filter(Boolean))];
+    const equipamentos = equipIds.length > 0
+      ? await prisma.equipamento.findMany({
+          where: { tenantId, id: { in: equipIds } },
+          select: { id: true, apelido: true, modelo: true, tag: true },
+        })
+      : [];
+    const equipMap = Object.fromEntries(equipamentos.map(e => [e.id, e]));
+
+    res.json(suspensoes.map(s => ({
+      ...s,
+      equipamento: s.equipamentoId ? equipMap[s.equipamentoId] ?? null : null,
+    })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/alertas/suspensoes ───────────────────────────────────────
+// Cria uma suspensão temporária de alertas
+router.post('/alertas/suspensoes', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { equipamentoId, tipoEvento, motivo, duracaoHoras } = req.body;
+
+  if (!duracaoHoras || duracaoHoras <= 0) {
+    return res.status(400).json({ error: 'duracaoHoras deve ser maior que zero.' });
+  }
+
+  const suspensoAte = new Date(Date.now() + duracaoHoras * 60 * 60 * 1000);
+
+  try {
+    const suspensao = await prisma.gehcAlertaSuspensao.create({
+      data: {
+        tenantId,
+        equipamentoId: equipamentoId || null,
+        tipoEvento:    tipoEvento    || null,
+        motivo:        motivo        || null,
+        suspensoAte,
+        criadoPor: req.usuario.id,
+      },
+    });
+    res.status(201).json(suspensao);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /api/gehc/alertas/suspensoes/:id ──────────────────────────────────
+// Remove uma suspensão antes do prazo
+router.delete('/alertas/suspensoes/:id', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { id } = req.params;
+  try {
+    await prisma.gehcAlertaSuspensao.deleteMany({ where: { id, tenantId } });
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
 

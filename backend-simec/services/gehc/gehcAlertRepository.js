@@ -3,15 +3,25 @@ import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
 
-const THRESHOLDS = {
-  heliumWarn:     70,
-  heliumCritical: 30,
-  tempWarn:       18,
-  tempCritical:   25,
-  flowMin:        1.5,
-  pressureMin:    0.8,
-  pressureMax:    1.5,
+export const THRESHOLDS = {
+  heliumWarn:          70,
+  heliumCritical:      30,
+  tempWarn:            18,
+  tempCritical:        25,
+  flowMin:             1.5,
+  pressureMin:         0.8,
+  pressureMax:         1.5,
   pressureCriticalMax: 2.0,
+};
+
+// Labels agrupados por métrica: permite saber quais alertas resolver quando a condição normaliza
+const LABELS_POR_METRICA = {
+  heliumLevelPct:    ['helio-critico', 'helio-baixo'],
+  compressorStatus:  ['compressor-off'],
+  coolantTempC:      ['temp-critica', 'temp-alta'],
+  coolantFlowGpm:    ['fluxo-baixo'],
+  heliumPressurePsi: ['pressao-critica', 'pressao-alta'],
+  magnetOnline:      ['magneto-offline'],
 };
 
 function regrasDeAlerta(snapshot, equipamentoNome) {
@@ -19,7 +29,7 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
   const { heliumLevelPct, heliumPressurePsi, compressorStatus,
           coolantTempC, coolantFlowGpm, magnetOnline } = snapshot;
 
-  if (heliumLevelPct !== null) {
+  if (heliumLevelPct !== null && heliumLevelPct !== undefined) {
     if (heliumLevelPct < THRESHOLDS.heliumCritical) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_HELIO_CRITICO,
@@ -49,7 +59,7 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
     });
   }
 
-  if (coolantTempC !== null) {
+  if (coolantTempC !== null && coolantTempC !== undefined) {
     if (coolantTempC > THRESHOLDS.tempCritical) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_TEMPERATURA_ALTA,
@@ -69,7 +79,7 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
     }
   }
 
-  if (coolantFlowGpm !== null && coolantFlowGpm < THRESHOLDS.flowMin) {
+  if (coolantFlowGpm !== null && coolantFlowGpm !== undefined && coolantFlowGpm < THRESHOLDS.flowMin) {
     alertas.push({
       evento: ALERT_EVENTOS.GEHC_FLUXO_BAIXO,
       prioridade: ALERT_PRIORIDADES.MEDIA,
@@ -79,7 +89,7 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
     });
   }
 
-  if (heliumPressurePsi !== null) {
+  if (heliumPressurePsi !== null && heliumPressurePsi !== undefined) {
     if (heliumPressurePsi > THRESHOLDS.pressureCriticalMax || heliumPressurePsi < THRESHOLDS.pressureMin) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_PRESSAO_ANORMAL,
@@ -113,9 +123,63 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
 }
 
 export async function processarAlertasGehc({ tenantId, equipamentoId, equipamentoNome, snapshot }) {
-  const regras = regrasDeAlerta(snapshot, equipamentoNome);
-  let criados = 0;
+  // Verifica suspensões ativas para este equipamento/tenant
+  const now = new Date();
+  const suspensoes = await prisma.gehcAlertaSuspensao.findMany({
+    where: {
+      tenantId,
+      suspensoAte: { gt: now },
+      OR: [
+        { equipamentoId: null },
+        { equipamentoId },
+      ],
+    },
+    select: { equipamentoId: true, tipoEvento: true },
+  });
 
+  // Suspensão global do equipamento (ou de todos os equipamentos do tenant)
+  const suspensoTudo = suspensoes.some(s => s.tipoEvento === null);
+  if (suspensoTudo) {
+    console.log(`[GEHC_ALERT] Alertas suspensos para ${equipamentoNome} — pulando processamento.`);
+    return { criados: 0, total: 0, suspenso: true };
+  }
+
+  const eventosSuspensos = new Set(
+    suspensoes.filter(s => s.tipoEvento !== null).map(s => s.tipoEvento)
+  );
+
+  // Computa regras e filtra eventos suspensos
+  const todasRegras = regrasDeAlerta(snapshot, equipamentoNome);
+  const regras = todasRegras.filter(r => !eventosSuspensos.has(r.evento));
+
+  const labelsAtivos = new Set(regras.map(r => r.label));
+  let mudouContagem = false;
+
+  // Auto-resolução: remove alertas cujas condições normalizaram (métrica tem dado mas não atingiu threshold)
+  const idsParaResolver = [];
+  for (const [metrica, labels] of Object.entries(LABELS_POR_METRICA)) {
+    const valor = snapshot[metrica];
+    if (valor !== null && valor !== undefined) {
+      for (const label of labels) {
+        if (!labelsAtivos.has(label)) {
+          idsParaResolver.push(buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, label));
+        }
+      }
+    }
+  }
+
+  if (idsParaResolver.length > 0) {
+    const { count } = await prisma.alerta.deleteMany({
+      where: { tenantId, id: { in: idsParaResolver } },
+    });
+    if (count > 0) {
+      mudouContagem = true;
+      console.log(`[GEHC_ALERT] ${equipamentoNome}: ${count} alerta(s) resolvido(s) automaticamente.`);
+    }
+  }
+
+  // Cria ou atualiza alertas ativos
+  let criados = 0;
   for (const regra of regras) {
     const alertaId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, regra.label);
 
@@ -146,10 +210,11 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
         },
       });
       criados++;
+      mudouContagem = true;
     }
   }
 
-  if (criados > 0) {
+  if (mudouContagem) {
     await publicarContagemAlertasParaTenant({ tenantId });
   }
 

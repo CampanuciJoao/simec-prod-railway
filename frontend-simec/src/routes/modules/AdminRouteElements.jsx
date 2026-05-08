@@ -2,6 +2,7 @@ import { Navigate, Route } from 'react-router-dom';
 
 import AdminRoute from '@/components/routes/AdminRoute';
 import {
+  AlertasGePage,
   GerenciamentoPage,
   GerenciarUsuariosPage,
   IntegracoesPage,
@@ -24,6 +25,7 @@ function AdminRouteElements() {
       <Route path="empresa"     element={<TenantSettingsPage />} />
       <Route path="auditoria"   element={<LogAuditoriaPage />} />
       <Route path="integracoes" element={<IntegracoesPage />} />
+      <Route path="alertas-ge"  element={<AlertasGePage />} />
     </Route>
   );
 }

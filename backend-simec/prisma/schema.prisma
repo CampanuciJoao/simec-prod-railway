@@ -51,6 +51,7 @@ model Tenant {
   gehcContratos        GehcContrato[]
   gehcOrdensServico    GehcOrdemServico[]
   gehcUtilizacao       GehcUtilizacaoMensal[]
+  gehcAlertaSuspensoes GehcAlertaSuspensao[]
 
   @@map("tenants")
 }
@@ -777,6 +778,24 @@ model GehcUtilizacaoMensal {
   @@unique([tenantId, equipamentoId, mesReferencia])
   @@index([tenantId, equipamentoId, mesReferencia(sort: Desc)])
   @@map("gehc_utilizacao_mensal")
+}
+
+// ─── GE Health Cloud — Suspensão temporária de alertas ───────────────────────
+model GehcAlertaSuspensao {
+  id            String    @id @default(uuid())
+  tenantId      String
+  equipamentoId String?   @map("equipamento_id")
+  tipoEvento    String?   @map("tipo_evento")
+  motivo        String?
+  suspensoAte   DateTime  @map("suspenso_ate")
+  criadoPor     String    @map("criado_por")
+  criadoEm      DateTime  @default(now()) @map("criado_em")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, suspensoAte])
+  @@index([tenantId, equipamentoId])
+  @@map("gehc_alerta_suspensoes")
 }
 
 model AgentSession {

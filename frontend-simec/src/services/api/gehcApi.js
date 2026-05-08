@@ -44,3 +44,12 @@ export const postGehcCredenciais = (login, password) =>
 
 export const deleteGehcCredenciais = () =>
   api.delete('/gehc/credenciais').then((res) => res.data);
+
+export const getGehcSuspensoes = () =>
+  api.get('/gehc/alertas/suspensoes').then((res) => res.data);
+
+export const postGehcSuspensao = (dados) =>
+  api.post('/gehc/alertas/suspensoes', dados).then((res) => res.data);
+
+export const deleteGehcSuspensao = (id) =>
+  api.delete(`/gehc/alertas/suspensoes/${id}`).then((res) => res.data);

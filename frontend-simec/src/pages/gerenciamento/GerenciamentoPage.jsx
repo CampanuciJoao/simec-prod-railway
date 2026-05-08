@@ -2,6 +2,7 @@ import React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faBan,
   faBuilding,
   faCogs,
   faPlug,
@@ -39,6 +40,12 @@ function GerenciamentoPage() {
       label: 'Integracoes',
       icon: <FontAwesomeIcon icon={faPlug} />,
       path: '/gerenciamento/integracoes',
+    },
+    {
+      id: 'alertas-ge',
+      label: 'Alertas GE',
+      icon: <FontAwesomeIcon icon={faBan} />,
+      path: '/gerenciamento/alertas-ge',
     },
   ];
 
