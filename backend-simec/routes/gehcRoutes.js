@@ -26,7 +26,7 @@ router.get('/status', async (req, res) => {
           select: { id: true, tag: true, apelido: true, modelo: true },
         }),
         prisma.gehcSaudeSnapshot.count({ where: { tenantId } }),
-        prisma.alerta.count({ where: { tenantId, tipo: 'GEHC_SAUDE', resolvidoEm: null } }),
+        prisma.alerta.count({ where: { tenantId, tipo: 'GEHC_SAUDE' } }),
         prisma.gehcSaudeSnapshot.findMany({
           where: { tenantId },
           orderBy: { capturedAt: 'desc' },
