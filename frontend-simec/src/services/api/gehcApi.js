@@ -18,6 +18,12 @@ export const getGehcOS = (equipamentoId, limite = 50) =>
 export const getGehcUtilizacao = (equipamentoId, meses = 12) =>
   api.get(`/gehc/equipamento/${equipamentoId}/utilizacao`, { params: { meses } }).then((res) => res.data);
 
+export const getGehcHistoricoGrafico = (equipamentoId, { inicio, fim } = {}) =>
+  api.get(`/gehc/equipamento/${equipamentoId}/historico/grafico`, { params: { inicio, fim } }).then((r) => r.data);
+
+export const getGehcHistorico = (equipamentoId, { inicio, fim, pagina = 1, limite = 50 } = {}) =>
+  api.get(`/gehc/equipamento/${equipamentoId}/historico`, { params: { inicio, fim, pagina, limite } }).then((r) => r.data);
+
 export const postGehcDiscovery = () =>
   api.post('/gehc/discovery').then((res) => res.data);
 
