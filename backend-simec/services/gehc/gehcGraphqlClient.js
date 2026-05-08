@@ -351,59 +351,77 @@ export async function introspectSchema({ accessToken, idToken }) {
 }
 
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
+// Confirmado via logs: assets(queryContext:{}) é o campo correto.
+// Introspection desabilitada — descoberta via tentativa/erro com __typename e totalRows.
 
 export async function fetchAllAssets({ accessToken, idToken }) {
-  // Passo 1: introspection — descobre campos raiz do Query type
+  // Passo 1: descobrir o tipo de retorno via __typename (funciona mesmo sem introspection)
   try {
-    const data = await query(`{
-      __type(name: "Query") {
-        fields { name type { name kind ofType { name kind } } }
-      }
-    }`, {}, { accessToken, idToken });
-    const nomes = (data?.__type?.fields ?? []).map(f => f.name);
-    console.log('[GEHC_GQL] Schema Query fields:', nomes.join(', '));
-    const candidatos = nomes.filter(n => /asset|equipment|device/i.test(n));
-    if (candidatos.length) console.log('[GEHC_GQL] Candidatos de listagem:', candidatos.join(', '));
+    const data = await query(`query { assets(queryContext: {}) { __typename } }`, {}, { accessToken, idToken });
+    if (data?.assets?.__typename) {
+      console.log('[GEHC_GQL] assets(queryContext:{}) __typename:', data.assets.__typename);
+    } else {
+      console.log('[GEHC_GQL] assets(queryContext:{}) raw:', JSON.stringify(data?.assets));
+    }
   } catch (err) {
-    console.warn('[GEHC_GQL] Introspection desabilitada ou falhou:', err.message);
+    console.warn('[GEHC_GQL] assets __typename falhou:', err.message);
   }
 
-  // Passo 2: tentar variantes com labels claros e erros completos
+  // Passo 2: verificar estrutura de paginação (padrão serviceEventsV2)
+  try {
+    const data = await query(
+      `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 1}}) { totalRows nextCursorMark } }`,
+      {}, { accessToken, idToken }
+    );
+    if (data?.assets !== undefined) {
+      console.log('[GEHC_GQL] assets paginado:', JSON.stringify(data.assets));
+    }
+  } catch (err) {
+    console.warn('[GEHC_GQL] assets paginado falhou:', err.message);
+  }
+
+  // Passo 3: variantes de seleção — todas usam assets(queryContext:{...}) que sabemos ser válido
   const variants = [
+    // Arrays paginados (padrão serviceEventsV2)
     {
-      label: 'assets(queryContext:{})',
+      label: 'assets-paged-items-id-eq',
+      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows items { id equipmentId systemId model modality productDescription } } }`,
+      extract: d => d?.assets?.items ?? null,
+    },
+    {
+      label: 'assets-paged-items-assetId',
+      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows items { assetId serialNumber systemId model modality productDescription } } }`,
+      extract: d => (d?.assets?.items ?? null)?.map(a => ({ id: a.assetId, equipmentId: a.serialNumber, systemId: a.systemId, model: a.model, modality: a.modality, productDescription: a.productDescription })),
+    },
+    {
+      label: 'assets-paged-assets-id',
+      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows assets { id equipmentId systemId model modality productDescription } } }`,
+      extract: d => d?.assets?.assets ?? null,
+    },
+    {
+      label: 'assets-paged-nodes',
+      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows nodes { id equipmentId systemId model modality productDescription } } }`,
+      extract: d => d?.assets?.nodes ?? null,
+    },
+    // Arrays diretos (sem paginação)
+    {
+      label: 'assets-flat-id',
       q: `query { assets(queryContext: {}) { id equipmentId systemId model modality productDescription } }`,
       extract: d => Array.isArray(d?.assets) ? d.assets : null,
     },
     {
-      label: 'assetList',
-      q: `query { assetList { id equipmentId systemId model modality productDescription } }`,
-      extract: d => Array.isArray(d?.assetList) ? d.assetList : null,
+      label: 'assets-flat-assetId',
+      q: `query { assets(queryContext: {}) { assetId serialNumber systemId model modality productDescription } }`,
+      extract: d => Array.isArray(d?.assets) ? d.assets.map(a => ({ id: a.assetId, equipmentId: a.serialNumber, ...a })) : null,
     },
+    // Diagnóstico: só totalRows sem campos aninhados
     {
-      label: 'accountAssets',
-      q: `query { accountAssets { id equipmentId systemId model modality productDescription } }`,
-      extract: d => Array.isArray(d?.accountAssets) ? d.accountAssets : null,
-    },
-    {
-      label: 'myEquipment.assets',
-      q: `query { myEquipment { assets { id equipmentId systemId model modality productDescription } } }`,
-      extract: d => Array.isArray(d?.myEquipment?.assets) ? d.myEquipment.assets : null,
-    },
-    {
-      label: 'assets.items',
-      q: `query { assets { items { id equipmentId systemId model modality productDescription } } }`,
-      extract: d => d?.assets?.items ?? null,
-    },
-    {
-      label: 'assets.data',
-      q: `query { assets { data { id equipmentId systemId } } }`,
-      extract: d => d?.assets?.data ?? null,
-    },
-    {
-      label: 'assets{totalCount}',
-      q: `query { assets { totalCount } }`,
-      extract: d => { if (d?.assets !== undefined) console.log('[GEHC_GQL] assets{} raw:', JSON.stringify(d.assets)); return null; },
+      label: 'assets-totalRows-only',
+      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 1}}) { totalRows } }`,
+      extract: d => {
+        if (d?.assets?.totalRows !== undefined) console.log('[GEHC_GQL] assets totalRows:', d.assets.totalRows);
+        return null;
+      },
     },
   ];
 
