@@ -299,6 +299,7 @@ function UltimosSnapshots({ snapshots }) {
                 Hélio: {s.heliumLevelPct}%
               </span>
             )}
+            {s.heliumPressurePsi != null && <span>Pressão: {s.heliumPressurePsi} PSI</span>}
             {s.compressorStatus && <span>Compressor: {s.compressorStatus}</span>}
             {s.coolantTempC != null && <span>Temp: {s.coolantTempC}°C</span>}
             <span style={{ color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)' }}>
