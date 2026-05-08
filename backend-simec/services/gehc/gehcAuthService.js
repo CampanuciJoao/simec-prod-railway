@@ -101,17 +101,30 @@ export async function capturarTokensViaPlaywright(tenantId) {
   const context = await browser.newContext();
   const page    = await context.newPage();
 
-  // Promessa que resolve assim que a resposta com tokens chegar — sem esperar o resto da página
   let resolveToken, rejectToken;
   const tokenPromise = new Promise((res, rej) => { resolveToken = res; rejectToken = rej; });
 
+  const CDX_HOST = 'cx-us-prd-services.cloud.gehealthcare.com';
+
+  // Estratégia 1: interceptar requests de saída para a API CDX — o SPA envia
+  // accesstoken e idtoken nos headers de todas as chamadas GraphQL
+  page.on('request', (request) => {
+    if (!request.url().includes(CDX_HOST)) return;
+    const h = request.headers();
+    if (h['accesstoken'] && h['idtoken']) {
+      console.log('[GEHC_AUTH] Tokens capturados via header de request CDX.');
+      resolveToken({ accessToken: h['accesstoken'], idToken: h['idtoken'], refreshToken: null, expiresAt: null });
+    }
+  });
+
+  // Estratégia 2: interceptar resposta JSON com access_token (OAuth token endpoint)
   page.on('response', async (response) => {
     if (response.status() < 200 || response.status() >= 300) return;
     if (!(response.headers()['content-type'] ?? '').includes('json')) return;
     try {
       const json = await response.json().catch(() => null);
       if (json?.access_token && json?.id_token) {
-        console.log('[GEHC_AUTH] Tokens capturados via interceptação de resposta.');
+        console.log('[GEHC_AUTH] Tokens capturados via resposta JSON OAuth.');
         resolveToken({
           accessToken:  json.access_token,
           idToken:      json.id_token,
@@ -154,33 +167,16 @@ export async function capturarTokensViaPlaywright(tenantId) {
     }
     console.log('[GEHC_AUTH] Credenciais enviadas, aguardando tokens...');
 
-    // Espera pela resposta com tokens OU por eles aparecerem no localStorage
-    // (SSO pode injetar tokens via JS sem passar por resposta de rede visível)
-    const lsPoller = new Promise((res) => {
-      const interval = setInterval(async () => {
-        const found = await page.evaluate(() => {
-          for (const key of Object.keys(localStorage)) {
-            try {
-              const val = JSON.parse(localStorage.getItem(key));
-              if (val?.access_token && val?.id_token) return val;
-              if (val?.AccessToken && val?.IdToken) return { access_token: val.AccessToken, id_token: val.IdToken, refresh_token: val.RefreshToken };
-            } catch { /* ignorar */ }
-          }
-          const a = localStorage.getItem('access_token');
-          const i = localStorage.getItem('id_token');
-          if (a && i) return { access_token: a, id_token: i, refresh_token: localStorage.getItem('refresh_token') };
-          return null;
-        }).catch(() => null);
-        if (found) {
-          clearInterval(interval);
-          res({ accessToken: found.access_token, idToken: found.id_token, refreshToken: found.refresh_token ?? null, expiresAt: null });
-        }
-      }, 1000);
-    });
+    // Aguarda a página autenticar (URL muda ou inputs somem)
+    await page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }).catch(() => {});
+
+    // Força o SPA a chamar a API CDX navegando para a lista de equipamentos
+    // — isso dispara requisições GraphQL com os tokens nos headers
+    await page.goto('https://www.gehealthcare.com.br/myequipment', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    console.log('[GEHC_AUTH] Navegando para myequipment para forçar chamadas à API CDX...');
 
     const tokensCaptured = await Promise.race([
       tokenPromise,
-      lsPoller,
       new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout aguardando tokens após login (45s)')), 45000)),
     ]);
 
