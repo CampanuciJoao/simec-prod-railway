@@ -4,4 +4,3 @@ export { default as TabAnexos } from './TabAnexos';
 export { default as TabHistorico } from './TabHistorico';
 export { default as TabCobertura } from './TabCobertura';
 export { default as TabVisaoGeral } from './TabVisaoGeral';
-export { default as TabSaudeGehc } from './TabSaudeGehc';
