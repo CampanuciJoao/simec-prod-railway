@@ -101,71 +101,76 @@ export async function capturarTokensViaPlaywright(tenantId) {
   const context = await browser.newContext();
   const page    = await context.newPage();
 
-  let tokensCaptured = null;
+  // Promessa que resolve assim que a resposta com tokens chegar — sem esperar o resto da página
+  let resolveToken, rejectToken;
+  const tokenPromise = new Promise((res, rej) => { resolveToken = res; rejectToken = rej; });
 
   page.on('response', async (response) => {
-    if (tokensCaptured) return;
-    const ct = response.headers()['content-type'] ?? '';
-    if (!ct.includes('json')) return;
     if (response.status() < 200 || response.status() >= 300) return;
+    if (!(response.headers()['content-type'] ?? '').includes('json')) return;
     try {
       const json = await response.json().catch(() => null);
       if (json?.access_token && json?.id_token) {
-        tokensCaptured = {
+        console.log('[GEHC_AUTH] Tokens capturados via interceptação de resposta.');
+        resolveToken({
           accessToken:  json.access_token,
           idToken:      json.id_token,
           refreshToken: json.refresh_token ?? null,
           expiresAt:    json.expires_in ? new Date(Date.now() + json.expires_in * 1000) : null,
-        };
-        console.log('[GEHC_AUTH] Tokens capturados via interceptação de resposta.');
+        });
       }
     } catch { /* ignorar */ }
   });
 
   try {
-    await page.goto(GEHC_PORTAL_URL, { waitUntil: 'networkidle', timeout: 30000 });
+    // domcontentloaded: não espera scripts de analytics — só o DOM
+    await page.goto(GEHC_PORTAL_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
-    await page.locator('input[name="username"], input[type="email"]').first().fill(login);
-    await page.locator('input[name="password"], input[type="password"]').first().fill(password);
-    await page.keyboard.press('Enter');
-    await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+    const emailInput = page.locator('input[name="username"], input[type="email"], input[name="email"]').first();
+    await emailInput.waitFor({ timeout: 15000 });
+    await emailInput.fill(login);
 
-    if (!tokensCaptured) {
-      const lsTokens = await page.evaluate(() => {
-        const keys = Object.keys(localStorage);
-        for (const key of keys) {
-          try {
-            const val = JSON.parse(localStorage.getItem(key));
-            if (val?.access_token && val?.id_token) return val;
-            if (val?.AccessToken && val?.IdToken) return { access_token: val.AccessToken, id_token: val.IdToken, refresh_token: val.RefreshToken };
-          } catch { /* ignora */ }
+    const passInput = page.locator('input[name="password"], input[type="password"]').first();
+    await passInput.waitFor({ timeout: 10000 });
+    await passInput.fill(password);
+    await passInput.press('Enter');
+
+    // Espera pela resposta com tokens OU por eles aparecerem no localStorage
+    // (SSO pode injetar tokens via JS sem passar por resposta de rede visível)
+    const lsPoller = new Promise((res) => {
+      const interval = setInterval(async () => {
+        const found = await page.evaluate(() => {
+          for (const key of Object.keys(localStorage)) {
+            try {
+              const val = JSON.parse(localStorage.getItem(key));
+              if (val?.access_token && val?.id_token) return val;
+              if (val?.AccessToken && val?.IdToken) return { access_token: val.AccessToken, id_token: val.IdToken, refresh_token: val.RefreshToken };
+            } catch { /* ignorar */ }
+          }
+          const a = localStorage.getItem('access_token');
+          const i = localStorage.getItem('id_token');
+          if (a && i) return { access_token: a, id_token: i, refresh_token: localStorage.getItem('refresh_token') };
+          return null;
+        }).catch(() => null);
+        if (found) {
+          clearInterval(interval);
+          res({ accessToken: found.access_token, idToken: found.id_token, refreshToken: found.refresh_token ?? null, expiresAt: null });
         }
-        const access  = localStorage.getItem('access_token') || localStorage.getItem('CognitoAccessToken');
-        const id      = localStorage.getItem('id_token')     || localStorage.getItem('CognitoIdToken');
-        const refresh = localStorage.getItem('refresh_token')|| localStorage.getItem('CognitoRefreshToken');
-        if (access && id) return { access_token: access, id_token: id, refresh_token: refresh };
-        return null;
-      }).catch(() => null);
+      }, 1000);
+    });
 
-      if (lsTokens) {
-        tokensCaptured = {
-          accessToken:  lsTokens.access_token,
-          idToken:      lsTokens.id_token,
-          refreshToken: lsTokens.refresh_token ?? null,
-          expiresAt:    null,
-        };
-        console.log('[GEHC_AUTH] Tokens encontrados no localStorage.');
-      }
-    }
-
-    if (!tokensCaptured) {
-      throw new Error('Login realizado mas nenhum token JWT foi capturado. Verifique as credenciais ou o fluxo de autenticação do portal.');
-    }
+    const tokensCaptured = await Promise.race([
+      tokenPromise,
+      lsPoller,
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout aguardando tokens após login (45s)')), 45000)),
+    ]);
 
     await salvarTokens(tenantId, tokensCaptured);
     console.log(`[GEHC_AUTH] Tokens salvos para tenant ${tenantId}.`);
     return tokensCaptured;
+  } catch (err) {
+    rejectToken?.(err);
+    throw err;
   } finally {
     await browser.close();
   }
