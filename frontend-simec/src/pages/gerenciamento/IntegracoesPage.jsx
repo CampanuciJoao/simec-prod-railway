@@ -284,7 +284,7 @@ function ListaVinculados({ lista, vincularState, onDesvincular }) {
 // ─── Seção: últimos snapshots ─────────────────────────────────────────────────
 
 function UltimosSnapshots({ snapshots }) {
-  if (!snapshots?.length) return <InlineEmptyState message="Nenhum snapshot capturado ainda." />;
+  if (!snapshots?.length) return <InlineEmptyState message="Nenhum equipamento vinculado possui captura de saúde válida ainda." />;
   return (
     <div className="space-y-2">
       {snapshots.map((s, i) => (
@@ -481,7 +481,7 @@ function IntegracoesPage() {
       {/* ── Últimos snapshots ── */}
       <PageSection
         title="Últimas capturas de saúde"
-        description={`${status?.snapshots?.total ?? 0} snapshot(s) no total. Exibindo os 10 mais recentes.`}
+        description={`${status?.snapshots?.equipamentosSincronizados ?? 0} equipamento(s) vinculados com captura válida. Exibindo apenas a leitura mais recente de cada um.`}
       >
         <UltimosSnapshots snapshots={status?.ultimosSnapshots} />
       </PageSection>

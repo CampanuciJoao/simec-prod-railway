@@ -14,6 +14,19 @@ import {
 
 const router = express.Router();
 
+const whereSnapshotValido = {
+  OR: [
+    { heliumLevelPct: { not: null } },
+    { heliumPressurePsi: { not: null } },
+    { compressorStatus: { not: null } },
+    { coolantTempC: { not: null } },
+    { coolantFlowGpm: { not: null } },
+    { cryocoolerStatus: { not: null } },
+    { magnetOnline: { not: null } },
+    { equipmentOnline: { not: null } },
+  ],
+};
+
 // Filtro para RMs GE: fabricante contém "GE" + tipo é "Ressonância Magnética" ou contém "RM"
 const whereRmGe = {
   fabricante: { contains: 'GE', mode: 'insensitive' },
@@ -27,7 +40,7 @@ const whereRmGe = {
 router.get('/status', async (req, res) => {
   const tenantId = req.usuario.tenantId;
   try {
-    const [total, vinculados, semVinculo, totalSnapshots, alertasAtivos, ultimosSnapshots, temToken] =
+    const [total, vinculados, semVinculo, totalSnapshots, alertasAtivos, snapshotsValidos, temToken] =
       await Promise.all([
         prisma.equipamento.count({
           where: { tenantId, ...whereRmGe },
@@ -42,33 +55,61 @@ router.get('/status', async (req, res) => {
         prisma.gehcSaudeSnapshot.count({ where: { tenantId } }),
         prisma.alerta.count({ where: { tenantId, tipo: 'GEHC_SAUDE' } }),
         prisma.gehcSaudeSnapshot.findMany({
-          where: { tenantId },
+          where: {
+            tenantId,
+            ...whereSnapshotValido,
+            equipamento: {
+              gehcAssetId: { not: null },
+            },
+          },
           orderBy: { capturedAt: 'desc' },
-          take: 10,
-          include: { equipamento: { select: { tag: true, apelido: true, modelo: true } } },
+          take: 200,
+          include: { equipamento: { select: { id: true, tag: true, apelido: true, modelo: true, gehcAssetId: true } } },
         }),
         prisma.gehcToken.findUnique({ where: { tenantId }, select: { capturedAt: true, expiresAt: true, gehcLogin: true, accessToken: true } }),
       ]);
 
+    const equipamentosSincronizadosIds = new Set();
+    const ultimosSnapshots = [];
+
+    for (const snapshot of snapshotsValidos) {
+      const equipamentoId = snapshot.equipamento?.id;
+      if (!equipamentoId || !snapshot.equipamento?.gehcAssetId) continue;
+
+      equipamentosSincronizadosIds.add(equipamentoId);
+
+      if (ultimosSnapshots.some((item) => item.equipamentoId === equipamentoId)) {
+        continue;
+      }
+
+      ultimosSnapshots.push({
+        equipamentoId,
+        equipamento: snapshot.equipamento?.apelido || snapshot.equipamento?.modelo || snapshot.equipamento?.tag,
+        capturedAt: snapshot.capturedAt,
+        heliumLevelPct: snapshot.heliumLevelPct,
+        heliumPressurePsi: snapshot.heliumPressurePsi,
+        compressorStatus: snapshot.compressorStatus,
+        coolantTempC: snapshot.coolantTempC,
+        magnetOnline: snapshot.magnetOnline,
+        equipmentOnline: snapshot.equipmentOnline,
+      });
+
+      if (ultimosSnapshots.length >= 10) break;
+    }
+
     res.json({
       rmsGe: { total, vinculadas: vinculados, semVinculo: semVinculo.length },
       rmsSeVinculo: semVinculo,
-      snapshots: { total: totalSnapshots },
+      snapshots: {
+        total: totalSnapshots,
+        equipamentosSincronizados: equipamentosSincronizadosIds.size,
+      },
       alertasAtivos,
       credenciais: { configurado: !!(temToken?.gehcLogin || process.env.GEHC_LOGIN) },
       auth: temToken?.accessToken
         ? { configurado: true, capturedAt: temToken.capturedAt, expiresAt: temToken.expiresAt }
         : { configurado: false },
-      ultimosSnapshots: ultimosSnapshots.map(s => ({
-        equipamento:       s.equipamento?.apelido || s.equipamento?.modelo || s.equipamento?.tag,
-        capturedAt:        s.capturedAt,
-        heliumLevelPct:    s.heliumLevelPct,
-        heliumPressurePsi: s.heliumPressurePsi,
-        compressorStatus:  s.compressorStatus,
-        coolantTempC:      s.coolantTempC,
-        magnetOnline:      s.magnetOnline,
-        equipmentOnline:   s.equipmentOnline,
-      })),
+      ultimosSnapshots,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
