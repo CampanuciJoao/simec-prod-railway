@@ -15,7 +15,7 @@ function ehRmGe(equipamento) {
   if (!equipamento) return false;
   const fabricante = (equipamento.fabricante ?? '').toUpperCase();
   const tipo       = (equipamento.tipo ?? '').toUpperCase();
-  return fabricante.includes('GE') && tipo.includes('RM');
+  return fabricante.includes('GE') && (tipo.includes('RM') || tipo.includes('RESSONAN'));
 }
 
 export function useDetalhesEquipamentoPage() {
