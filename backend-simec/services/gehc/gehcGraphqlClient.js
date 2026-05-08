@@ -319,127 +319,36 @@ export async function fetchAssetConnectivity({ systemId, accessToken, idToken })
   };
 }
 
-// ─── Introspection completa do schema CDX ─────────────────────────────────────
-
-export async function introspectSchema({ accessToken, idToken }) {
-  const result = { queryFields: null, knownTypes: {}, error: null };
-
-  try {
-    const data = await query(`{
-      __type(name: "Query") {
-        fields {
-          name
-          args { name type { name kind ofType { name kind } } }
-          type { name kind ofType { name kind ofType { name kind } } }
-        }
-      }
-    }`, {}, { accessToken, idToken });
-    result.queryFields = data?.__type?.fields ?? [];
-  } catch (err) {
-    result.error = `Introspection Query falhou: ${err.message}`;
-  }
-
-  const candidateTypes = ['AssetsResult', 'AssetCollection', 'AssetList', 'AssetPage', 'Assets'];
-  for (const typeName of candidateTypes) {
-    try {
-      const data = await query(`{ __type(name: "${typeName}") { fields { name type { name kind } } } }`, {}, { accessToken, idToken });
-      if (data?.__type?.fields?.length) {
-        result.knownTypes[typeName] = data.__type.fields.map(f => f.name);
-      }
-    } catch { /* ignorar tipos inexistentes */ }
-  }
-
-  return result;
-}
-
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
-// Confirmado via logs: assets(queryContext:{}) é o campo correto.
-// Introspection desabilitada — descoberta via tentativa/erro com __typename e totalRows.
+// Schema: assets(queryContext: {pageOffset: {cursorMark, rows}}) { totalRows nextCursorMark assets { ... } }
+// Confirmado via engenharia reversa (introspection desabilitada no CDX).
 
-export async function fetchAllAssets({ accessToken, idToken }) {
-  // Passo 1: descobrir o tipo de retorno via __typename (funciona mesmo sem introspection)
-  try {
-    const data = await query(`query { assets(queryContext: {}) { __typename } }`, {}, { accessToken, idToken });
-    if (data?.assets?.__typename) {
-      console.log('[GEHC_GQL] assets(queryContext:{}) __typename:', data.assets.__typename);
-    } else {
-      console.log('[GEHC_GQL] assets(queryContext:{}) raw:', JSON.stringify(data?.assets));
-    }
-  } catch (err) {
-    console.warn('[GEHC_GQL] assets __typename falhou:', err.message);
-  }
+export async function fetchAllAssets({ accessToken, idToken, maxRows = 500 }) {
+  const allAssets = [];
+  let cursorMark = '';
+  const rows = 100;
 
-  // Passo 2: verificar estrutura de paginação (padrão serviceEventsV2)
-  try {
+  while (true) {
     const data = await query(
-      `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 1}}) { totalRows nextCursorMark } }`,
-      {}, { accessToken, idToken }
+      `query {
+        assets(queryContext: {pageOffset: {cursorMark: "${cursorMark}", rows: ${rows}}}) {
+          totalRows
+          nextCursorMark
+          assets { id equipmentId systemId model modality productDescription }
+        }
+      }`,
+      {},
+      { accessToken, idToken }
     );
-    if (data?.assets !== undefined) {
-      console.log('[GEHC_GQL] assets paginado:', JSON.stringify(data.assets));
-    }
-  } catch (err) {
-    console.warn('[GEHC_GQL] assets paginado falhou:', err.message);
+
+    const page = data?.assets?.assets ?? [];
+    allAssets.push(...page);
+
+    const next = data?.assets?.nextCursorMark;
+    if (!next || next === cursorMark || page.length === 0 || allAssets.length >= maxRows) break;
+    cursorMark = next;
   }
 
-  // Passo 3: variantes de seleção — todas usam assets(queryContext:{...}) que sabemos ser válido
-  const variants = [
-    // Arrays paginados (padrão serviceEventsV2)
-    {
-      label: 'assets-paged-items-id-eq',
-      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows items { id equipmentId systemId model modality productDescription } } }`,
-      extract: d => d?.assets?.items ?? null,
-    },
-    {
-      label: 'assets-paged-items-assetId',
-      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows items { assetId serialNumber systemId model modality productDescription } } }`,
-      extract: d => (d?.assets?.items ?? null)?.map(a => ({ id: a.assetId, equipmentId: a.serialNumber, systemId: a.systemId, model: a.model, modality: a.modality, productDescription: a.productDescription })),
-    },
-    {
-      label: 'assets-paged-assets-id',
-      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows assets { id equipmentId systemId model modality productDescription } } }`,
-      extract: d => d?.assets?.assets ?? null,
-    },
-    {
-      label: 'assets-paged-nodes',
-      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 200}}) { totalRows nodes { id equipmentId systemId model modality productDescription } } }`,
-      extract: d => d?.assets?.nodes ?? null,
-    },
-    // Arrays diretos (sem paginação)
-    {
-      label: 'assets-flat-id',
-      q: `query { assets(queryContext: {}) { id equipmentId systemId model modality productDescription } }`,
-      extract: d => Array.isArray(d?.assets) ? d.assets : null,
-    },
-    {
-      label: 'assets-flat-assetId',
-      q: `query { assets(queryContext: {}) { assetId serialNumber systemId model modality productDescription } }`,
-      extract: d => Array.isArray(d?.assets) ? d.assets.map(a => ({ id: a.assetId, equipmentId: a.serialNumber, ...a })) : null,
-    },
-    // Diagnóstico: só totalRows sem campos aninhados
-    {
-      label: 'assets-totalRows-only',
-      q: `query { assets(queryContext: {pageOffset: {cursorMark: "", rows: 1}}) { totalRows } }`,
-      extract: d => {
-        if (d?.assets?.totalRows !== undefined) console.log('[GEHC_GQL] assets totalRows:', d.assets.totalRows);
-        return null;
-      },
-    },
-  ];
-
-  for (const { label, q, extract } of variants) {
-    try {
-      const data = await query(q, {}, { accessToken, idToken });
-      const result = extract(data);
-      if (result !== null) {
-        console.log(`[GEHC_GQL] fetchAllAssets OK via "${label}": ${result.length} asset(s)`);
-        return result;
-      }
-    } catch (err) {
-      console.warn(`[GEHC_GQL] variante "${label}" falhou: ${err.message}`);
-    }
-  }
-
-  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam. Use GET /api/gehc/debug/schema para ver o schema completo.');
-  return [];
+  console.log(`[GEHC_GQL] fetchAllAssets: ${allAssets.length} asset(s) obtidos.`);
+  return allAssets;
 }
