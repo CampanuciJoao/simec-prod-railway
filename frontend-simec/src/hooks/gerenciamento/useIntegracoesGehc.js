@@ -6,6 +6,8 @@ import {
   postGehcSync,
   putVincularEquipamento,
   deleteDesvincularEquipamento,
+  postGehcCredenciais,
+  deleteGehcCredenciais,
 } from '@/services/api/gehcApi';
 
 export function useIntegracoesGehc() {
@@ -16,12 +18,13 @@ export function useIntegracoesGehc() {
   const [runningDiscovery, setRunningDiscovery] = useState(false);
   const [runningSync, setRunningSync]           = useState(false);
   const [runningMonitor, setRunningMonitor]     = useState(false);
+  const [runningCredenciais, setRunningCredenciais] = useState(false);
 
-  const [resultDiscovery, setResultDiscovery] = useState(null);
-  const [resultSync, setResultSync]           = useState(null);
-  const [resultMonitor, setResultMonitor]     = useState(null);
+  const [resultDiscovery, setResultDiscovery]     = useState(null);
+  const [resultSync, setResultSync]               = useState(null);
+  const [resultMonitor, setResultMonitor]         = useState(null);
+  const [resultCredenciais, setResultCredenciais] = useState(null);
 
-  // Vinculação manual: { equipamentoId → { running, error } }
   const [vincularState, setVincularState] = useState({});
 
   const carregarStatus = useCallback(async () => {
@@ -38,6 +41,34 @@ export function useIntegracoesGehc() {
   }, []);
 
   useEffect(() => { carregarStatus(); }, [carregarStatus]);
+
+  const salvarCredenciais = useCallback(async (login, password) => {
+    setRunningCredenciais(true);
+    setResultCredenciais(null);
+    try {
+      const res = await postGehcCredenciais(login, password);
+      setResultCredenciais({ ok: true, ...res });
+      await carregarStatus();
+    } catch (err) {
+      setResultCredenciais({ ok: false, error: err?.response?.data?.error ?? err.message });
+    } finally {
+      setRunningCredenciais(false);
+    }
+  }, [carregarStatus]);
+
+  const excluirCredenciais = useCallback(async () => {
+    setRunningCredenciais(true);
+    setResultCredenciais(null);
+    try {
+      await deleteGehcCredenciais();
+      setResultCredenciais({ ok: true, mensagem: 'Credenciais removidas.' });
+      await carregarStatus();
+    } catch (err) {
+      setResultCredenciais({ ok: false, error: err?.response?.data?.error ?? err.message });
+    } finally {
+      setRunningCredenciais(false);
+    }
+  }, [carregarStatus]);
 
   const rodarDiscovery = useCallback(async () => {
     setRunningDiscovery(true);
@@ -114,6 +145,10 @@ export function useIntegracoesGehc() {
     loading,
     error,
     carregarStatus,
+    salvarCredenciais,
+    excluirCredenciais,
+    runningCredenciais,
+    resultCredenciais,
     rodarDiscovery,
     runningDiscovery,
     resultDiscovery,

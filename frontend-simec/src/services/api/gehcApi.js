@@ -32,3 +32,9 @@ export const putVincularEquipamento = (equipamentoId, gehcAssetId) =>
 
 export const deleteDesvincularEquipamento = (equipamentoId) =>
   api.delete(`/gehc/equipamento/${equipamentoId}/vincular`).then((res) => res.data);
+
+export const postGehcCredenciais = (login, password) =>
+  api.post('/gehc/credenciais', { login, password }).then((res) => res.data);
+
+export const deleteGehcCredenciais = () =>
+  api.delete('/gehc/credenciais').then((res) => res.data);

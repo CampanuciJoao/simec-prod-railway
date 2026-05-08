@@ -2,14 +2,44 @@ import { chromium } from 'playwright';
 import prisma from '../prismaService.js';
 import { encryptToken, decryptToken } from './gehcCrypto.js';
 
-const GEHC_BASE    = 'https://www.gehealthcare.com.br';
-const GEHC_LOGIN   = `${GEHC_BASE}/account`;
-const REFRESH_URL  = `${GEHC_BASE}/api/v1/RefreshToken`;
+const GEHC_PORTAL_URL = 'https://www.gehealthcare.com.br/account';
+const REFRESH_URL     = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
 
-// Tokens expiram em ~1h; renova com 5 min de margem
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
-// ─── Persistência (tokens criptografados com AES-256-GCM) ────────────────────
+// ─── Credenciais por tenant ───────────────────────────────────────────────────
+
+export async function salvarCredenciais(tenantId, login, password) {
+  await prisma.gehcToken.upsert({
+    where:  { tenantId },
+    create: { id: crypto.randomUUID(), tenantId, gehcLogin: encryptToken(login), gehcPassword: encryptToken(password) },
+    update: { gehcLogin: encryptToken(login), gehcPassword: encryptToken(password), updatedAt: new Date() },
+  });
+}
+
+export async function removerCredenciais(tenantId) {
+  await prisma.gehcToken.updateMany({
+    where: { tenantId },
+    data:  { gehcLogin: null, gehcPassword: null, accessToken: null, idToken: null, refreshToken: null, expiresAt: null },
+  });
+}
+
+async function lerCredenciais(tenantId) {
+  const row = await prisma.gehcToken.findUnique({
+    where:  { tenantId },
+    select: { gehcLogin: true, gehcPassword: true },
+  });
+  if (!row?.gehcLogin || !row?.gehcPassword) return null;
+  return { login: decryptToken(row.gehcLogin), password: decryptToken(row.gehcPassword) };
+}
+
+export async function temCredenciaisConfiguradas(tenantId) {
+  const row = await prisma.gehcToken.findUnique({ where: { tenantId }, select: { gehcLogin: true } });
+  if (row?.gehcLogin) return true;
+  return !!(process.env.GEHC_LOGIN && process.env.GEHC_PASSWORD);
+}
+
+// ─── Tokens por tenant ────────────────────────────────────────────────────────
 
 async function salvarTokens(tenantId, { accessToken, idToken, refreshToken, expiresAt }) {
   const enc = {
@@ -26,7 +56,7 @@ async function salvarTokens(tenantId, { accessToken, idToken, refreshToken, expi
 
 async function lerTokens(tenantId) {
   const row = await prisma.gehcToken.findUnique({ where: { tenantId } });
-  if (!row) return null;
+  if (!row?.accessToken) return null;
   return {
     ...row,
     accessToken:  decryptToken(row.accessToken),
@@ -57,8 +87,12 @@ async function refreshViaApi(refreshToken) {
 // ─── Login completo via Playwright ───────────────────────────────────────────
 
 export async function capturarTokensViaPlaywright(tenantId) {
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    throw new Error('GEHC_LOGIN e GEHC_PASSWORD não configurados no .env');
+  const creds = await lerCredenciais(tenantId);
+  const login    = creds?.login    ?? process.env.GEHC_LOGIN;
+  const password = creds?.password ?? process.env.GEHC_PASSWORD;
+
+  if (!login || !password) {
+    throw new Error('Credenciais GE não configuradas. Acesse Gerenciamento → Integrações para configurar o login e senha do portal GE Healthcare.');
   }
 
   console.log('[GEHC_AUTH] Iniciando login via Playwright para capturar tokens...');
@@ -69,13 +103,11 @@ export async function capturarTokensViaPlaywright(tenantId) {
 
   let tokensCaptured = null;
 
-  // Intercepta qualquer resposta JSON que contenha access_token
   page.on('response', async (response) => {
     if (tokensCaptured) return;
     const ct = response.headers()['content-type'] ?? '';
     if (!ct.includes('json')) return;
     if (response.status() < 200 || response.status() >= 300) return;
-
     try {
       const json = await response.json().catch(() => null);
       if (json?.access_token && json?.id_token) {
@@ -87,23 +119,18 @@ export async function capturarTokensViaPlaywright(tenantId) {
         };
         console.log('[GEHC_AUTH] Tokens capturados via interceptação de resposta.');
       }
-    } catch {
-      // ignorar respostas não JSON
-    }
+    } catch { /* ignorar */ }
   });
 
   try {
-    await page.goto(GEHC_LOGIN, { waitUntil: 'networkidle', timeout: 30000 });
+    await page.goto(GEHC_PORTAL_URL, { waitUntil: 'networkidle', timeout: 30000 });
 
-    await page.locator('input[name="username"], input[type="email"]').first().fill(process.env.GEHC_LOGIN);
-    await page.locator('input[name="password"], input[type="password"]').first().fill(process.env.GEHC_PASSWORD);
+    await page.locator('input[name="username"], input[type="email"]').first().fill(login);
+    await page.locator('input[name="password"], input[type="password"]').first().fill(password);
     await page.keyboard.press('Enter');
     await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 30000 }).catch(() => {});
-
-    // Aguarda mais um tick para interceptações pendentes processarem
     await page.waitForTimeout(2000);
 
-    // Fallback: tenta ler tokens do localStorage
     if (!tokensCaptured) {
       const lsTokens = await page.evaluate(() => {
         const keys = Object.keys(localStorage);
@@ -114,7 +141,6 @@ export async function capturarTokensViaPlaywright(tenantId) {
             if (val?.AccessToken && val?.IdToken) return { access_token: val.AccessToken, id_token: val.IdToken, refresh_token: val.RefreshToken };
           } catch { /* ignora */ }
         }
-        // Tenta chaves individuais comuns do Cognito
         const access  = localStorage.getItem('access_token') || localStorage.getItem('CognitoAccessToken');
         const id      = localStorage.getItem('id_token')     || localStorage.getItem('CognitoIdToken');
         const refresh = localStorage.getItem('refresh_token')|| localStorage.getItem('CognitoRefreshToken');
@@ -133,17 +159,8 @@ export async function capturarTokensViaPlaywright(tenantId) {
       }
     }
 
-    // Fallback final: tenta ler cookies de sessão
     if (!tokensCaptured) {
-      const cookies = await context.cookies();
-      const at = cookies.find(c => c.name.toLowerCase().includes('access') || c.name.toLowerCase().includes('token'));
-      if (at) {
-        console.warn('[GEHC_AUTH] Apenas cookie encontrado — pode não ser suficiente para GraphQL.');
-      }
-    }
-
-    if (!tokensCaptured) {
-      throw new Error('Login realizado mas nenhum token JWT foi capturado. Verifique o fluxo de autenticação do portal.');
+      throw new Error('Login realizado mas nenhum token JWT foi capturado. Verifique as credenciais ou o fluxo de autenticação do portal.');
     }
 
     await salvarTokens(tenantId, tokensCaptured);
@@ -155,8 +172,6 @@ export async function capturarTokensViaPlaywright(tenantId) {
 }
 
 // ─── Ponto de entrada principal ───────────────────────────────────────────────
-// Retorna { accessToken, idToken } válidos.
-// Ordem: DB → refresh automático → login completo.
 
 export async function obterTokensGehc(tenantId) {
   const stored = await lerTokens(tenantId);
@@ -170,7 +185,6 @@ export async function obterTokensGehc(tenantId) {
       return { accessToken: stored.accessToken, idToken: stored.idToken };
     }
 
-    // Tenta refresh
     if (stored.refreshToken) {
       try {
         console.log(`[GEHC_AUTH] Token expirado para tenant ${tenantId} — tentando refresh...`);
@@ -183,13 +197,14 @@ export async function obterTokensGehc(tenantId) {
     }
   }
 
-  // Login completo
   const novos = await capturarTokensViaPlaywright(tenantId);
   return { accessToken: novos.accessToken, idToken: novos.idToken };
 }
 
-// Invalida os tokens armazenados (força novo login na próxima chamada)
 export async function invalidarTokensGehc(tenantId) {
-  await prisma.gehcToken.deleteMany({ where: { tenantId } });
+  await prisma.gehcToken.updateMany({
+    where: { tenantId },
+    data:  { accessToken: null, idToken: null, refreshToken: null, expiresAt: null },
+  });
   console.log(`[GEHC_AUTH] Tokens invalidados para tenant ${tenantId}.`);
 }

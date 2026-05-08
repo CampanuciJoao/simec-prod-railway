@@ -694,10 +694,12 @@ model GehcSaudeSnapshot {
 model GehcToken {
   id           String    @id @default(uuid())
   tenantId     String    @unique
-  accessToken  String    @db.Text @map("access_token")
-  idToken      String    @db.Text @map("id_token")
+  accessToken  String?   @db.Text @map("access_token")
+  idToken      String?   @db.Text @map("id_token")
   refreshToken String?   @db.Text @map("refresh_token")
   expiresAt    DateTime? @map("expires_at")
+  gehcLogin    String?   @db.Text @map("gehc_login")
+  gehcPassword String?   @db.Text @map("gehc_password")
   capturedAt   DateTime  @default(now()) @map("captured_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
