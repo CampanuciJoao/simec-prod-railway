@@ -4,6 +4,8 @@ import {
   postGehcDiscovery,
   postGehcMonitor,
   postGehcSync,
+  putVincularEquipamento,
+  deleteDesvincularEquipamento,
 } from '@/services/api/gehcApi';
 
 export function useIntegracoesGehc() {
@@ -18,6 +20,9 @@ export function useIntegracoesGehc() {
   const [resultDiscovery, setResultDiscovery] = useState(null);
   const [resultSync, setResultSync]           = useState(null);
   const [resultMonitor, setResultMonitor]     = useState(null);
+
+  // Vinculação manual: { equipamentoId → { running, error } }
+  const [vincularState, setVincularState] = useState({});
 
   const carregarStatus = useCallback(async () => {
     setLoading(true);
@@ -76,6 +81,34 @@ export function useIntegracoesGehc() {
     }
   }, [carregarStatus]);
 
+  const vincularEquipamento = useCallback(async (equipamentoId, gehcAssetId) => {
+    setVincularState(s => ({ ...s, [equipamentoId]: { running: true, error: null } }));
+    try {
+      await putVincularEquipamento(equipamentoId, gehcAssetId);
+      await carregarStatus();
+      setVincularState(s => ({ ...s, [equipamentoId]: { running: false, error: null } }));
+    } catch (err) {
+      setVincularState(s => ({
+        ...s,
+        [equipamentoId]: { running: false, error: err?.response?.data?.error ?? err.message },
+      }));
+    }
+  }, [carregarStatus]);
+
+  const desvincularEquipamento = useCallback(async (equipamentoId) => {
+    setVincularState(s => ({ ...s, [equipamentoId]: { running: true, error: null } }));
+    try {
+      await deleteDesvincularEquipamento(equipamentoId);
+      await carregarStatus();
+      setVincularState(s => ({ ...s, [equipamentoId]: { running: false, error: null } }));
+    } catch (err) {
+      setVincularState(s => ({
+        ...s,
+        [equipamentoId]: { running: false, error: err?.response?.data?.error ?? err.message },
+      }));
+    }
+  }, [carregarStatus]);
+
   return {
     status,
     loading,
@@ -90,5 +123,8 @@ export function useIntegracoesGehc() {
     rodarMonitor,
     runningMonitor,
     resultMonitor,
+    vincularEquipamento,
+    desvincularEquipamento,
+    vincularState,
   };
 }

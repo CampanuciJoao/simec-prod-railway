@@ -1,7 +1,7 @@
 import express from 'express';
 import prisma from '../services/prismaService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
-import { descobrirEquipamentosGehc } from '../services/gehc/gehcDiscovery.js';
+import { descobrirEquipamentosGehc, vincularEquipamentoManual, desvincularEquipamento } from '../services/gehc/gehcDiscovery.js';
 import { monitorarSaudeGehc, obterUltimoSnapshotGehc } from '../services/gehc/gehcMonitor.js';
 import { sincronizarDadosGehc } from '../services/gehc/gehcSyncService.js';
 import { capturarTokensViaPlaywright, invalidarTokensGehc } from '../services/gehc/gehcAuthService.js';
@@ -98,10 +98,12 @@ router.post('/discovery', admin, async (req, res) => {
       jaVinculados: resultado.jaVinculados.length,
       semMatch:     resultado.semMatch.length,
       totalPortalGe: resultado.totalPortalGe ?? null,
+      pendentesConfirmacao: resultado.pendentesConfirmacao.length,
       detalhes: {
-        vinculados:   resultado.vinculados,
-        semMatch:     resultado.semMatch,
-        jaVinculados: resultado.jaVinculados,
+        vinculados:            resultado.vinculados,
+        pendentesConfirmacao:  resultado.pendentesConfirmacao,
+        semMatch:              resultado.semMatch,
+        jaVinculados:          resultado.jaVinculados,
       },
     });
   } catch (err) {
@@ -137,6 +139,32 @@ router.post('/sync', admin, async (req, res) => {
     res.json({ ok: true, ...resultado });
   } catch (err) {
     console.error('[GEHC_ROUTE] Erro no sync:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PUT /api/gehc/equipamento/:equipamentoId/vincular ────────────────────────
+router.put('/equipamento/:equipamentoId/vincular', admin, async (req, res) => {
+  const tenantId       = req.user.tenantId;
+  const { equipamentoId } = req.params;
+  const { gehcAssetId } = req.body;
+  if (!gehcAssetId) return res.status(400).json({ error: 'gehcAssetId é obrigatório.' });
+  try {
+    const resultado = await vincularEquipamentoManual(tenantId, equipamentoId, gehcAssetId);
+    res.json({ ok: true, ...resultado });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── DELETE /api/gehc/equipamento/:equipamentoId/vincular ─────────────────────
+router.delete('/equipamento/:equipamentoId/vincular', admin, async (req, res) => {
+  const tenantId       = req.user.tenantId;
+  const { equipamentoId } = req.params;
+  try {
+    await desvincularEquipamento(tenantId, equipamentoId);
+    res.json({ ok: true });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });

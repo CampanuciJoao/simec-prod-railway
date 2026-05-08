@@ -1,5 +1,6 @@
 import { chromium } from 'playwright';
 import prisma from '../prismaService.js';
+import { encryptToken, decryptToken } from './gehcCrypto.js';
 
 const GEHC_BASE    = 'https://www.gehealthcare.com.br';
 const GEHC_LOGIN   = `${GEHC_BASE}/account`;
@@ -8,18 +9,30 @@ const REFRESH_URL  = `${GEHC_BASE}/api/v1/RefreshToken`;
 // Tokens expiram em ~1h; renova com 5 min de margem
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
-// ─── Persistência ─────────────────────────────────────────────────────────────
+// ─── Persistência (tokens criptografados com AES-256-GCM) ────────────────────
 
 async function salvarTokens(tenantId, { accessToken, idToken, refreshToken, expiresAt }) {
+  const enc = {
+    accessToken:  encryptToken(accessToken),
+    idToken:      encryptToken(idToken),
+    refreshToken: refreshToken ? encryptToken(refreshToken) : null,
+  };
   await prisma.gehcToken.upsert({
     where:  { tenantId },
-    create: { id: crypto.randomUUID(), tenantId, accessToken, idToken, refreshToken: refreshToken ?? null, expiresAt: expiresAt ?? null },
-    update: { accessToken, idToken, refreshToken: refreshToken ?? null, expiresAt: expiresAt ?? null, updatedAt: new Date() },
+    create: { id: crypto.randomUUID(), tenantId, ...enc, expiresAt: expiresAt ?? null },
+    update: { ...enc, expiresAt: expiresAt ?? null, updatedAt: new Date() },
   });
 }
 
 async function lerTokens(tenantId) {
-  return prisma.gehcToken.findUnique({ where: { tenantId } });
+  const row = await prisma.gehcToken.findUnique({ where: { tenantId } });
+  if (!row) return null;
+  return {
+    ...row,
+    accessToken:  decryptToken(row.accessToken),
+    idToken:      decryptToken(row.idToken),
+    refreshToken: row.refreshToken ? decryptToken(row.refreshToken) : null,
+  };
 }
 
 // ─── Refresh via API ──────────────────────────────────────────────────────────

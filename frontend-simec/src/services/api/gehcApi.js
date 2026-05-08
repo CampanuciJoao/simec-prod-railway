@@ -26,3 +26,9 @@ export const postGehcSync = () =>
 
 export const postGehcMonitor = () =>
   api.post('/gehc/monitor').then((res) => res.data);
+
+export const putVincularEquipamento = (equipamentoId, gehcAssetId) =>
+  api.put(`/gehc/equipamento/${equipamentoId}/vincular`, { gehcAssetId }).then((res) => res.data);
+
+export const deleteDesvincularEquipamento = (equipamentoId) =>
+  api.delete(`/gehc/equipamento/${equipamentoId}/vincular`).then((res) => res.data);

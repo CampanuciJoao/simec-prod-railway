@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowsRotate,
@@ -10,6 +10,7 @@ import {
   faLinkSlash,
   faRotate,
   faSpinner,
+  faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -42,7 +43,9 @@ function ResultBanner({ result, nomeAcao }) {
         {result.error && <p className="mt-0.5" style={{ color: 'var(--text-muted)' }}>{result.error}</p>}
         {result.ok && result.vinculados !== undefined && (
           <p className="mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {result.vinculados} vinculado(s) · {result.jaVinculados} já vinculado(s) · {result.semMatch} sem match
+            {result.vinculados} vinculado(s) exatos
+            {result.pendentesConfirmacao > 0 && ` · ${result.pendentesConfirmacao} fuzzy (aguardam confirmação)`}
+            {' · '}{result.jaVinculados} já vinculado(s) · {result.semMatch} sem match
             {result.modo && <span> · via {result.modo === 'graphql' ? 'API GraphQL' : 'Playwright'}</span>}
           </p>
         )}
@@ -82,29 +85,165 @@ function StatusAuth({ auth }) {
   );
 }
 
-// ─── Seção: equipamentos sem match ────────────────────────────────────────────
+// ─── Seção: pendentes de confirmação (fuzzy) ──────────────────────────────────
 
-function ListaSemVinculo({ lista }) {
-  if (!lista?.length) return <InlineEmptyState message="Todos os equipamentos GE estão vinculados." />;
+function PendentesConfirmacao({ lista, vincularState, onConfirmar, onRejeitar }) {
+  if (!lista?.length) return null;
   return (
     <div className="space-y-2">
-      {lista.map((eq) => (
-        <div
-          key={eq.id}
-          className="flex items-center justify-between rounded-2xl border px-4 py-3"
-          style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
-        >
-          <div>
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-              {eq.apelido || eq.tag}
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              Tag: {eq.tag} · {eq.modelo || 'modelo não informado'}
-            </p>
+      {lista.map((eq) => {
+        const state = vincularState[eq.simecId] ?? {};
+        return (
+          <div
+            key={eq.simecId}
+            className="rounded-2xl border px-4 py-3"
+            style={{ borderColor: 'var(--color-warning)', backgroundColor: 'var(--bg-surface-soft)' }}
+          >
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faTriangleExclamation} style={{ color: 'var(--color-warning)' }} className="shrink-0" />
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {eq.tag}
+                  </p>
+                </div>
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Serial GE: <strong>{eq.serialGe ?? eq.gehcAssetId}</strong>
+                  {' · '}Modelo GE: {eq.modelo ?? '—'}
+                  {' · '}Distância: {eq.distancia}
+                </p>
+                {state.error && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--color-danger)' }}>{state.error}</p>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  type="button"
+                  variant="primary"
+                  disabled={state.running}
+                  onClick={() => onConfirmar(eq.simecId, eq.gehcAssetId)}
+                >
+                  <FontAwesomeIcon icon={state.running ? faSpinner : faCircleCheck} spin={state.running} />
+                  Confirmar
+                </Button>
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={state.running}
+                  onClick={() => onRejeitar(eq.simecId)}
+                >
+                  <FontAwesomeIcon icon={faLinkSlash} />
+                  Rejeitar
+                </Button>
+              </div>
+            </div>
           </div>
-          <FontAwesomeIcon icon={faLinkSlash} style={{ color: 'var(--color-warning)' }} />
-        </div>
-      ))}
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Seção: equipamentos sem match ────────────────────────────────────────────
+
+function ListaSemVinculo({ lista, vincularState, onVincular }) {
+  const [inputs, setInputs] = useState({});
+
+  if (!lista?.length) return <InlineEmptyState message="Todos os equipamentos GE estão vinculados." />;
+
+  return (
+    <div className="space-y-2">
+      {lista.map((eq) => {
+        const state = vincularState[eq.simecId ?? eq.id] ?? {};
+        const assetId = inputs[eq.simecId ?? eq.id] ?? '';
+        const id = eq.simecId ?? eq.id;
+        return (
+          <div
+            key={id}
+            className="rounded-2xl border px-4 py-3"
+            style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+          >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                  {eq.apelido || eq.tag}
+                </p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Tag: {eq.tag} · {eq.modelo || 'modelo não informado'}
+                </p>
+              </div>
+              <FontAwesomeIcon icon={faLinkSlash} style={{ color: 'var(--color-warning)' }} />
+            </div>
+            <div className="mt-2 flex gap-2">
+              <input
+                type="text"
+                placeholder="Asset ID do portal GE"
+                value={assetId}
+                onChange={e => setInputs(s => ({ ...s, [id]: e.target.value }))}
+                className="flex-1 rounded-xl border px-3 py-1.5 text-sm"
+                style={{
+                  borderColor: 'var(--border-soft)',
+                  backgroundColor: 'var(--bg-surface)',
+                  color: 'var(--text-primary)',
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={!assetId.trim() || state.running}
+                onClick={() => onVincular(id, assetId.trim())}
+              >
+                <FontAwesomeIcon icon={state.running ? faSpinner : faLink} spin={state.running} />
+                Vincular
+              </Button>
+            </div>
+            {state.error && (
+              <p className="mt-1 text-xs" style={{ color: 'var(--color-danger)' }}>{state.error}</p>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Seção: equipamentos já vinculados ────────────────────────────────────────
+
+function ListaVinculados({ lista, vincularState, onDesvincular }) {
+  if (!lista?.length) return <InlineEmptyState message="Nenhum equipamento vinculado ainda." />;
+  return (
+    <div className="space-y-2">
+      {lista.map((eq) => {
+        const state = vincularState[eq.simecId] ?? {};
+        return (
+          <div
+            key={eq.simecId}
+            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3"
+            style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+          >
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                {eq.tag}
+              </p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Asset ID: {eq.gehcAssetId}
+              </p>
+              {state.error && (
+                <p className="mt-0.5 text-xs" style={{ color: 'var(--color-danger)' }}>{state.error}</p>
+              )}
+            </div>
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={state.running}
+              onClick={() => onDesvincular(eq.simecId)}
+            >
+              <FontAwesomeIcon icon={state.running ? faSpinner : faLinkSlash} spin={state.running} />
+              Desvincular
+            </Button>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -155,6 +294,9 @@ function IntegracoesPage() {
     rodarDiscovery, runningDiscovery, resultDiscovery,
     rodarSync,      runningSync,      resultSync,
     rodarMonitor,   runningMonitor,   resultMonitor,
+    vincularEquipamento,
+    desvincularEquipamento,
+    vincularState,
   } = useIntegracoesGehc();
 
   if (loading) return <LoadingState message="Carregando status da integração GE..." />;
@@ -177,6 +319,16 @@ function IntegracoesPage() {
   }
 
   const anyRunning = runningDiscovery || runningSync || runningMonitor;
+
+  // Pendentes e semMatch vêm do último resultado de discovery
+  const pendentesConfirmacao = resultDiscovery?.ok ? (resultDiscovery.detalhes?.pendentesConfirmacao ?? []) : [];
+  const semMatchDiscovery    = resultDiscovery?.ok ? (resultDiscovery.detalhes?.semMatch ?? []) : [];
+
+  // Equipamentos sem vínculo vêm do status (sempre atualizado)
+  const semVinculoLista = status?.rmsSeVinculo ?? [];
+
+  // jaVinculados do último discovery (para oferecer desvincular pós-discovery)
+  const jaVinculados = resultDiscovery?.ok ? (resultDiscovery.detalhes?.jaVinculados ?? []) : [];
 
   return (
     <div className="space-y-6">
@@ -285,13 +437,46 @@ function IntegracoesPage() {
         </div>
       </PageSection>
 
-      {/* ── Equipamentos sem vínculo ── */}
-      {(status?.rmsGe?.semVinculo ?? 0) > 0 && (
+      {/* ── Pendentes de confirmação (fuzzy) ── */}
+      {pendentesConfirmacao.length > 0 && (
         <PageSection
-          title={`Equipamentos sem vínculo (${status.rmsGe.semVinculo})`}
-          description="RMs GE cadastradas no SIMEC que ainda não foram localizadas no portal MyEquipment 360."
+          title={`Correspondências para confirmar (${pendentesConfirmacao.length})`}
+          description="O discovery encontrou estes equipamentos por similaridade de serial (fuzzy). Confirme se o vínculo está correto ou rejeite para desvincular."
         >
-          <ListaSemVinculo lista={status?.rmsSeVinculo} />
+          <PendentesConfirmacao
+            lista={pendentesConfirmacao}
+            vincularState={vincularState}
+            onConfirmar={(equipamentoId, gehcAssetId) => vincularEquipamento(equipamentoId, gehcAssetId)}
+            onRejeitar={(equipamentoId) => desvincularEquipamento(equipamentoId)}
+          />
+        </PageSection>
+      )}
+
+      {/* ── Sem match: vinculação manual ── */}
+      {(semMatchDiscovery.length > 0 || semVinculoLista.length > 0) && (
+        <PageSection
+          title={`Equipamentos sem vínculo (${semVinculoLista.length || semMatchDiscovery.length})`}
+          description="RMs GE cadastradas no SIMEC que não foram localizadas no portal. Informe o Asset ID manualmente para vincular."
+        >
+          <ListaSemVinculo
+            lista={semVinculoLista.length ? semVinculoLista : semMatchDiscovery}
+            vincularState={vincularState}
+            onVincular={(equipamentoId, gehcAssetId) => vincularEquipamento(equipamentoId, gehcAssetId)}
+          />
+        </PageSection>
+      )}
+
+      {/* ── Equipamentos já vinculados (gerenciar) ── */}
+      {jaVinculados.length > 0 && (
+        <PageSection
+          title={`Equipamentos vinculados (${jaVinculados.length})`}
+          description="Equipamentos já conectados ao portal GE. Você pode desvincular caso precise corrigir o Asset ID."
+        >
+          <ListaVinculados
+            lista={jaVinculados}
+            vincularState={vincularState}
+            onDesvincular={(equipamentoId) => desvincularEquipamento(equipamentoId)}
+          />
         </PageSection>
       )}
 

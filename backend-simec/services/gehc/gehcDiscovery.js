@@ -1,10 +1,6 @@
-import { chromium } from 'playwright';
 import prisma from '../prismaService.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { fetchAllAssets } from './gehcGraphqlClient.js';
-
-const GEHC_BASE  = 'https://www.gehealthcare.com.br';
-const GEHC_LOGIN = `${GEHC_BASE}/account`;
 
 // ─── Fuzzy matching ───────────────────────────────────────────────────────────
 
@@ -37,113 +33,38 @@ function matchSerial(a, b) {
   return { match: false };
 }
 
-// ─── Modo 1: Discovery via GraphQL (preferencial) ────────────────────────────
-// Usa fetchAllAssets — retorna lista completa com equipmentId (serial), systemId,
-// modelo, modalidade, localização. Uma chamada HTTP, ~2s.
+// ─── Discovery via GraphQL ────────────────────────────────────────────────────
 
-async function descobrirViaGraphql(tenantId, equipamentosSimec) {
+async function listarRmsGe(tenantId) {
   let tokens;
   try {
     tokens = await obterTokensGehc(tenantId);
   } catch (err) {
-    console.warn(`[GEHC_DISCOVERY] Não foi possível obter tokens (${err.message}) — usando Playwright.`);
-    return null;
+    throw new Error(
+      `Autenticação GE necessária. Execute POST /api/gehc/auth para capturar os tokens primeiro. (${err.message})`
+    );
   }
 
   const assetsGe = await fetchAllAssets(tokens);
-  console.log(`[GEHC_DISCOVERY] GraphQL: ${assetsGe.length} equipamento(s) encontrado(s) no portal GE.`);
-
-  // Filtra ressonâncias magnéticas
   const rmsGe = assetsGe.filter(a => {
     const texto = `${a.modality ?? ''} ${a.model ?? ''} ${a.productDescription ?? ''}`.toUpperCase();
     return texto.includes('MR') || texto.includes('RM') || texto.includes('RESSONANCIA') ||
            texto.includes('RESONANCE') || texto.includes('SIGNA') || texto.includes('DISCOVERY');
   });
 
-  console.log(`[GEHC_DISCOVERY] ${rmsGe.length} RM(s) GE encontradas no portal.`);
+  console.log(`[GEHC_DISCOVERY] GraphQL: ${rmsGe.length} RM(s) encontradas no portal GE.`);
   return { rmsGe, tokens };
 }
 
-// ─── Modo 2: Discovery via Playwright (fallback) ──────────────────────────────
-
-async function loginGehc(page) {
-  await page.goto(GEHC_LOGIN, { waitUntil: 'networkidle', timeout: 30000 });
-  await page.locator('input[name="username"], input[type="email"]').first().fill(process.env.GEHC_LOGIN);
-  await page.locator('input[name="password"], input[type="password"]').first().fill(process.env.GEHC_PASSWORD);
-  await page.keyboard.press('Enter');
-  await page.waitForNavigation({ waitUntil: 'networkidle', timeout: 20000 });
-}
-
-async function extrairEquipamentosGe(page) {
-  await page.goto(`${GEHC_BASE}/account/equipment`, { waitUntil: 'networkidle', timeout: 20000 });
-
-  const equipamentos = [];
-  let pagina = 1;
-
-  while (true) {
-    await page.waitForLoadState('networkidle');
-
-    const cards = await page.locator('[class*="equipment-card"], [class*="asset-item"], [class*="product-item"]').all();
-
-    if (cards.length === 0) {
-      const links = await page.locator('a[href*="/equipment/"]').all();
-      for (const link of links) {
-        const href  = await link.getAttribute('href');
-        const texto = await link.innerText().catch(() => '');
-        const assetId = href?.split('/equipment/')[1]?.split('/')[0]?.split('?')[0];
-        if (assetId) equipamentos.push({ assetId, equipmentId: texto.trim(), href });
-      }
-      break;
-    }
-
-    for (const card of cards) {
-      const href    = await card.locator('a[href*="/equipment/"]').first().getAttribute('href').catch(() => null);
-      const serial  = await card.locator('[class*="serial"], [class*="tag"], [class*="model-number"]').first().innerText().catch(() => '');
-      const modelo  = await card.locator('[class*="model"], [class*="name"]').first().innerText().catch(() => '');
-      const tipo    = await card.locator('[class*="modality"], [class*="type"]').first().innerText().catch(() => '');
-      const assetId = href?.split('/equipment/')[1]?.split('/')[0]?.split('?')[0];
-      if (assetId) equipamentos.push({ assetId, equipmentId: serial.trim(), model: modelo.trim(), modality: tipo.trim(), href });
-    }
-
-    const btnProximo = page.locator('button[aria-label*="next"], button[aria-label*="Next"], [class*="pagination"] button:last-child').first();
-    const desabilitado = await btnProximo.isDisabled().catch(() => true);
-    if (desabilitado) break;
-
-    await btnProximo.click();
-    pagina++;
-    if (pagina > 20) break;
-  }
-
-  return equipamentos;
-}
-
-async function descobrirViaPlaywright(equipamentosSimec) {
-  const browser = await chromium.launch({ headless: true });
-  const page    = await browser.newPage();
-  try {
-    await loginGehc(page);
-    const todos  = await extrairEquipamentosGe(page);
-    const rmsGe  = todos.filter(a => {
-      const texto = `${a.modality ?? ''} ${a.model ?? ''}`.toUpperCase();
-      return texto.includes('MR') || texto.includes('RM') || texto.includes('SIGNA') || texto.includes('DISCOVERY');
-    });
-    console.log(`[GEHC_DISCOVERY] Playwright: ${rmsGe.length} RM(s) encontradas no portal.`);
-    return { rmsGe, tokens: null };
-  } finally {
-    await browser.close();
-  }
-}
-
-// ─── Matching e persistência ──────────────────────────────────────────────────
+// ─── Matching ─────────────────────────────────────────────────────────────────
 
 function melhorMatchGe(simec, rmsGe) {
   let melhor = null;
   let melhorDist = Infinity;
 
   for (const ge of rmsGe) {
-    // Tenta serial (equipmentId) e depois assetId como referência
     const porSerial  = matchSerial(simec.tag, ge.equipmentId ?? '');
-    const porAssetId = matchSerial(simec.tag, ge.assetId ?? '');
+    const porAssetId = matchSerial(simec.tag, ge.id ?? '');
     const resultado  = porSerial.match ? porSerial : (porAssetId.match ? porAssetId : null);
 
     if (resultado?.match && resultado.distancia < melhorDist) {
@@ -156,10 +77,13 @@ function melhorMatchGe(simec, rmsGe) {
 }
 
 // ─── Função principal ─────────────────────────────────────────────────────────
+// Matches exatos → vinculados automaticamente
+// Matches fuzzy  → retornados como pendentesConfirmacao (vinculados, mas sinalizados para revisão)
+// Sem match       → semMatch (não vinculados)
 
 export async function descobrirEquipamentosGehc(tenantId) {
   if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    throw new Error('GEHC_LOGIN e GEHC_PASSWORD não configurados no .env');
+    throw new Error('GEHC_LOGIN e GEHC_PASSWORD não configurados no servidor.');
   }
 
   const equipamentosSimec = await prisma.equipamento.findMany({
@@ -172,24 +96,17 @@ export async function descobrirEquipamentosGehc(tenantId) {
   });
 
   if (equipamentosSimec.length === 0) {
-    return { vinculados: [], semMatch: [], jaVinculados: [], modo: 'sem_equipamentos' };
+    return { vinculados: [], pendentesConfirmacao: [], semMatch: [], jaVinculados: [], modo: 'sem_equipamentos', totalPortalGe: 0 };
   }
 
   console.log(`[GEHC_DISCOVERY] ${equipamentosSimec.length} RM(s) GE encontradas no SIMEC.`);
 
-  // Tenta GraphQL primeiro, Playwright como fallback
-  let resultado = await descobrirViaGraphql(tenantId, equipamentosSimec);
-  let modo = 'graphql';
+  const { rmsGe } = await listarRmsGe(tenantId);
 
-  if (!resultado) {
-    resultado = await descobrirViaPlaywright(equipamentosSimec);
-    modo = 'playwright';
-  }
-
-  const { rmsGe } = resultado;
-  const vinculados   = [];
-  const semMatch     = [];
-  const jaVinculados = [];
+  const vinculados            = [];
+  const pendentesConfirmacao  = [];
+  const semMatch              = [];
+  const jaVinculados          = [];
 
   for (const simec of equipamentosSimec) {
     if (simec.gehcAssetId) {
@@ -200,32 +117,69 @@ export async function descobrirEquipamentosGehc(tenantId) {
     const match = melhorMatchGe(simec, rmsGe);
 
     if (match) {
+      const gehcAssetId  = match.ge.id;
+      const gehcSystemId = match.ge.systemId ?? null;
+
       await prisma.equipamento.update({
         where: { tenantId_id: { tenantId, id: simec.id } },
-        data:  {
-          gehcAssetId:  match.ge.id ?? match.ge.assetId,
-          gehcSystemId: match.ge.systemId ?? null,
-        },
+        data:  { gehcAssetId, gehcSystemId },
       });
 
-      vinculados.push({
-        simecId:     simec.id,
-        tag:         simec.tag,
-        gehcAssetId: match.ge.id ?? match.ge.assetId,
-        gehcSystemId: match.ge.systemId ?? null,
-        modelo:      match.ge.model ?? match.ge.modelo,
-        modalidade:  match.ge.modality ?? null,
-        confianca:   match.resultado.confianca,
-        distancia:   match.resultado.distancia,
-        serialGe:    match.ge.equipmentId ?? match.ge.serial,
-      });
+      const item = {
+        simecId:    simec.id,
+        tag:        simec.tag,
+        gehcAssetId,
+        gehcSystemId,
+        modelo:     match.ge.model ?? null,
+        modalidade: match.ge.modality ?? null,
+        confianca:  match.resultado.confianca,
+        distancia:  match.resultado.distancia,
+        serialGe:   match.ge.equipmentId ?? null,
+      };
 
-      console.log(`[GEHC_DISCOVERY] ✓ Vinculado: SIMEC "${simec.tag}" ↔ GE "${match.ge.equipmentId ?? match.ge.serial}" (confiança: ${match.resultado.confianca}, dist: ${match.resultado.distancia})`);
+      if (match.resultado.confianca === 'exato') {
+        vinculados.push(item);
+        console.log(`[GEHC_DISCOVERY] ✓ Vinculado (exato): SIMEC "${simec.tag}" ↔ GE "${match.ge.equipmentId}"`);
+      } else {
+        pendentesConfirmacao.push(item);
+        console.log(`[GEHC_DISCOVERY] ⚠ Vinculado (fuzzy, dist=${match.resultado.distancia}): SIMEC "${simec.tag}" ↔ GE "${match.ge.equipmentId}" — requer confirmação`);
+      }
     } else {
       semMatch.push({ simecId: simec.id, tag: simec.tag, modelo: simec.modelo });
       console.log(`[GEHC_DISCOVERY] ✗ Sem match: SIMEC "${simec.tag}" (${simec.modelo})`);
     }
   }
 
-  return { vinculados, semMatch, jaVinculados, modo, totalPortalGe: rmsGe.length };
+  return { vinculados, pendentesConfirmacao, semMatch, jaVinculados, modo: 'graphql', totalPortalGe: rmsGe.length };
+}
+
+// ─── Vincular manualmente ─────────────────────────────────────────────────────
+
+export async function vincularEquipamentoManual(tenantId, equipamentoId, gehcAssetId) {
+  // Tenta buscar systemId via API se tiver tokens
+  let gehcSystemId = null;
+  try {
+    const tokens = await obterTokensGehc(tenantId);
+    const assets = await fetchAllAssets(tokens);
+    const found  = assets.find(a => a.id === gehcAssetId || a.equipmentId === gehcAssetId);
+    gehcSystemId = found?.systemId ?? null;
+  } catch {
+    // sem tokens ou API indisponível — vincula sem systemId
+  }
+
+  await prisma.equipamento.update({
+    where: { tenantId_id: { tenantId, id: equipamentoId } },
+    data:  { gehcAssetId, gehcSystemId },
+  });
+
+  return { gehcAssetId, gehcSystemId };
+}
+
+// ─── Desvincular ──────────────────────────────────────────────────────────────
+
+export async function desvincularEquipamento(tenantId, equipamentoId) {
+  await prisma.equipamento.update({
+    where: { tenantId_id: { tenantId, id: equipamentoId } },
+    data:  { gehcAssetId: null, gehcSystemId: null },
+  });
 }

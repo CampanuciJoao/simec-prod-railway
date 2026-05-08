@@ -1,5 +1,4 @@
 import prisma from '../prismaService.js';
-import { scrapeEquipamentoSaude } from './gehcScraper.js';
 import { processarAlertasGehc } from './gehcAlertRepository.js';
 import { descobrirEquipamentosGehc } from './gehcDiscovery.js';
 import { obterTokensGehc } from './gehcAuthService.js';
@@ -69,27 +68,26 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
     try {
       console.log(`[GEHC_MONITOR] Capturando saúde: ${nome} (${eq.gehcAssetId})`);
 
-      // Busca saúde via GraphQL (preferencial) ou Playwright como fallback
-      let snapshot;
-      if (accessToken && idToken && eq.gehcSystemId) {
-        const [healthData, connectivityData] = await Promise.allSettled([
-          fetchEquipmentHealth({ systemId: eq.gehcSystemId, accessToken, idToken }),
-          fetchAssetConnectivity({ systemId: eq.gehcSystemId, accessToken, idToken }),
-        ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
-
-        snapshot = {
-          ...(healthData ?? {}),
-          equipmentOnline: connectivityData?.equipmentOnline ?? null,
-        };
-        delete snapshot._raw;
-      } else {
-        // Fallback: scraper Playwright (não requer tokens)
-        snapshot = await scrapeEquipamentoSaude({
-          gehcAssetUrl: `${GEHC_BASE_URL}/account/equipment/${eq.gehcAssetId}`,
-          gehcLogin:    process.env.GEHC_LOGIN,
-          gehcPassword: process.env.GEHC_PASSWORD,
-        });
+      // Requer tokens + systemId — sem Playwright no loop de monitoramento
+      if (!accessToken || !idToken) {
+        console.warn(`[GEHC_MONITOR] ${nome}: sem tokens de autenticação — execute POST /api/gehc/auth para autenticar.`);
+        continue;
       }
+      if (!eq.gehcSystemId) {
+        console.warn(`[GEHC_MONITOR] ${nome}: sem gehcSystemId — execute o discovery novamente para obter o systemId.`);
+        continue;
+      }
+
+      const [healthData, connectivityData] = await Promise.allSettled([
+        fetchEquipmentHealth({ systemId: eq.gehcSystemId, accessToken, idToken }),
+        fetchAssetConnectivity({ systemId: eq.gehcSystemId, accessToken, idToken }),
+      ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
+
+      const snapshot = {
+        ...(healthData ?? {}),
+        equipmentOnline: connectivityData?.equipmentOnline ?? null,
+      };
+      delete snapshot._raw;
 
       // Enriquece com uptime/utilização
       let uptimeData     = null;
