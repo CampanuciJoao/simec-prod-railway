@@ -11,6 +11,7 @@ const THRESHOLDS = {
   flowMin:        1.5,
   pressureMin:    0.8,
   pressureMax:    1.5,
+  pressureCriticalMax: 2.0,
 };
 
 function regrasDeAlerta(snapshot, equipamentoNome) {
@@ -78,15 +79,24 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
     });
   }
 
-  if (heliumPressurePsi !== null &&
-      (heliumPressurePsi < THRESHOLDS.pressureMin || heliumPressurePsi > THRESHOLDS.pressureMax)) {
-    alertas.push({
-      evento: ALERT_EVENTOS.GEHC_PRESSAO_ANORMAL,
-      prioridade: ALERT_PRIORIDADES.MEDIA,
-      titulo: `Pressão do hélio anormal — ${equipamentoNome}`,
-      subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (normal: ${THRESHOLDS.pressureMin}–${THRESHOLDS.pressureMax} PSI)`,
-      label: 'pressao-anormal',
-    });
+  if (heliumPressurePsi !== null) {
+    if (heliumPressurePsi > THRESHOLDS.pressureCriticalMax || heliumPressurePsi < THRESHOLDS.pressureMin) {
+      alertas.push({
+        evento: ALERT_EVENTOS.GEHC_PRESSAO_ANORMAL,
+        prioridade: ALERT_PRIORIDADES.ALTA,
+        titulo: `Pressão do hélio crítica — ${equipamentoNome}`,
+        subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (faixa segura: ${THRESHOLDS.pressureMin}–${THRESHOLDS.pressureCriticalMax} PSI).`,
+        label: 'pressao-critica',
+      });
+    } else if (heliumPressurePsi > THRESHOLDS.pressureMax) {
+      alertas.push({
+        evento: ALERT_EVENTOS.GEHC_PRESSAO_ANORMAL,
+        prioridade: ALERT_PRIORIDADES.MEDIA,
+        titulo: `Pressão do hélio elevada — ${equipamentoNome}`,
+        subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (recomendado: até ${THRESHOLDS.pressureMax} PSI).`,
+        label: 'pressao-alta',
+      });
+    }
   }
 
   if (magnetOnline === false) {

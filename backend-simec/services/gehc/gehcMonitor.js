@@ -2,10 +2,11 @@ import prisma from '../prismaService.js';
 import { scrapeEquipamentoSaude } from './gehcScraper.js';
 import { processarAlertasGehc } from './gehcAlertRepository.js';
 import { descobrirEquipamentosGehc } from './gehcDiscovery.js';
+import { fetchUptimeData, fetchUtilizationData } from './gehcGraphqlClient.js';
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
-export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false } = {}) {
+export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, accessToken = null, idToken = null } = {}) {
   if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
     console.warn('[GEHC_MONITOR] GEHC_LOGIN/GEHC_PASSWORD não configurados — pulando monitoramento.');
     return;
@@ -52,15 +53,30 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false } = 
 
       const snapshot = await scrapeEquipamentoSaude({
         gehcAssetUrl: url,
-        gehcLogin:    GEHC_LOGIN,
-        gehcPassword: GEHC_PASSWORD,
+        gehcLogin:    process.env.GEHC_LOGIN,
+        gehcPassword: process.env.GEHC_PASSWORD,
       });
+
+      // Enriquece snapshot com uptime/utilização via GraphQL (se tokens disponíveis)
+      let uptimeData      = null;
+      let utilizacaoData  = null;
+      if (accessToken && idToken) {
+        [uptimeData, utilizacaoData] = await Promise.allSettled([
+          fetchUptimeData({ assetId: eq.gehcAssetId, accessToken, idToken }),
+          fetchUtilizationData({ assetId: eq.gehcAssetId, accessToken, idToken }),
+        ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
+      }
 
       await prisma.gehcSaudeSnapshot.create({
         data: {
-          tenantId:      eq.tenantId,
-          equipamentoId: eq.id,
+          tenantId:       eq.tenantId,
+          equipamentoId:  eq.id,
           ...snapshot,
+          rawJson: JSON.stringify({
+            ...snapshot,
+            uptime:      uptimeData,
+            utilizacao:  utilizacaoData,
+          }),
         },
       });
 
@@ -71,8 +87,11 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false } = 
         snapshot,
       });
 
+      const uptimePct = uptimeData?.contractUptimeAggregate ?? '?';
+      const pacientesDia = utilizacaoData?.patientsAggregate?.averagePerDay ?? '?';
       console.log(`[GEHC_MONITOR] ${nome}: snapshot salvo, ${criados} alerta(s) novo(s).`);
       console.log(`[GEHC_MONITOR]   Hélio: ${snapshot.heliumLevelPct}% | Pressão: ${snapshot.heliumPressurePsi} PSI | Compressor: ${snapshot.compressorStatus} | Temp: ${snapshot.coolantTempC}°C | Fluxo: ${snapshot.coolantFlowGpm} GPM`);
+      console.log(`[GEHC_MONITOR]   Uptime: ${uptimePct}% | Pacientes/dia: ${pacientesDia}`);
     } catch (err) {
       console.error(`[GEHC_MONITOR] Erro ao monitorar ${nome}:`, err.message);
     }
