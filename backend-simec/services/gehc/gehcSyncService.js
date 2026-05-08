@@ -179,10 +179,6 @@ async function sincronizarEquipamento(eq, tokens) {
 // ─── Sync de todos os equipamentos vinculados do tenant ──────────────────────
 
 export async function sincronizarDadosGehc({ tenantId } = {}) {
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    console.warn('[GEHC_SYNC] Credenciais não configuradas — pulando sync.');
-    return;
-  }
 
   const where = tenantId
     ? { tenantId, gehcAssetId: { not: null } }

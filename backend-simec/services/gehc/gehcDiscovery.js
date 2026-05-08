@@ -82,10 +82,6 @@ function melhorMatchGe(simec, rmsGe) {
 // Sem match       → semMatch (não vinculados)
 
 export async function descobrirEquipamentosGehc(tenantId) {
-  if (!process.env.GEHC_LOGIN || !process.env.GEHC_PASSWORD) {
-    throw new Error('GEHC_LOGIN e GEHC_PASSWORD não configurados no servidor.');
-  }
-
   const equipamentosSimec = await prisma.equipamento.findMany({
     where: {
       tenantId,
