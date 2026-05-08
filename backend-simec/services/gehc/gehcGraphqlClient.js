@@ -129,8 +129,19 @@ export async function fetchServiceHistory({ assetId, accessToken, idToken, tenan
   const allItems = [];
   let cursorMark = '';
   const rows = 50;
+  let curAccessToken = accessToken;
+  let curIdToken = idToken;
 
   while (true) {
+    // Entre páginas, relê tokens do DB para pegar tokens renovados pelo retry da página anterior
+    if (tenantId && cursorMark !== '') {
+      try {
+        const fresh = await obterTokensGehc(tenantId);
+        curAccessToken = fresh.accessToken;
+        curIdToken = fresh.idToken;
+      } catch { /* mantém tokens existentes */ }
+    }
+
     const data = await query(QUERY_SERVICE_EVENTS, {
       queryContext: {
         experienceFiltering: true,
@@ -142,7 +153,7 @@ export async function fetchServiceHistory({ assetId, accessToken, idToken, tenan
         pageOffset: { cursorMark, rows },
         sort: { requestedDateTime: 'desc' },
       },
-    }, { accessToken, idToken, tenantId });
+    }, { accessToken: curAccessToken, idToken: curIdToken, tenantId });
 
     const items = data?.collection?.items ?? [];
     allItems.push(...items);
@@ -356,8 +367,19 @@ export async function fetchAllAssets({ accessToken, idToken, tenantId = null, ma
   const allAssets = [];
   let cursorMark = '';
   const rows = 100;
+  let curAccessToken = accessToken;
+  let curIdToken = idToken;
 
   while (true) {
+    // Entre páginas, relê tokens do DB para pegar tokens renovados pelo retry da página anterior
+    if (tenantId && cursorMark !== '') {
+      try {
+        const fresh = await obterTokensGehc(tenantId);
+        curAccessToken = fresh.accessToken;
+        curIdToken = fresh.idToken;
+      } catch { /* mantém tokens existentes */ }
+    }
+
     const data = await query(
       `query {
         assets(queryContext: {pageOffset: {cursorMark: "${cursorMark}", rows: ${rows}}}) {
@@ -367,7 +389,7 @@ export async function fetchAllAssets({ accessToken, idToken, tenantId = null, ma
         }
       }`,
       {},
-      { accessToken, idToken, tenantId }
+      { accessToken: curAccessToken, idToken: curIdToken, tenantId }
     );
 
     const page = data?.assets?.assets ?? [];
