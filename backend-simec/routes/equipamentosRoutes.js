@@ -210,6 +210,11 @@ async function buscarEquipamentoCompleto(tenantId, id) {
           createdAt: 'desc',
         },
       },
+      _count: {
+        select: {
+          gehcSaudeSnapshots: true,
+        },
+      },
     },
   });
 }

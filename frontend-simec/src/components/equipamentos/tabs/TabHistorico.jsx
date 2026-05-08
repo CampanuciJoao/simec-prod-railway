@@ -462,7 +462,9 @@ function TabHistoricoAtivo({ equipamento }) {
 // ─── Componente principal ──────────────────────────────────────────────────────
 
 function TabHistorico({ equipamento }) {
-  const temMonitoramentoSaude = Boolean(equipamento?.gehcAssetId);
+  const temMonitoramentoSaude =
+    Boolean(equipamento?.gehcAssetId) ||
+    (equipamento?._count?.gehcSaudeSnapshots ?? 0) > 0;
   const [subAba, setSubAba] = useState('historico');
 
   if (!temMonitoramentoSaude) {
