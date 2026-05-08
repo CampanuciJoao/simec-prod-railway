@@ -86,7 +86,10 @@ export async function descobrirEquipamentosGehc(tenantId) {
     where: {
       tenantId,
       fabricante: { contains: 'GE', mode: 'insensitive' },
-      tipo:       { contains: 'RM',  mode: 'insensitive' },
+      OR: [
+        { tipo: { contains: 'Ressonan', mode: 'insensitive' } },
+        { tipo: { contains: 'RM',       mode: 'insensitive' } },
+      ],
     },
     select: { id: true, tag: true, apelido: true, modelo: true, gehcAssetId: true },
   });

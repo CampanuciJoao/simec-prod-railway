@@ -14,6 +14,15 @@ import {
 
 const router = express.Router();
 
+// Filtro para RMs GE: fabricante contém "GE" + tipo é "Ressonância Magnética" ou contém "RM"
+const whereRmGe = {
+  fabricante: { contains: 'GE', mode: 'insensitive' },
+  OR: [
+    { tipo: { contains: 'Ressonan', mode: 'insensitive' } },
+    { tipo: { contains: 'RM',      mode: 'insensitive' } },
+  ],
+};
+
 // ─── GET /api/gehc/status ─────────────────────────────────────────────────────
 router.get('/status', async (req, res) => {
   const tenantId = req.usuario.tenantId;
@@ -21,13 +30,13 @@ router.get('/status', async (req, res) => {
     const [total, vinculados, semVinculo, totalSnapshots, alertasAtivos, ultimosSnapshots, temToken] =
       await Promise.all([
         prisma.equipamento.count({
-          where: { tenantId, fabricante: { contains: 'GE', mode: 'insensitive' }, tipo: { contains: 'RM', mode: 'insensitive' } },
+          where: { tenantId, ...whereRmGe },
         }),
         prisma.equipamento.count({
           where: { tenantId, gehcAssetId: { not: null } },
         }),
         prisma.equipamento.findMany({
-          where: { tenantId, fabricante: { contains: 'GE', mode: 'insensitive' }, tipo: { contains: 'RM', mode: 'insensitive' }, gehcAssetId: null },
+          where: { tenantId, ...whereRmGe, gehcAssetId: null },
           select: { id: true, tag: true, apelido: true, modelo: true },
         }),
         prisma.gehcSaudeSnapshot.count({ where: { tenantId } }),
