@@ -319,32 +319,49 @@ export async function fetchAssetConnectivity({ systemId, accessToken, idToken })
 
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
 
-// Variantes do campo raiz — tentadas em ordem até uma funcionar
-// assetsV2 não existe; candidatos baseados nos outros endpoints do CDX API
-const ASSET_FIELDS = `id equipmentId systemId model modality productDescription`;
-
-const QUERY_ASSETS_VARIANTS = [
-  { q: `query { assets { id equipmentId systemId model modality productDescription } }`,                   extract: d => Array.isArray(d?.assets) ? d.assets : null },
-  { q: `query { assets { items { id equipmentId systemId model modality productDescription } } }`,         extract: d => d?.assets?.items ?? null },
-  { q: `query { assets { nodes { id equipmentId systemId model modality productDescription } } }`,         extract: d => d?.assets?.nodes ?? null },
-  { q: `query { myEquipment { items { id equipmentId systemId model modality productDescription } } }`,    extract: d => d?.myEquipment?.items ?? null },
-  { q: `query { myEquipment { id equipmentId systemId model modality productDescription } }`,              extract: d => Array.isArray(d?.myEquipment) ? d.myEquipment : null },
-  { q: `query { equipmentList { id equipmentId systemId model modality productDescription } }`,            extract: d => Array.isArray(d?.equipmentList) ? d.equipmentList : null },
-];
-
 export async function fetchAllAssets({ accessToken, idToken }) {
-  for (const { q, extract } of QUERY_ASSETS_VARIANTS) {
+  // Passo 1: introspection para descobrir campos válidos dentro de 'assets'
+  try {
+    const introData = await query(`{
+      __type(name: "Query") {
+        fields { name args { name type { name kind ofType { name kind } } } }
+      }
+    }`, {}, { accessToken, idToken });
+    const fields = introData?.__type?.fields ?? [];
+    console.log('[GEHC_GQL] Schema Query fields:', fields.map(f => f.name).join(', '));
+  } catch (err) {
+    console.warn('[GEHC_GQL] Introspection falhou:', err.message.slice(0, 200));
+  }
+
+  // Passo 2: descobrir campos válidos dentro do tipo retornado por 'assets'
+  try {
+    const introAssets = await query(`{
+      __type(name: "AssetsResult") { fields { name } }
+    }`, {}, { accessToken, idToken });
+    console.log('[GEHC_GQL] AssetsResult fields:', JSON.stringify(introAssets));
+  } catch { /* ignorar */ }
+
+  // Passo 3: tentar queries com estruturas prováveis baseadas no erro (col 18 = primeiro campo dentro de assets)
+  const variants = [
+    { q: `query { assets(queryContext: {}) { id equipmentId systemId model modality productDescription } }`, extract: d => Array.isArray(d?.assets) ? d.assets : null },
+    { q: `query { assets { totalCount } }`,  extract: d => { console.log('[GEHC_GQL] assets totalCount:', JSON.stringify(d?.assets)); return null; } },
+    { q: `query { assets { data { id equipmentId systemId } } }`, extract: d => d?.assets?.data ?? null },
+    { q: `query { assets { result { id equipmentId systemId } } }`, extract: d => d?.assets?.result ?? null },
+  ];
+
+  for (const { q, extract } of variants) {
     try {
       const data = await query(q, {}, { accessToken, idToken });
       const result = extract(data);
       if (result !== null) {
-        console.log(`[GEHC_GQL] fetchAllAssets OK: ${q.slice(0, 70)}`);
+        console.log(`[GEHC_GQL] fetchAllAssets OK: ${q.slice(0, 80)}`);
         return result;
       }
     } catch (err) {
-      console.warn(`[GEHC_GQL] fetchAllAssets variante falhou (${q.slice(8, 30)}): ${err.message.slice(0, 120)}`);
+      console.warn(`[GEHC_GQL] variante (${q.slice(8, 35)}): ${err.message.slice(0, 150)}`);
     }
   }
-  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam — verificar schema CDX.');
+
+  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam.');
   return [];
 }
