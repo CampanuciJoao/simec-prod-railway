@@ -479,8 +479,7 @@ router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
       s.equipmentOnline   ?? '',
     ].join(','));
 
-    const csv      = [header, ...rows].join('
-');
+    const csv      = [header, ...rows].join('\n');
     const filename = `saude_ativo_${equipamentoId}_${new Date().toISOString().split('T')[0]}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
