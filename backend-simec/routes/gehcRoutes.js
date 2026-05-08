@@ -7,10 +7,12 @@ import { sincronizarDadosGehc } from '../services/gehc/gehcSyncService.js';
 import {
   capturarTokensViaPlaywright,
   invalidarTokensGehc,
+  obterTokensGehc,
   salvarCredenciais,
   removerCredenciais,
   temCredenciaisConfiguradas,
 } from '../services/gehc/gehcAuthService.js';
+import { introspectSchema } from '../services/gehc/gehcGraphqlClient.js';
 
 const router = express.Router();
 
@@ -341,4 +343,37 @@ router.get('/equipamento/:equipamentoId/resumo', async (req, res) => {
   }
 });
 
+// ─── GET /api/gehc/debug/schema ───────────────────────────────────────────────
+// Retorna o schema GraphQL CDX completo via HTTP — usado para descobrir o campo correto de listagem de assets.
+// Remove esta rota após resolver o fetchAllAssets.
+router.get('/debug/schema', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  try {
+    const tokens = await obterTokensGehc(tenantId);
+    const schema = await introspectSchema(tokens);
+    res.json({ ok: true, schema });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/debug/refetch ─────────────────────────────────────────────
+// Invalida tokens e força novo login via Playwright (com logging de queries CDX).
+// Use quando os tokens estão em cache e você precisa ver as queries capturadas nos logs.
+router.post('/debug/refetch', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  if (!(await temCredenciaisConfiguradas(tenantId))) {
+    return res.status(503).json({ error: 'Credenciais GE não configuradas.' });
+  }
+  try {
+    await invalidarTokensGehc(tenantId);
+    console.log('[GEHC_DEBUG] Tokens invalidados — iniciando Playwright para capturar queries CDX...');
+    await capturarTokensViaPlaywright(tenantId);
+    res.json({ ok: true, mensagem: 'Login refeito via Playwright. Verifique os logs do servidor para "[GEHC_AUTH] CDX query capturada:".' });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
+
