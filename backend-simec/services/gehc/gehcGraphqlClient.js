@@ -295,13 +295,15 @@ export async function fetchEquipmentHealth({ systemId, accessToken, idToken }) {
   const h = data?.equipmentHealth;
   if (!h) return null;
 
+  const toFloat = v => v !== null && v !== undefined ? parseFloat(v) || null : null;
+
   return {
-    heliumLevelPct:    h.magnetHealth?.heliumLevel?.currentValue        ?? null,
-    heliumPressurePsi: h.magnetHealth?.heliumPressure?.currentValue     ?? null,
-    compressorStatus:  h.compressorHealth?.statusValue                  ?? null,
-    coolantTempC:      h.magnetHealth?.chillerTemperature?.currentValue ?? null,
-    coolantFlowGpm:    h.magnetHealth?.chillerWaterFlow?.currentValue   ?? null,
-    cryocoolerStatus:  h.cryoCoolerStatus?.statusValue                  ?? null,
+    heliumLevelPct:    toFloat(h.magnetHealth?.heliumLevel?.currentValue),
+    heliumPressurePsi: toFloat(h.magnetHealth?.heliumPressure?.currentValue),
+    compressorStatus:  h.compressorHealth?.statusValue                   ?? null,
+    coolantTempC:      toFloat(h.magnetHealth?.chillerTemperature?.currentValue),
+    coolantFlowGpm:    toFloat(h.magnetHealth?.chillerWaterFlow?.currentValue),
+    cryocoolerStatus:  h.cryoCoolerStatus?.statusValue                   ?? null,
     magnetOnline:      h.magnetHealth?.magnetStatus?.toUpperCase() === 'ONLINE',
     _raw:              h,
   };
