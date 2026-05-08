@@ -12,7 +12,7 @@ async function refreshTokens(refreshToken) {
     body: JSON.stringify({ refresh_token: refreshToken }),
   });
   if (!res.ok) throw new Error(`RefreshToken falhou: ${res.status}`);
-  return res.json(); // { access_token, id_token }
+  return res.json();
 }
 
 function buildHeaders(accessToken, idToken) {
@@ -296,12 +296,12 @@ export async function fetchEquipmentHealth({ systemId, accessToken, idToken }) {
   if (!h) return null;
 
   return {
-    heliumLevelPct:    h.magnetHealth?.heliumLevel?.currentValue     ?? null,
-    heliumPressurePsi: h.magnetHealth?.heliumPressure?.currentValue  ?? null,
-    compressorStatus:  h.compressorHealth?.statusValue               ?? null,
+    heliumLevelPct:    h.magnetHealth?.heliumLevel?.currentValue        ?? null,
+    heliumPressurePsi: h.magnetHealth?.heliumPressure?.currentValue     ?? null,
+    compressorStatus:  h.compressorHealth?.statusValue                  ?? null,
     coolantTempC:      h.magnetHealth?.chillerTemperature?.currentValue ?? null,
-    coolantFlowGpm:    h.magnetHealth?.chillerWaterFlow?.currentValue ?? null,
-    cryocoolerStatus:  h.cryoCoolerStatus?.statusValue               ?? null,
+    coolantFlowGpm:    h.magnetHealth?.chillerWaterFlow?.currentValue   ?? null,
+    cryocoolerStatus:  h.cryoCoolerStatus?.statusValue                  ?? null,
     magnetOnline:      h.magnetHealth?.magnetStatus?.toUpperCase() === 'ONLINE',
     _raw:              h,
   };
@@ -317,51 +317,109 @@ export async function fetchAssetConnectivity({ systemId, accessToken, idToken })
   };
 }
 
+// ─── Introspection completa do schema CDX ─────────────────────────────────────
+
+export async function introspectSchema({ accessToken, idToken }) {
+  const result = { queryFields: null, knownTypes: {}, error: null };
+
+  try {
+    const data = await query(`{
+      __type(name: "Query") {
+        fields {
+          name
+          args { name type { name kind ofType { name kind } } }
+          type { name kind ofType { name kind ofType { name kind } } }
+        }
+      }
+    }`, {}, { accessToken, idToken });
+    result.queryFields = data?.__type?.fields ?? [];
+  } catch (err) {
+    result.error = `Introspection Query falhou: ${err.message}`;
+  }
+
+  const candidateTypes = ['AssetsResult', 'AssetCollection', 'AssetList', 'AssetPage', 'Assets'];
+  for (const typeName of candidateTypes) {
+    try {
+      const data = await query(`{ __type(name: "${typeName}") { fields { name type { name kind } } } }`, {}, { accessToken, idToken });
+      if (data?.__type?.fields?.length) {
+        result.knownTypes[typeName] = data.__type.fields.map(f => f.name);
+      }
+    } catch { /* ignorar tipos inexistentes */ }
+  }
+
+  return result;
+}
+
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
 
 export async function fetchAllAssets({ accessToken, idToken }) {
-  // Passo 1: introspection para descobrir campos válidos dentro de 'assets'
+  // Passo 1: introspection — descobre campos raiz do Query type
   try {
-    const introData = await query(`{
+    const data = await query(`{
       __type(name: "Query") {
-        fields { name args { name type { name kind ofType { name kind } } } }
+        fields { name type { name kind ofType { name kind } } }
       }
     }`, {}, { accessToken, idToken });
-    const fields = introData?.__type?.fields ?? [];
-    console.log('[GEHC_GQL] Schema Query fields:', fields.map(f => f.name).join(', '));
+    const nomes = (data?.__type?.fields ?? []).map(f => f.name);
+    console.log('[GEHC_GQL] Schema Query fields:', nomes.join(', '));
+    const candidatos = nomes.filter(n => /asset|equipment|device/i.test(n));
+    if (candidatos.length) console.log('[GEHC_GQL] Candidatos de listagem:', candidatos.join(', '));
   } catch (err) {
-    console.warn('[GEHC_GQL] Introspection falhou:', err.message.slice(0, 200));
+    console.warn('[GEHC_GQL] Introspection desabilitada ou falhou:', err.message);
   }
 
-  // Passo 2: descobrir campos válidos dentro do tipo retornado por 'assets'
-  try {
-    const introAssets = await query(`{
-      __type(name: "AssetsResult") { fields { name } }
-    }`, {}, { accessToken, idToken });
-    console.log('[GEHC_GQL] AssetsResult fields:', JSON.stringify(introAssets));
-  } catch { /* ignorar */ }
-
-  // Passo 3: tentar queries com estruturas prováveis baseadas no erro (col 18 = primeiro campo dentro de assets)
+  // Passo 2: tentar variantes com labels claros e erros completos
   const variants = [
-    { q: `query { assets(queryContext: {}) { id equipmentId systemId model modality productDescription } }`, extract: d => Array.isArray(d?.assets) ? d.assets : null },
-    { q: `query { assets { totalCount } }`,  extract: d => { console.log('[GEHC_GQL] assets totalCount:', JSON.stringify(d?.assets)); return null; } },
-    { q: `query { assets { data { id equipmentId systemId } } }`, extract: d => d?.assets?.data ?? null },
-    { q: `query { assets { result { id equipmentId systemId } } }`, extract: d => d?.assets?.result ?? null },
+    {
+      label: 'assets(queryContext:{})',
+      q: `query { assets(queryContext: {}) { id equipmentId systemId model modality productDescription } }`,
+      extract: d => Array.isArray(d?.assets) ? d.assets : null,
+    },
+    {
+      label: 'assetList',
+      q: `query { assetList { id equipmentId systemId model modality productDescription } }`,
+      extract: d => Array.isArray(d?.assetList) ? d.assetList : null,
+    },
+    {
+      label: 'accountAssets',
+      q: `query { accountAssets { id equipmentId systemId model modality productDescription } }`,
+      extract: d => Array.isArray(d?.accountAssets) ? d.accountAssets : null,
+    },
+    {
+      label: 'myEquipment.assets',
+      q: `query { myEquipment { assets { id equipmentId systemId model modality productDescription } } }`,
+      extract: d => Array.isArray(d?.myEquipment?.assets) ? d.myEquipment.assets : null,
+    },
+    {
+      label: 'assets.items',
+      q: `query { assets { items { id equipmentId systemId model modality productDescription } } }`,
+      extract: d => d?.assets?.items ?? null,
+    },
+    {
+      label: 'assets.data',
+      q: `query { assets { data { id equipmentId systemId } } }`,
+      extract: d => d?.assets?.data ?? null,
+    },
+    {
+      label: 'assets{totalCount}',
+      q: `query { assets { totalCount } }`,
+      extract: d => { if (d?.assets !== undefined) console.log('[GEHC_GQL] assets{} raw:', JSON.stringify(d.assets)); return null; },
+    },
   ];
 
-  for (const { q, extract } of variants) {
+  for (const { label, q, extract } of variants) {
     try {
       const data = await query(q, {}, { accessToken, idToken });
       const result = extract(data);
       if (result !== null) {
-        console.log(`[GEHC_GQL] fetchAllAssets OK: ${q.slice(0, 80)}`);
+        console.log(`[GEHC_GQL] fetchAllAssets OK via "${label}": ${result.length} asset(s)`);
         return result;
       }
     } catch (err) {
-      console.warn(`[GEHC_GQL] variante (${q.slice(8, 35)}): ${err.message.slice(0, 150)}`);
+      console.warn(`[GEHC_GQL] variante "${label}" falhou: ${err.message}`);
     }
   }
 
-  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam.');
+  console.error('[GEHC_GQL] fetchAllAssets: todas as variantes falharam. Use GET /api/gehc/debug/schema para ver o schema completo.');
   return [];
 }
