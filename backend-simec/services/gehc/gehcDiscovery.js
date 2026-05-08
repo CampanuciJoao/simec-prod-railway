@@ -171,7 +171,10 @@ export async function descobrirEquipamentosGehc(tenantId) {
       if (melhorMatch) {
         await prisma.equipamento.update({
           where: { tenantId_id: { tenantId, id: simec.id } },
-          data:  { gehcAssetId: melhorMatch.ge.assetId },
+          data:  {
+            gehcAssetId:  melhorMatch.ge.assetId,
+            gehcSystemId: melhorMatch.ge.systemId ?? null,
+          },
         });
 
         vinculados.push({

@@ -150,6 +150,7 @@ model Equipamento {
   riskUpdatedAt DateTime?
 
   gehcAssetId        String?  @map("gehc_asset_id")
+  gehcSystemId       String?  @map("gehc_system_id")
   gehcSaudeSnapshots GehcSaudeSnapshot[]
 
   @@unique([tenantId, tag])

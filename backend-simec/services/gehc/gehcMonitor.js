@@ -2,7 +2,12 @@ import prisma from '../prismaService.js';
 import { scrapeEquipamentoSaude } from './gehcScraper.js';
 import { processarAlertasGehc } from './gehcAlertRepository.js';
 import { descobrirEquipamentosGehc } from './gehcDiscovery.js';
-import { fetchUptimeData, fetchUtilizationData } from './gehcGraphqlClient.js';
+import {
+  fetchEquipmentHealth,
+  fetchAssetConnectivity,
+  fetchUptimeData,
+  fetchUtilizationData,
+} from './gehcGraphqlClient.js';
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
@@ -34,6 +39,7 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       apelido: true,
       modelo: true,
       gehcAssetId: true,
+      gehcSystemId: true,
     },
   });
 
@@ -51,15 +57,31 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
     try {
       console.log(`[GEHC_MONITOR] Capturando saúde: ${nome} (${eq.gehcAssetId})`);
 
-      const snapshot = await scrapeEquipamentoSaude({
-        gehcAssetUrl: url,
-        gehcLogin:    process.env.GEHC_LOGIN,
-        gehcPassword: process.env.GEHC_PASSWORD,
-      });
+      // Busca saúde via GraphQL (preferencial) ou Playwright como fallback
+      let snapshot;
+      if (accessToken && idToken && eq.gehcSystemId) {
+        const [healthData, connectivityData] = await Promise.allSettled([
+          fetchEquipmentHealth({ systemId: eq.gehcSystemId, accessToken, idToken }),
+          fetchAssetConnectivity({ systemId: eq.gehcSystemId, accessToken, idToken }),
+        ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
 
-      // Enriquece snapshot com uptime/utilização via GraphQL (se tokens disponíveis)
-      let uptimeData      = null;
-      let utilizacaoData  = null;
+        snapshot = {
+          ...(healthData ?? {}),
+          equipmentOnline: connectivityData?.equipmentOnline ?? null,
+        };
+        delete snapshot._raw;
+      } else {
+        // Fallback: scraper Playwright (não requer tokens)
+        snapshot = await scrapeEquipamentoSaude({
+          gehcAssetUrl: `${GEHC_BASE_URL}/account/equipment/${eq.gehcAssetId}`,
+          gehcLogin:    process.env.GEHC_LOGIN,
+          gehcPassword: process.env.GEHC_PASSWORD,
+        });
+      }
+
+      // Enriquece com uptime/utilização
+      let uptimeData     = null;
+      let utilizacaoData = null;
       if (accessToken && idToken) {
         [uptimeData, utilizacaoData] = await Promise.allSettled([
           fetchUptimeData({ assetId: eq.gehcAssetId, accessToken, idToken }),
@@ -69,14 +91,10 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
 
       await prisma.gehcSaudeSnapshot.create({
         data: {
-          tenantId:       eq.tenantId,
-          equipamentoId:  eq.id,
+          tenantId:      eq.tenantId,
+          equipamentoId: eq.id,
           ...snapshot,
-          rawJson: JSON.stringify({
-            ...snapshot,
-            uptime:      uptimeData,
-            utilizacao:  utilizacaoData,
-          }),
+          rawJson: JSON.stringify({ ...snapshot, uptime: uptimeData, utilizacao: utilizacaoData }),
         },
       });
 
@@ -87,11 +105,11 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
         snapshot,
       });
 
-      const uptimePct = uptimeData?.contractUptimeAggregate ?? '?';
+      const uptimePct    = uptimeData?.contractUptimeAggregate ?? '?';
       const pacientesDia = utilizacaoData?.patientsAggregate?.averagePerDay ?? '?';
       console.log(`[GEHC_MONITOR] ${nome}: snapshot salvo, ${criados} alerta(s) novo(s).`);
       console.log(`[GEHC_MONITOR]   Hélio: ${snapshot.heliumLevelPct}% | Pressão: ${snapshot.heliumPressurePsi} PSI | Compressor: ${snapshot.compressorStatus} | Temp: ${snapshot.coolantTempC}°C | Fluxo: ${snapshot.coolantFlowGpm} GPM`);
-      console.log(`[GEHC_MONITOR]   Uptime: ${uptimePct}% | Pacientes/dia: ${pacientesDia}`);
+      console.log(`[GEHC_MONITOR]   Uptime: ${uptimePct}% | Online: ${snapshot.equipmentOnline} | Pacientes/dia: ${pacientesDia}`);
     } catch (err) {
       console.error(`[GEHC_MONITOR] Erro ao monitorar ${nome}:`, err.message);
     }

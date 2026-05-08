@@ -227,14 +227,82 @@ export async function fetchAssetCoverage({ assetId, accessToken, idToken }) {
   return data?.asset ?? null;
 }
 
-// ─── Query: saúde do equipamento ─────────────────────────────────────────────
-// Aguardando captura da query real da aba Saúde via interceptor DevTools.
-// Para capturar: cole o interceptor no Console, navegue até a aba "Saúde"
-// do equipamento no portal GE, depois execute: copy(JSON.stringify(window._cdxCalls, null, 2))
+// ─── Query: saúde do equipamento (aba Saúde — hélio, pressão, compressor) ─────
 
-export async function fetchEquipmentHealth({ assetId, accessToken, idToken }) {
-  // TODO: completar com a query real capturada da aba Saúde (hélio, pressão, compressor)
-  return null;
+const QUERY_EQUIPMENT_HEALTH = `
+  query equipmentHealth($systemId: String) {
+    equipmentHealth(systemId: $systemId) {
+      systemId
+      compressorHealth {
+        statusValue
+        statusDate
+      }
+      cryoCoolerStatus {
+        statusValue
+        statusDate
+      }
+      magnetHealth {
+        magnetStatus
+        chillerWaterFlow {
+          unit
+          lastUpdated
+          currentValue
+        }
+        chillerTemperature {
+          unit
+          lastUpdated
+          currentValue
+        }
+        heliumLevel {
+          unit
+          lastUpdated
+          currentValue
+        }
+        heliumPressure {
+          unit
+          lastUpdated
+          currentValue
+        }
+      }
+    }
+  }
+`;
+
+const QUERY_ASSET_CONNECTIVITY = `
+  query assetConnectivity($systemId: String!) {
+    assetConnectivity(systemId: $systemId) {
+      systemId
+      status
+      lastUpOn
+    }
+  }
+`;
+
+export async function fetchEquipmentHealth({ systemId, accessToken, idToken }) {
+  const data = await query(QUERY_EQUIPMENT_HEALTH, { systemId }, { accessToken, idToken });
+  const h = data?.equipmentHealth;
+  if (!h) return null;
+
+  return {
+    heliumLevelPct:    h.magnetHealth?.heliumLevel?.currentValue     ?? null,
+    heliumPressurePsi: h.magnetHealth?.heliumPressure?.currentValue  ?? null,
+    compressorStatus:  h.compressorHealth?.statusValue               ?? null,
+    coolantTempC:      h.magnetHealth?.chillerTemperature?.currentValue ?? null,
+    coolantFlowGpm:    h.magnetHealth?.chillerWaterFlow?.currentValue ?? null,
+    cryocoolerStatus:  h.cryoCoolerStatus?.statusValue               ?? null,
+    magnetOnline:      h.magnetHealth?.magnetStatus?.toUpperCase() === 'ONLINE',
+    _raw:              h,
+  };
+}
+
+export async function fetchAssetConnectivity({ systemId, accessToken, idToken }) {
+  const data = await query(QUERY_ASSET_CONNECTIVITY, { systemId }, { accessToken, idToken });
+  const c = data?.assetConnectivity;
+  if (!c) return null;
+  return {
+    equipmentOnline: c.status?.toUpperCase() === 'ONLINE',
+    lastUpOn:        c.lastUpOn ?? null,
+  };
 }
 
 // ─── Query: lista de equipamentos da conta ────────────────────────────────────
@@ -245,6 +313,7 @@ const QUERY_ASSETS = `
       items: assets {
         id
         equipmentId
+        systemId
         model
         modality
         productDescription
