@@ -341,5 +341,154 @@ router.get('/equipamento/:equipamentoId/resumo', async (req, res) => {
   }
 });
 
+
+// ─── GET /api/gehc/equipamento/:equipamentoId/historico/grafico ───────────────
+// Dados agregados para graficos: helio (media diaria) e pressao (media 6h)
+router.get('/equipamento/:equipamentoId/historico/grafico', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { equipamentoId } = req.params;
+  const { inicio, fim } = req.query;
+
+  const dataInicio = inicio ? new Date(inicio) : new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
+  const dataFim    = fim    ? new Date(fim)    : new Date();
+
+  try {
+    const snapshots = await prisma.gehcSaudeSnapshot.findMany({
+      where: { tenantId, equipamentoId, capturedAt: { gte: dataInicio, lte: dataFim } },
+      orderBy: { capturedAt: 'asc' },
+      select: { capturedAt: true, heliumLevelPct: true, heliumPressurePsi: true },
+    });
+
+    // Helio: media diaria
+    const helioMap = new Map();
+    for (const s of snapshots) {
+      if (s.heliumLevelPct === null) continue;
+      const day = s.capturedAt.toISOString().split('T')[0];
+      if (!helioMap.has(day)) helioMap.set(day, []);
+      helioMap.get(day).push(s.heliumLevelPct);
+    }
+    const helio = [...helioMap.entries()].map(([day, vals]) => ({
+      bucket: day + 'T00:00:00.000Z',
+      avg:    +( vals.reduce((a, b) => a + b, 0) / vals.length ).toFixed(2),
+      min:    +( Math.min(...vals) ).toFixed(2),
+      max:    +( Math.max(...vals) ).toFixed(2),
+      n:      vals.length,
+    }));
+
+    // Pressao: media a cada 6h
+    const pressaoMap = new Map();
+    for (const s of snapshots) {
+      if (s.heliumPressurePsi === null) continue;
+      const ts     = s.capturedAt.getTime();
+      const bucket = new Date(Math.floor(ts / (6 * 3600 * 1000)) * (6 * 3600 * 1000)).toISOString();
+      if (!pressaoMap.has(bucket)) pressaoMap.set(bucket, []);
+      pressaoMap.get(bucket).push(s.heliumPressurePsi);
+    }
+    const pressao = [...pressaoMap.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([bucket, vals]) => ({
+        bucket,
+        avg: +( vals.reduce((a, b) => a + b, 0) / vals.length ).toFixed(3),
+        min: +( Math.min(...vals) ).toFixed(3),
+        max: +( Math.max(...vals) ).toFixed(3),
+        n:   vals.length,
+      }));
+
+    res.json({ helio, pressao });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/equipamento/:equipamentoId/historico ───────────────────────
+// Snapshots paginados para tabela de historico de saude
+router.get('/equipamento/:equipamentoId/historico', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { equipamentoId } = req.params;
+  const { inicio, fim } = req.query;
+  const pagina = Math.max(1, Number(req.query.pagina) || 1);
+  const limite = Math.min(Number(req.query.limite) || 50, 200);
+  const skip   = (pagina - 1) * limite;
+
+  const where = {
+    tenantId,
+    equipamentoId,
+    ...(inicio || fim
+      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim) }) } }
+      : {}),
+  };
+
+  try {
+    const [total, snapshots] = await Promise.all([
+      prisma.gehcSaudeSnapshot.count({ where }),
+      prisma.gehcSaudeSnapshot.findMany({
+        where,
+        orderBy: { capturedAt: 'desc' },
+        skip,
+        take: limite,
+        select: {
+          capturedAt: true, heliumLevelPct: true, heliumPressurePsi: true,
+          compressorStatus: true, coolantTempC: true, coolantFlowGpm: true,
+          cryocoolerStatus: true, magnetOnline: true, equipmentOnline: true,
+        },
+      }),
+    ]);
+
+    res.json({ equipamentoId, total, pagina, limite, totalPaginas: Math.ceil(total / limite), snapshots });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/equipamento/:equipamentoId/historico/export ────────────────
+// Exportacao CSV do historico de saude
+router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { equipamentoId } = req.params;
+  const { inicio, fim } = req.query;
+
+  const where = {
+    tenantId,
+    equipamentoId,
+    ...(inicio || fim
+      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim) }) } }
+      : {}),
+  };
+
+  try {
+    const snapshots = await prisma.gehcSaudeSnapshot.findMany({
+      where,
+      orderBy: { capturedAt: 'asc' },
+      select: {
+        capturedAt: true, heliumLevelPct: true, heliumPressurePsi: true,
+        compressorStatus: true, coolantTempC: true, coolantFlowGpm: true,
+        cryocoolerStatus: true, magnetOnline: true, equipmentOnline: true,
+      },
+    });
+
+    const header = 'capturedAt,heliumLevelPct,heliumPressurePsi,compressorStatus,coolantTempC,coolantFlowGpm,cryocoolerStatus,magnetOnline,equipmentOnline';
+    const rows   = snapshots.map(s => [
+      s.capturedAt?.toISOString() ?? '',
+      s.heliumLevelPct    ?? '',
+      s.heliumPressurePsi ?? '',
+      s.compressorStatus  ?? '',
+      s.coolantTempC      ?? '',
+      s.coolantFlowGpm    ?? '',
+      s.cryocoolerStatus  ?? '',
+      s.magnetOnline      ?? '',
+      s.equipmentOnline   ?? '',
+    ].join(','));
+
+    const csv      = [header, ...rows].join('
+');
+    const filename = `saude_ativo_${equipamentoId}_${new Date().toISOString().split('T')[0]}.csv`;
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send('﻿' + csv);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 export default router;
 
