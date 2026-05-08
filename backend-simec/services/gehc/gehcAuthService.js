@@ -125,15 +125,34 @@ export async function capturarTokensViaPlaywright(tenantId) {
   try {
     // domcontentloaded: não espera scripts de analytics — só o DOM
     await page.goto(GEHC_PORTAL_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    console.log('[GEHC_AUTH] URL após goto:', page.url());
 
-    const emailInput = page.locator('input[name="username"], input[type="email"], input[name="email"]').first();
-    await emailInput.waitFor({ timeout: 15000 });
+    // GEIDP usa input[type="text"] para username, não type="email"
+    const emailInput = page.locator([
+      'input[name="username"]',
+      'input[name="email"]',
+      'input[type="email"]',
+      'input[type="text"]',
+      'input[id="username"]',
+    ].join(', ')).first();
+
+    await emailInput.waitFor({ timeout: 20000 });
+    console.log('[GEHC_AUTH] Campo de email encontrado.');
     await emailInput.fill(login);
 
-    const passInput = page.locator('input[name="password"], input[type="password"]').first();
+    const passInput = page.locator('input[name="password"], input[type="password"], input[id="password"]').first();
     await passInput.waitFor({ timeout: 10000 });
     await passInput.fill(password);
-    await passInput.press('Enter');
+
+    // Tenta clicar no botão submit; fallback para Enter
+    const submitBtn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Sign"), button:has-text("Entrar"), button:has-text("Login")').first();
+    const hasSubmit = await submitBtn.count() > 0;
+    if (hasSubmit) {
+      await submitBtn.click();
+    } else {
+      await passInput.press('Enter');
+    }
+    console.log('[GEHC_AUTH] Credenciais enviadas, aguardando tokens...');
 
     // Espera pela resposta com tokens OU por eles aparecerem no localStorage
     // (SSO pode injetar tokens via JS sem passar por resposta de rede visível)
@@ -170,6 +189,11 @@ export async function capturarTokensViaPlaywright(tenantId) {
     return tokensCaptured;
   } catch (err) {
     rejectToken?.(err);
+    // Screenshot para diagnóstico — salvo em /tmp para não poluir o projeto
+    await page.screenshot({ path: '/tmp/gehc_auth_error.png', fullPage: true }).catch(() => {});
+    const html = await page.content().catch(() => '');
+    console.error('[GEHC_AUTH] Erro. URL atual:', page.url());
+    console.error('[GEHC_AUTH] Inputs visíveis:', html.match(/<input[^>]+>/g)?.join('\n') ?? 'nenhum');
     throw err;
   } finally {
     await browser.close();
