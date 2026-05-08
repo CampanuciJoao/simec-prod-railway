@@ -11,10 +11,11 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
+import { faFilePdf, faChevronLeft, faChevronRight } from '@fortawesome/free-solid-svg-icons';
 
 import { Button, Card, DateInput, InlineEmptyState, LoadingState } from '@/components/ui';
 import { getGehcHistoricoGrafico, getGehcHistorico } from '@/services/api/gehcApi';
+import { exportarSaudeEquipamentoPDF } from '@/services/api/pdfApi';
 import { formatarDataHora } from '@/utils/timeUtils';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
@@ -214,8 +215,7 @@ function TabHistoricoSaude({ equipamentoId }) {
   };
 
   const handleExportar = () => {
-    const params = new URLSearchParams({ ...(inicio && { inicio }), ...(fim && { fim }) });
-    window.open(`/api/gehc/equipamento/${equipamentoId}/historico/export?${params}`, '_blank');
+    void exportarSaudeEquipamentoPDF(equipamentoId, { inicio, fim }).catch(() => {});
   };
 
   return (
@@ -247,9 +247,9 @@ function TabHistoricoSaude({ equipamentoId }) {
           <div className="flex items-end gap-2 ml-auto flex-wrap">
             <DateInput label="De"  value={inicio} onChange={(e) => handleCustom('inicio', e)} />
             <DateInput label="Ate" value={fim}    onChange={(e) => handleCustom('fim', e)} />
-            <Button variant="outline" size="sm" onClick={handleExportar}>
-              <FontAwesomeIcon icon={faDownload} className="mr-2" />
-              Exportar CSV
+            <Button variant="danger" size="sm" onClick={handleExportar}>
+              <FontAwesomeIcon icon={faFilePdf} className="mr-2" />
+              Exportar PDF
             </Button>
           </div>
         </div>

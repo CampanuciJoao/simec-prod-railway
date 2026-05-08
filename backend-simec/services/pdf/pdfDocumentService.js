@@ -609,6 +609,43 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
   return finalizeDocument(doc);
 }
 
+export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
+  const title = 'RELATORIO DE SAUDE DO ATIVO';
+  const doc = createDocument(title, options);
+  const { locale, timeZone } = options;
+
+  drawSectionTitle(doc, 'Contexto do equipamento');
+  infoRow(doc, 'Equipamento', payload?.equipamento?.modelo);
+  infoRow(doc, 'TAG / N° Serie', payload?.equipamento?.tag);
+  if (payload?.equipamento?.apelido) infoRow(doc, 'Apelido', payload.equipamento.apelido);
+  infoRow(doc, 'Unidade', payload?.equipamento?.unidade);
+  infoRow(doc, 'Periodo',
+    payload?.inicio || payload?.fim
+      ? `${safeText(payload?.inicio, 'Inicio')} ate ${safeText(payload?.fim, 'Hoje')}`
+      : 'Historico completo',
+  );
+
+  drawSectionTitle(doc, 'Registros de saude');
+  const rows = (payload?.snapshots || []).map(s => [
+    formatDateTime(s.capturedAt, locale, timeZone),
+    s.heliumLevelPct    != null ? `${s.heliumLevelPct}%`   : '—',
+    s.heliumPressurePsi != null ? `${s.heliumPressurePsi}` : '—',
+    s.coolantTempC      != null ? `${s.coolantTempC}°C`    : '—',
+    s.coolantFlowGpm    != null ? `${s.coolantFlowGpm}`    : '—',
+    s.compressorStatus  || '—',
+    s.equipmentOnline === true ? 'Online' : s.equipmentOnline === false ? 'Offline' : '—',
+  ]);
+
+  drawTable(doc, {
+    headers: ['Data/Hora', 'Helio %', 'Pressao (PSI)', 'Temp (C)', 'Fluxo (GPM)', 'Compressor', 'Online'],
+    columnWidths: [110, 55, 70, 55, 65, 70, 60],
+    rows,
+    emptyMessage: 'Nenhum registro encontrado para o periodo selecionado.',
+  });
+
+  return finalizeDocument(doc);
+}
+
 export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
   const title = 'REGISTRO DE OCORRENCIA';
   const doc = createDocument(title, options);

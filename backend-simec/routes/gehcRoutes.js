@@ -11,6 +11,7 @@ import {
   removerCredenciais,
   temCredenciaisConfiguradas,
 } from '../services/gehc/gehcAuthService.js';
+import { gerarPdfSaudeEquipamentoBuffer } from '../services/pdf/pdfDocumentService.js';
 
 const router = express.Router();
 
@@ -526,6 +527,65 @@ router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send('﻿' + csv);
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/equipamento/:equipamentoId/historico/export-pdf ─────────────
+router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { equipamentoId } = req.params;
+  const { inicio, fim } = req.query;
+
+  const where = {
+    tenantId,
+    equipamentoId,
+    ...(inicio || fim
+      ? { capturedAt: { ...(inicio && { gte: new Date(inicio) }), ...(fim && { lte: new Date(fim) }) } }
+      : {}),
+  };
+
+  try {
+    const [equipamento, snapshots] = await Promise.all([
+      prisma.equipamento.findFirst({
+        where: { id: equipamentoId, tenantId },
+        select: {
+          modelo: true,
+          tag: true,
+          apelido: true,
+          unidade: { select: { nomeSistema: true } },
+        },
+      }),
+      prisma.gehcSaudeSnapshot.findMany({
+        where,
+        orderBy: { capturedAt: 'asc' },
+        select: {
+          capturedAt: true, heliumLevelPct: true, heliumPressurePsi: true,
+          compressorStatus: true, coolantTempC: true, coolantFlowGpm: true,
+          equipmentOnline: true,
+        },
+      }),
+    ]);
+
+    const pdfBuffer = await gerarPdfSaudeEquipamentoBuffer({
+      equipamento: {
+        modelo:   equipamento?.modelo,
+        tag:      equipamento?.tag,
+        apelido:  equipamento?.apelido,
+        unidade:  equipamento?.unidade?.nomeSistema,
+      },
+      inicio: inicio || null,
+      fim:    fim    || null,
+      snapshots,
+    }, { locale: 'pt-BR', timeZone: 'America/Sao_Paulo' });
+
+    const tag      = equipamento?.tag || equipamentoId;
+    const filename = `saude_ativo_${tag}_${new Date().toISOString().split('T')[0]}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.send(pdfBuffer);
+  } catch (err) {
+    console.error('[GEHC_PDF_SAUDE]', err.message);
     res.status(500).json({ error: err.message });
   }
 });

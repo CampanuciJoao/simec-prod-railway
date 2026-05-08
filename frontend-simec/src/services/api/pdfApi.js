@@ -110,3 +110,13 @@ export const exportarContratoPDF = (contratoId) =>
     { url: `/pdfs/contrato/${contratoId}`, method: 'get' },
     `contrato_${contratoId}.pdf`
   );
+
+export const exportarSaudeEquipamentoPDF = (equipamentoId, { inicio, fim } = {}, fallbackFileName) =>
+  baixarPdf(
+    {
+      url: `/gehc/equipamento/${equipamentoId}/historico/export-pdf`,
+      method: 'get',
+      params: { ...(inicio && { inicio }), ...(fim && { fim }) },
+    },
+    fallbackFileName || `saude_ativo_${equipamentoId}.pdf`
+  );
