@@ -15,12 +15,12 @@ function InteractiveKpiCard({ icon, title, value, subtitle, tone = 'slate', onCl
   };
 
   const inner = (
-    <Card className="h-full min-h-[150px]">
-      <div className="flex h-full flex-col justify-between gap-5">
-        <div className="flex items-start gap-4">
+    <Card className="h-full min-h-[100px]">
+      <div className="flex h-full flex-col justify-between gap-3">
+        <div className="flex items-start gap-3">
           <div
             className={[
-              'inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl',
+              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm',
               toneMap[tone] || toneMap.slate,
             ].join(' ')}
           >
@@ -36,7 +36,7 @@ function InteractiveKpiCard({ icon, title, value, subtitle, tone = 'slate', onCl
             </p>
 
             <p
-              className="mt-3 break-words text-3xl font-bold leading-tight tracking-tight"
+              className="mt-1.5 break-words text-2xl font-bold leading-tight tracking-tight"
               style={{ color: 'var(--text-primary)' }}
             >
               {value}
