@@ -34,7 +34,7 @@ const DashboardCard = forwardRef(function DashboardCard(
           style={{
             backgroundColor: 'var(--card-header-bg)',
             borderColor: 'var(--card-header-border)',
-            borderTop: '3px solid var(--brand-primary)',
+            borderTop: '3px solid var(--bg-topbar)',
             borderTopLeftRadius: '1rem',
             borderTopRightRadius: '1rem',
           }}
