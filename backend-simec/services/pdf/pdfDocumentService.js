@@ -493,8 +493,10 @@ function buildHistoricoRows(eventos = [], locale, timeZone) {
 export async function gerarPdfBIBuffer(dados, options = {}) {
   const title = `RELATORIO EXECUTIVO DE PERFORMANCE - ${safeText(dados?.ano)}`;
   const doc = createDocument(title, options);
-  const { locale, timeZone } = options;
 
+  const fmt = (v, suffix = '') => (v !== null && v !== undefined ? `${v}${suffix}` : '—');
+
+  // ── 1. Resumo Geral ─────────────────────────────────────────────────────────
   drawSectionTitle(doc, 'Resumo Geral');
   drawTable(doc, {
     headers: ['Indicador operacional', 'Valor acumulado'],
@@ -503,44 +505,80 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
       ['Total de ativos no sistema', safeText(dados?.resumoGeral?.totalAtivos, '0')],
       ['Manutencoes preventivas realizadas', safeText(dados?.resumoGeral?.preventivas, '0')],
       ['Manutencoes corretivas (paradas)', safeText(dados?.resumoGeral?.corretivas, '0')],
-      [
-        'Total de manutencoes concluidas',
-        safeText(dados?.resumoGeral?.totalManutencoesConcluidas, '0'),
-      ],
+      ['Total de manutencoes concluidas', safeText(dados?.resumoGeral?.totalManutencoesConcluidas, '0')],
+      ['Backlog (ordens em aberto)', fmt(dados?.kpis?.backlog)],
     ],
   });
 
-  drawSectionTitle(doc, 'Downtime por unidade');
+  // ── 2. KPIs Estratégicos ────────────────────────────────────────────────────
+  drawSectionTitle(doc, 'KPIs Estrategicos');
+  drawTable(doc, {
+    headers: ['Indicador', 'Valor', 'Descricao'],
+    columnWidths: [180, 100, 215],
+    rows: [
+      ['MTTR (tempo medio de reparo)', fmt(dados?.kpis?.mttrHoras, 'h'), 'Da abertura ate conclusao da OS corretiva'],
+      ['MTBF (tempo medio entre falhas)', fmt(dados?.kpis?.mtbfHoras, 'h'), 'Horas de operacao / numero de falhas corretivas'],
+      ['Disponibilidade da frota', fmt(dados?.kpis?.disponibilidadePct, '%'), 'Baseado no downtime acumulado vs horas totais'],
+      ['Conformidade PM', fmt(dados?.kpis?.conformidadePM, '%'), 'Preventivas concluidas dentro do prazo agendado'],
+    ],
+  });
+
+  // ── 3. Evolucao Mensal ──────────────────────────────────────────────────────
+  const evolucao = dados?.evolucaoMensal || [];
+  if (evolucao.length > 0) {
+    drawSectionTitle(doc, 'Evolucao Mensal');
+    drawTable(doc, {
+      headers: ['Mes', 'Preventivas', 'Corretivas', 'Downtime (h)'],
+      columnWidths: [120, 125, 125, 125],
+      rows: evolucao.map((m) => [
+        safeText(m?.mes),
+        safeText(m?.preventivas, '0'),
+        safeText(m?.corretivas, '0'),
+        safeText(m?.downtime, '0'),
+      ]),
+    });
+  }
+
+  // ── 4. Downtime por Unidade ─────────────────────────────────────────────────
+  drawSectionTitle(doc, 'Downtime por Unidade');
   drawTable(doc, {
     headers: ['Unidade / local', 'Horas totais fora de operacao'],
     columnWidths: [340, 155],
     rows: (dados?.rankingUnidades || []).map((item) => [
       safeText(item?.nome),
-      `${safeText(Number(item?.horasParado || 0).toFixed(2), '0')} horas`,
+      `${Number(item?.horasParado || 0).toFixed(2)} h`,
     ]),
   });
 
-  drawSectionTitle(doc, 'Reincidencia de falhas');
+  // ── 5. Top Equipamentos com maior Downtime ───────────────────────────────────
+  drawSectionTitle(doc, 'Top Equipamentos com Maior Downtime');
   drawTable(doc, {
-    headers: ['Equipamento / tag', 'Unidade', 'Qtd. falhas'],
-    columnWidths: [220, 180, 95],
-    rows: (dados?.rankingFrequencia || []).map((item) => [
-      `${safeText(item?.modelo)} (${safeText(item?.tag)})`,
-      safeText(item?.unidade),
-      safeText(item?.corretivas, '0'),
-    ]),
-  });
-
-  drawSectionTitle(doc, 'Top equipamentos com maior downtime');
-  drawTable(doc, {
-    headers: ['Equipamento / tag', 'Unidade', 'Tempo parado'],
-    columnWidths: [220, 180, 95],
+    headers: ['Equipamento / tag', 'Unidade', 'Preventivas', 'Corretivas', 'Tempo parado'],
+    columnWidths: [160, 140, 65, 65, 65],
     rows: (dados?.rankingDowntime || []).map((item) => [
       `${safeText(item?.modelo)} (${safeText(item?.tag)})`,
       safeText(item?.unidade),
-      `${safeText(Number(item?.horasParado || 0).toFixed(2), '0')} h`,
+      safeText(item?.preventivas, '0'),
+      safeText(item?.corretivas, '0'),
+      `${Number(item?.horasParado || 0).toFixed(2)} h`,
     ]),
   });
+
+  // ── 6. Reincidencia de Falhas ───────────────────────────────────────────────
+  const reincidentes = dados?.reincidentes?.length ? dados.reincidentes : (dados?.rankingFrequencia || []).filter((i) => i.corretivas >= 2);
+  if (reincidentes.length > 0) {
+    drawSectionTitle(doc, 'Reincidencia de Falhas (>= 2 ocorrencias)');
+    drawTable(doc, {
+      headers: ['Equipamento / tag', 'Unidade', 'Corretivas', 'Downtime (h)'],
+      columnWidths: [190, 155, 75, 75],
+      rows: reincidentes.map((item) => [
+        `${safeText(item?.modelo)} (${safeText(item?.tag)})`,
+        safeText(item?.unidade),
+        safeText(item?.corretivas, '0'),
+        `${Number(item?.horasParado || 0).toFixed(2)} h`,
+      ]),
+    });
+  }
 
   return finalizeDocument(doc);
 }

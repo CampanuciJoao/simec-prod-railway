@@ -42,101 +42,200 @@ function normalizarIdList(ids = []) {
   return [...new Set(idsValidos)];
 }
 
+function calcularHorasParadoOsCorretiva(os) {
+  const conclusao = toDateOrNull(os.dataHoraConclusao);
+  if (!conclusao) return 0;
+
+  if (os.statusEquipamentoAbertura === 'Inoperante') {
+    const abertura = toDateOrNull(os.dataHoraAbertura);
+    if (!abertura) return 0;
+    return Math.max(0, differenceInMinutes(conclusao, abertura)) / 60;
+  }
+
+  const visitas = (os.visitas || []).filter((v) => v.resultado);
+  if (!visitas.length) return 0;
+
+  let totalMinutos = 0;
+  for (const visita of visitas) {
+    const inicio = toDateOrNull(visita.dataHoraInicioReal) || toDateOrNull(visita.dataHoraInicioPrevista);
+    const fim = toDateOrNull(visita.dataHoraFimReal) || conclusao;
+    if (inicio && fim && fim > inicio) totalMinutos += differenceInMinutes(fim, inicio);
+  }
+  return Math.max(0, totalMinutos) / 60;
+}
+
 export async function obterDadosPdfBI({ tenantId }) {
   const agora = new Date();
   const inicioAno = startOfYear(agora);
   const fimAno = endOfYear(agora);
 
-  const [manutencoes, totalEquipamentos] = await Promise.all([
+  const [
+    manutencoes,
+    osCorretivas,
+    totalEquipamentos,
+    osConcluidasAno,
+    backlogManutencoes,
+    backlogOsCorretivas,
+    preventivasAno,
+  ] = await Promise.all([
     prisma.manutencao.findMany({
-      where: {
-        tenantId,
-        status: 'Concluida',
-        dataConclusao: {
-          gte: inicioAno,
-          lte: fimAno,
-        },
-      },
+      where: { tenantId, status: 'Concluida', dataConclusao: { gte: inicioAno, lte: fimAno } },
+      include: { equipamento: { include: { unidade: true } } },
+      orderBy: { dataConclusao: 'desc' },
+    }),
+    prisma.osCorretiva.findMany({
+      where: { tenantId, status: 'Concluida', dataHoraConclusao: { gte: inicioAno, lte: fimAno } },
       include: {
-        equipamento: {
-          include: {
-            unidade: true,
+        equipamento: { include: { unidade: true } },
+        visitas: {
+          where: { resultado: { not: null } },
+          select: {
+            dataHoraInicioPrevista: true,
+            dataHoraInicioReal: true,
+            dataHoraFimReal: true,
+            resultado: true,
           },
         },
       },
-      orderBy: {
-        dataConclusao: 'desc',
-      },
-      take: 1000,
     }),
-    prisma.equipamento.count({
-      where: {
-        tenantId,
-      },
+    prisma.equipamento.count({ where: { tenantId } }),
+    prisma.osCorretiva.findMany({
+      where: { tenantId, status: 'Concluida', dataHoraConclusao: { gte: inicioAno, lte: fimAno } },
+      select: { dataHoraAbertura: true, dataHoraConclusao: true },
+    }),
+    prisma.manutencao.count({ where: { tenantId, status: { notIn: ['Concluida', 'Cancelada'] } } }),
+    prisma.osCorretiva.count({ where: { tenantId, status: { not: 'Concluida' } } }),
+    prisma.manutencao.findMany({
+      where: { tenantId, tipo: 'Preventiva', status: 'Concluida', dataConclusao: { gte: inicioAno, lte: fimAno } },
+      select: { dataConclusao: true, dataHoraAgendamentoFim: true },
     }),
   ]);
 
   const statsEquip = {};
   const statsUnidade = {};
 
-  for (const manutencao of manutencoes) {
-    if (!manutencao.equipamento || !manutencao.equipamento.unidade) {
-      continue;
-    }
-
-    const equipamentoId = manutencao.equipamentoId;
-    const unidadeId = manutencao.equipamento.unidadeId;
-    const unidadeNome = manutencao.equipamento.unidade.nomeSistema;
-
-    if (!statsEquip[equipamentoId]) {
-      statsEquip[equipamentoId] = {
-        equipamentoId,
-        modelo: manutencao.equipamento.modelo,
-        tag: manutencao.equipamento.tag,
-        unidadeId,
-        unidade: unidadeNome,
+  const garantirEquip = (eId, equip) => {
+    if (!statsEquip[eId]) {
+      statsEquip[eId] = {
+        equipamentoId: eId,
+        modelo: equip.modelo,
+        tag: equip.tag,
+        unidadeId: equip.unidadeId,
+        unidade: equip.unidade?.nomeSistema || 'N/A',
         corretivas: 0,
         preventivas: 0,
         horasParado: 0,
       };
     }
+  };
 
-    if (!statsUnidade[unidadeId]) {
-      statsUnidade[unidadeId] = {
-        unidadeId,
-        nome: unidadeNome,
-        horasParado: 0,
-      };
-    }
+  const garantirUnidade = (uId, uNome) => {
+    if (!statsUnidade[uId]) statsUnidade[uId] = { unidadeId: uId, nome: uNome, horasParado: 0 };
+  };
 
-    if (manutencao.tipo === 'Corretiva') {
-      statsEquip[equipamentoId].corretivas += 1;
-    } else if (manutencao.tipo === 'Preventiva') {
-      statsEquip[equipamentoId].preventivas += 1;
-    }
-
-    const horasParado = calcularHorasParado(manutencao);
-    statsEquip[equipamentoId].horasParado += horasParado;
-    statsUnidade[unidadeId].horasParado += horasParado;
+  for (const m of manutencoes) {
+    if (!m.equipamento?.unidade) continue;
+    const eId = m.equipamentoId;
+    const uId = m.equipamento.unidadeId;
+    garantirEquip(eId, m.equipamento);
+    garantirUnidade(uId, m.equipamento.unidade.nomeSistema);
+    if (m.tipo === 'Corretiva') statsEquip[eId].corretivas += 1;
+    else if (m.tipo === 'Preventiva') statsEquip[eId].preventivas += 1;
+    const h = calcularHorasParado(m);
+    statsEquip[eId].horasParado += h;
+    statsUnidade[uId].horasParado += h;
   }
+
+  for (const os of osCorretivas) {
+    if (!os.equipamento?.unidade) continue;
+    const eId = os.equipamentoId;
+    const uId = os.equipamento.unidadeId;
+    garantirEquip(eId, os.equipamento);
+    garantirUnidade(uId, os.equipamento.unidade.nomeSistema);
+    statsEquip[eId].corretivas += 1;
+    const h = calcularHorasParadoOsCorretiva(os);
+    statsEquip[eId].horasParado += h;
+    statsUnidade[uId].horasParado += h;
+  }
+
+  const manutencoesPreventivas = manutencoes.filter((m) => m.tipo === 'Preventiva').length;
+  const manutencoesCorretivas = manutencoes.filter((m) => m.tipo === 'Corretiva').length + osCorretivas.length;
+
+  // MTTR
+  let mttrHoras = null;
+  if (osConcluidasAno.length > 0) {
+    const totalMin = osConcluidasAno.reduce((acc, os) => {
+      if (!os.dataHoraAbertura || !os.dataHoraConclusao) return acc;
+      return acc + differenceInMinutes(new Date(os.dataHoraConclusao), new Date(os.dataHoraAbertura));
+    }, 0);
+    mttrHoras = Math.round((totalMin / osConcluidasAno.length / 60) * 10) / 10;
+  }
+
+  // Conformidade PM
+  let conformidadePM = null;
+  if (preventivasAno.length > 0) {
+    const noPrazo = preventivasAno.filter(
+      (m) => m.dataConclusao && m.dataHoraAgendamentoFim && new Date(m.dataConclusao) <= new Date(m.dataHoraAgendamentoFim)
+    ).length;
+    conformidadePM = Math.round((noPrazo / preventivasAno.length) * 100);
+  }
+
+  const backlog = backlogManutencoes + backlogOsCorretivas;
+
+  // MTBF
+  const horasDecorridas = differenceInMinutes(agora, inicioAno) / 60;
+  const mtbfHoras = manutencoesCorretivas > 0
+    ? Math.round((horasDecorridas / manutencoesCorretivas) * 10) / 10
+    : null;
+
+  // Disponibilidade %
+  const totalHorasFlota = totalEquipamentos * horasDecorridas;
+  const totalDowntimeFlota = Object.values(statsEquip).reduce((a, e) => a + e.horasParado, 0);
+  const disponibilidadePct = totalHorasFlota > 0
+    ? Math.round(((totalHorasFlota - totalDowntimeFlota) / totalHorasFlota) * 1000) / 10
+    : null;
+
+  // Evolução mensal
+  const mesAtual = agora.getMonth();
+  const MESES_PT = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const evolucaoMensal = Array.from({ length: mesAtual + 1 }, (_, mesIdx) => ({
+    mes: MESES_PT[mesIdx],
+    preventivas: manutencoes.filter(
+      (m) => m.tipo === 'Preventiva' && m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx
+    ).length,
+    corretivas:
+      manutencoes.filter((m) => m.tipo === 'Corretiva' && m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx).length +
+      osCorretivas.filter((os) => os.dataHoraConclusao && new Date(os.dataHoraConclusao).getMonth() === mesIdx).length,
+    downtime: Math.round((
+      manutencoes
+        .filter((m) => m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx)
+        .reduce((acc, m) => acc + calcularHorasParado(m), 0) +
+      osCorretivas
+        .filter((os) => os.dataHoraConclusao && new Date(os.dataHoraConclusao).getMonth() === mesIdx)
+        .reduce((acc, os) => acc + calcularHorasParadoOsCorretiva(os), 0)
+    ) * 10) / 10,
+  }));
+
+  // Reincidentes
+  const reincidentes = Object.values(statsEquip)
+    .filter((e) => e.corretivas >= 2)
+    .sort((a, b) => b.corretivas - a.corretivas)
+    .slice(0, 10);
 
   return {
     ano: agora.getFullYear(),
     resumoGeral: {
       totalAtivos: totalEquipamentos,
-      preventivas: manutencoes.filter((item) => item.tipo === 'Preventiva').length,
-      corretivas: manutencoes.filter((item) => item.tipo === 'Corretiva').length,
-      totalManutencoesConcluidas: manutencoes.length,
+      preventivas: manutencoesPreventivas,
+      corretivas: manutencoesCorretivas,
+      totalManutencoesConcluidas: manutencoes.length + osCorretivas.length,
     },
-    rankingDowntime: Object.values(statsEquip)
-      .sort((a, b) => b.horasParado - a.horasParado)
-      .slice(0, 10),
-    rankingFrequencia: Object.values(statsEquip)
-      .sort((a, b) => b.corretivas - a.corretivas)
-      .slice(0, 10),
-    rankingUnidades: Object.values(statsUnidade)
-      .sort((a, b) => b.horasParado - a.horasParado)
-      .slice(0, 10),
+    kpis: { mttrHoras, conformidadePM, backlog, mtbfHoras, disponibilidadePct },
+    rankingDowntime: Object.values(statsEquip).sort((a, b) => b.horasParado - a.horasParado).slice(0, 10),
+    rankingFrequencia: Object.values(statsEquip).sort((a, b) => b.corretivas - a.corretivas).slice(0, 10),
+    rankingUnidades: Object.values(statsUnidade).sort((a, b) => b.horasParado - a.horasParado).slice(0, 10),
+    evolucaoMensal,
+    reincidentes,
   };
 }
 
