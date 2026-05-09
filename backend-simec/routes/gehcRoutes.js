@@ -61,6 +61,7 @@ router.get('/status', async (req, res) => {
             ...whereSnapshotValido,
             equipamento: {
               gehcAssetId: { not: null },
+              ...whereRmGe,
             },
           },
           orderBy: { capturedAt: 'desc' },
