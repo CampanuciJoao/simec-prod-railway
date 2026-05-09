@@ -82,23 +82,11 @@ function TelegramNotificacaoPage() {
         <PageSection
           title="Destinatários cadastrados"
           description="Chats privados e grupos que recebem alertas do sistema via bot do Telegram."
-          headerRight={!page.loading && !page.isEmpty ? (
-            <div className="flex flex-wrap gap-2">
-              {tokenAction}
-              {createAction}
-            </div>
-          ) : null}
         >
           {page.loading ? (
             <PageState loading />
           ) : page.isEmpty ? (
-            <div className="space-y-4">
-              <PageState isEmpty emptyMessage="Nenhum destinatário cadastrado." />
-              <div className="flex flex-wrap justify-center gap-2 sm:justify-start">
-                {tokenAction}
-                {createAction}
-              </div>
-            </div>
+            <PageState isEmpty emptyMessage="Nenhum destinatário cadastrado." />
           ) : (
             <TelegramTable
               destinatarios={page.destinatarios}
