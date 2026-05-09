@@ -4,7 +4,6 @@ import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
-  faArrowUpRightFromSquare,
   faChartPie,
   faHeartPulse,
   faRotateRight,
@@ -168,19 +167,17 @@ function SaudeRMs() {
       {snapshots.map((s, i) => (
         <div key={i} className="rounded-2xl border px-4 py-2.5" style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
           <div className="flex flex-wrap items-center justify-between gap-1">
-            <div className="flex items-center gap-2 min-w-0">
+            {s.equipamentoId ? (
+              <Link
+                to={`/equipamentos/detalhes/${s.equipamentoId}`}
+                className="text-sm font-semibold truncate min-w-0 hover:underline"
+                style={{ color: 'var(--text-primary)' }}
+              >
+                {s.equipamento}
+              </Link>
+            ) : (
               <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
-              {s.equipamentoId && (
-                <Link
-                  to={`/equipamentos/detalhes/${s.equipamentoId}`}
-                  title="Ver histórico de saúde"
-                  className="shrink-0 text-xs"
-                  style={{ color: 'var(--brand-primary)' }}
-                >
-                  <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-                </Link>
-              )}
-            </div>
+            )}
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatarDataHora(s.capturedAt)}</p>
           </div>
           <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
