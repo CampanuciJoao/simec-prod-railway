@@ -31,6 +31,7 @@ import orcamentosRoutes from './routes/orcamentosRoutes.js';
 import osCorretivaRoutes from './routes/osCorretivaRoutes.js';
 import gehcRoutes from './routes/gehcRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
+import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
@@ -129,6 +130,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/agent', agentRoutes);
+app.use('/api/telegram/webhook', telegramWebhookRoute);
 
 app.use(proteger);
 
