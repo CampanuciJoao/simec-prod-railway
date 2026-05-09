@@ -166,7 +166,7 @@ function BIPage() {
               title="Utilização GE Healthcare"
               description={
                 gehcUtilizacao
-                  ? `Exames e disponibilidade das RMs GE nos últimos ${gehcUtilizacao.periodo?.meses || 12} meses.`
+                  ? `Exames e disponibilidade dos equipamentos GE nos últimos ${gehcUtilizacao.periodo?.meses || 12} meses.`
                   : ''
               }
               darkHeader
