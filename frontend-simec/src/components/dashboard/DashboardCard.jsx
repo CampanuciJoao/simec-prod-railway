@@ -21,10 +21,11 @@ const DashboardCard = forwardRef(function DashboardCard(
       {...rest}
     >
       <div
-        className="flex h-full flex-col overflow-hidden rounded-2xl"
+        className="flex h-full flex-col overflow-hidden rounded-2xl border"
         style={{
           backgroundColor: 'var(--bg-surface)',
-          boxShadow: '0 0 0 2px var(--bg-topbar), 0 8px 24px rgba(8,17,31,0.10)',
+          borderColor: 'var(--border-soft)',
+          boxShadow: '0 4px 16px rgba(8,17,31,0.09)',
         }}
       >
         {/* Header com drag handle */}
