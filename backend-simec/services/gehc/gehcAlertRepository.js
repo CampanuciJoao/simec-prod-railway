@@ -184,6 +184,19 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
   const labelsAtivos = new Set(regras.map(r => r.label));
   let mudouContagem = false;
 
+  // Detecção de normalização do compressor: verifica ANTES da auto-resolução apagar o alerta
+  const { compressorStatus } = snapshot;
+  const compressorOffId   = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, 'compressor-off');
+  const compressorNormId  = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, 'compressor-normalizado');
+  let compressorNormalizou = false;
+  if (eRessonancia && compressorStatus === 'ON') {
+    const alertaOff = await prisma.alerta.findUnique({
+      where: { tenantId_id: { tenantId, id: compressorOffId } },
+      select: { id: true },
+    });
+    compressorNormalizou = !!alertaOff;
+  }
+
   // Auto-resolução: remove alertas cujas condições normalizaram (métrica tem dado mas não atingiu threshold)
   const idsParaResolver = [];
   for (const [metrica, labels] of Object.entries(LABELS_POR_METRICA)) {
@@ -204,6 +217,41 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
     if (count > 0) {
       mudouContagem = true;
       console.log(`[GEHC_ALERT] ${equipamentoNome}: ${count} alerta(s) resolvido(s) automaticamente.`);
+    }
+  }
+
+  // Normalização do compressor (transição OFF→ON)
+  if (eRessonancia && compressorStatus !== null && compressorStatus !== undefined) {
+    if (compressorNormalizou) {
+      const jaExiste = await prisma.alerta.findUnique({
+        where: { tenantId_id: { tenantId, id: compressorNormId } },
+        select: { id: true },
+      });
+      if (!jaExiste) {
+        await prisma.alerta.create({
+          data: {
+            id: compressorNormId,
+            tenantId,
+            titulo: `Compressor normalizado — ${equipamentoNome}`,
+            subtitulo: 'O compressor voltou a operar normalmente.',
+            data: new Date(),
+            prioridade: ALERT_PRIORIDADES.BAIXA,
+            tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
+            tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
+            tipoEvento: ALERT_EVENTOS.GEHC_COMPRESSOR_ON,
+          },
+        });
+        criados++;
+        mudouContagem = true;
+        console.log(`[GEHC_ALERT] ${equipamentoNome}: alerta de normalização do compressor criado.`);
+      }
+    } else if (compressorStatus !== 'ON') {
+      // Compressor voltou a ficar offline — remove alerta de normalização
+      const { count } = await prisma.alerta.deleteMany({ where: { tenantId, id: compressorNormId } });
+      if (count > 0) {
+        mudouContagem = true;
+        console.log(`[GEHC_ALERT] ${equipamentoNome}: alerta de normalização do compressor removido.`);
+      }
     }
   }
 
