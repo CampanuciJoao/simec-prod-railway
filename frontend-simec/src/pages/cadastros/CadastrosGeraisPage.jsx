@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   faBuilding,
   faEnvelope,
+  faPaperPlane,
   faPlus,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
@@ -34,6 +35,13 @@ function CadastrosGeraisPage() {
       description: 'Configure e-mails usados para alertas e comunicacao.',
       tone: 'slate',
       path: '/cadastros/emails',
+    },
+    {
+      icon: faPaperPlane,
+      title: 'Telegram',
+      description: 'Configure chats e grupos do Telegram para receber alertas.',
+      tone: 'sky',
+      path: '/cadastros/telegram',
     },
   ];
 

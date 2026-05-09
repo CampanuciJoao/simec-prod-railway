@@ -15,6 +15,7 @@ export * from './manutencoesApi';
 export * from './pdfApi';
 export * from './relatoriosApi';
 export * from './segurosApi';
+export * from './telegramApi';
 export * from './tenantSettingsApi';
 export * from './tenantsApi';
 export * from './unidadesApi';

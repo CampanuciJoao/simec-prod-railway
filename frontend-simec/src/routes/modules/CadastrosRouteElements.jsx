@@ -4,6 +4,7 @@ import AdminRoute from '@/components/routes/AdminRoute';
 import {
   CadastrosGeraisPage,
   EmailsNotificacaoPage,
+  TelegramNotificacaoPage,
   SalvarEquipamentoPage,
   SalvarUnidadePage,
   UnidadesPage,
@@ -35,6 +36,14 @@ function CadastrosRouteElements() {
         element={
           <AdminRoute>
             <EmailsNotificacaoPage />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="cadastros/telegram"
+        element={
+          <AdminRoute>
+            <TelegramNotificacaoPage />
           </AdminRoute>
         }
       />

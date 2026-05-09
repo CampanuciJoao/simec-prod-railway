@@ -68,6 +68,9 @@ export const AlertasPage = React.lazy(() =>
 export const EmailsNotificacaoPage = React.lazy(() =>
   import('@/pages/notificacoes/EmailsNotificacaoPage')
 );
+export const TelegramNotificacaoPage = React.lazy(() =>
+  import('@/pages/notificacoes/TelegramNotificacaoPage')
+);
 export const GerenciamentoPage = React.lazy(() =>
   import('@/pages/gerenciamento/GerenciamentoPage')
 );
