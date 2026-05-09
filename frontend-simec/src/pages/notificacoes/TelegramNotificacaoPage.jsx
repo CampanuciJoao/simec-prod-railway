@@ -1,6 +1,7 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperPlane, faPlus, faKey } from '@fortawesome/free-solid-svg-icons';
+import { faPaperPlane, faPlus, faKey, faArrowLeft } from '@fortawesome/free-solid-svg-icons';
 
 import { useTelegramNotificacaoPage } from '@/hooks/notificacoes/useTelegramNotificacaoPage';
 
@@ -21,6 +22,7 @@ import {
 } from '@/components/telegram';
 
 function TelegramNotificacaoPage() {
+  const navigate = useNavigate();
   const page = useTelegramNotificacaoPage();
 
   const createAction = (
@@ -73,6 +75,10 @@ function TelegramNotificacaoPage() {
           icon={faPaperPlane}
           actions={
             <div className="flex flex-wrap gap-2">
+              <Button type="button" variant="secondary" onClick={() => navigate(-1)}>
+                <FontAwesomeIcon icon={faArrowLeft} />
+                Voltar
+              </Button>
               {tokenAction}
               {createAction}
             </div>

@@ -8,13 +8,29 @@ function TelegramFormModal({ open, title, onClose, children }) {
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-2xl">
-        <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4">
-          <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+      <div
+        className="w-full max-w-3xl rounded-2xl shadow-2xl"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          border: '1px solid var(--border-soft)',
+        }}
+      >
+        <div
+          className="flex items-center justify-between gap-4 px-5 py-4"
+          style={{ borderBottom: '1px solid var(--border-soft)' }}
+        >
+          <h3 className="text-lg font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-700"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl transition"
+            style={{
+              backgroundColor: 'var(--bg-surface)',
+              border: '1px solid var(--border-soft)',
+              color: 'var(--text-muted)',
+            }}
             aria-label="Fechar"
           >
             <FontAwesomeIcon icon={faXmark} />

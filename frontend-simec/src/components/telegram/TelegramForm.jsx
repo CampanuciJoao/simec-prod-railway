@@ -28,10 +28,13 @@ const TOGGLES = [
 
 function ToggleField({ checked, onChange, label, description }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300">
+    <label
+      className="flex cursor-pointer items-start justify-between gap-4 rounded-xl p-4 transition"
+      style={{ backgroundColor: 'var(--bg-surface-soft)', border: '1px solid var(--border-soft)' }}
+    >
       <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-800">{label}</div>
-        {description && <div className="mt-1 text-xs leading-5 text-slate-500">{description}</div>}
+        <div className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</div>
+        {description && <div className="mt-1 text-xs leading-5" style={{ color: 'var(--text-muted)' }}>{description}</div>}
       </div>
       <span className={['relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition', checked ? 'bg-blue-600' : 'bg-slate-300'].join(' ')}>
         <input type="checkbox" checked={checked} onChange={onChange} className="peer sr-only" />
@@ -97,7 +100,7 @@ function TelegramForm({ initialData = null, onSubmit, onCancel, isSubmitting = f
       <Card>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-slate-700">Nome / Identificação</label>
+            <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Nome / Identificação</label>
             <div className="relative">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                 <FontAwesomeIcon icon={faUser} />
@@ -108,14 +111,14 @@ function TelegramForm({ initialData = null, onSubmit, onCancel, isSubmitting = f
 
           {isEditing ? (
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-slate-700">Chat ID</label>
+              <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Chat ID</label>
               <div className="relative">
                 <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
                   <FontAwesomeIcon icon={faHashtag} />
                 </span>
                 <Input value={formData.chatId} readOnly className="pl-10 bg-slate-50 text-slate-500 cursor-not-allowed" />
               </div>
-              <p className="text-xs text-slate-500">O Chat ID é definido na vinculação e não pode ser alterado.</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>O Chat ID é definido na vinculação e não pode ser alterado.</p>
             </div>
           ) : (
             <div className="flex flex-col gap-1.5">
@@ -126,12 +129,12 @@ function TelegramForm({ initialData = null, onSubmit, onCancel, isSubmitting = f
                 </span>
                 <Input name="chatId" value={formData.chatId} onChange={set('chatId')} placeholder="Ex.: -1001234567890" className="pl-10" />
               </div>
-              <p className="text-xs text-slate-500">Para grupos: adicione o bot e use o ID negativo do grupo. Para chats privados, prefira vincular pelo código.</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Para grupos: adicione o bot e use o ID negativo do grupo. Para chats privados, prefira vincular pelo código.</p>
             </div>
           )}
 
           <div className="flex flex-col gap-1.5 md:col-span-2">
-            <label className="text-sm font-medium text-slate-700">Status</label>
+            <label className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Status</label>
             <ToggleField
               checked={formData.ativo}
               onChange={toggle('ativo')}
@@ -148,8 +151,8 @@ function TelegramForm({ initialData = null, onSubmit, onCancel, isSubmitting = f
             <FontAwesomeIcon icon={faBell} />
           </span>
           <div>
-            <h3 className="text-base font-semibold text-slate-900">Tipos de alerta</h3>
-            <p className="text-sm text-slate-500">Selecione o que este chat deve receber.</p>
+            <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Tipos de alerta</h3>
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Selecione o que este chat deve receber.</p>
           </div>
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
