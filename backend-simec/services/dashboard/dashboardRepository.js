@@ -54,6 +54,8 @@ export function buscarResumoDashboard({
         createdAt: true,
         tipo: true,
       },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
     }),
     prisma.alerta.findMany({
       where: { tenantId },

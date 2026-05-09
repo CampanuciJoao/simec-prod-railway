@@ -1,5 +1,5 @@
-// Ficheiro: routes/segurosRoutes.js
-// Versão: Multi-tenant hardened + upload centralizado
+﻿// Ficheiro: routes/segurosRoutes.js
+// VersÃ£o: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -65,7 +65,7 @@ async function validarEquipamentoDoTenant(tenantId, equipamentoId) {
   });
 
   if (!equipamento) {
-    const error = new Error('Equipamento inválido.');
+    const error = new Error('Equipamento invÃ¡lido.');
     error.status = 404;
     throw error;
   }
@@ -88,7 +88,7 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
   });
 
   if (!unidade) {
-    const error = new Error('Unidade inválida.');
+    const error = new Error('Unidade invÃ¡lida.');
     error.status = 404;
     throw error;
   }
@@ -97,9 +97,9 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
 }
 
 async function verificarSobreposicaoCobertura(tenantId, { equipamentoId, dataInicio, dataFim, excluirId }) {
-  // Sobreposição só é verificada para equipamento: o mesmo equipamento não pode
-  // ter dois seguros ativos no mesmo período. Para unidades, múltiplos seguros
-  // são permitidos (containers, veículos, objetos distintos no mesmo terreno).
+  // SobreposiÃ§Ã£o sÃ³ Ã© verificada para equipamento: o mesmo equipamento nÃ£o pode
+  // ter dois seguros ativos no mesmo perÃ­odo. Para unidades, mÃºltiplos seguros
+  // sÃ£o permitidos (containers, veÃ­culos, objetos distintos no mesmo terreno).
   if (!equipamentoId) return;
 
   const inicio = new Date(dataInicio);
@@ -120,14 +120,14 @@ async function verificarSobreposicaoCobertura(tenantId, { equipamentoId, dataIni
 
   if (conflito) {
     const error = new Error(
-      `Já existe um seguro ativo cobrindo este equipamento no mesmo período (Apólice ${conflito.apoliceNumero || conflito.id}).`
+      `JÃ¡ existe um seguro ativo cobrindo este equipamento no mesmo perÃ­odo (ApÃ³lice ${conflito.apoliceNumero || conflito.id}).`
     );
     error.status = 409;
     throw error;
   }
 }
 
-// ─── Helpers de paginação e filtros ──────────────────────────────────────────
+// â”€â”€â”€ Helpers de paginaÃ§Ã£o e filtros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildStatusWhereSeguro(status) {
   if (!status) return null;
@@ -269,7 +269,7 @@ router.get('/:id', async (req, res) => {
     const seguro = await buscarSeguroCompleto(tenantId, req.params.id);
 
     if (!seguro) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
+      return res.status(404).json({ message: 'Seguro nÃ£o encontrado.' });
     }
 
     return res.json(seguro);
@@ -285,7 +285,7 @@ router.get('/:id', async (req, res) => {
 // POST CRIAR
 // ==============================
 router.post('/', validate(seguroSchema), async (req, res) => {
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
   const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
@@ -343,10 +343,10 @@ router.post('/', validate(seguroSchema), async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'CRIAÇÃO',
+      acao: 'CRIAÃ‡ÃƒO',
       entidade: 'Seguro',
       entidadeId: novoSeguro.id,
-      detalhes: `Seguro nº ${novoSeguro.apoliceNumero} cadastrado.`,
+      detalhes: `Seguro nÂº ${novoSeguro.apoliceNumero} cadastrado.`,
     });
 
     const seguroCompleto = await buscarSeguroCompleto(tenantId, novoSeguro.id);
@@ -357,7 +357,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Este número de apólice já está cadastrado.',
+        message: 'Este nÃºmero de apÃ³lice jÃ¡ estÃ¡ cadastrado.',
       });
     }
 
@@ -376,7 +376,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 // ==============================
 router.put('/:id', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
   const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
@@ -394,7 +394,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
     });
 
     if (!seguro) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
+      return res.status(404).json({ message: 'Seguro nÃ£o encontrado.' });
     }
 
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
@@ -433,10 +433,10 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Seguro',
       entidadeId: id,
-      detalhes: `Seguro nº ${atualizado.apoliceNumero} atualizado.`,
+      detalhes: `Seguro nÂº ${atualizado.apoliceNumero} atualizado.`,
     });
 
     const seguroCompleto = await buscarSeguroCompleto(tenantId, id);
@@ -447,7 +447,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Este número de apólice já está cadastrado.',
+        message: 'Este nÃºmero de apÃ³lice jÃ¡ estÃ¡ cadastrado.',
       });
     }
 
@@ -480,7 +480,7 @@ router.delete('/:id', admin, async (req, res) => {
     });
 
     if (!seguro) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
+      return res.status(404).json({ message: 'Seguro nÃ£o encontrado.' });
     }
 
     for (const anexo of seguro.anexos || []) {
@@ -506,10 +506,10 @@ router.delete('/:id', admin, async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EXCLUSÃO',
+      acao: 'EXCLUSÃƒO',
       entidade: 'Seguro',
       entidadeId: id,
-      detalhes: `Seguro nº ${seguro.apoliceNumero} excluído.`,
+      detalhes: `Seguro nÂº ${seguro.apoliceNumero} excluÃ­do.`,
     });
 
     return res.status(204).send();
@@ -520,7 +520,7 @@ router.delete('/:id', admin, async (req, res) => {
 });
 
 // ==============================
-// DOWNLOAD APÓLICE (primeiro anexo)
+// DOWNLOAD APÃ“LICE (primeiro anexo)
 // ==============================
 router.get('/:id/apolice', async (req, res) => {
   const { id } = req.params;
@@ -540,7 +540,7 @@ router.get('/:id/apolice', async (req, res) => {
     });
 
     if (!seguro) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
+      return res.status(404).json({ message: 'Seguro nÃ£o encontrado.' });
     }
 
     const anexo = seguro.anexos[0];
@@ -556,7 +556,7 @@ router.get('/:id/apolice', async (req, res) => {
     obj.Body.pipe(res);
   } catch (error) {
     console.error('[SEGURO_DOWNLOAD_ERROR]', error);
-    return res.status(404).json({ message: 'Arquivo não encontrado.' });
+    return res.status(404).json({ message: 'Arquivo nÃ£o encontrado.' });
   }
 });
 
@@ -616,8 +616,8 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
 
 // ==============================
 // POST CANCELAR
-// Cancela um seguro ativo registrando o motivo no histórico de auditoria.
-// Não remove o registro — fica acessível via GET /seguros/:id/historico.
+// Cancela um seguro ativo registrando o motivo no histÃ³rico de auditoria.
+// NÃ£o remove o registro â€” fica acessÃ­vel via GET /seguros/:id/historico.
 // ==============================
 router.post('/:id/cancelar', async (req, res) => {
   const { id } = req.params;
@@ -637,13 +637,13 @@ router.post('/:id/cancelar', async (req, res) => {
     });
 
     if (!seguro) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
+      return res.status(404).json({ message: 'Seguro nÃ£o encontrado.' });
     }
     if (seguro.status === 'Cancelado') {
-      return res.status(409).json({ message: 'Este seguro já está cancelado.' });
+      return res.status(409).json({ message: 'Este seguro jÃ¡ estÃ¡ cancelado.' });
     }
     if (seguro.status === 'Substituido') {
-      return res.status(409).json({ message: 'Seguros substituídos por renovação não podem ser cancelados.' });
+      return res.status(409).json({ message: 'Seguros substituÃ­dos por renovaÃ§Ã£o nÃ£o podem ser cancelados.' });
     }
 
     await prisma.seguro.update({
@@ -658,7 +658,7 @@ router.post('/:id/cancelar', async (req, res) => {
       ? `unidade ${seguro.unidade.nomeSistema}`
       : seguro.equipamento?.modelo
         ? `equipamento ${seguro.equipamento.modelo}`
-        : `apólice ${seguro.apoliceNumero}`;
+        : `apÃ³lice ${seguro.apoliceNumero}`;
 
     const dataFormatada = formatarDataHoraTenant(new Date(), req.usuario.tenant?.timezone || 'UTC');
     const motivoLog = motivo?.trim() ? ` Motivo: ${motivo.trim()}.` : '';
@@ -669,7 +669,7 @@ router.post('/:id/cancelar', async (req, res) => {
       acao: 'CANCELAMENTO',
       entidade: 'Seguro',
       entidadeId: id,
-      detalhes: `Apólice ${seguro.apoliceNumero} (${alvoDesc}) cancelada em ${dataFormatada}.${motivoLog}`,
+      detalhes: `ApÃ³lice ${seguro.apoliceNumero} (${alvoDesc}) cancelada em ${dataFormatada}.${motivoLog}`,
     });
 
     const seguroAtualizado = await buscarSeguroCompleto(tenantId, id);
@@ -682,12 +682,12 @@ router.post('/:id/cancelar', async (req, res) => {
 
 // ==============================
 // POST RENOVAR
-// Cria nova apólice, registra histórico dos anexos anteriores e marca o seguro
-// antigo como Substituido — operação atômica via transaction.
+// Cria nova apÃ³lice, registra histÃ³rico dos anexos anteriores e marca o seguro
+// antigo como Substituido â€” operaÃ§Ã£o atÃ´mica via transaction.
 // ==============================
 router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
   const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
@@ -703,7 +703,7 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
     });
 
     if (!seguroAntigo) {
-      return res.status(404).json({ message: 'Seguro não encontrado.' });
+      return res.status(404).json({ message: 'Seguro nÃ£o encontrado.' });
     }
     if (!['Ativo', 'Vigente'].includes(seguroAntigo.status)) {
       return res.status(409).json({ message: 'Apenas seguros ativos podem ser renovados.' });
@@ -717,7 +717,7 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
       ? `unidade ${seguroAntigo.unidade.nomeSistema}`
       : seguroAntigo.equipamento?.modelo
         ? `equipamento ${seguroAntigo.equipamento.modelo}`
-        : `apólice ${seguroAntigo.apoliceNumero}`;
+        : `apÃ³lice ${seguroAntigo.apoliceNumero}`;
 
     const anexosAntigos = seguroAntigo.anexos
       .map((a) => a.nomeOriginal || a.path)
@@ -757,18 +757,18 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
       registrarLog({
         tenantId,
         usuarioId: req.usuario.id,
-        acao: 'RENOVAÇÃO',
+        acao: 'RENOVAÃ‡ÃƒO',
         entidade: 'Seguro',
         entidadeId: id,
-        detalhes: `Apólice ${seguroAntigo.apoliceNumero} (${alvoDesc}) substituída pela apólice ${novoSeguro.apoliceNumero} em ${dataRenovacao}. Documentos anteriores: ${anexosAntigos}.`,
+        detalhes: `ApÃ³lice ${seguroAntigo.apoliceNumero} (${alvoDesc}) substituÃ­da pela apÃ³lice ${novoSeguro.apoliceNumero} em ${dataRenovacao}. Documentos anteriores: ${anexosAntigos}.`,
       }),
       registrarLog({
         tenantId,
         usuarioId: req.usuario.id,
-        acao: 'CRIAÇÃO',
+        acao: 'CRIAÃ‡ÃƒO',
         entidade: 'Seguro',
         entidadeId: novoSeguro.id,
-        detalhes: `Apólice ${novoSeguro.apoliceNumero} criada como renovação da apólice ${seguroAntigo.apoliceNumero} em ${dataRenovacao}.`,
+        detalhes: `ApÃ³lice ${novoSeguro.apoliceNumero} criada como renovaÃ§Ã£o da apÃ³lice ${seguroAntigo.apoliceNumero} em ${dataRenovacao}.`,
       }),
     ]);
 
@@ -778,7 +778,7 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
     console.error('[SEGURO_RENOVAR_ERROR]', error);
 
     if (error.code === 'P2002') {
-      return res.status(409).json({ message: 'Este número de apólice já está cadastrado.' });
+      return res.status(409).json({ message: 'Este nÃºmero de apÃ³lice jÃ¡ estÃ¡ cadastrado.' });
     }
     if (error.status) {
       return res.status(error.status).json({ message: error.message });
@@ -788,8 +788,8 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
 });
 
 // ==============================
-// GET HISTÓRICO DE RENOVAÇÕES
-// Retorna a cadeia completa de apólices anteriores a partir de qualquer seguro.
+// GET HISTÃ“RICO DE RENOVAÃ‡Ã•ES
+// Retorna a cadeia completa de apÃ³lices anteriores a partir de qualquer seguro.
 // ==============================
 router.get('/:id/historico', async (req, res) => {
   const { id } = req.params;
@@ -799,7 +799,7 @@ router.get('/:id/historico', async (req, res) => {
     const cadeia = [];
     let seguroAtualId = id;
 
-    // Percorre a cadeia de renovações via seguroAnteriorId
+    // Percorre a cadeia de renovaÃ§Ãµes via seguroAnteriorId
     while (seguroAtualId) {
       const seguro = await prisma.seguro.findFirst({
         where: { id: seguroAtualId, tenantId },
@@ -828,7 +828,7 @@ router.get('/:id/historico', async (req, res) => {
     return res.json(cadeia);
   } catch (error) {
     console.error('[SEGURO_HISTORICO_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao buscar histórico do seguro.' });
+    return res.status(500).json({ message: 'Erro ao buscar histÃ³rico do seguro.' });
   }
 });
 

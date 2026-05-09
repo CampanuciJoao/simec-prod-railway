@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTableCells, faFilePdf, faXRay, faUsers, faGauge, faHospital } from '@fortawesome/free-solid-svg-icons';
@@ -42,13 +42,23 @@ function BIPage() {
   const [gehcUtilizacao, setGehcUtilizacao] = useState(null);
   const [gehcLoading, setGehcLoading] = useState(false);
   const [gehcExportando, setGehcExportando] = useState(false);
+  const gehcAbortRef = useRef(null);
 
   useEffect(() => {
+    gehcAbortRef.current?.abort();
+    gehcAbortRef.current = new AbortController();
+    const { signal } = gehcAbortRef.current;
     setGehcLoading(true);
-    getGehcBIUtilizacao(12)
-      .then(setGehcUtilizacao)
-      .catch(() => {})
-      .finally(() => setGehcLoading(false));
+    getGehcBIUtilizacao(12, { signal })
+      .then((data) => { if (!signal.aborted) setGehcUtilizacao(data); })
+      .catch((err) => {
+        if (err?.name === 'CanceledError' || err?.name === 'AbortError') return;
+        if (err?.response?.status !== 404 && err?.response?.data?.code !== 'GEHC_NOT_CONFIGURED') {
+          console.warn('[GEHC_BI]', err?.response?.data?.error ?? err.message);
+        }
+      })
+      .finally(() => { if (!signal.aborted) setGehcLoading(false); });
+    return () => gehcAbortRef.current?.abort();
   }, []);
 
   const handleExportarGehcPDF = async () => {

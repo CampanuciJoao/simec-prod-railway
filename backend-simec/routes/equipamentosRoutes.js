@@ -1241,15 +1241,24 @@ router.put('/:id/acessorios/:acessorioId', async (req, res) => {
       }
     }
 
-    const atualizado = await prisma.acessorio.update({
+    const { count } = await prisma.acessorio.updateMany({
       where: {
         id: acessorioId,
+        tenantId,
       },
       data: {
         nome: nome.trim(),
         numeroSerie: numeroSerieNormalizado,
         descricao: descricao?.trim() || null,
       },
+    });
+
+    if (count === 0) {
+      return res.status(404).json({ message: 'Acessório não encontrado.' });
+    }
+
+    const atualizado = await prisma.acessorio.findFirst({
+      where: { id: acessorioId, tenantId },
     });
 
     await registrarLog({

@@ -32,8 +32,8 @@ export async function buscarContratosAtivosPorTenant(tenantId) {
 }
 
 export async function upsertAlertaContrato(tenantId, alertaId, data) {
-  const existente = await prisma.alerta.findUnique({
-    where: { id: alertaId },
+  const existente = await prisma.alerta.findFirst({
+    where: { id: alertaId, tenantId },
     select: {
       titulo: true,
       subtitulo: true,

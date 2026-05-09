@@ -13,7 +13,7 @@ import {
   buscarManutencoesParaInicioAutomatico,
   buscarManutencoesComFimProximo,
   buscarManutencoesParaConfirmacao,
-  upsertAlertaManutencao,
+  batchUpsertAlertasManutencao,
   atualizarStatusParaEmAndamento,
   moverParaAguardandoConfirmacao as moverStatusConfirmacao,
 } from './manutencaoAlertRepository.js';
@@ -33,68 +33,61 @@ export async function gerarAlertasAproximacaoInicio(tenantId, agora) {
   ];
 
   const manutencoes = await buscarManutencoesAgendadasFuturas(tenantId, agora);
-  let total = 0;
 
-  for (const manut of manutencoes) {
-    const minRestantes =
-      (new Date(manut.dataHoraAgendamentoInicio) - agora) / 60000;
-
-    for (const ponto of PONTOS) {
-      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
-        const alertaId = buildAlertId(tenantId, 'manut-prox-inicio', manut.id, ponto.label);
-
-        const result = await upsertAlertaManutencao(
-          tenantId,
-          alertaId,
-          await criarPayloadBaseAlerta({
-            id: alertaId,
-            titulo:        montarTituloProximidadeInicio(manut, ponto.limiar),
-            ...montarPayloadAlertaManutencaoBase(manut),
-            data:          manut.dataHoraAgendamentoInicio,
-            prioridade:    ponto.prioridade,
-            tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
-            tipoEvento:    ALERT_EVENTOS.MANUT_PROX_INICIO,
-            link:          `/manutencoes/detalhes/${manut.id}`,
-          })
-        );
-
-        if (result.created || result.updated) total++;
-        break;
+  const itens = await Promise.all(
+    manutencoes.flatMap(async (manut) => {
+      const minRestantes = (new Date(manut.dataHoraAgendamentoInicio) - agora) / 60000;
+      for (const ponto of PONTOS) {
+        if (minRestantes > 0 && minRestantes <= ponto.limiar) {
+          const alertaId = buildAlertId(tenantId, 'manut-prox-inicio', manut.id, ponto.label);
+          return [{
+            alertaId,
+            data: await criarPayloadBaseAlerta({
+              id: alertaId,
+              titulo:        montarTituloProximidadeInicio(manut, ponto.limiar),
+              ...montarPayloadAlertaManutencaoBase(manut),
+              data:          manut.dataHoraAgendamentoInicio,
+              prioridade:    ponto.prioridade,
+              tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
+              tipoEvento:    ALERT_EVENTOS.MANUT_PROX_INICIO,
+              link:          `/manutencoes/detalhes/${manut.id}`,
+            }),
+          }];
+        }
       }
-    }
-  }
+      return [];
+    })
+  );
 
-  return total;
+  return batchUpsertAlertasManutencao(tenantId, itens.flat());
 }
 
 export async function iniciarManutencoesAutomaticamente(tenantId, agora) {
   const manutencoes = await buscarManutencoesParaInicioAutomatico(tenantId, agora);
-  let total = 0;
 
-  for (const manut of manutencoes) {
-    await atualizarStatusParaEmAndamento(tenantId, manut, agora);
+  // Atualiza status em paralelo (transações independentes por manutenção)
+  await Promise.all(manutencoes.map((manut) => atualizarStatusParaEmAndamento(tenantId, manut, agora)));
 
-    const alertaId = buildAlertId(tenantId, 'manut-iniciada', manut.id);
+  const itens = await Promise.all(
+    manutencoes.map(async (manut) => {
+      const alertaId = buildAlertId(tenantId, 'manut-iniciada', manut.id);
+      return {
+        alertaId,
+        data: await criarPayloadBaseAlerta({
+          id: alertaId,
+          titulo:        montarTituloInicio(manut),
+          ...montarPayloadAlertaManutencaoBase(manut),
+          data:          agora,
+          prioridade:    ALERT_PRIORIDADES.MEDIA,
+          tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
+          tipoEvento:    ALERT_EVENTOS.MANUT_INICIADA,
+          link:          `/manutencoes/detalhes/${manut.id}`,
+        }),
+      };
+    })
+  );
 
-    const result = await upsertAlertaManutencao(
-      tenantId,
-      alertaId,
-      await criarPayloadBaseAlerta({
-        id: alertaId,
-        titulo:        montarTituloInicio(manut),
-        ...montarPayloadAlertaManutencaoBase(manut),
-        data:          agora,
-        prioridade:    ALERT_PRIORIDADES.MEDIA,
-        tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
-        tipoEvento:    ALERT_EVENTOS.MANUT_INICIADA,
-        link:          `/manutencoes/detalhes/${manut.id}`,
-      })
-    );
-
-    if (result.created || result.updated) total++;
-  }
-
-  return total;
+  return batchUpsertAlertasManutencao(tenantId, itens);
 }
 
 export async function gerarAlertasAproximacaoFim(tenantId, agora) {
@@ -104,67 +97,59 @@ export async function gerarAlertasAproximacaoFim(tenantId, agora) {
   ];
 
   const manutencoes = await buscarManutencoesComFimProximo(tenantId, agora);
-  let total = 0;
 
-  for (const manut of manutencoes) {
-    const minRestantes =
-      (new Date(manut.dataHoraAgendamentoFim) - agora) / 60000;
-
-    for (const ponto of PONTOS) {
-      if (minRestantes > 0 && minRestantes <= ponto.limiar) {
-        const alertaId = buildAlertId(tenantId, 'manut-prox-fim', manut.id, ponto.label);
-
-        const result = await upsertAlertaManutencao(
-          tenantId,
-          alertaId,
-          await criarPayloadBaseAlerta({
-            id: alertaId,
-            titulo:        montarTituloProximidadeFim(manut, ponto.limiar),
-            ...montarPayloadAlertaManutencaoBase(manut),
-            data:          manut.dataHoraAgendamentoFim,
-            prioridade:    ponto.prioridade,
-            tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
-            tipoEvento:    ALERT_EVENTOS.MANUT_PROX_FIM,
-            link:          `/manutencoes/detalhes/${manut.id}`,
-          })
-        );
-
-        if (result.created || result.updated) total++;
-        break;
+  const itens = await Promise.all(
+    manutencoes.flatMap(async (manut) => {
+      const minRestantes = (new Date(manut.dataHoraAgendamentoFim) - agora) / 60000;
+      for (const ponto of PONTOS) {
+        if (minRestantes > 0 && minRestantes <= ponto.limiar) {
+          const alertaId = buildAlertId(tenantId, 'manut-prox-fim', manut.id, ponto.label);
+          return [{
+            alertaId,
+            data: await criarPayloadBaseAlerta({
+              id: alertaId,
+              titulo:        montarTituloProximidadeFim(manut, ponto.limiar),
+              ...montarPayloadAlertaManutencaoBase(manut),
+              data:          manut.dataHoraAgendamentoFim,
+              prioridade:    ponto.prioridade,
+              tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
+              tipoEvento:    ALERT_EVENTOS.MANUT_PROX_FIM,
+              link:          `/manutencoes/detalhes/${manut.id}`,
+            }),
+          }];
+        }
       }
-    }
-  }
+      return [];
+    })
+  );
 
-  return total;
+  return batchUpsertAlertasManutencao(tenantId, itens.flat());
 }
 
 export async function moverParaAguardandoConfirmacao(tenantId, agora) {
   const manutencoes = await buscarManutencoesParaConfirmacao(tenantId, agora);
-  let total = 0;
 
-  for (const manut of manutencoes) {
-    await moverStatusConfirmacao(tenantId, manut);
+  await Promise.all(manutencoes.map((manut) => moverStatusConfirmacao(tenantId, manut)));
 
-    const alertaId = buildAlertId(tenantId, 'manut-confirm', manut.id);
+  const itens = await Promise.all(
+    manutencoes.map(async (manut) => {
+      const alertaId = buildAlertId(tenantId, 'manut-confirm', manut.id);
+      return {
+        alertaId,
+        data: await criarPayloadBaseAlerta({
+          id: alertaId,
+          titulo:        montarTituloConfirmacao(manut),
+          ...montarPayloadAlertaManutencaoBase(manut),
+          subtitulo:     montarSubtituloConfirmacaoFallback(manut),
+          data:          agora,
+          prioridade:    ALERT_PRIORIDADES.ALTA,
+          tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
+          tipoEvento:    ALERT_EVENTOS.MANUT_CONFIRMACAO,
+          link:          `/manutencoes/detalhes/${manut.id}`,
+        }),
+      };
+    })
+  );
 
-    const result = await upsertAlertaManutencao(
-      tenantId,
-      alertaId,
-      await criarPayloadBaseAlerta({
-        id: alertaId,
-        titulo:        montarTituloConfirmacao(manut),
-        ...montarPayloadAlertaManutencaoBase(manut),
-        subtitulo:     montarSubtituloConfirmacaoFallback(manut),
-        data:          agora,
-        prioridade:    ALERT_PRIORIDADES.ALTA,
-        tipoCategoria: ALERT_CATEGORIAS.MANUTENCAO,
-        tipoEvento:    ALERT_EVENTOS.MANUT_CONFIRMACAO,
-        link:          `/manutencoes/detalhes/${manut.id}`,
-      })
-    );
-
-    if (result.created || result.updated) total++;
-  }
-
-  return total;
+  return batchUpsertAlertasManutencao(tenantId, itens);
 }

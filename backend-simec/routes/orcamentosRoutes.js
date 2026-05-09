@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 import { admin } from '../middleware/authMiddleware.js';
 import validate from '../middleware/validate.js';
 import { orcamentoSchema, rejeitarSchema } from '../validators/orcamentoValidator.js';
@@ -28,7 +28,7 @@ router.get('/', async (req, res) => {
     return res.json(orcamentos);
   } catch (error) {
     console.error('[ORCAMENTO_LIST_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao listar orçamentos.' });
+    return res.status(500).json({ message: 'Erro ao listar orÃ§amentos.' });
   }
 });
 
@@ -38,7 +38,7 @@ router.get('/metricas', async (req, res) => {
     return res.json(metricas);
   } catch (error) {
     console.error('[ORCAMENTO_METRICAS_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao buscar métricas.' });
+    return res.status(500).json({ message: 'Erro ao buscar mÃ©tricas.' });
   }
 });
 
@@ -52,13 +52,13 @@ router.get('/:id', async (req, res) => {
   } catch (error) {
     console.error('[ORCAMENTO_GET_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao buscar orçamento.' });
+    return res.status(500).json({ message: 'Erro ao buscar orÃ§amento.' });
   }
 });
 
 router.post('/', validate(orcamentoSchema), async (req, res) => {
   try {
-    const dados = req.validatedData || req.body;
+    const dados = req.validatedData;
     const orcamento = await criarOrcamento({
       tenantId: req.usuario.tenantId,
       criadoPorId: req.usuario.id,
@@ -68,23 +68,23 @@ router.post('/', validate(orcamentoSchema), async (req, res) => {
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'CRIAÇÃO',
+      acao: 'CRIAÃ‡ÃƒO',
       entidade: 'Orcamento',
       entidadeId: orcamento.id,
-      detalhes: `Orçamento "${orcamento.titulo}" criado.`,
+      detalhes: `OrÃ§amento "${orcamento.titulo}" criado.`,
     });
 
     return res.status(201).json(orcamento);
   } catch (error) {
     console.error('[ORCAMENTO_CREATE_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao criar orçamento.' });
+    return res.status(500).json({ message: 'Erro ao criar orÃ§amento.' });
   }
 });
 
 router.put('/:id', validate(orcamentoSchema), async (req, res) => {
   try {
-    const dados = req.validatedData || req.body;
+    const dados = req.validatedData;
     const orcamento = await atualizarOrcamento({
       tenantId: req.usuario.tenantId,
       id: req.params.id,
@@ -94,17 +94,17 @@ router.put('/:id', validate(orcamentoSchema), async (req, res) => {
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
       entidadeId: req.params.id,
-      detalhes: `Orçamento "${orcamento.titulo}" atualizado.`,
+      detalhes: `OrÃ§amento "${orcamento.titulo}" atualizado.`,
     });
 
     return res.json(orcamento);
   } catch (error) {
     console.error('[ORCAMENTO_UPDATE_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao atualizar orçamento.' });
+    return res.status(500).json({ message: 'Erro ao atualizar orÃ§amento.' });
   }
 });
 
@@ -118,17 +118,17 @@ router.delete('/:id', async (req, res) => {
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EXCLUSÃO',
+      acao: 'EXCLUSÃƒO',
       entidade: 'Orcamento',
       entidadeId: req.params.id,
-      detalhes: `Orçamento excluído.`,
+      detalhes: `OrÃ§amento excluÃ­do.`,
     });
 
     return res.status(204).send();
   } catch (error) {
     console.error('[ORCAMENTO_DELETE_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao excluir orçamento.' });
+    return res.status(500).json({ message: 'Erro ao excluir orÃ§amento.' });
   }
 });
 
@@ -142,17 +142,17 @@ router.post('/:id/enviar-aprovacao', async (req, res) => {
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
       entidadeId: req.params.id,
-      detalhes: `Orçamento "${orcamento.titulo}" enviado para aprovação.`,
+      detalhes: `OrÃ§amento "${orcamento.titulo}" enviado para aprovaÃ§Ã£o.`,
     });
 
     return res.json(orcamento);
   } catch (error) {
     console.error('[ORCAMENTO_ENVIAR_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao enviar orçamento para aprovação.' });
+    return res.status(500).json({ message: 'Erro ao enviar orÃ§amento para aprovaÃ§Ã£o.' });
   }
 });
 
@@ -169,23 +169,23 @@ router.post('/:id/aprovar', admin, async (req, res) => {
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
       entidadeId: req.params.id,
-      detalhes: `Orçamento "${orcamento.titulo}" aprovado.`,
+      detalhes: `OrÃ§amento "${orcamento.titulo}" aprovado.`,
     });
 
     return res.json(orcamento);
   } catch (error) {
     console.error('[ORCAMENTO_APROVAR_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao aprovar orçamento.' });
+    return res.status(500).json({ message: 'Erro ao aprovar orÃ§amento.' });
   }
 });
 
 router.post('/:id/rejeitar', admin, validate(rejeitarSchema), async (req, res) => {
   try {
-    const { motivoRejeicao } = req.validatedData || req.body;
+    const { motivoRejeicao } = req.validatedData;
     const orcamento = await rejeitarOrcamento({
       tenantId: req.usuario.tenantId,
       id: req.params.id,
@@ -196,17 +196,17 @@ router.post('/:id/rejeitar', admin, validate(rejeitarSchema), async (req, res) =
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
       entidadeId: req.params.id,
-      detalhes: `Orçamento "${orcamento.titulo}" rejeitado. Motivo: ${motivoRejeicao}`,
+      detalhes: `OrÃ§amento "${orcamento.titulo}" rejeitado. Motivo: ${motivoRejeicao}`,
     });
 
     return res.json(orcamento);
   } catch (error) {
     console.error('[ORCAMENTO_REJEITAR_ERROR]', error);
     if (error.status) return res.status(error.status).json({ message: error.message });
-    return res.status(500).json({ message: 'Erro ao rejeitar orçamento.' });
+    return res.status(500).json({ message: 'Erro ao rejeitar orÃ§amento.' });
   }
 });
 

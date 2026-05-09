@@ -42,8 +42,10 @@ export function AlertasProvider({ children }) {
   const isAuthenticated = auth?.isAuthenticated || false;
   const authLoading   = auth?.loading || false;
 
-  const pollingRef = useRef(null);
-  const esRef      = useRef(null);
+  const pollingRef    = useRef(null);
+  const esRef         = useRef(null);
+  const reconnectRef  = useRef(null);
+  const backoffMsRef  = useRef(1000);
 
   const carregarAlertas = useCallback(async () => {
     if (!isAuthenticated || authLoading || !usuario?.id) {
@@ -73,36 +75,55 @@ export function AlertasProvider({ children }) {
   // SSE — recebe contagem em tempo real emitida pelo backend após cada ciclo de alertas
   useEffect(() => {
     if (!isAuthenticated || authLoading || !usuario?.id) {
+      clearTimeout(reconnectRef.current);
       esRef.current?.close();
       esRef.current = null;
       return;
     }
 
-    const token = getStoredToken();
-    if (!token) return;
+    function conectar() {
+      const token = getStoredToken();
+      if (!token) return;
 
-    const url = `${API_BASE_URL}/alertas/stream?t=${encodeURIComponent(token)}`;
-    const es  = new EventSource(url, { withCredentials: true });
-    esRef.current = es;
+      clearTimeout(reconnectRef.current);
+      esRef.current?.close();
 
-    es.addEventListener('open', () => setSseConnected(true));
+      const url = `${API_BASE_URL}/alertas/stream?t=${encodeURIComponent(token)}`;
+      const es  = new EventSource(url, { withCredentials: true });
+      esRef.current = es;
 
-    es.addEventListener('error', () => setSseConnected(false));
+      es.addEventListener('open', () => {
+        setSseConnected(true);
+        backoffMsRef.current = 1000;
+      });
 
-    es.addEventListener('message', (e) => {
-      try {
-        const msg = JSON.parse(e.data);
-        if (msg.type === 'alertas_count') {
-          setNaoVistos(Number(msg.naoVistos || 0));
-          carregarAlertas();
+      es.addEventListener('error', () => {
+        setSseConnected(false);
+        if (es.readyState === EventSource.CLOSED) {
+          const delay = Math.min(backoffMsRef.current, 30_000);
+          backoffMsRef.current = Math.min(delay * 2, 30_000);
+          reconnectRef.current = setTimeout(conectar, delay);
         }
-      } catch {
-        // payload inválido — ignorar
-      }
-    });
+      });
+
+      es.addEventListener('message', (e) => {
+        try {
+          const msg = JSON.parse(e.data);
+          if (msg.type === 'alertas_count') {
+            setNaoVistos(Number(msg.naoVistos || 0));
+            carregarAlertas();
+          }
+        } catch {
+          // payload inválido — ignorar
+        }
+      });
+    }
+
+    conectar();
 
     return () => {
-      es.close();
+      clearTimeout(reconnectRef.current);
+      esRef.current?.close();
       esRef.current = null;
       setSseConnected(false);
     };

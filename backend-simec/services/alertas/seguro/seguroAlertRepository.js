@@ -87,8 +87,8 @@ export async function buscarConflitosCoberturaPorTenant(tenantId) {
 }
 
 export async function upsertAlertaSeguro(tenantId, alertaId, data) {
-  const existente = await prisma.alerta.findUnique({
-    where: { id: alertaId },
+  const existente = await prisma.alerta.findFirst({
+    where: { id: alertaId, tenantId },
     select: {
       titulo: true,
       subtitulo: true,

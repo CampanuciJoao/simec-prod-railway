@@ -119,9 +119,9 @@ const alertasWorker = new Worker(
   },
   {
     connection,
-    concurrency: 1,
+    concurrency: 5,
     autorun: true,
-    limiter: { max: 1, duration: 5000 },
+    limiter: { max: 5, duration: 5000 },
   }
 );
 

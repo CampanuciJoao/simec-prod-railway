@@ -117,8 +117,8 @@ export async function buscarManutencoesParaConfirmacao(tenantId, agora) {
 }
 
 export async function upsertAlertaManutencao(tenantId, alertaId, data) {
-  const existente = await prisma.alerta.findUnique({
-    where: { id: alertaId },
+  const existente = await prisma.alerta.findFirst({
+    where: { id: alertaId, tenantId },
     select: {
       titulo: true,
       subtitulo: true,
@@ -136,14 +136,7 @@ export async function upsertAlertaManutencao(tenantId, alertaId, data) {
   });
 
   if (!existente) {
-    await prisma.alerta.create({
-      data: {
-        tenantId,
-        id: alertaId,
-        ...data,
-      },
-    });
-
+    await prisma.alerta.create({ data: { tenantId, id: alertaId, ...data } });
     return { created: true, updated: false };
   }
 
@@ -153,13 +146,50 @@ export async function upsertAlertaManutencao(tenantId, alertaId, data) {
 
   await prisma.alerta.update({
     where: { id: alertaId },
-    data: {
-      tenantId,
-      ...data,
-    },
+    data: { tenantId, ...data },
   });
 
   return { created: false, updated: true };
+}
+
+const ALERTA_SELECT = {
+  titulo: true, subtitulo: true, subtituloBase: true, numeroOS: true,
+  dataHoraAgendamentoInicio: true, dataHoraAgendamentoFim: true,
+  prioridade: true, data: true, tipo: true, tipoCategoria: true, tipoEvento: true, link: true,
+};
+
+export async function batchUpsertAlertasManutencao(tenantId, itens) {
+  if (itens.length === 0) return 0;
+
+  const ids = itens.map((i) => i.alertaId);
+  const existentes = await prisma.alerta.findMany({
+    where: { id: { in: ids }, tenantId },
+    select: { id: true, ...ALERTA_SELECT },
+  });
+  const existentesMap = new Map(existentes.map((e) => [e.id, e]));
+
+  const creates = [];
+  const updates = [];
+
+  for (const { alertaId, data } of itens) {
+    const existente = existentesMap.get(alertaId);
+    if (!existente) {
+      creates.push({ tenantId, id: alertaId, ...data });
+    } else if (alertaMudou(existente, data)) {
+      updates.push({ id: alertaId, data: { tenantId, ...data } });
+    }
+  }
+
+  await Promise.all([
+    creates.length > 0
+      ? prisma.alerta.createMany({ data: creates, skipDuplicates: true })
+      : Promise.resolve(),
+    updates.length > 0
+      ? prisma.$transaction(updates.map((u) => prisma.alerta.update({ where: { id: u.id }, data: u.data })))
+      : Promise.resolve(),
+  ]);
+
+  return creates.length + updates.length;
 }
 
 export async function removerAlertasManutencaoDaOS(

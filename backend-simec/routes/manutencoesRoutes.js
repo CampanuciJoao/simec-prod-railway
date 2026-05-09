@@ -1,4 +1,4 @@
-import express from 'express';
+﻿import express from 'express';
 
 import { proteger, admin } from '../middleware/authMiddleware.js';
 import validate from '../middleware/validate.js';
@@ -40,7 +40,7 @@ router.get('/', async (req, res) => {
     return res.json(data);
   } catch (error) {
     console.error('[MANUTENCAO_LIST_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao buscar manutenções.' });
+    return res.status(500).json({ message: 'Erro ao buscar manutenÃ§Ãµes.' });
   }
 });
 
@@ -57,7 +57,7 @@ router.get('/:id/historico', async (req, res) => {
     return res.json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_HISTORICO_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao buscar histórico.' });
+    return res.status(500).json({ message: 'Erro ao buscar histÃ³rico.' });
   }
 });
 
@@ -86,7 +86,7 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
     const resultado = await criarManutencaoService({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      dados: req.validatedData || req.body,
+      dados: req.validatedData,
       statusEquipamento: req.body?.statusEquipamento || null,
     });
 
@@ -102,7 +102,7 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
     return res.status(resultado.status).json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_CREATE_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao agendar manutenção.' });
+    return res.status(500).json({ message: 'Erro ao agendar manutenÃ§Ã£o.' });
   }
 });
 
@@ -112,7 +112,7 @@ router.put('/:id', validate(manutencaoSchema), async (req, res) => {
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
       manutencaoId: req.params.id,
-      dados: req.validatedData || req.body,
+      dados: req.validatedData,
     });
 
     if (!resultado.ok) {
@@ -127,7 +127,7 @@ router.put('/:id', validate(manutencaoSchema), async (req, res) => {
     return res.json(resultado.data);
   } catch (error) {
     console.error('[MANUTENCAO_UPDATE_ERROR]', error);
-    return res.status(500).json({ message: 'Erro ao atualizar manutenção.' });
+    return res.status(500).json({ message: 'Erro ao atualizar manutenÃ§Ã£o.' });
   }
 });
 
@@ -184,7 +184,7 @@ router.post('/:id/concluir', async (req, res) => {
   } catch (error) {
     console.error('[MANUTENCAO_CONCLUIR_ERROR]', error);
     return res.status(500).json({
-      message: 'Erro ao processar o desfecho da manutenção.',
+      message: 'Erro ao processar o desfecho da manutenÃ§Ã£o.',
     });
   }
 });
@@ -211,9 +211,9 @@ router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
         tenantId,
         usuarioId,
         acao: 'UPLOAD',
-        entidade: 'Manutenção',
+        entidade: 'ManutenÃ§Ã£o',
         entidadeId: manutencaoId,
-        detalhes: `Anexo(s) adicionado(s) à OS ${atualizada?.numeroOS || manutencaoId}: ${nomes}.`,
+        detalhes: `Anexo(s) adicionado(s) Ã  OS ${atualizada?.numeroOS || manutencaoId}: ${nomes}.`,
       });
     }
 
@@ -246,8 +246,8 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
     await registrarLog({
       tenantId,
       usuarioId,
-      acao: 'EXCLUSÃO',
-      entidade: 'Manutenção',
+      acao: 'EXCLUSÃƒO',
+      entidade: 'ManutenÃ§Ã£o',
       entidadeId: manutencaoId,
       detalhes: `Anexo removido da OS ${manutBefore?.numeroOS || manutencaoId}: ${anexoBefore?.nomeOriginal || anexoId}.`,
     });
@@ -301,10 +301,10 @@ router.delete('/:id', admin, async (req, res) => {
     await registrarLog({
       tenantId: req.usuario.tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EXCLUSÃO',
-      entidade: 'Manutenção',
+      acao: 'EXCLUSÃƒO',
+      entidade: 'ManutenÃ§Ã£o',
       entidadeId: req.params.id,
-      detalhes: `Manutenção "${manut.numeroOS}" excluída.`,
+      detalhes: `ManutenÃ§Ã£o "${manut.numeroOS}" excluÃ­da.`,
     });
 
     return res.status(204).send();
@@ -314,11 +314,11 @@ router.delete('/:id', admin, async (req, res) => {
     if (error.code === 'P2003') {
       return res.status(409).json({
         message:
-          'Não é possível excluir: manutenção possui vínculos ativos no sistema.',
+          'NÃ£o Ã© possÃ­vel excluir: manutenÃ§Ã£o possui vÃ­nculos ativos no sistema.',
       });
     }
 
-    return res.status(500).json({ message: 'Erro ao excluir manutenção.' });
+    return res.status(500).json({ message: 'Erro ao excluir manutenÃ§Ã£o.' });
   }
 });
 

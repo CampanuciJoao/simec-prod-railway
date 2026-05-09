@@ -1,5 +1,5 @@
-// Ficheiro: routes/unidadesRoutes.js
-// Versão: Multi-tenant hardened + upload centralizado
+﻿// Ficheiro: routes/unidadesRoutes.js
+// VersÃ£o: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -63,7 +63,7 @@ router.get('/:id', async (req, res) => {
     const unidade = await buscarUnidadeCompleta(tenantId, req.params.id);
 
     if (!unidade) {
-      return res.status(404).json({ message: 'Unidade não encontrada.' });
+      return res.status(404).json({ message: 'Unidade nÃ£o encontrada.' });
     }
 
     return res.json(unidade);
@@ -77,7 +77,7 @@ router.get('/:id', async (req, res) => {
 // POST CRIAR
 // ==============================
 router.post('/', validate(unidadeSchema), async (req, res) => {
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
 
   try {
     const tenantId = req.usuario.tenantId;
@@ -94,7 +94,7 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'CRIAÇÃO',
+      acao: 'CRIAÃ‡ÃƒO',
       entidade: 'Unidade',
       entidadeId: novaUnidade.id,
       detalhes: `Unidade "${novaUnidade.nomeSistema}" foi criada.`,
@@ -108,7 +108,7 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Já existe uma unidade com este Nome ou CNPJ.',
+        message: 'JÃ¡ existe uma unidade com este Nome ou CNPJ.',
       });
     }
 
@@ -122,7 +122,7 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
 router.put('/:id', validate(unidadeSchema), async (req, res) => {
   const { id } = req.params;
   const tenantId = req.usuario.tenantId;
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
 
   try {
     const unidadeExistente = await prisma.unidade.findFirst({
@@ -137,7 +137,7 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
     });
 
     if (!unidadeExistente) {
-      return res.status(404).json({ message: 'Unidade não encontrada.' });
+      return res.status(404).json({ message: 'Unidade nÃ£o encontrada.' });
     }
 
     const unidadeAtualizada = await prisma.unidade.update({
@@ -155,7 +155,7 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Unidade',
       entidadeId: id,
       detalhes: `Unidade "${unidadeAtualizada.nomeSistema}" foi atualizada.`,
@@ -169,7 +169,7 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Já existe uma unidade com este Nome ou CNPJ.',
+        message: 'JÃ¡ existe uma unidade com este Nome ou CNPJ.',
       });
     }
 
@@ -196,7 +196,7 @@ router.delete('/:id', admin, async (req, res) => {
     });
 
     if (!unidade) {
-      return res.status(404).json({ message: 'Unidade não encontrada.' });
+      return res.status(404).json({ message: 'Unidade nÃ£o encontrada.' });
     }
 
     for (const anexo of unidade.anexos || []) {
@@ -222,10 +222,10 @@ router.delete('/:id', admin, async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EXCLUSÃO',
+      acao: 'EXCLUSÃƒO',
       entidade: 'Unidade',
       entidadeId: id,
-      detalhes: `Unidade "${unidade.nomeSistema}" foi excluída.`,
+      detalhes: `Unidade "${unidade.nomeSistema}" foi excluÃ­da.`,
     });
 
     return res.status(204).send();
@@ -234,7 +234,7 @@ router.delete('/:id', admin, async (req, res) => {
 
     if (error.code === 'P2003') {
       return res.status(409).json({
-        message: 'Não é possível excluir: unidade possui equipamentos vinculados.',
+        message: 'NÃ£o Ã© possÃ­vel excluir: unidade possui equipamentos vinculados.',
       });
     }
 

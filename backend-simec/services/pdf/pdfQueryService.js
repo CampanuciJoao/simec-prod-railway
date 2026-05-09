@@ -67,6 +67,7 @@ export async function obterDadosPdfBI({ tenantId }) {
       orderBy: {
         dataConclusao: 'desc',
       },
+      take: 1000,
     }),
     prisma.equipamento.count({
       where: {

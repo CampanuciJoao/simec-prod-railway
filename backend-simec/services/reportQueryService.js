@@ -128,6 +128,7 @@ export async function buscarEquipamentosComServicos({
           dataFim: true,
           status: true,
         },
+        take: 20,
       },
       seguros: {
         select: {
@@ -137,6 +138,7 @@ export async function buscarEquipamentosComServicos({
           status: true,
         },
         orderBy: { dataFim: 'desc' },
+        take: 10,
       },
       manutencoes: {
         select: {

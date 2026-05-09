@@ -317,6 +317,7 @@ model HistoricoAtivoEvento {
   @@index([tenantId, equipamentoId, dataEvento(sort: Desc)])
   @@index([tenantId, categoria, dataEvento(sort: Desc)])
   @@index([tenantId, impactaAnalise, dataEvento(sort: Desc)])
+  @@index([tenantId, referenciaId, referenciaTipo])
   @@map("historico_ativo_eventos")
 }
 
@@ -432,7 +433,7 @@ model Alerta {
   @@index([tenantId, data])
   @@index([tenantId, tipo, data])
   @@index([tenantId, prioridade, data])
-  @@index([tenantId, emailEnviado])
+  @@index([tenantId, emailEnviado, createdAt(sort: Desc)])
   @@index([tenantId, numeroOS])
   @@index([tenantId, tipoEvento])
   @@index([tenantId, tipoCategoria])
@@ -795,6 +796,7 @@ model GehcAlertaSuspensao {
 
   @@index([tenantId, suspensoAte])
   @@index([tenantId, equipamentoId])
+  @@index([tenantId, equipamentoId, suspensoAte])
   @@map("gehc_alerta_suspensoes")
 }
 

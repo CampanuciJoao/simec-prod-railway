@@ -1,5 +1,5 @@
-// Ficheiro: routes/contratosRoutes.js
-// Versão: Multi-tenant hardened + upload centralizado
+﻿// Ficheiro: routes/contratosRoutes.js
+// VersÃ£o: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
 import prisma from '../services/prismaService.js';
@@ -32,7 +32,7 @@ async function validarUnidadesDoTenant(tenantId, unidadesCobertasIds = []) {
   });
 
   if (unidadesValidas.length !== unidadesCobertasIds.length) {
-    const error = new Error('Uma ou mais unidades não pertencem ao tenant.');
+    const error = new Error('Uma ou mais unidades nÃ£o pertencem ao tenant.');
     error.status = 400;
     throw error;
   }
@@ -61,7 +61,7 @@ async function validarEquipamentosDoTenant(
 
   if (equipamentosValidos.length !== equipamentosCobertosIds.length) {
     const error = new Error(
-      'Um ou mais equipamentos não pertencem ao tenant.'
+      'Um ou mais equipamentos nÃ£o pertencem ao tenant.'
     );
     error.status = 400;
     throw error;
@@ -97,7 +97,7 @@ async function buscarContratoCompleto(tenantId, id) {
   });
 }
 
-// ─── Helpers de paginação e filtros ──────────────────────────────────────────
+// â”€â”€â”€ Helpers de paginaÃ§Ã£o e filtros â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function buildStatusWhereContrato(status) {
   if (!status) return null;
@@ -230,7 +230,7 @@ router.get('/:id', async (req, res) => {
     );
 
     if (!contrato) {
-      return res.status(404).json({ message: 'Contrato não encontrado.' });
+      return res.status(404).json({ message: 'Contrato nÃ£o encontrado.' });
     }
 
     return res.json(contrato);
@@ -244,7 +244,7 @@ router.get('/:id', async (req, res) => {
 // POST CRIAR
 // ==============================
 router.post('/', validate(contratoSchema), async (req, res) => {
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
 
   const {
     numeroContrato,
@@ -302,10 +302,10 @@ router.post('/', validate(contratoSchema), async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'CRIAÇÃO',
+      acao: 'CRIAÃ‡ÃƒO',
       entidade: 'Contrato',
       entidadeId: novo.id,
-      detalhes: `Contrato nº ${numeroContrato} criado.`,
+      detalhes: `Contrato nÂº ${numeroContrato} criado.`,
     });
 
     const contratoCompleto = await buscarContratoCompleto(tenantId, novo.id);
@@ -316,7 +316,7 @@ router.post('/', validate(contratoSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Número de contrato já existe.',
+        message: 'NÃºmero de contrato jÃ¡ existe.',
       });
     }
 
@@ -335,7 +335,7 @@ router.post('/', validate(contratoSchema), async (req, res) => {
 // ==============================
 router.put('/:id', validate(contratoSchema), async (req, res) => {
   const { id } = req.params;
-  const dados = req.validatedData || req.body;
+  const dados = req.validatedData;
   const { unidadesCobertasIds, equipamentosCobertosIds, ...restante } = dados;
 
   try {
@@ -353,7 +353,7 @@ router.put('/:id', validate(contratoSchema), async (req, res) => {
     });
 
     if (!contrato) {
-      return res.status(404).json({ message: 'Contrato não encontrado.' });
+      return res.status(404).json({ message: 'Contrato nÃ£o encontrado.' });
     }
 
     await validarUnidadesDoTenant(tenantId, unidadesCobertasIds);
@@ -400,10 +400,10 @@ router.put('/:id', validate(contratoSchema), async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EDIÇÃO',
+      acao: 'EDIÃ‡ÃƒO',
       entidade: 'Contrato',
       entidadeId: id,
-      detalhes: `Contrato nº ${atualizado.numeroContrato} atualizado.`,
+      detalhes: `Contrato nÂº ${atualizado.numeroContrato} atualizado.`,
     });
 
     const contratoCompleto = await buscarContratoCompleto(tenantId, id);
@@ -414,7 +414,7 @@ router.put('/:id', validate(contratoSchema), async (req, res) => {
 
     if (error.code === 'P2002') {
       return res.status(409).json({
-        message: 'Número de contrato já existe.',
+        message: 'NÃºmero de contrato jÃ¡ existe.',
       });
     }
 
@@ -448,7 +448,7 @@ router.delete('/:id', admin, async (req, res) => {
     });
 
     if (!contrato) {
-      return res.status(404).json({ message: 'Contrato não encontrado.' });
+      return res.status(404).json({ message: 'Contrato nÃ£o encontrado.' });
     }
 
     for (const anexo of contrato.anexos || []) {
@@ -474,10 +474,10 @@ router.delete('/:id', admin, async (req, res) => {
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,
-      acao: 'EXCLUSÃO',
+      acao: 'EXCLUSÃƒO',
       entidade: 'Contrato',
       entidadeId: id,
-      detalhes: `Contrato nº ${contrato.numeroContrato} excluído.`,
+      detalhes: `Contrato nÂº ${contrato.numeroContrato} excluÃ­do.`,
     });
 
     return res.status(204).send();
