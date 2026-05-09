@@ -21,11 +21,10 @@ const DashboardCard = forwardRef(function DashboardCard(
       {...rest}
     >
       <div
-        className="flex h-full flex-col overflow-hidden rounded-2xl border"
+        className="flex h-full flex-col overflow-hidden rounded-2xl"
         style={{
           backgroundColor: 'var(--bg-surface)',
-          borderColor: 'var(--border-soft)',
-          boxShadow: 'var(--shadow-sm)',
+          boxShadow: '0 0 0 2px var(--bg-topbar), 0 8px 24px rgba(8,17,31,0.10)',
         }}
       >
         {/* Header com drag handle */}
@@ -34,7 +33,6 @@ const DashboardCard = forwardRef(function DashboardCard(
           style={{
             backgroundColor: 'var(--card-header-bg)',
             borderColor: 'var(--card-header-border)',
-            borderTop: '3px solid var(--bg-topbar)',
             borderTopLeftRadius: '1rem',
             borderTopRightRadius: '1rem',
           }}
