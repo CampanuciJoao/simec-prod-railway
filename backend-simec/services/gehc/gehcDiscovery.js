@@ -35,7 +35,7 @@ function matchSerial(a, b) {
 
 // ─── Discovery via GraphQL ────────────────────────────────────────────────────
 
-async function listarRmsGe(tenantId) {
+async function listarAssetsGe(tenantId) {
   let tokens;
   try {
     tokens = await obterTokensGehc(tenantId);
@@ -46,14 +46,9 @@ async function listarRmsGe(tenantId) {
   }
 
   const assetsGe = await fetchAllAssets({ ...tokens, tenantId });
-  const rmsGe = assetsGe.filter(a => {
-    const texto = `${a.modality ?? ''} ${a.model ?? ''} ${a.productDescription ?? ''}`.toUpperCase();
-    return texto.includes('MR') || texto.includes('RM') || texto.includes('RESSONANCIA') ||
-           texto.includes('RESONANCE') || texto.includes('SIGNA') || texto.includes('DISCOVERY');
-  });
 
-  console.log(`[GEHC_DISCOVERY] GraphQL: ${rmsGe.length} RM(s) encontradas no portal GE.`);
-  return { rmsGe, tokens };
+  console.log(`[GEHC_DISCOVERY] GraphQL: ${assetsGe.length} ativo(s) encontrado(s) no portal GE.`);
+  return { assetsGe, tokens };
 }
 
 // ─── Matching ─────────────────────────────────────────────────────────────────
@@ -86,10 +81,6 @@ export async function descobrirEquipamentosGehc(tenantId) {
     where: {
       tenantId,
       fabricante: { contains: 'GE', mode: 'insensitive' },
-      OR: [
-        { tipo: { contains: 'Ressonância', mode: 'insensitive' } },
-        { tipo: { contains: 'RM',       mode: 'insensitive' } },
-      ],
     },
     select: { id: true, tag: true, apelido: true, modelo: true, gehcAssetId: true },
   });
@@ -98,9 +89,9 @@ export async function descobrirEquipamentosGehc(tenantId) {
     return { vinculados: [], pendentesConfirmacao: [], semMatch: [], jaVinculados: [], modo: 'sem_equipamentos', totalPortalGe: 0 };
   }
 
-  console.log(`[GEHC_DISCOVERY] ${equipamentosSimec.length} RM(s) GE encontradas no SIMEC.`);
+  console.log(`[GEHC_DISCOVERY] ${equipamentosSimec.length} equipamento(s) GE encontrado(s) no SIMEC.`);
 
-  const { rmsGe } = await listarRmsGe(tenantId);
+  const { assetsGe } = await listarAssetsGe(tenantId);
 
   const vinculados            = [];
   const pendentesConfirmacao  = [];
@@ -113,7 +104,7 @@ export async function descobrirEquipamentosGehc(tenantId) {
       continue;
     }
 
-    const match = melhorMatchGe(simec, rmsGe);
+    const match = melhorMatchGe(simec, assetsGe);
 
     if (match) {
       const gehcAssetId  = match.ge.id;
@@ -149,7 +140,7 @@ export async function descobrirEquipamentosGehc(tenantId) {
     }
   }
 
-  return { vinculados, pendentesConfirmacao, semMatch, jaVinculados, modo: 'graphql', totalPortalGe: rmsGe.length };
+  return { vinculados, pendentesConfirmacao, semMatch, jaVinculados, modo: 'graphql', totalPortalGe: assetsGe.length };
 }
 
 // ─── Vincular manualmente ─────────────────────────────────────────────────────

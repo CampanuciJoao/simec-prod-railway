@@ -38,13 +38,13 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
     }
   }
 
-  // Discovery automático: vincula RMs GE ainda sem gehcAssetId
+  // Discovery automático: vincula equipamentos GE ainda sem gehcAssetId
   if (rodarDiscovery && tenantId) {
-    console.log('[GEHC_MONITOR] Rodando discovery para vincular novas RMs...');
+    console.log('[GEHC_MONITOR] Rodando discovery para vincular novos equipamentos GE...');
     const disc = await descobrirEquipamentosGehc(tenantId);
     console.log(`[GEHC_MONITOR] Discovery: ${disc.vinculados.length} vinculado(s), ${disc.semMatch.length} sem match.`);
     if (disc.semMatch.length > 0) {
-      console.warn('[GEHC_MONITOR] RMs sem match no portal GE:', disc.semMatch.map(e => e.tag).join(', '));
+      console.warn('[GEHC_MONITOR] Equipamentos sem match no portal GE:', disc.semMatch.map(e => e.tag).join(', '));
     }
   }
 
