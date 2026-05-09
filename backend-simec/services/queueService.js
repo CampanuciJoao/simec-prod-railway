@@ -174,7 +174,7 @@ export async function iniciarJobsDeAlertas() {
       'gehc-monitorar-saude',
       {},
       {
-        repeat: { every: 15 * 60 * 1000 },
+        repeat: { every: 30 * 60 * 1000 },
         removeOnComplete: 50,
         removeOnFail: 20,
       }
@@ -191,7 +191,7 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
-    console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 15min + captura imediata no startup.');
+    console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 30min + captura imediata no startup.');
 
     // Sync completo de contratos, OS e utilização — uma vez por dia às 02:00 UTC
     const repeatables4 = await queue.getRepeatableJobs();
