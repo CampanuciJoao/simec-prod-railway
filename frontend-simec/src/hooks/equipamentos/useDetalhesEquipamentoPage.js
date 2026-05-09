@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import {
   faChartLine,
   faFileMedical,
+  faHeartPulse,
   faHistory,
   faPaperclip,
   faShieldAlt,
@@ -22,14 +23,18 @@ export function useDetalhesEquipamentoPage() {
   } = useEquipamentoDetalhes(equipamentoId);
 
   const abas = useMemo(() => {
-    return [
+    const base = [
       { id: 'visaoGeral',  label: 'Visao geral',   icon: faChartLine  },
       { id: 'historico',   label: 'Historico',      icon: faHistory    },
       { id: 'fichaTecnica',label: 'Ficha tecnica',  icon: faFileMedical },
       { id: 'anexos',      label: 'Anexos',         icon: faPaperclip  },
       { id: 'cobertura',   label: 'Cobertura',      icon: faShieldAlt  },
     ];
-  }, []);
+    if (equipamento?.gehcAssetId) {
+      base.push({ id: 'saudeGehc', label: 'Saúde GE', icon: faHeartPulse });
+    }
+    return base;
+  }, [equipamento]);
 
   return {
     equipamentoId,

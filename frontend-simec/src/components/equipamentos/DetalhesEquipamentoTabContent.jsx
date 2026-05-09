@@ -6,6 +6,7 @@ import {
   TabHistorico,
   TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
+import TabSaudeGehc from '@/components/equipamentos/tabs/TabSaudeGehc';
 
 function DetalhesEquipamentoTabContent({
   abaAtiva,
@@ -29,6 +30,7 @@ function DetalhesEquipamentoTabContent({
     ),
     historico:  <TabHistorico equipamento={equipamento} />,
     cobertura:  <TabCobertura equipamento={equipamento} />,
+    saudeGehc:  <TabSaudeGehc equipamentoId={equipamentoId} equipamento={equipamento} />,
   };
 
   return tabContentMap[abaAtiva] || null;
