@@ -22,6 +22,7 @@ import BIWidgetShell from '@/components/bi/BIWidgetShell';
 import BIDowntimeChartWidget from '@/components/bi/BIDowntimeChartWidget';
 import BIFrequenciaFalhasWidget from '@/components/bi/BIFrequenciaFalhasWidget';
 import BIRankingDowntimeWidget from '@/components/bi/BIRankingDowntimeWidget';
+import BIEvolucaoMensalWidget from '@/components/bi/BIEvolucaoMensalWidget';
 import BIDetalhesDrawer from '@/components/bi/BIDetalhesDrawer';
 
 const ResponsiveGrid = WidthProvider(Responsive);
@@ -98,6 +99,14 @@ function BIPage() {
 
   const widgetMap = useMemo(
     () => ({
+      evolucao: {
+        id: 'evolucao',
+        title: 'Evolução mensal',
+        description: 'Preventivas, corretivas e downtime (horas) mês a mês no ano corrente.',
+        render: () => (
+          <BIEvolucaoMensalWidget data={page.dados?.evolucaoMensal ?? []} />
+        ),
+      },
       downtime: {
         id: 'downtime',
         title: 'Downtime por unidade',
@@ -112,10 +121,10 @@ function BIPage() {
       frequencia: {
         id: 'frequencia',
         title: 'Reincidência de falhas',
-        description: 'Equipamentos com maior volume de corretivas concluídas no período.',
+        description: 'Equipamentos com 2 ou mais ocorrências corretivas no período.',
         render: () => (
           <BIFrequenciaFalhasWidget
-            items={page.rankingFrequencia}
+            items={page.dados?.reincidentes ?? page.rankingFrequencia}
             onSelectEquipamento={page.handleDrillDownEquipamento}
           />
         ),

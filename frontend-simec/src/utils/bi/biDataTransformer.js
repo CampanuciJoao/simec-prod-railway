@@ -58,6 +58,8 @@ export function buildResumoCards(dados, rankingDowntime, rankingUnidades) {
   const mttrHoras = dados?.kpis?.mttrHoras ?? null;
   const conformidadePM = dados?.kpis?.conformidadePM ?? null;
   const backlog = dados?.kpis?.backlog ?? null;
+  const mtbfHoras = dados?.kpis?.mtbfHoras ?? null;
+  const disponibilidadePct = dados?.kpis?.disponibilidadePct ?? null;
 
   return {
     totalAtivos,
@@ -70,5 +72,7 @@ export function buildResumoCards(dados, rankingDowntime, rankingUnidades) {
     mttr: mttrHoras !== null ? `${mttrHoras}h` : '—',
     conformidadePM: conformidadePM !== null ? `${conformidadePM}%` : '—',
     backlog: backlog !== null ? backlog : '—',
+    mtbf: mtbfHoras !== null ? `${mtbfHoras}h` : '—',
+    disponibilidade: disponibilidadePct !== null ? `${disponibilidadePct}%` : '—',
   };
 }

@@ -8,6 +8,8 @@ import {
   faStopwatch,
   faCalendarCheck,
   faListCheck,
+  faRotate,
+  faChartLine,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { ResponsiveGrid } from '@/components/ui';
@@ -81,6 +83,22 @@ function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {
           value={resumoCards.backlog}
           subtitle="Ordens em aberto agora"
           tone="yellow"
+        />
+
+        <InteractiveKpiCard
+          icon={faRotate}
+          title="MTBF"
+          value={resumoCards.mtbf}
+          subtitle="Tempo médio entre falhas corretivas"
+          tone="blue"
+        />
+
+        <InteractiveKpiCard
+          icon={faChartLine}
+          title="Disponibilidade da frota"
+          value={resumoCards.disponibilidade}
+          subtitle="Baseado no downtime acumulado vs horas totais"
+          tone="green"
         />
       </ResponsiveGrid>
     </div>

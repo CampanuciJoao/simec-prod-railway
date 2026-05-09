@@ -4,9 +4,10 @@ export const BI_ROW_HEIGHT = 58;
 export const BI_GRID_MARGIN = [12, 12];
 
 export const DEFAULT_BI_LAYOUT = [
-  { i: 'downtime',   x: 0, y: 0,  w: 6,  h: 7, minW: 3, minH: 4 },
-  { i: 'frequencia', x: 6, y: 0,  w: 6,  h: 7, minW: 3, minH: 4 },
-  { i: 'ranking',    x: 0, y: 7,  w: 12, h: 7, minW: 6, minH: 4 },
+  { i: 'evolucao',   x: 0, y: 0,  w: 12, h: 7, minW: 6, minH: 4 },
+  { i: 'downtime',   x: 0, y: 7,  w: 6,  h: 7, minW: 3, minH: 4 },
+  { i: 'frequencia', x: 6, y: 7,  w: 6,  h: 7, minW: 3, minH: 4 },
+  { i: 'ranking',    x: 0, y: 14, w: 12, h: 7, minW: 6, minH: 4 },
 ];
 
 function storageKey(userId) {

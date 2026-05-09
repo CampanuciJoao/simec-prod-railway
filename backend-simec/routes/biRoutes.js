@@ -231,6 +231,59 @@ router.get('/indicadores', async (req, res) => {
       .sort((a, b) => b.horasParado - a.horasParado)
       .slice(0, 10);
 
+    // Evolução mensal — meses de Jan até o mês atual
+    const mesAtual = agora.getMonth();
+    const evolucaoMensal = Array.from({ length: mesAtual + 1 }, (_, mesIdx) => {
+      const mesLabel = `${agora.getFullYear()}-${String(mesIdx + 1).padStart(2, '0')}`;
+
+      const preventMes = manutencoes.filter(
+        (m) => m.tipo === 'Preventiva' && m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx
+      ).length;
+
+      const corrMes =
+        manutencoes.filter(
+          (m) => m.tipo === 'Corretiva' && m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx
+        ).length +
+        osCorretivas.filter(
+          (os) => os.dataHoraConclusao && new Date(os.dataHoraConclusao).getMonth() === mesIdx
+        ).length;
+
+      const downtimeMes =
+        manutencoes
+          .filter((m) => m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx)
+          .reduce((acc, m) => acc + calcularHorasParado(m), 0) +
+        osCorretivas
+          .filter((os) => os.dataHoraConclusao && new Date(os.dataHoraConclusao).getMonth() === mesIdx)
+          .reduce((acc, os) => acc + calcularHorasParadoOsCorretiva(os), 0);
+
+      return {
+        mes: mesLabel,
+        preventivas: preventMes,
+        corretivas: corrMes,
+        downtime: Math.round(downtimeMes * 10) / 10,
+      };
+    });
+
+    // MTBF frota — horas de operação / número total de falhas corretivas
+    const horasDecorridas = differenceInMinutes(agora, inicioAno) / 60;
+    const totalCorretivasFlota = manutencoesCorretivas;
+    const mtbfHoras = totalCorretivasFlota > 0
+      ? Math.round((horasDecorridas / totalCorretivasFlota) * 10) / 10
+      : null;
+
+    // Disponibilidade % frota — (horas totais - downtime) / horas totais
+    const totalHorasFlota = totalEquipamentos * horasDecorridas;
+    const totalDowntimeFlota = Object.values(statsEquip).reduce((a, e) => a + e.horasParado, 0);
+    const disponibilidadePct = totalHorasFlota > 0
+      ? Math.round(((totalHorasFlota - totalDowntimeFlota) / totalHorasFlota) * 1000) / 10
+      : null;
+
+    // Reincidentes — equipamentos com ≥ 2 ocorrências corretivas
+    const reincidentes = Object.values(statsEquip)
+      .filter((e) => e.corretivas >= 2)
+      .sort((a, b) => b.corretivas - a.corretivas)
+      .slice(0, 10);
+
     return res.status(200).json({
       ano: agora.getFullYear(),
       resumoGeral: {
@@ -243,10 +296,14 @@ router.get('/indicadores', async (req, res) => {
         mttrHoras,
         conformidadePM,
         backlog,
+        mtbfHoras,
+        disponibilidadePct,
       },
       rankingDowntime,
       rankingFrequencia,
       rankingUnidades,
+      evolucaoMensal,
+      reincidentes,
     });
   } catch (error) {
     console.error('[BI_INDICADORES_ERROR]', error);
