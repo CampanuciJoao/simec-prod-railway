@@ -78,7 +78,8 @@ function drawHeader(doc, os, options) {
   doc.font('Helvetica').fontSize(7.5).fillColor(C.border).text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
   doc.font('Helvetica').fontSize(8).fillColor(C.border).text(`Gerado em: ${fmt(new Date(), locale, timeZone)}`, 0, 20, { align: 'right', width: W - 14, lineBreak: false });
 
-  const titulo = `Ordem de Serviço Corretiva — Nº ${os.numeroOS}`;
+  const tipoOS = (os.visitas && os.visitas.length > 0) ? 'Corretiva' : 'Ocorrência';
+  const titulo = `Ordem de Serviço ${tipoOS} — Nº ${os.numeroOS}`;
   doc.font('Helvetica-Bold').fontSize(13).fillColor(C.black).text(titulo, 50, 66, { align: 'center', width: W - 100 });
 
   const sepY = 90;
@@ -91,25 +92,29 @@ function drawFooter(doc) {
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
     const W = doc.page.width;
-    const fy = doc.page.height - 38;
 
-    doc.font('Helvetica').fontSize(8).fillColor(C.muted);
-    doc.text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'left' });
-    doc.text('SIMEC — Confidencial', 0, fy, { align: 'right', width: W - 50 });
-
-    // Assinatura ancorada no rodapé da última página
+    // Assinatura primeiro (y menor)
     if (i === range.count - 1) {
-      const sigY = doc.page.height - doc.page.margins.bottom - 55;
+      const sigY = doc.page.height - doc.page.margins.bottom - 52;
       doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(C.border).stroke();
       doc.font('Helvetica').fontSize(8).fillColor(C.muted)
         .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
     }
+
+    // Número da página no canto direito do rodapé
+    const fy = doc.page.height - doc.page.margins.bottom - 10;
+    doc.font('Helvetica').fontSize(8).fillColor(C.muted)
+      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'right', width: W - 100 });
   }
+
+  // Garante que doc.y fique em posição segura para não criar página extra no doc.end()
+  doc.switchToPage(range.start + range.count - 1);
+  doc.y = doc.page.margins.top;
 }
 
 function sectionTitle(doc, text) {
   checkPageBreak(doc, 28);
-  doc.moveDown(0.4);
+  doc.moveDown(0.8);
   const y = doc.y;
   doc.save().rect(50, y, doc.page.width - 100, 18).fill(C.bg).restore();
   doc.font('Helvetica-Bold').fontSize(9).fillColor(C.dark).text(text, 54, y + 4);
@@ -117,10 +122,16 @@ function sectionTitle(doc, text) {
 }
 
 function infoRow(doc, label, value) {
-  checkPageBreak(doc, 16);
-  const W = doc.page.width;
-  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text(`${label}:`, 54, doc.y, { continued: true, width: 140 });
-  doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(` ${safe(value)}`, { width: W - 210 });
+  checkPageBreak(doc, 12);
+  const y = doc.y;
+
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted)
+    .text(`${label}:`, 54, y, { lineBreak: false });
+
+  doc.font('Helvetica').fontSize(8.5).fillColor(C.dark)
+    .text(` ${safe(value)}`, { lineBreak: false });
+
+  doc.y = y + 11;
 }
 
 function highlightBadge(doc, label, value, color = C.blue) {
@@ -165,9 +176,9 @@ function timelineEvent(doc, evento, options) {
   const eventHeight = doc.y - y;
   doc.save().rect(x, y, 3, Math.max(eventHeight, 12)).fill(cor).restore();
 
-  doc.moveDown(0.6);
-  doc.moveTo(x + 8, doc.y - 3).lineTo(W - 50, doc.y - 3).lineWidth(0.4).strokeColor(C.light).stroke();
   doc.moveDown(0.3);
+  doc.moveTo(x + 8, doc.y - 2).lineTo(W - 50, doc.y - 2).lineWidth(0.4).strokeColor(C.light).stroke();
+  doc.moveDown(0.15);
 }
 
 
@@ -196,12 +207,12 @@ export async function obterDadosPdfOsCorretiva({ tenantId, osId }) {
 
 export function gerarPdfOsCorretivaBuffer(os, options = {}) {
   return new Promise((resolve, reject) => {
-    const { locale = 'pt-BR', timeZone = 'America/Sao_Paulo' } = options;
+    const { locale = 'pt-BR', timeZone = 'UTC' } = options;
     const chunks = [];
 
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: 110, bottom: 60, left: 50, right: 50 },
+      margins: { top: 110, bottom: 48, left: 50, right: 50 },
       bufferPages: true,
     });
 
@@ -219,7 +230,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
       : os.equipamento?.tag);
     infoRow(doc, 'Unidade / Setor', os.equipamento?.unidade?.nomeSistema || os.equipamento?.setor);
     infoRow(doc, 'Fabricante', os.equipamento?.fabricante);
-    doc.moveDown(0.3);
+    doc.moveDown(0.2);
     highlightBadge(doc, 'Status na abertura da OS', STATUS_EQ[os.statusEquipamentoAbertura] || os.statusEquipamentoAbertura, '#b45309');
     highlightBadge(doc, 'Status atual do equipamento', STATUS_EQ[os.equipamento?.status] || os.equipamento?.status, os.status === 'Concluida' ? '#16a34a' : '#b45309');
 
@@ -230,23 +241,23 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     infoRow(doc, 'Solicitante', os.solicitante);
     infoRow(doc, 'Abertura', fmt(os.dataHoraAbertura, locale, timeZone));
     infoRow(doc, 'Aberta por', os.autor?.nome || 'N/A');
-    doc.moveDown(0.3);
-    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Descrição do problema:', 54, doc.y);
-    doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.descricaoProblema), 54, doc.y + 2, { width: doc.page.width - 108 });
-    doc.moveDown(0.3);
+    infoRow(doc, 'Descrição do problema', os.descricaoProblema);
 
-    if (os.status === 'Concluida' && os.dataHoraConclusao) {
+    const concluidaViaVisita = (os.visitas || []).some(v => v.resultado);
+
+  if (os.status === 'Concluida' && os.dataHoraConclusao && !concluidaViaVisita) {
       infoRow(doc, 'Conclusão', fmt(os.dataHoraConclusao, locale, timeZone));
       if (os.observacoesFinais) {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Observações finais:', 54, doc.y);
         doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.observacoesFinais), 54, doc.y + 2, { width: doc.page.width - 108 });
+        doc.moveDown(0.1);
       }
     }
 
     // ── Timeline
     sectionTitle(doc, 'TIMELINE CRONOLÓGICA');
 
-    const timeline = buildTimeline(os);
+    const timeline = buildTimeline(os, timeZone);
     for (const ev of timeline) {
       timelineEvent(doc, ev, { locale, timeZone });
     }
@@ -256,7 +267,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
   });
 }
 
-function buildTimeline(os) {
+function buildTimeline(os, timeZone = 'UTC') {
   const eventos = [];
 
   eventos.push({
@@ -277,8 +288,8 @@ function buildTimeline(os) {
   }
 
   for (const visita of os.visitas || []) {
-    const inicio = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraInicioPrevista));
-    const fim = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraFimPrevista));
+    const inicio = new Intl.DateTimeFormat('pt-BR', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraInicioPrevista));
+    const fim = new Intl.DateTimeFormat('pt-BR', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date(visita.dataHoraFimPrevista));
 
     eventos.push({
       tipo: 'visita_agendada',

@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faMicrochip, faHospital, faUser, faClock, faExclamationTriangle, faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faMicrochip, faHospital, faUser, faClock, faExclamationTriangle, faCheckCircle, faBan } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
 
@@ -85,6 +85,12 @@ function OsEquipamentoCard({ os }) {
         <InfoRow icon={faClock} label="Abertura" value={formatarDataHora(os.dataHoraAbertura)} />
         {os.dataHoraConclusao && (
           <InfoRow icon={faCheckCircle} label="Conclusão" value={formatarDataHora(os.dataHoraConclusao)} />
+        )}
+        {os.dataHoraCancelamento && (
+          <InfoRow icon={faBan} label="Cancelamento" value={formatarDataHora(os.dataHoraCancelamento)} />
+        )}
+        {os.motivoCancelamento && (
+          <InfoRow icon={faBan} label="Motivo do cancelamento" value={os.motivoCancelamento} />
         )}
       </div>
     </Card>

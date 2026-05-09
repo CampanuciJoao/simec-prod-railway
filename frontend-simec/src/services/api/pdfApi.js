@@ -47,6 +47,12 @@ export const exportarBIPDF = () =>
     'BI_ESTRATEGICO_SIMEC.pdf'
   );
 
+export const exportarUtilizacaoGehcPDF = (meses = 12) =>
+  baixarPdf(
+    { url: '/pdfs/gehc-utilizacao', method: 'get', params: { meses } },
+    `utilizacao_ge_${new Date().getFullYear()}.pdf`
+  );
+
 export const exportarOcorrenciaPDF = (ocorrenciaId) =>
   baixarPdf(
     { url: `/pdfs/ocorrencia/${ocorrenciaId}`, method: 'get' },
@@ -103,4 +109,20 @@ export const exportarOrcamentoPDF = (orcamentoId) =>
   baixarPdf(
     { url: `/pdfs/orcamento/${orcamentoId}`, method: 'get' },
     `orcamento_${orcamentoId.slice(-6).toUpperCase()}.pdf`
+  );
+
+export const exportarContratoPDF = (contratoId) =>
+  baixarPdf(
+    { url: `/pdfs/contrato/${contratoId}`, method: 'get' },
+    `contrato_${contratoId}.pdf`
+  );
+
+export const exportarSaudeEquipamentoPDF = (equipamentoId, { inicio, fim } = {}, fallbackFileName) =>
+  baixarPdf(
+    {
+      url: `/gehc/equipamento/${equipamentoId}/historico/export-pdf`,
+      method: 'get',
+      params: { ...(inicio && { inicio }), ...(fim && { fim }) },
+    },
+    fallbackFileName || `saude_ativo_${equipamentoId}.pdf`
   );

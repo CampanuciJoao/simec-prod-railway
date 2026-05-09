@@ -210,6 +210,11 @@ async function buscarEquipamentoCompleto(tenantId, id) {
           createdAt: 'desc',
         },
       },
+      _count: {
+        select: {
+          gehcSaudeSnapshots: true,
+        },
+      },
     },
   });
 }
@@ -302,6 +307,7 @@ router.get('/', async (req, res) => {
             tenantId: true,
             tag: true,
             modelo: true,
+            apelido: true,
             tipo: true,
             setor: true,
             fabricante: true,
@@ -316,6 +322,7 @@ router.get('/', async (req, res) => {
             unidadeId: true,
             createdAt: true,
             updatedAt: true,
+            gehcAssetId: true,
           },
           orderBy: buildEquipamentosOrderBy(sortBy, sortDirection),
           take: pageSize,

@@ -1,15 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowRight,
-  faBell,
   faChartPie,
-  faFileContract,
-  faHospital,
+  faHeartPulse,
   faRotateRight,
-  faScrewdriverWrench,
   faTriangleExclamation,
   faTableCells,
 } from '@fortawesome/free-solid-svg-icons';
@@ -37,6 +34,8 @@ import { AlertListItem } from '@/components/dashboard';
 import DashboardCard from '@/components/dashboard/DashboardCard';
 import BarChart from '@/components/charts/BarChart';
 import DonutChart from '@/components/charts/DonutChart';
+import { getGehcStatus } from '@/services/api/gehcApi';
+import { formatarDataHora } from '@/utils/timeUtils';
 
 const ResponsiveGrid = WidthProvider(Responsive);
 
@@ -53,30 +52,42 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
 
   return (
     <div
-      className="rounded-2xl border px-4 py-4"
+      className="rounded-xl border px-3 py-3"
       style={{ backgroundColor: 'var(--bg-surface-soft)', borderColor: 'var(--border-soft)' }}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <div
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm"
           style={{ backgroundColor: t.iconSurface, color: t.iconText }}
         >
           <FontAwesomeIcon icon={icon} />
         </div>
-        <div className="min-w-0">
-          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{label}</p>
-          <p className="mt-2 text-2xl font-bold leading-none" style={{ color: 'var(--text-primary)' }}>{value}</p>
-          <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-muted)' }}>{helper}</p>
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+          <p className="text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{value}</p>
         </div>
       </div>
+      <p className="mt-2 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
     </div>
   );
 }
 
 // ─── Ocorrências ──────────────────────────────────────────────────────────────
 
-const GRAVIDADE_TONE  = { alta: 'danger', media: 'warning', baixa: 'default' };
-const GRAVIDADE_LABEL = { alta: 'Alta', media: 'Média', baixa: 'Baixa' };
+const STATUS_OS_LABEL = {
+  Aberta:             'Aberta',
+  EmAndamento:        'Em andamento',
+  AguardandoTerceiro: 'Ag. terceiro',
+  Concluida:          'Concluída',
+};
+
+const STATUS_OS_TONE = {
+  Aberta:             'warning',
+  EmAndamento:        'info',
+  AguardandoTerceiro: 'warning',
+  Concluida:          'success',
+};
+
 const GRAVIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
 
 function ordenarOcorrencias(lista) {
@@ -84,17 +95,19 @@ function ordenarOcorrencias(lista) {
 }
 
 function OcorrenciaPendenteItem({ ocorrencia }) {
-  const tone = GRAVIDADE_TONE[ocorrencia.gravidade] || 'default';
+  const tone = STATUS_OS_TONE[ocorrencia.gravidade] || 'default';
   const toneColors = {
     danger:  { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)'  },
     warning: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)' },
+    info:    { bg: 'var(--brand-primary-soft)', text: 'var(--brand-primary)' },
+    success: { bg: 'var(--color-success-soft)', text: 'var(--color-success)' },
     default: { bg: 'var(--bg-surface-soft)',    text: 'var(--text-muted)'    },
   };
   const colors = toneColors[tone];
 
   return (
     <Link
-      to={`/equipamentos/ficha-tecnica/${ocorrencia.equipamento?.id}`}
+      to={`/manutencoes/ocorrencia/${ocorrencia.id}`}
       className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition hover:opacity-80"
       style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-soft)' }}
     >
@@ -114,49 +127,70 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
         className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
         style={{ backgroundColor: colors.bg, color: colors.text }}
       >
-        {GRAVIDADE_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
+        {STATUS_OS_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
       </span>
     </Link>
   );
 }
 
-// ─── Fila de atenção ──────────────────────────────────────────────────────────
+// ─── Saúde das RMs GE ─────────────────────────────────────────────────────────
 
-function FilaAtencao({ resumo }) {
-  const items = [
-    {
-      icon: faBell,
-      label: 'Alertas ativos',
-      value: resumo.alertasAtivos,
-      helper: resumo.alertasCriticos > 0 ? `${resumo.alertasCriticos} em prioridade alta` : 'Nenhum alerta crítico',
-      tone: resumo.alertasCriticos > 0 ? 'danger' : 'default',
-    },
-    {
-      icon: faScrewdriverWrench,
-      label: 'OS em andamento',
-      value: resumo.emManutencao,
-      helper: 'Ordens abertas que pressionam a disponibilidade.',
-      tone: resumo.emManutencao > 0 ? 'warning' : 'default',
-    },
-    {
-      icon: faFileContract,
-      label: 'Cobertura em atenção',
-      value: resumo.contratosVencendo,
-      helper: 'Contratos que pedem acompanhamento de vigência.',
-      tone: resumo.contratosVencendo > 0 ? 'warning' : 'default',
-    },
-    {
-      icon: faHospital,
-      label: 'Ativos restritos',
-      value: resumo.inativos,
-      helper: 'Equipamentos fora de operação ou em uso limitado.',
-      tone: resumo.inativos > 0 ? 'danger' : 'success',
-    },
-  ];
+function SaudeRMs() {
+  const [snapshots, setSnapshots] = useState([]);
+  const [configurado, setConfigurado] = useState(true);
+
+  useEffect(() => {
+    getGehcStatus()
+      .then((res) => {
+        setConfigurado(res.credenciais?.configurado ?? false);
+        setSnapshots(res.ultimosSnapshots ?? []);
+      })
+      .catch(() => {});
+  }, []);
+
+  if (!configurado) {
+    return (
+      <InlineEmptyState message="Integração GE não configurada.">
+        <Link to="/gerenciamento/integracoes" className="text-xs underline" style={{ color: 'var(--brand-primary)' }}>
+          Configurar agora
+        </Link>
+      </InlineEmptyState>
+    );
+  }
+
+  if (!snapshots.length) {
+    return <InlineEmptyState message="Nenhuma captura de saúde ainda. Execute o monitor na tela de integrações." />;
+  }
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      {items.map((item) => <DashboardMiniStat key={item.label} {...item} />)}
+    <div className="space-y-2 overflow-auto">
+      {snapshots.map((s, i) => (
+        <div key={i} className="rounded-2xl border px-4 py-2.5" style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
+          <div className="flex flex-wrap items-center justify-between gap-1">
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatarDataHora(s.capturedAt)}</p>
+          </div>
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+            {s.heliumLevelPct != null && (
+              <span style={{ color: s.heliumLevelPct < 30 ? 'var(--color-danger)' : s.heliumLevelPct < 70 ? 'var(--color-warning)' : 'var(--color-success)', fontWeight: 600 }}>
+                Hélio: {s.heliumLevelPct}%
+              </span>
+            )}
+            {s.heliumPressurePsi != null && <span>Pressão: {s.heliumPressurePsi} PSI</span>}
+            {s.compressorStatus && (
+              <span style={{ color: s.compressorStatus === 'ON' ? 'var(--text-muted)' : 'var(--color-danger)', fontWeight: s.compressorStatus !== 'ON' ? 600 : 400 }}>
+                Compressor: {s.compressorStatus}
+              </span>
+            )}
+            {s.coolantTempC != null && <span>Temp: {s.coolantTempC}°C</span>}
+            {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
+              <span style={{ color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                {s.equipmentOnline ? 'Online' : 'Offline'}
+              </span>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -221,7 +255,7 @@ function DashboardPage() {
       <div className="space-y-4">
         <PageHeader
           title="Dashboard"
-          subtitle="Arraste os cards para reorganizar. Redimensione pelas bordas."
+          subtitle="Visão geral da operação, alertas e indicadores do parque de equipamentos."
           icon={faChartPie}
           actions={
             <div className="flex gap-2">
@@ -317,13 +351,18 @@ function DashboardPage() {
             )}
           </DashboardCard>
 
-          {/* Fila de atenção */}
+          {/* Saúde das RMs GE */}
           <DashboardCard
             key="fila"
-            title="Fila de atenção"
-            description="Itens que ajudam a priorizar a operação."
+            title="Saúde das RMs GE"
+            description="Último snapshot de hélio, pressão e compressor."
+            headerRight={
+              <Link to="/gerenciamento/integracoes" style={{ color: 'var(--brand-primary)' }} className="text-xs">
+                <FontAwesomeIcon icon={faHeartPulse} className="mr-1" />Ver integrações
+              </Link>
+            }
           >
-            <FilaAtencao resumo={resumo} />
+            <SaudeRMs />
           </DashboardCard>
 
           {/* Leitura do parque */}

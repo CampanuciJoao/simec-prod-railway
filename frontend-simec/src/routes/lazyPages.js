@@ -56,8 +56,8 @@ export const SegurosPage = React.lazy(() =>
 export const SalvarSeguroPage = React.lazy(() =>
   import('@/pages/seguros/SalvarSeguroPage')
 );
-export const DetalhesSeguroPage = React.lazy(() =>
-  import('@/pages/seguros/DetalhesSeguroPage')
+export const RenovarSeguroPage = React.lazy(() =>
+  import('@/pages/seguros/RenovarSeguroPage')
 );
 export const RelatoriosPage = React.lazy(() =>
   import('@/pages/relatorios/RelatoriosPage')
@@ -79,6 +79,12 @@ export const TenantSettingsPage = React.lazy(() =>
 );
 export const LogAuditoriaPage = React.lazy(() =>
   import('@/pages/auditoria/LogAuditoriaPage')
+);
+export const IntegracoesPage = React.lazy(() =>
+  import('@/pages/gerenciamento/IntegracoesPage')
+);
+export const AlertasGePage = React.lazy(() =>
+  import('@/pages/gerenciamento/AlertasGePage')
 );
 export const AuditoriaDetalhadaPage = React.lazy(() =>
   import('@/pages/auditoria/AuditoriaDetalhadaPage')

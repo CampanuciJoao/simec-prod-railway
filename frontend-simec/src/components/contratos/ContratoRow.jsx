@@ -24,6 +24,8 @@ function ContratoRow({
   onToggleExpandir,
   onUploadArquivo,
   onDeleteAnexo,
+  exportandoPdfId,
+  onExportarPdf,
   onEdit,
   onDelete,
   uploadingId,
@@ -34,52 +36,89 @@ function ContratoRow({
   return (
     <div
       className={[
-        'overflow-hidden rounded-xl border-y border-r border-slate-200 border-l-[8px] bg-white shadow-sm transition-all hover:shadow-md',
+        'overflow-hidden rounded-xl border-y border-r border-l-[8px] shadow-sm transition-all hover:shadow-md',
         getRowHighlightClass(statusDinamico),
       ].join(' ')}
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderTopColor: 'var(--border-soft)',
+        borderRightColor: 'var(--border-soft)',
+        borderBottomColor: 'var(--border-soft)',
+      }}
     >
       <div
         className="flex cursor-pointer flex-col gap-4 p-5 xl:flex-row xl:items-center xl:justify-between"
         onClick={() => onToggleExpandir(contrato.id)}
       >
         <div className="flex min-w-0 flex-1 items-start gap-4">
-          <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+          <div
+            className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border"
+            style={{
+              backgroundColor: 'var(--brand-primary-soft)',
+              borderColor: 'var(--brand-primary-soft)',
+              color: 'var(--brand-primary)',
+            }}
+          >
             <FontAwesomeIcon icon={isAberto ? faMinusCircle : faPlusCircle} />
           </div>
 
           <div className="grid flex-1 grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              <span
+                className="text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Nº Contrato
               </span>
-              <div className="mt-1 text-base font-bold text-slate-900">
+              <div
+                className="mt-1 text-base font-bold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {contrato.numeroContrato}
               </div>
             </div>
 
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              <span
+                className="text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Fornecedor
               </span>
-              <div className="mt-1 text-sm font-semibold text-slate-800">
+              <div
+                className="mt-1 text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {contrato.fornecedor}
               </div>
             </div>
 
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              <span
+                className="text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Categoria
               </span>
-              <div className="mt-1 text-sm font-semibold text-slate-800">
+              <div
+                className="mt-1 text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {contrato.categoria}
               </div>
             </div>
 
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              <span
+                className="text-[10px] font-bold uppercase tracking-wide"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 Vencimento
               </span>
-              <div className="mt-1 text-sm font-semibold text-slate-800">
+              <div
+                className="mt-1 text-sm font-semibold"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {formatarData(contrato.dataFim)}
               </div>
             </div>
@@ -92,7 +131,7 @@ function ContratoRow({
           <FontAwesomeIcon
             icon={faPaperclip}
             className={
-              contrato.anexos?.length > 0 ? 'text-green-500' : 'text-slate-300'
+              contrato.anexos?.length > 0 ? 'text-green-500' : 'text-slate-400'
             }
             title={
               contrato.anexos?.length > 0 ? 'Documento anexado' : 'Sem anexo'
@@ -107,6 +146,8 @@ function ContratoRow({
           uploadingId={uploadingId}
           onUploadArquivo={onUploadArquivo}
           onDeleteAnexo={onDeleteAnexo}
+          exportandoPdfId={exportandoPdfId}
+          onExportarPdf={onExportarPdf}
           onEdit={onEdit}
           onDelete={onDelete}
         />
@@ -121,6 +162,8 @@ ContratoRow.propTypes = {
   onToggleExpandir: PropTypes.func.isRequired,
   onUploadArquivo: PropTypes.func.isRequired,
   onDeleteAnexo: PropTypes.func.isRequired,
+  exportandoPdfId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onExportarPdf: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
   uploadingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

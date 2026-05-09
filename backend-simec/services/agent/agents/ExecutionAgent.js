@@ -61,7 +61,7 @@ export const ExecutionAgent = {
   capacidades: ['executar_agendamento', 'executar_relatorio', 'executar_seguro', 'executar_analytics', 'executar_reset'],
 
   async executar(contexto) {
-    const { mensagem, usuarioId, usuarioNome, tenantId, plano, validacao } = contexto;
+    const { mensagem, usuarioId, usuarioNome, tenantId, tenantTimezone = 'UTC', plano, validacao } = contexto;
 
     if (!validacao?.aprovado) {
       const resposta = respostaAgente(
@@ -72,7 +72,7 @@ export const ExecutionAgent = {
       return resposta;
     }
 
-    const contextoUsuario = { usuarioId, usuarioNome, tenantId };
+    const contextoUsuario = { usuarioId, usuarioNome, tenantId, tenantTimezone };
 
     if (plano.acao === 'RESET') {
       for (const sessao of plano.cancelar_sessoes) {

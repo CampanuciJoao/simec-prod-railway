@@ -90,6 +90,73 @@ export async function buscarManutencoesRealizadas({
 }
 
 /**
+ * Busca equipamentos com serviços vinculados (contratos, seguros, manutenções)
+ */
+export async function buscarEquipamentosComServicos({
+  tenantId,
+  unidadeId,
+  tipo,
+  fabricante,
+  status,
+}) {
+  if (!tenantId) throw new Error('TENANT_ID_OBRIGATORIO');
+
+  const where = { tenantId };
+  if (unidadeId) where.unidadeId = unidadeId;
+  if (tipo) where.tipo = { contains: tipo, mode: 'insensitive' };
+  if (fabricante) where.fabricante = { contains: fabricante, mode: 'insensitive' };
+  if (status) where.status = status;
+
+  return prisma.equipamento.findMany({
+    where,
+    select: {
+      id: true,
+      modelo: true,
+      tipo: true,
+      tag: true,
+      status: true,
+      fabricante: true,
+      setor: true,
+      numeroPatrimonio: true,
+      registroAnvisa: true,
+      unidade: { select: { nomeSistema: true } },
+      contratosCobertos: {
+        select: {
+          numeroContrato: true,
+          fornecedor: true,
+          categoria: true,
+          dataFim: true,
+          status: true,
+        },
+      },
+      seguros: {
+        select: {
+          apoliceNumero: true,
+          seguradora: true,
+          dataFim: true,
+          status: true,
+        },
+        orderBy: { dataFim: 'desc' },
+      },
+      manutencoes: {
+        select: {
+          tipo: true,
+          status: true,
+          dataConclusao: true,
+          dataHoraAgendamentoInicio: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 50,
+      },
+    },
+    orderBy: [
+      { unidade: { nomeSistema: 'asc' } },
+      { modelo: 'asc' },
+    ],
+  });
+}
+
+/**
  * Busca inventário de equipamentos
  */
 export async function buscarInventarioEquipamentos({

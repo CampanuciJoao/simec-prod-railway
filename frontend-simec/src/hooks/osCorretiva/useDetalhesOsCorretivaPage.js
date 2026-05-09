@@ -5,6 +5,7 @@ import {
   agendarVisita,
   registrarResultadoVisita,
   concluirOsCorretiva,
+  cancelarOsCorretiva,
   downloadPdfOsCorretiva,
 } from '../../services/api/osCorretivaApi';
 import { useModal } from '../shared/useModal';
@@ -23,6 +24,7 @@ export function useDetalhesOsCorretivaPage(osId) {
   const visitaModal = useModal();
   const resultadoModal = useModal();
   const concluirModal = useModal();
+  const cancelarModal = useModal();
 
   const fetchOs = useCallback(async () => {
     if (!osId) return;
@@ -78,8 +80,8 @@ export function useDetalhesOsCorretivaPage(osId) {
     }
   }, [osId, addToast, visitaModal, fetchOs]);
 
-  const handleRegistrarResultado = useCallback(async (dados) => {
-    const visitaId = resultadoModal.modalData?.visitaId;
+  const handleRegistrarResultado = useCallback(async (dados, visitaIdOverride) => {
+    const visitaId = visitaIdOverride || resultadoModal.modalData?.visitaId;
     if (!visitaId) return;
     setSubmitting(true);
     setFieldErrors({});
@@ -112,6 +114,21 @@ export function useDetalhesOsCorretivaPage(osId) {
     }
   }, [osId, addToast, concluirModal, fetchOs]);
 
+  const handleCancelarOs = useCallback(async (motivoCancelamento) => {
+    setSubmitting(true);
+    try {
+      await cancelarOsCorretiva(osId, motivoCancelamento);
+      addToast('OS Corretiva cancelada.', 'success');
+      cancelarModal.closeModal();
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao cancelar OS.';
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, cancelarModal, fetchOs]);
+
   const handleExportarPdf = useCallback(async () => {
     try {
       const response = await downloadPdfOsCorretiva(osId);
@@ -138,10 +155,12 @@ export function useDetalhesOsCorretivaPage(osId) {
     visitaModal,
     resultadoModal,
     concluirModal,
+    cancelarModal,
     handleAdicionarNota,
     handleAgendarVisita,
     handleRegistrarResultado,
     handleConcluirOs,
+    handleCancelarOs,
     handleExportarPdf,
     refetch: fetchOs,
   };

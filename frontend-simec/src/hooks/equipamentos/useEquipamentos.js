@@ -31,7 +31,7 @@ function buildQueryParams({
   };
 }
 
-export const useEquipamentos = () => {
+export const useEquipamentos = (initialState = {}) => {
   const { addToast } = useToast();
 
   const [equipamentos, setEquipamentos] = useState([]);
@@ -57,12 +57,12 @@ export const useEquipamentos = () => {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
 
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState(initialState.searchTerm || '');
   const [filtros, setFiltros] = useState({
-    unidadeId: '',
-    tipo: '',
-    fabricante: '',
-    status: '',
+    unidadeId: initialState.filtros?.unidadeId || '',
+    tipo: initialState.filtros?.tipo || '',
+    fabricante: initialState.filtros?.fabricante || '',
+    status: initialState.filtros?.status || '',
   });
   const [sortConfig, setSortConfig] = useState({
     key: 'modelo',

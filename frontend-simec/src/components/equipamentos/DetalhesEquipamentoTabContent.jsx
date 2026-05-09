@@ -27,8 +27,8 @@ function DetalhesEquipamentoTabContent({
         onUpdate={onRefresh}
       />
     ),
-    historico: <TabHistorico equipamento={equipamento} />,
-    cobertura: <TabCobertura equipamento={equipamento} />,
+    historico:  <TabHistorico equipamento={equipamento} />,
+    cobertura:  <TabCobertura equipamento={equipamento} />,
   };
 
   return tabContentMap[abaAtiva] || null;

@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTableCells } from '@fortawesome/free-solid-svg-icons';
+import { faTableCells, faFilePdf, faXRay, faUsers, faGauge, faHospital } from '@fortawesome/free-solid-svg-icons';
 
 import 'react-grid-layout/css/styles.css';
 import 'react-resizable/css/styles.css';
 
+import { getGehcBIUtilizacao } from '@/services/api/gehcApi';
+import { exportarUtilizacaoGehcPDF } from '@/services/api/pdfApi';
 import { useBIPage } from '@/hooks/bi/useBIPage';
 import { useBIDrawerData } from '@/hooks/bi/useBIDrawerData';
 import { useBILayout, DEFAULT_BI_LAYOUT, BI_ROW_HEIGHT, BI_GRID_MARGIN } from '@/hooks/bi/useBILayout';
@@ -36,6 +38,29 @@ function BIPage() {
 
   const { layout, onLayoutChange, resetLayout } = useBILayout(usuario?.id);
   const [expandedWidget, setExpandedWidget] = useState(null);
+
+  const [gehcUtilizacao, setGehcUtilizacao] = useState(null);
+  const [gehcLoading, setGehcLoading] = useState(false);
+  const [gehcExportando, setGehcExportando] = useState(false);
+
+  useEffect(() => {
+    setGehcLoading(true);
+    getGehcBIUtilizacao(12)
+      .then(setGehcUtilizacao)
+      .catch(() => {})
+      .finally(() => setGehcLoading(false));
+  }, []);
+
+  const handleExportarGehcPDF = async () => {
+    setGehcExportando(true);
+    try {
+      await exportarUtilizacaoGehcPDF(12);
+    } catch (e) {
+      console.error('[GEHC_PDF_EXPORT]', e);
+    } finally {
+      setGehcExportando(false);
+    }
+  };
 
   const hasResumoCards = !!page.resumoCards && typeof page.resumoCards === 'object';
 
@@ -126,10 +151,107 @@ function BIPage() {
             />
           ) : null}
 
+          {(gehcLoading || gehcUtilizacao) && (
+            <PageSection
+              title="Utilização GE Healthcare"
+              description={
+                gehcUtilizacao
+                  ? `Exames e disponibilidade das RMs GE nos últimos ${gehcUtilizacao.periodo?.meses || 12} meses.`
+                  : ''
+              }
+              darkHeader
+              headerRight={
+                gehcUtilizacao && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleExportarGehcPDF}
+                    disabled={gehcExportando}
+                  >
+                    <FontAwesomeIcon icon={faFilePdf} className="mr-1" />
+                    {gehcExportando ? 'Gerando...' : 'Exportar PDF'}
+                  </Button>
+                )
+              }
+            >
+              {gehcLoading ? (
+                <div className="p-8 text-center text-gray-400 text-sm">Carregando dados GE Healthcare...</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border-b border-gray-700">
+                    {[
+                      { icon: faXRay, label: 'Total de Exames', value: gehcUtilizacao.totais?.exames?.toLocaleString('pt-BR') ?? '—' },
+                      { icon: faUsers, label: 'Total de Pacientes', value: gehcUtilizacao.totais?.pacientes?.toLocaleString('pt-BR') ?? '—' },
+                      { icon: faGauge, label: 'Uptime Médio', value: gehcUtilizacao.totais?.uptimeMedio != null ? `${gehcUtilizacao.totais.uptimeMedio.toFixed(1)}%` : '—' },
+                    ].map(({ icon, label, value }) => (
+                      <div key={label} className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
+                        <FontAwesomeIcon icon={icon} className="text-blue-400 text-xl w-6 shrink-0" />
+                        <div>
+                          <p className="text-xs text-gray-400">{label}</p>
+                          <p className="text-lg font-semibold text-white">{value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="divide-y divide-gray-700/60">
+                    {gehcUtilizacao.unidades?.map((unidade) => (
+                      <div key={unidade.nome} className="p-4">
+                        <div className="flex items-center justify-between mb-3">
+                          <h3 className="font-semibold text-white text-sm flex items-center gap-2">
+                            <FontAwesomeIcon icon={faHospital} className="text-blue-400" />
+                            {unidade.nome}
+                          </h3>
+                          <div className="text-xs text-gray-400 flex gap-4">
+                            <span>{unidade.totalExames?.toLocaleString('pt-BR')} exames</span>
+                            <span>{unidade.totalPacientes?.toLocaleString('pt-BR')} pacientes</span>
+                            {unidade.uptimeMedio != null && (
+                              <span>Uptime {unidade.uptimeMedio.toFixed(1)}%</span>
+                            )}
+                          </div>
+                        </div>
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-gray-400 border-b border-gray-700">
+                              <th className="text-left py-1 pr-3 font-medium">Equipamento</th>
+                              <th className="text-left py-1 pr-3 font-medium">Tag</th>
+                              <th className="text-right py-1 pr-3 font-medium">Exames</th>
+                              <th className="text-right py-1 pr-3 font-medium">Pacientes</th>
+                              <th className="text-right py-1 pr-3 font-medium">Média/Dia</th>
+                              <th className="text-right py-1 font-medium">Uptime</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {unidade.equipamentos?.map((eq) => (
+                              <tr
+                                key={eq.tag || eq.nome}
+                                className="text-gray-300 border-b border-gray-800/60 hover:bg-gray-800/30 transition-colors"
+                              >
+                                <td className="py-1.5 pr-3">{eq.nome}</td>
+                                <td className="py-1.5 pr-3 text-gray-400 font-mono">{eq.tag}</td>
+                                <td className="py-1.5 pr-3 text-right">{eq.totalExames?.toLocaleString('pt-BR')}</td>
+                                <td className="py-1.5 pr-3 text-right">{eq.totalPacientes?.toLocaleString('pt-BR')}</td>
+                                <td className="py-1.5 pr-3 text-right">{eq.mediaExamesDia ?? '—'}</td>
+                                <td className="py-1.5 text-right">
+                                  {eq.uptimeMedio != null ? `${eq.uptimeMedio.toFixed(1)}%` : '—'}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </PageSection>
+          )}
+
           {shouldShowState ? (
             <PageSection
               title="Widgets analíticos"
               description="Os gráficos priorizam leitura executiva rápida, com foco em downtime, criticidade e recorrência operacional."
+              darkHeader
             >
               <PageState
                 loading={page.loading}
@@ -142,6 +264,7 @@ function BIPage() {
             <PageSection
               title="Widgets analíticos"
               description="Arraste os widgets para reorganizar. Redimensione pelas bordas."
+              darkHeader
               headerRight={
                 <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
                   <FontAwesomeIcon icon={faTableCells} /> Redefinir layout

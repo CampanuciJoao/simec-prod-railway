@@ -21,16 +21,15 @@ export function useDetalhesEquipamentoPage() {
     refetch: refetchEquipamento,
   } = useEquipamentoDetalhes(equipamentoId);
 
-  const abas = useMemo(
-    () => [
-      { id: 'visaoGeral', label: 'Visao geral', icon: faChartLine },
-      { id: 'historico', label: 'Historico', icon: faHistory },
-      { id: 'fichaTecnica', label: 'Ficha tecnica', icon: faFileMedical },
-      { id: 'anexos', label: 'Anexos', icon: faPaperclip },
-      { id: 'cobertura', label: 'Cobertura', icon: faShieldAlt },
-    ],
-    []
-  );
+  const abas = useMemo(() => {
+    return [
+      { id: 'visaoGeral',  label: 'Visao geral',   icon: faChartLine  },
+      { id: 'historico',   label: 'Historico',      icon: faHistory    },
+      { id: 'fichaTecnica',label: 'Ficha tecnica',  icon: faFileMedical },
+      { id: 'anexos',      label: 'Anexos',         icon: faPaperclip  },
+      { id: 'cobertura',   label: 'Cobertura',      icon: faShieldAlt  },
+    ];
+  }, []);
 
   return {
     equipamentoId,

@@ -2,10 +2,12 @@ import React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faUsersCog,
-  faScroll,
-  faCogs,
+  faBan,
   faBuilding,
+  faCogs,
+  faPlug,
+  faScroll,
+  faUsersCog,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { PageLayout, PageHeader, ResponsiveTabs } from '@/components/ui';
@@ -32,6 +34,18 @@ function GerenciamentoPage() {
       label: 'Log de auditoria',
       icon: <FontAwesomeIcon icon={faScroll} />,
       path: '/gerenciamento/auditoria',
+    },
+    {
+      id: 'integracoes',
+      label: 'Integracoes',
+      icon: <FontAwesomeIcon icon={faPlug} />,
+      path: '/gerenciamento/integracoes',
+    },
+    {
+      id: 'alertas-ge',
+      label: 'Alertas GE',
+      icon: <FontAwesomeIcon icon={faBan} />,
+      path: '/gerenciamento/alertas-ge',
     },
   ];
 

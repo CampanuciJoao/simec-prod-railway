@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
+    "postinstall": "npx playwright install --with-deps chromium",
     "start": "node scripts/migrate.mjs && node server.js",
     "start:prod": "node scripts/migrate.mjs && node server.js",
     "pretest": "prisma generate",
@@ -14,10 +15,15 @@
     "prisma:migrate:deploy": "npx prisma migrate deploy",
     "prisma:push": "npx prisma db push",
     "prisma:reset": "npx prisma db push --force-reset && npm run seed",
-    "test": "node --test --experimental-test-isolation=none tests/**/*.test.js",
-    "test:agent": "node --test --experimental-test-isolation=none tests/agent/agentCore.test.js",
-    "test:auth": "node --test --experimental-test-isolation=none tests/auth/*.test.js",
-    "test:risk": "node --test --experimental-test-isolation=none tests/risk/*.test.js"
+    "test": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/**/*.test.js",
+    "test:agent": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/agent/agentCore.test.js",
+    "test:os": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/agent/osCorretivaAgent.test.js",
+    "test:flow": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/agent/osCorretivaFlow.test.js",
+    "test:action": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/agent/actionResolver.test.js",
+    "test:scoring": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/agent/entityScoring.test.js",
+    "test:state": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/agent/agendamentoState.test.js",
+    "test:auth": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/auth/*.test.js",
+    "test:risk": "node --env-file=tests/.env.test --test --experimental-test-isolation=none tests/risk/*.test.js"
   },
   "prisma": {
     "seed": "node seed.js"
@@ -42,6 +48,7 @@
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",
     "pdfkit": "^0.18.0",
+    "playwright": "^1.59.1",
     "socket.io": "^4.8.3",
     "uuid": "^11.1.0",
     "zod": "^4.3.6"

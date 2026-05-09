@@ -1,6 +1,6 @@
 // Ficheiro: backend-simec/services/time/constants.js
 
-export const SYSTEM_DEFAULT_TIMEZONE = 'America/Campo_Grande';
+export const SYSTEM_DEFAULT_TIMEZONE = 'UTC';
 export const SYSTEM_DEFAULT_LOCALE = 'pt-BR';
 
 export const MANUTENCAO_STATUSS_CONFLITANTES = [

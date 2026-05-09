@@ -1,8 +1,11 @@
 import {
   buscarVisitasComInicioProximo,
+  buscarVisitasParaInicioAutomatico,
   buscarVisitasComFimProximo,
   buscarVisitasVencidasPorTenant,
+  buscarVisitasParaConfirmacao,
   upsertAlertaOsCorretiva,
+  atualizarStatusVisitaParaEmExecucao,
 } from './osCorretivaAlertRepository.js';
 import {
   criarPayloadBaseAlerta,
@@ -13,8 +16,9 @@ import {
 import { onAlertasProcessados } from '../alertasEventService.js';
 
 const PONTOS_INICIO = [
-  { limiar: 10, prioridade: ALERT_PRIORIDADES.ALTA, label: '10min' },
-  { limiar: 60, prioridade: ALERT_PRIORIDADES.MEDIA, label: '1h' },
+  { limiar: 10,   prioridade: ALERT_PRIORIDADES.ALTA,  label: '10min' },
+  { limiar: 60,   prioridade: ALERT_PRIORIDADES.MEDIA, label: '1h'    },
+  { limiar: 1440, prioridade: ALERT_PRIORIDADES.BAIXA, label: '24h'   },
 ];
 
 const PONTOS_FIM = [
@@ -24,7 +28,7 @@ const PONTOS_FIM = [
 
 function equipTag(visita) {
   const eq = visita.osCorretiva?.equipamento;
-  return eq?.tag || eq?.nome || 'Equipamento';
+  return eq?.modelo || eq?.tag || 'Equipamento';
 }
 
 export async function gerarAlertasVisitaInicioProximo(tenantId, agora) {
@@ -48,7 +52,11 @@ export async function gerarAlertasVisitaInicioProximo(tenantId, agora) {
             id: alertaId,
             titulo: `Visita prestes a iniciar – ${os?.numeroOS || 'OS'}`,
             subtitulo: `${equipTag(visita)} | ${prestador} — início em ~${ponto.limiar}min`,
+            subtituloBase: `${equipTag(visita)} | ${prestador}`,
+            numeroOS: os?.numeroOS || null,
             data: visita.dataHoraInicioPrevista,
+            dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+            dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
             prioridade: ponto.prioridade,
             tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
             tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_INICIO_PROXIMO,
@@ -90,7 +98,11 @@ export async function gerarAlertasVisitaFimProximo(tenantId, agora) {
             id: alertaId,
             titulo: `Visita se aproximando do fim – ${os?.numeroOS || 'OS'}`,
             subtitulo: `${equipTag(visita)} | ${prestador} — encerra em ~${ponto.limiar}min`,
+            subtituloBase: `${equipTag(visita)} | ${prestador}`,
+            numeroOS: os?.numeroOS || null,
             data: visita.dataHoraFimPrevista,
+            dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+            dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
             prioridade: ponto.prioridade,
             tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
             tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_FIM_PROXIMO,
@@ -124,7 +136,11 @@ export async function gerarAlertaVisitaVencida(tenantId, visita) {
       id: alertaId,
       titulo: `Visita vencida – ${os?.numeroOS || 'OS'}`,
       subtitulo: `${equipTag(visita)} | ${prestador} — prazo venceu, registrar resultado`,
+      subtituloBase: `${equipTag(visita)} | ${prestador}`,
+      numeroOS: os?.numeroOS || null,
       data: visita.dataHoraFimPrevista,
+      dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+      dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
       prioridade: ALERT_PRIORIDADES.ALTA,
       tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
       tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_VENCIDA,
@@ -137,4 +153,82 @@ export async function gerarAlertaVisitaVencida(tenantId, visita) {
   }
 
   return 1;
+}
+
+export async function iniciarVisitasAutomaticamente(tenantId, agora) {
+  const visitas = await buscarVisitasParaInicioAutomatico(tenantId, agora);
+  let total = 0;
+
+  for (const visita of visitas) {
+    await atualizarStatusVisitaParaEmExecucao(tenantId, visita.id);
+
+    const os = visita.osCorretiva;
+    const prestador = visita.prestadorNome || 'Terceiro';
+    const alertaId = `os-corretiva-visita-iniciada-${tenantId}-${visita.id}`;
+
+    const result = await upsertAlertaOsCorretiva(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
+        titulo: `Visita iniciada – ${os?.numeroOS || 'OS'}`,
+        subtitulo: `${equipTag(visita)} | ${prestador} — técnico em campo`,
+        subtituloBase: `${equipTag(visita)} | ${prestador}`,
+        numeroOS: os?.numeroOS || null,
+        data: agora,
+        dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+        dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
+        prioridade: ALERT_PRIORIDADES.MEDIA,
+        tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
+        tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_INICIADA,
+        link: `/manutencoes/ocorrencia/${os?.id}`,
+      })
+    );
+
+    if (result.created || result.updated) {
+      await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+    }
+
+    total++;
+  }
+
+  return total;
+}
+
+export async function moverVisitasParaConfirmacao(tenantId, agora) {
+  const visitas = await buscarVisitasParaConfirmacao(tenantId, agora);
+  let total = 0;
+
+  for (const visita of visitas) {
+    const os = visita.osCorretiva;
+    const prestador = visita.prestadorNome || 'Terceiro';
+    const alertaId = `os-corretiva-visita-confirmacao-${tenantId}-${visita.id}`;
+
+    const result = await upsertAlertaOsCorretiva(
+      tenantId,
+      alertaId,
+      await criarPayloadBaseAlerta({
+        id: alertaId,
+        titulo: `Visita aguarda resultado – ${os?.numeroOS || 'OS'}`,
+        subtitulo: `${equipTag(visita)} | ${prestador} — prazo encerrado, registrar resultado`,
+        subtituloBase: `${equipTag(visita)} | ${prestador}`,
+        numeroOS: os?.numeroOS || null,
+        data: agora,
+        dataHoraAgendamentoInicio: visita.dataHoraInicioPrevista,
+        dataHoraAgendamentoFim: visita.dataHoraFimPrevista,
+        prioridade: ALERT_PRIORIDADES.ALTA,
+        tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
+        tipoEvento: ALERT_EVENTOS.OS_CORRETIVA_VISITA_CONFIRMACAO,
+        link: `/manutencoes/ocorrencia/${os?.id}`,
+      })
+    );
+
+    if (result.created || result.updated) {
+      await onAlertasProcessados({ tenantsAfetados: [tenantId] });
+    }
+
+    total++;
+  }
+
+  return total;
 }

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import SeguroCard from './SeguroCard';
 
-function SegurosListSection({ seguros, getStatus, actions }) {
+function SegurosListSection({ seguros, getStatus, actions, isAdmin }) {
   const [expandedId, setExpandedId] = useState(null);
 
   const handleToggle = (id) => {
@@ -19,7 +19,10 @@ function SegurosListSection({ seguros, getStatus, actions }) {
           isExpanded={expandedId === s.id}
           onToggle={handleToggle}
           onEdit={() => actions.edit(s.id)}
-          onDelete={() => actions.delete(s)}
+          onRenovar={() => actions.renovar?.(s.id)}
+          onCancelar={(motivo) => actions.cancelar(s.id, motivo)}
+          onExcluir={() => actions.excluir(s.id)}
+          isAdmin={isAdmin}
         />
       ))}
     </div>

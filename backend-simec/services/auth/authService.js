@@ -85,6 +85,7 @@ function buildAuthResponse(usuario, accessToken) {
       email: usuario.email,
       role: usuario.role,
       tenantId: usuario.tenantId,
+      timezone: usuario.timezone || null,
     },
     tenant: {
       id: usuario.tenant.id,

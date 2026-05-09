@@ -6,6 +6,7 @@ import express from 'express';
 import {
   buscarManutencoesRealizadas,
   buscarInventarioEquipamentos,
+  buscarEquipamentosComServicos,
 } from '../services/reportQueryService.js';
 import { proteger } from '../middleware/authMiddleware.js';
 
@@ -24,6 +25,7 @@ router.post('/gerar', async (req, res) => {
     tipoManutencao,
     fabricante,
     status,
+    tipo,
   } = req.body;
 
   const tenantId = req.usuario?.tenantId;
@@ -48,6 +50,17 @@ router.post('/gerar', async (req, res) => {
       dadosRelatorio = await buscarInventarioEquipamentos({
         tenantId,
         unidadeId: unidadeId || null,
+        fabricante: fabricante ? String(fabricante).trim() : null,
+        status: status ? String(status).trim() : null,
+      });
+    }
+
+    // EQUIPAMENTOS COM SERVIÇOS VINCULADOS
+    else if (tipoRelatorio === 'equipamentosServicos') {
+      dadosRelatorio = await buscarEquipamentosComServicos({
+        tenantId,
+        unidadeId: unidadeId || null,
+        tipo: tipo ? String(tipo).trim() : null,
         fabricante: fabricante ? String(fabricante).trim() : null,
         status: status ? String(status).trim() : null,
       });

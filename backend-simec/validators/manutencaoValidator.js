@@ -109,8 +109,8 @@ export const manutencaoSchema = z
       }
     }
 
-    // Preventiva/Calibracao/Inspecao exigem agendamento
-    if (['Preventiva', 'Calibracao', 'Inspecao'].includes(data.tipo) && !temAgendamento) {
+    // Preventiva/Calibracao/Inspecao exigem data de agendamento
+    if (['Preventiva', 'Calibracao', 'Inspecao'].includes(data.tipo) && !data.agendamentoDataInicioLocal) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['agendamentoDataInicioLocal'],

@@ -68,6 +68,7 @@ router.post('/chat', proteger, async (req, res) => {
       usuarioId,
       usuarioNome,
       tenantId,
+      tenantTimezone: req.usuario.tenant?.timezone || 'UTC',
       requestId,
     });
 

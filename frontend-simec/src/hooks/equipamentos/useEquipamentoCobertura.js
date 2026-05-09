@@ -58,12 +58,12 @@ export function useEquipamentoCobertura(equipamento) {
 
     try {
       const [contratosData, segurosData] = await Promise.all([
-        getContratos(),
-        getSeguros(),
+        getContratos({ pageSize: 100 }),
+        getSeguros({ pageSize: 100 }),
       ]);
 
-      setContratos(Array.isArray(contratosData) ? contratosData : []);
-      setSeguros(Array.isArray(segurosData) ? segurosData : []);
+      setContratos(Array.isArray(contratosData?.data) ? contratosData.data : []);
+      setSeguros(Array.isArray(segurosData?.data) ? segurosData.data : []);
     } catch (err) {
       const mensagem = getErrorMessage(
         err,

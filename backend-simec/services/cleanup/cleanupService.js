@@ -118,7 +118,7 @@ export async function limparSegurosAntigos() {
 
   const result = await prisma.seguro.deleteMany({
     where: {
-      status: { in: ['Expirado', 'Cancelado'] },
+      status: { in: ['Expirado', 'Cancelado', 'Substituido'] },
       dataFim: { lt: corte },
     },
   });

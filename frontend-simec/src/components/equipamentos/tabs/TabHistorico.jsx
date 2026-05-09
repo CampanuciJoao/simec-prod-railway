@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faHistory,
@@ -6,6 +6,7 @@ import {
   faFilter,
   faCalendarDay,
   faRotateLeft,
+  faHeartPulse,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -25,6 +26,7 @@ import {
 } from '@/utils/equipamentos/historicoTimelineUtils';
 
 import HistoricoTimelineList from '@/components/equipamentos/HistoricoTimelineList';
+import TabHistoricoSaude from '@/components/equipamentos/tabs/TabHistoricoSaude';
 
 import {
   Button,
@@ -36,7 +38,29 @@ import {
   StatusBadge,
 } from '@/components/ui';
 
-function TabHistorico({ equipamento }) {
+// ─── Sub-tab pill ──────────────────────────────────────────────────────────────
+
+function SubTabPill({ active, onClick, icon, children }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium transition-colors"
+      style={{
+        backgroundColor: active ? 'var(--brand-primary)' : 'var(--bg-surface-soft)',
+        color:           active ? '#fff'                  : 'var(--text-secondary)',
+        border: `1px solid ${active ? 'var(--brand-primary)' : 'var(--border-soft)'}`,
+        cursor: 'pointer',
+      }}
+    >
+      <FontAwesomeIcon icon={icon} />
+      {children}
+    </button>
+  );
+}
+
+// ─── Aba: Historico do ativo ───────────────────────────────────────────────────
+
+function TabHistoricoAtivo({ equipamento }) {
   const { addToast } = useToast();
   const { isAdmin } = useAuth();
 
@@ -107,16 +131,11 @@ function TabHistorico({ equipamento }) {
 
   const { linhaDoTempo, totalFiltrado } =
     useMemo(
-      () =>
-        buildHistoricoTimeline({
-          eventos,
-        }),
+      () => buildHistoricoTimeline({ eventos }),
       [eventos]
     );
 
-  const temFiltroAtivo = Boolean(
-    dataInicio || dataFim || filtroTipo !== 'Todos'
-  );
+  const temFiltroAtivo = Boolean(dataInicio || dataFim || filtroTipo !== 'Todos');
 
   const handleSetHoje = (campo) => {
     const hoje = new Date().toISOString().split('T')[0];
@@ -135,10 +154,9 @@ function TabHistorico({ equipamento }) {
       equipamento.id,
       buildQueryParams({}),
       `auditoria_${equipamento?.tag || 'Equipamento'}.pdf`
-    )
-      .catch(() => {
-        addToast('Erro ao gerar o PDF do historico.', 'error');
-      });
+    ).catch(() => {
+      addToast('Erro ao gerar o PDF do historico.', 'error');
+    });
   };
 
   const handleDeleteEvento = async (eventoId) => {
@@ -437,6 +455,43 @@ function TabHistorico({ equipamento }) {
             ) : null}
           </div>
         ) : null}
+    </div>
+  );
+}
+
+// ─── Componente principal ──────────────────────────────────────────────────────
+
+function TabHistorico({ equipamento }) {
+  const temMonitoramentoSaude =
+    Boolean(equipamento?.gehcAssetId) ||
+    (equipamento?._count?.gehcSaudeSnapshots ?? 0) > 0;
+  const [subAba, setSubAba] = useState('historico');
+
+  if (!temMonitoramentoSaude) {
+    return <TabHistoricoAtivo equipamento={equipamento} />;
+  }
+
+  return (
+    <div className="space-y-5">
+      <div className="flex gap-2 flex-wrap">
+        <SubTabPill
+          active={subAba === 'historico'}
+          onClick={() => setSubAba('historico')}
+          icon={faHistory}
+        >
+          Historico do ativo
+        </SubTabPill>
+        <SubTabPill
+          active={subAba === 'saude'}
+          onClick={() => setSubAba('saude')}
+          icon={faHeartPulse}
+        >
+          Saude do ativo
+        </SubTabPill>
+      </div>
+
+      {subAba === 'historico' && <TabHistoricoAtivo equipamento={equipamento} />}
+      {subAba === 'saude'     && <TabHistoricoSaude equipamentoId={equipamento.id} />}
     </div>
   );
 }

@@ -8,14 +8,13 @@ import {
   buscarOsPorId,
   buscarOsResumo,
   listarOsCorretivas,
-  existeOsAbertaParaEquipamento,
   contarOsDoTenant,
-  criarOsCorretiva,
   atualizarOsCorretiva,
   criarNotaOsCorretiva,
   criarVisitaTerceiro,
   buscarVisitaPorId,
   atualizarVisita,
+  buscarConflitoVisitaPorEquipamento,
 } from './osCorretivaRepository.js';
 
 import {
@@ -81,16 +80,6 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
 
   if (equipamento.status === 'Desativado') {
     return { ok: false, status: 422, message: 'Não é possível abrir OS para equipamento desativado.' };
-  }
-
-  const osAberta = await existeOsAbertaParaEquipamento({ tenantId, equipamentoId: v.data.equipamentoId });
-  if (osAberta) {
-    return {
-      ok: false,
-      status: 409,
-      message: `Já existe uma OS Corretiva aberta para este equipamento: ${osAberta.numeroOS}.`,
-      conflito: { numeroOS: osAberta.numeroOS, id: osAberta.id },
-    };
   }
 
   const total = await contarOsDoTenant(tenantId);
@@ -207,6 +196,34 @@ export async function agendarVisitaTerceiroService({ tenantId, usuarioId, osId, 
     return { ok: false, status: 422, message: 'Não é possível agendar visita em OS concluída.' };
   }
 
+  const inicioUtc = new Date(v.data.dataHoraInicioPrevista);
+  const fimUtc = new Date(v.data.dataHoraFimPrevista);
+
+  const conflito = await buscarConflitoVisitaPorEquipamento({
+    tenantId,
+    equipamentoId: os.equipamentoId,
+    inicioUtc,
+    fimUtc,
+  });
+
+  if (conflito) {
+    const inicio = conflito.dataHoraInicioPrevista.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const fim = conflito.dataHoraFimPrevista.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const data = conflito.dataHoraInicioPrevista.toLocaleDateString('pt-BR');
+    return {
+      ok: false,
+      status: 409,
+      message: `Já existe uma visita agendada para este equipamento nesse horário (${conflito.osCorretiva.numeroOS} — ${conflito.prestadorNome}, ${data} das ${inicio} às ${fim}). Por favor, escolha outro horário.`,
+      conflito: {
+        visitaId: conflito.id,
+        numeroOS: conflito.osCorretiva.numeroOS,
+        prestadorNome: conflito.prestadorNome,
+        dataHoraInicioPrevista: conflito.dataHoraInicioPrevista,
+        dataHoraFimPrevista: conflito.dataHoraFimPrevista,
+      },
+    };
+  }
+
   const visita = await criarVisitaTerceiro({
     tenantId,
     osId,
@@ -307,6 +324,8 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
   if (!os) return { ok: false, status: 404, message: 'OS não encontrada.' };
 
   if (v.data.resultado === 'Operante') {
+    const dataFimReal = v.data.dataHoraFimReal ? new Date(v.data.dataHoraFimReal) : new Date();
+
     // Encerra a visita e a OS
     await prisma.$transaction(async (tx) => {
       await tx.visitaTerceiro.update({
@@ -315,7 +334,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
           status: 'Concluida',
           resultado: 'Operante',
           observacoes: v.data.observacoes || null,
-          dataHoraFimReal: new Date(),
+          dataHoraFimReal: dataFimReal,
         },
       });
 
@@ -323,7 +342,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
         where: { tenantId_id: { tenantId, id: osId } },
         data: {
           status: 'Concluida',
-          dataHoraConclusao: new Date(),
+          dataHoraConclusao: dataFimReal,
           observacoesFinais: v.data.observacoes || null,
         },
       });
@@ -449,6 +468,71 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     entidade: 'OsCorretiva',
     entidadeId: osId,
     detalhes: `OS ${os.numeroOS} concluída. Equipamento retornou a Operante.`,
+  });
+
+  await reprocessarAlertas(tenantId);
+
+  const completa = await buscarOsPorId({ tenantId, osId });
+  return { ok: true, data: completa };
+}
+
+// ─── Cancelar OS ─────────────────────────────────────────────────────────────
+
+export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, motivoCancelamento }) {
+  if (!motivoCancelamento?.trim()) {
+    return { ok: false, status: 400, message: 'O motivo do cancelamento é obrigatório.' };
+  }
+
+  const os = await buscarOsResumo({ tenantId, osId });
+  if (!os) return { ok: false, status: 404, message: 'OS Corretiva não encontrada.' };
+
+  if (os.status === 'Concluida') {
+    return { ok: false, status: 422, message: 'Não é possível cancelar uma OS já concluída.' };
+  }
+  if (os.status === 'Cancelada') {
+    return { ok: false, status: 422, message: 'Esta OS já está cancelada.' };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.osCorretiva.update({
+      where: { tenantId_id: { tenantId, id: osId } },
+      data: {
+        status: 'Cancelada',
+        motivoCancelamento: motivoCancelamento.trim(),
+        dataHoraCancelamento: new Date(),
+      },
+    });
+
+    await tx.equipamento.update({
+      where: { id: os.equipamentoId },
+      data: { status: 'Operante' },
+    });
+  });
+
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: os.equipamentoId,
+    tipoEvento: 'os_corretiva_cancelada',
+    categoria: 'manutencao',
+    subcategoria: os.tipo,
+    titulo: `OS ${os.numeroOS} cancelada`,
+    descricao: motivoCancelamento.trim(),
+    origem: 'usuario',
+    status: 'Cancelada',
+    impactaAnalise: false,
+    referenciaId: osId,
+    referenciaTipo: 'os_corretiva',
+    metadata: { motivoCancelamento: motivoCancelamento.trim() },
+    dataEvento: new Date(),
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDIÇÃO',
+    entidade: 'OsCorretiva',
+    entidadeId: osId,
+    detalhes: `OS ${os.numeroOS} cancelada. Motivo: ${motivoCancelamento.trim()}. Equipamento revertido para Operante.`,
   });
 
   await reprocessarAlertas(tenantId);

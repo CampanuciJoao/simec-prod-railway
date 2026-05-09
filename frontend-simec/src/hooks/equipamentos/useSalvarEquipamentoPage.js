@@ -62,7 +62,7 @@ export function useSalvarEquipamentoPage() {
         addToast('Equipamento cadastrado com sucesso!', 'success');
       }
 
-      navigate('/equipamentos');
+      navigate('/equipamentos', { state: { restoreFilters: true } });
       return true;
     } catch (apiError) {
       const errorMessage = getErrorMessage(
@@ -79,7 +79,7 @@ export function useSalvarEquipamentoPage() {
   };
 
   const goBackToEquipamentos = useCallback(() => {
-    navigate('/equipamentos');
+    navigate('/equipamentos', { state: { restoreFilters: true } });
   }, [navigate]);
 
   return {

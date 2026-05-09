@@ -56,11 +56,32 @@ export function pareceSeguro(msg) {
   ]);
 }
 
+export function pareceOsCorretiva(msg) {
+  return contemAlgumTermo(msg, [
+    'ocorrencia',
+    'ocorrência',
+    'os corretiva',
+    'manutencao corretiva',
+    'manutenção corretiva',
+    'abrir ocorrencia',
+    'registrar ocorrencia',
+    'equipamento parou',
+    'equipamento quebrou',
+    'agendar visita',
+    'visita tecnica',
+    'visita técnica',
+    'visita de terceiro',
+    'prestador',
+  ]);
+}
+
 export function ajustarIntencaoPorHeuristica(intencao, msgMinuscula) {
   let intencaoFinal = intencao;
 
   if (pareceSeguro(msgMinuscula)) {
     intencaoFinal = 'SEGURO';
+  } else if (pareceOsCorretiva(msgMinuscula)) {
+    intencaoFinal = 'OS_CORRETIVA';
   } else if (pareceAgendamento(msgMinuscula)) {
     intencaoFinal = 'AGENDAR_MANUTENCAO';
   } else if (pareceConsultaRelatorio(msgMinuscula)) {

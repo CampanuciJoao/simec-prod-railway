@@ -69,7 +69,7 @@ export function buscarResumoDashboard({
     prisma.osCorretiva.findMany({
       where: {
         tenantId,
-        status: { not: 'Concluida' },
+        status: { notIn: ['Concluida', 'Cancelada'] },
       },
       orderBy: { dataHoraAbertura: 'desc' },
       take: 8,

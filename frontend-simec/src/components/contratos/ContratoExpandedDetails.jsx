@@ -1,18 +1,18 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faHospital,
   faMicrochip,
   faPaperclip,
-  faUpload,
-  faFilePdf,
-  faExternalLinkAlt,
   faEdit,
   faTrashAlt,
+  faFilePdf,
+  faSpinner,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { Button } from '@/components/ui';
+import CompactAttachmentList from '@/components/ui/feedback/CompactAttachmentList';
 
 const API_BASE_URL =
   import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
@@ -22,15 +22,51 @@ function ContratoExpandedDetails({
   uploadingId,
   onUploadArquivo,
   onDeleteAnexo,
+  exportandoPdfId,
+  onExportarPdf,
   onEdit,
   onDelete,
 }) {
+  const handleUpload = useCallback(
+    (file) => onUploadArquivo(contrato.id, file),
+    [contrato.id, onUploadArquivo]
+  );
+
+  const handleDelete = useCallback(
+    (attachment) => onDeleteAnexo(contrato.id, attachment.id),
+    [contrato.id, onDeleteAnexo]
+  );
+
+  const getAttachmentUrl = useCallback(
+    (attachment) => `${API_BASE_URL}/${attachment.path}`,
+    []
+  );
+
   return (
-    <div className="border-t border-slate-200 bg-slate-50/70 p-5">
+    <div
+      className="border-t p-5"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface-subtle)',
+      }}
+    >
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_1fr]">
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <FontAwesomeIcon icon={faHospital} className="text-slate-500" />
+        {/* Unidades cobertas */}
+        <div
+          className="rounded-xl border p-4"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <h5
+            className="mb-3 flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <FontAwesomeIcon
+              icon={faHospital}
+              style={{ color: 'var(--text-muted)' }}
+            />
             Unidades cobertas
           </h5>
 
@@ -39,22 +75,40 @@ function ContratoExpandedDetails({
               contrato.unidadesCobertas.map((unidade) => (
                 <span
                   key={unidade.id}
-                  className="inline-flex rounded-full bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700 shadow-sm ring-1 ring-slate-200"
+                  className="inline-flex rounded-full px-3 py-1 text-sm font-medium shadow-sm ring-1"
+                  style={{
+                    backgroundColor: 'var(--bg-surface-soft)',
+                    color: 'var(--text-secondary)',
+                    ringColor: 'var(--border-soft)',
+                  }}
                 >
                   {unidade.nomeSistema}
                 </span>
               ))
             ) : (
-              <p className="text-sm italic text-slate-400">
+              <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>
                 Nenhuma unidade vinculada.
               </p>
             )}
           </div>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4">
-          <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-            <FontAwesomeIcon icon={faMicrochip} className="text-slate-500" />
+        {/* Equipamentos vinculados */}
+        <div
+          className="rounded-xl border p-4"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <h5
+            className="mb-3 flex items-center gap-2 text-sm font-semibold"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            <FontAwesomeIcon
+              icon={faMicrochip}
+              style={{ color: 'var(--text-muted)' }}
+            />
             Equipamentos vinculados ({contrato.equipamentosCobertos?.length || 0})
           </h5>
 
@@ -64,20 +118,34 @@ function ContratoExpandedDetails({
                 {contrato.equipamentosCobertos.map((equipamento) => (
                   <div
                     key={equipamento.id}
-                    className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                    className="flex items-center justify-between rounded-lg border px-3 py-2"
+                    style={{
+                      backgroundColor: 'var(--bg-surface-soft)',
+                      borderColor: 'var(--border-soft)',
+                    }}
                   >
-                    <span className="text-sm font-medium text-slate-800">
+                    <span
+                      className="text-sm font-medium"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
                       {equipamento.modelo}
                     </span>
 
-                    <span className="rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                    <span
+                      className="rounded-full px-2 py-0.5 text-xs font-semibold ring-1"
+                      style={{
+                        backgroundColor: 'var(--bg-elevated)',
+                        color: 'var(--text-secondary)',
+                        ringColor: 'var(--border-soft)',
+                      }}
+                    >
                       {equipamento.tag}
                     </span>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-sm italic text-slate-400">
+              <p className="text-sm italic" style={{ color: 'var(--text-muted)' }}>
                 Sem equipamentos específicos.
               </p>
             )}
@@ -85,71 +153,52 @@ function ContratoExpandedDetails({
         </div>
       </div>
 
-      <div className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
-        <h5 className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-800">
-          <FontAwesomeIcon icon={faPaperclip} className="text-slate-500" />
+      {/* Documentos */}
+      <div
+        className="mt-5 rounded-xl border p-4"
+        style={{
+          backgroundColor: 'var(--bg-surface)',
+          borderColor: 'var(--border-soft)',
+        }}
+      >
+        <h5
+          className="mb-3 flex items-center gap-2 text-sm font-semibold"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          <FontAwesomeIcon
+            icon={faPaperclip}
+            style={{ color: 'var(--text-muted)' }}
+          />
           Documentos do contrato
         </h5>
 
-        <div className="flex flex-col gap-3">
-          {contrato.anexos?.length > 0 ? (
-            contrato.anexos.map((anexo) => (
-              <div
-                key={anexo.id}
-                className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
-              >
-                <a
-                  href={`${API_BASE_URL}/${anexo.path}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 text-sm font-semibold text-blue-600 no-underline hover:underline"
-                >
-                  <FontAwesomeIcon icon={faFilePdf} />
-                  <span>{anexo.nomeOriginal}</span>
-                  <FontAwesomeIcon icon={faExternalLinkAlt} size="xs" />
-                </a>
-
-                <Button
-                  type="button"
-                  variant="danger"
-                  size="sm"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteAnexo(contrato.id, anexo.id);
-                  }}
-                >
-                  <FontAwesomeIcon icon={faTrashAlt} />
-                  Remover
-                </Button>
-              </div>
-            ))
-          ) : (
-            <p className="text-sm italic text-slate-400">
-              Nenhum documento anexado.
-            </p>
-          )}
-
-          <div>
-            <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-              <FontAwesomeIcon
-                icon={faUpload}
-                spin={uploadingId === contrato.id}
-              />
-              {uploadingId === contrato.id
-                ? 'Enviando...'
-                : 'Enviar documento'}
-
-              <input
-                type="file"
-                hidden
-                onChange={(e) => onUploadArquivo(contrato.id, e)}
-              />
-            </label>
-          </div>
-        </div>
+        <CompactAttachmentList
+          attachments={contrato.anexos || []}
+          uploadLabel="clique para selecionar"
+          emptyMessage="Nenhum documento anexado."
+          isUploading={uploadingId === contrato.id}
+          onUpload={handleUpload}
+          onDelete={handleDelete}
+          getAttachmentUrl={getAttachmentUrl}
+        />
       </div>
 
       <div className="mt-5 flex justify-end gap-2">
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => onExportarPdf(contrato)}
+          disabled={exportandoPdfId === contrato.id}
+          title="Exportar contrato em PDF"
+        >
+          <FontAwesomeIcon
+            icon={exportandoPdfId === contrato.id ? faSpinner : faFilePdf}
+            spin={exportandoPdfId === contrato.id}
+          />
+          {exportandoPdfId === contrato.id ? 'Gerando...' : 'Exportar PDF'}
+        </Button>
+
         <Button
           type="button"
           variant="secondary"
@@ -179,6 +228,8 @@ ContratoExpandedDetails.propTypes = {
   uploadingId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   onUploadArquivo: PropTypes.func.isRequired,
   onDeleteAnexo: PropTypes.func.isRequired,
+  exportandoPdfId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  onExportarPdf: PropTypes.func.isRequired,
   onEdit: PropTypes.func.isRequired,
   onDelete: PropTypes.func.isRequired,
 };

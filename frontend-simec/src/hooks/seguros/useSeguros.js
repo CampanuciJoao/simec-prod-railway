@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import debounce from 'lodash/debounce';
 
-import { getSeguros, getUnidades, deleteSeguro } from '../../services/api';
+import { getSeguros, getUnidades, deleteSeguro, cancelarSeguro } from '../../services/api';
 
 export function getNomeUnidadeSeguro(seguro) {
   if (typeof seguro?.unidade === 'string') return seguro.unidade;
@@ -101,6 +101,15 @@ export function useSeguros() {
     [fetchPage]
   );
 
+  const cancelarItem = useCallback(
+    async (id, motivo) => {
+      await cancelarSeguro(id, motivo);
+      const { page, search, filtros: filt } = paramsRef.current;
+      await fetchPage(page, search, filt);
+    },
+    [fetchPage]
+  );
+
   return {
     seguros,
     metricas,
@@ -114,6 +123,7 @@ export function useSeguros() {
     pagination,
     goToPage,
     removerSeguro,
+    cancelarItem,
     getNomeUnidade: getNomeUnidadeSeguro,
     getStatusDinamico: getStatusDinamicoSeguro,
   };

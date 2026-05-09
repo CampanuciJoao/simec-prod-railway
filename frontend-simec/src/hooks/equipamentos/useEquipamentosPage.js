@@ -1,11 +1,33 @@
-import { useMemo, useCallback, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useMemo, useCallback, useState, useEffect } from 'react';
+import { useNavigate, useNavigationType, useLocation } from 'react-router-dom';
 import { useToast } from '../../contexts/ToastContext';
 import { useEquipamentos } from './useEquipamentos';
+
+const SESSION_KEY = 'equipamentos_filtros';
+
+function lerFiltrosSalvos() {
+  try {
+    const raw = sessionStorage.getItem(SESSION_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 export function useEquipamentosPage() {
   const navigate = useNavigate();
   const { addToast } = useToast();
+  const navigationType = useNavigationType();
+  const location = useLocation();
+
+  const initialState = useMemo(() => {
+    const shouldRestore =
+      navigationType === 'POP' || location.state?.restoreFilters === true;
+    if (shouldRestore) return lerFiltrosSalvos() ?? {};
+    sessionStorage.removeItem(SESSION_KEY);
+    return {};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const {
     equipamentos,
@@ -21,7 +43,14 @@ export function useEquipamentosPage() {
     controles,
     removerEquipamento,
     atualizarStatusLocalmente,
-  } = useEquipamentos();
+  } = useEquipamentos(initialState);
+
+  useEffect(() => {
+    sessionStorage.setItem(
+      SESSION_KEY,
+      JSON.stringify({ filtros: controles.filtros, searchTerm: controles.searchTerm })
+    );
+  }, [controles.filtros, controles.searchTerm]);
 
   const [equipamentoParaExcluir, setEquipamentoParaExcluir] = useState(null);
 

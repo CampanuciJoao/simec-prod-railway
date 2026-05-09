@@ -1,12 +1,11 @@
-function formatarDataHoraBR(data) {
-  if (!data) return 'N/A';
-  return new Date(data).toLocaleString('pt-BR');
-}
+import { formatarDataHoraTenant } from '../../../shared/dateFormatter.js';
 
 export function montarResumoUltima(manutencao, filtros, contexto = {}) {
   if (!manutencao) {
     return 'Não encontrei manutenção correspondente com os filtros informados.';
   }
+
+  const timezone = contexto.tenantTimezone || 'UTC';
 
   const unidadeNome =
     manutencao?.equipamento?.unidade?.nomeSistema ||
@@ -25,7 +24,7 @@ export function montarResumoUltima(manutencao, filtros, contexto = {}) {
     manutencao.dataConclusao ||
     manutencao.createdAt;
 
-  return `A última ${manutencao.tipo?.toLowerCase()} na unidade ${unidadeNome} foi a OS ${manutencao.numeroOS}, em ${formatarDataHoraBR(dataReferencia)}, no equipamento ${equipamentoNome} (TAG ${tag}), com status ${manutencao.status}.`;
+  return `A última ${manutencao.tipo?.toLowerCase()} na unidade ${unidadeNome} foi a OS ${manutencao.numeroOS}, em ${formatarDataHoraTenant(dataReferencia, timezone)}, no equipamento ${equipamentoNome} (TAG ${tag}), com status ${manutencao.status}.`;
 }
 
 export function montarResumoLista(manutencoes, filtros, contexto = {}) {

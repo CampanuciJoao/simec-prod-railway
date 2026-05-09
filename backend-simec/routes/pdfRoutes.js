@@ -6,6 +6,7 @@ import {
   gerarPdfOcorrenciaBuffer,
   gerarPdfOSManutencaoBuffer,
   gerarPdfRelatorioBuffer,
+  gerarPdfUtilizacaoGehcBuffer,
 } from '../services/pdf/pdfDocumentService.js';
 import {
   obterDadosPdfBI,
@@ -23,15 +24,17 @@ import {
   obterDadosPdfOsCorretiva,
   gerarPdfOsCorretivaBuffer,
 } from '../services/pdf/osCorretivaPdfService.js';
+import { obterDadosPdfContrato } from '../services/pdf/contratosPdfService.js';
+import { gerarPdfContratoBuffer } from '../services/pdf/pdfDocumentService.js';
 
 const router = express.Router();
 
 router.use(proteger);
 
-function getPdfOptions(req) {
+function getPdfOptions(req, unidadeTimezone = null) {
   return {
     locale: req.usuario?.tenant?.locale || 'pt-BR',
-    timeZone: req.usuario?.tenant?.timezone || 'America/Cuiaba',
+    timeZone: unidadeTimezone || req.usuario?.tenant?.timezone || 'UTC',
   };
 }
 
@@ -83,7 +86,10 @@ router.get('/manutencao/:id', async (req, res) => {
       tenantId: req.usuario.tenantId,
       manutencaoId: req.params.id,
     });
-    const buffer = await gerarPdfOSManutencaoBuffer(manutencao, getPdfOptions(req));
+    const buffer = await gerarPdfOSManutencaoBuffer(
+      manutencao,
+      getPdfOptions(req, manutencao.equipamento?.unidade?.timezone)
+    );
     const fileName = `OS_${manutencao.numeroOS || 'SEM_NUMERO'}.pdf`;
 
     return sendPdf(res, buffer, fileName);
@@ -132,7 +138,10 @@ router.get('/ocorrencia/:id', async (req, res) => {
       tenantId: req.usuario.tenantId,
       ocorrenciaId: req.params.id,
     });
-    const buffer = await gerarPdfOcorrenciaBuffer(ocorrencia, getPdfOptions(req));
+    const buffer = await gerarPdfOcorrenciaBuffer(
+      ocorrencia,
+      getPdfOptions(req, ocorrencia.equipamento?.unidade?.timezone)
+    );
     const tag = ocorrencia.equipamento?.tag || 'EQ';
     const suffix = ocorrencia.id.slice(-6).toUpperCase();
     return sendPdf(res, buffer, `ocorrencia_${tag}_${suffix}.pdf`);
@@ -154,7 +163,7 @@ router.get('/equipamentos/:id/historico', async (req, res) => {
     });
     const buffer = await gerarPdfHistoricoEquipamentoBuffer(
       payload,
-      getPdfOptions(req)
+      getPdfOptions(req, payload.equipamento?.unidadeTimezone)
     );
     const fileName = `auditoria_${payload?.equipamento?.tag || 'Equipamento'}.pdf`;
 
@@ -186,7 +195,10 @@ router.get('/os-corretiva/:id', async (req, res) => {
       tenantId: req.usuario.tenantId,
       osId: req.params.id,
     });
-    const buffer = await gerarPdfOsCorretivaBuffer(os, getPdfOptions(req));
+    const buffer = await gerarPdfOsCorretivaBuffer(
+      os,
+      getPdfOptions(req, os.equipamento?.unidade?.timezone)
+    );
     return sendPdf(res, buffer, `OS_CORT_${os.numeroOS || req.params.id}.pdf`);
   } catch (error) {
     console.error('[PDF_OS_CORRETIVA_ERROR]', error);
@@ -194,6 +206,119 @@ router.get('/os-corretiva/:id', async (req, res) => {
       return res.status(404).json({ message: 'OS Corretiva não encontrada.' });
     }
     return res.status(500).json({ message: 'Erro ao gerar PDF da OS Corretiva.' });
+  }
+});
+
+router.get('/contrato/:id', async (req, res) => {
+  try {
+    const contrato = await obterDadosPdfContrato({
+      tenantId: req.usuario.tenantId,
+      contratoId: req.params.id,
+    });
+    const buffer = await gerarPdfContratoBuffer(contrato, getPdfOptions(req));
+    const suffix = contrato.numeroContrato || req.params.id.slice(-6).toUpperCase();
+    return sendPdf(res, buffer, `contrato_${suffix}.pdf`);
+  } catch (error) {
+    console.error('[PDF_CONTRATO_ERROR]', error);
+    if (error.message === 'CONTRATO_NAO_ENCONTRADO') {
+      return res.status(404).json({ message: 'Contrato não encontrado.' });
+    }
+    if (error.message === 'CONTRATO_ID_INVALIDO') {
+      return res.status(400).json({ message: 'ID do contrato inválido.' });
+    }
+    return res.status(500).json({ message: 'Erro ao gerar PDF do contrato.' });
+  }
+});
+
+// ─── GET /pdfs/gehc-utilizacao ───────────────────────────────────────────────
+router.get('/gehc-utilizacao', async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const meses = Math.min(Number(req.query.meses) || 12, 36);
+
+    const inicio = new Date();
+    inicio.setMonth(inicio.getMonth() - meses);
+    inicio.setDate(1);
+    inicio.setHours(0, 0, 0, 0);
+
+    const registros = await prisma.gehcUtilizacaoMensal.findMany({
+      where: { tenantId, mesReferencia: { gte: inicio } },
+      orderBy: { mesReferencia: 'asc' },
+      include: {
+        equipamento: {
+          select: {
+            id: true, apelido: true, modelo: true, tag: true, unidadeId: true,
+            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
+          },
+        },
+      },
+    });
+
+    function diasNoMes(date) {
+      return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+
+    const unidadeMap = new Map();
+    for (const r of registros) {
+      const eq = r.equipamento;
+      if (!eq) continue;
+      const uid = eq.unidadeId;
+      if (!unidadeMap.has(uid)) {
+        unidadeMap.set(uid, {
+          nome: eq.unidade?.nomeFantasia || eq.unidade?.nomeSistema || uid,
+          equipamentos: new Map(),
+        });
+      }
+      const uNode = unidadeMap.get(uid);
+      if (!uNode.equipamentos.has(eq.id)) {
+        uNode.equipamentos.set(eq.id, { nome: eq.apelido || eq.modelo || eq.tag, tag: eq.tag, meses: [] });
+      }
+      const dias = diasNoMes(r.mesReferencia);
+      uNode.equipamentos.get(eq.id).meses.push({
+        mes: r.mesReferencia.toISOString().slice(0, 7),
+        exames: r.examesTotal ?? null,
+        pacientes: r.pacientesTotal ?? null,
+        duracaoMedia: r.duracaoMediaMin ?? null,
+        uptime: r.uptimeContrato ?? null,
+        mediaExamesDia: r.examesTotal != null ? +(r.examesTotal / dias).toFixed(1) : null,
+      });
+    }
+
+    const unidades = [...unidadeMap.values()].map(u => {
+      const equipamentos = [...u.equipamentos.values()].map(eq => {
+        const totalExames = eq.meses.reduce((a, m) => a + (m.exames ?? 0), 0);
+        const totalPacientes = eq.meses.reduce((a, m) => a + (m.pacientes ?? 0), 0);
+        const mediasValidas = eq.meses.filter(m => m.mediaExamesDia != null);
+        const uptimes = eq.meses.filter(m => m.uptime != null).map(m => m.uptime);
+        return {
+          ...eq,
+          totalExames, totalPacientes,
+          mediaExamesDia: mediasValidas.length ? +(mediasValidas.reduce((a, m) => a + m.mediaExamesDia, 0) / mediasValidas.length).toFixed(1) : null,
+          uptimeMedio: uptimes.length ? +(uptimes.reduce((a, v) => a + v, 0) / uptimes.length).toFixed(1) : null,
+        };
+      });
+      const totalExames = equipamentos.reduce((a, e) => a + e.totalExames, 0);
+      const totalPacientes = equipamentos.reduce((a, e) => a + e.totalPacientes, 0);
+      const uptimes = equipamentos.map(e => e.uptimeMedio).filter(v => v != null);
+      return {
+        nome: u.nome, totalExames, totalPacientes,
+        uptimeMedio: uptimes.length ? +(uptimes.reduce((a, v) => a + v, 0) / uptimes.length).toFixed(1) : null,
+        equipamentos,
+      };
+    });
+
+    const totais = {
+      exames: unidades.reduce((a, u) => a + u.totalExames, 0),
+      pacientes: unidades.reduce((a, u) => a + u.totalPacientes, 0),
+      uptimeMedio: unidades.map(u => u.uptimeMedio).filter(v => v != null).reduce((a, v, _i, arr) => a + v / arr.length, 0) || null,
+    };
+
+    const buffer = await gerarPdfUtilizacaoGehcBuffer({ periodo: { meses }, totais, unidades }, getPdfOptions(req));
+    const ano = new Date().getFullYear();
+    return sendPdf(res, buffer, `utilizacao_ge_${ano}.pdf`);
+  } catch (err) {
+    console.error('[PDF_GEHC_UTILIZACAO]', err.message);
+    return res.status(500).json({ message: 'Erro ao gerar PDF de utilização GE.' });
   }
 });
 

@@ -2,10 +2,11 @@ import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faFolderOpen, faStickyNote, faTruck, faClipboardCheck, faCheckCircle,
+  faFolderOpen, faStickyNote, faTruck, faClipboardCheck, faCheckCircle, faBan,
 } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
+import { useUnidadeTimezone } from '@/hooks/useTenantTimezone';
 
 const TIPO_CONFIG = {
   abertura: { icon: faFolderOpen, color: '#2563eb', label: 'Abertura' },
@@ -14,10 +15,24 @@ const TIPO_CONFIG = {
   visita_agendada: { icon: faTruck, color: '#7c3aed', label: 'Visita agendada' },
   resultado_visita: { icon: faClipboardCheck, color: '#059669', label: 'Resultado da visita' },
   conclusao: { icon: faCheckCircle, color: '#16a34a', label: 'Conclusão' },
+  cancelamento: { icon: faBan, color: '#6b7280', label: 'Cancelamento' },
 };
 
-function TimelineItem({ evento }) {
+function TimelineItem({ evento, timezone }) {
   const cfg = TIPO_CONFIG[evento.tipo] || TIPO_CONFIG.nota;
+  const fmt = (iso) => formatarDataHora(iso, { timeZone: timezone });
+
+  const descricaoTexto = (() => {
+    if (evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista) {
+      return `Previsão: ${fmt(evento.meta.dataHoraInicioPrevista)} até ${fmt(evento.meta.dataHoraFimPrevista)}`;
+    }
+    return evento.descricao || null;
+  })();
+
+  const resumoOs =
+    evento.meta?.isConclusive && evento.meta?.dataHoraAberturaOs
+      ? `OS aberta em ${fmt(evento.meta.dataHoraAberturaOs)} — encerrada em ${fmt(evento.meta.dataHoraConclusaoOs)}`
+      : null;
 
   return (
     <div className="flex gap-4">
@@ -35,14 +50,19 @@ function TimelineItem({ evento }) {
       {/* Conteúdo */}
       <div className="pb-6 min-w-0 flex-1">
         <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--text-muted)' }}>
-          {formatarDataHora(evento.dataHora)}
+          {fmt(evento.dataHora)}
         </p>
         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {evento.titulo}
         </p>
-        {evento.descricao && (
+        {descricaoTexto && (
           <p className="mt-1 text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
-            {evento.descricao}
+            {descricaoTexto}
+          </p>
+        )}
+        {resumoOs && (
+          <p className="mt-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            {resumoOs}
           </p>
         )}
       </div>
@@ -50,7 +70,9 @@ function TimelineItem({ evento }) {
   );
 }
 
-function OsCorretivaTimeline({ timeline }) {
+function OsCorretivaTimeline({ timeline, timezone: tzProp }) {
+  const tz = useUnidadeTimezone({ timezone: tzProp });
+
   if (!timeline || timeline.length === 0) {
     return (
       <Card className="rounded-3xl p-6">
@@ -68,7 +90,7 @@ function OsCorretivaTimeline({ timeline }) {
       </h2>
       <div>
         {timeline.map((evento, idx) => (
-          <TimelineItem key={idx} evento={evento} />
+          <TimelineItem key={idx} evento={evento} timezone={tz} />
         ))}
       </div>
     </Card>
@@ -77,6 +99,7 @@ function OsCorretivaTimeline({ timeline }) {
 
 OsCorretivaTimeline.propTypes = {
   timeline: PropTypes.array.isRequired,
+  timezone: PropTypes.string,
 };
 
 export default OsCorretivaTimeline;

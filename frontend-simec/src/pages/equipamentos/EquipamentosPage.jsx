@@ -77,10 +77,12 @@ function EquipamentosPage() {
           subtitle="Acompanhe, filtre e gerencie os equipamentos cadastrados"
           icon={faMicrochip}
           actions={
-            <Button type="button" onClick={page.goToCreate}>
-              <FontAwesomeIcon icon={faPlus} />
-              <span>Adicionar equipamento</span>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button type="button" onClick={page.goToCreate}>
+                <FontAwesomeIcon icon={faPlus} />
+                <span>Adicionar equipamento</span>
+              </Button>
+            </div>
           }
         />
 

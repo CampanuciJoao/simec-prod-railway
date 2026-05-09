@@ -1,3 +1,5 @@
+import { formatarDataTenant } from '../../../shared/dateFormatter.js';
+
 function formatarMoedaBR(valor) {
   return Number(valor || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -5,15 +7,16 @@ function formatarMoedaBR(valor) {
   });
 }
 
-export function formatarDataBR(data) {
-  if (!data) return 'N/A';
-  return new Date(data).toLocaleDateString('pt-BR');
+export function formatarDataBR(data, timezone = 'UTC') {
+  return formatarDataTenant(data, timezone);
 }
 
 export function montarResumoSeguro(seguro, contexto) {
   if (!seguro) {
     return 'Não encontrei um seguro correspondente com os filtros informados.';
   }
+
+  const timezone = contexto?.tenantTimezone || 'UTC';
 
   const alvo = seguro.equipamento
     ? `equipamento ${seguro.equipamento.modelo} (TAG ${seguro.equipamento.tag || 'N/A'})`
@@ -23,7 +26,7 @@ export function montarResumoSeguro(seguro, contexto) {
 
   const statusTexto = seguro.status ? ` Status atual: ${seguro.status}.` : '';
 
-  return `Encontrei a apólice ${seguro.apoliceNumero} da seguradora ${seguro.seguradora}, vinculada ao ${alvo}. A vigência vai de ${formatarDataBR(seguro.dataInicio)} até ${formatarDataBR(seguro.dataFim)}.${statusTexto}`;
+  return `Encontrei a apólice ${seguro.apoliceNumero} da seguradora ${seguro.seguradora}, vinculada ao ${alvo}. A vigência vai de ${formatarDataBR(seguro.dataInicio, timezone)} até ${formatarDataBR(seguro.dataFim, timezone)}.${statusTexto}`;
 }
 
 export function montarMensagemCoberturas(payload) {

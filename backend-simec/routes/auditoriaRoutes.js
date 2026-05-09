@@ -76,7 +76,7 @@ router.get('/', async (req, res) => {
           });
         }
 
-        fim.setHours(23, 59, 59, 999);
+        fim.setUTCHours(23, 59, 59, 999);
         whereClause.timestamp.lte = fim;
       }
     }

@@ -1,11 +1,12 @@
 import { getSessionKey } from '../core/sessionKeys.js';
 
-export function criarContexto({ mensagem, usuarioId, usuarioNome, tenantId }) {
+export function criarContexto({ mensagem, usuarioId, usuarioNome, tenantId, tenantTimezone = 'UTC' }) {
   return {
     mensagem,
     usuarioId,
     usuarioNome,
     tenantId,
+    tenantTimezone,
     sessionKey: getSessionKey(usuarioId, tenantId),
     sessoes: {
       agendamento: null,

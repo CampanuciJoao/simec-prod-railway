@@ -10,7 +10,7 @@ const VISITA_SELECT = {
     select: {
       id: true,
       numeroOS: true,
-      equipamento: { select: { tag: true, nome: true } },
+      equipamento: { select: { tag: true, modelo: true } },
     },
   },
 };
@@ -26,11 +26,45 @@ export async function buscarVisitasComInicioProximo(tenantId, agora, horizonte) 
   });
 }
 
-export async function buscarVisitasComFimProximo(tenantId, agora, horizonte) {
+export async function buscarVisitasParaInicioAutomatico(tenantId, agora) {
+  const margemInicio = new Date(agora.getTime() + 60_000);
   return prisma.visitaTerceiro.findMany({
     where: {
       tenantId,
       status: 'Agendada',
+      dataHoraInicioPrevista: { lte: margemInicio },
+      dataHoraFimPrevista: { gt: agora },
+    },
+    select: VISITA_SELECT,
+  });
+}
+
+export async function buscarVisitasParaConfirmacao(tenantId, agora) {
+  return prisma.visitaTerceiro.findMany({
+    where: {
+      tenantId,
+      status: 'EmExecucao',
+      dataHoraFimPrevista: { lte: agora },
+    },
+    select: VISITA_SELECT,
+  });
+}
+
+export async function atualizarStatusVisitaParaEmExecucao(tenantId, visitaId) {
+  await prisma.visitaTerceiro.update({
+    where: { id: visitaId, tenantId },
+    data: {
+      status: 'EmExecucao',
+      dataHoraInicioReal: new Date(),
+    },
+  });
+}
+
+export async function buscarVisitasComFimProximo(tenantId, agora, horizonte) {
+  return prisma.visitaTerceiro.findMany({
+    where: {
+      tenantId,
+      status: 'EmExecucao',
       dataHoraFimPrevista: { gt: agora, lte: horizonte },
     },
     select: VISITA_SELECT,

@@ -74,6 +74,8 @@ function ContratosPage() {
                 uploadingId={page.uploadingId}
                 handleUploadArquivo={page.handleUploadArquivo}
                 handleDeleteAnexo={page.handleDeleteAnexo}
+                exportandoPdfId={page.exportandoPdfId}
+                onExportarPdf={page.handleExportarPdf}
                 goToEdit={page.goToEdit}
                 onAskDelete={page.deleteModal.openModal}
               />

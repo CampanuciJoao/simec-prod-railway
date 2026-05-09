@@ -8,6 +8,7 @@ import {
   faArrowRight,
   faCircleInfo,
 } from '@fortawesome/free-solid-svg-icons';
+import { formatarData } from '@/utils/timeUtils';
 
 import {
   Button,
@@ -114,8 +115,8 @@ function TabCobertura({ equipamento }) {
                   >
                     <span>Categoria: {contrato.categoria || 'N/A'}</span>
                     <span>
-                      Vigencia: {contrato.dataInicio || 'N/A'} ate{' '}
-                      {contrato.dataFim || 'N/A'}
+                      Vigência: {formatarData(contrato.dataInicio) || 'N/A'} até{' '}
+                      {formatarData(contrato.dataFim) || 'N/A'}
                     </span>
                     <span>
                       Equipamentos cobertos:{' '}
@@ -183,7 +184,7 @@ function TabCobertura({ equipamento }) {
                   </div>
 
                   <div className="mt-4 flex justify-end">
-                    <Link to={`/seguros/detalhes/${seguro.id}`}>
+                    <Link to={`/seguros/editar/${seguro.id}`}>
                       <Button type="button" variant="secondary">
                         <FontAwesomeIcon icon={faArrowRight} />
                         Abrir apolice

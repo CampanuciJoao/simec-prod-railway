@@ -29,6 +29,7 @@ import helpRoutes from './routes/helpRoutes.js';
 import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
 import orcamentosRoutes from './routes/orcamentosRoutes.js';
 import osCorretivaRoutes from './routes/osCorretivaRoutes.js';
+import gehcRoutes from './routes/gehcRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
@@ -40,7 +41,13 @@ const httpServer = createServer(app);
 
 const PORT = process.env.PORT || 5000;
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
-const corsOrigin = FRONTEND_URL === '*' ? true : FRONTEND_URL;
+// Suporta múltiplas origens separadas por vírgula: 'https://a.com,https://b.com'
+const corsOrigin =
+  FRONTEND_URL === '*'
+    ? true
+    : FRONTEND_URL.includes(',')
+    ? FRONTEND_URL.split(',').map((u) => u.trim())
+    : FRONTEND_URL;
 
 const io = new Server(httpServer, {
   cors: {
@@ -151,6 +158,7 @@ app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);
 app.use('/api/os-corretiva', osCorretivaRoutes);
+app.use('/api/gehc', gehcRoutes);
 
 app.use('/api', (req, res) => {
   console.warn(`[404] ${req.method} ${req.originalUrl} â€” rota nÃ£o encontrada`);

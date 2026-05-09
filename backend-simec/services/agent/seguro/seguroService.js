@@ -38,6 +38,7 @@ export const SeguroService = {
       usuarioId = null,
       usuarioNome = null,
       requestId = null,
+      tenantTimezone = 'UTC',
     } = contextoUsuario;
     const logContext = {
       requestId,
@@ -64,7 +65,8 @@ export const SeguroService = {
 
         const resposta = construirRespostaAcaoContextualSeguro(
           acaoContextual,
-          estadoAnterior
+          estadoAnterior,
+          tenantTimezone
         );
 
         await registrarSessaoSeguro(
@@ -216,7 +218,7 @@ export const SeguroService = {
         });
       }
 
-      const respostaTexto = montarResumoSeguro(seguro, contexto);
+      const respostaTexto = montarResumoSeguro(seguro, { ...contexto, tenantTimezone });
       const payload = construirPayloadSeguro(seguro, respostaTexto);
 
       await registrarSessaoSeguro(

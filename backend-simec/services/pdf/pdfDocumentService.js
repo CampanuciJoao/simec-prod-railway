@@ -22,7 +22,7 @@ const COLORS = {
   blue: '#2563eb',
 };
 
-function formatDate(value, locale = 'pt-BR', timeZone = 'America/Cuiaba') {
+function formatDate(value, locale = 'pt-BR', timeZone = 'UTC') {
   if (!value) return 'N/A';
 
   const parsed = new Date(value);
@@ -36,7 +36,7 @@ function formatDate(value, locale = 'pt-BR', timeZone = 'America/Cuiaba') {
   }).format(parsed);
 }
 
-function formatDateTime(value, locale = 'pt-BR', timeZone = 'America/Cuiaba') {
+function formatDateTime(value, locale = 'pt-BR', timeZone = 'UTC') {
   if (!value) return 'N/A';
 
   const parsed = new Date(value);
@@ -82,7 +82,7 @@ function drawHeader(doc, title, options = {}) {
     .font('Helvetica')
     .fontSize(7.5)
     .fillColor(COLORS.slate300)
-    .text('Sistema de Manutencao de Equipamentos', textX, 30);
+    .text('Sistema de Gestão de Equipamentos de Radiologia', textX, 30);
 
   doc
     .font('Helvetica')
@@ -106,33 +106,32 @@ function drawHeader(doc, title, options = {}) {
   doc.y = sepY + 14;
 }
 
-function drawFooter(doc, prefix = 'SIMEC') {
+function drawFooter(doc) {
   const range = doc.bufferedPageRange();
-  const lastPage = range.start + range.count - 1;
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const W = doc.page.width;
 
-  for (let index = 0; index < range.count; index += 1) {
-    doc.switchToPage(range.start + index);
-    const footerY = doc.page.height - 40;
+    if (i === range.count - 1) {
+      const sigY = doc.page.height - doc.page.margins.bottom - 52;
+      doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(COLORS.slate300).stroke();
+      doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate500)
+        .text('Assinatura do Responsável Técnico', 100, sigY + 5, { align: 'center', width: W - 200 });
+    }
 
-    doc
-      .font('Helvetica')
-      .fontSize(8)
-      .fillColor(COLORS.slate500)
-      .text(`${prefix} - Pagina ${index + 1} de ${range.count}`, 50, footerY, {
-        align: 'center',
-        lineBreak: false,
-      });
+    const fy = doc.page.height - doc.page.margins.bottom - 10;
+    doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate500)
+      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'right', width: W - 100 });
   }
 
-  // Restaura cursor dentro da margem para evitar página em branco extra no doc.end()
-  doc.switchToPage(lastPage);
-  doc.y = doc.page.height - doc.page.margins.bottom;
+  doc.switchToPage(range.start + range.count - 1);
+  doc.y = doc.page.margins.top;
 }
 
 function createDocument(title, options = {}) {
   const doc = new PDFDocument({
     size: 'A4',
-    margin: 50,
+    margins: { top: 110, bottom: 48, left: 50, right: 50 },
     bufferPages: true,
   });
 
@@ -146,8 +145,8 @@ function createDocument(title, options = {}) {
   return doc;
 }
 
-function finalizeDocument(doc, prefix) {
-  drawFooter(doc, prefix);
+function finalizeDocument(doc) {
+  drawFooter(doc);
 
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -166,8 +165,8 @@ function ensureSpace(doc, neededHeight = 32) {
   doc.addPage();
 }
 
-function drawGroupHeader(doc, title) {
-  ensureSpace(doc, 28);
+function drawGroupHeader(doc, title, rightText = null) {
+  ensureSpace(doc, 80);
 
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -182,25 +181,40 @@ function drawGroupHeader(doc, title) {
     .fillColor(COLORS.slate700)
     .text(title, x + 12, y + 5, { lineBreak: false });
 
+  if (rightText) {
+    doc
+      .font('Helvetica')
+      .fontSize(8)
+      .fillColor(COLORS.slate500)
+      .text(rightText, x + 12, y + 6, { width: w - 24, align: 'right', lineBreak: false });
+  }
+
   doc.y = y + 24;
 }
 
 function drawSectionTitle(doc, title) {
-  ensureSpace(doc, 36);
-
+  ensureSpace(doc, 60);
+  doc.moveDown(0.8);
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   const y = doc.y;
 
-  doc.save().rect(x, y, w, 22).fill(COLORS.slate100).restore();
+  doc.save().rect(x, y, w, 18).fill(COLORS.slate100).restore();
 
-  doc
-    .font('Helvetica-Bold')
-    .fontSize(10)
-    .fillColor(COLORS.slate900)
-    .text(title, x + 8, y + 6, { lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate700)
+    .text(title, x + 4, y + 4);
 
-  doc.y = y + 30;
+  doc.y = y + 22;
+}
+
+function infoRow(doc, label, value) {
+  ensureSpace(doc, 12);
+  const y = doc.y;
+  doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.slate500)
+    .text(`${label}:`, 54, y, { lineBreak: false });
+  doc.font('Helvetica').fontSize(8.5).fillColor(COLORS.slate700)
+    .text(` ${safeText(value)}`, { lineBreak: false });
+  doc.y = y + 11;
 }
 
 function drawInfoGrid(doc, items = [], columns = 2) {
@@ -346,6 +360,109 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
   doc.moveDown(1);
 }
 
+function drawLineChart(doc, { subtitle, labels, series, chartHeight = 130 }) {
+  const SERIES_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706'];
+  const ML = 34; // margem esquerda (rótulos eixo Y)
+  const MR = 10;
+  const MB = 34; // margem inferior (rótulos X + legenda)
+
+  const pageL = doc.page.margins.left;
+  const totalW = doc.page.width - pageL - doc.page.margins.right;
+  const plotX = pageL + ML;
+  const plotW = totalW - ML - MR;
+  const plotH = chartHeight;
+  const n = labels.length;
+
+  ensureSpace(doc, plotH + MB + (subtitle ? 14 : 0) + 16);
+
+  if (subtitle) {
+    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate500)
+      .text(subtitle, pageL, doc.y, { width: totalW });
+    doc.y += 10;
+  }
+
+  const plotY = doc.y;
+
+  // fundo
+  doc.save().rect(plotX, plotY, plotW, plotH)
+    .fillAndStroke(COLORS.white, COLORS.slate300).restore();
+
+  // grade horizontal e rótulos Y
+  [0, 0.25, 0.5, 0.75, 1].forEach((pct) => {
+    const gy = plotY + plotH * (1 - pct);
+    doc.save()
+      .moveTo(plotX, gy).lineTo(plotX + plotW, gy)
+      .lineWidth(pct === 0 || pct === 1 ? 0.6 : 0.25)
+      .strokeColor(COLORS.slate300).stroke().restore();
+    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate400)
+      .text(`${Math.round(pct * 100)}%`, pageL, gy - 3.5,
+        { width: ML - 5, align: 'right', lineBreak: false });
+  });
+
+  // rótulos X
+  const maxLbls = 7;
+  const step = Math.max(1, Math.floor(n / maxLbls));
+  labels.forEach((lbl, i) => {
+    if (i !== 0 && i % step !== 0 && i !== n - 1) return;
+    const lx = plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate500)
+      .text(lbl, lx - 20, plotY + plotH + 4, { width: 40, align: 'center', lineBreak: false });
+  });
+
+  // séries
+  const drawn = [];
+  series.forEach(({ label, values, color }, si) => {
+    const valid = values.filter((v) => v != null && !Number.isNaN(v));
+    if (valid.length === 0) return;
+
+    const min = Math.min(...valid);
+    const max = Math.max(...valid);
+    const range = max - min || 1;
+    const norm = (v) => (v - min) / range;
+
+    const lineColor = color || SERIES_COLORS[si % SERIES_COLORS.length];
+    drawn.push({ label, color: lineColor, min, max });
+
+    const pts = values.map((v, i) => ({
+      x: plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2),
+      y: v != null && !Number.isNaN(v) ? plotY + plotH * (1 - norm(v)) : null,
+    }));
+
+    // linha
+    doc.save();
+    let open = false;
+    pts.forEach((pt) => {
+      if (pt.y == null) { open = false; return; }
+      if (!open) { doc.moveTo(pt.x, pt.y); open = true; }
+      else { doc.lineTo(pt.x, pt.y); }
+    });
+    doc.lineWidth(1.5).strokeColor(lineColor).stroke().restore();
+
+    // pontos (só quando não há muitos)
+    if (n <= 60) {
+      pts.forEach((pt) => {
+        if (pt.y == null) return;
+        doc.save().circle(pt.x, pt.y, 2).fill(lineColor).restore();
+      });
+    }
+  });
+
+  // legenda
+  const legY = plotY + plotH + 18;
+  let legX = plotX;
+  drawn.forEach(({ label, color, min, max }) => {
+    doc.save().rect(legX, legY + 1, 14, 5).fill(color).restore();
+    const range = min === max
+      ? `${min.toFixed(1)}`
+      : `${min.toFixed(1)} – ${max.toFixed(1)}`;
+    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate600)
+      .text(`${label}  (${range})`, legX + 17, legY, { lineBreak: false });
+    legX += 125;
+  });
+
+  doc.y = legY + 16;
+}
+
 function buildHistoricoRows(eventos = [], locale, timeZone) {
   return eventos.map((evento) => {
     const metadata = evento?.metadata || {};
@@ -419,7 +536,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
     ]),
   });
 
-  return finalizeDocument(doc, 'Relatorio BI SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
@@ -472,7 +589,7 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
     });
   }
 
-  return finalizeDocument(doc, 'Relatorios SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) {
@@ -481,18 +598,14 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Contexto do equipamento');
-  drawInfoGrid(doc, [
-    { label: 'Equipamento', value: payload?.equipamento?.modelo },
-    { label: 'Numero de serie (TAG)', value: payload?.equipamento?.tag },
-    { label: 'Unidade', value: payload?.equipamento?.unidade },
-    {
-      label: 'Periodo',
-      value:
-        payload?.filtros?.dataInicio || payload?.filtros?.dataFim
-          ? `${safeText(payload?.filtros?.dataInicio, 'Inicio')} ate ${safeText(payload?.filtros?.dataFim, 'Hoje')}`
-          : 'Historico completo',
-    },
-  ]);
+  infoRow(doc, 'Equipamento', payload?.equipamento?.modelo);
+  infoRow(doc, 'Número de série (TAG)', payload?.equipamento?.tag);
+  infoRow(doc, 'Unidade', payload?.equipamento?.unidade);
+  infoRow(doc, 'Período',
+    payload?.filtros?.dataInicio || payload?.filtros?.dataFim
+      ? `${safeText(payload?.filtros?.dataInicio, 'Início')} até ${safeText(payload?.filtros?.dataFim, 'Hoje')}`
+      : 'Histórico completo',
+  );
 
   drawSectionTitle(doc, 'Linha do tempo');
   drawTable(doc, {
@@ -501,7 +614,7 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
     rows: buildHistoricoRows(payload?.eventos || [], locale, timeZone),
   });
 
-  return finalizeDocument(doc, 'Auditoria SIMEC');
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
@@ -509,23 +622,15 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
 
-  drawSectionTitle(doc, 'Informacoes do equipamento');
-  drawInfoGrid(doc, [
-    { label: 'Modelo', value: manutencao?.equipamento?.modelo },
-    { label: 'Numero de serie / TAG', value: manutencao?.equipamento?.tag },
-    {
-      label: 'Unidade',
-      value:
-        manutencao?.equipamento?.unidade?.nomeSistema ||
-        manutencao?.equipamento?.unidade?.nome ||
-        'N/A',
-    },
-    { label: 'Tipo', value: manutencao?.tipo },
-    { label: 'Numero do chamado', value: manutencao?.numeroChamado },
-    { label: 'Status atual', value: manutencao?.status },
-  ]);
+  drawSectionTitle(doc, 'Informações do equipamento');
+  infoRow(doc, 'Modelo', manutencao?.equipamento?.modelo);
+  infoRow(doc, 'Número de série / TAG', manutencao?.equipamento?.tag);
+  infoRow(doc, 'Unidade', manutencao?.equipamento?.unidade?.nomeSistema || manutencao?.equipamento?.unidade?.nome || 'N/A');
+  infoRow(doc, 'Tipo', manutencao?.tipo);
+  infoRow(doc, 'Número do chamado', manutencao?.numeroChamado);
+  infoRow(doc, 'Status atual', manutencao?.status);
 
-  drawSectionTitle(doc, 'Cronograma e execucao real');
+  drawSectionTitle(doc, 'Cronograma e execução real');
   drawTable(doc, {
     headers: ['Etapa', 'Data/Hora planejada', 'Data/Hora real'],
     columnWidths: [120, 185, 190],
@@ -543,10 +648,10 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
     ],
   });
 
-  drawSectionTitle(doc, 'Descricao do problema / servico');
-  drawParagraph(doc, manutencao?.descricaoProblemaServico || 'Nenhuma descricao informada.');
+  drawSectionTitle(doc, 'Descrição do problema / serviço');
+  infoRow(doc, 'Descrição', manutencao?.descricaoProblemaServico || 'Nenhuma descrição informada.');
 
-  drawSectionTitle(doc, 'Historico do chamado / notas tecnicas');
+  drawSectionTitle(doc, 'Histórico do chamado / notas técnicas');
   drawTable(doc, {
     headers: ['Data/Hora', 'Responsavel', 'Nota / andamento'],
     columnWidths: [100, 130, 265],
@@ -557,26 +662,163 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
     ]),
   });
 
-  ensureSpace(doc, 90);
-  const signatureY = doc.y + 30;
-  doc
-    .moveTo(50, signatureY)
-    .lineTo(230, signatureY)
-    .strokeColor(COLORS.slate500)
-    .stroke();
-  doc
-    .moveTo(320, signatureY)
-    .lineTo(545, signatureY)
-    .stroke();
+  return finalizeDocument(doc);
+}
 
-  doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLORS.slate700)
-    .text('Responsavel tecnico', 50, signatureY + 6)
-    .text('Assinatura unidade / cliente', 320, signatureY + 6);
+export async function gerarPdfContratoBuffer(contrato, options = {}) {
+  const { locale, timeZone } = options;
+  const title = `CONTRATO Nº ${safeText(contrato?.numeroContrato, 'SEM NUMERO')}`;
+  const doc = createDocument(title, options);
 
-  return finalizeDocument(doc, 'OS SIMEC');
+  drawSectionTitle(doc, 'Dados do contrato');
+  drawInfoGrid(doc, [
+    { label: 'Nº do Contrato', value: contrato?.numeroContrato },
+    { label: 'Categoria', value: contrato?.categoria },
+    { label: 'Fornecedor', value: contrato?.fornecedor },
+    { label: 'Status', value: contrato?.status },
+    { label: 'Vigência - Início', value: formatDate(contrato?.dataInicio, locale, timeZone) },
+    { label: 'Vigência - Fim', value: formatDate(contrato?.dataFim, locale, timeZone) },
+  ]);
+
+  drawSectionTitle(doc, 'Equipamentos vinculados');
+  const equipamentos = contrato?.equipamentosCobertos || [];
+  if (equipamentos.length === 0) {
+    drawTable(doc, {
+      headers: ['Modelo', 'Tag', 'Status'],
+      columnWidths: [255, 175, 65],
+      rows: [],
+      emptyMessage: 'Nenhum equipamento vinculado.',
+    });
+  } else {
+    const grupos = {};
+    for (const eq of equipamentos) {
+      const key = eq?.unidade?.nomeSistema || 'Sem unidade';
+      if (!grupos[key]) {
+        grupos[key] = { cnpj: eq?.unidade?.cnpj || null, itens: [] };
+      }
+      grupos[key].itens.push(eq);
+    }
+    for (const [unidadeNome, { cnpj, itens }] of Object.entries(grupos)) {
+      const rightText = cnpj ? `CNPJ: ${cnpj}` : null;
+      drawGroupHeader(doc, unidadeNome, rightText);
+      drawTable(doc, {
+        headers: ['Modelo', 'Tag', 'Status'],
+        columnWidths: [255, 175, 65],
+        rows: itens.map((e) => [safeText(e?.modelo), safeText(e?.tag), safeText(e?.status)]),
+      });
+    }
+  }
+
+  return finalizeDocument(doc);
+}
+
+export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
+  const title = 'RELATORIO DE UTILIZACAO GE HEALTHCARE';
+  const doc = createDocument(title, options);
+  const { locale, timeZone } = options;
+
+  const { periodo, totais, unidades = [] } = payload;
+
+  drawSectionTitle(doc, 'Resumo geral');
+  infoRow(doc, 'Periodo', `Ultimos ${periodo?.meses ?? 12} meses`);
+  infoRow(doc, 'Total de exames', safeText(totais?.exames));
+  infoRow(doc, 'Total de pacientes', safeText(totais?.pacientes));
+  infoRow(doc, 'Uptime medio (contrato)', totais?.uptimeMedio != null ? `${totais.uptimeMedio}%` : 'N/A');
+
+  for (const unidade of unidades) {
+    drawSectionTitle(doc, `Unidade: ${safeText(unidade.nome)}`);
+    infoRow(doc, 'Total de exames', safeText(unidade.totalExames));
+    infoRow(doc, 'Total de pacientes', safeText(unidade.totalPacientes));
+    infoRow(doc, 'Uptime medio', unidade.uptimeMedio != null ? `${unidade.uptimeMedio}%` : 'N/A');
+
+    for (const eq of unidade.equipamentos ?? []) {
+      drawGroupHeader(doc, `${safeText(eq.nome)} — ${safeText(eq.tag)}`);
+      infoRow(doc, 'Total de exames', safeText(eq.totalExames));
+      infoRow(doc, 'Media exames/dia', eq.mediaExamesDia != null ? safeText(eq.mediaExamesDia) : 'N/A');
+      infoRow(doc, 'Uptime medio', eq.uptimeMedio != null ? `${eq.uptimeMedio}%` : 'N/A');
+
+      const rows = (eq.meses ?? []).map(m => [
+        m.mes ?? '—',
+        m.exames        != null ? String(m.exames)                          : '—',
+        m.pacientes     != null ? String(m.pacientes)                       : '—',
+        m.mediaExamesDia != null ? `${m.mediaExamesDia}/dia`                : '—',
+        m.duracaoMedia  != null ? `${m.duracaoMedia} min`                   : '—',
+        m.uptime        != null ? `${m.uptime}%`                            : '—',
+      ]);
+
+      drawTable(doc, {
+        headers:      ['Mes', 'Exames', 'Pacientes', 'Media/dia', 'Duracao', 'Uptime'],
+        columnWidths: [70, 55, 65, 65, 65, 55],
+        rows,
+        emptyMessage: 'Sem dados de utilizacao para este equipamento.',
+      });
+    }
+  }
+
+  return finalizeDocument(doc);
+}
+
+export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
+  const title = 'RELATORIO DE SAUDE DO ATIVO';
+  const doc = createDocument(title, options);
+  const { locale, timeZone } = options;
+
+  drawSectionTitle(doc, 'Contexto do equipamento');
+  infoRow(doc, 'Equipamento', payload?.equipamento?.modelo);
+  infoRow(doc, 'TAG / N° Serie', payload?.equipamento?.tag);
+  if (payload?.equipamento?.apelido) infoRow(doc, 'Apelido', payload.equipamento.apelido);
+  infoRow(doc, 'Unidade', payload?.equipamento?.unidade);
+  infoRow(doc, 'Periodo',
+    payload?.inicio || payload?.fim
+      ? `${safeText(payload?.inicio, 'Inicio')} ate ${safeText(payload?.fim, 'Hoje')}`
+      : 'Historico completo',
+  );
+
+  const snapshots = payload?.snapshots || [];
+
+  if (snapshots.length >= 2) {
+    drawSectionTitle(doc, 'Evolução das métricas no período');
+
+    const usarHora = snapshots.length <= 48;
+    const fmtLabel = (capturedAt) =>
+      new Intl.DateTimeFormat(locale || 'pt-BR', {
+        timeZone: timeZone || 'UTC',
+        day: '2-digit',
+        month: '2-digit',
+        ...(usarHora ? { hour: '2-digit' } : {}),
+      }).format(new Date(capturedAt));
+
+    drawLineChart(doc, {
+      subtitle: 'Valores normalizados por métrica: 0% = mínimo do período, 100% = máximo',
+      labels: snapshots.map((s) => fmtLabel(s.capturedAt)),
+      series: [
+        { label: 'Hélio (%)',      values: snapshots.map((s) => s.heliumLevelPct),    color: '#2563eb' },
+        { label: 'Temperatura(°C)',values: snapshots.map((s) => s.coolantTempC),      color: '#dc2626' },
+        { label: 'Pressão (PSI)', values: snapshots.map((s) => s.heliumPressurePsi), color: '#16a34a' },
+        { label: 'Fluxo (GPM)',   values: snapshots.map((s) => s.coolantFlowGpm),    color: '#d97706' },
+      ],
+    });
+  }
+
+  drawSectionTitle(doc, 'Registros de saude');
+  const rows = snapshots.map(s => [
+    formatDateTime(s.capturedAt, locale, timeZone),
+    s.heliumLevelPct    != null ? `${s.heliumLevelPct}%`   : '—',
+    s.heliumPressurePsi != null ? `${s.heliumPressurePsi}` : '—',
+    s.coolantTempC      != null ? `${s.coolantTempC}°C`    : '—',
+    s.coolantFlowGpm    != null ? `${s.coolantFlowGpm}`    : '—',
+    s.compressorStatus  || '—',
+    s.equipmentOnline === true ? 'Online' : s.equipmentOnline === false ? 'Offline' : '—',
+  ]);
+
+  drawTable(doc, {
+    headers: ['Data/Hora', 'Helio %', 'Pressao (PSI)', 'Temp (C)', 'Fluxo (GPM)', 'Compressor', 'Online'],
+    columnWidths: [110, 55, 70, 55, 65, 70, 60],
+    rows,
+    emptyMessage: 'Nenhum registro encontrado para o periodo selecionado.',
+  });
+
+  return finalizeDocument(doc);
 }
 
 export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
@@ -585,51 +827,33 @@ export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Equipamento');
-  drawInfoGrid(doc, [
-    { label: 'Modelo', value: ocorrencia.equipamento?.modelo },
-    { label: 'Numero de serie / TAG', value: ocorrencia.equipamento?.tag },
-    { label: 'Unidade', value: ocorrencia.equipamento?.unidade?.nomeSistema },
-  ], 3);
+  infoRow(doc, 'Modelo', ocorrencia.equipamento?.modelo);
+  infoRow(doc, 'Número de série / TAG', ocorrencia.equipamento?.tag);
+  infoRow(doc, 'Unidade', ocorrencia.equipamento?.unidade?.nomeSistema);
 
-  drawSectionTitle(doc, 'Identificacao do registro');
-  drawInfoGrid(doc, [
-    { label: 'Identificador unico', value: ocorrencia.id },
-    { label: 'Data do registro', value: formatDateTime(ocorrencia.data, locale, timeZone) },
-    { label: 'Tipo', value: ocorrencia.tipo },
-    { label: 'Gravidade', value: String(ocorrencia.gravidade || 'media').toUpperCase() },
-    { label: 'Origem', value: ocorrencia.origem || 'usuario' },
-    { label: 'Tecnico responsavel', value: ocorrencia.tecnico || 'N/A' },
-    { label: 'Status', value: ocorrencia.resolvido ? 'Resolvido' : 'Pendente' },
-    ocorrencia.resolvido
-      ? { label: 'Data resolucao', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) }
-      : { label: 'Aguardando', value: 'Sem resolucao registrada' },
-  ]);
+  drawSectionTitle(doc, 'Identificação do registro');
+  infoRow(doc, 'Identificador', ocorrencia.id);
+  infoRow(doc, 'Data do registro', formatDateTime(ocorrencia.data, locale, timeZone));
+  infoRow(doc, 'Tipo', ocorrencia.tipo);
+  infoRow(doc, 'Gravidade', String(ocorrencia.gravidade || 'media').toUpperCase());
+  infoRow(doc, 'Origem', ocorrencia.origem || 'usuário');
+  infoRow(doc, 'Técnico responsável', ocorrencia.tecnico || 'N/A');
+  infoRow(doc, 'Status', ocorrencia.resolvido ? 'Resolvido' : 'Pendente');
+  infoRow(doc, ocorrencia.resolvido ? 'Data resolução' : 'Aguardando',
+    ocorrencia.resolvido ? formatDateTime(ocorrencia.dataResolucao, locale, timeZone) : 'Sem resolução registrada');
 
-  drawSectionTitle(doc, 'Titulo');
-  drawParagraph(doc, ocorrencia.titulo);
+  drawSectionTitle(doc, 'Título');
+  infoRow(doc, 'Título', ocorrencia.titulo);
 
-  drawSectionTitle(doc, 'Descricao');
-  drawParagraph(doc, ocorrencia.descricao || 'Sem descricao informada.');
+  drawSectionTitle(doc, 'Descrição');
+  infoRow(doc, 'Descrição', ocorrencia.descricao || 'Sem descrição informada.');
 
   if (ocorrencia.resolvido) {
-    drawSectionTitle(doc, 'Resolucao');
-    drawInfoGrid(doc, [
-      { label: 'Resolvido por', value: ocorrencia.tecnicoResolucao || 'N/A' },
-      { label: 'Data', value: formatDateTime(ocorrencia.dataResolucao, locale, timeZone) },
-    ]);
-    drawParagraph(doc, ocorrencia.solucao || '-');
+    drawSectionTitle(doc, 'Resolução');
+    infoRow(doc, 'Resolvido por', ocorrencia.tecnicoResolucao || 'N/A');
+    infoRow(doc, 'Data', formatDateTime(ocorrencia.dataResolucao, locale, timeZone));
+    infoRow(doc, 'Solução', ocorrencia.solucao || '-');
   }
 
-  ensureSpace(doc, 90);
-  const signatureY = doc.y + 30;
-  doc.moveTo(50, signatureY).lineTo(230, signatureY).strokeColor(COLORS.slate500).stroke();
-  doc.moveTo(320, signatureY).lineTo(545, signatureY).stroke();
-  doc
-    .font('Helvetica')
-    .fontSize(9)
-    .fillColor(COLORS.slate700)
-    .text('Tecnico responsavel', 50, signatureY + 6)
-    .text('Responsavel pela unidade', 320, signatureY + 6);
-
-  return finalizeDocument(doc, 'Ocorrencia SIMEC');
+  return finalizeDocument(doc);
 }

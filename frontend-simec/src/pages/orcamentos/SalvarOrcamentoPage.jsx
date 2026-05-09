@@ -23,9 +23,15 @@ function SalvarOrcamentoPage() {
 
   if (p.loadingData) return <LoadingState />;
 
+  const formatarCnpj = (cnpj) => {
+    const d = cnpj.replace(/\D/g, '');
+    if (d.length !== 14) return cnpj;
+    return `${d.slice(0,2)}.${d.slice(2,5)}.${d.slice(5,8)}/${d.slice(8,12)}-${d.slice(12,14)}`;
+  };
+
   const unidadeOptions = p.unidades.map((u) => ({
     value: u.id,
-    label: u.nomeFantasia || u.nomeSistema,
+    label: u.cnpj ? `${u.nomeSistema} — ${formatarCnpj(u.cnpj)}` : u.nomeSistema,
   }));
 
   return (

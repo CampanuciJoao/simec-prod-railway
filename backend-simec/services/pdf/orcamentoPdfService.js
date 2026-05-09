@@ -52,6 +52,32 @@ function box(doc, x, y, w, h, { fill, stroke = BORDER } = {}) {
   doc.restore();
 }
 
+function drawHeader(doc) {
+  const W = doc.page.width;
+  doc.save().rect(0, 0, W, 52).fill('#1e293b').restore();
+  if (fs.existsSync(logoPath)) doc.image(logoPath, 12, 5, { fit: [42, 42] });
+  const tx = fs.existsSync(logoPath) ? 60 : 14;
+  doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff').text('SIMEC', tx, 10);
+  doc.font('Helvetica').fontSize(7.5).fillColor('#cbd5e1').text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
+  const gerado = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date());
+  doc.font('Helvetica').fontSize(8).fillColor('#cbd5e1').text(`Gerado em: ${gerado}`, 0, 20, { align: 'right', width: W - 14, lineBreak: false });
+  doc.moveTo(50, 90).lineTo(W - 50, 90).lineWidth(0.8).strokeColor('#cbd5e1').stroke();
+  doc.y = 104;
+}
+
+function drawFooter(doc) {
+  const range = doc.bufferedPageRange();
+  for (let i = 0; i < range.count; i++) {
+    doc.switchToPage(range.start + i);
+    const W = doc.page.width;
+    const fy = doc.page.height - doc.page.margins.bottom - 10;
+    doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+      .text(`Página ${i + 1} de ${range.count}`, 50, fy, { align: 'right', width: W - 100 });
+  }
+  doc.switchToPage(range.start + range.count - 1);
+  doc.y = doc.page.margins.top;
+}
+
 // ─── widths ──────────────────────────────────────────────────────────────────
 
 function buildCols(contentW, nForn) {
@@ -85,15 +111,19 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
 
 export async function gerarPdfOrcamentoBuffer(orcamento) {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margin: 36, bufferPages: true });
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 48, left: 36, right: 36 }, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
+    doc.on('pageAdded', () => drawHeader(doc));
+
+    drawHeader(doc);
 
     const marginX  = 36;
     const contentW = doc.page.width - marginX * 2;
     _desenhar(doc, orcamento, { marginX, contentW });
+    drawFooter(doc);
     doc.end();
   });
 }
@@ -105,8 +135,6 @@ function _desenhar(doc, orc, { marginX, contentW }) {
   const itens        = orc.itens        || [];
   const nForn        = fornecedores.length;
   const cols         = buildCols(contentW, nForn);
-
-  doc.y = 32;
 
   const aprovadoId = orc.fornecedorAprovadoId || null;
 
@@ -122,21 +150,17 @@ function _desenhar(doc, orc, { marginX, contentW }) {
 // ─── 1. Linha "Orçamento" (full width, com logo) ─────────────────────────────
 
 function _cabecalhoTitulo(doc, { marginX, contentW }) {
-  const rowH   = 56;
+  const rowH   = 48;
   const startY = doc.y;
-  const logoSize = 44;
 
   box(doc, marginX, startY, contentW, rowH);
 
-  if (fs.existsSync(logoPath)) {
-    doc.image(logoPath, marginX + 8, startY + (rowH - logoSize) / 2, { fit: [logoSize, logoSize] });
-  }
-
   doc
     .font('Helvetica-Bold').fontSize(22).fillColor(TEXT)
-    .text('Orçamento', marginX + logoSize + 16, startY + 17, {
-      width: contentW - logoSize - 24,
+    .text('Orçamento', marginX, startY + 13, {
+      width: contentW,
       align: 'center',
+      lineBreak: false,
     });
 
   doc.y = startY + rowH;
@@ -163,16 +187,16 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
   // célula direita: metadados com borda própria
   box(doc, marginX + leftW, y, rightW, rowH, { fill: C.gray50 });
   const tipo  = TIPO_LABEL[orc.tipo] || orc.tipo || '';
-  const und   = orc.unidade?.nomeFantasia || orc.unidade?.nomeSistema || '';
-  const data  = fmtData(orc.createdAt);
-  const meta  = [tipo, und, data].filter(Boolean).join('   ·   ');
+  const und   = orc.unidade?.nomeSistema || orc.unidade?.nomeFantasia || '';
+  const meta  = [tipo, und].filter(Boolean).join('   ·   ');
 
   doc
     .font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
     .text(meta, marginX + leftW + 6, y + 11, {
       width: rightW - 12,
-      align: 'right',
+      align: 'center',
       lineBreak: false,
+      ellipsis: true,
     });
 
   doc.y = y + rowH;
@@ -226,7 +250,7 @@ function _formaPagamento(doc, fornecedores, { marginX, leftW, fornWidths }) {
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
     .font('Helvetica-Bold').fontSize(7.5).fillColor(TEXT)
-    .text('FORMA DE PAGAMENTO', marginX + 8, y + 8, { width: leftW - 16 });
+    .text('FORMA DE PAGAMENTO', marginX + 8, y + 8, { width: leftW - 16, lineBreak: false });
 
   let cx = marginX + leftW;
   for (let i = 0; i < fornecedores.length; i++) {
@@ -257,9 +281,9 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
   box(doc, marginX,         y0, descW, thH, { fill: C.gray100 });
   box(doc, marginX + descW, y0, dataW, thH, { fill: C.gray100 });
   doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT)
-    .text('DESCRIÇÃO', marginX + 6, y0 + 6, { width: descW - 12 });
+    .text('DESCRIÇÃO', marginX + 6, y0 + 6, { width: descW - 12, lineBreak: false });
   doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT)
-    .text('DATA', marginX + descW + 4, y0 + 6, { width: dataW - 8, align: 'center' });
+    .text('DATA', marginX + descW + 4, y0 + 6, { width: dataW - 8, align: 'center', lineBreak: false });
 
   let cx0 = marginX + leftW;
   for (let i = 0; i < nForn; i++) {
@@ -285,7 +309,7 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
     doc.font(isRed ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(fg)
       .text(safe(item.descricao), marginX + 6, ry + 7, { width: descW - 12, lineBreak: false, ellipsis: true });
     doc.font('Helvetica').fontSize(8).fillColor(isRed ? C.red : C.gray600)
-      .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center' });
+      .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center', lineBreak: false });
 
     let cx = marginX + leftW;
     for (let i = 0; i < nForn; i++) {

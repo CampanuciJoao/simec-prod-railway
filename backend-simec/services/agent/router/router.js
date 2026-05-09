@@ -1,6 +1,7 @@
 import { AgendamentoService } from '../agendamento/agendamentoService.js';
 import { RelatorioService } from '../relatorio/relatorioService.js';
 import { SeguroService } from '../seguro/seguroService.js';
+import { OsCorretivaAgentService } from '../osCorretiva/index.js';
 import { classificarIntencao } from '../shared/intentClassifier.js';
 import { resolverAcaoPorContexto } from '../shared/actionResolver.js';
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
@@ -16,6 +17,7 @@ import {
   pareceAgendamento,
   pareceConsultaRelatorio,
   pareceSeguro,
+  pareceOsCorretiva,
 } from './intentRouting.js';
 
 async function cancelarSessaoSeExistir(sessao, mensagem) {
@@ -29,27 +31,22 @@ async function cancelarSessaoSeExistir(sessao, mensagem) {
 }
 
 async function buscarSessoesAtivas(tenantId, sessionKey) {
-  const [sessaoAgendamento, sessaoRelatorio, sessaoSeguro] = await Promise.all([
-    AgentSessionRepository.buscarSessaoAtiva(
-      tenantId,
-      sessionKey,
-      'AGENDAR_MANUTENCAO'
-    ),
-    AgentSessionRepository.buscarSessaoAtiva(
-      tenantId,
-      sessionKey,
-      'RELATORIO'
-    ),
+  const [sessaoAgendamento, sessaoRelatorio, sessaoSeguro, sessaoOsCorretiva] = await Promise.all([
+    AgentSessionRepository.buscarSessaoAtiva(tenantId, sessionKey, 'AGENDAR_MANUTENCAO'),
+    AgentSessionRepository.buscarSessaoAtiva(tenantId, sessionKey, 'RELATORIO'),
     AgentSessionRepository.buscarSessaoAtiva(tenantId, sessionKey, 'SEGURO'),
+    AgentSessionRepository.buscarSessaoAtiva(tenantId, sessionKey, 'OS_CORRETIVA'),
   ]);
 
   return {
     sessaoAgendamento,
     sessaoRelatorio,
     sessaoSeguro,
+    sessaoOsCorretiva,
     temAgendamentoAtivo: !!sessaoAgendamento,
     temRelatorioAtivo: !!sessaoRelatorio,
     temSeguroAtivo: !!sessaoSeguro,
+    temOsCorretivaAtivo: !!sessaoOsCorretiva,
   };
 }
 
@@ -86,9 +83,11 @@ export const RoteadorAgente = async ({
       sessaoAgendamento,
       sessaoRelatorio,
       sessaoSeguro,
+      sessaoOsCorretiva,
       temAgendamentoAtivo,
       temRelatorioAtivo,
       temSeguroAtivo,
+      temOsCorretivaAtivo,
     } = await buscarSessoesAtivas(tenantId, sessionKey);
 
     logAgentStage('AGENT_ROUTER_STATE', logContext, {
@@ -97,15 +96,18 @@ export const RoteadorAgente = async ({
       temAgendamentoAtivo,
       temRelatorioAtivo,
       temSeguroAtivo,
+      temOsCorretivaAtivo,
       sessaoAgendamentoId: sessaoAgendamento?.id || null,
       sessaoRelatorioId: sessaoRelatorio?.id || null,
       sessaoSeguroId: sessaoSeguro?.id || null,
+      sessaoOsCorretivaId: sessaoOsCorretiva?.id || null,
     });
 
     if (RESET_COMMANDS.some((cmd) => msgMinuscula.includes(cmd))) {
       await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
       await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
       await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
+      await cancelarSessaoSeExistir(sessaoOsCorretiva, mensagem);
 
       logAgentStage('AGENT_ROUTER_DECISION', logContext, {
         decision: 'RESET',
@@ -175,6 +177,26 @@ export const RoteadorAgente = async ({
       );
     }
 
+    const acaoOsCorretiva = sessaoOsCorretiva
+      ? resolverAcaoPorContexto(sessaoOsCorretiva, mensagem)
+      : null;
+
+    if (acaoOsCorretiva?.matched) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTEXTUAL_ACTION',
+        targetIntent: 'OS_CORRETIVA',
+        sessionId: sessaoOsCorretiva.id,
+        action: acaoOsCorretiva.action,
+      });
+
+      return await OsCorretivaAgentService.processar(
+        mensagem,
+        contextoUsuario,
+        sessaoOsCorretiva,
+        acaoOsCorretiva
+      );
+    }
+
     if (
       temAgendamentoAtivo &&
       !pareceSeguro(msgMinuscula) &&
@@ -216,7 +238,8 @@ export const RoteadorAgente = async ({
     if (
       temSeguroAtivo &&
       !pareceAgendamento(msgMinuscula) &&
-      !pareceConsultaRelatorio(msgMinuscula)
+      !pareceConsultaRelatorio(msgMinuscula) &&
+      !pareceOsCorretiva(msgMinuscula)
     ) {
       logAgentStage('AGENT_ROUTER_DECISION', logContext, {
         decision: 'CONTINUE_ACTIVE_SESSION',
@@ -228,6 +251,21 @@ export const RoteadorAgente = async ({
         mensagem,
         contextoUsuario,
         sessaoSeguro,
+        null
+      );
+    }
+
+    if (temOsCorretivaAtivo && !pareceAgendamento(msgMinuscula) && !pareceSeguro(msgMinuscula)) {
+      logAgentStage('AGENT_ROUTER_DECISION', logContext, {
+        decision: 'CONTINUE_ACTIVE_SESSION',
+        targetIntent: 'OS_CORRETIVA',
+        sessionId: sessaoOsCorretiva?.id || null,
+      });
+
+      return await OsCorretivaAgentService.processar(
+        mensagem,
+        contextoUsuario,
+        sessaoOsCorretiva,
         null
       );
     }
@@ -277,6 +315,7 @@ export const RoteadorAgente = async ({
     if (intencao === 'SEGURO') {
       await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
       await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
+      await cancelarSessaoSeExistir(sessaoOsCorretiva, mensagem);
 
       logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
         targetIntent: intencao,
@@ -291,13 +330,31 @@ export const RoteadorAgente = async ({
       );
     }
 
+    if (intencao === 'OS_CORRETIVA') {
+      await cancelarSessaoSeExistir(sessaoAgendamento, mensagem);
+      await cancelarSessaoSeExistir(sessaoRelatorio, mensagem);
+      await cancelarSessaoSeExistir(sessaoSeguro, mensagem);
+
+      logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
+        targetIntent: intencao,
+        reusedSessionId: sessaoOsCorretiva?.id || null,
+      });
+
+      return await OsCorretivaAgentService.processar(
+        mensagem,
+        contextoUsuario,
+        sessaoOsCorretiva || null,
+        null
+      );
+    }
+
     logAgentStage('AGENT_ROUTER_ROUTE', logContext, {
       targetIntent: 'UNKNOWN',
       decision: 'FALLBACK_GREETING',
     });
 
     return respostaAgente(
-      'Olá! Sou a T.H.I.A.G.O. Posso ajudar com agendamentos, relatórios e seguros. Como posso ajudar?'
+      'Olá! Sou a T.H.I.A.G.O. Posso ajudar com agendamentos, relatórios, seguros e ocorrências corretivas. Como posso ajudar?'
     );
   } catch (error) {
     logAgentError(
