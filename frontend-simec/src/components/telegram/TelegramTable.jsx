@@ -26,9 +26,16 @@ function TelegramTable({ destinatarios, onEdit, onDelete }) {
 
       <Card padded={false} className="overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+          <table className="min-w-full" style={{ borderCollapse: 'collapse' }}>
+            <thead>
+              <tr
+                className="text-left text-xs font-semibold uppercase tracking-wide"
+                style={{
+                  backgroundColor: 'var(--bg-surface-soft)',
+                  borderBottom: '1px solid var(--border-soft)',
+                  color: 'var(--text-muted)',
+                }}
+              >
                 <th className="px-4 py-3">Nome / Chat</th>
                 <th className="px-4 py-3">Chat ID</th>
                 <th className="px-4 py-3 text-center">Status</th>
@@ -39,13 +46,17 @@ function TelegramTable({ destinatarios, onEdit, onDelete }) {
               </tr>
             </thead>
 
-            <tbody className="divide-y divide-slate-100 bg-white">
+            <tbody>
               {destinatarios.map((dest) => (
-                <tr key={dest.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3 text-sm font-medium text-slate-800">
-                    {dest.nome || <span className="italic text-slate-400">Sem nome</span>}
+                <tr
+                  key={dest.id}
+                  style={{ borderBottom: '1px solid var(--border-soft)' }}
+                  className="transition-colors hover:bg-black/5"
+                >
+                  <td className="px-4 py-3 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {dest.nome || <span className="italic" style={{ color: 'var(--text-muted)' }}>Sem nome</span>}
                   </td>
-                  <td className="px-4 py-3 font-mono text-xs text-slate-500">
+                  <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
                     {dest.chatId}
                   </td>
                   <td className="px-4 py-3 text-center">
