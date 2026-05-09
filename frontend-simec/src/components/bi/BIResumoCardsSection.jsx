@@ -60,7 +60,7 @@ function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {
         />
       </ResponsiveGrid>
 
-      <ResponsiveGrid cols={{ base: 1, sm: 3 }}>
+      <ResponsiveGrid cols={{ base: 1, sm: 2, md: 3, xl: 5 }}>
         <InteractiveKpiCard
           icon={faStopwatch}
           title="Tempo médio de resolução"
