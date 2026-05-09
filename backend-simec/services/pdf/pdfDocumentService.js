@@ -496,6 +496,15 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
 
   const fmt = (v, suffix = '') => (v !== null && v !== undefined ? `${v}${suffix}` : '—');
 
+  const fmtHoras = (horasDecimal) => {
+    if (horasDecimal == null || isNaN(horasDecimal)) return '—';
+    const h = Math.floor(horasDecimal);
+    const min = Math.round((horasDecimal - h) * 60);
+    if (h === 0) return `${min}min`;
+    if (min === 0) return `${h}h`;
+    return `${h}h ${min}min`;
+  };
+
   // reserva espaço mínimo antes de cada seção (título + cabeçalho da tabela + 3 linhas)
   const SECTION_MIN = 150;
 
@@ -521,8 +530,8 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
     headers: ['Indicador', 'Valor', 'Descricao'],
     columnWidths: [180, 100, 215],
     rows: [
-      ['MTTR (tempo medio de reparo)', fmt(dados?.kpis?.mttrHoras, 'h'), 'Da abertura ate conclusao da OS corretiva'],
-      ['MTBF (tempo medio entre falhas)', fmt(dados?.kpis?.mtbfHoras, 'h'), 'Horas de operacao / numero de falhas corretivas'],
+      ['MTTR (tempo medio de reparo)', fmtHoras(dados?.kpis?.mttrHoras), 'Da abertura ate conclusao da OS corretiva'],
+      ['MTBF (tempo medio entre falhas)', fmtHoras(dados?.kpis?.mtbfHoras), 'Horas de operacao / numero de falhas corretivas'],
       ['Disponibilidade da frota', fmt(dados?.kpis?.disponibilidadePct, '%'), 'Baseado no downtime acumulado vs horas totais'],
       ['Conformidade PM', fmt(dados?.kpis?.conformidadePM, '%'), 'Preventivas concluidas dentro do prazo agendado'],
     ],
@@ -549,11 +558,11 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   ensureSpace(doc, SECTION_MIN);
   drawSectionTitle(doc, 'Downtime por Unidade');
   drawTable(doc, {
-    headers: ['Unidade / local', 'Horas totais fora de operacao'],
+    headers: ['Unidade / local', 'Tempo fora de operacao'],
     columnWidths: [340, 155],
     rows: (dados?.rankingUnidades || []).map((item) => [
       safeText(item?.nome),
-      `${Number(item?.horasParado || 0).toFixed(2)} h`,
+      fmtHoras(Number(item?.horasParado || 0)),
     ]),
   });
 
@@ -568,7 +577,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
       safeText(item?.unidade),
       safeText(item?.preventivas, '0'),
       safeText(item?.corretivas, '0'),
-      `${Number(item?.horasParado || 0).toFixed(2)} h`,
+      fmtHoras(Number(item?.horasParado || 0)),
     ]),
   });
 
@@ -578,13 +587,13 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
     ensureSpace(doc, SECTION_MIN);
     drawSectionTitle(doc, 'Reincidencia de Falhas (>= 2 ocorrencias)');
     drawTable(doc, {
-      headers: ['Equipamento / tag', 'Unidade', 'Corretivas', 'Downtime (h)'],
+      headers: ['Equipamento / tag', 'Unidade', 'Corretivas', 'Downtime'],
       columnWidths: [190, 155, 75, 75],
       rows: reincidentes.map((item) => [
         `${safeText(item?.modelo)} (${safeText(item?.tag)})`,
         safeText(item?.unidade),
         safeText(item?.corretivas, '0'),
-        `${Number(item?.horasParado || 0).toFixed(2)} h`,
+        fmtHoras(Number(item?.horasParado || 0)),
       ]),
     });
   }
