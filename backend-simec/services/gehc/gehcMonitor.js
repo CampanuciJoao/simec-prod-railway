@@ -11,9 +11,10 @@ import {
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
-function temDadosDeSaude(snapshot) {
+function temDadosSuficientes(snapshot) {
   if (!snapshot) return false;
-
+  // Conectividade sozinha já é dado válido (registra offline no histórico)
+  if (snapshot.equipmentOnline !== null && snapshot.equipmentOnline !== undefined) return true;
   return [
     snapshot.heliumLevelPct,
     snapshot.heliumPressurePsi,
@@ -68,24 +69,22 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
     return;
   }
 
-  console.log(`[GEHC_MONITOR] Iniciando monitoramento de ${equipamentos.length} equipamento(s) GE.`);
+  console.log(`[GEHC_MONITOR] Iniciando monitoramento paralelo de ${equipamentos.length} equipamento(s) GE.`);
 
-  for (const eq of equipamentos) {
+  await Promise.allSettled(equipamentos.map(async (eq) => {
     const nome = eq.apelido || eq.modelo || eq.id;
-    const url  = `${GEHC_BASE_URL}/account/equipment/${eq.gehcAssetId}`;
 
     try {
-      console.log(`[GEHC_MONITOR] Capturando saúde: ${nome} (${eq.gehcAssetId})`);
-
-      // Requer tokens + systemId — sem Playwright no loop de monitoramento
       if (!accessToken || !idToken) {
         console.warn(`[GEHC_MONITOR] ${nome}: sem tokens de autenticação — execute POST /api/gehc/auth para autenticar.`);
-        continue;
+        return;
       }
       if (!eq.gehcSystemId) {
         console.warn(`[GEHC_MONITOR] ${nome}: sem gehcSystemId — execute o discovery novamente para obter o systemId.`);
-        continue;
+        return;
       }
+
+      console.log(`[GEHC_MONITOR] Capturando saúde: ${nome} (${eq.gehcAssetId})`);
 
       const [healthData, connectivityData] = await Promise.allSettled([
         fetchEquipmentHealth({ systemId: eq.gehcSystemId, accessToken, idToken, tenantId: eq.tenantId }),
@@ -98,22 +97,16 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       };
       delete snapshot._raw;
 
-      if (!temDadosDeSaude(snapshot)) {
-        console.warn(
-          `[GEHC_MONITOR] ${nome}: leitura de saúde vazia — snapshot ignorado para não gravar captura sem métricas.`
-        );
-        continue;
+      if (!temDadosSuficientes(snapshot)) {
+        console.warn(`[GEHC_MONITOR] ${nome}: sem dados de saúde nem conectividade — snapshot ignorado.`);
+        return;
       }
 
-      // Enriquece com uptime/utilização
-      let uptimeData     = null;
-      let utilizacaoData = null;
-      if (accessToken && idToken) {
-        [uptimeData, utilizacaoData] = await Promise.allSettled([
-          fetchUptimeData({ assetId: eq.gehcAssetId, accessToken, idToken, tenantId: eq.tenantId }),
-          fetchUtilizationData({ assetId: eq.gehcAssetId, accessToken, idToken, tenantId: eq.tenantId }),
-        ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
-      }
+      // Enriquece com uptime/utilização (não bloqueia o snapshot se falhar)
+      const [uptimeData, utilizacaoData] = await Promise.allSettled([
+        fetchUptimeData({ assetId: eq.gehcAssetId, accessToken, idToken, tenantId: eq.tenantId }),
+        fetchUtilizationData({ assetId: eq.gehcAssetId, accessToken, idToken, tenantId: eq.tenantId }),
+      ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : null));
 
       await prisma.gehcSaudeSnapshot.create({
         data: {
@@ -133,13 +126,11 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
 
       const uptimePct    = uptimeData?.contractUptimeAggregate ?? '?';
       const pacientesDia = utilizacaoData?.patientsAggregate?.averagePerDay ?? '?';
-      console.log(`[GEHC_MONITOR] ${nome}: snapshot salvo, ${criados} alerta(s) novo(s).`);
-      console.log(`[GEHC_MONITOR]   Hélio: ${snapshot.heliumLevelPct}% | Pressão: ${snapshot.heliumPressurePsi} PSI | Compressor: ${snapshot.compressorStatus} | Temp: ${snapshot.coolantTempC}°C | Fluxo: ${snapshot.coolantFlowGpm} GPM`);
-      console.log(`[GEHC_MONITOR]   Uptime: ${uptimePct}% | Online: ${snapshot.equipmentOnline} | Pacientes/dia: ${pacientesDia}`);
+      console.log(`[GEHC_MONITOR] ${nome}: snapshot salvo, ${criados} alerta(s) novo(s). Online=${snapshot.equipmentOnline} | Hélio=${snapshot.heliumLevelPct}% | Uptime=${uptimePct}% | Pacientes/dia=${pacientesDia}`);
     } catch (err) {
       console.error(`[GEHC_MONITOR] Erro ao monitorar ${nome}:`, err.message);
     }
-  }
+  }));
 
   console.log('[GEHC_MONITOR] Monitoramento concluído.');
 }
