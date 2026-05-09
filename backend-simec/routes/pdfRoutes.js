@@ -249,7 +249,7 @@ router.get('/gehc-utilizacao', async (req, res) => {
         equipamento: {
           select: {
             id: true, apelido: true, modelo: true, tag: true, unidadeId: true,
-            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
+            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true, cidade: true } },
           },
         },
       },
@@ -259,6 +259,11 @@ router.get('/gehc-utilizacao', async (req, res) => {
       return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     }
 
+    function nomeUnidade(u) {
+      const base = u?.nomeFantasia || u?.nomeSistema || '—';
+      return u?.cidade ? `${base} — ${u.cidade}` : base;
+    }
+
     const unidadeMap = new Map();
     for (const r of registros) {
       const eq = r.equipamento;
@@ -266,7 +271,7 @@ router.get('/gehc-utilizacao', async (req, res) => {
       const uid = eq.unidadeId;
       if (!unidadeMap.has(uid)) {
         unidadeMap.set(uid, {
-          nome: eq.unidade?.nomeFantasia || eq.unidade?.nomeSistema || uid,
+          nome: nomeUnidade(eq.unidade),
           equipamentos: new Map(),
         });
       }

@@ -681,7 +681,7 @@ router.get('/bi/utilizacao', async (req, res) => {
           select: {
             id: true, apelido: true, modelo: true, tag: true,
             unidadeId: true,
-            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true } },
+            unidade: { select: { id: true, nomeSistema: true, nomeFantasia: true, cidade: true } },
           },
         },
       },
@@ -689,6 +689,11 @@ router.get('/bi/utilizacao', async (req, res) => {
 
     function diasNoMes(date) {
       return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+    }
+
+    function nomeUnidade(u) {
+      const base = u?.nomeFantasia || u?.nomeSistema || '—';
+      return u?.cidade ? `${base} — ${u.cidade}` : base;
     }
 
     // Agrupa por unidade → equipamento
@@ -703,7 +708,7 @@ router.get('/bi/utilizacao', async (req, res) => {
       if (!unidadeMap.has(uid)) {
         unidadeMap.set(uid, {
           unidadeId: uid,
-          nome: unidade?.nomeFantasia || unidade?.nomeSistema || uid,
+          nome: nomeUnidade(unidade),
           equipamentos: new Map(),
         });
       }
