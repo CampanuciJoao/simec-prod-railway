@@ -8,6 +8,7 @@ import {
 
 import { gerarInsightsInteligentes } from './proactivityAgent.js';
 import { onAlertasProcessados } from './alertasEventService.js';
+import { dispararNotificacoesTelegram } from '../telegram/telegramAlertService.js';
 
 const ETAPA_TIMEOUT_MS = 90_000;
 
@@ -117,9 +118,10 @@ export async function processarAlertasEEnviarNotificacoes() {
   );
 
   if (tenantsAfetados.length > 0) {
-    await onAlertasProcessados({
-      tenantsAfetados,
-    });
+    await Promise.allSettled([
+      onAlertasProcessados({ tenantsAfetados }),
+      dispararNotificacoesTelegram(tenantsAfetados),
+    ]);
   }
 
   console.log(

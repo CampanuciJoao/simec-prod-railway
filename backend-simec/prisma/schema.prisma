@@ -51,7 +51,9 @@ model Tenant {
   gehcContratos        GehcContrato[]
   gehcOrdensServico    GehcOrdemServico[]
   gehcUtilizacao       GehcUtilizacaoMensal[]
-  gehcAlertaSuspensoes GehcAlertaSuspensao[]
+  gehcAlertaSuspensoes     GehcAlertaSuspensao[]
+  telegramNotificacoes     TelegramNotificacao[]
+  telegramVinculacaoTokens TelegramVinculacaoToken[]
 
   @@map("tenants")
 }
@@ -420,8 +422,9 @@ model Alerta {
   tipoCategoria String? @map("tipo_categoria")
   tipoEvento    String? @map("tipo_evento")
 
-  link         String?
-  emailEnviado Boolean @default(false)
+  link            String?
+  emailEnviado    Boolean @default(false)
+  telegramEnviado Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -434,6 +437,7 @@ model Alerta {
   @@index([tenantId, tipo, data])
   @@index([tenantId, prioridade, data])
   @@index([tenantId, emailEnviado, createdAt(sort: Desc)])
+  @@index([tenantId, telegramEnviado, createdAt(sort: Desc)])
   @@index([tenantId, numeroOS])
   @@index([tenantId, tipoEvento])
   @@index([tenantId, tipoCategoria])
@@ -1083,4 +1087,42 @@ enum ResultadoVisita {
   Operante
   PrazoEstendido
   Pendente
+}
+
+model TelegramNotificacao {
+  id       String  @id @default(uuid())
+  tenantId String
+  chatId   String
+  nome     String?
+  ativo    Boolean @default(true)
+
+  recebeAlertasContrato     Boolean @default(true)
+  recebeAlertasManutencao   Boolean @default(true)
+  recebeAlertasSeguro       Boolean @default(true)
+  recebeAlertasGehc         Boolean @default(true)
+  recebeAlertasOsCorretiva  Boolean @default(false)
+  recebeAlertasRecomendacao Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, chatId])
+  @@map("telegram_notificacoes")
+}
+
+model TelegramVinculacaoToken {
+  id        String   @id @default(uuid())
+  tenantId  String
+  token     String   @unique
+  expiresAt DateTime
+  usado     Boolean  @default(false)
+  chatId    String?
+
+  createdAt DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("telegram_vinculacao_tokens")
 }

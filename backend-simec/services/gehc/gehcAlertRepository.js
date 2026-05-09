@@ -2,6 +2,7 @@ import prisma from '../prismaService.js';
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
+import { dispararNotificacoesTelegram } from '../telegram/telegramAlertService.js';
 
 export const THRESHOLDS = {
   heliumWarn:          70,
@@ -279,7 +280,10 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
   }
 
   if (mudouContagem) {
-    await publicarContagemAlertasParaTenant({ tenantId });
+    await Promise.allSettled([
+      publicarContagemAlertasParaTenant({ tenantId }),
+      dispararNotificacoesTelegram([tenantId]),
+    ]);
   }
 
   return { criados, total: regras.length };
