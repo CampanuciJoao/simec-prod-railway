@@ -738,6 +738,8 @@ export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
     infoRow(doc, 'Uptime medio', unidade.uptimeMedio != null ? `${unidade.uptimeMedio}%` : 'N/A');
 
     for (const eq of unidade.equipamentos ?? []) {
+      // Garante espaço suficiente para cabeçalho + infoRows + header da tabela + 1 linha
+      ensureSpace(doc, 175);
       drawGroupHeader(doc, `${safeText(eq.nome)} — ${safeText(eq.tag)}`);
       infoRow(doc, 'Total de exames', safeText(eq.totalExames));
       infoRow(doc, 'Media exames/dia', eq.mediaExamesDia != null ? safeText(eq.mediaExamesDia) : 'N/A');
@@ -752,9 +754,10 @@ export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
         m.uptime        != null ? `${m.uptime}%`                            : '—',
       ]);
 
+      // Colunas somam 495pt = largura útil da página A4 (595 - 50 - 50)
       drawTable(doc, {
         headers:      ['Mes', 'Exames', 'Pacientes', 'Media/dia', 'Duracao', 'Uptime'],
-        columnWidths: [70, 55, 65, 65, 65, 55],
+        columnWidths: [80, 80, 85, 80, 85, 85],
         rows,
         emptyMessage: 'Sem dados de utilizacao para este equipamento.',
       });
