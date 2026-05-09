@@ -1,4 +1,5 @@
 import express from 'express';
+import prisma from '../services/prismaService.js';
 import { proteger } from '../middleware/authMiddleware.js';
 import {
   gerarPdfBIBuffer,
