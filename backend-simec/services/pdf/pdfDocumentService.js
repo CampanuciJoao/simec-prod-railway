@@ -360,6 +360,109 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
   doc.moveDown(1);
 }
 
+function drawLineChart(doc, { subtitle, labels, series, chartHeight = 130 }) {
+  const SERIES_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706'];
+  const ML = 34; // margem esquerda (rótulos eixo Y)
+  const MR = 10;
+  const MB = 34; // margem inferior (rótulos X + legenda)
+
+  const pageL = doc.page.margins.left;
+  const totalW = doc.page.width - pageL - doc.page.margins.right;
+  const plotX = pageL + ML;
+  const plotW = totalW - ML - MR;
+  const plotH = chartHeight;
+  const n = labels.length;
+
+  ensureSpace(doc, plotH + MB + (subtitle ? 14 : 0) + 16);
+
+  if (subtitle) {
+    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate500)
+      .text(subtitle, pageL, doc.y, { width: totalW });
+    doc.y += 10;
+  }
+
+  const plotY = doc.y;
+
+  // fundo
+  doc.save().rect(plotX, plotY, plotW, plotH)
+    .fillAndStroke(COLORS.white, COLORS.slate300).restore();
+
+  // grade horizontal e rótulos Y
+  [0, 0.25, 0.5, 0.75, 1].forEach((pct) => {
+    const gy = plotY + plotH * (1 - pct);
+    doc.save()
+      .moveTo(plotX, gy).lineTo(plotX + plotW, gy)
+      .lineWidth(pct === 0 || pct === 1 ? 0.6 : 0.25)
+      .strokeColor(COLORS.slate300).stroke().restore();
+    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate400)
+      .text(`${Math.round(pct * 100)}%`, pageL, gy - 3.5,
+        { width: ML - 5, align: 'right', lineBreak: false });
+  });
+
+  // rótulos X
+  const maxLbls = 7;
+  const step = Math.max(1, Math.floor(n / maxLbls));
+  labels.forEach((lbl, i) => {
+    if (i !== 0 && i % step !== 0 && i !== n - 1) return;
+    const lx = plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate500)
+      .text(lbl, lx - 20, plotY + plotH + 4, { width: 40, align: 'center', lineBreak: false });
+  });
+
+  // séries
+  const drawn = [];
+  series.forEach(({ label, values, color }, si) => {
+    const valid = values.filter((v) => v != null && !Number.isNaN(v));
+    if (valid.length === 0) return;
+
+    const min = Math.min(...valid);
+    const max = Math.max(...valid);
+    const range = max - min || 1;
+    const norm = (v) => (v - min) / range;
+
+    const lineColor = color || SERIES_COLORS[si % SERIES_COLORS.length];
+    drawn.push({ label, color: lineColor, min, max });
+
+    const pts = values.map((v, i) => ({
+      x: plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2),
+      y: v != null && !Number.isNaN(v) ? plotY + plotH * (1 - norm(v)) : null,
+    }));
+
+    // linha
+    doc.save();
+    let open = false;
+    pts.forEach((pt) => {
+      if (pt.y == null) { open = false; return; }
+      if (!open) { doc.moveTo(pt.x, pt.y); open = true; }
+      else { doc.lineTo(pt.x, pt.y); }
+    });
+    doc.lineWidth(1.5).strokeColor(lineColor).stroke().restore();
+
+    // pontos (só quando não há muitos)
+    if (n <= 60) {
+      pts.forEach((pt) => {
+        if (pt.y == null) return;
+        doc.save().circle(pt.x, pt.y, 2).fill(lineColor).restore();
+      });
+    }
+  });
+
+  // legenda
+  const legY = plotY + plotH + 18;
+  let legX = plotX;
+  drawn.forEach(({ label, color, min, max }) => {
+    doc.save().rect(legX, legY + 1, 14, 5).fill(color).restore();
+    const range = min === max
+      ? `${min.toFixed(1)}`
+      : `${min.toFixed(1)} – ${max.toFixed(1)}`;
+    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate600)
+      .text(`${label}  (${range})`, legX + 17, legY, { lineBreak: false });
+    legX += 125;
+  });
+
+  doc.y = legY + 16;
+}
+
 function buildHistoricoRows(eventos = [], locale, timeZone) {
   return eventos.map((evento) => {
     const metadata = evento?.metadata || {};
@@ -671,8 +774,34 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
       : 'Historico completo',
   );
 
+  const snapshots = payload?.snapshots || [];
+
+  if (snapshots.length >= 2) {
+    drawSectionTitle(doc, 'Evolução das métricas no período');
+
+    const usarHora = snapshots.length <= 48;
+    const fmtLabel = (capturedAt) =>
+      new Intl.DateTimeFormat(locale || 'pt-BR', {
+        timeZone: timeZone || 'UTC',
+        day: '2-digit',
+        month: '2-digit',
+        ...(usarHora ? { hour: '2-digit' } : {}),
+      }).format(new Date(capturedAt));
+
+    drawLineChart(doc, {
+      subtitle: 'Valores normalizados por métrica: 0% = mínimo do período, 100% = máximo',
+      labels: snapshots.map((s) => fmtLabel(s.capturedAt)),
+      series: [
+        { label: 'Hélio (%)',      values: snapshots.map((s) => s.heliumLevelPct),    color: '#2563eb' },
+        { label: 'Temperatura(°C)',values: snapshots.map((s) => s.coolantTempC),      color: '#dc2626' },
+        { label: 'Pressão (PSI)', values: snapshots.map((s) => s.heliumPressurePsi), color: '#16a34a' },
+        { label: 'Fluxo (GPM)',   values: snapshots.map((s) => s.coolantFlowGpm),    color: '#d97706' },
+      ],
+    });
+  }
+
   drawSectionTitle(doc, 'Registros de saude');
-  const rows = (payload?.snapshots || []).map(s => [
+  const rows = snapshots.map(s => [
     formatDateTime(s.capturedAt, locale, timeZone),
     s.heliumLevelPct    != null ? `${s.heliumLevelPct}%`   : '—',
     s.heliumPressurePsi != null ? `${s.heliumPressurePsi}` : '—',
