@@ -1,16 +1,19 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheck, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faTimesCircle } from '@fortawesome/free-solid-svg-icons';
 
-function TelegramStatusIcon({ ativo }) {
-  return ativo ? (
-    <FontAwesomeIcon icon={faCheck} className="text-green-500" />
-  ) : (
-    <FontAwesomeIcon icon={faXmark} className="text-slate-300" />
+function TelegramStatusIcon({ ativo = false }) {
+  return (
+    <span
+      className={['inline-flex items-center justify-center rounded-full text-base', ativo ? 'text-emerald-600' : 'text-red-500'].join(' ')}
+      title={ativo ? 'Sim' : 'Não'}
+    >
+      <FontAwesomeIcon icon={ativo ? faCheckCircle : faTimesCircle} />
+    </span>
   );
 }
 
-TelegramStatusIcon.propTypes = { ativo: PropTypes.bool.isRequired };
+TelegramStatusIcon.propTypes = { ativo: PropTypes.bool };
 
 export default TelegramStatusIcon;

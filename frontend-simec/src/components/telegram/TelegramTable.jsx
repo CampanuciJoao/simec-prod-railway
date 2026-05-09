@@ -3,26 +3,26 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
 
-import { Card } from '@/components/ui';
+import { Button, Card } from '@/components/ui';
 import TelegramStatusIcon from './TelegramStatusIcon';
 
 const COLUNAS = [
-  { key: 'recebeAlertasContrato',    label: 'Contratos' },
-  { key: 'recebeAlertasManutencao',  label: 'Manutenções' },
-  { key: 'recebeAlertasSeguro',      label: 'Seguros' },
-  { key: 'recebeAlertasGehc',        label: 'GEHC' },
-  { key: 'recebeAlertasOsCorretiva', label: 'OS Corretiva' },
-  { key: 'recebeAlertasRecomendacao',label: 'Recomendações' },
+  { key: 'recebeAlertasContrato',     label: 'Contratos' },
+  { key: 'recebeAlertasManutencao',   label: 'Manutenções' },
+  { key: 'recebeAlertasSeguro',       label: 'Seguros' },
+  { key: 'recebeAlertasGehc',         label: 'GEHC' },
+  { key: 'recebeAlertasOsCorretiva',  label: 'OS Corretiva' },
+  { key: 'recebeAlertasRecomendacao', label: 'Recomendações' },
 ];
 
 function TelegramTable({ destinatarios, onEdit, onDelete }) {
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-        <span className="text-sm font-medium text-slate-600">
+      <Card className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between" padded>
+        <span className="text-sm font-medium" style={{ color: 'var(--text-muted)' }}>
           {destinatarios.length} destinatário(s) cadastrado(s)
         </span>
-      </div>
+      </Card>
 
       <Card padded={false} className="overflow-hidden">
         <div className="overflow-x-auto">
@@ -43,7 +43,7 @@ function TelegramTable({ destinatarios, onEdit, onDelete }) {
               {destinatarios.map((dest) => (
                 <tr key={dest.id} className="hover:bg-slate-50">
                   <td className="px-4 py-3 text-sm font-medium text-slate-800">
-                    {dest.nome || <span className="text-slate-400 italic">Sem nome</span>}
+                    {dest.nome || <span className="italic text-slate-400">Sem nome</span>}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs text-slate-500">
                     {dest.chatId}
@@ -51,9 +51,7 @@ function TelegramTable({ destinatarios, onEdit, onDelete }) {
                   <td className="px-4 py-3 text-center">
                     <span className={[
                       'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
-                      dest.ativo
-                        ? 'bg-green-100 text-green-700'
-                        : 'bg-slate-100 text-slate-500',
+                      dest.ativo ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500',
                     ].join(' ')}>
                       {dest.ativo ? 'Ativo' : 'Inativo'}
                     </span>
@@ -65,23 +63,23 @@ function TelegramTable({ destinatarios, onEdit, onDelete }) {
                   ))}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-2">
-                      <button
+                      <Button
                         type="button"
+                        variant="ghost"
                         onClick={() => onEdit(dest)}
                         title="Editar"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:border-slate-300"
                       >
                         <FontAwesomeIcon icon={faEdit} />
-                        Editar
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
+                        variant="ghost"
+                        className="text-red-600 hover:text-red-700"
                         onClick={() => onDelete(dest)}
                         title="Remover"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:border-red-300"
                       >
                         <FontAwesomeIcon icon={faTrashAlt} />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
