@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faEdit, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
 
-import { Button, Card } from '@/components/ui';
+import { Card } from '@/components/ui';
 import TelegramStatusIcon from './TelegramStatusIcon';
 
 const COLUNAS = [
@@ -65,18 +65,23 @@ function TelegramTable({ destinatarios, onEdit, onDelete }) {
                   ))}
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-center gap-2">
-                      <Button type="button" variant="ghost" onClick={() => onEdit(dest)} title="Editar">
-                        <FontAwesomeIcon icon={faEdit} />
-                      </Button>
-                      <Button
+                      <button
                         type="button"
-                        variant="ghost"
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => onEdit(dest)}
+                        title="Editar"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 hover:border-slate-300"
+                      >
+                        <FontAwesomeIcon icon={faEdit} />
+                        Editar
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => onDelete(dest)}
                         title="Remover"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 hover:border-red-300"
                       >
                         <FontAwesomeIcon icon={faTrashAlt} />
-                      </Button>
+                      </button>
                     </div>
                   </td>
                 </tr>
