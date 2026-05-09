@@ -7,7 +7,7 @@
     "dev": "nodemon server.js",
     "postinstall": "npx playwright install --with-deps chromium",
     "start": "node scripts/migrate.mjs && node server.js",
-    "start:prod": "node scripts/migrate.mjs && node server.js",
+    "start:prod": "node scripts/migrate.mjs && node scripts/start-all.mjs",
     "pretest": "prisma generate",
     "seed": "node seed.js",
     "tenant:maintenance": "node scripts/tenantOperationalMaintenance.js",
