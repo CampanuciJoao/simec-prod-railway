@@ -2,6 +2,7 @@ import { Queue } from 'bullmq';
 import IORedis from 'ioredis';
 import dotenv from 'dotenv';
 import { getRedisConnectionOptions } from './redis/redisConnectionOptions.js';
+import prisma from './prismaService.js';
 
 dotenv.config();
 
@@ -180,16 +181,24 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
-    // Captura imediata no startup — não espera o primeiro ciclo de 15min
-    await queue.add(
-      'gehc-monitorar-saude',
-      {},
-      {
-        jobId: `gehc-monitorar-saude-startup-${Date.now()}`,
-        removeOnComplete: 5,
-        removeOnFail: 5,
-      }
-    );
+    // Captura imediata no startup — só dispara se o último snapshot tem mais de 25min
+    const STARTUP_THRESHOLD_MS = 25 * 60 * 1000;
+    const ultimoSnapshot = await prisma.gehcSaudeSnapshot.findFirst({
+      orderBy: { capturedAt: 'desc' },
+      select: { capturedAt: true },
+    }).catch(() => null);
+    const precisaCapturar = !ultimoSnapshot || (Date.now() - ultimoSnapshot.capturedAt.getTime() > STARTUP_THRESHOLD_MS);
+    if (precisaCapturar) {
+      await queue.add(
+        'gehc-monitorar-saude',
+        {},
+        {
+          jobId: `gehc-monitorar-saude-startup-${Date.now()}`,
+          removeOnComplete: 5,
+          removeOnFail: 5,
+        }
+      );
+    }
 
     console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 30min + captura imediata no startup.');
 
