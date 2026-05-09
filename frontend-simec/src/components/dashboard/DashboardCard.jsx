@@ -25,12 +25,19 @@ const DashboardCard = forwardRef(function DashboardCard(
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border-soft)',
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         {/* Header com drag handle */}
         <div
           className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
-          style={{ backgroundColor: 'var(--card-header-bg)', borderColor: 'var(--card-header-border)' }}
+          style={{
+            backgroundColor: 'var(--card-header-bg)',
+            borderColor: 'var(--card-header-border)',
+            borderTop: '3px solid var(--brand-primary)',
+            borderTopLeftRadius: '1rem',
+            borderTopRightRadius: '1rem',
+          }}
         >
           <div className="flex items-start gap-2 min-w-0">
             <FontAwesomeIcon

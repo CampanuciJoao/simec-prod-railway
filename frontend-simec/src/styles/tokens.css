@@ -32,10 +32,10 @@
 }
 
 :root[data-theme='light'] {
-  --card-header-bg: #f3f7fc;
+  --card-header-bg: #ffffff;
   --card-header-border: #e2eaf4;
-  --card-header-text: #0f172a;
-  --card-header-text-muted: #70839c;
+  --card-header-text: #1a3a5c;
+  --card-header-text-muted: #607d9a;
 
   --bg-app: #f6f8fc;
   --bg-app-muted: #eef3f8;
@@ -88,9 +88,9 @@
 
   --section-header-border: #e6edf5;
 
-  --shadow-sm: 0 2px 8px rgba(15, 23, 42, 0.04);
-  --shadow-md: 0 12px 32px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 20px 55px rgba(15, 23, 42, 0.12);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 20px 55px rgba(15, 23, 42, 0.13);
 
   --kpi-surface: #ffffff;
   --header-surface: linear-gradient(

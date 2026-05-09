@@ -98,6 +98,41 @@
   }
 }
 
+/* ─── React Grid Layout: resize handles ─────────────────────────────────── */
+.react-resizable-handle {
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+
+.react-grid-item:hover .react-resizable-handle {
+  opacity: 1;
+}
+
+.react-resizable-handle::after {
+  content: '';
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--border-strong);
+  border-bottom: 2px solid var(--border-strong);
+  border-radius: 1px;
+  box-sizing: border-box;
+}
+
+/* sobrescreve a imagem de fundo triangular padrão */
+.react-resizable-handle-se,
+.react-resizable-handle-sw,
+.react-resizable-handle-ne,
+.react-resizable-handle-nw,
+.react-resizable-handle-e,
+.react-resizable-handle-w,
+.react-resizable-handle-s,
+.react-resizable-handle-n {
+  background-image: none !important;
+}
+
 @layer utilities {
   .content-fade-in {
     animation: contentFadeIn 0.24s ease-out;
