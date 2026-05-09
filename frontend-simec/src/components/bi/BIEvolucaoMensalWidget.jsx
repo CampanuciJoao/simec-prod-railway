@@ -64,7 +64,7 @@ function BIEvolucaoMensalWidget({ data = [] }) {
             { label: 'Preventivas no período', value: totais.preventivas, color: 'rgb(34,197,94)',  bg: 'rgba(34,197,94,0.08)'  },
             { label: 'Corretivas no período',  value: totais.corretivas,  color: 'rgb(239,68,68)',  bg: 'rgba(239,68,68,0.08)',
               extra: <TrendBadge atual={totais.ultimoCorretivas} anterior={totais.penultimoCorretivas} /> },
-            { label: 'Downtime acumulado',     value: `${totais.downtime}h`, color: 'rgb(251,191,36)', bg: 'rgba(251,191,36,0.08)' },
+            { label: 'Total downtime no ano', value: `${totais.downtime}h`, color: 'rgb(251,191,36)', bg: 'rgba(251,191,36,0.08)', sub: 'Soma de todos os meses' },
             ...(piorMes ? [{ label: 'Mês mais crítico', value: piorMes.mes, color: 'var(--text-secondary)', bg: 'var(--bg-surface-subtle)',
               sub: `${piorMes.corretivas} corretiva${piorMes.corretivas > 1 ? 's' : ''}` }] : []),
           ].map(({ label, value, color, bg, extra, sub }) => (
