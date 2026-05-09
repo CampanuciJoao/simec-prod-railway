@@ -496,7 +496,11 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
 
   const fmt = (v, suffix = '') => (v !== null && v !== undefined ? `${v}${suffix}` : '—');
 
+  // reserva espaço mínimo antes de cada seção (título + cabeçalho da tabela + 3 linhas)
+  const SECTION_MIN = 150;
+
   // ── 1. Resumo Geral ─────────────────────────────────────────────────────────
+  ensureSpace(doc, SECTION_MIN);
   drawSectionTitle(doc, 'Resumo Geral');
   drawTable(doc, {
     headers: ['Indicador operacional', 'Valor acumulado'],
@@ -511,6 +515,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   });
 
   // ── 2. KPIs Estratégicos ────────────────────────────────────────────────────
+  ensureSpace(doc, SECTION_MIN);
   drawSectionTitle(doc, 'KPIs Estrategicos');
   drawTable(doc, {
     headers: ['Indicador', 'Valor', 'Descricao'],
@@ -526,6 +531,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   // ── 3. Evolucao Mensal ──────────────────────────────────────────────────────
   const evolucao = dados?.evolucaoMensal || [];
   if (evolucao.length > 0) {
+    ensureSpace(doc, SECTION_MIN);
     drawSectionTitle(doc, 'Evolucao Mensal');
     drawTable(doc, {
       headers: ['Mes', 'Preventivas', 'Corretivas', 'Downtime (h)'],
@@ -540,6 +546,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   }
 
   // ── 4. Downtime por Unidade ─────────────────────────────────────────────────
+  ensureSpace(doc, SECTION_MIN);
   drawSectionTitle(doc, 'Downtime por Unidade');
   drawTable(doc, {
     headers: ['Unidade / local', 'Horas totais fora de operacao'],
@@ -551,6 +558,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   });
 
   // ── 5. Top Equipamentos com maior Downtime ───────────────────────────────────
+  ensureSpace(doc, SECTION_MIN);
   drawSectionTitle(doc, 'Top Equipamentos com Maior Downtime');
   drawTable(doc, {
     headers: ['Equipamento / tag', 'Unidade', 'Preventivas', 'Corretivas', 'Tempo parado'],
@@ -567,6 +575,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   // ── 6. Reincidencia de Falhas ───────────────────────────────────────────────
   const reincidentes = dados?.reincidentes?.length ? dados.reincidentes : (dados?.rankingFrequencia || []).filter((i) => i.corretivas >= 2);
   if (reincidentes.length > 0) {
+    ensureSpace(doc, SECTION_MIN);
     drawSectionTitle(doc, 'Reincidencia de Falhas (>= 2 ocorrencias)');
     drawTable(doc, {
       headers: ['Equipamento / tag', 'Unidade', 'Corretivas', 'Downtime (h)'],
