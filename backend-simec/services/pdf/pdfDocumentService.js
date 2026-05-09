@@ -440,6 +440,19 @@ function drawSingleMetricChart(doc, { title, unit, labels, values, color = COLOR
   });
   doc.lineWidth(2).strokeColor(color).stroke().restore();
 
+  // área preenchida abaixo da linha
+  const baseline = plotY + plotH;
+  const firstPt  = pts.find((p) => p.y != null);
+  const lastPt   = [...pts].reverse().find((p) => p.y != null);
+  if (firstPt && lastPt) {
+    doc.save();
+    doc.moveTo(firstPt.x, baseline).lineTo(firstPt.x, firstPt.y);
+    pts.forEach((pt) => { if (pt.y != null) doc.lineTo(pt.x, pt.y); });
+    doc.lineTo(lastPt.x, baseline).closePath();
+    doc.fillColor(color, 0.12).fill();
+    doc.restore();
+  }
+
   // pontos individuais
   if (n <= 80) {
     pts.forEach((pt) => {
@@ -790,7 +803,7 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
         unit: '%',
         labels,
         values: helioValues,
-        color: '#2563eb',
+        color: '#3b82f6',
       });
       drawTable(doc, {
         headers: ['Data / Hora', 'Hélio (%)'],
@@ -814,7 +827,7 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
         unit: 'PSI',
         labels,
         values: pressaoValues,
-        color: '#16a34a',
+        color: '#8b5cf6',
       });
       drawTable(doc, {
         headers: ['Data / Hora', 'Pressão (PSI)'],
@@ -826,6 +839,30 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
             `${s.heliumPressurePsi} PSI`,
           ]),
         emptyMessage: 'Sem leituras de pressão no período.',
+      });
+    }
+
+    // ── Gráfico 3: Temperatura do Coolant ──────────────────────────────────
+    const tempValues = snapshots.map((s) => s.coolantTempC);
+    if (tempValues.some((v) => v != null)) {
+      drawSectionTitle(doc, 'Temperatura do sistema de resfriamento no período');
+      drawSingleMetricChart(doc, {
+        title: 'Temperatura (°C)',
+        unit: '°C',
+        labels,
+        values: tempValues,
+        color: '#dc2626',
+      });
+      drawTable(doc, {
+        headers: ['Data / Hora', 'Temperatura (°C)'],
+        columnWidths: [280, 215],
+        rows: snapshots
+          .filter((s) => s.coolantTempC != null)
+          .map((s) => [
+            formatDateTime(s.capturedAt, locale, timeZone),
+            `${s.coolantTempC} °C`,
+          ]),
+        emptyMessage: 'Sem leituras de temperatura no período.',
       });
     }
   }
