@@ -360,107 +360,100 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
   doc.moveDown(1);
 }
 
-function drawLineChart(doc, { subtitle, labels, series, chartHeight = 130 }) {
-  const SERIES_COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706'];
-  const ML = 34; // margem esquerda (rótulos eixo Y)
+function drawSingleMetricChart(doc, { title, unit, labels, values, color = COLORS.blue, chartHeight = 110 }) {
+  const valid = values.filter((v) => v != null && !Number.isNaN(v));
+  if (valid.length === 0) return;
+
+  const rawMin = Math.min(...valid);
+  const rawMax = Math.max(...valid);
+  const pad    = (rawMax - rawMin) * 0.15 || 0.5;
+  const yMin   = rawMin - pad;
+  const yMax   = rawMax + pad;
+  const yRange = yMax - yMin;
+
+  const ML = 48; // espaço para rótulos Y com valores reais
   const MR = 10;
-  const MB = 34; // margem inferior (rótulos X + legenda)
+  const MB = 24; // espaço para rótulos X
 
-  const pageL = doc.page.margins.left;
+  const pageL  = doc.page.margins.left;
   const totalW = doc.page.width - pageL - doc.page.margins.right;
-  const plotX = pageL + ML;
-  const plotW = totalW - ML - MR;
-  const plotH = chartHeight;
-  const n = labels.length;
+  const plotX  = pageL + ML;
+  const plotW  = totalW - ML - MR;
+  const plotH  = chartHeight;
+  const n      = labels.length;
 
-  ensureSpace(doc, plotH + MB + (subtitle ? 14 : 0) + 16);
+  ensureSpace(doc, plotH + MB + 36);
 
-  if (subtitle) {
-    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate500)
-      .text(subtitle, pageL, doc.y, { width: totalW });
-    doc.y += 10;
-  }
-
+  // cabeçalho do gráfico
+  drawGroupHeader(doc, title);
   const plotY = doc.y;
 
-  // fundo
+  // fundo branco com borda
   doc.save().rect(plotX, plotY, plotW, plotH)
-    .fillAndStroke(COLORS.white, COLORS.slate300).restore();
+    .fillAndStroke(COLORS.white, COLORS.slate200).restore();
 
-  // grade horizontal e rótulos Y
-  [0, 0.25, 0.5, 0.75, 1].forEach((pct) => {
-    const gy = plotY + plotH * (1 - pct);
+  // grade horizontal: 5 níveis com valores reais no eixo Y
+  const ticks = 5;
+  for (let i = 0; i <= ticks; i++) {
+    const pct = i / ticks;
+    const val = yMin + pct * yRange;
+    const gy  = plotY + plotH * (1 - pct);
+
     doc.save()
       .moveTo(plotX, gy).lineTo(plotX + plotW, gy)
-      .lineWidth(pct === 0 || pct === 1 ? 0.6 : 0.25)
+      .lineWidth(i === 0 || i === ticks ? 0.7 : 0.2)
       .strokeColor(COLORS.slate300).stroke().restore();
-    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate400)
-      .text(`${Math.round(pct * 100)}%`, pageL, gy - 3.5,
-        { width: ML - 5, align: 'right', lineBreak: false });
-  });
 
-  // rótulos X
-  const maxLbls = 7;
-  const step = Math.max(1, Math.floor(n / maxLbls));
+    // valor real (não percentual)
+    const lbl = Number.isInteger(val) ? String(val) : val.toFixed(1);
+    doc.font('Helvetica').fontSize(6).fillColor(COLORS.slate500)
+      .text(lbl, pageL, gy - 3.5, { width: ML - 6, align: 'right', lineBreak: false });
+  }
+
+  // unidade no topo do eixo Y
+  doc.font('Helvetica-Bold').fontSize(6).fillColor(COLORS.slate400)
+    .text(unit || '', pageL, plotY - 10, { width: ML - 4, align: 'right', lineBreak: false });
+
+  // rótulos X (máx 8)
+  const step = Math.max(1, Math.floor(n / 8));
   labels.forEach((lbl, i) => {
     if (i !== 0 && i % step !== 0 && i !== n - 1) return;
     const lx = plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
     doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate500)
-      .text(lbl, lx - 20, plotY + plotH + 4, { width: 40, align: 'center', lineBreak: false });
+      .text(lbl, lx - 20, plotY + plotH + 5, { width: 40, align: 'center', lineBreak: false });
   });
 
-  // séries
-  const drawn = [];
-  series.forEach(({ label, values, color }, si) => {
-    const valid = values.filter((v) => v != null && !Number.isNaN(v));
-    if (valid.length === 0) return;
+  // pontos e linha principal
+  const toY = (v) => plotY + plotH * (1 - (v - yMin) / yRange);
+  const pts  = values.map((v, i) => ({
+    x: plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2),
+    y: v != null && !Number.isNaN(v) ? toY(v) : null,
+  }));
 
-    const min = Math.min(...valid);
-    const max = Math.max(...valid);
-    const range = max - min || 1;
-    const norm = (v) => (v - min) / range;
+  // linha
+  doc.save();
+  let open = false;
+  pts.forEach((pt) => {
+    if (pt.y == null) { open = false; return; }
+    if (!open) { doc.moveTo(pt.x, pt.y); open = true; }
+    else { doc.lineTo(pt.x, pt.y); }
+  });
+  doc.lineWidth(2).strokeColor(color).stroke().restore();
 
-    const lineColor = color || SERIES_COLORS[si % SERIES_COLORS.length];
-    drawn.push({ label, color: lineColor, min, max });
-
-    const pts = values.map((v, i) => ({
-      x: plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2),
-      y: v != null && !Number.isNaN(v) ? plotY + plotH * (1 - norm(v)) : null,
-    }));
-
-    // linha
-    doc.save();
-    let open = false;
+  // pontos individuais
+  if (n <= 80) {
     pts.forEach((pt) => {
-      if (pt.y == null) { open = false; return; }
-      if (!open) { doc.moveTo(pt.x, pt.y); open = true; }
-      else { doc.lineTo(pt.x, pt.y); }
+      if (pt.y == null) return;
+      doc.save().circle(pt.x, pt.y, 2.5)
+        .fillAndStroke(COLORS.white, color).lineWidth(1.2).restore();
     });
-    doc.lineWidth(1.5).strokeColor(lineColor).stroke().restore();
+  }
 
-    // pontos (só quando não há muitos)
-    if (n <= 60) {
-      pts.forEach((pt) => {
-        if (pt.y == null) return;
-        doc.save().circle(pt.x, pt.y, 2).fill(lineColor).restore();
-      });
-    }
-  });
+  // eixo Y (linha vertical)
+  doc.save().moveTo(plotX, plotY).lineTo(plotX, plotY + plotH)
+    .lineWidth(0.8).strokeColor(COLORS.slate400).stroke().restore();
 
-  // legenda
-  const legY = plotY + plotH + 18;
-  let legX = plotX;
-  drawn.forEach(({ label, color, min, max }) => {
-    doc.save().rect(legX, legY + 1, 14, 5).fill(color).restore();
-    const range = min === max
-      ? `${min.toFixed(1)}`
-      : `${min.toFixed(1)} – ${max.toFixed(1)}`;
-    doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate600)
-      .text(`${label}  (${range})`, legX + 17, legY, { lineBreak: false });
-    legX += 125;
-  });
-
-  doc.y = legY + 16;
+  doc.y = plotY + plotH + MB + 4;
 }
 
 function buildHistoricoRows(eventos = [], locale, timeZone) {
@@ -777,8 +770,6 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
   const snapshots = payload?.snapshots || [];
 
   if (snapshots.length >= 2) {
-    drawSectionTitle(doc, 'Evolução das métricas no período');
-
     const usarHora = snapshots.length <= 48;
     const fmtLabel = (capturedAt) =>
       new Intl.DateTimeFormat(locale || 'pt-BR', {
@@ -788,19 +779,58 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
         ...(usarHora ? { hour: '2-digit' } : {}),
       }).format(new Date(capturedAt));
 
-    drawLineChart(doc, {
-      subtitle: 'Valores normalizados por métrica: 0% = mínimo do período, 100% = máximo',
-      labels: snapshots.map((s) => fmtLabel(s.capturedAt)),
-      series: [
-        { label: 'Hélio (%)',      values: snapshots.map((s) => s.heliumLevelPct),    color: '#2563eb' },
-        { label: 'Temperatura(°C)',values: snapshots.map((s) => s.coolantTempC),      color: '#dc2626' },
-        { label: 'Pressão (PSI)', values: snapshots.map((s) => s.heliumPressurePsi), color: '#16a34a' },
-        { label: 'Fluxo (GPM)',   values: snapshots.map((s) => s.coolantFlowGpm),    color: '#d97706' },
-      ],
-    });
+    const labels = snapshots.map((s) => fmtLabel(s.capturedAt));
+
+    // ── Gráfico 1: Nível de Hélio ──────────────────────────────────────────
+    const helioValues = snapshots.map((s) => s.heliumLevelPct);
+    if (helioValues.some((v) => v != null)) {
+      drawSectionTitle(doc, 'Nível de Hélio no período');
+      drawSingleMetricChart(doc, {
+        title: 'Nível de Hélio (%)',
+        unit: '%',
+        labels,
+        values: helioValues,
+        color: '#2563eb',
+      });
+      drawTable(doc, {
+        headers: ['Data / Hora', 'Hélio (%)'],
+        columnWidths: [280, 215],
+        rows: snapshots
+          .filter((s) => s.heliumLevelPct != null)
+          .map((s) => [
+            formatDateTime(s.capturedAt, locale, timeZone),
+            `${s.heliumLevelPct}%`,
+          ]),
+        emptyMessage: 'Sem leituras de hélio no período.',
+      });
+    }
+
+    // ── Gráfico 2: Pressão do Hélio ────────────────────────────────────────
+    const pressaoValues = snapshots.map((s) => s.heliumPressurePsi);
+    if (pressaoValues.some((v) => v != null)) {
+      drawSectionTitle(doc, 'Pressão do Hélio no período');
+      drawSingleMetricChart(doc, {
+        title: 'Pressão (PSI)',
+        unit: 'PSI',
+        labels,
+        values: pressaoValues,
+        color: '#16a34a',
+      });
+      drawTable(doc, {
+        headers: ['Data / Hora', 'Pressão (PSI)'],
+        columnWidths: [280, 215],
+        rows: snapshots
+          .filter((s) => s.heliumPressurePsi != null)
+          .map((s) => [
+            formatDateTime(s.capturedAt, locale, timeZone),
+            `${s.heliumPressurePsi} PSI`,
+          ]),
+        emptyMessage: 'Sem leituras de pressão no período.',
+      });
+    }
   }
 
-  drawSectionTitle(doc, 'Registros de saude');
+  drawSectionTitle(doc, 'Registros completos de saude');
   const rows = snapshots.map(s => [
     formatDateTime(s.capturedAt, locale, timeZone),
     s.heliumLevelPct    != null ? `${s.heliumLevelPct}%`   : '—',
