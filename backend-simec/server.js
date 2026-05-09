@@ -30,6 +30,7 @@ import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
 import orcamentosRoutes from './routes/orcamentosRoutes.js';
 import osCorretivaRoutes from './routes/osCorretivaRoutes.js';
 import gehcRoutes from './routes/gehcRoutes.js';
+import telegramRoutes from './routes/telegramRoutes.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
@@ -164,6 +165,7 @@ app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);
 app.use('/api/os-corretiva', osCorretivaRoutes);
 app.use('/api/gehc', gehcRoutes);
+app.use('/api/telegram', telegramRoutes);
 
 app.use('/api', (req, res) => {
   console.warn(`[404] ${req.method} ${req.originalUrl} — rota não encontrada`);
