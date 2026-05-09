@@ -27,10 +27,13 @@ const LABELS_POR_METRICA = {
   magnetOnline:      ['magneto-offline'],
 };
 
-function regrasDeAlerta(snapshot, equipamentoNome) {
+function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false) {
   const alertas = [];
   const { heliumLevelPct, heliumPressurePsi, compressorStatus,
           coolantTempC, coolantFlowGpm, magnetOnline } = snapshot;
+
+  // Alertas de hélio, magneto e cryo são exclusivos de ressonâncias magnéticas
+  if (!eRessonancia) return alertas;
 
   if (heliumLevelPct !== null && heliumLevelPct !== undefined) {
     if (heliumLevelPct < THRESHOLDS.heliumCritical) {
@@ -148,7 +151,7 @@ async function verificarOfflineProlongado(tenantId, equipamentoId, agora) {
   return agora - primeiroSnapshot.capturedAt >= OFFLINE_THRESHOLD_MS;
 }
 
-export async function processarAlertasGehc({ tenantId, equipamentoId, equipamentoNome, snapshot }) {
+export async function processarAlertasGehc({ tenantId, equipamentoId, equipamentoNome, snapshot, eRessonancia = false }) {
   // Verifica suspensões ativas para este equipamento/tenant
   const now = new Date();
   const suspensoes = await prisma.gehcAlertaSuspensao.findMany({
@@ -175,7 +178,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
   );
 
   // Computa regras e filtra eventos suspensos
-  const todasRegras = regrasDeAlerta(snapshot, equipamentoNome);
+  const todasRegras = regrasDeAlerta(snapshot, equipamentoNome, eRessonancia);
   const regras = todasRegras.filter(r => !eventosSuspensos.has(r.evento));
 
   const labelsAtivos = new Set(regras.map(r => r.label));

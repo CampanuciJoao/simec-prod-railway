@@ -59,6 +59,7 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       tenantId: true,
       apelido: true,
       modelo: true,
+      tipo: true,
       gehcAssetId: true,
       gehcSystemId: true,
     },
@@ -117,11 +118,15 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
         },
       });
 
+      const tipoNorm = (eq.tipo ?? '').toLowerCase();
+      const eRessonancia = tipoNorm.includes('ressonância') || tipoNorm.includes('ressonancia') || tipoNorm.includes('rm');
+
       const { criados } = await processarAlertasGehc({
         tenantId:        eq.tenantId,
         equipamentoId:   eq.id,
         equipamentoNome: nome,
         snapshot,
+        eRessonancia,
       });
 
       const uptimePct    = uptimeData?.contractUptimeAggregate ?? '?';
