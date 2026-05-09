@@ -14,6 +14,8 @@ export const THRESHOLDS = {
   pressureCriticalMax: 2.0,
 };
 
+const OFFLINE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 horas
+
 // Labels agrupados por métrica: permite saber quais alertas resolver quando a condição normaliza
 const LABELS_POR_METRICA = {
   heliumLevelPct:    ['helio-critico', 'helio-baixo'],
@@ -122,6 +124,29 @@ function regrasDeAlerta(snapshot, equipamentoNome) {
   return alertas;
 }
 
+async function verificarOfflineProlongado(tenantId, equipamentoId, agora) {
+  // Encontra o snapshot online mais recente para calcular quanto tempo está offline
+  const ultimoOnline = await prisma.gehcSaudeSnapshot.findFirst({
+    where: { tenantId, equipamentoId, equipmentOnline: true },
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  });
+
+  if (ultimoOnline) {
+    return agora - ultimoOnline.capturedAt >= OFFLINE_THRESHOLD_MS;
+  }
+
+  // Nunca esteve online — conta a partir do primeiro snapshot registrado
+  const primeiroSnapshot = await prisma.gehcSaudeSnapshot.findFirst({
+    where: { tenantId, equipamentoId },
+    orderBy: { capturedAt: 'asc' },
+    select: { capturedAt: true },
+  });
+
+  if (!primeiroSnapshot) return false;
+  return agora - primeiroSnapshot.capturedAt >= OFFLINE_THRESHOLD_MS;
+}
+
 export async function processarAlertasGehc({ tenantId, equipamentoId, equipamentoNome, snapshot }) {
   // Verifica suspensões ativas para este equipamento/tenant
   const now = new Date();
@@ -178,8 +203,47 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
     }
   }
 
-  // Cria ou atualiza alertas ativos
+  // Alerta de equipamento offline prolongado (>6h)
   let criados = 0;
+  const alertaOfflineId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, 'equipamento-offline');
+  if (snapshot.equipmentOnline === true) {
+    const { count } = await prisma.alerta.deleteMany({
+      where: { tenantId, id: alertaOfflineId },
+    });
+    if (count > 0) {
+      mudouContagem = true;
+      console.log(`[GEHC_ALERT] ${equipamentoNome}: alerta offline resolvido — equipamento voltou online.`);
+    }
+  } else if (snapshot.equipmentOnline === false && !eventosSuspensos.has(ALERT_EVENTOS.GEHC_EQUIPAMENTO_OFFLINE)) {
+    const agora = new Date();
+    const offlineProlongado = await verificarOfflineProlongado(tenantId, equipamentoId, agora);
+    if (offlineProlongado) {
+      const existente = await prisma.alerta.findUnique({
+        where: { tenantId_id: { tenantId, id: alertaOfflineId } },
+        select: { id: true },
+      });
+      if (!existente) {
+        await prisma.alerta.create({
+          data: {
+            id: alertaOfflineId,
+            tenantId,
+            titulo: `Equipamento offline há mais de 6h — ${equipamentoNome}`,
+            subtitulo: 'Verifique a conectividade do equipamento com o portal GE Healthcare.',
+            data: agora,
+            prioridade: ALERT_PRIORIDADES.ALTA,
+            tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
+            tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
+            tipoEvento: ALERT_EVENTOS.GEHC_EQUIPAMENTO_OFFLINE,
+          },
+        });
+        criados++;
+        mudouContagem = true;
+        console.log(`[GEHC_ALERT] ${equipamentoNome}: alerta offline prolongado criado.`);
+      }
+    }
+  }
+
+  // Cria ou atualiza alertas ativos
   for (const regra of regras) {
     const alertaId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, regra.label);
 
