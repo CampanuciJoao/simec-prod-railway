@@ -112,10 +112,24 @@ export function useIntegracoesGehc() {
     }
   }, [carregarStatus]);
 
+  const removerPendenteConfirmacao = useCallback((equipamentoId) => {
+    setResultDiscovery(prev => {
+      if (!prev?.detalhes?.pendentesConfirmacao) return prev;
+      return {
+        ...prev,
+        detalhes: {
+          ...prev.detalhes,
+          pendentesConfirmacao: prev.detalhes.pendentesConfirmacao.filter(e => e.simecId !== equipamentoId),
+        },
+      };
+    });
+  }, []);
+
   const vincularEquipamento = useCallback(async (equipamentoId, gehcAssetId) => {
     setVincularState(s => ({ ...s, [equipamentoId]: { running: true, error: null } }));
     try {
       await putVincularEquipamento(equipamentoId, gehcAssetId);
+      removerPendenteConfirmacao(equipamentoId);
       await carregarStatus();
       setVincularState(s => ({ ...s, [equipamentoId]: { running: false, error: null } }));
     } catch (err) {
@@ -124,12 +138,13 @@ export function useIntegracoesGehc() {
         [equipamentoId]: { running: false, error: err?.response?.data?.error ?? err.message },
       }));
     }
-  }, [carregarStatus]);
+  }, [carregarStatus, removerPendenteConfirmacao]);
 
   const desvincularEquipamento = useCallback(async (equipamentoId) => {
     setVincularState(s => ({ ...s, [equipamentoId]: { running: true, error: null } }));
     try {
       await deleteDesvincularEquipamento(equipamentoId);
+      removerPendenteConfirmacao(equipamentoId);
       await carregarStatus();
       setVincularState(s => ({ ...s, [equipamentoId]: { running: false, error: null } }));
     } catch (err) {
@@ -138,7 +153,7 @@ export function useIntegracoesGehc() {
         [equipamentoId]: { running: false, error: err?.response?.data?.error ?? err.message },
       }));
     }
-  }, [carregarStatus]);
+  }, [carregarStatus, removerPendenteConfirmacao]);
 
   return {
     status,
