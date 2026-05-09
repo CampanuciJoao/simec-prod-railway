@@ -162,7 +162,7 @@ export async function iniciarJobsDeAlertas() {
       }
     );
 
-    // Job GEHC: monitoramento de saúde das RMs GE a cada 2h
+    // Job GEHC: monitoramento de saúde das RMs GE a cada 15min
     const repeatables3 = await queue.getRepeatableJobs();
     for (const job of repeatables3) {
       if (job.name === 'gehc-monitorar-saude') {
@@ -174,14 +174,24 @@ export async function iniciarJobsDeAlertas() {
       'gehc-monitorar-saude',
       {},
       {
-        jobId: 'gehc-monitorar-saude',
-        repeat: { every: 2 * 60 * 60 * 1000 },
-        removeOnComplete: 20,
+        repeat: { every: 15 * 60 * 1000 },
+        removeOnComplete: 50,
         removeOnFail: 20,
       }
     );
 
-    console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 2h.');
+    // Captura imediata no startup — não espera o primeiro ciclo de 15min
+    await queue.add(
+      'gehc-monitorar-saude',
+      {},
+      {
+        jobId: `gehc-monitorar-saude-startup-${Date.now()}`,
+        removeOnComplete: 5,
+        removeOnFail: 5,
+      }
+    );
+
+    console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 15min + captura imediata no startup.');
 
     // Sync completo de contratos, OS e utilização — uma vez por dia às 02:00 UTC
     const repeatables4 = await queue.getRepeatableJobs();
@@ -195,7 +205,6 @@ export async function iniciarJobsDeAlertas() {
       'gehc-sync-dados',
       {},
       {
-        jobId: 'gehc-sync-dados',
         repeat: { cron: '0 2 * * *' },
         removeOnComplete: 10,
         removeOnFail: 10,
