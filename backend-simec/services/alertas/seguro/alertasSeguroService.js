@@ -1,7 +1,7 @@
 import prisma from '../../prismaService.js';
 import { getAgora } from '../../time/index.js';
-import { buscarSegurosAtivosPorTenant } from './seguroAlertRepository.js';
-import { gerarAlertaVencimentoSeguro } from './seguroAlertRules.js';
+import { buscarSegurosAtivosPorTenant, buscarConflitosCoberturaPorTenant } from './seguroAlertRepository.js';
+import { gerarAlertaVencimentoSeguro, gerarAlertaConflitoCobertura } from './seguroAlertRules.js';
 
 /**
  * Processa um tenant
@@ -9,31 +9,33 @@ import { gerarAlertaVencimentoSeguro } from './seguroAlertRules.js';
 async function processarTenant(tenant, agoraUtc) {
   const timezone = tenant.timezone || 'America/Campo_Grande';
 
-  const segurosAtivos = await buscarSegurosAtivosPorTenant(tenant.id);
+  const [segurosAtivos, conflitos] = await Promise.all([
+    buscarSegurosAtivosPorTenant(tenant.id),
+    buscarConflitosCoberturaPorTenant(tenant.id),
+  ]);
 
-  let total = 0;
-
-  // 🔥 roda em paralelo (melhor performance)
-  const results = await Promise.all(
-    segurosAtivos.map((seguro) =>
-      gerarAlertaVencimentoSeguro(
-        tenant.id,
-        seguro,
-        agoraUtc,
-        timezone
+  const [vencimentoResults, conflitoResults] = await Promise.all([
+    Promise.all(
+      segurosAtivos.map((seguro) =>
+        gerarAlertaVencimentoSeguro(tenant.id, seguro, agoraUtc, timezone)
       )
-    )
-  );
+    ),
+    Promise.all(
+      conflitos.map(([a, b]) => gerarAlertaConflitoCobertura(tenant.id, a, b))
+    ),
+  ]);
 
-  total = results.reduce((acc, val) => acc + val, 0);
+  const total =
+    vencimentoResults.reduce((acc, val) => acc + val, 0) +
+    conflitoResults.reduce((acc, val) => acc + val, 0);
 
   console.log(
-    `[ALERTA_SEGURO][${tenant.id}] Total=${total} | tz=${timezone}`
+    `[ALERTA_SEGURO][${tenant.id}] Total=${total} conflitos=${conflitos.length} | tz=${timezone}`
   );
 
   return {
     total,
-    afetou: total > 0, // 🔥 importante
+    afetou: total > 0,
   };
 }
 

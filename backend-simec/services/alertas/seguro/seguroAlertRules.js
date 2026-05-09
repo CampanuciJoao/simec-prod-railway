@@ -3,6 +3,8 @@ import {
   montarTituloSeguroVencido,
   montarTituloSeguroVence,
   montarSubtituloSeguro,
+  montarTituloSeguroConflito,
+  montarSubtituloSeguroConflito,
 } from './seguroAlertFormatter.js';
 
 import { upsertAlertaSeguro } from './seguroAlertRepository.js';
@@ -108,4 +110,28 @@ export async function gerarAlertaVencimentoSeguro(
   }
 
   return 0;
+}
+
+export async function gerarAlertaConflitoCobertura(tenantId, seguroA, seguroB) {
+  const [idA, idB] = [seguroA.id, seguroB.id].sort();
+  const alertaId = buildSeguroAlertId(tenantId, 'seguro-conflito', `${idA}_${idB}`);
+
+  await upsertAlertaSeguro(
+    tenantId,
+    alertaId,
+    await criarPayloadBaseAlerta({
+      id: alertaId,
+      titulo:        montarTituloSeguroConflito(seguroA),
+      subtitulo:     montarSubtituloSeguroConflito(seguroA, seguroB),
+      data:          new Date(),
+      prioridade:    ALERT_PRIORIDADES.ALTA,
+      tipoCategoria: ALERT_CATEGORIAS.SEGURO,
+      tipoEvento:    ALERT_EVENTOS.SEGURO_CONFLITO,
+      link:          `/seguros/detalhes/${seguroA.id}`,
+      contexto:  { seguroIdA: seguroA.id, seguroIdB: seguroB.id, tenantId },
+      metadata:  { tipo: 'seguro', criticidade: 'Alto' },
+    })
+  );
+
+  return 1;
 }

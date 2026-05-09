@@ -18,3 +18,13 @@ export function montarSubtituloSeguro(seguro) {
 export function montarTituloSeguroVence(seguro, texto) {
   return `Seguro da ${resolverAlvoSeguro(seguro)} vence ${texto}`;
 }
+
+export function montarTituloSeguroConflito(seguro) {
+  return `Conflito de cobertura na ${resolverAlvoSeguro(seguro)}`;
+}
+
+export function montarSubtituloSeguroConflito(seguroA, seguroB) {
+  const a = seguroA?.apoliceNumero || 'S/N';
+  const b = seguroB?.apoliceNumero || 'S/N';
+  return `Apólices ${a} e ${b} com cobertura simultânea`;
+}

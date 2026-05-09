@@ -101,6 +101,37 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
   return unidade;
 }
 
+async function verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId }) {
+  const inicio = new Date(dataInicio);
+  const fim    = new Date(dataFim);
+
+  const alvos = [];
+  if (unidadeId)     alvos.push({ campo: 'prédio',       where: { unidadeId } });
+  if (equipamentoId) alvos.push({ campo: 'equipamento',  where: { equipamentoId } });
+
+  for (const { campo, where } of alvos) {
+    const conflito = await prisma.seguro.findFirst({
+      where: {
+        tenantId,
+        ...where,
+        status: { in: ['Ativo', 'Vigente'] },
+        id: excluirId ? { not: excluirId } : undefined,
+        dataInicio: { lt: fim },
+        dataFim:    { gt: inicio },
+      },
+      select: { id: true, apoliceNumero: true },
+    });
+
+    if (conflito) {
+      const error = new Error(
+        `Já existe um seguro ativo cobrindo este ${campo} no mesmo período (Apólice ${conflito.apoliceNumero || conflito.id}).`
+      );
+      error.status = 409;
+      throw error;
+    }
+  }
+}
+
 // ─── Helpers de paginação e filtros ──────────────────────────────────────────
 
 function buildStatusWhereSeguro(status) {
@@ -267,6 +298,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
+    await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: null });
 
     const novoSeguro = await prisma.seguro.create({
       data: {
@@ -372,6 +404,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
+    await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: id });
 
     const atualizado = await prisma.seguro.update({
       where: {
