@@ -12,6 +12,7 @@ import { useBIPage } from '@/hooks/bi/useBIPage';
 import { useBIDrawerData } from '@/hooks/bi/useBIDrawerData';
 import { useBILayout, DEFAULT_BI_LAYOUT, BI_ROW_HEIGHT, BI_GRID_MARGIN } from '@/hooks/bi/useBILayout';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/contexts/ToastContext';
 
 import { PageLayout, PageSection, PageState, Button } from '@/components/ui';
 
@@ -28,6 +29,7 @@ const ResponsiveGrid = WidthProvider(Responsive);
 function BIPage() {
   const page = useBIPage();
   const { usuario } = useAuth();
+  const { addToast } = useToast();
 
   const unidadeCriticaId = page.rankingUnidades[0]?.unidadeId || null;
   const drawerData = useBIDrawerData({
@@ -65,8 +67,10 @@ function BIPage() {
     setGehcExportando(true);
     try {
       await exportarUtilizacaoGehcPDF(12);
+      addToast('PDF gerado com sucesso.', 'success');
     } catch (e) {
       console.error('[GEHC_PDF_EXPORT]', e);
+      addToast('Erro ao gerar o PDF. Tente novamente.', 'error');
     } finally {
       setGehcExportando(false);
     }
