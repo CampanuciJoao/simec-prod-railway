@@ -275,7 +275,7 @@ router.get('/indicadores', async (req, res) => {
     const totalHorasFlota = totalEquipamentos * horasDecorridas;
     const totalDowntimeFlota = Object.values(statsEquip).reduce((a, e) => a + e.horasParado, 0);
     const disponibilidadePct = totalHorasFlota > 0
-      ? Math.round(((totalHorasFlota - totalDowntimeFlota) / totalHorasFlota) * 1000) / 10
+      ? Math.round(((totalHorasFlota - totalDowntimeFlota) / totalHorasFlota) * 100000) / 1000
       : null;
 
     // Reincidentes — equipamentos com ≥ 2 ocorrências corretivas
