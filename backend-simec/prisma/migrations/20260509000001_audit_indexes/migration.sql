@@ -1,4 +1,4 @@
-﻿-- audit_indexes: indexes de performance baseados na auditoria tecnica 2026-05-09
+-- audit_indexes: indexes de performance baseados na auditoria tecnica 2026-05-09
 
 -- Alerta: substituir index simples por composto com createdAt (queries de notificacao por email)
 DROP INDEX IF EXISTS "alertas_tenantId_emailEnviado_idx";
