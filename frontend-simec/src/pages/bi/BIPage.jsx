@@ -165,6 +165,59 @@ function BIPage() {
             />
           ) : null}
 
+          {shouldShowState ? (
+            <PageSection
+              title="Widgets analíticos"
+              description="Os gráficos priorizam leitura executiva rápida, com foco em downtime, criticidade e recorrência operacional."
+              darkHeader
+            >
+              <PageState
+                loading={page.loading}
+                error={page.error?.message || page.error || ''}
+                isEmpty={isEmpty}
+                emptyMessage="Dados de BI não disponíveis para o período selecionado."
+              />
+            </PageSection>
+          ) : (
+            <PageSection
+              title="Widgets analíticos"
+              description="Arraste os widgets para reorganizar. Redimensione pelas bordas."
+              darkHeader
+              headerRight={
+                <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
+                  <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
+                </Button>
+              }
+            >
+              <ResponsiveGrid
+                layouts={{ lg: computedLayout, md: computedLayout, sm: computedLayout }}
+                breakpoints={{ lg: 1100, md: 768, sm: 0 }}
+                cols={{ lg: 12, md: 12, sm: 1 }}
+                rowHeight={BI_ROW_HEIGHT}
+                margin={BI_GRID_MARGIN}
+                draggableHandle=".drag-handle"
+                onLayoutChange={handleLayoutChange}
+                resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
+                className="layout"
+              >
+                {Object.values(widgetMap).map((widget) => {
+                  const isExpanded = expandedWidget === widget.id;
+                  return (
+                    <BIWidgetShell
+                      key={widget.id}
+                      title={widget.title}
+                      description={widget.description}
+                      expanded={isExpanded}
+                      onToggleExpand={() => toggleExpand(widget.id)}
+                    >
+                      {widget.render(isExpanded)}
+                    </BIWidgetShell>
+                  );
+                })}
+              </ResponsiveGrid>
+            </PageSection>
+          )}
+
           {(gehcLoading || gehcUtilizacao) && (
             <PageSection
               title="Utilização GE Healthcare"
@@ -258,59 +311,6 @@ function BIPage() {
                   </div>
                 </>
               )}
-            </PageSection>
-          )}
-
-          {shouldShowState ? (
-            <PageSection
-              title="Widgets analíticos"
-              description="Os gráficos priorizam leitura executiva rápida, com foco em downtime, criticidade e recorrência operacional."
-              darkHeader
-            >
-              <PageState
-                loading={page.loading}
-                error={page.error?.message || page.error || ''}
-                isEmpty={isEmpty}
-                emptyMessage="Dados de BI não disponíveis para o período selecionado."
-              />
-            </PageSection>
-          ) : (
-            <PageSection
-              title="Widgets analíticos"
-              description="Arraste os widgets para reorganizar. Redimensione pelas bordas."
-              darkHeader
-              headerRight={
-                <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
-                  <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
-                </Button>
-              }
-            >
-              <ResponsiveGrid
-                layouts={{ lg: computedLayout, md: computedLayout, sm: computedLayout }}
-                breakpoints={{ lg: 1100, md: 768, sm: 0 }}
-                cols={{ lg: 12, md: 12, sm: 1 }}
-                rowHeight={BI_ROW_HEIGHT}
-                margin={BI_GRID_MARGIN}
-                draggableHandle=".drag-handle"
-                onLayoutChange={handleLayoutChange}
-                resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
-                className="layout"
-              >
-                {Object.values(widgetMap).map((widget) => {
-                  const isExpanded = expandedWidget === widget.id;
-                  return (
-                    <BIWidgetShell
-                      key={widget.id}
-                      title={widget.title}
-                      description={widget.description}
-                      expanded={isExpanded}
-                      onToggleExpand={() => toggleExpand(widget.id)}
-                    >
-                      {widget.render(isExpanded)}
-                    </BIWidgetShell>
-                  );
-                })}
-              </ResponsiveGrid>
             </PageSection>
           )}
         </div>
