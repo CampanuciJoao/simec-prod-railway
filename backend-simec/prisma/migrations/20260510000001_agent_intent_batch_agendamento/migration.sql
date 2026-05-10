@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "AgentIntent" ADD VALUE 'BATCH_AGENDAMENTO';

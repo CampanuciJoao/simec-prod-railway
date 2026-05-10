@@ -656,6 +656,7 @@ enum AgentSessionStatus {
 
 enum AgentIntent {
   AGENDAR_MANUTENCAO
+  BATCH_AGENDAMENTO
   RELATORIO
   SEGURO
   CONTRATO
