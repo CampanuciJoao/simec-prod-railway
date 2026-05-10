@@ -15,12 +15,12 @@ function InteractiveKpiCard({ icon, title, value, subtitle, tone = 'slate', onCl
   };
 
   const inner = (
-    <Card className="h-full min-h-[100px]">
-      <div className="flex h-full flex-col justify-between gap-3">
-        <div className="flex items-start gap-3">
+    <Card padded={false} className="h-full min-h-[80px] p-3">
+      <div className="flex h-full flex-col justify-between gap-2">
+        <div className="flex items-start gap-2">
           <div
             className={[
-              'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm',
+              'inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-xs',
               toneMap[tone] || toneMap.slate,
             ].join(' ')}
           >
@@ -29,14 +29,14 @@ function InteractiveKpiCard({ icon, title, value, subtitle, tone = 'slate', onCl
 
           <div className="min-w-0 flex-1">
             <p
-              className="text-xs font-semibold uppercase tracking-wide"
+              className="text-[10px] font-semibold uppercase leading-tight tracking-wide"
               style={{ color: 'var(--text-muted)' }}
             >
               {title}
             </p>
 
             <p
-              className="mt-1.5 break-words text-2xl font-bold leading-tight tracking-tight"
+              className="mt-1 break-words text-lg font-bold leading-tight tracking-tight"
               style={{ color: 'var(--text-primary)' }}
             >
               {value}
@@ -46,14 +46,14 @@ function InteractiveKpiCard({ icon, title, value, subtitle, tone = 'slate', onCl
 
         {onClick ? (
           <div
-            className="flex items-center gap-2 text-xs font-semibold"
+            className="flex items-center gap-1.5 text-[10px] font-semibold"
             style={{ color: 'var(--brand-primary)' }}
           >
             <span>Ver detalhes</span>
             <FontAwesomeIcon icon={faArrowRight} />
           </div>
         ) : subtitle ? (
-          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
+          <p className="text-[10px] leading-tight" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
         ) : null}
       </div>
     </Card>
