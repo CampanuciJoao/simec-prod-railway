@@ -14,7 +14,7 @@ import { InteractiveKpiCard } from '@/components/bi';
 
 function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {
   return (
-    <ResponsiveGrid cols={{ base: 1, sm: 2, md: 4, xl: 7 }}>
+    <ResponsiveGrid cols={{ base: 1, sm: 2, md: 4, lg: 7 }}>
       <InteractiveKpiCard
         icon={faMicrochip}
         title="Ativos no sistema"
