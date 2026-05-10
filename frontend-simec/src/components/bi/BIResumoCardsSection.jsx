@@ -9,12 +9,11 @@ import {
   faRotate,
 } from '@fortawesome/free-solid-svg-icons';
 
-import { ResponsiveGrid } from '@/components/ui';
 import { InteractiveKpiCard } from '@/components/bi';
 
 function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {
   return (
-    <ResponsiveGrid cols={{ base: 1, sm: 2, md: 4, lg: 7 }}>
+    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
       <InteractiveKpiCard
         icon={faMicrochip}
         title="Ativos no sistema"
@@ -70,7 +69,7 @@ function BIResumoCardsSection({ resumoCards, onOpenDrawer }) {
         subtitle="Tempo médio entre falhas corretivas"
         tone="blue"
       />
-    </ResponsiveGrid>
+    </div>
   );
 }
 
