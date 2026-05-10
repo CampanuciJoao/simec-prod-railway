@@ -2,7 +2,6 @@ import prisma from '../prismaService.js';
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
-import { dispararNotificacoesTelegram } from '../telegram/telegramAlertService.js';
 
 export const THRESHOLDS = {
   heliumWarn:          70,
@@ -183,6 +182,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
 
   const labelsAtivos = new Set(regras.map(r => r.label));
   let mudouContagem = false;
+  let criados = 0;
 
   // Detecção de normalização do compressor: verifica ANTES da auto-resolução apagar o alerta
   const { compressorStatus } = snapshot;
@@ -256,7 +256,6 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
   }
 
   // Alerta de equipamento offline prolongado (>6h)
-  let criados = 0;
   const alertaOfflineId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, 'equipamento-offline');
   if (snapshot.equipmentOnline === true) {
     const { count } = await prisma.alerta.deleteMany({
@@ -266,7 +265,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
       mudouContagem = true;
       console.log(`[GEHC_ALERT] ${equipamentoNome}: alerta offline resolvido — equipamento voltou online.`);
     }
-  } else if (snapshot.equipmentOnline === false && !eventosSuspensos.has(ALERT_EVENTOS.GEHC_EQUIPAMENTO_OFFLINE)) {
+  } else if (eRessonancia && snapshot.equipmentOnline === false && !eventosSuspensos.has(ALERT_EVENTOS.GEHC_EQUIPAMENTO_OFFLINE)) {
     const agora = new Date();
     const offlineProlongado = await verificarOfflineProlongado(tenantId, equipamentoId, agora);
     if (offlineProlongado) {
@@ -331,11 +330,8 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
   }
 
   if (mudouContagem) {
-    await Promise.allSettled([
-      publicarContagemAlertasParaTenant({ tenantId }),
-      dispararNotificacoesTelegram([tenantId]),
-    ]);
+    await publicarContagemAlertasParaTenant({ tenantId });
   }
 
-  return { criados, total: regras.length };
+  return { criados, total: regras.length, mudouContagem };
 }

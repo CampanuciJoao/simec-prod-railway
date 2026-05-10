@@ -2,6 +2,7 @@ import prisma from '../prismaService.js';
 import { processarAlertasGehc } from './gehcAlertRepository.js';
 import { descobrirEquipamentosGehc } from './gehcDiscovery.js';
 import { obterTokensGehc } from './gehcAuthService.js';
+import { dispararNotificacoesTelegram } from '../telegram/telegramAlertService.js';
 import {
   fetchEquipmentHealth,
   fetchAssetConnectivity,
@@ -72,17 +73,17 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
 
   console.log(`[GEHC_MONITOR] Iniciando monitoramento paralelo de ${equipamentos.length} equipamento(s) GE.`);
 
-  await Promise.allSettled(equipamentos.map(async (eq) => {
+  const resultados = await Promise.allSettled(equipamentos.map(async (eq) => {
     const nome = eq.apelido || eq.modelo || eq.id;
 
     try {
       if (!accessToken || !idToken) {
         console.warn(`[GEHC_MONITOR] ${nome}: sem tokens de autenticação — execute POST /api/gehc/auth para autenticar.`);
-        return;
+        return { tenantId: eq.tenantId, mudouContagem: false };
       }
       if (!eq.gehcSystemId) {
         console.warn(`[GEHC_MONITOR] ${nome}: sem gehcSystemId — execute o discovery novamente para obter o systemId.`);
-        return;
+        return { tenantId: eq.tenantId, mudouContagem: false };
       }
 
       console.log(`[GEHC_MONITOR] Capturando saúde: ${nome} (${eq.gehcAssetId})`);
@@ -100,7 +101,7 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
 
       if (!temDadosSuficientes(snapshot)) {
         console.warn(`[GEHC_MONITOR] ${nome}: sem dados de saúde nem conectividade — snapshot ignorado.`);
-        return;
+        return { tenantId: eq.tenantId, mudouContagem: false };
       }
 
       // Enriquece com uptime/utilização (não bloqueia o snapshot se falhar)
@@ -121,7 +122,7 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       const tipoNorm = (eq.tipo ?? '').toLowerCase();
       const eRessonancia = tipoNorm.includes('ressonância') || tipoNorm.includes('ressonancia') || tipoNorm.includes('rm');
 
-      const { criados } = await processarAlertasGehc({
+      const { criados, mudouContagem } = await processarAlertasGehc({
         tenantId:        eq.tenantId,
         equipamentoId:   eq.id,
         equipamentoNome: nome,
@@ -132,10 +133,23 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
       const uptimePct    = uptimeData?.contractUptimeAggregate ?? '?';
       const pacientesDia = utilizacaoData?.patientsAggregate?.averagePerDay ?? '?';
       console.log(`[GEHC_MONITOR] ${nome}: snapshot salvo, ${criados} alerta(s) novo(s). Online=${snapshot.equipmentOnline} | Hélio=${snapshot.heliumLevelPct}% | Uptime=${uptimePct}% | Pacientes/dia=${pacientesDia}`);
+
+      return { tenantId: eq.tenantId, mudouContagem };
     } catch (err) {
       console.error(`[GEHC_MONITOR] Erro ao monitorar ${nome}:`, err.message);
+      return { tenantId: eq.tenantId, mudouContagem: false };
     }
   }));
+
+  // Dispara Telegram uma única vez por tenant que teve mudanças de alerta
+  const tenantsComMudancas = new Set(
+    resultados
+      .filter(r => r.status === 'fulfilled' && r.value?.mudouContagem)
+      .map(r => r.value.tenantId)
+  );
+  if (tenantsComMudancas.size > 0) {
+    await dispararNotificacoesTelegram([...tenantsComMudancas]);
+  }
 
   console.log('[GEHC_MONITOR] Monitoramento concluído.');
 }
