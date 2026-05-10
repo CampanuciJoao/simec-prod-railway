@@ -20,6 +20,10 @@ const COLORS = {
   slate100: '#f1f5f9',
   white: '#ffffff',
   blue: '#2563eb',
+  slate400: '#94a3b8',
+  green: '#22c55e',
+  red: '#ef4444',
+  amber: '#f59e0b',
 };
 
 function formatDate(value, locale = 'pt-BR', timeZone = 'UTC') {
@@ -490,6 +494,221 @@ function buildHistoricoRows(eventos = [], locale, timeZone) {
   });
 }
 
+// ── Cards visuais de KPI (2 colunas, N linhas) ─────────────────────────────
+function drawKpiCards(doc, cards) {
+  const ml = doc.page.margins.left;
+  const totalW = doc.page.width - ml - doc.page.margins.right;
+  const cardW = (totalW - 10) / 2;
+  const cardH = 54;
+  const gapX = 10;
+  const gapY = 8;
+
+  const rows = Math.ceil(cards.length / 2);
+  ensureSpace(doc, rows * (cardH + gapY) + 12);
+  const startY = doc.y;
+
+  cards.forEach((card, i) => {
+    const col = i % 2;
+    const row = Math.floor(i / 2);
+    const x = ml + col * (cardW + gapX);
+    const y = startY + row * (cardH + gapY);
+
+    doc.save().roundedRect(x, y, cardW, cardH, 3)
+      .fillAndStroke(COLORS.white, COLORS.slate200).restore();
+
+    // acento colorido lateral esquerdo
+    doc.save().roundedRect(x, y, 4, cardH, 2).fill(card.color).restore();
+
+    doc.font('Helvetica-Bold').fontSize(18).fillColor(card.color)
+      .text(String(card.value), x + 12, y + 7, { width: cardW - 20, lineBreak: false });
+
+    doc.font('Helvetica-Bold').fontSize(7).fillColor(COLORS.slate700)
+      .text(card.label, x + 12, y + 31, { width: cardW - 20, lineBreak: false });
+
+    if (card.desc) {
+      doc.font('Helvetica').fontSize(6.5).fillColor(COLORS.slate500)
+        .text(card.desc, x + 12, y + 42, { width: cardW - 20, lineBreak: false });
+    }
+  });
+
+  doc.y = startY + rows * (cardH + gapY) + 8;
+}
+
+// ── Gráfico de linhas com múltiplas séries ─────────────────────────────────
+function drawMultiLineChart(doc, { title, labels, series, chartHeight = 110 }) {
+  const allValues = series.flatMap((s) => s.values).filter((v) => v != null && !Number.isNaN(v));
+  if (allValues.length === 0) return;
+
+  const rawMax = Math.max(...allValues, 1);
+  const yMax = rawMax * 1.2;
+  const yRange = yMax;
+
+  const ML = 40;
+  const MR = 10;
+  const MB = 32;
+  const pageL = doc.page.margins.left;
+  const totalW = doc.page.width - pageL - doc.page.margins.right;
+  const plotX = pageL + ML;
+  const plotW = totalW - ML - MR;
+  const plotH = chartHeight;
+  const n = labels.length;
+
+  ensureSpace(doc, plotH + MB + 50);
+  drawGroupHeader(doc, title);
+  const plotY = doc.y;
+
+  doc.save().rect(plotX, plotY, plotW, plotH)
+    .fillAndStroke(COLORS.white, COLORS.slate200).restore();
+
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) {
+    const pct = i / ticks;
+    const val = pct * yRange;
+    const gy = plotY + plotH * (1 - pct);
+    doc.save()
+      .moveTo(plotX, gy).lineTo(plotX + plotW, gy)
+      .lineWidth(i === 0 || i === ticks ? 0.7 : 0.2)
+      .strokeColor(COLORS.slate300).stroke().restore();
+    const lbl = Number.isInteger(val) ? String(val) : val.toFixed(1);
+    doc.font('Helvetica').fontSize(6).fillColor(COLORS.slate500)
+      .text(lbl, pageL, gy - 3.5, { width: ML - 6, align: 'right', lineBreak: false });
+  }
+
+  const step = Math.max(1, Math.floor(n / 8));
+  labels.forEach((lbl, i) => {
+    if (i !== 0 && i % step !== 0 && i !== n - 1) return;
+    const lx = plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2);
+    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate500)
+      .text(lbl, lx - 20, plotY + plotH + 5, { width: 40, align: 'center', lineBreak: false });
+  });
+
+  const toY = (v) => plotY + plotH * (1 - v / yRange);
+
+  series.forEach((s) => {
+    const pts = s.values.map((v, i) => ({
+      x: plotX + (n > 1 ? (i / (n - 1)) * plotW : plotW / 2),
+      y: v != null && !Number.isNaN(v) ? toY(v) : null,
+    }));
+
+    doc.save();
+    let open = false;
+    pts.forEach((pt) => {
+      if (pt.y == null) { open = false; return; }
+      if (!open) { doc.moveTo(pt.x, pt.y); open = true; }
+      else { doc.lineTo(pt.x, pt.y); }
+    });
+    doc.lineWidth(1.8).strokeColor(s.color).stroke().restore();
+
+    const firstPt = pts.find((p) => p.y != null);
+    const lastPt = [...pts].reverse().find((p) => p.y != null);
+    if (firstPt && lastPt) {
+      const baseline = plotY + plotH;
+      doc.save();
+      doc.moveTo(firstPt.x, baseline).lineTo(firstPt.x, firstPt.y);
+      pts.forEach((pt) => { if (pt.y != null) doc.lineTo(pt.x, pt.y); });
+      doc.lineTo(lastPt.x, baseline).closePath();
+      doc.fillColor(s.color, 0.1).fill();
+      doc.restore();
+    }
+
+    if (n <= 24) {
+      pts.forEach((pt) => {
+        if (pt.y == null) return;
+        doc.save().circle(pt.x, pt.y, 2.5)
+          .fillAndStroke(COLORS.white, s.color).lineWidth(1.2).restore();
+      });
+    }
+  });
+
+  doc.save().moveTo(plotX, plotY).lineTo(plotX, plotY + plotH)
+    .lineWidth(0.8).strokeColor(COLORS.slate400).stroke().restore();
+
+  const legendY = plotY + plotH + 16;
+  series.forEach((s, i) => {
+    const lx = plotX + i * 110;
+    doc.save().rect(lx, legendY + 1, 16, 3).fill(s.color).restore();
+    doc.font('Helvetica').fontSize(7).fillColor(COLORS.slate600)
+      .text(s.label, lx + 20, legendY - 1, { lineBreak: false });
+  });
+
+  doc.y = legendY + 16;
+}
+
+// ── Gráfico de barras verticais (série única) ──────────────────────────────
+function drawBarChart(doc, { title, labels, values, unit = '', color = COLORS.blue, chartHeight = 90 }) {
+  const hasData = values.some((v) => v != null && !Number.isNaN(v) && v > 0);
+  if (!hasData) return;
+
+  const rawMax = Math.max(...values.map((v) => (v == null || Number.isNaN(v) ? 0 : v)), 0.1);
+  const yMax = rawMax * 1.25;
+
+  const ML = 44;
+  const MR = 10;
+  const MB = 24;
+  const pageL = doc.page.margins.left;
+  const totalW = doc.page.width - pageL - doc.page.margins.right;
+  const plotX = pageL + ML;
+  const plotW = totalW - ML - MR;
+  const plotH = chartHeight;
+  const n = labels.length;
+
+  ensureSpace(doc, plotH + MB + 50);
+  drawGroupHeader(doc, title);
+  const plotY = doc.y;
+
+  doc.save().rect(plotX, plotY, plotW, plotH)
+    .fillAndStroke(COLORS.white, COLORS.slate200).restore();
+
+  const ticks = 4;
+  for (let i = 0; i <= ticks; i++) {
+    const pct = i / ticks;
+    const val = pct * yMax;
+    const gy = plotY + plotH * (1 - pct);
+    doc.save()
+      .moveTo(plotX, gy).lineTo(plotX + plotW, gy)
+      .lineWidth(i === 0 || i === ticks ? 0.7 : 0.2)
+      .strokeColor(COLORS.slate300).stroke().restore();
+    const lbl = val < 10 ? val.toFixed(1) : Math.round(val).toString();
+    doc.font('Helvetica').fontSize(6).fillColor(COLORS.slate500)
+      .text(lbl, pageL, gy - 3.5, { width: ML - 6, align: 'right', lineBreak: false });
+  }
+
+  if (unit) {
+    doc.font('Helvetica-Bold').fontSize(6).fillColor(COLORS.slate400)
+      .text(unit, pageL, plotY - 10, { width: ML - 4, align: 'right', lineBreak: false });
+  }
+
+  const slotW = plotW / n;
+  const barW = Math.max(4, slotW * 0.55);
+  const barOffset = (slotW - barW) / 2;
+
+  values.forEach((v, i) => {
+    const val = v == null || Number.isNaN(v) ? 0 : v;
+    const barH = val > 0 ? (val / yMax) * plotH : 0;
+    const bx = plotX + i * slotW + barOffset;
+    const by = plotY + plotH - barH;
+
+    if (barH > 0) {
+      doc.save().rect(bx, by, barW, barH).fill(color).restore();
+    }
+
+    const cx = plotX + i * slotW + slotW / 2;
+    doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate500)
+      .text(labels[i], cx - 18, plotY + plotH + 5, { width: 36, align: 'center', lineBreak: false });
+
+    if (barH > 8 && val > 0) {
+      const lbl = val < 10 ? val.toFixed(1) : Math.round(val).toString();
+      doc.font('Helvetica').fontSize(5.5).fillColor(COLORS.slate600)
+        .text(lbl, bx - 2, by - 9, { width: barW + 4, align: 'center', lineBreak: false });
+    }
+  });
+
+  doc.save().moveTo(plotX, plotY).lineTo(plotX, plotY + plotH)
+    .lineWidth(0.8).strokeColor(COLORS.slate400).stroke().restore();
+
+  doc.y = plotY + plotH + MB + 4;
+}
+
 export async function gerarPdfBIBuffer(dados, options = {}) {
   const title = `RELATORIO EXECUTIVO DE PERFORMANCE - ${safeText(dados?.ano)}`;
   const doc = createDocument(title, options);
@@ -519,29 +738,57 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
       ['Manutencoes preventivas realizadas', safeText(dados?.resumoGeral?.preventivas, '0')],
       ['Manutencoes corretivas (paradas)', safeText(dados?.resumoGeral?.corretivas, '0')],
       ['Total de manutencoes concluidas', safeText(dados?.resumoGeral?.totalManutencoesConcluidas, '0')],
-      ['Backlog (ordens em aberto)', fmt(dados?.kpis?.backlog)],
     ],
   });
 
   // ── 2. KPIs Estratégicos ────────────────────────────────────────────────────
   ensureSpace(doc, SECTION_MIN);
   drawSectionTitle(doc, 'KPIs Estrategicos');
+
+  drawKpiCards(doc, [
+    { label: 'MTTR — Tempo Médio de Reparo',    value: fmtHoras(dados?.kpis?.mttrHoras), color: COLORS.red,  desc: 'Da abertura até conclusão da OS corretiva' },
+    { label: 'MTBF — Tempo Médio entre Falhas', value: fmtHoras(dados?.kpis?.mtbfHoras), color: COLORS.blue, desc: 'Horas de operação / nº de falhas corretivas' },
+  ]);
+
   drawTable(doc, {
     headers: ['Indicador', 'Valor', 'Descricao'],
     columnWidths: [180, 100, 215],
     rows: [
       ['MTTR (tempo medio de reparo)', fmtHoras(dados?.kpis?.mttrHoras), 'Da abertura ate conclusao da OS corretiva'],
       ['MTBF (tempo medio entre falhas)', fmtHoras(dados?.kpis?.mtbfHoras), 'Horas de operacao / numero de falhas corretivas'],
-      ['Disponibilidade da frota', fmt(dados?.kpis?.disponibilidadePct, '%'), 'Baseado no downtime acumulado vs horas totais'],
-      ['Conformidade PM', fmt(dados?.kpis?.conformidadePM, '%'), 'Preventivas concluidas dentro do prazo agendado'],
     ],
   });
 
   // ── 3. Evolucao Mensal ──────────────────────────────────────────────────────
   const evolucao = dados?.evolucaoMensal || [];
   if (evolucao.length > 0) {
+    const meses       = evolucao.map((m) => safeText(m?.mes));
+    const valPrev     = evolucao.map((m) => Number(m?.preventivas) || 0);
+    const valCorret   = evolucao.map((m) => Number(m?.corretivas)  || 0);
+    const valDowntime = evolucao.map((m) => Number(m?.downtime)    || 0);
+
     ensureSpace(doc, SECTION_MIN);
     drawSectionTitle(doc, 'Evolucao Mensal');
+
+    drawMultiLineChart(doc, {
+      title: 'Preventivas vs Corretivas por Mês',
+      labels: meses,
+      series: [
+        { label: 'Preventivas', values: valPrev,   color: COLORS.green },
+        { label: 'Corretivas',  values: valCorret, color: COLORS.red   },
+      ],
+    });
+
+    if (valDowntime.some((v) => v > 0)) {
+      drawBarChart(doc, {
+        title: 'Downtime Mensal (horas paradas)',
+        labels: meses,
+        values: valDowntime,
+        unit: 'h',
+        color: COLORS.amber,
+      });
+    }
+
     drawTable(doc, {
       headers: ['Mes', 'Preventivas', 'Corretivas', 'Downtime (h)'],
       columnWidths: [120, 125, 125, 125],
