@@ -18,17 +18,6 @@ const LOGIN_MAX_ATTEMPTS = 5;
 const RESET_WINDOW_MS = 15 * 60 * 1000;
 const RESET_MAX_ATTEMPTS = 5;
 
-function parseCookies(req) {
-  const cookieHeader = req.headers.cookie || '';
-
-  return cookieHeader.split(';').reduce((acc, part) => {
-    const [rawKey, ...rawValue] = part.trim().split('=');
-    if (!rawKey) return acc;
-    acc[rawKey] = decodeURIComponent(rawValue.join('='));
-    return acc;
-  }, {});
-}
-
 function buildAttemptKey(req, mode) {
   const username = String(req.body?.username || req.body?.email || '')
     .toLowerCase()
@@ -143,9 +132,8 @@ export function buildAuthRouter(services = {}) {
 
   router.post('/refresh', async (req, res) => {
     try {
-      const cookies = parseCookies(req);
       const resultado = await authServices.refreshAuthSessionService(
-        cookies[REFRESH_TOKEN_COOKIE]
+        req.cookies?.[REFRESH_TOKEN_COOKIE]
       );
 
       return res.status(resultado.status).json(
@@ -159,20 +147,18 @@ export function buildAuthRouter(services = {}) {
 
   router.post('/logout', async (req, res) => {
     try {
-      // Invalidate the server-side user cache so the next request goes to DB
       const authHeader = req.headers.authorization;
       if (authHeader?.startsWith('Bearer ')) {
         try {
           const decoded = jwt.verify(authHeader.slice(7), process.env.JWT_SECRET);
-          if (decoded?.id) invalidateUserCache(decoded.id);
+          if (decoded?.id) await invalidateUserCache(decoded.id);
         } catch {
-          // expired/invalid token — cache will expire on its own TTL
+          // token expirado/inválido — cache expira pelo TTL
         }
       }
 
-      const cookies = parseCookies(req);
       const resultado = await authServices.logoutAuthSessionService(
-        cookies[REFRESH_TOKEN_COOKIE]
+        req.cookies?.[REFRESH_TOKEN_COOKIE]
       );
 
       clearRefreshCookie(res);

@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "postinstall": "npx playwright install --with-deps chromium",
+    "postinstall": "node -e \"if(process.env.GEHC_SCRAPER_ENABLED === 'true'){require('child_process').execSync('npx playwright install --with-deps chromium',{stdio:'inherit'})}else{console.log('[postinstall] Playwright ignorado — defina GEHC_SCRAPER_ENABLED=true para instalar.')}\"",
     "start": "node scripts/migrate.mjs && node server.js",
     "start:prod": "node scripts/migrate.mjs && node scripts/start-all.mjs",
     "pretest": "prisma generate",
@@ -39,6 +39,7 @@
     "axios": "^1.14.0",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.73.0",
+    "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "date-fns": "^4.1.0",
     "dotenv": "^16.5.0",

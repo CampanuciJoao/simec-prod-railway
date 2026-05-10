@@ -1,10 +1,15 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from 'crypto';
 
-// Deriva chave AES-256 (32 bytes) a partir do JWT_SECRET já presente no Railway.
-// Se quiser isolamento total, defina GEHC_TOKEN_SECRET no Railway com 32+ chars.
+// GEHC_TOKEN_SECRET deve ser definido no Railway como variável independente (32+ chars).
+// NÃO reutiliza JWT_SECRET — rotacionar JWT não pode quebrar tokens GEHC já criptografados no banco.
 function deriveKey() {
-  const secret = process.env.GEHC_TOKEN_SECRET || process.env.JWT_SECRET;
-  if (!secret) throw new Error('JWT_SECRET ou GEHC_TOKEN_SECRET não configurado — não é possível criptografar tokens GE.');
+  const secret = process.env.GEHC_TOKEN_SECRET;
+  if (!secret) {
+    throw new Error(
+      'GEHC_TOKEN_SECRET não configurado. Defina esta variável no Railway antes de usar a integração GEHC. ' +
+      'Ela deve ser independente do JWT_SECRET para que rotações de JWT não corrompam tokens armazenados.'
+    );
+  }
   return createHash('sha256').update(secret).digest(); // 32 bytes
 }
 

@@ -1,30 +1,4 @@
-import IORedis from 'ioredis';
-import { getRedisConnectionOptions } from './redisConnectionOptions.js';
-
-let client = null;
-let unavailable = false;
-
-function getClient() {
-  if (unavailable) return null;
-  if (client) return client;
-
-  client = new IORedis({
-    ...getRedisConnectionOptions(),
-    lazyConnect: true,
-    enableOfflineQueue: false,
-    maxRetriesPerRequest: null,
-    retryStrategy: () => null,
-  });
-
-  client.on('error', (err) => {
-    if (!unavailable) {
-      console.warn('[RATE_LIMITER] Redis indisponível — usando fallback in-memory:', err.message);
-      unavailable = true;
-    }
-  });
-
-  return client;
-}
+import { getSharedRedisClient, isSharedRedisUnavailable } from './sharedRedisClient.js';
 
 // Fallback in-memory para quando o Redis não está disponível
 const memoryBuckets = new Map();
@@ -40,14 +14,10 @@ function getMemoryState(key, windowMs) {
   return current;
 }
 
-/**
- * Verifica e incrementa o contador de tentativas.
- * Retorna { limited: boolean, remaining: number, retryAfterSeconds: number }
- */
 export async function checkRateLimit(key, { maxAttempts, windowMs }) {
-  const redis = getClient();
+  const redis = getSharedRedisClient();
 
-  if (redis && !unavailable) {
+  if (redis && !isSharedRedisUnavailable()) {
     try {
       const redisKey = `rl:${key}`;
       const windowSec = Math.ceil(windowMs / 1000);
@@ -84,13 +54,10 @@ export async function checkRateLimit(key, { maxAttempts, windowMs }) {
   return { limited: false, remaining: maxAttempts - state.count, retryAfterSeconds: 0 };
 }
 
-/**
- * Reseta o contador de tentativas após sucesso.
- */
 export async function resetRateLimit(key) {
-  const redis = getClient();
+  const redis = getSharedRedisClient();
 
-  if (redis && !unavailable) {
+  if (redis && !isSharedRedisUnavailable()) {
     try {
       await redis.del(`rl:${key}`);
       return;

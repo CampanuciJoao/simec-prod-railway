@@ -33,10 +33,13 @@ import gehcRoutes from './routes/gehcRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
 import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
 
+import cookieParser from 'cookie-parser';
+
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
 import { iniciarJobsDeAlertas } from './services/queueService.js';
 import { getFromR2 } from './services/uploads/fileStorageService.js';
+import prisma from './services/prismaService.js';
 
 const app = express();
 const httpServer = createServer(app);
@@ -110,8 +113,9 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');
@@ -134,10 +138,19 @@ app.use('/api/telegram/webhook', telegramWebhookRoute);
 
 app.use(proteger);
 
-// Endpoint protegido de arquivos — autenticação obrigatória, isolamento por tenant via R2 key
+// Endpoint protegido de arquivos — autenticação + validação de tenant obrigatórias
 app.get('/uploads/*path', async (req, res) => {
   const key = 'uploads/' + req.params.path;
   try {
+    const anexo = await prisma.anexo.findFirst({
+      where: { path: key, tenantId: req.usuario.tenantId },
+      select: { id: true },
+    });
+
+    if (!anexo) {
+      return res.status(403).json({ error: 'Acesso negado.' });
+    }
+
     const obj = await getFromR2(key);
     res.set('Content-Type', obj.ContentType || 'application/octet-stream');
     obj.Body.pipe(res);

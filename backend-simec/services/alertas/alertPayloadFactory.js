@@ -5,7 +5,7 @@ import {
   getAlertTypeLabel,
 } from './alertTypes.js';
 
-export async function criarPayloadBaseAlerta({
+export function criarPayloadBaseAlerta({
   id,
   titulo,
   subtitulo = null,

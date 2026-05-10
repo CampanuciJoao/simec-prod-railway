@@ -1,26 +1,39 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../services/prismaService.js';
+import { getSharedRedisClient, isSharedRedisUnavailable } from '../services/redis/sharedRedisClient.js';
 
-// 60-second TTL cache — eliminates one DB round-trip per authenticated request
-const USER_CACHE_TTL_MS = 60_000;
-const userCache = new Map(); // key: userId → { data, expiresAt }
+const USER_CACHE_PREFIX = 'user_cache:';
+const USER_CACHE_TTL_S = 60;
 
-function getCachedUser(userId) {
-  const entry = userCache.get(userId);
-  if (!entry) return null;
-  if (Date.now() > entry.expiresAt) {
-    userCache.delete(userId);
+async function getCachedUser(userId) {
+  const redis = getSharedRedisClient();
+  if (!redis || isSharedRedisUnavailable()) return null;
+  try {
+    const raw = await redis.get(`${USER_CACHE_PREFIX}${userId}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
     return null;
   }
-  return entry.data;
 }
 
-function setCachedUser(userId, data) {
-  userCache.set(userId, { data, expiresAt: Date.now() + USER_CACHE_TTL_MS });
+async function setCachedUser(userId, data) {
+  const redis = getSharedRedisClient();
+  if (!redis || isSharedRedisUnavailable()) return;
+  try {
+    await redis.set(`${USER_CACHE_PREFIX}${userId}`, JSON.stringify(data), 'EX', USER_CACHE_TTL_S);
+  } catch {
+    // cache degradado não bloqueia autenticação
+  }
 }
 
-export function invalidateUserCache(userId) {
-  userCache.delete(userId);
+export async function invalidateUserCache(userId) {
+  const redis = getSharedRedisClient();
+  if (!redis || isSharedRedisUnavailable()) return;
+  try {
+    await redis.del(`${USER_CACHE_PREFIX}${userId}`);
+  } catch {
+    // silencioso
+  }
 }
 
 export const proteger = async (req, res, next) => {
@@ -56,7 +69,7 @@ export const proteger = async (req, res, next) => {
       });
     }
 
-    let usuarioAtual = getCachedUser(decoded.id);
+    let usuarioAtual = await getCachedUser(decoded.id);
 
     if (!usuarioAtual) {
       usuarioAtual = await prisma.usuario.findUnique({
@@ -78,7 +91,7 @@ export const proteger = async (req, res, next) => {
         },
       });
 
-      if (usuarioAtual) setCachedUser(decoded.id, usuarioAtual);
+      if (usuarioAtual) await setCachedUser(decoded.id, usuarioAtual);
     }
 
     if (!usuarioAtual) {

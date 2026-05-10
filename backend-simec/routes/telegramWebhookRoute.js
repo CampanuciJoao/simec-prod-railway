@@ -4,6 +4,19 @@ import { enviarMensagem } from '../services/telegram/telegramService.js';
 
 const router = Router();
 
+// Valida o secret token configurado no Telegram via setWebhook(secret_token=...)
+// Variável de ambiente: TELEGRAM_WEBHOOK_SECRET
+router.use((req, res, next) => {
+  const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  if (!expectedSecret) return next();
+
+  const incoming = req.headers['x-telegram-bot-api-secret-token'];
+  if (incoming !== expectedSecret) {
+    return res.sendStatus(403);
+  }
+  next();
+});
+
 router.post('/', async (req, res) => {
   res.sendStatus(200);
 
