@@ -7,31 +7,38 @@ import Card from '@/components/ui/primitives/Card';
 
 const toneStyleMap = {
   slate: {
-    iconBg: 'var(--bg-surface-subtle)',
+    cardBg:   'var(--kpi-surface)',
+    iconBg:   'var(--bg-surface-subtle)',
     iconText: 'var(--text-secondary)',
   },
   blue: {
-    iconBg: 'var(--brand-primary-soft)',
+    cardBg:   'var(--brand-primary-surface)',
+    iconBg:   'var(--brand-primary-soft)',
     iconText: 'var(--brand-primary)',
   },
   green: {
-    iconBg: 'var(--color-success-soft)',
+    cardBg:   'var(--color-success-surface)',
+    iconBg:   'var(--color-success-soft)',
     iconText: 'var(--color-success)',
   },
   yellow: {
-    iconBg: 'var(--color-warning-soft)',
+    cardBg:   'var(--color-warning-surface)',
+    iconBg:   'var(--color-warning-soft)',
     iconText: 'var(--color-warning)',
   },
   orange: {
-    iconBg: 'var(--color-warning-soft)',
+    cardBg:   'var(--color-warning-surface)',
+    iconBg:   'var(--color-warning-soft)',
     iconText: 'var(--color-warning)',
   },
   red: {
-    iconBg: 'var(--color-danger-soft)',
+    cardBg:   'var(--color-danger-surface)',
+    iconBg:   'var(--color-danger-soft)',
     iconText: 'var(--color-danger)',
   },
   purple: {
-    iconBg: 'var(--color-info-soft)',
+    cardBg:   'var(--color-info-surface)',
+    iconBg:   'var(--color-info-soft)',
     iconText: 'var(--color-info)',
   },
 };
@@ -54,7 +61,7 @@ function KpiCard({
       className={['h-full rounded-3xl', className].join(' ')}
       interactive={isInteractive}
       style={{
-        backgroundColor: 'var(--kpi-surface)',
+        backgroundColor: toneStyle.cardBg,
         borderColor: 'var(--border-soft)',
       }}
     >

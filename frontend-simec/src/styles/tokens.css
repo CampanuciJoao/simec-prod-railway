@@ -14,15 +14,19 @@
 
   --color-success: #059669;
   --color-success-soft: rgba(5, 150, 105, 0.14);
+  --color-success-surface: rgba(5, 150, 105, 0.07);
 
   --color-warning: #d97706;
   --color-warning-soft: rgba(217, 119, 6, 0.14);
+  --color-warning-surface: rgba(217, 119, 6, 0.07);
 
   --color-danger: #dc2626;
   --color-danger-soft: rgba(220, 38, 38, 0.14);
+  --color-danger-surface: rgba(220, 38, 38, 0.06);
 
   --color-info: #223663;
   --color-info-soft: rgba(37, 99, 235, 0.14);
+  --color-info-surface: rgba(99, 102, 241, 0.08);
 
   --radius-sm: 0.75rem;
   --radius-md: 1rem;
@@ -42,13 +46,13 @@
   --card-header-text: #0f172a;
   --card-header-text-muted: #64748b;
 
-  /* Background: tons slate neutros — sai do azul-sobre-azul */
-  --bg-app: #f7f8fa;
-  --bg-app-muted: #eef1f5;
+  /* Background: tons slate suficientemente distintos do branco dos cards */
+  --bg-app: #eef1f6;
+  --bg-app-muted: #e3e8ef;
 
   --bg-surface: #ffffff;
-  --bg-surface-soft: #fafbfc;
-  --bg-surface-subtle: #f3f5f8;
+  --bg-surface-soft: #f8fafc;
+  --bg-surface-subtle: #f1f5f9;
   --bg-elevated: #ffffff;
 
   --bg-hover: #f1f5f9;
