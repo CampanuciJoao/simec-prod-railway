@@ -23,22 +23,28 @@ function BIPageHeader({
       subtitle="Acompanhe indicadores executivos de criticidade, downtime e recorrência operacional."
       icon={faChartBar}
       actions={
-        <>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
           <Button
             type="button"
             variant="secondary"
             onClick={onRefresh}
             disabled={!canRefresh}
+            className="w-full sm:w-auto justify-center"
           >
             <FontAwesomeIcon icon={faArrowsRotate} />
             Atualizar
           </Button>
 
-          <Button type="button" onClick={onPrint} disabled={!canPrint}>
+          <Button
+            type="button"
+            onClick={onPrint}
+            disabled={!canPrint}
+            className="w-full sm:w-auto justify-center"
+          >
             <FontAwesomeIcon icon={faPrint} />
             Imprimir relatório executivo
           </Button>
-        </>
+        </div>
       }
     />
   );

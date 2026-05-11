@@ -42,6 +42,21 @@ function BIPage() {
   const { layout, onLayoutChange, resetLayout } = useBILayout(usuario?.id);
   const [expandedWidget, setExpandedWidget] = useState(null);
 
+  // Drag/resize só faz sentido em desktop. Em touch (mobile) o usuário
+  // arrasta widgets ao tentar scrollar — desativa.
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(min-width: 1024px)').matches
+      : true
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const [gehcUtilizacao, setGehcUtilizacao] = useState(null);
   const [gehcLoading, setGehcLoading] = useState(false);
   const [gehcExportando, setGehcExportando] = useState(false);
@@ -157,7 +172,7 @@ function BIPage() {
 
   return (
     <>
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout padded fullHeight>
         <div className="space-y-6">
           <BIPageHeader
             ano={page.dados?.ano}
@@ -205,6 +220,8 @@ function BIPage() {
                 rowHeight={BI_ROW_HEIGHT}
                 margin={BI_GRID_MARGIN}
                 draggableHandle=".drag-handle"
+                isDraggable={isDesktop}
+                isResizable={isDesktop}
                 onLayoutChange={handleLayoutChange}
                 resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
                 className="layout"
