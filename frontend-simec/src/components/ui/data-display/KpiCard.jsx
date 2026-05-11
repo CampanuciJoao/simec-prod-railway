@@ -96,43 +96,27 @@ function KpiCard({
         }}
       />
 
-      <div className="flex h-full items-start gap-4">
+      <div className="flex h-full items-center gap-3">
         <div
-          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
           style={{
             backgroundColor: toneStyle.iconBg,
             color: toneStyle.iconText,
           }}
         >
-          <FontAwesomeIcon icon={icon} className="text-base" />
+          <FontAwesomeIcon icon={icon} className="text-[15px]" />
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <p
-              className="text-[10.5px] font-semibold uppercase tracking-[0.16em]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {title}
-            </p>
-            {code && (
-              <span
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 9.5,
-                  fontWeight: 700,
-                  letterSpacing: '0.2em',
-                  color: 'var(--text-muted)',
-                  opacity: 0.7,
-                }}
-              >
-                {code}
-              </span>
-            )}
-          </div>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {title}
+          </p>
 
           <p
-            className="stat-value mt-1.5 text-3xl font-semibold leading-none"
+            className="stat-value mt-1 text-2xl font-semibold leading-none"
             style={{ color: 'var(--text-primary)' }}
           >
             {value}
@@ -140,7 +124,7 @@ function KpiCard({
 
           {subtitle ? (
             <p
-              className="mt-2 line-clamp-2 text-sm leading-snug"
+              className="mt-1 line-clamp-1 text-xs leading-snug"
               style={{ color: 'var(--text-secondary)' }}
             >
               {subtitle}

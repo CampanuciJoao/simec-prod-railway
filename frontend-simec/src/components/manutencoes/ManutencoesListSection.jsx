@@ -41,7 +41,6 @@ function ManutencoesListSection({
       <div className="space-y-6">
         <KpiGrid>
           <KpiCard
-            code="M01"
             icon={faClock}
             title="Total"
             value={metricas?.total ?? 0}
@@ -51,7 +50,6 @@ function ManutencoesListSection({
           />
 
           <KpiCard
-            code="M02"
             icon={faTriangleExclamation}
             title="Aguardando"
             value={metricas?.aguardando ?? 0}
@@ -60,7 +58,6 @@ function ManutencoesListSection({
           />
 
           <KpiCard
-            code="M03"
             icon={faCircleCheck}
             title="Concluídas"
             value={metricas?.concluidas ?? 0}
@@ -69,7 +66,6 @@ function ManutencoesListSection({
           />
 
           <KpiCard
-            code="M04"
             icon={faCircleXmark}
             title="Canceladas"
             value={metricas?.canceladas ?? 0}

@@ -25,12 +25,8 @@ function PageSection({
   const resolvedHeaderRight = actions || headerRight;
   const hasHeader = title || description || resolvedHeaderRight;
 
-  // Deriva eyebrow do title (string) quando não passado. `false` esconde.
-  const eyebrowText = eyebrow === false
-    ? null
-    : eyebrow != null
-      ? eyebrow
-      : (typeof title === 'string' ? `· ${title.toUpperCase()}` : null);
+  // Eyebrow só aparece se passada explicitamente — não derivada do title.
+  const eyebrowText = eyebrow != null && eyebrow !== false ? eyebrow : null;
 
   if (darkHeader) {
     return (

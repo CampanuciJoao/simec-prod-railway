@@ -52,7 +52,7 @@ const ResponsiveGrid = WidthProvider(Responsive);
  * - Ícone num quadrado tonal compacto
  * - Helper text muted
  */
-function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code }) {
+function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
   const toneMap = {
     default: { accent: 'var(--brand-primary)', iconSurface: 'var(--brand-primary-soft)', iconText: 'var(--brand-primary)' },
     success: { accent: 'var(--color-success)', iconSurface: 'var(--color-success-soft)', iconText: 'var(--color-success)' },
@@ -63,7 +63,7 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code 
 
   return (
     <div
-      className="relative rounded-xl border px-3.5 py-3 overflow-hidden transition-all duration-200"
+      className="relative rounded-xl border px-3 py-2.5 overflow-hidden transition-all duration-200"
       style={{
         backgroundColor: 'var(--bg-surface-soft)',
         borderColor: 'var(--border-soft)',
@@ -80,7 +80,7 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code 
         }}
       />
 
-      <div className="flex items-start gap-3">
+      <div className="flex items-center gap-3">
         <div
           className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm"
           style={{ backgroundColor: t.iconSurface, color: t.iconText }}
@@ -88,27 +88,12 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code 
           <FontAwesomeIcon icon={icon} />
         </div>
         <div className="min-w-0 flex-1">
-          <div className="flex items-baseline justify-between gap-2">
-            <p
-              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-              style={{ color: 'var(--text-muted)' }}
-            >
-              {label}
-            </p>
-            {code && (
-              <span
-                className="text-[9.5px] font-bold"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  letterSpacing: '0.18em',
-                  color: 'var(--text-muted)',
-                  opacity: 0.7,
-                }}
-              >
-                {code}
-              </span>
-            )}
-          </div>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {label}
+          </p>
           <p
             className="stat-value mt-0.5 text-2xl font-semibold leading-none"
             style={{ color: 'var(--text-primary)' }}
@@ -117,7 +102,11 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code 
           </p>
         </div>
       </div>
-      <p className="mt-2.5 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
+      {helper && (
+        <p className="mt-1.5 text-[11px] leading-snug line-clamp-1" style={{ color: 'var(--text-muted)' }}>
+          {helper}
+        </p>
+      )}
     </div>
   );
 }
@@ -475,7 +464,6 @@ function DashboardPage() {
         {/* KPI ribbon — 4 indicadores operacionais antes do grid configurável */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <DashboardMiniStat
-            code="K01"
             icon={faMicrochip}
             label="Parque ativo"
             value={
@@ -496,7 +484,6 @@ function DashboardPage() {
             tone="default"
           />
           <DashboardMiniStat
-            code="K02"
             icon={faWrench}
             label="Em manutenção"
             value={resumo.emManutencao}
@@ -504,7 +491,6 @@ function DashboardPage() {
             tone="warning"
           />
           <DashboardMiniStat
-            code="K03"
             icon={faTriangleExclamation}
             label="Alertas críticos"
             value={resumo.alertasCriticos}
@@ -512,7 +498,6 @@ function DashboardPage() {
             tone="danger"
           />
           <DashboardMiniStat
-            code="K04"
             icon={faFileContract}
             label="Contratos vencendo"
             value={resumo.contratosVencendo}

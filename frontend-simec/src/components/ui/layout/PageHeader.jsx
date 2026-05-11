@@ -22,10 +22,8 @@ function PageHeader({
   eyebrow,
   className = '',
 }) {
-  // Deriva eyebrow do title quando não passada explicitamente
-  const eyebrowText = eyebrow != null
-    ? eyebrow
-    : (typeof title === 'string' ? `/ ${title.toUpperCase()}` : null);
+  // Eyebrow só aparece se passada explicitamente — não derivada do title.
+  const eyebrowText = eyebrow != null ? eyebrow : null;
 
   return (
     <Card
