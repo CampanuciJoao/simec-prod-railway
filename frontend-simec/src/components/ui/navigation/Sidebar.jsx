@@ -59,7 +59,6 @@ function Sidebar({
           borderRight: '1px solid var(--border-soft)',
           color: 'var(--text-sidebar)',
           boxShadow: 'var(--shadow-md)',
-          position: 'relative',
         }}
       >
         {/* Faixa colorida superior — alinha com KpiCard e PageHeader */}
