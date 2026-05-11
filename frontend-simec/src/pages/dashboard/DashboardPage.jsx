@@ -237,16 +237,18 @@ function GaugeBox({ label, value, tone = 'ok' }) {
         backgroundColor: t.bg,
         border: `1px solid ${t.border}`,
         borderRadius: 6,
-        padding: '6px 8px',
+        padding: '5px 7px',
+        minWidth: 0,
       }}
     >
       <div
+        className="truncate"
         style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 9.5,
-          letterSpacing: '0.2em',
-          textTransform: 'uppercase',
+          fontSize: 10.5,
+          fontWeight: 600,
           color: 'var(--text-muted)',
+          letterSpacing: '0',
+          textTransform: 'none',
         }}
       >
         {label}
@@ -254,7 +256,7 @@ function GaugeBox({ label, value, tone = 'ok' }) {
       <div
         className="stat-value"
         style={{
-          fontSize: 15,
+          fontSize: 14,
           fontWeight: 700,
           color: t.color,
           marginTop: 1,
@@ -296,26 +298,26 @@ function SaudeRMs() {
   }
 
   return (
-    <div className="space-y-2.5 overflow-auto">
+    <div className="space-y-2">
       {snapshots.map((s, i) => (
         <div
           key={i}
-          className="rounded-xl border px-3.5 py-3"
+          className="rounded-lg border px-3 py-2"
           style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
         >
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
             {s.equipamentoId ? (
               <Link
                 to={`/equipamentos/detalhes/${s.equipamentoId}`}
-                className="text-sm font-semibold truncate min-w-0 hover:underline"
+                className="text-[13.5px] font-semibold truncate min-w-0 hover:underline"
                 style={{ color: 'var(--text-primary)' }}
               >
                 {s.equipamento}
               </Link>
             ) : (
-              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
+              <p className="text-[13.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
             )}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
                 <span
                   style={{
@@ -347,10 +349,10 @@ function SaudeRMs() {
             </div>
           </div>
 
-          <div className="mt-2.5 grid grid-cols-4 gap-1.5">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
             {s.heliumLevelPct != null && (
               <GaugeBox
-                label="He"
+                label="Hélio"
                 value={`${s.heliumLevelPct}%`}
                 tone={
                   s.heliumLevelPct < 30 ? 'crit'
@@ -361,22 +363,22 @@ function SaudeRMs() {
             )}
             {s.heliumPressurePsi != null && (
               <GaugeBox
-                label="PSI"
-                value={s.heliumPressurePsi}
+                label="Pressão"
+                value={`${s.heliumPressurePsi} PSI`}
                 tone="ok"
               />
             )}
             {s.compressorStatus && (
               <GaugeBox
-                label="Comp"
+                label="Compressor"
                 value={s.compressorStatus}
                 tone={s.compressorStatus === 'ON' ? 'good' : 'crit'}
               />
             )}
             {s.coolantTempC != null && (
               <GaugeBox
-                label="Temp"
-                value={`${s.coolantTempC}°`}
+                label="Temperatura"
+                value={`${s.coolantTempC}°C`}
                 tone="ok"
               />
             )}
