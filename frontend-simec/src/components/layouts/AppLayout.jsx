@@ -182,7 +182,10 @@ function AppLayout() {
         </div>
       </div>
 
-      <div className="fixed bottom-4 right-4 z-50">
+      {/* ChatBot escondido em telas pequenas — em mobile cobria paginador,
+          botões finais de listas e a aba 'Sair' da topbar quando scrolada.
+          Mantém o atalho em sm+ onde há espaço lateral suficiente. */}
+      <div className="hidden sm:block fixed bottom-4 right-4 z-50">
         <ChatBot />
       </div>
     </>
