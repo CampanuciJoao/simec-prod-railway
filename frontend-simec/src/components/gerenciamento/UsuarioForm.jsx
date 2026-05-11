@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -24,6 +24,9 @@ const TIMEZONE_OPTIONS = [
     .map((tz) => ({ value: tz, label: labelTimezone(tz) })),
 ];
 
+const SENHA_MIN_LENGTH = 6;
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 function UsuarioForm({
   onSubmit,
   onCancel,
@@ -43,6 +46,10 @@ function UsuarioForm({
 
   const [senhaVisivel, setSenhaVisivel] = useState(false);
   const [confirmaSenhaVisivel, setConfirmaSenhaVisivel] = useState(false);
+  // touched = quais campos o usuario ja interagiu. So mostramos erro depois do
+  // primeiro blur/edit para nao bombardear o usuario com vermelho em campos vazios
+  // assim que ele abre o form.
+  const [touched, setTouched] = useState({});
 
   const { addToast } = useToast();
 
@@ -57,6 +64,7 @@ function UsuarioForm({
         senha: '',
         confirmaSenha: '',
       });
+      setTouched({});
       return;
     }
 
@@ -68,18 +76,91 @@ function UsuarioForm({
       confirmaSenha: '',
       role: 'user',
     });
+    setTouched({});
   }, [isEditing, initialData]);
+
+  // Calcula erros em tempo real. Cada campo so reporta erro se o usuario ja
+  // interagiu com ele (touched) ou se tentou submeter. Padrao classico de
+  // form validation: feedback aparece quando faz sentido, nao antes.
+  const errors = useMemo(() => {
+    const result = {};
+
+    if (!formData.nome.trim()) {
+      result.nome = 'Informe o nome completo.';
+    }
+
+    if (!formData.email.trim()) {
+      result.email = 'Informe o e-mail.';
+    } else if (!EMAIL_REGEX.test(formData.email.trim())) {
+      result.email = 'E-mail invalido.';
+    }
+
+    if (!isEditing && !formData.username.trim()) {
+      result.username = 'Informe o nome de usuario.';
+    }
+
+    // Senha: obrigatoria na criacao, opcional na edicao (so valida se preenchida)
+    const senhaObrigatoria = !isEditing;
+    if (senhaObrigatoria && !formData.senha) {
+      result.senha = 'Defina uma senha.';
+    } else if (formData.senha && formData.senha.length < SENHA_MIN_LENGTH) {
+      result.senha = `A senha deve ter pelo menos ${SENHA_MIN_LENGTH} caracteres.`;
+    }
+
+    // Confirmacao so e exigida se uma senha foi digitada
+    if (formData.senha) {
+      if (!formData.confirmaSenha) {
+        result.confirmaSenha = 'Repita a senha para confirmar.';
+      } else if (formData.confirmaSenha !== formData.senha) {
+        result.confirmaSenha = 'As senhas nao coincidem.';
+      }
+    }
+
+    return result;
+  }, [formData, isEditing]);
+
+  // So exibimos o erro de um campo se ele foi tocado ou se o usuario ja tentou submeter
+  const visibleErrors = useMemo(() => {
+    const result = {};
+    for (const key of Object.keys(errors)) {
+      if (touched[key]) {
+        result[key] = errors[key];
+      }
+    }
+    return result;
+  }, [errors, touched]);
+
+  const formInvalido = Object.keys(errors).length > 0;
 
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  const handleBlur = (event) => {
+    const { name } = event.target;
+    setTouched((prev) => ({ ...prev, [name]: true }));
+  };
+
   const handleSubmit = (event) => {
     event.preventDefault();
 
-    if (formData.senha && formData.senha !== formData.confirmaSenha) {
-      addToast('As senhas nao coincidem.', 'error');
+    // Marca todos os campos como touched para que erros virem visiveis
+    if (formInvalido) {
+      const allTouched = Object.keys(errors).reduce(
+        (acc, key) => ({ ...acc, [key]: true }),
+        {}
+      );
+      setTouched((prev) => ({ ...prev, ...allTouched }));
+
+      // Mensagem clara perto do botao + toast como reforco
+      const primeiraMensagem = errors[Object.keys(errors)[0]];
+      addToast(primeiraMensagem, 'error');
+
+      // Foca no primeiro campo com erro para guiar o usuario
+      const primeiroCampoComErro = Object.keys(errors)[0];
+      const elemento = document.querySelector(`[name="${primeiroCampoComErro}"]`);
+      elemento?.focus();
       return;
     }
 
@@ -106,15 +187,17 @@ function UsuarioForm({
       title={isEditing ? 'Editar usuario' : 'Novo usuario'}
       description="Gerencie acesso, contato e permissao dentro do tenant."
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-6" noValidate>
         <ResponsiveGrid cols={{ base: 1, md: 2 }}>
           <Input
             label="Nome completo"
             name="nome"
             value={formData.nome}
             onChange={handleChange}
+            onBlur={handleBlur}
             required
             disabled={isSubmitting}
+            error={visibleErrors.nome}
           />
 
           <Input
@@ -123,8 +206,10 @@ function UsuarioForm({
             name="email"
             value={formData.email}
             onChange={handleChange}
+            onBlur={handleBlur}
             required
             disabled={isSubmitting}
+            error={visibleErrors.email}
           />
 
           <Input
@@ -132,8 +217,10 @@ function UsuarioForm({
             name="username"
             value={formData.username}
             onChange={handleChange}
+            onBlur={handleBlur}
             required
             disabled={isSubmitting || isEditing}
+            error={visibleErrors.username}
           />
         </ResponsiveGrid>
 
@@ -145,10 +232,17 @@ function UsuarioForm({
               name="senha"
               value={formData.senha}
               onChange={handleChange}
+              onBlur={handleBlur}
               required={!isEditing}
-              minLength={6}
+              minLength={SENHA_MIN_LENGTH}
               disabled={isSubmitting}
               className="pr-10"
+              error={visibleErrors.senha}
+              hint={
+                !visibleErrors.senha && !isEditing
+                  ? `Minimo ${SENHA_MIN_LENGTH} caracteres.`
+                  : undefined
+              }
             />
 
             <button
@@ -168,10 +262,20 @@ function UsuarioForm({
               name="confirmaSenha"
               value={formData.confirmaSenha}
               onChange={handleChange}
+              onBlur={handleBlur}
               required={!isEditing && !!formData.senha}
-              minLength={6}
+              minLength={SENHA_MIN_LENGTH}
               disabled={isSubmitting}
               className="pr-10"
+              error={visibleErrors.confirmaSenha}
+              hint={
+                !visibleErrors.confirmaSenha &&
+                formData.senha &&
+                formData.confirmaSenha &&
+                formData.senha === formData.confirmaSenha
+                  ? 'As senhas coincidem.'
+                  : undefined
+              }
             />
 
             <button
@@ -207,6 +311,28 @@ function UsuarioForm({
             hint="Se definido, sobrepõe o fuso da empresa para este usuário."
           />
         </ResponsiveGrid>
+
+        {/* Resumo perto do botao de submit. So aparece depois que algum campo
+            foi tocado e ainda ha pendencias. Diferente do toast (que e efemero),
+            esse banner fica visivel ate o usuario corrigir. */}
+        {Object.keys(visibleErrors).length > 0 ? (
+          <div
+            role="alert"
+            className="rounded-xl border px-4 py-3 text-sm"
+            style={{
+              backgroundColor: 'var(--color-danger-soft)',
+              borderColor: 'var(--color-danger)',
+              color: 'var(--text-primary)',
+            }}
+          >
+            <p className="mb-1 font-semibold">Corrija os campos destacados antes de continuar:</p>
+            <ul className="list-disc pl-5 space-y-0.5">
+              {Object.values(visibleErrors).map((mensagem, idx) => (
+                <li key={idx}>{mensagem}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="flex flex-wrap gap-3">
           <Button type="submit" disabled={isSubmitting}>
