@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faSpinner,
@@ -160,49 +160,71 @@ function TextInput({ name, value, onChange, placeholder, type = 'text' }) {
 
 /* ─── Tabela compartilhada ──────────────────────────────────────────────── */
 
+/**
+ * Tabela com modo card responsivo: em < md (768px), cada <tr> vira um
+ * card com label/value verticais (CSS em index.css usa data-label).
+ * Os labels vêm das colunas via Context — Cell pega o label correto
+ * pelo índice da sua posição entre os filhos do LogRow.
+ */
+const ColumnsContext = createContext([]);
+const CellIndexContext = createContext(null);
+
 function LogTable({ columns, children }) {
   return (
-    <div
-      className="overflow-x-auto rounded-2xl border"
-      style={{
-        borderColor: 'var(--border-soft)',
-        backgroundColor: 'var(--bg-surface)',
-        boxShadow: 'var(--shadow-sm)',
-      }}
-    >
-      <table className="min-w-full">
-        <thead>
-          <tr
-            style={{
-              backgroundColor: 'var(--bg-surface-soft)',
-              borderBottom: '1px solid var(--border-soft)',
-            }}
-          >
-            {columns.map((c) => (
-              <th
-                key={c}
-                className="px-4 py-3 text-left"
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10.5,
-                  fontWeight: 700,
-                  letterSpacing: '0.16em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                {c}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>{children}</tbody>
-      </table>
-    </div>
+    <ColumnsContext.Provider value={columns}>
+      <div
+        className="responsive-table-wrap overflow-x-auto rounded-2xl border"
+        style={{
+          borderColor: 'var(--border-soft)',
+          backgroundColor: 'var(--bg-surface)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
+        <table className="responsive-table min-w-full">
+          <thead>
+            <tr
+              style={{
+                backgroundColor: 'var(--bg-surface-soft)',
+                borderBottom: '1px solid var(--border-soft)',
+              }}
+            >
+              {columns.map((c) => (
+                <th
+                  key={c}
+                  className="px-4 py-3 text-left"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.16em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  {c}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </ColumnsContext.Provider>
   );
 }
 
 function LogRow({ children }) {
+  // Injeta o índice em cada Cell filho — Cell usa o índice para
+  // pegar o data-label correspondente do ColumnsContext.
+  const wrapped = React.Children.map(children, (child, index) => {
+    if (!React.isValidElement(child)) return child;
+    return (
+      <CellIndexContext.Provider value={index} key={index}>
+        {child}
+      </CellIndexContext.Provider>
+    );
+  });
+
   return (
     <tr
       style={{
@@ -212,15 +234,20 @@ function LogRow({ children }) {
       onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'var(--bg-surface-soft)'; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
     >
-      {children}
+      {wrapped}
     </tr>
   );
 }
 
 function Cell({ children, mono = false, muted = false, nowrap = false }) {
+  const columns = useContext(ColumnsContext);
+  const index = useContext(CellIndexContext);
+  const dataLabel = (index != null && columns?.[index]) || undefined;
+
   return (
     <td
       className="px-4 py-3"
+      data-label={dataLabel}
       style={{
         fontSize: 13,
         color: muted ? 'var(--text-muted)' : 'var(--text-primary)',

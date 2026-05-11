@@ -355,7 +355,7 @@ function BIPage() {
                           </div>
                         </div>
 
-                        <table className="w-full" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                        <table className="responsive-table w-full" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
                           <colgroup>
                             <col style={{ width: '28%' }} />
                             <col style={{ width: '20%' }} />
@@ -394,12 +394,14 @@ function BIPage() {
                                   style={{ borderBottom: '1px solid var(--border-soft)' }}
                                 >
                                   <td className="py-2 px-2 truncate"
+                                    data-label="Equipamento"
                                     style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}
                                     title={eq.nome}
                                   >
                                     {eq.nome}
                                   </td>
                                   <td className="py-2 px-2 truncate"
+                                    data-label="Tag"
                                     style={{
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: 12,
@@ -410,6 +412,7 @@ function BIPage() {
                                     {eq.tag || '—'}
                                   </td>
                                   <td className="py-2 px-2 stat-value"
+                                    data-label="Exames"
                                     style={{
                                       textAlign: 'right',
                                       fontSize: 13,
@@ -419,6 +422,7 @@ function BIPage() {
                                     {eq.totalExames?.toLocaleString('pt-BR') ?? '—'}
                                   </td>
                                   <td className="py-2 px-2 stat-value"
+                                    data-label="Pacientes"
                                     style={{
                                       textAlign: 'right',
                                       fontSize: 13,
@@ -428,6 +432,7 @@ function BIPage() {
                                     {eq.totalPacientes?.toLocaleString('pt-BR') ?? '—'}
                                   </td>
                                   <td className="py-2 px-2 stat-value"
+                                    data-label="Média/Dia"
                                     style={{
                                       textAlign: 'right',
                                       fontSize: 13,
@@ -437,6 +442,7 @@ function BIPage() {
                                     {eq.mediaExamesDia ?? '—'}
                                   </td>
                                   <td className="py-2 px-2 stat-value"
+                                    data-label="Uptime"
                                     style={{
                                       textAlign: 'right',
                                       fontSize: 13,
