@@ -7,6 +7,8 @@ import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendaca
 import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
 import { monitorarSaudeGehc } from './services/gehc/gehcMonitor.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
+import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
+import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -108,6 +110,41 @@ const alertasWorker = new Worker(
           resultados.push({ tenantId: tenant.id, ok: true, total: r?.total ?? 0 });
         } catch (err) {
           console.error(`[GEHC_SYNC_WORKER] Erro tenant ${tenant.id}:`, err.message);
+          resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+        }
+      }
+
+      return { ok: true, tenants: resultados.length, resultados };
+    }
+
+    if (job?.name === 'gehc-discovery-diario') {
+      // Roda discovery apenas para tenants que já tenham credenciais GE
+      // configuradas — sem credenciais o discovery falha em capturar tokens
+      // e não traz valor. Reduz ruído nos logs.
+      const tenants = await prisma.tenant.findMany({
+        where: { ativo: true },
+        select: { id: true },
+      });
+
+      const resultados = [];
+      for (const tenant of tenants) {
+        try {
+          const temCreds = await temCredenciaisConfiguradas(tenant.id);
+          if (!temCreds) {
+            resultados.push({ tenantId: tenant.id, ok: true, skipped: 'sem_credenciais' });
+            continue;
+          }
+          const r = await descobrirEquipamentosGehc(tenant.id);
+          resultados.push({
+            tenantId: tenant.id,
+            ok: true,
+            vinculados: r.vinculados.length,
+            jaVinculados: r.jaVinculados.length,
+            semMatch: r.semMatch.length,
+            pendentesConfirmacao: r.pendentesConfirmacao.length,
+          });
+        } catch (err) {
+          console.error(`[GEHC_DISCOVERY_WORKER] Erro tenant ${tenant.id}:`, err.message);
           resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
         }
       }
