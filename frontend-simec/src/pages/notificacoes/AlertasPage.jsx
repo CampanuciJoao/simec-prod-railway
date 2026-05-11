@@ -28,8 +28,18 @@ function AlertasPage() {
   const hasError = Boolean(page.error);
   const isEmpty = !page.loading && page.alertasFiltrados.length === 0;
 
+  // Empty state contextual: usuário está com o filtro default (NaoVisto)
+  // e a lista veio vazia → significa que não há nada pendente. Convidamos
+  // a revisar os vistos.
+  const isDefaultEmpty =
+    isEmpty
+    && !page.searchTerm
+    && page.filtros.status === 'NaoVisto'
+    && !page.filtros.tipo
+    && !page.filtros.prioridade;
+
   return (
-    <PageLayout background="slate" padded fullHeight>
+    <PageLayout padded fullHeight>
       <div className="space-y-6">
         <PageHeader
           title="Alertas do Sistema"
@@ -67,7 +77,14 @@ function AlertasPage() {
         ) : hasError ? (
           <PageState error="Erro ao carregar alertas." />
         ) : isEmpty ? (
-          <PageState isEmpty emptyMessage="Nenhum alerta encontrado para os critérios selecionados." />
+          isDefaultEmpty ? (
+            <PageState
+              isEmpty
+              emptyMessage="Você está em dia. Nenhum alerta não visto. Filtre por VISTOS para revisar alertas já tratados."
+            />
+          ) : (
+            <PageState isEmpty emptyMessage="Nenhum alerta encontrado para os critérios selecionados." />
+          )
         ) : (
           <div className="space-y-4">
             <div className="flex flex-col gap-4">
