@@ -8,8 +8,13 @@ import { buildSelectFiltersConfig } from '@/utils/alertas/alertasPageUtils';
 
 const PAGE_SIZE = 25;
 
+/**
+ * Filtro padrão da página: oculta alertas já vistos.
+ * Para revisar vistos, basta trocar o filtro de Status para 'Visto'
+ * (manualmente ou via card 'VISTOS' do topo).
+ */
 function getFiltrosIniciais() {
-  return { status: '', tipo: '', prioridade: '' };
+  return { status: 'NaoVisto', tipo: '', prioridade: '' };
 }
 
 export function useAlertasPage() {
