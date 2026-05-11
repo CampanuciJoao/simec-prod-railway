@@ -54,8 +54,24 @@ model Tenant {
   gehcAlertaSuspensoes     GehcAlertaSuspensao[]
   telegramNotificacoes     TelegramNotificacao[]
   telegramVinculacaoTokens TelegramVinculacaoToken[]
+  alertConfigs             AlertConfig[]
 
   @@map("tenants")
+}
+
+model AlertConfig {
+  id        String   @id @default(uuid())
+  tenantId  String
+  module    String
+  config    Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, module])
+  @@index([tenantId])
+  @@map("alert_configs")
 }
 
 model Unidade {

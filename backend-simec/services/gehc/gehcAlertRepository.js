@@ -2,17 +2,15 @@ import prisma from '../prismaService.js';
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
+import { DEFAULTS as ALERT_DEFAULTS, getConfig as getAlertConfig } from '../alertas/alertConfigService.js';
 
-export const THRESHOLDS = {
-  heliumWarn:          70,
-  heliumCritical:      30,
-  tempWarn:            18,
-  tempCritical:        25,
-  flowMin:             1.5,
-  pressureMin:         0.8,
-  pressureMax:         1.5,
-  pressureCriticalMax: 2.0,
-};
+/**
+ * THRESHOLDS legados — mantidos como **defaults estáticos** para
+ * compatibilidade com qualquer importação direta. A fonte de verdade
+ * é `DEFAULTS.GEHC` em alertConfigService. Quem precisa dos valores
+ * efetivos por tenant deve chamar `getAlertConfig(tenantId, 'GEHC')`.
+ */
+export const THRESHOLDS = ALERT_DEFAULTS.GEHC;
 
 const OFFLINE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 horas
 
@@ -26,16 +24,25 @@ const LABELS_POR_METRICA = {
   magnetOnline:      ['magneto-offline'],
 };
 
-function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false) {
+/**
+ * Avalia o snapshot contra os thresholds e retorna a lista de alertas a criar.
+ * @param {object} snapshot - leitura GE atual
+ * @param {string} equipamentoNome
+ * @param {boolean} eRessonancia
+ * @param {object} [thresholds=THRESHOLDS] - configuração efetiva do tenant
+ *   (defaults se não passado, para compatibilidade com chamadas legadas)
+ */
+function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresholds = THRESHOLDS) {
   const alertas = [];
   const { heliumLevelPct, heliumPressurePsi, compressorStatus,
           coolantTempC, coolantFlowGpm, magnetOnline } = snapshot;
+  const t = thresholds || THRESHOLDS;
 
   // Alertas de hélio, magneto e cryo são exclusivos de ressonâncias magnéticas
   if (!eRessonancia) return alertas;
 
   if (heliumLevelPct !== null && heliumLevelPct !== undefined) {
-    if (heliumLevelPct < THRESHOLDS.heliumCritical) {
+    if (heliumLevelPct < t.heliumCritical) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_HELIO_CRITICO,
         prioridade: ALERT_PRIORIDADES.ALTA,
@@ -43,12 +50,12 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false) {
         subtitulo: `Nível atual: ${heliumLevelPct}% — risco iminente de quench`,
         label: 'helio-critico',
       });
-    } else if (heliumLevelPct < THRESHOLDS.heliumWarn) {
+    } else if (heliumLevelPct < t.heliumWarn) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_HELIO_BAIXO,
         prioridade: ALERT_PRIORIDADES.MEDIA,
         titulo: `Nível de hélio baixo — ${equipamentoNome}`,
-        subtitulo: `Nível atual: ${heliumLevelPct}% (recomendado: acima de ${THRESHOLDS.heliumWarn}%)`,
+        subtitulo: `Nível atual: ${heliumLevelPct}% (recomendado: acima de ${t.heliumWarn}%)`,
         label: 'helio-baixo',
       });
     }
@@ -65,50 +72,50 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false) {
   }
 
   if (coolantTempC !== null && coolantTempC !== undefined) {
-    if (coolantTempC > THRESHOLDS.tempCritical) {
+    if (coolantTempC > t.tempCritical) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_TEMPERATURA_ALTA,
         prioridade: ALERT_PRIORIDADES.ALTA,
         titulo: `Temperatura do resfriador crítica — ${equipamentoNome}`,
-        subtitulo: `Temperatura atual: ${coolantTempC}°C (limite crítico: ${THRESHOLDS.tempCritical}°C)`,
+        subtitulo: `Temperatura atual: ${coolantTempC}°C (limite crítico: ${t.tempCritical}°C)`,
         label: 'temp-critica',
       });
-    } else if (coolantTempC > THRESHOLDS.tempWarn) {
+    } else if (coolantTempC > t.tempWarn) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_TEMPERATURA_ALTA,
         prioridade: ALERT_PRIORIDADES.MEDIA,
         titulo: `Temperatura do resfriador elevada — ${equipamentoNome}`,
-        subtitulo: `Temperatura atual: ${coolantTempC}°C (recomendado: abaixo de ${THRESHOLDS.tempWarn}°C)`,
+        subtitulo: `Temperatura atual: ${coolantTempC}°C (recomendado: abaixo de ${t.tempWarn}°C)`,
         label: 'temp-alta',
       });
     }
   }
 
-  if (coolantFlowGpm !== null && coolantFlowGpm !== undefined && coolantFlowGpm < THRESHOLDS.flowMin) {
+  if (coolantFlowGpm !== null && coolantFlowGpm !== undefined && coolantFlowGpm < t.flowMin) {
     alertas.push({
       evento: ALERT_EVENTOS.GEHC_FLUXO_BAIXO,
       prioridade: ALERT_PRIORIDADES.MEDIA,
       titulo: `Fluxo do resfriador abaixo do normal — ${equipamentoNome}`,
-      subtitulo: `Fluxo atual: ${coolantFlowGpm} GPM (mínimo: ${THRESHOLDS.flowMin} GPM)`,
+      subtitulo: `Fluxo atual: ${coolantFlowGpm} GPM (mínimo: ${t.flowMin} GPM)`,
       label: 'fluxo-baixo',
     });
   }
 
   if (heliumPressurePsi !== null && heliumPressurePsi !== undefined) {
-    if (heliumPressurePsi > THRESHOLDS.pressureCriticalMax || heliumPressurePsi < THRESHOLDS.pressureMin) {
+    if (heliumPressurePsi > t.pressureCriticalMax || heliumPressurePsi < t.pressureMin) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_PRESSAO_ANORMAL,
         prioridade: ALERT_PRIORIDADES.ALTA,
         titulo: `Pressão do hélio crítica — ${equipamentoNome}`,
-        subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (faixa segura: ${THRESHOLDS.pressureMin}–${THRESHOLDS.pressureCriticalMax} PSI).`,
+        subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (faixa segura: ${t.pressureMin}–${t.pressureCriticalMax} PSI).`,
         label: 'pressao-critica',
       });
-    } else if (heliumPressurePsi > THRESHOLDS.pressureMax) {
+    } else if (heliumPressurePsi > t.pressureMax) {
       alertas.push({
         evento: ALERT_EVENTOS.GEHC_PRESSAO_ANORMAL,
         prioridade: ALERT_PRIORIDADES.MEDIA,
         titulo: `Pressão do hélio elevada — ${equipamentoNome}`,
-        subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (recomendado: até ${THRESHOLDS.pressureMax} PSI).`,
+        subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (recomendado: até ${t.pressureMax} PSI).`,
         label: 'pressao-alta',
       });
     }
@@ -176,8 +183,20 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
     suspensoes.filter(s => s.tipoEvento !== null).map(s => s.tipoEvento)
   );
 
+  // Carrega thresholds efetivos do tenant (com fallback para defaults)
+  let thresholds = THRESHOLDS;
+  try {
+    const cfg = await getAlertConfig(tenantId, 'GEHC');
+    if (cfg) {
+      const { __meta, ...clean } = cfg;
+      thresholds = clean;
+    }
+  } catch (err) {
+    console.warn('[GEHC_ALERT] Falha ao carregar thresholds, usando defaults:', err.message);
+  }
+
   // Computa regras e filtra eventos suspensos
-  const todasRegras = regrasDeAlerta(snapshot, equipamentoNome, eRessonancia);
+  const todasRegras = regrasDeAlerta(snapshot, equipamentoNome, eRessonancia, thresholds);
   const regras = todasRegras.filter(r => !eventosSuspensos.has(r.evento));
 
   const labelsAtivos = new Set(regras.map(r => r.label));

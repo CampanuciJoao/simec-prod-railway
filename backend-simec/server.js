@@ -30,6 +30,7 @@ import superadminHelpRoutes from './routes/superadminHelpRoutes.js';
 import orcamentosRoutes from './routes/orcamentosRoutes.js';
 import osCorretivaRoutes from './routes/osCorretivaRoutes.js';
 import gehcRoutes from './routes/gehcRoutes.js';
+import alertConfigRoutes from './routes/alertConfigRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
 import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
 
@@ -180,6 +181,7 @@ app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);
 app.use('/api/os-corretiva', osCorretivaRoutes);
 app.use('/api/gehc', gehcRoutes);
+app.use('/api/alert-config', alertConfigRoutes);
 app.use('/api/telegram', telegramRoutes);
 
 app.use('/api', (req, res) => {
