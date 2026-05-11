@@ -2,7 +2,6 @@ import { Navigate, Route } from 'react-router-dom';
 
 import AdminRoute from '@/components/routes/AdminRoute';
 import {
-  CadastrosGeraisPage,
   EmailsNotificacaoPage,
   TelegramNotificacaoPage,
   SalvarEquipamentoPage,
@@ -13,7 +12,9 @@ import {
 function CadastrosRouteElements() {
   return (
     <>
-      <Route path="cadastros" element={<CadastrosGeraisPage />} />
+      {/* Hub de Cadastros foi movido para /gerenciamento/cadastros.
+          Mantemos o redirect para preservar bookmarks e atalhos antigos. */}
+      <Route path="cadastros" element={<Navigate to="/gerenciamento/cadastros" replace />} />
       <Route path="cadastros/unidades" element={<UnidadesPage />} />
       <Route
         path="cadastros/unidades/adicionar"

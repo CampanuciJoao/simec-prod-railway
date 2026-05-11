@@ -21,11 +21,6 @@ export const sidebarConfig = [
     icon: faTachometerAlt,
   },
   {
-    label: 'Cadastros Gerais',
-    path: '/cadastros',
-    icon: faPlus,
-  },
-  {
     label: 'Equipamentos',
     path: '/equipamentos',
     icon: faMicrochip,
