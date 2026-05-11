@@ -325,31 +325,34 @@ const TABS = [
 function TabBar({ active, onChange }) {
   return (
     <div
-      className="inline-flex gap-1 rounded-xl p-1"
+      className="scrollbar-none overflow-x-auto rounded-xl p-1 -mx-1 sm:mx-0"
       style={{
         backgroundColor: 'var(--bg-surface-subtle)',
         border: '1px solid var(--border-soft)',
       }}
     >
-      {TABS.map((tab) => {
-        const isActive = active === tab.id;
-        return (
-          <button
-            key={tab.id}
-            type="button"
-            onClick={() => onChange(tab.id)}
-            className="inline-flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-semibold transition-all"
-            style={{
-              backgroundColor: isActive ? 'var(--bg-surface)' : 'transparent',
-              color:           isActive ? 'var(--text-primary)' : 'var(--text-muted)',
-              boxShadow:       isActive ? 'var(--shadow-sm)' : 'none',
-            }}
-          >
-            <FontAwesomeIcon icon={tab.icon} className="text-xs" />
-            {tab.label}
-          </button>
-        );
-      })}
+      <div className="flex gap-1 w-max sm:w-auto">
+        {TABS.map((tab) => {
+          const isActive = active === tab.id;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onChange(tab.id)}
+              className="inline-flex items-center justify-center gap-2 rounded-lg px-3 sm:px-3.5 py-2 text-[13px] sm:text-sm font-semibold transition-all shrink-0 whitespace-nowrap"
+              style={{
+                backgroundColor: isActive ? 'var(--bg-surface)' : 'transparent',
+                color:           isActive ? 'var(--text-primary)' : 'var(--text-muted)',
+                boxShadow:       isActive ? 'var(--shadow-sm)' : 'none',
+                minHeight: 40,
+              }}
+            >
+              <FontAwesomeIcon icon={tab.icon} className="text-xs" />
+              {tab.label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
