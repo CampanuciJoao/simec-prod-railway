@@ -184,6 +184,20 @@
   background-image: none !important;
 }
 
+/* Em mobile: drag/resize não fazem sentido em touch — esconde o ícone
+   grip do header dos cards e os handles de resize. */
+@media (max-width: 1023px) {
+  .drag-handle {
+    cursor: default !important;
+  }
+  .drag-handle svg[data-icon="grip-vertical"] {
+    display: none;
+  }
+  .react-resizable-handle {
+    display: none !important;
+  }
+}
+
 @layer utilities {
   .content-fade-in {
     animation: contentFadeIn 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
