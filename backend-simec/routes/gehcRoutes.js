@@ -766,9 +766,14 @@ router.get('/bi/utilizacao', async (req, res) => {
       return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
     }
 
+    // Prioriza nomeSistema (nome curto que aparece nos selects do app);
+    // cai para nomeFantasia se não houver. Adiciona cidade apenas quando
+    // o nome base não a inclui — evita 'CERDIL Dourados — Dourados'.
     function nomeUnidade(u) {
-      const base = u?.nomeFantasia || u?.nomeSistema || '—';
-      return u?.cidade ? `${base} — ${u.cidade}` : base;
+      const base = u?.nomeSistema || u?.nomeFantasia || '—';
+      if (!u?.cidade) return base;
+      if (base.toLowerCase().includes(u.cidade.toLowerCase())) return base;
+      return `${base} — ${u.cidade}`;
     }
 
     // Agrupa por unidade → equipamento
