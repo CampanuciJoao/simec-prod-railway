@@ -122,99 +122,6 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code 
   );
 }
 
-// ─── Info-strip técnico ──────────────────────────────────────────────────────
-
-/**
- * Linha discreta em monospace com contexto operacional: contadores
- * agregados + timestamp da última leitura. Estética 'console técnico'
- * sem ocupar espaço de KPI principal.
- */
-function DashboardInfoStrip({ resumo }) {
-  const [now, setNow] = useState(() => new Date());
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 30_000);
-    return () => clearInterval(id);
-  }, []);
-
-  const items = [
-    {
-      label: 'Parque',
-      value: `${resumo.totalEquipamentos} EQUIP.`,
-      tone: 'default',
-    },
-    {
-      label: 'Disponib.',
-      value: `${resumo.disponibilidade}%`,
-      tone: resumo.disponibilidade >= 95 ? 'good' : resumo.disponibilidade >= 85 ? 'warn' : 'crit',
-    },
-    {
-      label: 'Manut.',
-      value: resumo.emManutencao,
-      tone: resumo.emManutencao > 0 ? 'warn' : 'default',
-    },
-    {
-      label: 'Alertas',
-      value: resumo.alertasAtivos,
-      tone: resumo.alertasCriticos > 0 ? 'crit' : 'default',
-    },
-  ];
-
-  const toneColor = (tone) => ({
-    default: 'var(--text-primary)',
-    good:    'var(--color-success)',
-    warn:    'var(--color-warning)',
-    crit:    'var(--color-danger)',
-  })[tone] || 'var(--text-primary)';
-
-  return (
-    <div
-      className="flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2 rounded-lg border"
-      style={{
-        borderColor: 'var(--border-soft)',
-        backgroundColor: 'var(--bg-surface-soft)',
-        fontFamily: 'var(--font-mono)',
-        fontSize: 11,
-        letterSpacing: '0.04em',
-      }}
-    >
-      {items.map((it) => (
-        <span key={it.label} className="inline-flex items-center gap-1.5">
-          <span
-            style={{
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: '0.2em',
-              textTransform: 'uppercase',
-              color: 'var(--text-muted)',
-            }}
-          >
-            {it.label}
-          </span>
-          <span style={{ color: toneColor(it.tone), fontWeight: 700 }}>{it.value}</span>
-        </span>
-      ))}
-      <span
-        className="ml-auto inline-flex items-center gap-1.5"
-        style={{
-          color: 'var(--text-muted)',
-          fontSize: 10,
-          letterSpacing: '0.06em',
-        }}
-      >
-        <span
-          aria-hidden="true"
-          style={{
-            width: 6, height: 6, borderRadius: '50%',
-            backgroundColor: 'var(--color-success)',
-          }}
-        />
-        Atualizado{' '}
-        {now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-      </span>
-    </div>
-  );
-}
-
 // ─── Ocorrências ──────────────────────────────────────────────────────────────
 
 const STATUS_OS_LABEL = {
@@ -564,9 +471,6 @@ function DashboardPage() {
             </div>
           }
         />
-
-        {/* Info-strip técnico — contexto da sessão em monospace */}
-        <DashboardInfoStrip resumo={resumo} />
 
         {/* KPI ribbon — 4 indicadores operacionais antes do grid configurável */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

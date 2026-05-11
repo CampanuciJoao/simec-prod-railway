@@ -18,6 +18,7 @@ function EquipamentosKpiGrid({
   return (
     <KpiGrid className="xl:grid-cols-5">
       <KpiCard
+        code="E01"
         icon={faMicrochip}
         title="Total"
         value={metricas.total ?? 0}
@@ -27,6 +28,7 @@ function EquipamentosKpiGrid({
       />
 
       <KpiCard
+        code="E02"
         icon={faCircleCheck}
         title="Operantes"
         value={metricas.operantes ?? 0}
@@ -36,6 +38,7 @@ function EquipamentosKpiGrid({
       />
 
       <KpiCard
+        code="E03"
         icon={faScrewdriverWrench}
         title="Em manutenção"
         value={metricas.emManutencao ?? 0}
@@ -45,6 +48,7 @@ function EquipamentosKpiGrid({
       />
 
       <KpiCard
+        code="E04"
         icon={faCircleXmark}
         title="Inoperantes"
         value={metricas.inoperantes ?? 0}
@@ -54,6 +58,7 @@ function EquipamentosKpiGrid({
       />
 
       <KpiCard
+        code="E05"
         icon={faTriangleExclamation}
         title="Uso limitado"
         value={metricas.usoLimitado ?? 0}

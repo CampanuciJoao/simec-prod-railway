@@ -21,6 +21,7 @@ function AlertasKpiGrid({
   return (
     <KpiGrid className="mb-6 md:grid-cols-3 xl:grid-cols-5">
       <KpiCard
+        code="A01"
         icon={faList}
         title="Total"
         value={metricas.total}
@@ -28,13 +29,15 @@ function AlertasKpiGrid({
         onClick={onClearAll}
       />
       <KpiCard
+        code="A02"
         icon={faBell}
-        title="Nao vistos"
+        title="Não vistos"
         value={metricas.naoVistos}
         tone="blue"
         onClick={onFilterNaoVistos}
       />
       <KpiCard
+        code="A03"
         icon={faCircleCheck}
         title="Vistos"
         value={metricas.vistos}
@@ -42,15 +45,17 @@ function AlertasKpiGrid({
         onClick={onFilterVistos}
       />
       <KpiCard
+        code="A04"
         icon={faTriangleExclamation}
-        title="Criticos"
+        title="Críticos"
         value={metricas.criticos}
         tone="red"
         onClick={onFilterCriticos}
       />
       <KpiCard
+        code="A05"
         icon={faLightbulb}
-        title="Recomendacoes"
+        title="Recomendações"
         value={totalRecomendacoes}
         tone="purple"
         onClick={onFilterRecomendacoes}
