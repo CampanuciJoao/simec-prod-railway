@@ -271,23 +271,26 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
       style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface)' }}
     >
       <div
-        className="flex flex-wrap items-start justify-between gap-3 px-5 py-4 border-b"
+        className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 border-b"
         style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
       >
         <div className="min-w-0">
-          <p className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{catalog.titulo}</p>
-          <p className="mt-0.5 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{catalog.descricao}</p>
-          {customizado ? (
-            <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              <FontAwesomeIcon icon={faPenToSquare} className="mr-1" style={{ color: 'var(--brand-primary)' }} />
-              Customizado pelo tenant — última edição em {formatarDataHora(data.meta.updatedAt)}.
-            </p>
-          ) : (
-            <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-              <FontAwesomeIcon icon={faCircleCheck} className="mr-1" style={{ color: 'var(--color-success)' }} />
-              Usando padrões do sistema (não customizado).
-            </p>
-          )}
+          <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{catalog.titulo}</p>
+          <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>
+            {catalog.descricao}
+            {' · '}
+            {customizado ? (
+              <span style={{ color: 'var(--brand-primary)' }}>
+                <FontAwesomeIcon icon={faPenToSquare} className="mr-1" />
+                Customizado — última edição em {formatarDataHora(data.meta.updatedAt)}
+              </span>
+            ) : (
+              <span style={{ color: 'var(--color-success)' }}>
+                <FontAwesomeIcon icon={faCircleCheck} className="mr-1" />
+                Usando padrões do sistema
+              </span>
+            )}
+          </p>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -344,36 +347,38 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
         </ul>
       )}
 
-      <div className="p-5 space-y-4">
+      <div className="p-3 space-y-2">
         {catalog.grupos.map((grupo) => (
           <div
             key={grupo.metrica}
-            className="rounded-xl border px-4 py-3"
+            className="rounded-lg border px-3 py-2.5"
             style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
           >
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-2.5">
               <span
-                className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                className="mt-0.5 inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs"
                 style={{ backgroundColor: `${grupo.cor}1f`, color: grupo.cor }}
               >
                 <FontAwesomeIcon icon={grupo.icon} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{grupo.metrica}</p>
-                <p className="mt-0.5 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{grupo.contexto}</p>
+                <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{grupo.metrica}</p>
+                  <p className="text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>{grupo.contexto}</p>
+                </div>
 
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-2">
                   {grupo.campos.map((campo) => {
                     const valorAtual = data.config[campo.key];
                     const valorDraft = draft[campo.key] ?? '';
                     return (
                       <div key={campo.key} className="min-w-0">
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.16em]" style={{ color: 'var(--text-muted)' }}>
+                        <p className="text-[9.5px] font-semibold uppercase tracking-[0.14em]" style={{ color: 'var(--text-muted)' }}>
                           {campo.label}
                         </p>
                         {edit ? (
-                          <div className="mt-1 flex items-center gap-2">
-                            <span style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{campo.operador}</span>
+                          <div className="mt-1 flex items-center gap-1.5">
+                            <span className="text-xs" style={{ color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>{campo.operador}</span>
                             <input
                               type="number"
                               step="any"
@@ -381,23 +386,23 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
                               onChange={(e) => handleChange(campo.key, e.target.value)}
                               style={{
                                 width: '100%',
-                                borderRadius: '0.5rem',
+                                borderRadius: '0.375rem',
                                 border: '1px solid var(--border-soft)',
                                 backgroundColor: 'var(--bg-surface)',
                                 color: 'var(--text-primary)',
-                                padding: '0.35rem 0.6rem',
-                                fontSize: '0.875rem',
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.8125rem',
                                 fontFamily: 'var(--font-mono)',
                                 fontVariantNumeric: 'tabular-nums',
                               }}
                             />
                             {campo.suffix && (
-                              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{campo.suffix}</span>
+                              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>{campo.suffix}</span>
                             )}
                           </div>
                         ) : (
                           <p
-                            className="stat-value mt-1 text-base font-semibold"
+                            className="stat-value mt-0.5 text-[13.5px] font-semibold leading-tight"
                             style={{ color: 'var(--color-danger)' }}
                           >
                             {formatRange(campo, valorAtual)}
@@ -415,21 +420,21 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
         {catalog.fixos?.map((fixo) => (
           <div
             key={fixo.metrica}
-            className="rounded-xl border px-4 py-3 flex items-start gap-3"
+            className="rounded-lg border px-3 py-2 flex items-center gap-2.5"
             style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
           >
             <span
-              className="mt-0.5 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-xs"
               style={{ backgroundColor: `${fixo.cor}1f`, color: fixo.cor }}
             >
               <FontAwesomeIcon icon={fixo.icon} />
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{fixo.metrica}</p>
-                <p className="text-xs font-semibold" style={{ color: 'var(--color-danger)' }}>{fixo.regra}</p>
+                <p className="text-[13px] font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{fixo.metrica}</p>
+                <p className="text-[11.5px] font-semibold" style={{ color: 'var(--color-danger)' }}>{fixo.regra}</p>
               </div>
-              <p className="mt-0.5 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
+              <p className="mt-0.5 text-[11px] leading-snug" style={{ color: 'var(--text-muted)' }}>
                 {fixo.contexto} <span style={{ fontStyle: 'italic' }}>(regra fixa — não customizável)</span>
               </p>
             </div>
@@ -715,16 +720,6 @@ function AlertasPage() {
       </PageSection>
 
       <PageSection
-        title="Suspensões ativas"
-        description="Alertas pausados temporariamente. Ao expirar o prazo, os alertas voltam a ser gerados automaticamente."
-      >
-        {loadingSusp
-          ? <LoadingState message="Carregando suspensões..." />
-          : <ListaSuspensoes suspensoes={suspensoes} onRemover={handleRemover} removendoId={removendoId} />
-        }
-      </PageSection>
-
-      <PageSection
         title="Suspender alertas"
         description="Pause alertas de um equipamento específico por um período determinado. Útil durante manutenções programadas para evitar notificações desnecessárias."
       >
@@ -751,6 +746,16 @@ function AlertasPage() {
           Selecionar <strong>Todos os equipamentos</strong> pausa alertas GE de todo o tenant.
           Selecionar <strong>Todos os eventos</strong> pausa qualquer tipo de alerta daquele equipamento.
         </p>
+      </PageSection>
+
+      <PageSection
+        title="Suspensões ativas"
+        description="Alertas pausados temporariamente. Ao expirar o prazo, os alertas voltam a ser gerados automaticamente."
+      >
+        {loadingSusp
+          ? <LoadingState message="Carregando suspensões..." />
+          : <ListaSuspensoes suspensoes={suspensoes} onRemover={handleRemover} removendoId={removendoId} />
+        }
       </PageSection>
 
     </div>
