@@ -12,12 +12,21 @@ function ManutencoesPageHeader({ onCreate, onRegistrarOcorrencia }) {
       subtitle="Acompanhe e gerencie ordens de serviço do sistema"
       icon={faWrench}
       actions={
-        <div className="flex items-center gap-2">
-          <Button type="button" variant="secondary" onClick={onRegistrarOcorrencia}>
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={onRegistrarOcorrencia}
+            className="w-full sm:w-auto justify-center"
+          >
             <FontAwesomeIcon icon={faExclamationTriangle} />
             Registrar ocorrência
           </Button>
-          <Button type="button" onClick={onCreate}>
+          <Button
+            type="button"
+            onClick={onCreate}
+            className="w-full sm:w-auto justify-center"
+          >
             <FontAwesomeIcon icon={faPlus} />
             Agendar nova
           </Button>
