@@ -2,6 +2,7 @@ import { Navigate, Route } from 'react-router-dom';
 
 import AdminRoute from '@/components/routes/AdminRoute';
 import {
+  CadastrosGeraisPage,
   ConfiguracaoAlertasPage,
   GerenciamentoPage,
   GerenciarUsuariosPage,
@@ -20,7 +21,8 @@ function AdminRouteElements() {
         </AdminRoute>
       }
     >
-      <Route index element={<Navigate to="usuarios" replace />} />
+      <Route index element={<Navigate to="cadastros" replace />} />
+      <Route path="cadastros"   element={<CadastrosGeraisPage embedded />} />
       <Route path="usuarios"    element={<GerenciarUsuariosPage />} />
       <Route path="empresa"     element={<TenantSettingsPage />} />
       <Route path="auditoria"   element={<LogAuditoriaPage />} />

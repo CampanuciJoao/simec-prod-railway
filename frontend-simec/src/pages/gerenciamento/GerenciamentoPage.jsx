@@ -6,8 +6,8 @@ import {
   faBuilding,
   faCogs,
   faPlug,
+  faPlus,
   faScroll,
-  faUsersCog,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { PageLayout, PageHeader, ResponsiveTabs } from '@/components/ui';
@@ -18,10 +18,10 @@ function GerenciamentoPage() {
 
   const tabs = [
     {
-      id: 'usuarios',
-      label: 'Usuarios',
-      icon: <FontAwesomeIcon icon={faUsersCog} />,
-      path: '/gerenciamento/usuarios',
+      id: 'cadastros',
+      label: 'Cadastros',
+      icon: <FontAwesomeIcon icon={faPlus} />,
+      path: '/gerenciamento/cadastros',
     },
     {
       id: 'empresa',
@@ -49,8 +49,10 @@ function GerenciamentoPage() {
     },
   ];
 
+  // /gerenciamento/usuarios é acessado pelo card "Usuários" do hub Cadastros,
+  // mas não tem aba própria — cai no fallback abaixo e destaca "Cadastros".
   const activeTab =
-    tabs.find((tab) => location.pathname.startsWith(tab.path))?.id || 'usuarios';
+    tabs.find((tab) => location.pathname.startsWith(tab.path))?.id ?? 'cadastros';
 
   const handleChangeTab = (tabId) => {
     const selectedTab = tabs.find((tab) => tab.id === tabId);
