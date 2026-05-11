@@ -4,12 +4,13 @@ export const ROW_HEIGHT = 58;
 export const GRID_COLS = 12;
 export const GRID_MARGIN = [12, 12];
 
+// Ordem visual: top→bottom, left→right.
 export const DEFAULT_LAYOUT = [
-  { i: 'ocorrencias', x: 0,  y: 0,  w: 7, h: 6, minW: 3, minH: 3 },
-  { i: 'alertas',     x: 7,  y: 0,  w: 5, h: 6, minW: 3, minH: 3 },
-  { i: 'fila',        x: 0,  y: 6,  w: 7, h: 5, minW: 4, minH: 4 },
-  { i: 'parque',      x: 7,  y: 6,  w: 5, h: 5, minW: 3, minH: 3 },
-  { i: 'historico',   x: 0,  y: 11, w: 12, h: 5, minW: 6, minH: 3 },
+  { i: 'fila',        x: 0, y: 0,  w: 6,  h: 6, minW: 4, minH: 4 },
+  { i: 'parque',      x: 6, y: 0,  w: 6,  h: 6, minW: 3, minH: 3 },
+  { i: 'ocorrencias', x: 0, y: 6,  w: 6,  h: 9, minW: 3, minH: 3 },
+  { i: 'alertas',     x: 6, y: 6,  w: 6,  h: 9, minW: 3, minH: 3 },
+  { i: 'historico',   x: 0, y: 15, w: 12, h: 6, minW: 6, minH: 3 },
 ];
 
 function storageKey(userId) {
