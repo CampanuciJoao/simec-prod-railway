@@ -49,7 +49,7 @@ function Sidebar({
 
       <aside
         className={[
-          'fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col transition-transform duration-300 lg:sticky lg:z-20',
+          'app-sidebar fixed left-0 top-0 z-50 flex h-screen w-[260px] flex-col transition-transform duration-300 lg:sticky lg:z-20',
           isMobileOpen
             ? 'translate-x-0'
             : '-translate-x-full lg:translate-x-0',

@@ -31,7 +31,7 @@ function AppTopbar({
 }) {
   return (
     <header
-      className="border-b px-4 py-4 sm:px-6"
+      className="app-topbar border-b px-4 py-4 sm:px-6"
       style={{
         borderColor: 'var(--brand-topbar-border)',
         backgroundColor: 'var(--bg-topbar)',

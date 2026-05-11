@@ -184,6 +184,120 @@
   background-image: none !important;
 }
 
+/* Em mobile: drag/resize não fazem sentido em touch — esconde o ícone
+   grip do header dos cards e os handles de resize. */
+@media (max-width: 1023px) {
+  .drag-handle {
+    cursor: default !important;
+  }
+  .drag-handle svg[data-icon="grip-vertical"] {
+    display: none;
+  }
+  .react-resizable-handle {
+    display: none !important;
+  }
+}
+
+/* ── Touch targets: dispositivos com ponteiro grosseiro (touch) garantem
+   o mínimo de 44×44px recomendado por Apple HIG / Material para evitar
+   miss-taps. Aplica aos elementos interativos principais. ── */
+@media (pointer: coarse) {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  .ui-button {
+    min-height: 44px;
+  }
+  /* Inputs/Selects do app já têm py-2.5 que aproxima 40px — garante 44 */
+  input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+  /* Items da sidebar (NavLink) com mínimo confortável para touch */
+  .sidebar-nav-item {
+    min-height: 44px;
+  }
+}
+
+/* ── Safe-area-inset: respeita notch/home-bar do iOS quando o site é
+   aberto em PWA ou Safari mobile. Combina com viewport-fit=cover no
+   index.html. Aplicado nas barras fixas (topbar e sidebar). ── */
+@supports (padding: max(0px)) {
+  .app-topbar {
+    padding-top: max(env(safe-area-inset-top), 0px);
+    padding-left: max(env(safe-area-inset-left), 1rem);
+    padding-right: max(env(safe-area-inset-right), 1rem);
+  }
+  .app-sidebar {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+  }
+}
+
+/* ── Responsive table: em < md, transforma cada linha em um card.
+   Aplicar a classe `responsive-table` em <table> e injetar data-label
+   em cada <td>. Em md+ a tabela continua como tabela normal. ── */
+@media (max-width: 767px) {
+  table.responsive-table {
+    display: block;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+  table.responsive-table thead {
+    display: none;
+  }
+  table.responsive-table tbody,
+  table.responsive-table tr {
+    display: block;
+    width: 100%;
+  }
+  table.responsive-table tr {
+    border: 1px solid var(--border-soft);
+    border-radius: 12px;
+    padding: 12px 14px;
+    margin-bottom: 10px;
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+  }
+  table.responsive-table td {
+    display: block;
+    width: 100% !important;
+    padding: 6px 0 !important;
+    text-align: left !important;
+    border: none !important;
+    white-space: normal !important;
+    border-bottom: 1px dashed var(--border-soft);
+  }
+  table.responsive-table td:last-child {
+    border-bottom: none;
+    padding-bottom: 0 !important;
+  }
+  table.responsive-table td:first-child {
+    padding-top: 0 !important;
+  }
+  table.responsive-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+  }
+  /* Container wrapper overflow-x deixa de fazer sentido em modo card. */
+  .responsive-table-wrap {
+    overflow: visible !important;
+    border: none !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+}
+
 @layer utilities {
   .content-fade-in {
     animation: contentFadeIn 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);

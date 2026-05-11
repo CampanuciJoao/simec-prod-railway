@@ -396,6 +396,21 @@ function DashboardPage() {
 
   const { layout, onLayoutChange, resetLayout } = useDashboardLayout(usuario?.id);
 
+  // Drag/resize do dashboard só faz sentido em desktop. Em touch (mobile)
+  // o usuário acaba arrastando ao tentar scrollar — desativa.
+  const [isDesktop, setIsDesktop] = useState(() =>
+    typeof window !== 'undefined'
+      ? window.matchMedia('(min-width: 1024px)').matches
+      : true
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = (e) => setIsDesktop(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const resumo = useMemo(() => {
     const totalEquipamentos = Number(data.totalEquipamentos || 0);
     const ativos            = Number(data.ativos || 0);
@@ -508,9 +523,8 @@ function DashboardPage() {
 
         {/* Margem horizontal negativa compensa o padding interno que o
             react-grid-layout aplica nos itens (metade de GRID_MARGIN[0]).
-            Sem isso, o grid fica visualmente recuado em relação ao KPI
-            ribbon acima — desalinhamento que aparecia nas laterais. */}
-        <div className="-mx-1.5">
+            Aplicada apenas em lg+ — em mobile causaria overflow horizontal. */}
+        <div className="lg:-mx-1.5">
         <ResponsiveGrid
           layouts={{ lg: layout, md: layout, sm: layout }}
           breakpoints={{ lg: 1100, md: 768, sm: 0 }}
@@ -518,6 +532,8 @@ function DashboardPage() {
           rowHeight={ROW_HEIGHT}
           margin={GRID_MARGIN}
           draggableHandle=".drag-handle"
+          isDraggable={isDesktop}
+          isResizable={isDesktop}
           onLayoutChange={(_current, allLayouts) => onLayoutChange(allLayouts.lg || layout)}
           resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
           className="layout"
