@@ -10,24 +10,22 @@ function SidebarItem({
 }) {
   const navLinkClass = ({ isActive }) =>
     [
-      'flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all',
-      'min-w-0 border',
+      'sidebar-nav-item relative flex items-center gap-3 rounded-xl pl-4 pr-3 py-2.5',
+      'text-sm font-medium transition-colors duration-150',
+      'min-w-0',
       isActive ? 'shadow-sm' : '',
     ].join(' ');
 
   const getNavLinkStyle = ({ isActive }) => {
     if (isActive) {
       return {
-        backgroundColor: 'var(--brand-primary)',
-        color: 'var(--text-inverse)',
-        borderColor: 'transparent',
+        backgroundColor: 'var(--bg-sidebar-active)',
+        color: 'var(--text-sidebar-active)',
       };
     }
-
     return {
       backgroundColor: 'transparent',
       color: 'var(--text-sidebar-muted)',
-      borderColor: 'transparent',
     };
   };
 
@@ -40,9 +38,8 @@ function SidebarItem({
       onMouseEnter={(e) => {
         const active = e.currentTarget.getAttribute('aria-current') === 'page';
         if (!active) {
-          e.currentTarget.style.backgroundColor = 'var(--bg-surface-subtle)';
-          e.currentTarget.style.color = 'var(--text-primary)';
-          e.currentTarget.style.borderColor = 'var(--border-soft)';
+          e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.06)';
+          e.currentTarget.style.color = 'var(--text-sidebar)';
         }
       }}
       onMouseLeave={(e) => {
@@ -50,7 +47,6 @@ function SidebarItem({
         if (!active) {
           e.currentTarget.style.backgroundColor = 'transparent';
           e.currentTarget.style.color = 'var(--text-sidebar-muted)';
-          e.currentTarget.style.borderColor = 'transparent';
         }
       }}
     >
