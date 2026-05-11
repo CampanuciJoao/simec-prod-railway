@@ -25,27 +25,42 @@ function getTipoLabel(tipo) {
 }
 
 const STATUS_BORDER = {
-  Concluida: 'var(--color-success)',
-  Cancelada: 'var(--text-muted)',
-  EmAndamento: '#8b5cf6',
-  AguardandoConfirmacao: '#f97316',
-  Agendada: 'var(--brand-primary)',
-  Pendente: 'var(--color-warning)',
+  Concluida:             'var(--color-success)',
+  Cancelada:             'var(--text-muted)',
+  EmAndamento:           'var(--color-info)',
+  AguardandoConfirmacao: 'var(--color-warning)',
+  Agendada:              'var(--brand-primary)',
+  Pendente:              'var(--color-warning)',
 };
 
 function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
   return (
     <Card
-      className="rounded-3xl p-5"
-      style={{ borderLeftWidth: '4px', borderLeftColor: STATUS_BORDER[manutencao.status] || 'var(--border-soft)' }}
+      className="rounded-2xl p-5"
+      style={{
+        borderLeftWidth: '4px',
+        borderLeftColor: STATUS_BORDER[manutencao.status] || 'var(--border-soft)',
+      }}
     >
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: '0.18em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-muted)',
+                  }}
+                >
+                  OS
+                </span>
                 <h3
-                  className="text-xl font-bold tracking-tight"
+                  className="text-xl font-bold tracking-tight stat-value"
                   style={{ color: 'var(--text-primary)' }}
                 >
                   {manutencao.numeroOS}
@@ -99,7 +114,7 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
 
             <InfoCard
               icon={faHourglassStart}
-              label="Inicio agendado"
+              label="Início agendado"
               value={formatarDataHora(manutencao.dataHoraAgendamentoInicio)}
             />
 

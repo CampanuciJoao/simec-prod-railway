@@ -5,12 +5,15 @@ export const GRID_COLS = 12;
 export const GRID_MARGIN = [12, 12];
 
 // Ordem visual: top→bottom, left→right.
+// Prioridade da entrada da tela: Alertas e Saúde das RMs no topo
+// (alta importância operacional), Ocorrências em destaque na linha 2,
+// gráficos auxiliares (donut + histórico) no fim.
 export const DEFAULT_LAYOUT = [
-  { i: 'fila',        x: 0, y: 0,  w: 6,  h: 6, minW: 4, minH: 4 },
-  { i: 'parque',      x: 6, y: 0,  w: 6,  h: 6, minW: 3, minH: 3 },
-  { i: 'ocorrencias', x: 0, y: 6,  w: 6,  h: 9, minW: 3, minH: 3 },
-  { i: 'alertas',     x: 6, y: 6,  w: 6,  h: 9, minW: 3, minH: 3 },
-  { i: 'historico',   x: 0, y: 15, w: 12, h: 6, minW: 6, minH: 3 },
+  { i: 'alertas',     x: 0, y: 0,  w: 6,  h: 7, minW: 3, minH: 3 },
+  { i: 'fila',        x: 6, y: 0,  w: 6,  h: 7, minW: 4, minH: 4 },
+  { i: 'ocorrencias', x: 0, y: 7,  w: 8,  h: 7, minW: 3, minH: 3 },
+  { i: 'parque',      x: 8, y: 7,  w: 4,  h: 7, minW: 3, minH: 3 },
+  { i: 'historico',   x: 0, y: 14, w: 12, h: 5, minW: 6, minH: 3 },
 ];
 
 function storageKey(userId) {

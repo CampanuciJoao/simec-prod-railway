@@ -3,6 +3,15 @@ import PropTypes from 'prop-types';
 
 import Card from '@/components/ui/primitives/Card';
 
+/**
+ * Seção de página padrão.
+ *
+ * Acréscimo padronizado (alinhado com PageHeader):
+ * - Eyebrow monospace uppercase ("· TITULO") acima do h2. Cria
+ *   contexto técnico discreto e amarra visualmente com PageHeader.
+ * - Deriva automaticamente do `title` quando é string; pode ser
+ *   sobrescrita via prop `eyebrow`. Passar `eyebrow={false}` esconde.
+ */
 function PageSection({
   title,
   description,
@@ -11,9 +20,13 @@ function PageSection({
   children,
   className = '',
   darkHeader = false,
+  eyebrow,
 }) {
   const resolvedHeaderRight = actions || headerRight;
   const hasHeader = title || description || resolvedHeaderRight;
+
+  // Eyebrow só aparece se passada explicitamente — não derivada do title.
+  const eyebrowText = eyebrow != null && eyebrow !== false ? eyebrow : null;
 
   if (darkHeader) {
     return (
@@ -64,8 +77,27 @@ function PageSection({
           style={{ borderColor: 'var(--section-header-border)' }}
         >
           <div className="min-w-0">
+            {eyebrowText ? (
+              <p
+                className="truncate"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: '0.2em',
+                  color: 'var(--text-muted)',
+                  opacity: 0.72,
+                  marginBottom: 4,
+                }}
+              >
+                {eyebrowText}
+              </p>
+            ) : null}
             {title ? (
-              <h2 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>
+              <h2
+                className="text-base font-semibold leading-tight"
+                style={{ color: 'var(--text-primary)' }}
+              >
                 {title}
               </h2>
             ) : null}
@@ -93,6 +125,7 @@ PageSection.propTypes = {
   children: PropTypes.node,
   className: PropTypes.string,
   darkHeader: PropTypes.bool,
+  eyebrow: PropTypes.oneOfType([PropTypes.node, PropTypes.bool]),
 };
 
 export default PageSection;

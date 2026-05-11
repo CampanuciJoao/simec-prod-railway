@@ -29,7 +29,7 @@ function AlertasKpiGrid({
       />
       <KpiCard
         icon={faBell}
-        title="Nao vistos"
+        title="Não vistos"
         value={metricas.naoVistos}
         tone="blue"
         onClick={onFilterNaoVistos}
@@ -43,14 +43,14 @@ function AlertasKpiGrid({
       />
       <KpiCard
         icon={faTriangleExclamation}
-        title="Criticos"
+        title="Críticos"
         value={metricas.criticos}
         tone="red"
         onClick={onFilterCriticos}
       />
       <KpiCard
         icon={faLightbulb}
-        title="Recomendacoes"
+        title="Recomendações"
         value={totalRecomendacoes}
         tone="purple"
         onClick={onFilterRecomendacoes}

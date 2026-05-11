@@ -32,12 +32,12 @@ function DetalhesManutencaoPage() {
 
   if (showState) {
     return (
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout padded fullHeight>
         <PageHeader
           title={
             page.manutencao?.numeroOS
-              ? `Detalhes da Ordem de Servico: ${page.manutencao.numeroOS}`
-              : 'Detalhes da Ordem de Servico'
+              ? `Detalhes da Ordem de Serviço: ${page.manutencao.numeroOS}`
+              : 'Detalhes da Ordem de Serviço'
           }
           icon={faWrench}
           actions={
@@ -51,7 +51,7 @@ function DetalhesManutencaoPage() {
           loading={page.loading}
           error={page.error?.message || page.error || ''}
           isEmpty={!page.loading && !page.error && !page.manutencao}
-          emptyMessage="Ordem de servico nao encontrada."
+          emptyMessage="Ordem de serviço não encontrada."
         />
       </PageLayout>
     );
@@ -88,8 +88,8 @@ function DetalhesManutencaoPage() {
         isOpen={page.cancelModal.isOpen}
         onClose={page.cancelModal.closeModal}
         onConfirm={page.handleCancelarManutencao}
-        title="Cancelar manutencao"
-        message="Informe a justificativa para cancelar esta ordem de servico."
+        title="Cancelar manutenção"
+        message="Informe a justificativa para cancelar esta ordem de serviço."
         confirmText="Confirmar cancelamento"
         cancelText="Voltar"
         isDestructive
@@ -100,12 +100,11 @@ function DetalhesManutencaoPage() {
           rows={3}
           value={page.cancelReason}
           onChange={(event) => page.setCancelReason(event.target.value)}
-          placeholder="Explique por que a OS esta sendo cancelada."
+          placeholder="Explique por que a OS está sendo cancelada."
         />
       </ModalConfirmacao>
 
       <PageLayout
-        background="slate"
         padded
         fullHeight
         contentClassName="space-y-6"
@@ -118,8 +117,8 @@ function DetalhesManutencaoPage() {
 
         {page.manutencao.status === 'Pendente' ? (
           <PageSection
-            title="Proximos passos"
-            description="Esta OS esta em triagem. Escolha como prosseguir."
+            title="Próximos passos"
+            description="Esta OS está em triagem. Escolha como prosseguir."
           >
             <div className="space-y-4">
               <div className="flex flex-wrap gap-3">
@@ -129,7 +128,7 @@ function DetalhesManutencaoPage() {
                   disabled={page.submitting}
                 >
                   <FontAwesomeIcon icon={faCalendarCheck} />
-                  Agendar visita tecnica
+                  Agendar visita técnica
                 </Button>
 
                 {!resolverOpen ? (
@@ -153,7 +152,7 @@ function DetalhesManutencaoPage() {
                       value={resolucaoTexto}
                       onChange={(e) => setResolucaoTexto(e.target.value)}
                       rows={3}
-                      placeholder="Descreva como o problema foi resolvido sem necessidade de visita tecnica."
+                      placeholder="Descreva como o problema foi resolvido sem necessidade de visita técnica."
                     />
                     <div className="flex justify-end gap-2">
                       <Button
@@ -170,7 +169,7 @@ function DetalhesManutencaoPage() {
                         onClick={handleResolverInternamente}
                         disabled={!resolucaoTexto.trim() || page.submitting}
                       >
-                        {page.submitting ? 'Salvando...' : 'Confirmar resolucao'}
+                        {page.submitting ? 'Salvando...' : 'Confirmar resolução'}
                       </Button>
                     </div>
                   </div>

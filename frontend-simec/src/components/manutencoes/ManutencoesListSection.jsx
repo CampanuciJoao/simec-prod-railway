@@ -107,10 +107,16 @@ function ManutencoesListSection({
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
+        <div
+          className="flex flex-col items-center justify-center gap-3 text-sm md:flex-row md:justify-between"
+          style={{ color: 'var(--text-muted)' }}
+        >
           <span>
-            Exibindo <strong>{items.length}</strong> de{' '}
-            <strong>{total ?? items.length}</strong> registro(s).
+            Exibindo{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>{items.length}</strong>{' '}
+            de{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>{total ?? items.length}</strong>{' '}
+            registro(s).
           </span>
 
           {hasNextPage ? (
