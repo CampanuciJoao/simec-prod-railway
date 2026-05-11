@@ -335,3 +335,86 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
 
   return { criados, total: regras.length, mudouContagem };
 }
+
+// Threshold para considerar que o monitoramento GE parou. 2h cobre ciclos
+// normais (30min cada) com folga e ainda aciona antes que um dia inteiro
+// passe em silencio como no incidente 2026-05-10.
+const STALE_MONITORING_MS = 2 * 60 * 60 * 1000;
+
+// Verifica se o tenant tem equipamentos GE vinculados sem snapshot recente.
+// Cria/remove alerta GEHC_MONITORAMENTO_PARADO conforme o estado.
+//
+// Chamado uma vez por ciclo do monitor (ver gehcMonitor.js). E idempotente:
+// roda quantas vezes for, sem duplicar alertas.
+export async function verificarMonitoramentoParado(tenantId) {
+  const equipamentosVinculados = await prisma.equipamento.count({
+    where: { tenantId, gehcAssetId: { not: null } },
+  });
+
+  // Sem equipamentos vinculados nao faz sentido alertar sobre monitoramento.
+  if (equipamentosVinculados === 0) return { acao: 'sem_equipamentos' };
+
+  const ultimoSnapshot = await prisma.gehcSaudeSnapshot.findFirst({
+    where: { tenantId },
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  });
+
+  const alertaId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, 'integracao', 'monitoramento-parado');
+  const agora = Date.now();
+  const idadeUltimoMs = ultimoSnapshot ? agora - ultimoSnapshot.capturedAt.getTime() : Infinity;
+  const parado = idadeUltimoMs > STALE_MONITORING_MS;
+
+  if (!parado) {
+    // Voltou a sincronizar: remove alerta se existir.
+    const { count } = await prisma.alerta.deleteMany({
+      where: { tenantId, id: alertaId },
+    });
+    if (count > 0) {
+      await publicarContagemAlertasParaTenant({ tenantId });
+      console.log(`[GEHC_ALERT] Monitoramento normalizado para tenant ${tenantId}.`);
+    }
+    return { acao: 'normalizado', removidos: count };
+  }
+
+  // Esta parado: upsert do alerta.
+  const horas = Math.round(idadeUltimoMs / 3600000);
+  const subtitulo = ultimoSnapshot
+    ? `Sem novos dados ha aproximadamente ${horas}h. Reautentique em Gerenciamento -> Integracoes.`
+    : 'Nenhum snapshot foi capturado ainda. Verifique a autenticacao em Gerenciamento -> Integracoes.';
+
+  const existente = await prisma.alerta.findUnique({
+    where: { tenantId_id: { tenantId, id: alertaId } },
+    select: { id: true, subtitulo: true },
+  });
+
+  if (existente?.subtitulo === subtitulo) {
+    return { acao: 'inalterado' };
+  }
+
+  if (existente) {
+    await prisma.alerta.update({
+      where: { tenantId_id: { tenantId, id: alertaId } },
+      data: { subtitulo, data: new Date() },
+    });
+    return { acao: 'atualizado' };
+  }
+
+  await prisma.alerta.create({
+    data: {
+      id: alertaId,
+      tenantId,
+      titulo: 'Monitoramento GE sem atualizacao',
+      subtitulo,
+      data: new Date(),
+      prioridade: ALERT_PRIORIDADES.ALTA,
+      tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
+      tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
+      tipoEvento: ALERT_EVENTOS.GEHC_MONITORAMENTO_PARADO,
+      link: '/gerenciamento/integracoes',
+    },
+  });
+  await publicarContagemAlertasParaTenant({ tenantId });
+  console.log(`[GEHC_ALERT] Alerta de monitoramento parado criado para tenant ${tenantId} (${horas}h sem snapshot).`);
+  return { acao: 'criado', idadeHoras: horas };
+}

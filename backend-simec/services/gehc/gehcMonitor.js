@@ -1,5 +1,5 @@
 import prisma from '../prismaService.js';
-import { processarAlertasGehc } from './gehcAlertRepository.js';
+import { processarAlertasGehc, verificarMonitoramentoParado } from './gehcAlertRepository.js';
 import { descobrirEquipamentosGehc } from './gehcDiscovery.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { dispararNotificacoesTelegram } from '../telegram/telegramAlertService.js';
@@ -149,6 +149,17 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
   );
   if (tenantsComMudancas.size > 0) {
     await dispararNotificacoesTelegram([...tenantsComMudancas]);
+  }
+
+  // Verifica se algum tenant ficou com monitoramento parado e cria/remove
+  // alerta operacional informando que precisa reautenticar.
+  const tenantsProcessados = new Set(equipamentos.map((eq) => eq.tenantId));
+  for (const tid of tenantsProcessados) {
+    try {
+      await verificarMonitoramentoParado(tid);
+    } catch (err) {
+      console.warn(`[GEHC_MONITOR] Falha ao verificar monitoramento parado do tenant ${tid}: ${err.message}`);
+    }
   }
 
   console.log('[GEHC_MONITOR] Monitoramento concluído.');

@@ -7,6 +7,14 @@ const REFRESH_URL     = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
 
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
+// TTL conservador aplicado quando capturamos tokens sem `expires_in` explícito
+// (acontece na estratégia 1 — header CDX, ver capturarTokensViaPlaywright).
+// 50 minutos é menor que o ciclo típico de expiração da GE (~60min), então
+// disparamos refresh/relogin antes do servidor da fonte revogar o token.
+// Sem isso, tokens ficavam considerados eternamente válidos e o monitor
+// silenciava 401 sem renovar (incidente 2026-05-10, ver ADR-015).
+const FALLBACK_TTL_MS = 50 * 60 * 1000;
+
 // ─── Credenciais por tenant ───────────────────────────────────────────────────
 
 export async function salvarCredenciais(tenantId, login, password) {
@@ -119,8 +127,13 @@ export async function capturarTokensViaPlaywright(tenantId) {
       } catch { /* ignorar */ }
     }
     if (h['accesstoken'] && h['idtoken']) {
-      console.log('[GEHC_AUTH] Tokens capturados via header de request CDX.');
-      resolveToken({ accessToken: h['accesstoken'], idToken: h['idtoken'], refreshToken: null, expiresAt: null });
+      console.log(`[GEHC_AUTH] Tokens capturados via header de request CDX. TTL fallback: ${FALLBACK_TTL_MS / 60000}min.`);
+      resolveToken({
+        accessToken: h['accesstoken'],
+        idToken: h['idtoken'],
+        refreshToken: null,
+        expiresAt: new Date(Date.now() + FALLBACK_TTL_MS),
+      });
     }
   });
 
@@ -210,21 +223,46 @@ export async function capturarTokensViaPlaywright(tenantId) {
 
 // ─── Ponto de entrada principal ───────────────────────────────────────────────
 
+function calcularExpiracao(stored) {
+  // Caso explícito: temos expiresAt da fonte (OAuth response com expires_in).
+  if (stored.expiresAt) {
+    return {
+      expirado: stored.expiresAt.getTime() - Date.now() < EXPIRY_MARGIN_MS,
+      motivo: 'expiresAt explicito',
+    };
+  }
+
+  // Caso histórico: tokens salvos antes do TTL fallback existir podem ter
+  // expiresAt null. Tratamos como suspeitos depois de FALLBACK_TTL_MS da
+  // última atualização — protege contra o cenário do incidente 2026-05-10
+  // (token sem expiresAt considerado eternamente válido).
+  const referencia = stored.updatedAt || stored.capturedAt;
+  if (referencia) {
+    const idade = Date.now() - new Date(referencia).getTime();
+    return {
+      expirado: idade > FALLBACK_TTL_MS,
+      motivo: `expiresAt nulo, idade=${Math.round(idade / 60000)}min`,
+    };
+  }
+
+  return { expirado: true, motivo: 'sem expiresAt e sem referencia temporal' };
+}
+
 export async function obterTokensGehc(tenantId) {
   const stored = await lerTokens(tenantId);
 
   if (stored) {
-    const expired = stored.expiresAt
-      ? stored.expiresAt.getTime() - Date.now() < EXPIRY_MARGIN_MS
-      : false;
+    const { expirado, motivo } = calcularExpiracao(stored);
 
-    if (!expired) {
+    if (!expirado) {
       return { accessToken: stored.accessToken, idToken: stored.idToken };
     }
 
+    console.log(`[GEHC_AUTH] Token suspeito para tenant ${tenantId} (${motivo}) — renovando.`);
+
     if (stored.refreshToken) {
       try {
-        console.log(`[GEHC_AUTH] Token expirado para tenant ${tenantId} — tentando refresh...`);
+        console.log(`[GEHC_AUTH] Tentando refresh via API para tenant ${tenantId}...`);
         const novos = await refreshViaApi(stored.refreshToken);
         await salvarTokens(tenantId, novos);
         return { accessToken: novos.accessToken, idToken: novos.idToken };
