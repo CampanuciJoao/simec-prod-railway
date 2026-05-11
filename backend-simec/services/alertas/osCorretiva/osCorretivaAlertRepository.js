@@ -1,4 +1,5 @@
 import prisma from '../../prismaService.js';
+import { ALERT_CATEGORIAS } from '../alertTypes.js';
 
 const VISITA_SELECT = {
   id: true,
@@ -15,12 +16,17 @@ const VISITA_SELECT = {
   },
 };
 
+// Filtro defensivo: visitas cuja OS-âncora ainda está viva.
+// Evita gerar alertas para OSs que já foram concluídas/canceladas.
+const OS_ATIVA = { status: { notIn: ['Concluida', 'Cancelada'] } };
+
 export async function buscarVisitasComInicioProximo(tenantId, agora, horizonte) {
   return prisma.visitaTerceiro.findMany({
     where: {
       tenantId,
       status: 'Agendada',
       dataHoraInicioPrevista: { gt: agora, lte: horizonte },
+      osCorretiva: OS_ATIVA,
     },
     select: VISITA_SELECT,
   });
@@ -34,6 +40,7 @@ export async function buscarVisitasParaInicioAutomatico(tenantId, agora) {
       status: 'Agendada',
       dataHoraInicioPrevista: { lte: margemInicio },
       dataHoraFimPrevista: { gt: agora },
+      osCorretiva: OS_ATIVA,
     },
     select: VISITA_SELECT,
   });
@@ -45,6 +52,7 @@ export async function buscarVisitasParaConfirmacao(tenantId, agora) {
       tenantId,
       status: 'EmExecucao',
       dataHoraFimPrevista: { lte: agora },
+      osCorretiva: OS_ATIVA,
     },
     select: VISITA_SELECT,
   });
@@ -66,6 +74,7 @@ export async function buscarVisitasComFimProximo(tenantId, agora, horizonte) {
       tenantId,
       status: 'EmExecucao',
       dataHoraFimPrevista: { gt: agora, lte: horizonte },
+      osCorretiva: OS_ATIVA,
     },
     select: VISITA_SELECT,
   });
@@ -77,8 +86,44 @@ export async function buscarVisitasVencidasPorTenant(tenantId, agora) {
       tenantId,
       status: 'Agendada',
       dataHoraFimPrevista: { lt: agora },
+      osCorretiva: OS_ATIVA,
     },
     select: VISITA_SELECT,
+  });
+}
+
+// Remove todos os alertas de OS Corretiva associados a um numeroOS.
+// Espelha o padrão de `removerAlertasManutencaoDaOS` em manutencaoAlertRepository.js
+// e deve ser chamado em toda transição da OS para estado terminal (Concluida/Cancelada/excluída).
+export async function removerAlertasOsCorretivaDaOS(tenantId, numeroOS) {
+  if (!tenantId || !numeroOS) return { count: 0 };
+
+  return prisma.alerta.deleteMany({
+    where: {
+      tenantId,
+      tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
+      numeroOS,
+    },
+  });
+}
+
+// Compactação defensiva: varre alertas de OS Corretiva cujo numeroOS aponta para
+// uma OS já em estado terminal e remove. Usado pelo orchestrator como rede de
+// segurança caso algum fluxo futuro esqueça de chamar removerAlertasOsCorretivaDaOS.
+export async function compactarAlertasOsCorretivaTerminais(tenantId) {
+  const osTerminais = await prisma.osCorretiva.findMany({
+    where: { tenantId, status: { in: ['Concluida', 'Cancelada'] } },
+    select: { numeroOS: true },
+  });
+
+  if (osTerminais.length === 0) return { count: 0 };
+
+  return prisma.alerta.deleteMany({
+    where: {
+      tenantId,
+      tipoCategoria: ALERT_CATEGORIAS.OS_CORRETIVA,
+      numeroOS: { in: osTerminais.map((o) => o.numeroOS) },
+    },
   });
 }
 

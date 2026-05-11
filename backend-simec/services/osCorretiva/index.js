@@ -16,6 +16,7 @@ import {
   atualizarVisita,
   buscarConflitoVisitaPorEquipamento,
 } from './osCorretivaRepository.js';
+import { removerAlertasOsCorretivaDaOS } from '../alertas/osCorretiva/osCorretivaAlertRepository.js';
 
 import {
   validarAbrirOs,
@@ -403,6 +404,10 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
     detalhes: `Resultado da visita na OS ${os.numeroOS}: ${v.data.resultado}.`,
   });
 
+  if (v.data.resultado === 'Operante') {
+    await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
+  }
+
   await reprocessarAlertas(tenantId);
 
   const osAtualizada = await buscarOsPorId({ tenantId, osId });
@@ -470,6 +475,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     detalhes: `OS ${os.numeroOS} concluída. Equipamento retornou a Operante.`,
   });
 
+  await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
   await reprocessarAlertas(tenantId);
 
   const completa = await buscarOsPorId({ tenantId, osId });
@@ -535,6 +541,7 @@ export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, mo
     detalhes: `OS ${os.numeroOS} cancelada. Motivo: ${motivoCancelamento.trim()}. Equipamento revertido para Operante.`,
   });
 
+  await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
   await reprocessarAlertas(tenantId);
 
   const completa = await buscarOsPorId({ tenantId, osId });
@@ -566,6 +573,8 @@ export async function excluirOsCorretivaService({ tenantId, usuarioId, osId }) {
     await tx.visitaTerceiro.deleteMany({ where: { tenantId, osCorretivaId: osId } });
     await tx.osCorretiva.delete({ where: { tenantId_id: { tenantId, id: osId } } });
   });
+
+  await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
 
   await registrarLog({
     tenantId,

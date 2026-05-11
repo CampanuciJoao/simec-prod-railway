@@ -8,15 +8,18 @@ import {
   atualizarLeituraAlerta,
   criarLeituraAlerta,
   buscarAlertaFormatado,
+  buscarBaselineNotificacoes,
 } from './alertasRepository.js';
 import { adaptarAlertaStatus, adaptarListaAlertas } from './alertasAdapter.js';
 
 const STATUS_VALIDOS = new Set(['Visto', 'NaoVisto']);
 
 export async function listarAlertasService({ tenantId, userId, page = 1, pageSize = 25, filtros = {} }) {
+  const baseline = await buscarBaselineNotificacoes({ tenantId, userId });
+
   const [paginado, metricas] = await Promise.all([
-    listarAlertasPaginado({ tenantId, userId, page, pageSize, filtros }),
-    contarMetricasAlertas({ tenantId, userId }),
+    listarAlertasPaginado({ tenantId, userId, baseline, page, pageSize, filtros }),
+    contarMetricasAlertas({ tenantId, userId, baseline }),
   ]);
 
   const totalPages = Math.ceil(paginado.total / pageSize) || 1;
@@ -35,7 +38,8 @@ export async function listarAlertasService({ tenantId, userId, page = 1, pageSiz
 }
 
 export async function resumirAlertasService({ tenantId, userId }) {
-  const naoVistos = await contarAlertasNaoVistosDoUsuario({ tenantId, userId });
+  const baseline = await buscarBaselineNotificacoes({ tenantId, userId });
+  const naoVistos = await contarAlertasNaoVistosDoUsuario({ tenantId, userId, baseline });
   return { ok: true, data: { naoVistos } };
 }
 
