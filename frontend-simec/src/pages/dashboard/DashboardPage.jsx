@@ -3,7 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
+  faArrowRight,
+  faChartPie,
+  faHeartPulse,
   faRotateRight,
+  faTriangleExclamation,
   faTableCells,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -20,9 +24,11 @@ import {
 } from '@/hooks/dashboard/useDashboardLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import {
+  Button,
+  InlineEmptyState,
+  PageHeader,
   PageLayout,
   PageState,
-  InlineEmptyState,
 } from '@/components/ui';
 import { AlertListItem } from '@/components/dashboard';
 import DashboardCard from '@/components/dashboard/DashboardCard';
@@ -33,203 +39,40 @@ import { formatarDataHora } from '@/utils/timeUtils';
 
 const ResponsiveGrid = WidthProvider(Responsive);
 
-/* ─── Header compacto ─── */
+// ─── Mini-stat ────────────────────────────────────────────────────────────────
 
-function DashboardHeader({ onReset, onReload }) {
-  const agora = new Date();
-  const dataStr = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  const horaStr = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  return (
-    <div
-      className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
-      style={{ paddingTop: 4, paddingBottom: 18, borderBottom: '2px solid var(--text-primary)' }}
-    >
-      <div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            fontWeight: 700,
-            letterSpacing: '0.24em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 10,
-          }}
-        >
-          <span style={{ background: 'var(--brand-accent)', color: 'var(--brand-accent-ink)', padding: '3px 7px', fontWeight: 800 }}>P-00</span>
-          <span>{dataStr} · {horaStr}</span>
-        </div>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 800,
-            fontSize: 'clamp(32px, 3.4vw, 44px)',
-            lineHeight: 1,
-            letterSpacing: '-0.035em',
-            color: 'var(--text-primary)',
-            textTransform: 'uppercase',
-            marginTop: 10,
-          }}
-        >
-          Dashboard
-        </h1>
-        <p
-          style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 13.5,
-            color: 'var(--text-secondary)',
-            marginTop: 6,
-            maxWidth: 620,
-          }}
-        >
-          Visão geral da operação, alertas e indicadores do parque de equipamentos.
-        </p>
-      </div>
-      <div className="flex shrink-0 gap-0">
-        <button
-          type="button"
-          onClick={onReset}
-          title="Redefinir layout padrão"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            padding: '10px 16px',
-            background: 'transparent',
-            color: 'var(--text-primary)',
-            border: '2px solid var(--text-primary)',
-            cursor: 'pointer',
-          }}
-        >
-          <FontAwesomeIcon icon={faTableCells} /> Layout
-        </button>
-        <button
-          type="button"
-          onClick={onReload}
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 12,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-            padding: '10px 16px',
-            background: 'var(--brand-accent)',
-            color: 'var(--brand-accent-ink)',
-            border: '2px solid var(--text-primary)',
-            borderLeft: 'none',
-            cursor: 'pointer',
-          }}
-        >
-          <FontAwesomeIcon icon={faRotateRight} /> Atualizar
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ─── KPI bloco ─── */
-
-function KpiBlock({ index, label, value, suffix, help, tone = 'default' }) {
-  const tones = {
-    default: { bg: 'var(--bg-surface)',   color: 'var(--text-primary)', muted: 'var(--text-muted)',           id: 'var(--text-muted)' },
-    accent:  { bg: 'var(--brand-accent)', color: 'var(--text-primary)', muted: 'rgba(10,10,10,0.7)',          id: 'rgba(10,10,10,0.7)' },
-    ink:     { bg: 'var(--text-primary)', color: 'var(--text-inverse)', muted: 'rgba(239,234,225,0.72)',      id: 'rgba(239,234,225,0.62)' },
-    danger:  { bg: 'var(--color-danger)', color: '#ffffff',             muted: 'rgba(255,255,255,0.85)',      id: 'rgba(255,255,255,0.75)' },
+function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
+  const toneMap = {
+    default: { iconSurface: 'var(--brand-primary-soft)', iconText: 'var(--brand-primary)' },
+    success: { iconSurface: 'var(--color-success-soft)', iconText: 'var(--color-success)' },
+    warning: { iconSurface: 'var(--color-warning-soft)', iconText: 'var(--color-warning)' },
+    danger:  { iconSurface: 'var(--color-danger-soft)',  iconText: 'var(--color-danger)'  },
   };
-  const t = tones[tone] || tones.default;
-
-  const isZero = value === 0 || value === '0';
+  const t = toneMap[tone] || toneMap.default;
 
   return (
     <div
-      style={{
-        background: t.bg,
-        color: t.color,
-        padding: '18px 20px 20px',
-        borderRight: '2px solid var(--text-primary)',
-        position: 'relative',
-        minHeight: 150,
-        display: 'flex',
-        flexDirection: 'column',
-        justifyContent: 'space-between',
-      }}
+      className="rounded-xl border px-3 py-3"
+      style={{ backgroundColor: 'var(--bg-surface-soft)', borderColor: 'var(--border-soft)' }}
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex items-center gap-3">
         <div
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 13,
-            letterSpacing: '0.04em',
-            textTransform: 'uppercase',
-          }}
+          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm"
+          style={{ backgroundColor: t.iconSurface, color: t.iconText }}
         >
-          {label}
+          <FontAwesomeIcon icon={icon} />
         </div>
-        <div
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            fontWeight: 700,
-            letterSpacing: '0.24em',
-            color: t.id,
-          }}
-        >
-          {String(index).padStart(3, '0')}
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
+          <p className="stat-value text-xl font-semibold leading-tight" style={{ color: 'var(--text-primary)' }}>{value}</p>
         </div>
       </div>
-
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 800,
-          fontSize: 'clamp(44px, 4.2vw, 64px)',
-          lineHeight: 0.95,
-          letterSpacing: '-0.04em',
-          marginTop: 10,
-          opacity: isZero ? 0.5 : 1,
-        }}
-      >
-        {value}
-        {suffix && (
-          <sup
-            style={{
-              fontSize: 16,
-              fontWeight: 700,
-              verticalAlign: 'top',
-              marginLeft: 4,
-              letterSpacing: 0,
-              opacity: 0.55,
-            }}
-          >
-            {suffix}
-          </sup>
-        )}
-      </div>
-
-      {help && (
-        <p
-          style={{
-            fontSize: 12,
-            lineHeight: 1.4,
-            marginTop: 10,
-            color: t.muted,
-            fontFamily: 'var(--font-body)',
-          }}
-        >
-          {help}
-        </p>
-      )}
+      <p className="mt-2 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
     </div>
   );
 }
 
-/* ─── Ocorrências ─── */
+// ─── Ocorrências ──────────────────────────────────────────────────────────────
 
 const STATUS_OS_LABEL = {
   Aberta:             'Aberta',
@@ -237,84 +80,52 @@ const STATUS_OS_LABEL = {
   AguardandoTerceiro: 'Ag. terceiro',
   Concluida:          'Concluída',
 };
+
+const STATUS_OS_TONE = {
+  Aberta:             'warning',
+  EmAndamento:        'info',
+  AguardandoTerceiro: 'warning',
+  Concluida:          'success',
+};
+
 const GRAVIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
 
 function ordenarOcorrencias(lista) {
   return [...lista].sort((a, b) => (GRAVIDADE_ORDEM[a.gravidade] ?? 3) - (GRAVIDADE_ORDEM[b.gravidade] ?? 3));
 }
 
-function OcorrenciaItem({ ocorrencia, num }) {
-  const grav = ocorrencia.gravidade || 'baixa';
-  const numStyles = {
-    alta:  { color: 'var(--color-danger)' },
-    media: {
-      WebkitTextStroke: '2px var(--text-primary)',
-      WebkitTextFillColor: 'transparent',
-      color: 'transparent',
-    },
-    baixa: { color: 'var(--text-muted)' },
+function OcorrenciaPendenteItem({ ocorrencia }) {
+  const tone = STATUS_OS_TONE[ocorrencia.gravidade] || 'default';
+  const toneColors = {
+    danger:  { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)'  },
+    warning: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)' },
+    info:    { bg: 'var(--brand-primary-soft)', text: 'var(--brand-primary)' },
+    success: { bg: 'var(--color-success-soft)', text: 'var(--color-success)' },
+    default: { bg: 'var(--bg-surface-soft)',    text: 'var(--text-muted)'    },
   };
-  const badgeStyles = {
-    alta:  { background: 'var(--color-danger)',  color: '#fff' },
-    media: { background: 'var(--brand-accent)',  color: 'var(--brand-accent-ink)' },
-    baixa: { background: 'var(--text-primary)',  color: 'var(--text-inverse)' },
-  };
+  const colors = toneColors[tone];
+
   return (
     <Link
       to={`/manutencoes/ocorrencia/${ocorrencia.id}`}
-      className="grid grid-cols-[48px_1fr_auto] items-center gap-4 py-3.5"
-      style={{ borderTop: '2px solid var(--text-primary)', textDecoration: 'none' }}
+      className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition hover:opacity-80"
+      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-soft)' }}
     >
       <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 800,
-          fontSize: 30,
-          lineHeight: 1,
-          letterSpacing: '-0.04em',
-          ...numStyles[grav],
-        }}
+        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs"
+        style={{ backgroundColor: colors.bg, color: colors.text }}
       >
-        {String(num).padStart(2, '0')}
+        <FontAwesomeIcon icon={faTriangleExclamation} />
       </div>
-      <div className="min-w-0">
-        <p
-          className="truncate"
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: 14,
-            lineHeight: 1.25,
-            letterSpacing: '-0.01em',
-            color: 'var(--text-primary)',
-          }}
-        >
-          {ocorrencia.titulo}
-        </p>
-        <p
-          className="mt-1 truncate"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 10,
-            letterSpacing: '0.08em',
-            textTransform: 'uppercase',
-            color: 'var(--text-muted)',
-          }}
-        >
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{ocorrencia.titulo}</p>
+        <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
           {ocorrencia.equipamento?.modelo} · {ocorrencia.equipamento?.tag}
         </p>
       </div>
       <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 700,
-          fontSize: 10,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          padding: '5px 8px',
-          whiteSpace: 'nowrap',
-          ...badgeStyles[grav],
-        }}
+        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
+        style={{ backgroundColor: colors.bg, color: colors.text }}
       >
         {STATUS_OS_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
       </span>
@@ -322,21 +133,7 @@ function OcorrenciaItem({ ocorrencia, num }) {
   );
 }
 
-/* ─── Saúde das RMs GE ─── */
-
-function GaugeBox({ label, value, tone = 'ok' }) {
-  const styles = {
-    ok:   { background: 'var(--bg-surface)',   border: '2px solid var(--text-primary)', color: 'var(--text-primary)' },
-    warn: { background: 'var(--brand-accent)', border: '2px solid var(--text-primary)', color: 'var(--text-primary)' },
-    crit: { background: 'var(--color-danger)', border: '2px solid var(--color-danger)', color: '#fff' },
-  };
-  return (
-    <div style={{ ...styles[tone], padding: '7px 9px' }}>
-      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.75 }}>{label}</div>
-      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, marginTop: 2, letterSpacing: '-0.02em' }}>{value}</div>
-    </div>
-  );
-}
+// ─── Saúde das RMs GE ─────────────────────────────────────────────────────────
 
 function SaudeRMs() {
   const [snapshots, setSnapshots] = useState([]);
@@ -354,7 +151,7 @@ function SaudeRMs() {
   if (!configurado) {
     return (
       <InlineEmptyState message="Integração GE não configurada.">
-        <Link to="/gerenciamento/integracoes" style={{ color: 'var(--text-primary)', fontWeight: 700, borderBottom: '3px solid var(--brand-accent)' }} className="text-xs uppercase tracking-wider">
+        <Link to="/gerenciamento/integracoes" className="text-xs underline" style={{ color: 'var(--brand-primary)' }}>
           Configurar agora
         </Link>
       </InlineEmptyState>
@@ -366,47 +163,40 @@ function SaudeRMs() {
   }
 
   return (
-    <div className="overflow-auto">
+    <div className="space-y-2 overflow-auto">
       {snapshots.map((s, i) => (
-        <div key={i} className="py-3.5" style={{ borderTop: '2px solid var(--text-primary)' }}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div key={i} className="rounded-2xl border px-4 py-2.5" style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
+          <div className="flex flex-wrap items-center justify-between gap-1">
             {s.equipamentoId ? (
               <Link
                 to={`/equipamentos/detalhes/${s.equipamentoId}`}
-                className="min-w-0 truncate"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 700,
-                  fontSize: 14,
-                  letterSpacing: '-0.01em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-primary)',
-                  textDecoration: 'none',
-                }}
+                className="text-sm font-semibold truncate min-w-0 hover:underline"
+                style={{ color: 'var(--text-primary)' }}
               >
                 {s.equipamento}
               </Link>
             ) : (
-              <p className="truncate" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
-                {s.equipamento}
-              </p>
+              <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
             )}
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', color: 'var(--text-muted)' }}>
-              {formatarDataHora(s.capturedAt)}
-            </p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatarDataHora(s.capturedAt)}</p>
           </div>
-          <div className="mt-2.5 grid grid-cols-4 gap-2">
+          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
             {s.heliumLevelPct != null && (
-              <GaugeBox label="He" value={`${s.heliumLevelPct}%`} tone={s.heliumLevelPct < 30 ? 'crit' : s.heliumLevelPct < 70 ? 'warn' : 'ok'} />
+              <span style={{ color: s.heliumLevelPct < 30 ? 'var(--color-danger)' : s.heliumLevelPct < 70 ? 'var(--color-warning)' : 'var(--color-success)', fontWeight: 600 }}>
+                Hélio: {s.heliumLevelPct}%
+              </span>
             )}
-            {s.heliumPressurePsi != null && (
-              <GaugeBox label="PSI" value={s.heliumPressurePsi} tone="ok" />
-            )}
+            {s.heliumPressurePsi != null && <span>Pressão: {s.heliumPressurePsi} PSI</span>}
             {s.compressorStatus && (
-              <GaugeBox label="Comp" value={s.compressorStatus} tone={s.compressorStatus === 'ON' ? 'ok' : 'crit'} />
+              <span style={{ color: s.compressorStatus === 'ON' ? 'var(--text-muted)' : 'var(--color-danger)', fontWeight: s.compressorStatus !== 'ON' ? 600 : 400 }}>
+                Compressor: {s.compressorStatus}
+              </span>
             )}
-            {s.coolantTempC != null && (
-              <GaugeBox label="Temp" value={`${s.coolantTempC}°`} tone="ok" />
+            {s.coolantTempC != null && <span>Temp: {s.coolantTempC}°C</span>}
+            {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
+              <span style={{ color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)' }}>
+                {s.equipmentOnline ? 'Online' : 'Offline'}
+              </span>
             )}
           </div>
         </div>
@@ -415,12 +205,13 @@ function SaudeRMs() {
   );
 }
 
-/* ─── DashboardPage ─── */
+// ─── DashboardPage ────────────────────────────────────────────────────────────
 
 function DashboardPage() {
   const { data, loading, error, recarregar } = useDashboard();
   const { usuario } = useAuth();
   const navigate = useNavigate();
+
   const { layout, onLayoutChange, resetLayout } = useDashboardLayout(usuario?.id);
 
   const resumo = useMemo(() => {
@@ -445,8 +236,17 @@ function DashboardPage() {
     return (
       <PageLayout padded fullHeight>
         <div className="space-y-6">
-          <DashboardHeader onReset={resetLayout} onReload={recarregar} />
-          <PageState loading={loading} error={error} isEmpty={isEmpty} emptyMessage="Nenhum dado disponível no momento." />
+          <PageHeader
+            title="Dashboard"
+            subtitle="Resumo operacional do parque, manutenções e alertas."
+            icon={faChartPie}
+            actions={
+              <Button type="button" variant="secondary" onClick={recarregar}>
+                <FontAwesomeIcon icon={faRotateRight} /> Atualizar
+              </Button>
+            }
+          />
+          <PageState loading={loading} error={error} isEmpty={isEmpty} emptyMessage="Nenhum dado disponível." />
         </div>
       </PageLayout>
     );
@@ -457,220 +257,155 @@ function DashboardPage() {
   }
 
   const alertasVisiveis     = calcItemsVisible(getH('alertas'),     56, 0);
-  const ocorrenciasVisiveis = calcItemsVisible(getH('ocorrencias'), 72, 0);
+  const ocorrenciasVisiveis = calcItemsVisible(getH('ocorrencias'), 64, 0);
   const ocorrenciasOrdenadas = ordenarOcorrencias(data.ocorrenciasPendentes || []);
 
   return (
     <PageLayout padded fullHeight>
       <div className="space-y-4">
+        <PageHeader
+          title="Dashboard"
+          subtitle="Visão geral da operação, alertas e indicadores do parque de equipamentos."
+          icon={faChartPie}
+          actions={
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
+                <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
+              </Button>
+              <Button type="button" variant="secondary" onClick={recarregar}>
+                <FontAwesomeIcon icon={faRotateRight} /> Atualizar
+              </Button>
+            </div>
+          }
+        />
 
-        <div className="content-fade-in">
-          <DashboardHeader onReset={resetLayout} onReload={recarregar} />
-        </div>
-
-        {/* KPI STRIP — protagonistas, logo abaixo do header */}
-        <div
-          className="grid grid-cols-2 md:grid-cols-4 bh-reveal"
-          style={{
-            border: '2px solid var(--text-primary)',
-            animationDelay: '80ms',
-          }}
+        <ResponsiveGrid
+          layouts={{ lg: layout, md: layout, sm: layout }}
+          breakpoints={{ lg: 1100, md: 768, sm: 0 }}
+          cols={{ lg: 12, md: 12, sm: 1 }}
+          rowHeight={ROW_HEIGHT}
+          margin={GRID_MARGIN}
+          draggableHandle=".drag-handle"
+          onLayoutChange={(_current, allLayouts) => onLayoutChange(allLayouts.lg || layout)}
+          resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
+          className="layout"
         >
-          <KpiBlock
-            index={1}
-            label="Parque ativo"
-            value={resumo.ativos}
-            suffix={resumo.totalEquipamentos > 0 ? `/${resumo.totalEquipamentos}` : null}
-            help={
-              resumo.totalEquipamentos > 0
-                ? `Disponibilidade efetiva em ${resumo.disponibilidade}%.`
-                : 'Sem equipamentos cadastrados.'
+          {/* Ocorrências pendentes */}
+          <DashboardCard
+            key="ocorrencias"
+            title="Ocorrências pendentes"
+            description="Registros abertos que precisam de atenção."
+            headerRight={
+              ocorrenciasOrdenadas.length > 0 ? (
+                <span
+                  className="rounded-full px-2.5 py-1 text-xs font-bold"
+                  style={{ backgroundColor: 'var(--color-danger-soft)', color: 'var(--color-danger)' }}
+                >
+                  {ocorrenciasOrdenadas.length} abertas
+                </span>
+              ) : null
             }
-            tone="default"
-          />
-          <KpiBlock
-            index={2}
-            label="Em manutenção"
-            value={resumo.emManutencao}
-            help="Equipamentos com OS aberta ou em curso."
-            tone="accent"
-          />
-          <KpiBlock
-            index={3}
-            label="Alertas críticos"
-            value={resumo.alertasCriticos}
-            help="Prioridade alta sinalizada pelo sistema."
-            tone="ink"
-          />
-          <KpiBlock
-            index={4}
-            label="Contratos vencendo"
-            value={resumo.contratosVencendo}
-            help="Próximos 60 dias — janela curta de renegociação."
-            tone="danger"
-          />
-        </div>
-
-        {/* GRID DE CARDS */}
-        <div className="bh-reveal" style={{ animationDelay: '160ms' }}>
-          <ResponsiveGrid
-            layouts={{ lg: layout, md: layout, sm: layout }}
-            breakpoints={{ lg: 1100, md: 768, sm: 0 }}
-            cols={{ lg: 12, md: 12, sm: 1 }}
-            rowHeight={ROW_HEIGHT}
-            margin={GRID_MARGIN}
-            draggableHandle=".drag-handle"
-            onLayoutChange={(_current, allLayouts) => onLayoutChange(allLayouts.lg || layout)}
-            resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
-            className="layout"
           >
-            <DashboardCard
-              key="ocorrencias"
-              id="P-01 · ocorrências"
-              title="Ocorrências pendentes"
-              description="Registros abertos que exigem ação operacional."
-              headerRight={
-                ocorrenciasOrdenadas.length > 0 ? (
-                  <span
-                    style={{
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 10,
-                      fontWeight: 700,
-                      letterSpacing: '0.18em',
-                      textTransform: 'uppercase',
-                      background: 'var(--color-danger)',
-                      color: '#fff',
-                      padding: '5px 9px',
-                    }}
-                  >
-                    ● {ocorrenciasOrdenadas.length} abertas
-                  </span>
-                ) : null
-              }
-            >
-              {ocorrenciasOrdenadas.length > 0 ? (
-                <div>
-                  {ocorrenciasOrdenadas.slice(0, ocorrenciasVisiveis).map((oc, idx) => (
-                    <OcorrenciaItem key={oc.id} ocorrencia={oc} num={idx + 1} />
-                  ))}
-                  <div style={{ borderTop: '2px solid var(--text-primary)' }} />
-                  {ocorrenciasOrdenadas.length > ocorrenciasVisiveis && (
-                    <p className="pt-3 text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-                      e mais{' '}
-                      <strong style={{ color: 'var(--color-danger)' }}>
-                        {ocorrenciasOrdenadas.length - ocorrenciasVisiveis}
-                      </strong>{' '}
-                      ocorrência(s) — aumente o card.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <InlineEmptyState message="Nenhuma ocorrência pendente. Parque sem registros em aberto." />
-              )}
-            </DashboardCard>
-
-            <DashboardCard
-              key="alertas"
-              id="P-02 · alertas"
-              title="Alertas recentes"
-              description="Avisos mais recentes do sistema."
-              headerRight={
-                <Link
-                  to="/alertas"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 700,
-                    fontSize: 11,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--brand-accent)',
-                    textDecoration: 'none',
-                    borderBottom: '2px solid var(--brand-accent)',
-                    paddingBottom: 1,
-                  }}
-                >
-                  Ver todos →
-                </Link>
-              }
-            >
-              {(data.alertas || []).length > 0 ? (
-                <div>
-                  {data.alertas.slice(0, alertasVisiveis).map((alerta) => (
-                    <AlertListItem key={alerta.id} alerta={alerta} />
-                  ))}
-                  {data.alertas.length > alertasVisiveis && (
-                    <p className="pt-2 text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
-                      e mais{' '}
-                      <strong style={{ color: 'var(--text-primary)' }}>
-                        {data.alertas.length - alertasVisiveis}
-                      </strong>{' '}
-                      alerta(s).
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <InlineEmptyState message="Nenhum alerta recente." />
-              )}
-            </DashboardCard>
-
-            <DashboardCard
-              key="fila"
-              id="P-03 · GEHC"
-              title="Saúde das RMs GE"
-              description="Último snapshot de hélio, pressão, compressor e temperatura."
-              headerRight={
-                <Link
-                  to="/gerenciamento/integracoes"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    fontWeight: 700,
-                    fontSize: 11,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--brand-accent)',
-                    textDecoration: 'none',
-                  }}
-                >
-                  Integrações →
-                </Link>
-              }
-            >
-              <SaudeRMs />
-            </DashboardCard>
-
-            <DashboardCard
-              key="parque"
-              id="P-04 · parque"
-              title="Leitura do parque"
-              description="Distribuição atual por status operacional."
-            >
-              <div className="flex h-full min-h-[200px] items-center justify-center">
-                <div className="h-[240px] w-full max-w-[340px]">
-                  <DonutChart
-                    data={data.statusEquipamentos}
-                    onClickSegment={(label) => navigate('/equipamentos', { state: { filtroStatus: label } })}
-                  />
-                </div>
+            {ocorrenciasOrdenadas.length > 0 ? (
+              <div className="space-y-2">
+                {ocorrenciasOrdenadas.slice(0, ocorrenciasVisiveis).map((oc) => (
+                  <OcorrenciaPendenteItem key={oc.id} ocorrencia={oc} />
+                ))}
+                {ocorrenciasOrdenadas.length > ocorrenciasVisiveis && (
+                  <p className="pt-1 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+                    e mais{' '}
+                    <strong style={{ color: 'var(--color-danger)' }}>
+                      {ocorrenciasOrdenadas.length - ocorrenciasVisiveis}
+                    </strong>{' '}
+                    ocorrência(s) — aumente o card para ver mais.
+                  </p>
+                )}
               </div>
-            </DashboardCard>
+            ) : (
+              <InlineEmptyState message="Nenhuma ocorrência pendente. Parque sem registros em aberto." />
+            )}
+          </DashboardCard>
 
-            <DashboardCard
-              key="historico"
-              id="P-05 · histórico"
-              title="Histórico de manutenções"
-              description="Volume consolidado por período."
-            >
-              <div className="h-full min-h-[200px]">
-                <BarChart
-                  data={data.manutencoesPorTipo}
-                  datasetLabel="Ordens"
-                  emptyMessage="Sem manutenções consolidadas para o período."
+          {/* Alertas recentes */}
+          <DashboardCard
+            key="alertas"
+            title="Alertas recentes"
+            description="Avisos mais recentes do sistema."
+            headerRight={
+              <Link
+                to="/alertas"
+                className="inline-flex items-center gap-2 text-sm font-medium transition hover:opacity-80"
+                style={{ color: 'var(--brand-primary)' }}
+              >
+                Ver todos <FontAwesomeIcon icon={faArrowRight} className="text-xs" />
+              </Link>
+            }
+          >
+            {(data.alertas || []).length > 0 ? (
+              <div className="space-y-3">
+                {data.alertas.slice(0, alertasVisiveis).map((alerta) => (
+                  <AlertListItem key={alerta.id} alerta={alerta} />
+                ))}
+                {data.alertas.length > alertasVisiveis && (
+                  <p className="pt-1 text-center text-xs" style={{ color: 'var(--text-muted)' }}>
+                    e mais{' '}
+                    <strong style={{ color: 'var(--brand-primary)' }}>
+                      {data.alertas.length - alertasVisiveis}
+                    </strong>{' '}
+                    alerta(s) — aumente o card para ver mais.
+                  </p>
+                )}
+              </div>
+            ) : (
+              <InlineEmptyState message="Nenhum alerta recente." />
+            )}
+          </DashboardCard>
+
+          {/* Saúde das RMs GE */}
+          <DashboardCard
+            key="fila"
+            title="Saúde das RMs GE"
+            description="Último snapshot de hélio, pressão e compressor."
+            headerRight={
+              <Link to="/gerenciamento/integracoes" style={{ color: 'var(--brand-primary)' }} className="text-xs">
+                <FontAwesomeIcon icon={faHeartPulse} className="mr-1" />Ver integrações
+              </Link>
+            }
+          >
+            <SaudeRMs />
+          </DashboardCard>
+
+          {/* Leitura do parque */}
+          <DashboardCard
+            key="parque"
+            title="Leitura do parque"
+            description="Distribuição atual por status operacional."
+          >
+            <div className="flex h-full min-h-[200px] items-center justify-center">
+              <div className="h-[220px] w-full max-w-[320px]">
+                <DonutChart
+                  data={data.statusEquipamentos}
+                  onClickSegment={(label) => navigate('/equipamentos', { state: { filtroStatus: label } })}
                 />
               </div>
-            </DashboardCard>
-          </ResponsiveGrid>
-        </div>
+            </div>
+          </DashboardCard>
 
+          {/* Histórico de manutenções */}
+          <DashboardCard
+            key="historico"
+            title="Histórico de manutenções"
+            description="Volume consolidado por período."
+          >
+            <div className="h-full min-h-[200px]">
+              <BarChart
+                data={data.manutencoesPorTipo}
+                datasetLabel="Ordens"
+                emptyMessage="Sem manutenções consolidadas para o período."
+              />
+            </div>
+          </DashboardCard>
+        </ResponsiveGrid>
       </div>
     </PageLayout>
   );

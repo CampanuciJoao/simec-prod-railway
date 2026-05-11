@@ -1,194 +1,174 @@
-/* ─────────────────────────────────────────────────────────────────────────────
- * SIMEC · Design tokens — Bauhaus Contemporâneo
- * Direção estética: blocos sólidos, preto absoluto + amarelo construção + vermelho sinal.
- * Mantém os MESMOS nomes de tokens do tema anterior para preservar a cascata
- * em todas as telas — apenas os valores mudam.
- * ───────────────────────────────────────────────────────────────────────────── */
-
 :root {
-  /* ── Famílias tipográficas ── */
-  --font-display: 'Syne', 'Inter Tight', system-ui, sans-serif;
-  --font-body:    'DM Sans', system-ui, -apple-system, sans-serif;
-  --font-mono:    'JetBrains Mono', ui-monospace, 'SFMono-Regular', monospace;
+  /* Famílias tipográficas — refinamento sutil sobre o tema azul corporativo */
+  --font-body:    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'Geist Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
 
-  /* ── Marca: preto é a estrutura, amarelo é o acento ── */
-  --brand-primary:               #0a0a0a;
-  --brand-primary-hover:         #1b1b1b;
-  --brand-primary-soft:          rgba(10, 10, 10, 0.08);
-  --brand-primary-surface:       rgba(10, 10, 10, 0.04);
-  --brand-primary-surface-strong:rgba(10, 10, 10, 0.10);
+  --brand-primary: #2563eb;
+  --brand-primary-hover: #1d4ed8;
+  --brand-primary-soft: rgba(37, 99, 235, 0.14);
+  --brand-primary-surface: rgba(37, 99, 235, 0.08);
+  --brand-primary-surface-strong: rgba(37, 99, 235, 0.14);
+  --brand-topbar: #0b1220;
+  --brand-topbar-border: rgba(255, 255, 255, 0.12);
 
-  --brand-accent:                #ffd400;        /* amarelo construção */
-  --brand-accent-hover:          #f5c200;
-  --brand-accent-soft:           rgba(255, 212, 0, 0.18);
-  --brand-accent-ink:            #0a0a0a;         /* texto sobre amarelo */
+  --color-success: #059669;
+  --color-success-soft: rgba(5, 150, 105, 0.14);
 
-  --brand-topbar:                #0a0a0a;
-  --brand-topbar-border:         rgba(255, 212, 0, 0.32);
+  --color-warning: #d97706;
+  --color-warning-soft: rgba(217, 119, 6, 0.14);
 
-  /* ── Sinais semânticos ── */
-  --color-success:               #207d56;
-  --color-success-soft:          rgba(32, 125, 86, 0.14);
+  --color-danger: #dc2626;
+  --color-danger-soft: rgba(220, 38, 38, 0.14);
 
-  --color-warning:               #c98a00;          /* âmbar profundo (sobre paper) */
-  --color-warning-soft:          rgba(255, 212, 0, 0.22);
+  --color-info: #223663;
+  --color-info-soft: rgba(37, 99, 235, 0.14);
 
-  --color-danger:                #e63946;
-  --color-danger-soft:           rgba(230, 57, 70, 0.14);
+  --radius-sm: 0.75rem;
+  --radius-md: 1rem;
+  --radius-lg: 1.25rem;
+  --radius-xl: 1.5rem;
 
-  --color-info:                  #2a4cdc;
-  --color-info-soft:             rgba(42, 76, 220, 0.14);
+  --transition-default: 180ms ease;
 
-  /* ── Geometria: bauhaus é grade rígida (mantém alguns radius para legacy) ── */
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-xl: 0;
-  --radius-legacy-sm: 0.5rem;   /* fallback para componentes legados que pedem curva */
-  --radius-pill: 9999px;
-
-  --transition-default: 160ms cubic-bezier(.18,.7,.2,1);
-
-  --focus-ring:         rgba(10, 10, 10, 0.22);
-  --focus-ring-accent:  rgba(255, 212, 0, 0.45);
-  --focus-ring-danger:  rgba(230, 57, 70, 0.28);
-  --focus-ring-success: rgba(32, 125, 86, 0.28);
+  --focus-ring: rgba(37, 99, 235, 0.24);
+  --focus-ring-danger: rgba(220, 38, 38, 0.22);
+  --focus-ring-success: rgba(5, 150, 105, 0.22);
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * TEMA CLARO — paper offwhite + tinta preta + amarelo construção
- * ────────────────────────────────────────────────────────────────────────── */
 :root[data-theme='light'] {
-  --card-header-bg:          #0a0a0a;
-  --card-header-border:      #0a0a0a;
-  --card-header-text:        #efeae1;
-  --card-header-text-muted:  rgba(239, 234, 225, 0.7);
+  --card-header-bg: #ffffff;
+  --card-header-border: #e2eaf4;
+  --card-header-text: #1a3a5c;
+  --card-header-text-muted: #607d9a;
 
-  --bg-app:                  #efeae1;
-  --bg-app-muted:            #e3dccd;
+  --bg-app: #f6f8fc;
+  --bg-app-muted: #eef3f8;
 
-  --bg-surface:              #ffffff;
-  --bg-surface-soft:         #efeae1;
-  --bg-surface-subtle:       #e3dccd;
-  --bg-elevated:             #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-soft: #fbfcfe;
+  --bg-surface-subtle: #f3f7fc;
+  --bg-elevated: #ffffff;
 
-  --bg-hover:                #e3dccd;
-  --bg-active:               #d5cdb9;
+  --bg-hover: #eef4fb;
+  --bg-active: #e5edf8;
 
-  --bg-sidebar:              #0a0a0a;
-  --bg-sidebar-soft:         #1b1b1b;
-  --bg-sidebar-hover:        #2d2d2d;
-  --bg-sidebar-active:       #ffd400;
+  --bg-sidebar: #08111f;
+  --bg-sidebar-soft: #0d1727;
+  --bg-sidebar-hover: #182338;
+  --bg-sidebar-active: #2f6df6;
 
-  --bg-topbar:               #0a0a0a;
-  --bg-breadcrumb:           #0a0a0a;
+  --bg-topbar: #08111f;
+  --bg-breadcrumb: #08111f;
 
-  --border-default:          #0a0a0a;
-  --border-soft:             #d5cdb9;
-  --border-strong:           #0a0a0a;
+  --border-default: #d8e1eb;
+  --border-soft: #e7edf5;
+  --border-strong: #a8b7c9;
 
-  --text-primary:            #0a0a0a;
-  --text-secondary:          #2d2d2d;
-  --text-muted:              #5a5a55;
-  --text-inverse:            #efeae1;
+  --text-primary: #0f172a;
+  --text-secondary: #41556f;
+  --text-muted: #70839c;
+  --text-inverse: #ffffff;
 
-  --text-sidebar:            #efeae1;
-  --text-sidebar-muted:      rgba(239, 234, 225, 0.62);
-  --text-sidebar-active:     #0a0a0a;
+  --text-sidebar: #ffffff;
+  --text-sidebar-muted: #ffffff;
+  --text-sidebar-active: #ffffff;
 
-  --text-topbar:             #efeae1;
-  --text-topbar-muted:       rgba(239, 234, 225, 0.72);
+  --text-topbar: #ffffff;
+  --text-topbar-muted: rgba(255, 255, 255, 0.82);
 
-  --text-brand-surface:      #0a0a0a;
-  --text-brand-surface-muted:#2d2d2d;
+  --text-brand-surface: #ffffff;
+  --text-brand-surface-muted: rgba(255, 255, 255, 0.82);
 
-  --overlay-bg:              rgba(10, 10, 10, 0.54);
+  --overlay-bg: rgba(15, 23, 42, 0.44);
 
-  --button-primary-hover:    #1b1b1b;
-  --button-secondary-bg:     #ffffff;
-  --button-secondary-hover:  #e3dccd;
-  --button-secondary-text:   #0a0a0a;
-  --button-secondary-border: #0a0a0a;
-  --button-danger-hover:     #c92e3a;
-  --button-success-hover:    #1a6747;
-  --button-ghost-hover:      rgba(10, 10, 10, 0.08);
+  --button-primary-hover: #1d4ed8;
+  --button-secondary-bg: #ffffff;
+  --button-secondary-hover: #f3f7fc;
+  --button-secondary-text: #0f172a;
+  --button-secondary-border: #d8e1eb;
+  --button-danger-hover: #b91c1c;
+  --button-success-hover: #047857;
+  --button-ghost-hover: rgba(15, 23, 42, 0.06);
 
-  --section-header-border:   #0a0a0a;
+  --section-header-border: #e6edf5;
 
-  /* Sombras "duras" estilo bauhaus (deslocamento, sem blur grande) */
-  --shadow-sm: 2px 2px 0 #0a0a0a;
-  --shadow-md: 4px 4px 0 #0a0a0a;
-  --shadow-lg: 8px 8px 0 #0a0a0a;
-  --shadow-soft: 0 1px 3px rgba(10,10,10,0.08), 0 4px 14px rgba(10,10,10,0.06);
+  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
+  --shadow-lg: 0 20px 55px rgba(15, 23, 42, 0.13);
 
   --kpi-surface: #ffffff;
-  --header-surface: #0a0a0a;
+  --header-surface: linear-gradient(
+    180deg,
+    rgba(8, 17, 31, 0.98) 0%,
+    rgba(13, 23, 39, 0.98) 100%
+  );
   --section-surface: #ffffff;
 }
 
-/* ──────────────────────────────────────────────────────────────────────────
- * TEMA ESCURO — tinta dominante + papel como acento
- * ────────────────────────────────────────────────────────────────────────── */
 :root[data-theme='dark'] {
-  --card-header-bg:          #ffd400;
-  --card-header-border:      #ffd400;
-  --card-header-text:        #0a0a0a;
-  --card-header-text-muted:  rgba(10, 10, 10, 0.62);
+  --card-header-bg: #08111f;
+  --card-header-border: #182338;
+  --card-header-text: #dbe7fb;
+  --card-header-text-muted: rgba(219, 231, 251, 0.6);
 
-  --bg-app:                  #0a0a0a;
-  --bg-app-muted:            #131313;
+  --bg-app: #0b1220;
+  --bg-app-muted: #111b2d;
 
-  --bg-surface:              #1b1b1b;
-  --bg-surface-soft:         #131313;
-  --bg-surface-subtle:       #222222;
-  --bg-elevated:             #1f1f1f;
+  --bg-surface: #131d31;
+  --bg-surface-soft: #182338;
+  --bg-surface-subtle: #1d2a40;
+  --bg-elevated: #1a2740;
 
-  --bg-hover:                #2d2d2d;
-  --bg-active:               #3a3a3a;
+  --bg-hover: #1a2740;
+  --bg-active: #223149;
 
-  --bg-sidebar:              #0a0a0a;
-  --bg-sidebar-soft:         #131313;
-  --bg-sidebar-hover:        #2d2d2d;
-  --bg-sidebar-active:       #ffd400;
+  --bg-sidebar: #08111f;
+  --bg-sidebar-soft: #0d1727;
+  --bg-sidebar-hover: #182338;
+  --bg-sidebar-active: #2563eb;
 
-  --bg-topbar:               #0a0a0a;
-  --bg-breadcrumb:           #131313;
+  --bg-topbar: var(--brand-topbar);
+  --bg-breadcrumb: #0f1d37;
 
-  --border-default:          #ffd400;
-  --border-soft:             #2d2d2d;
-  --border-strong:           #ffd400;
+  --border-default: #2a3a55;
+  --border-soft: #223149;
+  --border-strong: #3e5578;
 
-  --text-primary:            #efeae1;
-  --text-secondary:          #cfc8b6;
-  --text-muted:              #8b8676;
-  --text-inverse:            #0a0a0a;
+  --text-primary: #e6edf8;
+  --text-secondary: #c8d3e5;
+  --text-muted: #93a4bf;
+  --text-inverse: #ffffff;
 
-  --text-sidebar:            #efeae1;
-  --text-sidebar-muted:      rgba(239, 234, 225, 0.65);
-  --text-sidebar-active:     #0a0a0a;
+  --text-sidebar: #dbe7fb;
+  --text-sidebar-muted: #b7c7e6;
+  --text-sidebar-active: #ffffff;
 
-  --text-topbar:             #efeae1;
-  --text-topbar-muted:       rgba(239, 234, 225, 0.7);
+  --text-topbar: #ffffff;
+  --text-topbar-muted: rgba(255, 255, 255, 0.78);
 
-  --overlay-bg:              rgba(0, 0, 0, 0.72);
+  --overlay-bg: rgba(2, 6, 23, 0.72);
 
-  --button-primary-hover:    #ffe14a;
-  --button-secondary-bg:     #1b1b1b;
-  --button-secondary-hover:  #2d2d2d;
-  --button-secondary-text:   #efeae1;
-  --button-secondary-border: #ffd400;
-  --button-danger-hover:     #ff5060;
-  --button-success-hover:    #29a772;
-  --button-ghost-hover:      rgba(239, 234, 225, 0.08);
+  --button-primary-hover: #3b82f6;
+  --button-secondary-bg: #182338;
+  --button-secondary-hover: #223149;
+  --button-secondary-text: #d7e0ef;
+  --button-secondary-border: #31445f;
+  --button-danger-hover: #ef4444;
+  --button-success-hover: #10b981;
+  --button-ghost-hover: rgba(255, 255, 255, 0.06);
 
-  --section-header-border:   #2d2d2d;
+  --section-header-border: #223149;
 
-  --shadow-sm: 2px 2px 0 #ffd400;
-  --shadow-md: 4px 4px 0 #ffd400;
-  --shadow-lg: 8px 8px 0 #ffd400;
-  --shadow-soft: 0 1px 3px rgba(0,0,0,0.4), 0 8px 24px rgba(0,0,0,0.36);
+  --shadow-sm: 0 1px 2px rgba(2, 6, 23, 0.32);
+  --shadow-md: 0 8px 24px rgba(2, 6, 23, 0.36);
+  --shadow-lg: 0 16px 40px rgba(2, 6, 23, 0.42);
 
-  --kpi-surface: #1b1b1b;
-  --header-surface: #0a0a0a;
-  --section-surface: #1b1b1b;
+  --kpi-surface: #131d31;
+  --header-surface: linear-gradient(
+    180deg,
+    rgba(20, 36, 66, 0.96) 0%,
+    rgba(15, 29, 56, 0.96) 100%
+  );
+  --section-surface: #131d31;
 }

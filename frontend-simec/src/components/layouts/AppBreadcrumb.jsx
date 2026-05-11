@@ -7,25 +7,15 @@ function AppBreadcrumb({ items = [] }) {
 
   return (
     <div
-      className="px-4 sm:px-6"
+      className="border-b px-4 py-3 sm:px-6"
       style={{
-        backgroundColor: 'var(--bg-app)',
-        borderTop: '2px solid var(--text-primary)',
-        borderBottom: '2px solid var(--text-primary)',
-        paddingTop: 10,
-        paddingBottom: 10,
+        borderColor: 'var(--brand-topbar-border)',
+        backgroundColor: 'var(--bg-breadcrumb)',
       }}
     >
       <nav
-        className="flex flex-wrap items-center gap-1"
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          fontWeight: 600,
-          letterSpacing: '0.16em',
-          textTransform: 'uppercase',
-          color: 'var(--text-muted)',
-        }}
+        className="flex flex-wrap items-center gap-1 text-sm"
+        style={{ color: 'var(--text-brand-surface-muted)' }}
       >
         {items.map((item, index) => {
           const isLast = index === items.length - 1;
@@ -35,18 +25,18 @@ function AppBreadcrumb({ items = [] }) {
               {item.to && !isLast ? (
                 <Link
                   to={item.to}
-                  className="transition hover:opacity-80"
-                  style={{ color: 'var(--text-muted)', textDecoration: 'none' }}
+                  className="font-medium transition hover:opacity-80"
+                  style={{ color: 'var(--text-brand-surface-muted)' }}
                 >
                   {item.label}
                 </Link>
               ) : (
                 <span
+                  className={isLast ? 'font-semibold' : ''}
                   style={{
-                    color: isLast ? 'var(--text-primary)' : 'var(--text-muted)',
-                    fontWeight: isLast ? 800 : 600,
-                    background: isLast ? 'var(--brand-accent)' : 'transparent',
-                    padding: isLast ? '2px 6px' : 0,
+                    color: isLast
+                      ? 'var(--text-brand-surface)'
+                      : 'var(--text-brand-surface-muted)',
                   }}
                 >
                   {item.label}
@@ -54,7 +44,10 @@ function AppBreadcrumb({ items = [] }) {
               )}
 
               {!isLast && (
-                <span style={{ color: 'var(--text-muted)', margin: '0 4px' }}>
+                <span
+                  className="mx-1"
+                  style={{ color: 'var(--text-brand-surface-muted)' }}
+                >
                   /
                 </span>
               )}
