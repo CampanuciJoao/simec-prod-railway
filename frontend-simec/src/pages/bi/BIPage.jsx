@@ -251,68 +251,208 @@ function BIPage() {
               }
             >
               {gehcLoading ? (
-                <div className="p-8 text-center text-gray-400 text-sm">Carregando dados GE Healthcare...</div>
+                <div className="p-8 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                  Carregando dados GE Healthcare...
+                </div>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 p-4 border-b border-gray-700">
+                  {/* KPIs do topo — tokenizados, alinhados com o padrão do app */}
+                  <div
+                    className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4"
+                    style={{ borderBottom: '1px solid var(--border-soft)' }}
+                  >
                     {[
-                      { icon: faXRay, label: 'Total de Exames', value: gehcUtilizacao.totais?.exames?.toLocaleString('pt-BR') ?? '—' },
-                      { icon: faUsers, label: 'Total de Pacientes', value: gehcUtilizacao.totais?.pacientes?.toLocaleString('pt-BR') ?? '—' },
-                      { icon: faGauge, label: 'Uptime Médio', value: gehcUtilizacao.totais?.uptimeMedio != null ? `${gehcUtilizacao.totais.uptimeMedio.toFixed(1)}%` : '—' },
-                    ].map(({ icon, label, value }) => (
-                      <div key={label} className="flex items-center gap-3 bg-gray-800/50 rounded-lg p-3">
-                        <FontAwesomeIcon icon={icon} className="text-blue-400 text-xl w-6 shrink-0" />
-                        <div>
-                          <p className="text-xs text-gray-400">{label}</p>
-                          <p className="text-lg font-semibold text-white">{value}</p>
+                      { icon: faXRay,  label: 'Total de Exames',    value: gehcUtilizacao.totais?.exames?.toLocaleString('pt-BR') ?? '—',
+                        bg: 'var(--brand-primary-surface)', fg: 'var(--brand-primary)' },
+                      { icon: faUsers, label: 'Total de Pacientes', value: gehcUtilizacao.totais?.pacientes?.toLocaleString('pt-BR') ?? '—',
+                        bg: 'var(--color-info-surface)',    fg: 'var(--color-info)' },
+                      { icon: faGauge, label: 'Uptime Médio',       value: gehcUtilizacao.totais?.uptimeMedio != null ? `${gehcUtilizacao.totais.uptimeMedio.toFixed(1)}%` : '—',
+                        bg: 'var(--color-success-surface)', fg: 'var(--color-success)' },
+                    ].map(({ icon, label, value, bg, fg }) => (
+                      <div
+                        key={label}
+                        className="flex items-center gap-3 rounded-xl p-3.5"
+                        style={{ backgroundColor: bg, border: '1px solid var(--border-soft)' }}
+                      >
+                        <span
+                          className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                          style={{ backgroundColor: 'var(--bg-surface)', color: fg, border: '1px solid var(--border-soft)' }}
+                        >
+                          <FontAwesomeIcon icon={icon} />
+                        </span>
+                        <div className="min-w-0">
+                          <p
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 10.5,
+                              fontWeight: 600,
+                              letterSpacing: '0.14em',
+                              textTransform: 'uppercase',
+                              color: 'var(--text-muted)',
+                            }}
+                          >
+                            {label}
+                          </p>
+                          <p
+                            className="stat-value mt-0.5"
+                            style={{ fontSize: 22, fontWeight: 600, color: 'var(--text-primary)', lineHeight: 1.1 }}
+                          >
+                            {value}
+                          </p>
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="divide-y divide-gray-700/60">
-                    {gehcUtilizacao.unidades?.map((unidade) => (
-                      <div key={unidade.nome} className="p-4">
-                        <div className="flex items-center justify-between mb-3">
-                          <h3 className="font-semibold text-white text-sm flex items-center gap-2">
-                            <FontAwesomeIcon icon={faHospital} className="text-blue-400" />
+                  {/* Tabelas por unidade — colgroup com larguras fixas garante alinhamento entre todas */}
+                  <div>
+                    {gehcUtilizacao.unidades?.map((unidade, idx) => (
+                      <div
+                        key={`${unidade.nome}-${idx}`}
+                        className="p-4"
+                        style={{ borderTop: idx > 0 ? '1px solid var(--border-soft)' : 'none' }}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+                          <h3
+                            className="flex items-center gap-2"
+                            style={{
+                              fontFamily: 'var(--font-display)',
+                              fontSize: 14,
+                              fontWeight: 600,
+                              color: 'var(--text-primary)',
+                              letterSpacing: '-0.01em',
+                            }}
+                          >
+                            <FontAwesomeIcon icon={faHospital} style={{ color: 'var(--brand-primary)' }} />
                             {unidade.nome}
                           </h3>
-                          <div className="text-xs text-gray-400 flex gap-4">
-                            <span>{unidade.totalExames?.toLocaleString('pt-BR')} exames</span>
-                            <span>{unidade.totalPacientes?.toLocaleString('pt-BR')} pacientes</span>
+                          <div
+                            className="flex flex-wrap gap-x-4 gap-y-1"
+                            style={{
+                              fontFamily: 'var(--font-mono)',
+                              fontSize: 11,
+                              color: 'var(--text-muted)',
+                              letterSpacing: '0.04em',
+                            }}
+                          >
+                            <span>
+                              <strong style={{ color: 'var(--text-primary)' }}>
+                                {unidade.totalExames?.toLocaleString('pt-BR')}
+                              </strong> exames
+                            </span>
+                            <span>
+                              <strong style={{ color: 'var(--text-primary)' }}>
+                                {unidade.totalPacientes?.toLocaleString('pt-BR')}
+                              </strong> pacientes
+                            </span>
                             {unidade.uptimeMedio != null && (
-                              <span>Uptime {unidade.uptimeMedio.toFixed(1)}%</span>
+                              <span>
+                                Uptime <strong style={{ color: 'var(--text-primary)' }}>
+                                  {unidade.uptimeMedio.toFixed(1)}%
+                                </strong>
+                              </span>
                             )}
                           </div>
                         </div>
-                        <table className="w-full text-xs">
+
+                        <table className="w-full" style={{ tableLayout: 'fixed', borderCollapse: 'collapse' }}>
+                          <colgroup>
+                            <col style={{ width: '28%' }} />
+                            <col style={{ width: '20%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '13%' }} />
+                            <col style={{ width: '13%' }} />
+                          </colgroup>
                           <thead>
-                            <tr className="text-gray-400 border-b border-gray-700">
-                              <th className="text-left py-1 pr-3 font-medium">Equipamento</th>
-                              <th className="text-left py-1 pr-3 font-medium">Tag</th>
-                              <th className="text-right py-1 pr-3 font-medium">Exames</th>
-                              <th className="text-right py-1 pr-3 font-medium">Pacientes</th>
-                              <th className="text-right py-1 pr-3 font-medium">Média/Dia</th>
-                              <th className="text-right py-1 font-medium">Uptime</th>
+                            <tr style={{ borderBottom: '1px solid var(--border-soft)' }}>
+                              {['Equipamento', 'Tag', 'Exames', 'Pacientes', 'Média/Dia', 'Uptime'].map((h, i) => (
+                                <th
+                                  key={h}
+                                  className="py-2 px-2"
+                                  style={{
+                                    textAlign: i >= 2 ? 'right' : 'left',
+                                    fontFamily: 'var(--font-mono)',
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    letterSpacing: '0.16em',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--text-muted)',
+                                  }}
+                                >
+                                  {h}
+                                </th>
+                              ))}
                             </tr>
                           </thead>
                           <tbody>
-                            {unidade.equipamentos?.map((eq) => (
-                              <tr
-                                key={eq.tag || eq.nome}
-                                className="text-gray-300 border-b border-gray-800/60 hover:bg-gray-800/30 transition-colors"
-                              >
-                                <td className="py-1.5 pr-3">{eq.nome}</td>
-                                <td className="py-1.5 pr-3 text-gray-400 font-mono">{eq.tag}</td>
-                                <td className="py-1.5 pr-3 text-right">{eq.totalExames?.toLocaleString('pt-BR')}</td>
-                                <td className="py-1.5 pr-3 text-right">{eq.totalPacientes?.toLocaleString('pt-BR')}</td>
-                                <td className="py-1.5 pr-3 text-right">{eq.mediaExamesDia ?? '—'}</td>
-                                <td className="py-1.5 text-right">
-                                  {eq.uptimeMedio != null ? `${eq.uptimeMedio.toFixed(1)}%` : '—'}
-                                </td>
-                              </tr>
-                            ))}
+                            {unidade.equipamentos?.map((eq) => {
+                              const semDados = !eq.totalExames && !eq.totalPacientes;
+                              return (
+                                <tr
+                                  key={eq.tag || eq.nome}
+                                  style={{ borderBottom: '1px solid var(--border-soft)' }}
+                                >
+                                  <td className="py-2 px-2 truncate"
+                                    style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500 }}
+                                    title={eq.nome}
+                                  >
+                                    {eq.nome}
+                                  </td>
+                                  <td className="py-2 px-2 truncate"
+                                    style={{
+                                      fontFamily: 'var(--font-mono)',
+                                      fontSize: 12,
+                                      color: 'var(--text-muted)',
+                                    }}
+                                    title={eq.tag}
+                                  >
+                                    {eq.tag || '—'}
+                                  </td>
+                                  <td className="py-2 px-2 stat-value"
+                                    style={{
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                      color: semDados ? 'var(--text-muted)' : 'var(--text-primary)',
+                                    }}
+                                  >
+                                    {eq.totalExames?.toLocaleString('pt-BR') ?? '—'}
+                                  </td>
+                                  <td className="py-2 px-2 stat-value"
+                                    style={{
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                      color: semDados ? 'var(--text-muted)' : 'var(--text-primary)',
+                                    }}
+                                  >
+                                    {eq.totalPacientes?.toLocaleString('pt-BR') ?? '—'}
+                                  </td>
+                                  <td className="py-2 px-2 stat-value"
+                                    style={{
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                      color: 'var(--text-secondary)',
+                                    }}
+                                  >
+                                    {eq.mediaExamesDia ?? '—'}
+                                  </td>
+                                  <td className="py-2 px-2 stat-value"
+                                    style={{
+                                      textAlign: 'right',
+                                      fontSize: 13,
+                                      fontWeight: 600,
+                                      color: eq.uptimeMedio == null
+                                        ? 'var(--text-muted)'
+                                        : eq.uptimeMedio >= 99 ? 'var(--color-success)'
+                                        : eq.uptimeMedio >= 95 ? 'var(--color-warning)'
+                                        : 'var(--color-danger)',
+                                    }}
+                                  >
+                                    {eq.uptimeMedio != null ? `${eq.uptimeMedio.toFixed(1)}%` : '—'}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
