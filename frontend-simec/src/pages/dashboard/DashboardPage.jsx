@@ -521,6 +521,11 @@ function DashboardPage() {
           />
         </div>
 
+        {/* Margem horizontal negativa compensa o padding interno que o
+            react-grid-layout aplica nos itens (metade de GRID_MARGIN[0]).
+            Sem isso, o grid fica visualmente recuado em relação ao KPI
+            ribbon acima — desalinhamento que aparecia nas laterais. */}
+        <div className="-mx-1.5">
         <ResponsiveGrid
           layouts={{ lg: layout, md: layout, sm: layout }}
           breakpoints={{ lg: 1100, md: 768, sm: 0 }}
@@ -648,6 +653,7 @@ function DashboardPage() {
             </div>
           </DashboardCard>
         </ResponsiveGrid>
+        </div>
       </div>
     </PageLayout>
   );
