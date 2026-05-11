@@ -262,7 +262,7 @@ function OnboardingProgress({ result, running }) {
 function CredenciaisStatus({ configurado, capturedAt, expiresAt, running, onEditar, onRemover, onAtualizar }) {
   if (!configurado) return null;
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
       <div>
         <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--color-success)' }}>
           <FontAwesomeIcon icon={faCircleCheck} />
@@ -279,16 +279,17 @@ function CredenciaisStatus({ configurado, capturedAt, expiresAt, running, onEdit
           </p>
         )}
       </div>
-      <div className="flex gap-2">
-        <Button type="button" variant="secondary" disabled={running} onClick={onAtualizar}>
+      <div className="grid grid-cols-3 gap-2 sm:flex">
+        <Button type="button" variant="secondary" disabled={running} onClick={onAtualizar} className="justify-center">
           <FontAwesomeIcon icon={faArrowsRotate} />
-          Atualizar
+          <span className="hidden sm:inline">Atualizar</span>
+          <span className="sm:hidden">Atualizar</span>
         </Button>
-        <Button type="button" variant="secondary" disabled={running} onClick={onEditar}>
+        <Button type="button" variant="secondary" disabled={running} onClick={onEditar} className="justify-center">
           <FontAwesomeIcon icon={faPenToSquare} />
           Editar
         </Button>
-        <Button type="button" variant="danger" disabled={running} onClick={onRemover}>
+        <Button type="button" variant="danger" disabled={running} onClick={onRemover} className="justify-center">
           <FontAwesomeIcon icon={running ? faSpinner : faTrash} spin={running} />
           Remover
         </Button>
@@ -364,16 +365,16 @@ function ListaSemVinculo({ lista, vincularState, onVincular }) {
               </div>
               <FontAwesomeIcon icon={faLinkSlash} style={{ color: 'var(--color-warning)' }} />
             </div>
-            <div className="mt-2 flex gap-2">
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
               <input
                 type="text"
                 placeholder="Asset ID do portal GE"
                 value={assetId}
                 onChange={e => setInputs(s => ({ ...s, [id]: e.target.value }))}
-                className="flex-1 rounded-xl border px-3 py-1.5 text-sm"
+                className="flex-1 rounded-xl border px-3 py-2 text-sm"
                 style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)' }}
               />
-              <Button type="button" variant="secondary" disabled={!assetId.trim() || state.running} onClick={() => onVincular(id, assetId.trim())}>
+              <Button type="button" variant="secondary" disabled={!assetId.trim() || state.running} onClick={() => onVincular(id, assetId.trim())} className="justify-center">
                 <FontAwesomeIcon icon={state.running ? faSpinner : faLink} spin={state.running} />
                 Vincular
               </Button>
@@ -432,7 +433,7 @@ function UltimosSnapshots({ snapshots }) {
             )}
             {s.heliumPressurePsi != null && <span>Pressão: {s.heliumPressurePsi} PSI</span>}
             {s.compressorStatus && <span>Compressor: {s.compressorStatus}</span>}
-            {s.coolantTempC != null && <span>Temp: {s.coolantTempC}°C</span>}
+            {s.coolantTempC != null && <span>Temperatura: {s.coolantTempC}°C</span>}
             <span style={{ color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)' }}>
               {s.equipmentOnline === true ? 'Online' : s.equipmentOnline === false ? 'Offline' : ''}
             </span>
@@ -544,16 +545,16 @@ function IntegracoesPage() {
           {/* Botões de ação — só aparecem se credenciais estiverem configuradas */}
           {credConfiguradas && (
             <>
-              <div className="flex flex-wrap gap-3">
-                <Button type="button" variant="primary" onClick={rodarDiscovery} disabled={anyRunning}>
+              <div className="grid grid-cols-1 sm:flex sm:flex-wrap gap-2 sm:gap-3">
+                <Button type="button" variant="primary" onClick={rodarDiscovery} disabled={anyRunning} className="justify-center">
                   <FontAwesomeIcon icon={runningDiscovery ? faSpinner : faLink} spin={runningDiscovery} />
                   {runningDiscovery ? 'Vinculando...' : 'Vincular equipamentos'}
                 </Button>
-                <Button type="button" variant="secondary" onClick={rodarSync} disabled={anyRunning}>
+                <Button type="button" variant="secondary" onClick={rodarSync} disabled={anyRunning} className="justify-center">
                   <FontAwesomeIcon icon={runningSync ? faSpinner : faRotate} spin={runningSync} />
                   {runningSync ? 'Sincronizando...' : 'Sincronizar dados'}
                 </Button>
-                <Button type="button" variant="secondary" onClick={rodarMonitor} disabled={anyRunning}>
+                <Button type="button" variant="secondary" onClick={rodarMonitor} disabled={anyRunning} className="justify-center">
                   <FontAwesomeIcon icon={runningMonitor ? faSpinner : faHeartPulse} spin={runningMonitor} />
                   {runningMonitor ? 'Capturando...' : 'Capturar saúde agora'}
                 </Button>

@@ -79,7 +79,7 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
   const explicacao = useMemo(() => extrairExplicacao(alerta), [alerta]);
   const resumoRecomendacao =
     subtituloRenderizado ||
-    'O sistema identificou sinais de risco e recomenda avaliacao humana do ativo.';
+    'O sistema identificou sinais de risco e recomenda avaliação humana do ativo.';
 
   const handleViewDetails = useCallback(async () => {
     if (alerta.status === 'NaoVisto') {
@@ -104,10 +104,15 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
   return (
     <div
       className={[
-        'overflow-hidden rounded-xl border-y border-r border-slate-200 border-l-[8px] bg-white shadow-sm transition-all hover:shadow-md',
+        'overflow-hidden rounded-xl border-y border-r border-l-[8px] shadow-sm transition-all hover:shadow-md',
         style.border,
         alerta.status === 'Visto' ? 'opacity-70' : '',
       ].join(' ')}
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderTopColor: 'var(--border-soft)',
+        borderRightColor: 'var(--border-soft)',
+      }}
     >
       <div className="flex flex-col gap-4 p-5">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -124,18 +129,30 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
 
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h4 className="text-base font-bold leading-tight text-slate-800">
+                <h4
+                  className="text-base font-bold leading-tight"
+                  style={{ color: 'var(--text-primary)' }}
+                >
                   {alerta.titulo}
                 </h4>
 
                 {isRecomendacao ? (
-                  <span className="rounded-full bg-violet-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-wide text-violet-700">
+                  <span
+                    className="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide"
+                    style={{
+                      backgroundColor: 'var(--color-info-surface)',
+                      color: 'var(--color-info)',
+                    }}
+                  >
                     Inteligente
                   </span>
                 ) : null}
               </div>
 
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+              <div
+                className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 {subtituloRenderizado ? (
                   <span className="font-medium">{subtituloRenderizado}</span>
                 ) : null}
@@ -162,17 +179,23 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 ) : null}
 
                 {isAguardandoConfirmacao ? (
-                  <span className="rounded-md bg-orange-100 px-2 py-1 text-[10px] font-black uppercase text-orange-700">
-                    Acao necessaria
+                  <span
+                    className="rounded-md px-2 py-1 text-[10px] font-black uppercase"
+                    style={{
+                      backgroundColor: 'var(--color-warning-surface)',
+                      color: 'var(--color-warning)',
+                    }}
+                  >
+                    Ação necessária
                   </span>
                 ) : (
                   <span
-                    className={[
-                      'rounded-md px-2 py-1 text-[10px] font-black uppercase',
+                    className="rounded-md px-2 py-1 text-[10px] font-black uppercase"
+                    style={
                       alerta.status === 'NaoVisto'
-                        ? 'bg-slate-900 text-white'
-                        : 'bg-slate-100 text-slate-600',
-                    ].join(' ')}
+                        ? { backgroundColor: 'var(--text-primary)', color: 'var(--text-inverse)' }
+                        : { backgroundColor: 'var(--bg-surface-subtle)', color: 'var(--text-muted)' }
+                    }
                   >
                     {alerta.status === 'NaoVisto' ? 'Não visto' : 'Visto'}
                   </span>
@@ -181,10 +204,19 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
             </div>
           </div>
 
-          <div className="flex shrink-0 items-center gap-2 md:border-l md:border-slate-100 md:pl-5">
+          <div
+            className="flex shrink-0 items-center gap-2 md:border-l md:pl-5"
+            style={{ borderColor: 'var(--border-soft)' }}
+          >
             <Link
               to={alerta.link || '#'}
-              className="inline-flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-4 py-2 text-xs font-bold text-blue-600 no-underline transition-all hover:bg-blue-600 hover:text-white"
+              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold no-underline transition-all"
+              style={{
+                borderColor: 'var(--brand-primary-soft)',
+                backgroundColor: 'var(--brand-primary-surface)',
+                color: 'var(--brand-primary)',
+                minHeight: 44,
+              }}
               onClick={(event) => handleOpenLink(event)}
             >
               <FontAwesomeIcon icon={faEye} />
@@ -195,7 +227,11 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
               <button
                 type="button"
                 onClick={() => onUpdateStatus(alerta.id, 'NaoVisto')}
-                className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 transition-colors hover:bg-amber-100 hover:text-amber-600"
+                className="flex h-11 w-11 sm:h-10 sm:w-10 items-center justify-center rounded-lg transition-colors"
+                style={{
+                  backgroundColor: 'var(--bg-surface-subtle)',
+                  color: 'var(--text-muted)',
+                }}
                 title="Marcar como não visto"
               >
                 <FontAwesomeIcon icon={faEyeSlash} />
@@ -205,7 +241,11 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 <button
                   type="button"
                   onClick={() => onUpdateStatus(alerta.id, 'Visto')}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-green-50 text-green-600 transition-colors hover:bg-green-600 hover:text-white"
+                  className="flex h-11 w-11 sm:h-10 sm:w-10 items-center justify-center rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: 'var(--color-success-surface)',
+                    color: 'var(--color-success)',
+                  }}
                   title="Marcar como visto"
                 >
                   <FontAwesomeIcon icon={faCheck} />
@@ -214,7 +254,11 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 <button
                   type="button"
                   onClick={() => onDismiss(alerta.id)}
-                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-50 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                  className="flex h-11 w-11 sm:h-10 sm:w-10 items-center justify-center rounded-lg transition-colors"
+                  style={{
+                    backgroundColor: 'var(--bg-surface-soft)',
+                    color: 'var(--text-muted)',
+                  }}
                   title="Dispensar alerta"
                 >
                   <FontAwesomeIcon icon={faBellSlash} />
@@ -225,34 +269,51 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
         </div>
 
         {isRecomendacao ? (
-          <div className="rounded-2xl border border-violet-200 bg-violet-50/70 p-4">
+          <div
+            className="rounded-2xl border p-4"
+            style={{
+              borderColor: 'var(--color-info-soft)',
+              backgroundColor: 'var(--color-info-surface)',
+            }}
+          >
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-violet-900">
+                <p className="text-sm font-semibold" style={{ color: 'var(--color-info)' }}>
                   Recomendação proativa
                 </p>
-                <p className="mt-1 text-sm text-violet-700">
+                <p className="mt-1 text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {resumoRecomendacao}
                 </p>
               </div>
 
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap w-full md:w-auto">
                 {explicacao ? (
                   <button
                     type="button"
                     onClick={handleToggleExplicacao}
-                    className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-4 py-2 text-xs font-bold text-violet-700 transition hover:bg-violet-100"
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold transition"
+                    style={{
+                      borderColor: 'var(--color-info-soft)',
+                      backgroundColor: 'var(--bg-surface)',
+                      color: 'var(--color-info)',
+                      minHeight: 44,
+                    }}
                   >
                     <FontAwesomeIcon
                       icon={showExplicacao ? faChevronUp : faChevronDown}
                     />
-                    {showExplicacao ? 'Ocultar explicacao' : 'Ver explicacao'}
+                    {showExplicacao ? 'Ocultar explicação' : 'Ver explicação'}
                   </button>
                 ) : null}
 
                 <Link
                   to={buildAgendarPreventivaLink(alerta)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-xs font-bold text-white no-underline transition hover:bg-violet-700"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold no-underline transition"
+                  style={{
+                    backgroundColor: 'var(--color-info)',
+                    color: '#ffffff',
+                    minHeight: 44,
+                  }}
                   onClick={(event) =>
                     handleOpenLink(event, buildAgendarPreventivaLink(alerta))
                   }
@@ -263,7 +324,13 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
 
                 <Link
                   to={alerta.link || '#'}
-                  className="inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-white px-4 py-2 text-xs font-bold text-violet-700 no-underline transition hover:bg-violet-100"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg border px-4 py-2 text-xs font-bold no-underline transition"
+                  style={{
+                    borderColor: 'var(--color-info-soft)',
+                    backgroundColor: 'var(--bg-surface)',
+                    color: 'var(--color-info)',
+                    minHeight: 44,
+                  }}
                   onClick={(event) => handleOpenLink(event)}
                 >
                   <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
@@ -273,11 +340,23 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
             </div>
 
             {showExplicacao && explicacao ? (
-              <div className="mt-4 rounded-xl border border-violet-200 bg-white/80 p-4">
-                <p className="text-xs font-black uppercase tracking-wide text-violet-500">
-                  Explicacao analitica
+              <div
+                className="mt-4 rounded-xl border p-4"
+                style={{
+                  borderColor: 'var(--color-info-soft)',
+                  backgroundColor: 'var(--bg-surface)',
+                }}
+              >
+                <p
+                  className="text-xs font-black uppercase tracking-wide"
+                  style={{ color: 'var(--color-info)' }}
+                >
+                  Explicação analítica
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
+                <p
+                  className="mt-2 text-sm leading-6"
+                  style={{ color: 'var(--text-secondary)' }}
+                >
                   {explicacao}
                 </p>
               </div>
