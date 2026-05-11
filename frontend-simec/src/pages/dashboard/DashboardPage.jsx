@@ -9,6 +9,9 @@ import {
   faRotateRight,
   faTriangleExclamation,
   faTableCells,
+  faMicrochip,
+  faWrench,
+  faFileContract,
 } from '@fortawesome/free-solid-svg-icons';
 
 import 'react-grid-layout/css/styles.css';
@@ -41,37 +44,71 @@ const ResponsiveGrid = WidthProvider(Responsive);
 
 // ─── Mini-stat ────────────────────────────────────────────────────────────────
 
-function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
+/**
+ * Mini-stat tech-industrial:
+ * - Borda superior 1px colorida por tone (faixa de identidade)
+ * - ID monospace (K01-K04) no canto superior direito
+ * - Eyebrow uppercase tracking + valor grande em mono tabular
+ * - Ícone num quadrado tonal compacto
+ * - Helper text muted
+ */
+function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code }) {
   const toneMap = {
-    default: { iconSurface: 'var(--brand-primary-soft)', iconText: 'var(--brand-primary)' },
-    success: { iconSurface: 'var(--color-success-soft)', iconText: 'var(--color-success)' },
-    warning: { iconSurface: 'var(--color-warning-soft)', iconText: 'var(--color-warning)' },
-    danger:  { iconSurface: 'var(--color-danger-soft)',  iconText: 'var(--color-danger)'  },
+    default: { accent: 'var(--brand-primary)', iconSurface: 'var(--brand-primary-soft)', iconText: 'var(--brand-primary)' },
+    success: { accent: 'var(--color-success)', iconSurface: 'var(--color-success-soft)', iconText: 'var(--color-success)' },
+    warning: { accent: 'var(--color-warning)', iconSurface: 'var(--color-warning-soft)', iconText: 'var(--color-warning)' },
+    danger:  { accent: 'var(--color-danger)',  iconSurface: 'var(--color-danger-soft)',  iconText: 'var(--color-danger)'  },
   };
   const t = toneMap[tone] || toneMap.default;
 
   return (
     <div
-      className="rounded-xl border px-3.5 py-3 transition-all duration-200"
+      className="relative rounded-xl border px-3.5 py-3 overflow-hidden transition-all duration-200"
       style={{
         backgroundColor: 'var(--bg-surface-soft)',
         borderColor: 'var(--border-soft)',
       }}
     >
-      <div className="flex items-center gap-3">
+      {/* faixa colorida superior — sinaliza a categoria sem pesar */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          top: 0, left: 0, right: 0, height: 2,
+          background: `linear-gradient(90deg, transparent, ${t.accent}, transparent)`,
+          opacity: 0.7,
+        }}
+      />
+
+      <div className="flex items-start gap-3">
         <div
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm"
           style={{ backgroundColor: t.iconSurface, color: t.iconText }}
         >
           <FontAwesomeIcon icon={icon} />
         </div>
         <div className="min-w-0 flex-1">
-          <p
-            className="text-[10px] font-semibold uppercase tracking-[0.16em]"
-            style={{ color: 'var(--text-muted)' }}
-          >
-            {label}
-          </p>
+          <div className="flex items-baseline justify-between gap-2">
+            <p
+              className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              {label}
+            </p>
+            {code && (
+              <span
+                className="text-[9.5px] font-bold"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  letterSpacing: '0.18em',
+                  color: 'var(--text-muted)',
+                  opacity: 0.7,
+                }}
+              >
+                {code}
+              </span>
+            )}
+          </div>
           <p
             className="stat-value mt-0.5 text-2xl font-semibold leading-none"
             style={{ color: 'var(--text-primary)' }}
@@ -82,6 +119,50 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
       </div>
       <p className="mt-2.5 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
     </div>
+  );
+}
+
+// ─── Live indicator ──────────────────────────────────────────────────────────
+
+/**
+ * Chip discreto verde piscando indicando que a página está mostrando
+ * dados em tempo real (refresh manual via botão; o dashboard usa
+ * dados frescos a cada navegação).
+ */
+function LiveIndicator() {
+  return (
+    <>
+      <style>{`
+        @keyframes simec-live-pulse {
+          0%, 100% { opacity: 1; transform: scale(1); }
+          50%      { opacity: 0.35; transform: scale(0.85); }
+        }
+      `}</style>
+      <span
+        className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+        style={{
+          backgroundColor: 'var(--color-success-surface)',
+          border: '1px solid var(--color-success-soft)',
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.18em',
+          textTransform: 'uppercase',
+          color: 'var(--color-success)',
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            width: 6, height: 6, borderRadius: '50%',
+            backgroundColor: 'var(--color-success)',
+            boxShadow: '0 0 0 3px var(--color-success-surface)',
+            animation: 'simec-live-pulse 1.6s ease-in-out infinite',
+          }}
+        />
+        Live
+      </span>
+    </>
   );
 }
 
@@ -107,40 +188,85 @@ function ordenarOcorrencias(lista) {
   return [...lista].sort((a, b) => (GRAVIDADE_ORDEM[a.gravidade] ?? 3) - (GRAVIDADE_ORDEM[b.gravidade] ?? 3));
 }
 
+/**
+ * Item de ocorrência tech-industrial:
+ * - Barra lateral colorida de 4px (sev) à esquerda — leitura imediata
+ * - Tag monospace uppercase compacta (CRIT/HIGH/MED/INFO)
+ * - Layout em grid com TAG do equipamento separada
+ */
+const GRAV_LABEL = {
+  alta:  'CRIT',
+  media: 'HIGH',
+  baixa: 'MED',
+};
+
 function OcorrenciaPendenteItem({ ocorrencia }) {
   const tone = STATUS_OS_TONE[ocorrencia.gravidade] || 'default';
   const toneColors = {
-    danger:  { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)'  },
-    warning: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)' },
-    info:    { bg: 'var(--brand-primary-soft)', text: 'var(--brand-primary)' },
-    success: { bg: 'var(--color-success-soft)', text: 'var(--color-success)' },
-    default: { bg: 'var(--bg-surface-soft)',    text: 'var(--text-muted)'    },
+    danger:  { bg: 'var(--color-danger-soft)',  text: 'var(--color-danger)',   bar: 'var(--color-danger)'   },
+    warning: { bg: 'var(--color-warning-soft)', text: 'var(--color-warning)',  bar: 'var(--color-warning)'  },
+    info:    { bg: 'var(--brand-primary-soft)', text: 'var(--brand-primary)',  bar: 'var(--brand-primary)'  },
+    success: { bg: 'var(--color-success-soft)', text: 'var(--color-success)',  bar: 'var(--color-success)'  },
+    default: { bg: 'var(--bg-surface-soft)',    text: 'var(--text-muted)',     bar: 'var(--border-strong)'  },
   };
   const colors = toneColors[tone];
+  const gravUpper = GRAV_LABEL[ocorrencia.gravidade] || (STATUS_OS_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade || '').toUpperCase();
 
   return (
     <Link
       to={`/manutencoes/ocorrencia/${ocorrencia.id}`}
-      className="flex items-start gap-3 rounded-2xl border px-4 py-3 transition hover:opacity-80"
-      style={{ backgroundColor: 'var(--bg-surface)', borderColor: 'var(--border-soft)' }}
+      className="group relative flex items-stretch gap-3 rounded-xl border pl-3 pr-3 py-2.5 transition-all"
+      style={{
+        backgroundColor: 'var(--bg-surface)',
+        borderColor: 'var(--border-soft)',
+      }}
     >
-      <div
-        className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-xl text-xs"
-        style={{ backgroundColor: colors.bg, color: colors.text }}
-      >
-        <FontAwesomeIcon icon={faTriangleExclamation} />
-      </div>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{ocorrencia.titulo}</p>
-        <p className="mt-0.5 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
-          {ocorrencia.equipamento?.modelo} · {ocorrencia.equipamento?.tag}
+      {/* Barra lateral de severidade — 4px, cor sólida */}
+      <span
+        aria-hidden="true"
+        style={{
+          position: 'absolute',
+          left: 0, top: 8, bottom: 8,
+          width: 3,
+          backgroundColor: colors.bar,
+          borderRadius: '0 2px 2px 0',
+        }}
+      />
+
+      <div className="min-w-0 flex-1 pl-2">
+        <p className="truncate text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {ocorrencia.titulo}
+        </p>
+        <p
+          className="mt-0.5 truncate"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10.5,
+            letterSpacing: '0.06em',
+            color: 'var(--text-muted)',
+          }}
+        >
+          {ocorrencia.equipamento?.modelo}
+          {ocorrencia.equipamento?.tag ? ` · TAG ${ocorrencia.equipamento.tag}` : ''}
         </p>
       </div>
+
       <span
-        className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase"
-        style={{ backgroundColor: colors.bg, color: colors.text }}
+        className="shrink-0 self-center inline-flex items-center"
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: '0.14em',
+          padding: '4px 7px',
+          borderRadius: 4,
+          backgroundColor: colors.bg,
+          color: colors.text,
+          border: `1px solid ${colors.text}`,
+          textTransform: 'uppercase',
+        }}
       >
-        {STATUS_OS_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
+        {gravUpper}
       </span>
     </Link>
   );
@@ -281,16 +407,68 @@ function DashboardPage() {
           subtitle="Visão geral da operação, alertas e indicadores do parque de equipamentos."
           icon={faChartPie}
           actions={
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
-                <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
-              </Button>
-              <Button type="button" variant="secondary" onClick={recarregar}>
-                <FontAwesomeIcon icon={faRotateRight} /> Atualizar
-              </Button>
+            <div className="flex items-center gap-3">
+              <LiveIndicator />
+              <div className="flex gap-2">
+                <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
+                  <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
+                </Button>
+                <Button type="button" variant="secondary" onClick={recarregar}>
+                  <FontAwesomeIcon icon={faRotateRight} /> Atualizar
+                </Button>
+              </div>
             </div>
           }
         />
+
+        {/* KPI ribbon — 4 indicadores operacionais antes do grid configurável */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <DashboardMiniStat
+            code="K01"
+            icon={faMicrochip}
+            label="Parque ativo"
+            value={
+              <>
+                {resumo.ativos}
+                {resumo.totalEquipamentos > 0 && (
+                  <span style={{ fontSize: '0.5em', fontWeight: 500, color: 'var(--text-muted)', marginLeft: 4 }}>
+                    /{resumo.totalEquipamentos}
+                  </span>
+                )}
+              </>
+            }
+            helper={
+              resumo.totalEquipamentos > 0
+                ? `${resumo.disponibilidade}% disponibilidade efetiva`
+                : 'Sem equipamentos cadastrados'
+            }
+            tone="default"
+          />
+          <DashboardMiniStat
+            code="K02"
+            icon={faWrench}
+            label="Em manutenção"
+            value={resumo.emManutencao}
+            helper="Equipamentos com OS aberta ou em curso"
+            tone="warning"
+          />
+          <DashboardMiniStat
+            code="K03"
+            icon={faTriangleExclamation}
+            label="Alertas críticos"
+            value={resumo.alertasCriticos}
+            helper="Prioridade alta sinalizada pelo sistema"
+            tone="danger"
+          />
+          <DashboardMiniStat
+            code="K04"
+            icon={faFileContract}
+            label="Contratos vencendo"
+            value={resumo.contratosVencendo}
+            helper="Próximos 60 dias — janela de renegociação"
+            tone="default"
+          />
+        </div>
 
         <ResponsiveGrid
           layouts={{ lg: layout, md: layout, sm: layout }}
