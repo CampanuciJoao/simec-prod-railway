@@ -45,6 +45,12 @@ export const postGehcCredenciais = (login, password) =>
 export const deleteGehcCredenciais = () =>
   api.delete('/gehc/credenciais').then((res) => res.data);
 
+// Onboarding em uma chamada (ADR-016). Salva credenciais, autentica, faz
+// discovery e dispara primeira captura. Timeout maior porque o Playwright
+// pode demorar 30-60s.
+export const postGehcOnboard = (login, password) =>
+  api.post('/gehc/onboard', { login, password }, { timeout: 120_000 }).then((res) => res.data);
+
 export const getGehcBIUtilizacao = (meses = 12) =>
   api.get('/gehc/bi/utilizacao', { params: { meses } }).then((res) => res.data);
 

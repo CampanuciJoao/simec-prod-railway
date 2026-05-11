@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faArrowsRotate,
+  faBolt,
+  faCircle,
   faCircleCheck,
   faCircleExclamation,
   faCircleXmark,
@@ -66,8 +68,15 @@ function ResultBanner({ result, nomeAcao }) {
 }
 
 // ─── Formulário de credenciais ────────────────────────────────────────────────
+//
+// Oferece dois caminhos:
+//   - Primário: "Configurar integração GE" -> chama POST /gehc/onboard, faz
+//     tudo em sequência (salvar credenciais, autenticar, discovery, captura).
+//     Recomendado para a maioria dos casos.
+//   - Avançado: link "Apenas salvar credenciais" -> caminho antigo, salva
+//     credenciais sem disparar nada. Usuário continua o fluxo manualmente.
 
-function FormCredenciais({ running, onSalvar }) {
+function FormCredenciais({ runningOnboard, runningSalvar, onOnboard, onSalvar }) {
   const [login, setLogin]       = useState('');
   const [password, setPassword] = useState('');
 
@@ -76,6 +85,9 @@ function FormCredenciais({ running, onSalvar }) {
     backgroundColor: 'var(--bg-surface)',
     color: 'var(--text-primary)',
   };
+
+  const running = runningOnboard || runningSalvar;
+  const camposPreenchidos = !!login.trim() && !!password.trim();
 
   return (
     <div className="space-y-3">
@@ -94,6 +106,7 @@ function FormCredenciais({ running, onSalvar }) {
             placeholder="usuario@hospital.com.br"
             value={login}
             onChange={e => setLogin(e.target.value)}
+            disabled={running}
             className="w-full rounded-xl border px-3 py-2 text-sm"
             style={inputStyle}
           />
@@ -108,20 +121,138 @@ function FormCredenciais({ running, onSalvar }) {
             placeholder="••••••••"
             value={password}
             onChange={e => setPassword(e.target.value)}
+            disabled={running}
             className="w-full rounded-xl border px-3 py-2 text-sm"
             style={inputStyle}
           />
         </div>
       </div>
-      <Button
-        type="button"
-        variant="primary"
-        disabled={!login.trim() || !password.trim() || running}
-        onClick={() => onSalvar(login.trim(), password.trim())}
-      >
-        <FontAwesomeIcon icon={running ? faSpinner : faKey} spin={running} />
-        {running ? 'Salvando...' : 'Salvar credenciais'}
-      </Button>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Button
+          type="button"
+          variant="primary"
+          disabled={!camposPreenchidos || running}
+          onClick={() => onOnboard(login.trim(), password.trim())}
+        >
+          <FontAwesomeIcon icon={runningOnboard ? faSpinner : faBolt} spin={runningOnboard} />
+          {runningOnboard ? 'Configurando...' : 'Configurar integração GE'}
+        </Button>
+
+        <button
+          type="button"
+          className="text-xs underline disabled:opacity-50"
+          style={{ color: 'var(--text-muted)' }}
+          disabled={!camposPreenchidos || running}
+          onClick={() => onSalvar(login.trim(), password.trim())}
+        >
+          {runningSalvar ? 'Salvando...' : 'Apenas salvar credenciais'}
+        </button>
+      </div>
+
+      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+        <strong>Configurar integração GE</strong> faz tudo em sequência:
+        autentica no portal, vincula RMs do SIMEC e captura a primeira leitura
+        de saúde. Pode demorar até 1 minuto.
+      </p>
+    </div>
+  );
+}
+
+// ─── Progresso do onboarding ─────────────────────────────────────────────────
+//
+// Mostra os 4 passos com checkmarks. Cada passo pode estar em um de quatro
+// estados: pendente (cinza), em andamento (spinner), concluido (verde),
+// falhou (vermelho). Estado em andamento e' computado a partir do primeiro
+// passo que ainda nao tem `ok` definido enquanto o request global esta rodando.
+
+const PASSOS_ONBOARD = [
+  { id: 'credenciais', label: 'Salvando credenciais' },
+  { id: 'auth',        label: 'Autenticando no portal GE (Playwright)' },
+  { id: 'discovery',   label: 'Vinculando equipamentos' },
+  { id: 'captura',     label: 'Capturando primeira leitura de saude' },
+];
+
+function OnboardingProgress({ result, running }) {
+  if (!running && !result) return null;
+
+  const passos = result?.passos ?? {};
+  // Quando ainda esta rodando e nao temos passos retornados, calculamos qual
+  // passo esta "ativo" pelo primeiro que nao tem `ok` definido.
+  const primeiroIncompleto = PASSOS_ONBOARD.findIndex(({ id }) => !passos[id]?.ok);
+
+  return (
+    <div
+      className="rounded-2xl border px-4 py-3 space-y-2"
+      style={{
+        borderColor: result?.ok === false ? 'var(--color-danger)' : 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface-soft)',
+      }}
+    >
+      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+        {running ? 'Configurando integração GE...' : result?.ok ? 'Integração configurada' : 'Configuração interrompida'}
+      </p>
+
+      <ul className="space-y-1.5">
+        {PASSOS_ONBOARD.map(({ id, label }, idx) => {
+          const passo = passos[id];
+          const concluido = passo?.ok === true;
+          const falhou = passo && passo.ok === false || result?.falhouEm === id;
+          const emAndamento = running && !concluido && !falhou && idx === primeiroIncompleto;
+          const pendente = !concluido && !falhou && !emAndamento;
+
+          let icon = faCircle;
+          let cor = 'var(--text-muted)';
+          if (concluido) { icon = faCircleCheck; cor = 'var(--color-success)'; }
+          else if (falhou) { icon = faCircleXmark; cor = 'var(--color-danger)'; }
+          else if (emAndamento) { icon = faSpinner; cor = 'var(--brand-primary)'; }
+
+          return (
+            <li key={id} className="flex items-start gap-2 text-sm">
+              <FontAwesomeIcon
+                icon={icon}
+                spin={emAndamento}
+                className="mt-0.5 shrink-0"
+                style={{ color: cor, opacity: pendente ? 0.4 : 1 }}
+              />
+              <div className="min-w-0">
+                <p style={{ color: 'var(--text-primary)', opacity: pendente ? 0.6 : 1 }}>
+                  {label}
+                </p>
+                {passo?.error && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-danger)' }}>
+                    {passo.error}
+                  </p>
+                )}
+                {passo?.warning && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--color-warning)' }}>
+                    {passo.warning} (não bloqueante)
+                  </p>
+                )}
+                {id === 'discovery' && concluido && passo.totalPortalGe !== undefined && (
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {passo.vinculados} novos · {passo.jaVinculados} já vinculados · {passo.semMatch} sem match
+                    {passo.pendentesConfirmacao > 0 && ` · ${passo.pendentesConfirmacao} aguardam confirmação`}
+                    {passo.totalPortalGe !== null && ` · ${passo.totalPortalGe} no portal GE`}
+                  </p>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      {result?.ok && (
+        <p className="text-xs pt-1" style={{ color: 'var(--text-muted)' }}>
+          Próximas capturas automáticas a cada 30 minutos.
+        </p>
+      )}
+
+      {result?.ok === false && result.error && (
+        <p className="text-xs pt-1" style={{ color: 'var(--color-danger)' }}>
+          {result.error}
+        </p>
+      )}
     </div>
   );
 }
@@ -321,6 +452,7 @@ function IntegracoesPage() {
     rodarDiscovery, runningDiscovery, resultDiscovery,
     rodarSync,      runningSync,      resultSync,
     rodarMonitor,   runningMonitor,   resultMonitor,
+    rodarOnboard,   runningOnboard,   resultOnboard,
     vincularEquipamento, desvincularEquipamento, vincularState,
   } = useIntegracoesGehc();
 
@@ -340,7 +472,7 @@ function IntegracoesPage() {
     );
   }
 
-  const anyRunning  = runningDiscovery || runningSync || runningMonitor;
+  const anyRunning  = runningDiscovery || runningSync || runningMonitor || runningOnboard;
   const credConfiguradas = status?.credenciais?.configurado;
   const mostrarForm = !credConfiguradas || editandoCredenciais;
 
@@ -376,7 +508,12 @@ function IntegracoesPage() {
             {mostrarForm ? (
               <>
                 <FormCredenciais
-                  running={runningCredenciais}
+                  runningOnboard={runningOnboard}
+                  runningSalvar={runningCredenciais}
+                  onOnboard={async (l, p) => {
+                    const res = await rodarOnboard(l, p);
+                    if (res?.ok) setEditandoCredenciais(false);
+                  }}
                   onSalvar={async (l, p) => {
                     await salvarCredenciais(l, p);
                     setEditandoCredenciais(false);
@@ -400,6 +537,7 @@ function IntegracoesPage() {
               />
             )}
 
+            <OnboardingProgress result={resultOnboard} running={runningOnboard} />
             <ResultBanner result={resultCredenciais} nomeAcao="Credenciais" />
           </div>
 

@@ -8,6 +8,7 @@ import {
   deleteDesvincularEquipamento,
   postGehcCredenciais,
   deleteGehcCredenciais,
+  postGehcOnboard,
 } from '@/services/api/gehcApi';
 
 export function useIntegracoesGehc() {
@@ -19,11 +20,13 @@ export function useIntegracoesGehc() {
   const [runningSync, setRunningSync]           = useState(false);
   const [runningMonitor, setRunningMonitor]     = useState(false);
   const [runningCredenciais, setRunningCredenciais] = useState(false);
+  const [runningOnboard, setRunningOnboard]     = useState(false);
 
   const [resultDiscovery, setResultDiscovery]     = useState(null);
   const [resultSync, setResultSync]               = useState(null);
   const [resultMonitor, setResultMonitor]         = useState(null);
   const [resultCredenciais, setResultCredenciais] = useState(null);
+  const [resultOnboard, setResultOnboard]         = useState(null);
 
   const [vincularState, setVincularState] = useState({});
 
@@ -95,6 +98,35 @@ export function useIntegracoesGehc() {
       setResultSync({ ok: false, error: err?.response?.data?.error ?? err.message });
     } finally {
       setRunningSync(false);
+    }
+  }, [carregarStatus]);
+
+  // Onboarding em uma chamada (ADR-016): salvar credenciais + autenticar +
+  // discovery + primeira captura. Backend retorna objeto `passos` com status
+  // de cada etapa para o frontend exibir progresso.
+  const rodarOnboard = useCallback(async (login, password) => {
+    setRunningOnboard(true);
+    setResultOnboard(null);
+    try {
+      const res = await postGehcOnboard(login, password);
+      setResultOnboard({ ok: true, ...res });
+      await carregarStatus();
+      return { ok: true, ...res };
+    } catch (err) {
+      const payload = err?.response?.data;
+      const fail = {
+        ok: false,
+        error: payload?.error ?? err.message,
+        passos: payload?.passos ?? null,
+        falhouEm: payload?.falhouEm ?? null,
+      };
+      setResultOnboard(fail);
+      // Re-carrega status mesmo em falha: alguns passos podem ter completado
+      // (ex.: credenciais salvas mas auth falhou). UI precisa refletir isso.
+      await carregarStatus().catch(() => {});
+      return fail;
+    } finally {
+      setRunningOnboard(false);
     }
   }, [carregarStatus]);
 
@@ -173,6 +205,9 @@ export function useIntegracoesGehc() {
     rodarMonitor,
     runningMonitor,
     resultMonitor,
+    rodarOnboard,
+    runningOnboard,
+    resultOnboard,
     vincularEquipamento,
     desvincularEquipamento,
     vincularState,
