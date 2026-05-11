@@ -31,11 +31,11 @@ function AppTopbar({
 }) {
   return (
     <header
-      className="border-b px-4 py-4 sm:px-6"
+      className="px-4 py-3 sm:px-6"
       style={{
-        borderColor: 'var(--brand-topbar-border)',
         backgroundColor: 'var(--bg-topbar)',
         color: 'var(--text-topbar)',
+        borderBottom: '4px solid var(--brand-accent)',
       }}
     >
       <ActionBar
@@ -54,16 +54,80 @@ function AppTopbar({
               <FontAwesomeIcon icon={faBars} />
             </Button>
 
-            <div className="min-w-0">
-              <p
-                className="text-sm"
-                style={{ color: 'var(--text-topbar-muted)' }}
+            {/* Marca SIMEC bauhaus */}
+            <div className="flex items-center gap-2.5 mr-2 hidden sm:flex">
+              <span
+                style={{
+                  position: 'relative',
+                  width: 18,
+                  height: 18,
+                  background: 'var(--brand-accent)',
+                  display: 'inline-block',
+                }}
               >
-                Olá,
+                <span
+                  style={{
+                    position: 'absolute',
+                    width: 8,
+                    height: 8,
+                    background: 'var(--color-danger)',
+                    left: 5,
+                    top: 5,
+                  }}
+                />
+              </span>
+              <span
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 800,
+                  fontSize: 18,
+                  letterSpacing: '-0.04em',
+                  color: 'var(--text-topbar)',
+                }}
+              >
+                SIMEC
+              </span>
+              <span
+                className="hidden md:inline"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.22em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-topbar-muted)',
+                  marginLeft: 6,
+                  paddingLeft: 10,
+                  borderLeft: '1px solid var(--brand-topbar-border)',
+                }}
+              >
+                gestão · manutenção
+              </span>
+            </div>
+
+            <div className="min-w-0 ml-auto sm:ml-4 hidden md:block">
+              <p
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  letterSpacing: '0.22em',
+                  textTransform: 'uppercase',
+                  color: 'var(--text-topbar-muted)',
+                }}
+              >
+                Olá
               </p>
               <h2
-                className="truncate font-semibold"
-                style={{ color: 'var(--text-topbar)' }}
+                className="truncate"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  letterSpacing: '-0.01em',
+                  color: 'var(--text-topbar)',
+                  marginTop: 1,
+                }}
               >
                 {nomeUsuario}
               </h2>

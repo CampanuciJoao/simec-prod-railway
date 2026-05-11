@@ -3,9 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Responsive, WidthProvider } from 'react-grid-layout';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faArrowRight,
   faRotateRight,
-  faTriangleExclamation,
   faTableCells,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -35,107 +33,173 @@ import { formatarDataHora } from '@/utils/timeUtils';
 
 const ResponsiveGrid = WidthProvider(Responsive);
 
-/* ─── Botões locais bauhaus ─── */
+/* ─── Header compacto ─── */
 
-function BhButton({ children, variant = 'default', onClick, title }) {
-  const base = {
-    fontFamily: 'var(--font-display)',
-    fontWeight: 700,
-    fontSize: 12,
-    letterSpacing: '0.04em',
-    textTransform: 'uppercase',
-    padding: '10px 16px',
-    border: '2px solid var(--text-primary)',
-    cursor: 'pointer',
-    transition: 'all 160ms cubic-bezier(.18,.7,.2,1)',
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 8,
-  };
-  const palettes = {
-    default: { background: 'transparent', color: 'var(--text-primary)' },
-    accent: { background: 'var(--brand-accent)', borderColor: 'var(--text-primary)', color: 'var(--text-primary)' },
-  };
+function DashboardHeader({ onReset, onReload }) {
+  const agora = new Date();
+  const dataStr = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+  const horaStr = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
   return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      style={{ ...base, ...palettes[variant] }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.transform = 'translate(-2px, -2px)';
-        e.currentTarget.style.boxShadow = '4px 4px 0 var(--text-primary)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.transform = 'translate(0, 0)';
-        e.currentTarget.style.boxShadow = 'none';
-      }}
+    <div
+      className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between"
+      style={{ paddingTop: 4, paddingBottom: 18, borderBottom: '2px solid var(--text-primary)' }}
     >
-      {children}
-    </button>
+      <div>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.24em',
+            textTransform: 'uppercase',
+            color: 'var(--text-muted)',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <span style={{ background: 'var(--brand-accent)', color: 'var(--brand-accent-ink)', padding: '3px 7px', fontWeight: 800 }}>P-00</span>
+          <span>{dataStr} · {horaStr}</span>
+        </div>
+        <h1
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 800,
+            fontSize: 'clamp(32px, 3.4vw, 44px)',
+            lineHeight: 1,
+            letterSpacing: '-0.035em',
+            color: 'var(--text-primary)',
+            textTransform: 'uppercase',
+            marginTop: 10,
+          }}
+        >
+          Dashboard
+        </h1>
+        <p
+          style={{
+            fontFamily: 'var(--font-body)',
+            fontSize: 13.5,
+            color: 'var(--text-secondary)',
+            marginTop: 6,
+            maxWidth: 620,
+          }}
+        >
+          Visão geral da operação, alertas e indicadores do parque de equipamentos.
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-0">
+        <button
+          type="button"
+          onClick={onReset}
+          title="Redefinir layout padrão"
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            padding: '10px 16px',
+            background: 'transparent',
+            color: 'var(--text-primary)',
+            border: '2px solid var(--text-primary)',
+            cursor: 'pointer',
+          }}
+        >
+          <FontAwesomeIcon icon={faTableCells} /> Layout
+        </button>
+        <button
+          type="button"
+          onClick={onReload}
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 12,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+            padding: '10px 16px',
+            background: 'var(--brand-accent)',
+            color: 'var(--brand-accent-ink)',
+            border: '2px solid var(--text-primary)',
+            borderLeft: 'none',
+            cursor: 'pointer',
+          }}
+        >
+          <FontAwesomeIcon icon={faRotateRight} /> Atualizar
+        </button>
+      </div>
+    </div>
   );
 }
 
-/* ─── KPI bloco bauhaus ─── */
+/* ─── KPI bloco ─── */
 
 function KpiBlock({ index, label, value, suffix, help, tone = 'default' }) {
   const tones = {
-    default: { bg: 'var(--bg-surface)',   color: 'var(--text-primary)', muted: 'var(--text-muted)', id: 'var(--text-muted)' },
-    accent:  { bg: 'var(--brand-accent)', color: 'var(--text-primary)', muted: 'rgba(10,10,10,0.7)', id: 'rgba(10,10,10,0.7)' },
-    ink:     { bg: 'var(--text-primary)', color: 'var(--text-inverse)', muted: 'rgba(239,234,225,0.72)', id: 'rgba(239,234,225,0.62)' },
-    danger:  { bg: 'var(--color-danger)', color: '#ffffff', muted: 'rgba(255,255,255,0.85)', id: 'rgba(255,255,255,0.75)' },
+    default: { bg: 'var(--bg-surface)',   color: 'var(--text-primary)', muted: 'var(--text-muted)',           id: 'var(--text-muted)' },
+    accent:  { bg: 'var(--brand-accent)', color: 'var(--text-primary)', muted: 'rgba(10,10,10,0.7)',          id: 'rgba(10,10,10,0.7)' },
+    ink:     { bg: 'var(--text-primary)', color: 'var(--text-inverse)', muted: 'rgba(239,234,225,0.72)',      id: 'rgba(239,234,225,0.62)' },
+    danger:  { bg: 'var(--color-danger)', color: '#ffffff',             muted: 'rgba(255,255,255,0.85)',      id: 'rgba(255,255,255,0.75)' },
   };
   const t = tones[tone] || tones.default;
+
+  const isZero = value === 0 || value === '0';
 
   return (
     <div
       style={{
         background: t.bg,
         color: t.color,
-        padding: '24px 22px 26px',
+        padding: '18px 20px 20px',
         borderRight: '2px solid var(--text-primary)',
         position: 'relative',
+        minHeight: 150,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
       }}
     >
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: '0.24em',
-          textTransform: 'uppercase',
-          color: t.id,
-        }}
-      >
-        {String(index).padStart(3, '0')}
+      <div className="flex items-center justify-between gap-3">
+        <div
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontWeight: 700,
+            fontSize: 13,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          {label}
+        </div>
+        <div
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            fontWeight: 700,
+            letterSpacing: '0.24em',
+            color: t.id,
+          }}
+        >
+          {String(index).padStart(3, '0')}
+        </div>
       </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 700,
-          fontSize: 14,
-          letterSpacing: '0.04em',
-          textTransform: 'uppercase',
-          marginTop: 6,
-        }}
-      >
-        {label}
-      </div>
+
       <div
         style={{
           fontFamily: 'var(--font-display)',
           fontWeight: 800,
-          fontSize: 'clamp(56px, 5.6vw, 84px)',
-          lineHeight: 0.9,
-          letterSpacing: '-0.05em',
-          marginTop: 14,
+          fontSize: 'clamp(44px, 4.2vw, 64px)',
+          lineHeight: 0.95,
+          letterSpacing: '-0.04em',
+          marginTop: 10,
+          opacity: isZero ? 0.5 : 1,
         }}
       >
         {value}
         {suffix && (
           <sup
             style={{
-              fontSize: 20,
+              fontSize: 16,
               fontWeight: 700,
               verticalAlign: 'top',
               marginLeft: 4,
@@ -147,15 +211,15 @@ function KpiBlock({ index, label, value, suffix, help, tone = 'default' }) {
           </sup>
         )}
       </div>
+
       {help && (
         <p
           style={{
-            fontSize: 13,
+            fontSize: 12,
             lineHeight: 1.4,
-            marginTop: 12,
+            marginTop: 10,
             color: t.muted,
             fontFamily: 'var(--font-body)',
-            maxWidth: 260,
           }}
         >
           {help}
@@ -172,12 +236,6 @@ const STATUS_OS_LABEL = {
   EmAndamento:        'Em andamento',
   AguardandoTerceiro: 'Ag. terceiro',
   Concluida:          'Concluída',
-};
-const STATUS_OS_TONE = {
-  Aberta:             'warning',
-  EmAndamento:        'info',
-  AguardandoTerceiro: 'warning',
-  Concluida:          'success',
 };
 const GRAVIDADE_ORDEM = { alta: 0, media: 1, baixa: 2 };
 
@@ -201,18 +259,17 @@ function OcorrenciaItem({ ocorrencia, num }) {
     media: { background: 'var(--brand-accent)',  color: 'var(--brand-accent-ink)' },
     baixa: { background: 'var(--text-primary)',  color: 'var(--text-inverse)' },
   };
-  const tone = STATUS_OS_TONE[ocorrencia.gravidade] || 'default';
   return (
     <Link
       to={`/manutencoes/ocorrencia/${ocorrencia.id}`}
-      className="grid grid-cols-[60px_1fr_auto] items-center gap-4 py-4"
+      className="grid grid-cols-[48px_1fr_auto] items-center gap-4 py-3.5"
       style={{ borderTop: '2px solid var(--text-primary)', textDecoration: 'none' }}
     >
       <div
         style={{
           fontFamily: 'var(--font-display)',
           fontWeight: 800,
-          fontSize: 38,
+          fontSize: 30,
           lineHeight: 1,
           letterSpacing: '-0.04em',
           ...numStyles[grav],
@@ -226,8 +283,8 @@ function OcorrenciaItem({ ocorrencia, num }) {
           style={{
             fontFamily: 'var(--font-display)',
             fontWeight: 700,
-            fontSize: 16,
-            lineHeight: 1.2,
+            fontSize: 14,
+            lineHeight: 1.25,
             letterSpacing: '-0.01em',
             color: 'var(--text-primary)',
           }}
@@ -238,7 +295,7 @@ function OcorrenciaItem({ ocorrencia, num }) {
           className="mt-1 truncate"
           style={{
             fontFamily: 'var(--font-mono)',
-            fontSize: 10.5,
+            fontSize: 10,
             letterSpacing: '0.08em',
             textTransform: 'uppercase',
             color: 'var(--text-muted)',
@@ -251,14 +308,13 @@ function OcorrenciaItem({ ocorrencia, num }) {
         style={{
           fontFamily: 'var(--font-display)',
           fontWeight: 700,
-          fontSize: 11,
-          letterSpacing: '0.1em',
+          fontSize: 10,
+          letterSpacing: '0.12em',
           textTransform: 'uppercase',
-          padding: '6px 10px',
+          padding: '5px 8px',
           whiteSpace: 'nowrap',
           ...badgeStyles[grav],
         }}
-        title={tone}
       >
         {STATUS_OS_LABEL[ocorrencia.gravidade] || ocorrencia.gravidade}
       </span>
@@ -270,34 +326,14 @@ function OcorrenciaItem({ ocorrencia, num }) {
 
 function GaugeBox({ label, value, tone = 'ok' }) {
   const styles = {
-    ok:   { background: 'var(--bg-surface)',     border: '2px solid var(--text-primary)', color: 'var(--text-primary)' },
-    warn: { background: 'var(--brand-accent)',   border: '2px solid var(--text-primary)', color: 'var(--text-primary)' },
-    crit: { background: 'var(--color-danger)',   border: '2px solid var(--color-danger)', color: '#fff' },
+    ok:   { background: 'var(--bg-surface)',   border: '2px solid var(--text-primary)', color: 'var(--text-primary)' },
+    warn: { background: 'var(--brand-accent)', border: '2px solid var(--text-primary)', color: 'var(--text-primary)' },
+    crit: { background: 'var(--color-danger)', border: '2px solid var(--color-danger)', color: '#fff' },
   };
   return (
-    <div style={{ ...styles[tone], padding: '8px 10px' }}>
-      <div
-        style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          letterSpacing: '0.2em',
-          textTransform: 'uppercase',
-          opacity: 0.75,
-        }}
-      >
-        {label}
-      </div>
-      <div
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontWeight: 800,
-          fontSize: 20,
-          marginTop: 2,
-          letterSpacing: '-0.02em',
-        }}
-      >
-        {value}
-      </div>
+    <div style={{ ...styles[tone], padding: '7px 9px' }}>
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.2em', textTransform: 'uppercase', opacity: 0.75 }}>{label}</div>
+      <div style={{ fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 18, marginTop: 2, letterSpacing: '-0.02em' }}>{value}</div>
     </div>
   );
 }
@@ -332,7 +368,7 @@ function SaudeRMs() {
   return (
     <div className="overflow-auto">
       {snapshots.map((s, i) => (
-        <div key={i} className="py-4" style={{ borderTop: '2px solid var(--text-primary)' }}>
+        <div key={i} className="py-3.5" style={{ borderTop: '2px solid var(--text-primary)' }}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             {s.equipamentoId ? (
               <Link
@@ -341,7 +377,7 @@ function SaudeRMs() {
                 style={{
                   fontFamily: 'var(--font-display)',
                   fontWeight: 700,
-                  fontSize: 16,
+                  fontSize: 14,
                   letterSpacing: '-0.01em',
                   textTransform: 'uppercase',
                   color: 'var(--text-primary)',
@@ -351,17 +387,7 @@ function SaudeRMs() {
                 {s.equipamento}
               </Link>
             ) : (
-              <p
-                className="truncate"
-                style={{
-                  fontFamily: 'var(--font-display)',
-                  fontWeight: 700,
-                  fontSize: 16,
-                  letterSpacing: '-0.01em',
-                  textTransform: 'uppercase',
-                  color: 'var(--text-primary)',
-                }}
-              >
+              <p className="truncate" style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em', textTransform: 'uppercase', color: 'var(--text-primary)' }}>
                 {s.equipamento}
               </p>
             )}
@@ -369,24 +395,15 @@ function SaudeRMs() {
               {formatarDataHora(s.capturedAt)}
             </p>
           </div>
-
-          <div className="mt-3 grid grid-cols-4 gap-2">
+          <div className="mt-2.5 grid grid-cols-4 gap-2">
             {s.heliumLevelPct != null && (
-              <GaugeBox
-                label="He"
-                value={`${s.heliumLevelPct}%`}
-                tone={s.heliumLevelPct < 30 ? 'crit' : s.heliumLevelPct < 70 ? 'warn' : 'ok'}
-              />
+              <GaugeBox label="He" value={`${s.heliumLevelPct}%`} tone={s.heliumLevelPct < 30 ? 'crit' : s.heliumLevelPct < 70 ? 'warn' : 'ok'} />
             )}
             {s.heliumPressurePsi != null && (
               <GaugeBox label="PSI" value={s.heliumPressurePsi} tone="ok" />
             )}
             {s.compressorStatus && (
-              <GaugeBox
-                label="Comp"
-                value={s.compressorStatus}
-                tone={s.compressorStatus === 'ON' ? 'ok' : 'crit'}
-              />
+              <GaugeBox label="Comp" value={s.compressorStatus} tone={s.compressorStatus === 'ON' ? 'ok' : 'crit'} />
             )}
             {s.coolantTempC != null && (
               <GaugeBox label="Temp" value={`${s.coolantTempC}°`} tone="ok" />
@@ -424,19 +441,11 @@ function DashboardPage() {
     resumo.contratosVencendo === 0 && resumo.alertasAtivos === 0 &&
     (data.alertas || []).length === 0 && (data.statusEquipamentos || []).length === 0;
 
-  // ── Headline editorial bauhaus
-  const headline = useMemo(() => {
-    const criticos = resumo.alertasCriticos;
-    const total    = resumo.totalEquipamentos;
-    const ativos   = resumo.ativos;
-    return { criticos, total, ativos };
-  }, [resumo]);
-
   if (loading || error || isEmpty) {
     return (
       <PageLayout padded fullHeight>
         <div className="space-y-6">
-          <BauhausHeader resumo={resumo} onReset={resetLayout} onReload={recarregar} />
+          <DashboardHeader onReset={resetLayout} onReload={recarregar} />
           <PageState loading={loading} error={error} isEmpty={isEmpty} emptyMessage="Nenhum dado disponível no momento." />
         </div>
       </PageLayout>
@@ -448,31 +457,35 @@ function DashboardPage() {
   }
 
   const alertasVisiveis     = calcItemsVisible(getH('alertas'),     56, 0);
-  const ocorrenciasVisiveis = calcItemsVisible(getH('ocorrencias'), 88, 0);
+  const ocorrenciasVisiveis = calcItemsVisible(getH('ocorrencias'), 72, 0);
   const ocorrenciasOrdenadas = ordenarOcorrencias(data.ocorrenciasPendentes || []);
 
   return (
     <PageLayout padded fullHeight>
-      <div className="space-y-0">
+      <div className="space-y-4">
 
-        {/* HEADLINE */}
-        <BauhausHeader resumo={resumo} headline={headline} onReset={resetLayout} onReload={recarregar} />
+        <div className="content-fade-in">
+          <DashboardHeader onReset={resetLayout} onReload={recarregar} />
+        </div>
 
-        {/* KPI STRIP */}
+        {/* KPI STRIP — protagonistas, logo abaixo do header */}
         <div
           className="grid grid-cols-2 md:grid-cols-4 bh-reveal"
           style={{
-            borderTop: '4px solid var(--text-primary)',
-            borderBottom: '4px solid var(--text-primary)',
-            animationDelay: '120ms',
+            border: '2px solid var(--text-primary)',
+            animationDelay: '80ms',
           }}
         >
           <KpiBlock
             index={1}
             label="Parque ativo"
             value={resumo.ativos}
-            suffix={`/${resumo.totalEquipamentos}`}
-            help={`Disponibilidade efetiva em ${resumo.disponibilidade}% — leitura do parque sob gestão.`}
+            suffix={resumo.totalEquipamentos > 0 ? `/${resumo.totalEquipamentos}` : null}
+            help={
+              resumo.totalEquipamentos > 0
+                ? `Disponibilidade efetiva em ${resumo.disponibilidade}%.`
+                : 'Sem equipamentos cadastrados.'
+            }
             tone="default"
           />
           <KpiBlock
@@ -499,7 +512,7 @@ function DashboardPage() {
         </div>
 
         {/* GRID DE CARDS */}
-        <div className="bh-reveal" style={{ animationDelay: '240ms' }}>
+        <div className="bh-reveal" style={{ animationDelay: '160ms' }}>
           <ResponsiveGrid
             layouts={{ lg: layout, md: layout, sm: layout }}
             breakpoints={{ lg: 1100, md: 768, sm: 0 }}
@@ -511,12 +524,11 @@ function DashboardPage() {
             resizeHandles={['se', 'sw', 'ne', 'nw', 'e', 'w', 's', 'n']}
             className="layout"
           >
-            {/* Ocorrências pendentes */}
             <DashboardCard
               key="ocorrencias"
               id="P-01 · ocorrências"
               title="Ocorrências pendentes"
-              description="Registros abertos que exigem ação operacional hoje."
+              description="Registros abertos que exigem ação operacional."
               headerRight={
                 ocorrenciasOrdenadas.length > 0 ? (
                   <span
@@ -543,15 +555,7 @@ function DashboardPage() {
                   ))}
                   <div style={{ borderTop: '2px solid var(--text-primary)' }} />
                   {ocorrenciasOrdenadas.length > ocorrenciasVisiveis && (
-                    <p
-                      className="pt-3 text-center"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        letterSpacing: '0.06em',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
+                    <p className="pt-3 text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
                       e mais{' '}
                       <strong style={{ color: 'var(--color-danger)' }}>
                         {ocorrenciasOrdenadas.length - ocorrenciasVisiveis}
@@ -565,24 +569,23 @@ function DashboardPage() {
               )}
             </DashboardCard>
 
-            {/* Alertas recentes */}
             <DashboardCard
               key="alertas"
               id="P-02 · alertas"
               title="Alertas recentes"
-              description="Avisos mais recentes do sistema, em ordem cronológica."
+              description="Avisos mais recentes do sistema."
               headerRight={
                 <Link
                   to="/alertas"
                   style={{
                     fontFamily: 'var(--font-display)',
                     fontWeight: 700,
-                    fontSize: 12,
-                    letterSpacing: '0.06em',
+                    fontSize: 11,
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     color: 'var(--brand-accent)',
                     textDecoration: 'none',
-                    borderBottom: '3px solid var(--brand-accent)',
+                    borderBottom: '2px solid var(--brand-accent)',
                     paddingBottom: 1,
                   }}
                 >
@@ -596,15 +599,7 @@ function DashboardPage() {
                     <AlertListItem key={alerta.id} alerta={alerta} />
                   ))}
                   {data.alertas.length > alertasVisiveis && (
-                    <p
-                      className="pt-2 text-center"
-                      style={{
-                        fontFamily: 'var(--font-mono)',
-                        fontSize: 11,
-                        letterSpacing: '0.06em',
-                        color: 'var(--text-muted)',
-                      }}
-                    >
+                    <p className="pt-2 text-center" style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
                       e mais{' '}
                       <strong style={{ color: 'var(--text-primary)' }}>
                         {data.alertas.length - alertasVisiveis}
@@ -618,7 +613,6 @@ function DashboardPage() {
               )}
             </DashboardCard>
 
-            {/* Saúde das RMs GE */}
             <DashboardCard
               key="fila"
               id="P-03 · GEHC"
@@ -644,7 +638,6 @@ function DashboardPage() {
               <SaudeRMs />
             </DashboardCard>
 
-            {/* Leitura do parque */}
             <DashboardCard
               key="parque"
               id="P-04 · parque"
@@ -661,12 +654,11 @@ function DashboardPage() {
               </div>
             </DashboardCard>
 
-            {/* Histórico de manutenções */}
             <DashboardCard
               key="historico"
               id="P-05 · histórico"
               title="Histórico de manutenções"
-              description="Volume consolidado por período — corretivas e preventivas."
+              description="Volume consolidado por período."
             >
               <div className="h-full min-h-[200px]">
                 <BarChart
@@ -681,162 +673,6 @@ function DashboardPage() {
 
       </div>
     </PageLayout>
-  );
-}
-
-/* ─── Header bauhaus (manchete + topbar de ações) ─── */
-
-function BauhausHeader({ resumo, headline, onReset, onReload }) {
-  const criticos = headline?.criticos ?? resumo.alertasCriticos;
-  const total    = headline?.total    ?? resumo.totalEquipamentos;
-  const agora    = new Date();
-  const dataStr  = agora.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
-  const horaStr  = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
-  // Numero por extenso curto
-  const porExtenso = (n) => {
-    const map = {
-      0: 'zero', 1: 'um', 2: 'dois', 3: 'três', 4: 'quatro',
-      5: 'cinco', 6: 'seis', 7: 'sete', 8: 'oito', 9: 'nove',
-      10: 'dez',
-    };
-    return map[n] ?? String(n);
-  };
-
-  return (
-    <div className="bh-reveal" style={{ animationDelay: '40ms' }}>
-      {/* Faixa preta de ações/ribbon */}
-      <div
-        className="flex flex-wrap items-center gap-6 px-6 py-3"
-        style={{ background: 'var(--text-primary)', color: 'var(--text-inverse)' }}
-      >
-        <div className="flex items-center gap-2">
-          <span style={{ width: 16, height: 16, background: 'var(--brand-accent)', position: 'relative', display: 'inline-block' }}>
-            <span style={{ position: 'absolute', width: 8, height: 8, background: 'var(--color-danger)', left: 4, top: 4 }} />
-          </span>
-          <span
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 800,
-              fontSize: 20,
-              letterSpacing: '-0.04em',
-            }}
-          >
-            SIMEC
-          </span>
-        </div>
-        <div
-          className="hidden md:flex flex-1 items-center gap-6"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 11,
-            letterSpacing: '0.22em',
-            textTransform: 'uppercase',
-            color: 'rgba(239,234,225,0.7)',
-          }}
-        >
-          <span>EDIÇÃO <strong style={{ color: 'var(--brand-accent)' }}>{dataStr}</strong></span>
-          <span>TURNO <strong style={{ color: 'var(--brand-accent)' }}>{horaStr}</strong></span>
-          <span>PARQUE <strong style={{ color: 'var(--brand-accent)' }}>{total}</strong></span>
-        </div>
-        <div className="ml-auto flex gap-0">
-          <button
-            type="button"
-            onClick={onReset}
-            title="Redefinir layout padrão"
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              padding: '10px 16px',
-              background: 'transparent',
-              color: 'var(--text-inverse)',
-              border: '2px solid var(--text-inverse)',
-              cursor: 'pointer',
-            }}
-          >
-            <FontAwesomeIcon icon={faTableCells} /> Layout
-          </button>
-          <button
-            type="button"
-            onClick={onReload}
-            style={{
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontSize: 12,
-              letterSpacing: '0.04em',
-              textTransform: 'uppercase',
-              padding: '10px 16px',
-              background: 'var(--brand-accent)',
-              color: 'var(--brand-accent-ink)',
-              border: '2px solid var(--brand-accent)',
-              cursor: 'pointer',
-            }}
-          >
-            <FontAwesomeIcon icon={faRotateRight} /> Atualizar
-          </button>
-        </div>
-      </div>
-
-      {/* Manchete */}
-      <div className="grid md:grid-cols-[8fr_4fr] gap-8 px-6 pt-12 pb-8" style={{ borderBottom: '4px solid var(--text-primary)' }}>
-        <h1
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 800,
-            fontSize: 'clamp(48px, 6.6vw, 96px)',
-            letterSpacing: '-0.055em',
-            lineHeight: 0.9,
-            color: 'var(--text-primary)',
-            textTransform: 'uppercase',
-            margin: 0,
-          }}
-        >
-          <span style={{ display: 'block' }}>
-            {criticos > 0 ? (
-              <>
-                <span>{porExtenso(criticos)} </span>
-                <span style={{ color: 'var(--color-danger)' }}>{criticos === 1 ? 'crítico.' : 'críticos.'}</span>
-              </>
-            ) : (
-              <span>Parque <span style={{ color: 'var(--color-success)' }}>estável.</span></span>
-            )}
-          </span>
-          <span style={{ display: 'block' }}>
-            <span className="bh-mark">Cento e</span> trinta e
-          </span>
-          <span style={{ display: 'block' }}>
-            <span className="bh-stroke">dois</span>{' '}
-            sob gestão.
-          </span>
-        </h1>
-        <div style={{ borderLeft: '2px solid var(--text-primary)', paddingLeft: 22 }}>
-          <p style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 800,
-            fontSize: 14,
-            letterSpacing: '0.18em',
-            color: 'var(--color-danger)',
-          }}>
-            N.º {String(Math.floor(agora.getTime() / 86400000) % 1000).padStart(3, '0')} · BOLETIM DIÁRIO
-          </p>
-          <p style={{
-            fontFamily: 'var(--font-body)',
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: 'var(--text-secondary)',
-            marginTop: 12,
-          }}>
-            Síntese operacional do parque. Hoje o sistema sinaliza{' '}
-            <strong className="bh-mark">{resumo.alertasAtivos} alerta(s)</strong>,{' '}
-            <strong className="bh-mark">{resumo.contratosVencendo} contrato(s)</strong> próximos do vencimento, e{' '}
-            <strong>{resumo.emManutencao} equipamento(s)</strong> em manutenção.
-          </p>
-        </div>
-      </div>
-    </div>
   );
 }
 
