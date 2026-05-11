@@ -178,10 +178,12 @@
     transform: translateY(-1px);
   }
 
-  /* Stagger sutil dos cards do dashboard ao carregar.
-     react-grid-layout renderiza filhos em ordem; aplicamos delays incrementais. */
+  /* Stagger sutil dos cards do dashboard.
+     CUIDADO: react-grid-layout posiciona os itens via `transform: translate(...)`.
+     Não animar transform aqui — só opacity — senão os cards perdem posição
+     e empilham no canto superior esquerdo (regressão do commit anterior). */
   .layout > .react-grid-item {
-    animation: contentFadeIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation: rgiFadeIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
   }
   .layout > .react-grid-item:nth-child(1) { animation-delay: 40ms; }
   .layout > .react-grid-item:nth-child(2) { animation-delay: 100ms; }
@@ -199,5 +201,10 @@
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes rgiFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 }
