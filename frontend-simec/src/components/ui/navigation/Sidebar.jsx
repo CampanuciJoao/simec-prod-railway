@@ -93,23 +93,7 @@ function Sidebar({
           </button>
         </div>
 
-        {/* Eyebrow técnico — identidade discreta abaixo do logo */}
-        <p
-          className="px-3 pt-3 text-center"
-          style={{
-            fontFamily: 'var(--font-mono)',
-            fontSize: 9.5,
-            fontWeight: 600,
-            letterSpacing: '0.28em',
-            textTransform: 'uppercase',
-            color: 'var(--text-sidebar-muted)',
-            opacity: 0.6,
-          }}
-        >
-          Control Center
-        </p>
-
-        <div className="scrollbar-none mt-4 flex-1 overflow-y-auto px-3 pb-3">
+        <div className="scrollbar-none mt-5 flex-1 overflow-y-auto px-3 pb-3">
           <nav>
             <ul className="space-y-1.5">
               {mainItems.map((item) => (
@@ -156,45 +140,87 @@ function Sidebar({
           </nav>
         </div>
 
-        {/* Footer técnico — versão + status do sistema */}
+        {/* Footer técnico — usuário, role, versão e status */}
         <div
-          className="px-3 py-3 flex items-center justify-between gap-2"
-          style={{
-            borderTop: '1px solid var(--border-soft)',
-            opacity: 0.85,
-          }}
+          className="px-3 py-3 space-y-1.5"
+          style={{ borderTop: '1px solid var(--border-soft)' }}
         >
-          <span
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 10,
-              fontWeight: 600,
-              letterSpacing: '0.14em',
-              color: 'var(--text-sidebar-muted)',
-            }}
-          >
-            v4.2.1
-          </span>
-          <span
-            className="inline-flex items-center gap-1.5"
-            style={{
-              fontFamily: 'var(--font-mono)',
-              fontSize: 9.5,
-              fontWeight: 700,
-              letterSpacing: '0.16em',
-              textTransform: 'uppercase',
-              color: 'var(--color-success)',
-            }}
-          >
+          {usuario?.nome && (
+            <div className="flex items-baseline justify-between gap-2 min-w-0">
+              <span
+                className="truncate"
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  letterSpacing: '0.04em',
+                  color: 'var(--text-sidebar)',
+                }}
+                title={usuario.nome}
+              >
+                {usuario.nome}
+              </span>
+              {usuario.role && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: '0.2em',
+                    textTransform: 'uppercase',
+                    padding: '2px 5px',
+                    borderRadius: 3,
+                    backgroundColor: usuario.role === 'superadmin'
+                      ? 'rgba(220, 38, 38, 0.18)'
+                      : usuario.role === 'admin'
+                        ? 'rgba(37, 99, 235, 0.22)'
+                        : 'rgba(255, 255, 255, 0.08)',
+                    color: usuario.role === 'superadmin'
+                      ? '#fca5a5'
+                      : usuario.role === 'admin'
+                        ? '#93c5fd'
+                        : 'var(--text-sidebar-muted)',
+                  }}
+                >
+                  {usuario.role}
+                </span>
+              )}
+            </div>
+          )}
+          <div className="flex items-center justify-between gap-2">
             <span
-              aria-hidden="true"
               style={{
-                width: 6, height: 6, borderRadius: '50%',
-                backgroundColor: 'var(--color-success)',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10,
+                fontWeight: 600,
+                letterSpacing: '0.14em',
+                color: 'var(--text-sidebar-muted)',
               }}
-            />
-            Online
-          </span>
+            >
+              SIMEC v4.2.1
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5"
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 9.5,
+                fontWeight: 700,
+                letterSpacing: '0.16em',
+                textTransform: 'uppercase',
+                color: 'var(--color-success)',
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 6, height: 6, borderRadius: '50%',
+                  backgroundColor: 'var(--color-success)',
+                  boxShadow: '0 0 0 2px rgba(5, 150, 105, 0.2)',
+                }}
+              />
+              Online
+            </span>
+          </div>
         </div>
       </aside>
     </>
