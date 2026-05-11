@@ -7,31 +7,38 @@ import Card from '@/components/ui/primitives/Card';
 
 const toneStyleMap = {
   slate: {
-    iconBg: 'var(--bg-surface-subtle)',
+    cardBg:   'var(--kpi-surface)',
+    iconBg:   'var(--bg-surface-subtle)',
     iconText: 'var(--text-secondary)',
   },
   blue: {
-    iconBg: 'var(--brand-primary-soft)',
+    cardBg:   'var(--brand-primary-surface)',
+    iconBg:   'var(--brand-primary-soft)',
     iconText: 'var(--brand-primary)',
   },
   green: {
-    iconBg: 'var(--color-success-soft)',
+    cardBg:   'var(--color-success-surface)',
+    iconBg:   'var(--color-success-soft)',
     iconText: 'var(--color-success)',
   },
   yellow: {
-    iconBg: 'var(--color-warning-soft)',
+    cardBg:   'var(--color-warning-surface)',
+    iconBg:   'var(--color-warning-soft)',
     iconText: 'var(--color-warning)',
   },
   orange: {
-    iconBg: 'var(--color-warning-soft)',
+    cardBg:   'var(--color-warning-surface)',
+    iconBg:   'var(--color-warning-soft)',
     iconText: 'var(--color-warning)',
   },
   red: {
-    iconBg: 'var(--color-danger-soft)',
+    cardBg:   'var(--color-danger-surface)',
+    iconBg:   'var(--color-danger-soft)',
     iconText: 'var(--color-danger)',
   },
   purple: {
-    iconBg: 'var(--color-info-soft)',
+    cardBg:   'var(--color-info-surface)',
+    iconBg:   'var(--color-info-soft)',
     iconText: 'var(--color-info)',
   },
 };
@@ -54,7 +61,7 @@ function KpiCard({
       className={['h-full rounded-3xl', className].join(' ')}
       interactive={isInteractive}
       style={{
-        backgroundColor: 'var(--kpi-surface)',
+        backgroundColor: toneStyle.cardBg,
         borderColor: 'var(--border-soft)',
       }}
     >
@@ -71,14 +78,14 @@ function KpiCard({
 
         <div className="min-w-0 flex-1">
           <p
-            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            className="text-[10.5px] font-semibold uppercase tracking-[0.16em]"
             style={{ color: 'var(--text-muted)' }}
           >
             {title}
           </p>
 
           <p
-            className="mt-2 text-3xl font-bold leading-none tracking-tight"
+            className="stat-value mt-2 text-3xl font-semibold leading-none"
             style={{ color: 'var(--text-primary)' }}
           >
             {value}
@@ -86,7 +93,7 @@ function KpiCard({
 
           {subtitle ? (
             <p
-              className="mt-2 line-clamp-2 text-sm"
+              className="mt-2 line-clamp-2 text-sm leading-snug"
               style={{ color: 'var(--text-secondary)' }}
             >
               {subtitle}

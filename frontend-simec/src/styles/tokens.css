@@ -1,4 +1,9 @@
 :root {
+  /* Famílias tipográficas — refinamento sutil sobre o tema azul corporativo */
+  --font-body:    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'Geist Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+
   --brand-primary: #2563eb;
   --brand-primary-hover: #1d4ed8;
   --brand-primary-soft: rgba(37, 99, 235, 0.14);
@@ -9,15 +14,19 @@
 
   --color-success: #059669;
   --color-success-soft: rgba(5, 150, 105, 0.14);
+  --color-success-surface: rgba(5, 150, 105, 0.07);
 
   --color-warning: #d97706;
   --color-warning-soft: rgba(217, 119, 6, 0.14);
+  --color-warning-surface: rgba(217, 119, 6, 0.07);
 
   --color-danger: #dc2626;
   --color-danger-soft: rgba(220, 38, 38, 0.14);
+  --color-danger-surface: rgba(220, 38, 38, 0.06);
 
   --color-info: #223663;
   --color-info-soft: rgba(37, 99, 235, 0.14);
+  --color-info-surface: rgba(99, 102, 241, 0.08);
 
   --radius-sm: 0.75rem;
   --radius-md: 1rem;
@@ -33,70 +42,76 @@
 
 :root[data-theme='light'] {
   --card-header-bg: #ffffff;
-  --card-header-border: #e2eaf4;
-  --card-header-text: #1a3a5c;
-  --card-header-text-muted: #607d9a;
+  --card-header-border: #eef1f5;
+  --card-header-text: #0f172a;
+  --card-header-text-muted: #64748b;
 
-  --bg-app: #f6f8fc;
-  --bg-app-muted: #eef3f8;
+  /* Background: tons slate suficientemente distintos do branco dos cards */
+  --bg-app: #eef1f6;
+  --bg-app-muted: #e3e8ef;
 
   --bg-surface: #ffffff;
-  --bg-surface-soft: #fbfcfe;
-  --bg-surface-subtle: #f3f7fc;
+  --bg-surface-soft: #f8fafc;
+  --bg-surface-subtle: #f1f5f9;
   --bg-elevated: #ffffff;
 
-  --bg-hover: #eef4fb;
-  --bg-active: #e5edf8;
+  --bg-hover: #f1f5f9;
+  --bg-active: #e2e8f0;
 
-  --bg-sidebar: #08111f;
-  --bg-sidebar-soft: #0d1727;
-  --bg-sidebar-hover: #182338;
-  --bg-sidebar-active: #2f6df6;
+  --bg-sidebar: #0b1220;
+  --bg-sidebar-soft: #111a2c;
+  --bg-sidebar-hover: #1a2540;
+  --bg-sidebar-active: #2563eb;
 
-  --bg-topbar: #08111f;
-  --bg-breadcrumb: #08111f;
+  --bg-topbar: #0b1220;
+  --bg-breadcrumb: #0b1220;
 
-  --border-default: #d8e1eb;
-  --border-soft: #e7edf5;
-  --border-strong: #a8b7c9;
+  /* Bordas: slate-200/300, mais neutras */
+  --border-default: #d8dde5;
+  --border-soft: #e7eaf0;
+  --border-strong: #94a3b8;
 
   --text-primary: #0f172a;
-  --text-secondary: #41556f;
-  --text-muted: #70839c;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
   --text-inverse: #ffffff;
 
   --text-sidebar: #ffffff;
-  --text-sidebar-muted: #ffffff;
+  --text-sidebar-muted: rgba(255, 255, 255, 0.78);
   --text-sidebar-active: #ffffff;
 
   --text-topbar: #ffffff;
   --text-topbar-muted: rgba(255, 255, 255, 0.82);
 
   --text-brand-surface: #ffffff;
-  --text-brand-surface-muted: rgba(255, 255, 255, 0.82);
+  --text-brand-surface-muted: rgba(255, 255, 255, 0.78);
 
-  --overlay-bg: rgba(15, 23, 42, 0.44);
+  --overlay-bg: rgba(15, 23, 42, 0.5);
 
   --button-primary-hover: #1d4ed8;
   --button-secondary-bg: #ffffff;
-  --button-secondary-hover: #f3f7fc;
+  --button-secondary-hover: #f3f5f8;
   --button-secondary-text: #0f172a;
-  --button-secondary-border: #d8e1eb;
+  --button-secondary-border: #d8dde5;
   --button-danger-hover: #b91c1c;
   --button-success-hover: #047857;
-  --button-ghost-hover: rgba(15, 23, 42, 0.06);
+  --button-ghost-hover: rgba(15, 23, 42, 0.05);
 
-  --section-header-border: #e6edf5;
+  --section-header-border: #eef1f5;
 
-  --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.10), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --shadow-lg: 0 20px 55px rgba(15, 23, 42, 0.13);
+  /* Sombras refinadas tipo Linear/Notion: sutis, multi-camada */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 1px rgba(15, 23, 42, 0.03);
+  --shadow-md: 0 1px 3px rgba(15, 23, 42, 0.06), 0 8px 24px -8px rgba(15, 23, 42, 0.10);
+  --shadow-lg: 0 10px 38px -8px rgba(15, 23, 42, 0.18), 0 4px 12px -4px rgba(15, 23, 42, 0.06);
+
+  /* Foco visível e acessível */
+  --focus-ring: rgba(37, 99, 235, 0.32);
 
   --kpi-surface: #ffffff;
   --header-surface: linear-gradient(
     180deg,
-    rgba(8, 17, 31, 0.98) 0%,
-    rgba(13, 23, 39, 0.98) 100%
+    rgba(11, 18, 32, 0.98) 0%,
+    rgba(17, 26, 44, 0.98) 100%
   );
   --section-surface: #ffffff;
 }

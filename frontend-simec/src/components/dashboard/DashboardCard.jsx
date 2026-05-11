@@ -21,16 +21,16 @@ const DashboardCard = forwardRef(function DashboardCard(
       {...rest}
     >
       <div
-        className="flex h-full flex-col overflow-hidden rounded-2xl border"
+        className="flex h-full flex-col overflow-hidden rounded-2xl border transition-all duration-200"
         style={{
           backgroundColor: 'var(--bg-surface)',
           borderColor: 'var(--border-soft)',
-          boxShadow: '0 4px 16px rgba(8,17,31,0.09)',
+          boxShadow: 'var(--shadow-sm)',
         }}
       >
         {/* Header com drag handle */}
         <div
-          className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
+          className="drag-handle group flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-3.5 active:cursor-grabbing"
           style={{
             backgroundColor: 'var(--card-header-bg)',
             borderColor: 'var(--card-header-border)',
@@ -38,18 +38,24 @@ const DashboardCard = forwardRef(function DashboardCard(
             borderTopRightRadius: '1rem',
           }}
         >
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex items-start gap-2.5 min-w-0">
             <FontAwesomeIcon
               icon={faGripVertical}
-              className="mt-0.5 shrink-0 text-xs opacity-25"
+              className="mt-1 shrink-0 text-[10px] opacity-30 transition-opacity group-hover:opacity-60"
               style={{ color: 'var(--card-header-text)' }}
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--card-header-text)' }}>
+              <p
+                className="text-[14px] font-semibold leading-tight tracking-[-0.01em]"
+                style={{ color: 'var(--card-header-text)' }}
+              >
                 {title}
               </p>
               {description && (
-                <p className="mt-0.5 text-xs leading-snug line-clamp-1" style={{ color: 'var(--card-header-text-muted)' }}>
+                <p
+                  className="mt-1 text-[11.5px] leading-snug line-clamp-1"
+                  style={{ color: 'var(--card-header-text-muted)' }}
+                >
                   {description}
                 </p>
               )}
@@ -59,7 +65,7 @@ const DashboardCard = forwardRef(function DashboardCard(
         </div>
 
         {/* Conteúdo do card */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">
           {children}
         </div>
       </div>

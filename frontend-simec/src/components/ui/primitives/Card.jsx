@@ -34,10 +34,10 @@ function Card({
   return (
     <div
       className={[
-        'rounded-2xl border transition-all',
+        'rounded-2xl border transition-all duration-200 ease-out',
         padded ? 'p-4 md:p-5' : '',
         interactive
-          ? 'cursor-pointer hover:shadow-md'
+          ? 'cursor-pointer hover:-translate-y-0.5 hover:shadow-md'
           : '',
         className,
       ].join(' ')}

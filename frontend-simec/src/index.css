@@ -7,13 +7,28 @@
 
 @layer base {
   html {
-    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
   }
 
   body {
     @apply antialiased;
     background: var(--bg-app);
     color: var(--text-primary);
+    font-family: var(--font-body);
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.015em;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
+  }
+
+  button, input, select, textarea {
+    font-family: var(--font-body);
   }
 
   #root {
@@ -33,6 +48,41 @@
 }
 
 @layer components {
+  /* ── Sidebar: barra lateral indicadora de item ativo ── */
+  .sidebar-nav-item::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%) scaleY(0);
+    width: 3px;
+    height: 60%;
+    background: #ffffff;
+    border-radius: 0 2px 2px 0;
+    transition: transform 180ms cubic-bezier(0.2, 0.7, 0.2, 1);
+    transform-origin: center;
+  }
+  .sidebar-nav-item[aria-current="page"]::before {
+    transform: translateY(-50%) scaleY(1);
+  }
+
+  /* Utilitários tipográficos refinados */
+  .font-display { font-family: var(--font-display); letter-spacing: -0.015em; }
+  .font-body    { font-family: var(--font-body); }
+  .font-mono    { font-family: var(--font-mono); font-feature-settings: "ss01", "ss02", "zero"; }
+
+  /* Números tabulares (KPIs, métricas): leitura técnica precisa */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "lnum";
+  }
+  .stat-value {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum", "ss01", "zero";
+    letter-spacing: -0.02em;
+  }
+
   .chat-markdown {
     @apply text-sm leading-relaxed;
     color: #334155;
@@ -135,21 +185,44 @@
 
 @layer utilities {
   .content-fade-in {
-    animation: contentFadeIn 0.24s ease-out;
+    animation: contentFadeIn 0.28s cubic-bezier(0.2, 0.7, 0.2, 1);
   }
 
   .card-hover {
     @apply transition hover:shadow-md;
+    transition: transform 200ms cubic-bezier(0.2, 0.7, 0.2, 1), box-shadow 200ms ease;
   }
+  .card-hover:hover {
+    transform: translateY(-1px);
+  }
+
+  /* Stagger sutil dos cards do dashboard.
+     CUIDADO: react-grid-layout posiciona os itens via `transform: translate(...)`.
+     Não animar transform aqui — só opacity — senão os cards perdem posição
+     e empilham no canto superior esquerdo (regressão do commit anterior). */
+  .layout > .react-grid-item {
+    animation: rgiFadeIn 0.42s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+  .layout > .react-grid-item:nth-child(1) { animation-delay: 40ms; }
+  .layout > .react-grid-item:nth-child(2) { animation-delay: 100ms; }
+  .layout > .react-grid-item:nth-child(3) { animation-delay: 160ms; }
+  .layout > .react-grid-item:nth-child(4) { animation-delay: 220ms; }
+  .layout > .react-grid-item:nth-child(5) { animation-delay: 280ms; }
+  .layout > .react-grid-item:nth-child(6) { animation-delay: 340ms; }
 
   @keyframes contentFadeIn {
     from {
       opacity: 0;
-      transform: translateY(6px);
+      transform: translateY(8px);
     }
     to {
       opacity: 1;
       transform: translateY(0);
     }
+  }
+
+  @keyframes rgiFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 }

@@ -52,22 +52,35 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
 
   return (
     <div
-      className="rounded-xl border px-3 py-3"
-      style={{ backgroundColor: 'var(--bg-surface-soft)', borderColor: 'var(--border-soft)' }}
+      className="rounded-xl border px-3.5 py-3 transition-all duration-200"
+      style={{
+        backgroundColor: 'var(--bg-surface-soft)',
+        borderColor: 'var(--border-soft)',
+      }}
     >
       <div className="flex items-center gap-3">
         <div
-          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-sm"
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-sm"
           style={{ backgroundColor: t.iconSurface, color: t.iconText }}
         >
           <FontAwesomeIcon icon={icon} />
         </div>
         <div className="min-w-0 flex-1">
-          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>{label}</p>
-          <p className="text-xl font-bold leading-tight" style={{ color: 'var(--text-primary)' }}>{value}</p>
+          <p
+            className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            {label}
+          </p>
+          <p
+            className="stat-value mt-0.5 text-2xl font-semibold leading-none"
+            style={{ color: 'var(--text-primary)' }}
+          >
+            {value}
+          </p>
         </div>
       </div>
-      <p className="mt-2 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
+      <p className="mt-2.5 text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>{helper}</p>
     </div>
   );
 }
