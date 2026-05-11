@@ -3,11 +3,12 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faGripVertical } from '@fortawesome/free-solid-svg-icons';
 
 /**
- * Wrapper de card para o grid configurável.
- * Precisa usar forwardRef para que react-grid-layout passe a ref corretamente.
+ * Card de dashboard — direção bauhaus contemporâneo.
+ * Borda grossa preta, header em tinta com etiqueta amarela.
+ * Preserva forwardRef e handlers do react-grid-layout.
  */
 const DashboardCard = forwardRef(function DashboardCard(
-  { title, description, headerRight, children, style, className, onMouseDown, onMouseUp, onTouchEnd, ...rest },
+  { id, title, description, headerRight, children, style, className, onMouseDown, onMouseUp, onTouchEnd, ...rest },
   ref
 ) {
   return (
@@ -21,35 +22,59 @@ const DashboardCard = forwardRef(function DashboardCard(
       {...rest}
     >
       <div
-        className="flex h-full flex-col overflow-hidden rounded-2xl border"
+        className="flex h-full flex-col overflow-hidden"
         style={{
           backgroundColor: 'var(--bg-surface)',
-          borderColor: 'var(--border-soft)',
-          boxShadow: '0 4px 16px rgba(8,17,31,0.09)',
+          border: '2px solid var(--border-strong)',
+          borderRadius: 0,
         }}
       >
-        {/* Header com drag handle */}
+        {/* Header em tinta — drag handle integrada */}
         <div
-          className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 border-b px-5 py-4 active:cursor-grabbing"
+          className="drag-handle flex shrink-0 cursor-grab items-start justify-between gap-3 px-5 py-3 active:cursor-grabbing"
           style={{
             backgroundColor: 'var(--card-header-bg)',
-            borderColor: 'var(--card-header-border)',
-            borderTopLeftRadius: '1rem',
-            borderTopRightRadius: '1rem',
+            color: 'var(--card-header-text)',
+            borderBottom: '2px solid var(--border-strong)',
           }}
         >
-          <div className="flex items-start gap-2 min-w-0">
+          <div className="flex items-start gap-3 min-w-0">
             <FontAwesomeIcon
               icon={faGripVertical}
-              className="mt-0.5 shrink-0 text-xs opacity-25"
+              className="mt-1 shrink-0 text-[10px] opacity-50"
               style={{ color: 'var(--card-header-text)' }}
             />
             <div className="min-w-0">
-              <p className="text-sm font-semibold leading-tight" style={{ color: 'var(--card-header-text)' }}>
+              {id && (
+                <p
+                  className="text-[10px] font-bold uppercase mb-0.5"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    letterSpacing: '0.22em',
+                    color: 'var(--brand-accent)',
+                  }}
+                >
+                  {id}
+                </p>
+              )}
+              <p
+                className="text-[15px] font-bold leading-tight uppercase"
+                style={{
+                  fontFamily: 'var(--font-display)',
+                  letterSpacing: '-0.02em',
+                  color: 'var(--card-header-text)',
+                }}
+              >
                 {title}
               </p>
               {description && (
-                <p className="mt-0.5 text-xs leading-snug line-clamp-1" style={{ color: 'var(--card-header-text-muted)' }}>
+                <p
+                  className="mt-1 text-[11px] leading-snug line-clamp-2"
+                  style={{
+                    color: 'var(--card-header-text-muted)',
+                    fontFamily: 'var(--font-body)',
+                  }}
+                >
                   {description}
                 </p>
               )}
@@ -58,8 +83,8 @@ const DashboardCard = forwardRef(function DashboardCard(
           {headerRight && <div className="shrink-0">{headerRight}</div>}
         </div>
 
-        {/* Conteúdo do card */}
-        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        {/* Conteúdo */}
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
           {children}
         </div>
       </div>

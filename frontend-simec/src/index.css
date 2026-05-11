@@ -7,13 +7,41 @@
 
 @layer base {
   html {
-    font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-body);
   }
 
   body {
     @apply antialiased;
     background: var(--bg-app);
     color: var(--text-primary);
+    font-family: var(--font-body);
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  /* Diagonais sutis no fundo do app — assinatura bauhaus discreta */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+      repeating-linear-gradient(135deg, transparent 0 22px, rgba(10, 10, 10, 0.022) 22px 23px);
+    z-index: 0;
+  }
+  :root[data-theme='dark'] body::before {
+    background-image:
+      repeating-linear-gradient(135deg, transparent 0 22px, rgba(255, 212, 0, 0.025) 22px 23px);
+  }
+  /* Garante que conteúdo da app fica acima das listras */
+  #root { position: relative; z-index: 1; }
+
+  h1, h2, h3, h4, h5 {
+    font-family: var(--font-display);
+    letter-spacing: -0.02em;
+  }
+
+  code, kbd, samp, pre {
+    font-family: var(--font-mono);
   }
 
   #root {
@@ -24,90 +52,112 @@
     border-color: var(--border-soft);
   }
 
-  button,
-  input,
-  select,
-  textarea {
+  button, input, select, textarea {
     @apply outline-none;
+    font-family: var(--font-body);
   }
 }
 
 @layer components {
+  /* ── Tipografia utilitária ── */
+  .font-display { font-family: var(--font-display); letter-spacing: -0.02em; }
+  .font-body    { font-family: var(--font-body); }
+  .font-mono    { font-family: var(--font-mono); font-feature-settings: "ss02", "zero"; }
+
+  /* ── Bauhaus: bloco editorial com borda grossa ── */
+  .bh-block {
+    background: var(--bg-surface);
+    border: 2px solid var(--border-strong);
+    transition: transform var(--transition-default), box-shadow var(--transition-default);
+  }
+  .bh-block--lift:hover {
+    transform: translate(-3px, -3px);
+    box-shadow: 6px 6px 0 var(--border-strong);
+  }
+
+  /* ── Tag tipo etiqueta ── */
+  .bh-tag {
+    display: inline-block;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    background: var(--text-primary);
+    color: var(--text-inverse);
+    padding: 5px 9px;
+  }
+  .bh-tag--accent { background: var(--brand-accent); color: var(--brand-accent-ink); }
+  .bh-tag--danger { background: var(--color-danger); color: #fff; }
+
+  /* ── Highlight tipo marca-texto amarelo ── */
+  .bh-mark {
+    background: var(--brand-accent);
+    color: var(--brand-accent-ink);
+    padding: 0 4px;
+  }
+  .bh-stroke {
+    -webkit-text-stroke: 2px var(--text-primary);
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+  }
+
+  /* ── Markdown do chat ── */
   .chat-markdown {
     @apply text-sm leading-relaxed;
-    color: #334155;
+    color: var(--text-secondary);
+    font-family: var(--font-body);
   }
-
-  .chat-markdown p {
-    @apply mb-2;
-  }
-
-  .chat-markdown strong {
-    font-weight: 600;
-    color: #0f172a;
-  }
-
-  .chat-markdown ul {
-    @apply mb-2 list-disc pl-5;
-  }
-
-  .chat-markdown ol {
-    @apply mb-2 list-decimal pl-5;
-  }
-
-  .chat-markdown li {
-    @apply mb-1;
-  }
-
+  .chat-markdown p   { @apply mb-2; }
+  .chat-markdown strong { font-weight: 600; color: var(--text-primary); }
+  .chat-markdown ul  { @apply mb-2 list-disc pl-5; }
+  .chat-markdown ol  { @apply mb-2 list-decimal pl-5; }
+  .chat-markdown li  { @apply mb-1; }
   .chat-markdown code {
-    @apply rounded-md px-1.5 py-0.5 text-xs;
-    background: #e2e8f0;
-    color: #0f172a;
+    @apply px-1.5 py-0.5 text-xs;
+    background: var(--bg-app-muted);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
   }
-
   .chat-markdown pre {
-    @apply overflow-x-auto rounded-2xl p-3 text-xs;
-    background: #0f172a;
-    color: #e2e8f0;
+    @apply overflow-x-auto p-3 text-xs;
+    background: var(--text-primary);
+    color: var(--bg-app);
+    font-family: var(--font-mono);
   }
-
   .chat-markdown h1 {
     @apply mb-1 mt-2 text-lg font-bold;
-    color: #0f172a;
+    color: var(--text-primary);
+    font-family: var(--font-display);
   }
-
   .chat-markdown h2 {
     @apply mb-1 mt-2 text-base font-semibold;
-    color: #0f172a;
+    color: var(--text-primary);
+    font-family: var(--font-display);
   }
-
   .chat-markdown a {
-    color: #0891b2;
+    color: var(--color-info);
     text-decoration: underline;
   }
-
   .chat-markdown pre code {
     @apply bg-transparent p-0;
     color: inherit;
   }
-
   .chat-markdown blockquote {
-    @apply my-2 border-l-4 pl-3 italic;
-    border-color: #67e8f9;
-    color: #475569;
+    @apply my-2 border-l-4 pl-3;
+    border-color: var(--brand-accent);
+    color: var(--text-secondary);
   }
 }
 
-/* ─── React Grid Layout: resize handles ─────────────────────────────────── */
+/* ── React Grid Layout: resize handles ── */
 .react-resizable-handle {
   opacity: 0;
   transition: opacity 0.18s ease;
 }
-
 .react-grid-item:hover .react-resizable-handle {
   opacity: 1;
 }
-
 .react-resizable-handle::after {
   content: '';
   position: absolute;
@@ -117,11 +167,8 @@
   height: 9px;
   border-right: 2px solid var(--border-strong);
   border-bottom: 2px solid var(--border-strong);
-  border-radius: 1px;
   box-sizing: border-box;
 }
-
-/* sobrescreve a imagem de fundo triangular padrão */
 .react-resizable-handle-se,
 .react-resizable-handle-sw,
 .react-resizable-handle-ne,
@@ -134,22 +181,25 @@
 }
 
 @layer utilities {
-  .content-fade-in {
-    animation: contentFadeIn 0.24s ease-out;
-  }
+  .content-fade-in { animation: contentFadeIn 0.32s cubic-bezier(.18,.7,.2,1); }
+  .bh-reveal       { opacity: 0; transform: translateY(14px); animation: bhReveal 600ms cubic-bezier(.18,.7,.2,1) forwards; }
+  .bh-reveal-l     { opacity: 0; transform: translateX(-22px); animation: bhRevealL 700ms cubic-bezier(.18,.7,.2,1) forwards; }
+  .bh-reveal-r     { opacity: 0; transform: translateX(22px); animation: bhRevealR 700ms cubic-bezier(.18,.7,.2,1) forwards; }
 
-  .card-hover {
-    @apply transition hover:shadow-md;
-  }
+  .card-hover { @apply transition; }
+  .card-hover:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--border-strong); }
 
   @keyframes contentFadeIn {
-    from {
-      opacity: 0;
-      transform: translateY(6px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bhReveal {
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes bhRevealL {
+    to { opacity: 1; transform: translateX(0); }
+  }
+  @keyframes bhRevealR {
+    to { opacity: 1; transform: translateX(0); }
   }
 }
