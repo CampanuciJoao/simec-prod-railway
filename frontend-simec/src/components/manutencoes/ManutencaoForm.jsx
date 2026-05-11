@@ -56,7 +56,7 @@ function ManutencaoForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
-      <PageSection title="Equipamento e classificacao">
+      <PageSection title="Equipamento e classificação">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Select
             label="Unidade"
@@ -81,13 +81,13 @@ function ManutencaoForm({
             onChange={(event) => handleChange('tipo', event.target.value)}
             options={[
               { value: 'Preventiva', label: 'Preventiva' },
-              { value: 'Calibracao', label: 'Calibracao' },
-              { value: 'Inspecao', label: 'Inspecao' },
+              { value: 'Calibracao', label: 'Calibração' },
+              { value: 'Inspecao',   label: 'Inspeção' },
             ]}
           />
 
           <Input
-            label="Tecnico responsavel"
+            label="Técnico responsável"
             value={formData.tecnicoResponsavel}
             onChange={(event) =>
               handleChange('tecnicoResponsavel', event.target.value)
@@ -109,11 +109,11 @@ function ManutencaoForm({
         ) : null}
       </PageSection>
 
-      <PageSection title="Descricao e contexto">
+      <PageSection title="Descrição e contexto">
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {isCorretiva ? (
             <Input
-              label="Numero do chamado"
+              label="Número do chamado"
               value={formData.numeroChamado}
               onChange={(event) =>
                 handleChange('numeroChamado', event.target.value)
@@ -124,7 +124,7 @@ function ManutencaoForm({
 
           <div className="lg:col-span-2">
             <Textarea
-              label="Descricao do servico"
+              label="Descrição do serviço"
               value={formData.descricaoProblemaServico}
               onChange={(event) =>
                 handleChange('descricaoProblemaServico', event.target.value)
@@ -140,7 +140,7 @@ function ManutencaoForm({
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <div className="space-y-4">
             <DateInput
-              label="Data de inicio"
+              label="Data de início"
               value={formData.agendamentoDataInicioLocal}
               onChange={(event) =>
                 handleChange('agendamentoDataInicioLocal', event.target.value)
@@ -161,7 +161,7 @@ function ManutencaoForm({
 
           <div className="space-y-4">
             <DateInput
-              label="Data de termino"
+              label="Data de término"
               value={formData.agendamentoDataFimLocal}
               onChange={(event) =>
                 handleChange('agendamentoDataFimLocal', event.target.value)
@@ -196,7 +196,7 @@ function ManutencaoForm({
               color: 'var(--color-danger)',
             }}
           >
-            O termino precisa ser posterior ao inicio da manutencao.
+            O término precisa ser posterior ao início da manutenção.
           </div>
         ) : null}
       </PageSection>
@@ -208,8 +208,8 @@ function ManutencaoForm({
               ? 'Salvando...'
               : 'Agendando...'
             : isEditing
-              ? 'Salvar alteracoes'
-              : 'Agendar manutencao'}
+              ? 'Salvar alterações'
+              : 'Agendar manutenção'}
         </Button>
       </div>
     </form>

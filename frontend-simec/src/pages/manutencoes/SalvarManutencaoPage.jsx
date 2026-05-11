@@ -13,7 +13,6 @@ import {
   Button,
   PageHeader,
   PageLayout,
-  PageSection,
   PageState,
 } from '@/components/ui';
 
@@ -25,12 +24,12 @@ function SalvarManutencaoPage() {
     : 'Agendar Nova Manutenção';
 
   const subtitle = page.isEditing
-    ? 'Atualize os dados da ordem de serviço'
-    : 'Preencha os dados para criar uma nova ordem de serviço';
+    ? 'Atualize os dados da ordem de serviço.'
+    : 'Preencha os dados para criar uma nova ordem de serviço.';
 
   if (page.loading) {
     return (
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout padded fullHeight>
         <PageState loading />
       </PageLayout>
     );
@@ -38,7 +37,7 @@ function SalvarManutencaoPage() {
 
   if (page.error) {
     return (
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout padded fullHeight>
         <PageHeader
           title={title}
           icon={faWrench}
@@ -57,7 +56,7 @@ function SalvarManutencaoPage() {
 
   if (page.isEditing && !page.initialData) {
     return (
-      <PageLayout background="slate" padded fullHeight>
+      <PageLayout padded fullHeight>
         <PageHeader
           title="Editar Manutenção"
           icon={faWrench}
@@ -78,7 +77,7 @@ function SalvarManutencaoPage() {
   }
 
   return (
-    <PageLayout background="slate" padded fullHeight>
+    <PageLayout padded fullHeight>
       <PageHeader
         title={title}
         subtitle={subtitle}
@@ -91,16 +90,14 @@ function SalvarManutencaoPage() {
         }
       />
 
-      <PageSection>
-        <ManutencaoForm
-          initialData={page.initialData}
-          onSubmit={page.handleSave}
-          isEditing={page.isEditing}
-          isSubmitting={page.submitting}
-          todosEquipamentos={page.equipamentos}
-          unidadesDisponiveis={page.unidades}
-        />
-      </PageSection>
+      <ManutencaoForm
+        initialData={page.initialData}
+        onSubmit={page.handleSave}
+        isEditing={page.isEditing}
+        isSubmitting={page.submitting}
+        todosEquipamentos={page.equipamentos}
+        unidadesDisponiveis={page.unidades}
+      />
     </PageLayout>
   );
 }
