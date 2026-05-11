@@ -141,6 +141,80 @@ router.delete('/credenciais', admin, async (req, res) => {
   }
 });
 
+// ─── POST /api/gehc/onboard ───────────────────────────────────────────────────
+// Onboarding completo da integração GE em uma única chamada:
+//   1. Salva credenciais (login + senha)
+//   2. Captura tokens via Playwright
+//   3. Roda discovery (vincula RMs SIMEC ↔ portal GE)
+//   4. Dispara primeira captura de saúde
+//
+// Cada passo retorna seu próprio status. Se um falhar, os anteriores não são
+// revertidos (são idempotentes), mas o cliente saberá exatamente onde parou.
+// Ver ADR-016 (automacao da integracao GE).
+router.post('/onboard', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { login, password } = req.body;
+
+  if (!login || !password) {
+    return res.status(400).json({ error: 'login e password são obrigatórios.' });
+  }
+
+  const passos = {
+    credenciais: { ok: false },
+    auth: { ok: false },
+    discovery: { ok: false },
+    captura: { ok: false },
+  };
+
+  // Passo 1: salvar credenciais
+  try {
+    await salvarCredenciais(tenantId, login, password);
+    passos.credenciais.ok = true;
+  } catch (err) {
+    passos.credenciais.error = err.message;
+    return res.status(500).json({ ok: false, passos, falhouEm: 'credenciais' });
+  }
+
+  // Passo 2: autenticar via Playwright
+  try {
+    await capturarTokensViaPlaywright(tenantId);
+    passos.auth.ok = true;
+  } catch (err) {
+    passos.auth.error = err.message;
+    return res.status(500).json({ ok: false, passos, falhouEm: 'auth' });
+  }
+
+  // Passo 3: discovery
+  try {
+    const resultado = await descobrirEquipamentosGehc(tenantId);
+    passos.discovery.ok = true;
+    passos.discovery.vinculados = resultado.vinculados.length;
+    passos.discovery.jaVinculados = resultado.jaVinculados.length;
+    passos.discovery.semMatch = resultado.semMatch.length;
+    passos.discovery.pendentesConfirmacao = resultado.pendentesConfirmacao.length;
+    passos.discovery.totalPortalGe = resultado.totalPortalGe ?? null;
+  } catch (err) {
+    passos.discovery.error = err.message;
+    return res.status(500).json({ ok: false, passos, falhouEm: 'discovery' });
+  }
+
+  // Passo 4: primeira captura de saúde (não-bloqueante)
+  // Se isso falhar, o tenant ainda está em estado utilizável (próximo ciclo do
+  // monitor automático vai capturar). Reportamos como warning, não erro fatal.
+  try {
+    await monitorarSaudeGehc({ tenantId });
+    passos.captura.ok = true;
+  } catch (err) {
+    passos.captura.warning = err.message;
+  }
+
+  res.json({
+    ok: true,
+    mensagem: 'Onboarding GE concluído. Próximos snapshots automáticos a cada 30min.',
+    passos,
+  });
+});
+
 // ─── POST /api/gehc/auth ──────────────────────────────────────────────────────
 router.post('/auth', admin, async (req, res) => {
   const tenantId = req.usuario.tenantId;

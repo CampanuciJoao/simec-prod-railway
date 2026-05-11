@@ -222,6 +222,28 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-sync-dados) agendado diariamente às 02:00 UTC.');
 
+    // Discovery automático diário — detecta RMs novas no portal GE sem precisar
+    // de clique do admin. Roda às 02:30 UTC, depois do gehc-sync-dados.
+    // Ver ADR-016 (automacao da integracao GE).
+    const repeatables5 = await queue.getRepeatableJobs();
+    for (const job of repeatables5) {
+      if (job.name === 'gehc-discovery-diario') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'gehc-discovery-diario',
+      {},
+      {
+        repeat: { cron: '30 2 * * *' },
+        removeOnComplete: 10,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job GEHC (gehc-discovery-diario) agendado diariamente às 02:30 UTC.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {
