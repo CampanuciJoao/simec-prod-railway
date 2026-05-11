@@ -40,7 +40,7 @@ function PageHeader({
 
           <div className="min-w-0">
             <h1
-              className="text-2xl font-bold tracking-tight sm:text-3xl"
+              className="text-2xl font-semibold tracking-[-0.02em] sm:text-[28px]"
               style={{ color: 'var(--text-brand-surface)' }}
             >
               {title}
@@ -48,7 +48,7 @@ function PageHeader({
 
             {subtitle ? (
               <p
-                className="mt-1 text-sm sm:text-base"
+                className="mt-1.5 text-sm leading-relaxed sm:text-[15px]"
                 style={{ color: 'var(--text-brand-surface-muted)' }}
               >
                 {subtitle}

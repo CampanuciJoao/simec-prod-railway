@@ -71,14 +71,14 @@ function KpiCard({
 
         <div className="min-w-0 flex-1">
           <p
-            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            className="text-[10.5px] font-semibold uppercase tracking-[0.16em]"
             style={{ color: 'var(--text-muted)' }}
           >
             {title}
           </p>
 
           <p
-            className="mt-2 text-3xl font-bold leading-none tracking-tight"
+            className="stat-value mt-2 text-3xl font-semibold leading-none"
             style={{ color: 'var(--text-primary)' }}
           >
             {value}
@@ -86,7 +86,7 @@ function KpiCard({
 
           {subtitle ? (
             <p
-              className="mt-2 line-clamp-2 text-sm"
+              className="mt-2 line-clamp-2 text-sm leading-snug"
               style={{ color: 'var(--text-secondary)' }}
             >
               {subtitle}
