@@ -93,9 +93,25 @@ function Sidebar({
           </button>
         </div>
 
-        <div className="scrollbar-none mt-5 flex-1 overflow-y-auto px-3 pb-6">
+        {/* Eyebrow técnico — identidade discreta abaixo do logo */}
+        <p
+          className="px-3 pt-3 text-center"
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 9.5,
+            fontWeight: 600,
+            letterSpacing: '0.28em',
+            textTransform: 'uppercase',
+            color: 'var(--text-sidebar-muted)',
+            opacity: 0.6,
+          }}
+        >
+          Control Center
+        </p>
+
+        <div className="scrollbar-none mt-4 flex-1 overflow-y-auto px-3 pb-3">
           <nav>
-            <ul className="space-y-2">
+            <ul className="space-y-1.5">
               {mainItems.map((item) => (
                 <li key={item.path}>
                   <SidebarItem
@@ -108,11 +124,27 @@ function Sidebar({
             </ul>
 
             {adminItems.length > 0 && (
-              <div
-                className="mt-6 border-t pt-6"
-                style={{ borderColor: 'var(--border-soft)' }}
-              >
-                <ul className="space-y-2">
+              <div className="mt-5">
+                {/* Eyebrow 'Admin' separa a seção administrativa */}
+                <p
+                  className="mb-2 px-4"
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.24em',
+                    textTransform: 'uppercase',
+                    color: 'var(--text-sidebar-muted)',
+                    opacity: 0.55,
+                  }}
+                >
+                  · Admin
+                </p>
+                <div
+                  className="border-t pt-2"
+                  style={{ borderColor: 'var(--border-soft)', opacity: 0.5 }}
+                />
+                <ul className="space-y-1.5 mt-2">
                   {adminItems.map((item) => (
                     <li key={item.path}>
                       <SidebarItem item={item} onClick={onClose} />
@@ -122,6 +154,47 @@ function Sidebar({
               </div>
             )}
           </nav>
+        </div>
+
+        {/* Footer técnico — versão + status do sistema */}
+        <div
+          className="px-3 py-3 flex items-center justify-between gap-2"
+          style={{
+            borderTop: '1px solid var(--border-soft)',
+            opacity: 0.85,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              fontWeight: 600,
+              letterSpacing: '0.14em',
+              color: 'var(--text-sidebar-muted)',
+            }}
+          >
+            v4.2.1
+          </span>
+          <span
+            className="inline-flex items-center gap-1.5"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 9.5,
+              fontWeight: 700,
+              letterSpacing: '0.16em',
+              textTransform: 'uppercase',
+              color: 'var(--color-success)',
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 6, height: 6, borderRadius: '50%',
+                backgroundColor: 'var(--color-success)',
+              }}
+            />
+            Online
+          </span>
         </div>
       </aside>
     </>

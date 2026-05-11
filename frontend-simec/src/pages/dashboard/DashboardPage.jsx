@@ -122,50 +122,6 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default', code 
   );
 }
 
-// ─── Live indicator ──────────────────────────────────────────────────────────
-
-/**
- * Chip discreto verde piscando indicando que a página está mostrando
- * dados em tempo real (refresh manual via botão; o dashboard usa
- * dados frescos a cada navegação).
- */
-function LiveIndicator() {
-  return (
-    <>
-      <style>{`
-        @keyframes simec-live-pulse {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50%      { opacity: 0.35; transform: scale(0.85); }
-        }
-      `}</style>
-      <span
-        className="hidden sm:inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
-        style={{
-          backgroundColor: 'var(--color-success-surface)',
-          border: '1px solid var(--color-success-soft)',
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          fontWeight: 700,
-          letterSpacing: '0.18em',
-          textTransform: 'uppercase',
-          color: 'var(--color-success)',
-        }}
-      >
-        <span
-          aria-hidden="true"
-          style={{
-            width: 6, height: 6, borderRadius: '50%',
-            backgroundColor: 'var(--color-success)',
-            boxShadow: '0 0 0 3px var(--color-success-surface)',
-            animation: 'simec-live-pulse 1.6s ease-in-out infinite',
-          }}
-        />
-        Live
-      </span>
-    </>
-  );
-}
-
 // ─── Ocorrências ──────────────────────────────────────────────────────────────
 
 const STATUS_OS_LABEL = {
@@ -274,6 +230,55 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
 
 // ─── Saúde das RMs GE ─────────────────────────────────────────────────────────
 
+/**
+ * Gauge box visual — He / PSI / COMP / TEMP em quadrados coloridos
+ * por estado. Substitui a leitura inline de texto plano.
+ */
+function GaugeBox({ label, value, tone = 'ok' }) {
+  const tones = {
+    ok:   { border: 'var(--border-default)',     bg: 'var(--bg-surface)',          color: 'var(--text-primary)' },
+    good: { border: 'var(--color-success-soft)', bg: 'var(--color-success-surface)', color: 'var(--color-success)' },
+    warn: { border: 'var(--color-warning-soft)', bg: 'var(--color-warning-surface)', color: 'var(--color-warning)' },
+    crit: { border: 'var(--color-danger)',       bg: 'var(--color-danger-surface)', color: 'var(--color-danger)' },
+  };
+  const t = tones[tone] || tones.ok;
+  return (
+    <div
+      style={{
+        backgroundColor: t.bg,
+        border: `1px solid ${t.border}`,
+        borderRadius: 6,
+        padding: '6px 8px',
+      }}
+    >
+      <div
+        style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 9.5,
+          letterSpacing: '0.2em',
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        className="stat-value"
+        style={{
+          fontSize: 15,
+          fontWeight: 700,
+          color: t.color,
+          marginTop: 1,
+          lineHeight: 1.1,
+          letterSpacing: '-0.01em',
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 function SaudeRMs() {
   const [snapshots, setSnapshots] = useState([]);
   const [configurado, setConfigurado] = useState(true);
@@ -302,10 +307,14 @@ function SaudeRMs() {
   }
 
   return (
-    <div className="space-y-2 overflow-auto">
+    <div className="space-y-2.5 overflow-auto">
       {snapshots.map((s, i) => (
-        <div key={i} className="rounded-2xl border px-4 py-2.5" style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
-          <div className="flex flex-wrap items-center justify-between gap-1">
+        <div
+          key={i}
+          className="rounded-xl border px-3.5 py-3"
+          style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
             {s.equipamentoId ? (
               <Link
                 to={`/equipamentos/detalhes/${s.equipamentoId}`}
@@ -317,25 +326,70 @@ function SaudeRMs() {
             ) : (
               <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
             )}
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{formatarDataHora(s.capturedAt)}</p>
+            <div className="flex items-center gap-2">
+              {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
+                <span
+                  style={{
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.16em',
+                    textTransform: 'uppercase',
+                    padding: '2px 6px',
+                    borderRadius: 3,
+                    backgroundColor: s.equipmentOnline ? 'var(--color-success-surface)' : 'var(--color-danger-surface)',
+                    color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)',
+                    border: `1px solid ${s.equipmentOnline ? 'var(--color-success-soft)' : 'var(--color-danger-soft)'}`,
+                  }}
+                >
+                  {s.equipmentOnline ? '● Online' : '○ Offline'}
+                </span>
+              )}
+              <p
+                style={{
+                  fontFamily: 'var(--font-mono)',
+                  fontSize: 10,
+                  letterSpacing: '0.04em',
+                  color: 'var(--text-muted)',
+                }}
+              >
+                {formatarDataHora(s.capturedAt)}
+              </p>
+            </div>
           </div>
-          <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+
+          <div className="mt-2.5 grid grid-cols-4 gap-1.5">
             {s.heliumLevelPct != null && (
-              <span style={{ color: s.heliumLevelPct < 30 ? 'var(--color-danger)' : s.heliumLevelPct < 70 ? 'var(--color-warning)' : 'var(--color-success)', fontWeight: 600 }}>
-                Hélio: {s.heliumLevelPct}%
-              </span>
+              <GaugeBox
+                label="He"
+                value={`${s.heliumLevelPct}%`}
+                tone={
+                  s.heliumLevelPct < 30 ? 'crit'
+                  : s.heliumLevelPct < 70 ? 'warn'
+                  : 'good'
+                }
+              />
             )}
-            {s.heliumPressurePsi != null && <span>Pressão: {s.heliumPressurePsi} PSI</span>}
+            {s.heliumPressurePsi != null && (
+              <GaugeBox
+                label="PSI"
+                value={s.heliumPressurePsi}
+                tone="ok"
+              />
+            )}
             {s.compressorStatus && (
-              <span style={{ color: s.compressorStatus === 'ON' ? 'var(--text-muted)' : 'var(--color-danger)', fontWeight: s.compressorStatus !== 'ON' ? 600 : 400 }}>
-                Compressor: {s.compressorStatus}
-              </span>
+              <GaugeBox
+                label="Comp"
+                value={s.compressorStatus}
+                tone={s.compressorStatus === 'ON' ? 'good' : 'crit'}
+              />
             )}
-            {s.coolantTempC != null && <span>Temp: {s.coolantTempC}°C</span>}
-            {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
-              <span style={{ color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)' }}>
-                {s.equipmentOnline ? 'Online' : 'Offline'}
-              </span>
+            {s.coolantTempC != null && (
+              <GaugeBox
+                label="Temp"
+                value={`${s.coolantTempC}°`}
+                tone="ok"
+              />
             )}
           </div>
         </div>
@@ -407,16 +461,13 @@ function DashboardPage() {
           subtitle="Visão geral da operação, alertas e indicadores do parque de equipamentos."
           icon={faChartPie}
           actions={
-            <div className="flex items-center gap-3">
-              <LiveIndicator />
-              <div className="flex gap-2">
-                <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
-                  <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
-                </Button>
-                <Button type="button" variant="secondary" onClick={recarregar}>
-                  <FontAwesomeIcon icon={faRotateRight} /> Atualizar
-                </Button>
-              </div>
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" onClick={resetLayout} title="Redefinir layout padrão">
+                <FontAwesomeIcon icon={faTableCells} /> Redefinir layout
+              </Button>
+              <Button type="button" variant="secondary" onClick={recarregar}>
+                <FontAwesomeIcon icon={faRotateRight} /> Atualizar
+              </Button>
             </div>
           }
         />

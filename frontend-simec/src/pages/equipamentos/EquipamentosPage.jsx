@@ -134,13 +134,13 @@ function EquipamentosPage() {
                     className="text-sm font-semibold"
                     style={{ color: 'var(--text-primary)' }}
                   >
-                    A lista nao carregou como esperado
+                    A lista não carregou como esperado
                   </p>
                   <p
                     className="mt-1 text-sm"
                     style={{ color: 'var(--text-muted)' }}
                   >
-                    Mantive filtros e acoes do modulo disponiveis para voce
+                    Mantive filtros e ações do módulo disponíveis para você
                     tentar novamente sem perder contexto.
                   </p>
                 </div>
@@ -166,10 +166,13 @@ function EquipamentosPage() {
             />
 
             <PageSection>
-              <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
+              <div
+                className="flex flex-col items-center justify-center gap-3 text-sm md:flex-row md:justify-between"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 <span>
-                  Exibindo <strong>{page.equipamentos.length}</strong> de{' '}
-                  <strong>{totalFiltrado}</strong> equipamento(s).
+                  Exibindo <strong style={{ color: 'var(--text-primary)' }}>{page.equipamentos.length}</strong> de{' '}
+                  <strong style={{ color: 'var(--text-primary)' }}>{totalFiltrado}</strong> equipamento(s).
                 </span>
 
                 {page.pagination.hasNextPage ? (
