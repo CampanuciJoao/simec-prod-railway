@@ -41,6 +41,7 @@ function ManutencoesListSection({
       <div className="space-y-6">
         <KpiGrid>
           <KpiCard
+            code="M01"
             icon={faClock}
             title="Total"
             value={metricas?.total ?? 0}
@@ -50,6 +51,7 @@ function ManutencoesListSection({
           />
 
           <KpiCard
+            code="M02"
             icon={faTriangleExclamation}
             title="Aguardando"
             value={metricas?.aguardando ?? 0}
@@ -58,6 +60,7 @@ function ManutencoesListSection({
           />
 
           <KpiCard
+            code="M03"
             icon={faCircleCheck}
             title="Concluídas"
             value={metricas?.concluidas ?? 0}
@@ -66,6 +69,7 @@ function ManutencoesListSection({
           />
 
           <KpiCard
+            code="M04"
             icon={faCircleXmark}
             title="Canceladas"
             value={metricas?.canceladas ?? 0}
@@ -107,10 +111,16 @@ function ManutencoesListSection({
           )}
         </div>
 
-        <div className="flex flex-col items-center justify-center gap-3 text-sm text-slate-500 md:flex-row md:justify-between">
+        <div
+          className="flex flex-col items-center justify-center gap-3 text-sm md:flex-row md:justify-between"
+          style={{ color: 'var(--text-muted)' }}
+        >
           <span>
-            Exibindo <strong>{items.length}</strong> de{' '}
-            <strong>{total ?? items.length}</strong> registro(s).
+            Exibindo{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>{items.length}</strong>{' '}
+            de{' '}
+            <strong style={{ color: 'var(--text-primary)' }}>{total ?? items.length}</strong>{' '}
+            registro(s).
           </span>
 
           {hasNextPage ? (
