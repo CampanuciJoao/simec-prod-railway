@@ -77,6 +77,7 @@ router.get('/', async (req, res) => {
       tipo:       req.query.tipo       || '',
       prioridade: req.query.prioridade || '',
       search:     req.query.search     || '',
+      incluirHistorico: req.query.incluirHistorico === 'true',
     };
 
     const resultado = await listarAlertasService({

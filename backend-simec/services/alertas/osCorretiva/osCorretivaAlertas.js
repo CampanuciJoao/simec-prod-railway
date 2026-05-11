@@ -1,6 +1,9 @@
 import prisma from '../../prismaService.js';
 import { getAgora } from '../../time/index.js';
-import { buscarVisitasVencidasPorTenant } from './osCorretivaAlertRepository.js';
+import {
+  buscarVisitasVencidasPorTenant,
+  compactarAlertasOsCorretivaTerminais,
+} from './osCorretivaAlertRepository.js';
 import {
   gerarAlertasVisitaInicioProximo,
   iniciarVisitasAutomaticamente,
@@ -10,6 +13,11 @@ import {
 } from './osCorretivaAlertRules.js';
 
 async function processarTenant(tenant, agora) {
+  // Rede de segurança: limpa alertas de OS já em estado terminal antes de gerar
+  // novos. Os pontos de transição já chamam removerAlertasOsCorretivaDaOS, mas
+  // se algum fluxo futuro esquecer, esta varredura corrige no próximo ciclo.
+  const compactacao = await compactarAlertasOsCorretivaTerminais(tenant.id);
+
   const [inicioTotal, iniciadasTotal, fimTotal, confirmacaoTotal, visitas] = await Promise.all([
     gerarAlertasVisitaInicioProximo(tenant.id, agora),
     iniciarVisitasAutomaticamente(tenant.id, agora),
@@ -26,10 +34,10 @@ async function processarTenant(tenant, agora) {
   const total = inicioTotal + iniciadasTotal + fimTotal + confirmacaoTotal + vencidaTotal;
 
   console.log(
-    `[ALERTA_OS_CORRETIVA][${tenant.id}] inicio_proximo=${inicioTotal} iniciadas=${iniciadasTotal} fim_proximo=${fimTotal} confirmacao=${confirmacaoTotal} vencidas=${vencidaTotal}`
+    `[ALERTA_OS_CORRETIVA][${tenant.id}] compactados=${compactacao.count || 0} inicio_proximo=${inicioTotal} iniciadas=${iniciadasTotal} fim_proximo=${fimTotal} confirmacao=${confirmacaoTotal} vencidas=${vencidaTotal}`
   );
 
-  return { total, afetou: total > 0 };
+  return { total, afetou: total > 0 || (compactacao.count || 0) > 0 };
 }
 
 export async function gerarAlertasOsCorretiva() {
