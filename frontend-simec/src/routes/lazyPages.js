@@ -86,8 +86,8 @@ export const LogAuditoriaPage = React.lazy(() =>
 export const IntegracoesPage = React.lazy(() =>
   import('@/pages/gerenciamento/IntegracoesPage')
 );
-export const AlertasGePage = React.lazy(() =>
-  import('@/pages/gerenciamento/AlertasGePage')
+export const ConfiguracaoAlertasPage = React.lazy(() =>
+  import('@/pages/gerenciamento/ConfiguracaoAlertasPage')
 );
 export const AuditoriaDetalhadaPage = React.lazy(() =>
   import('@/pages/auditoria/AuditoriaDetalhadaPage')

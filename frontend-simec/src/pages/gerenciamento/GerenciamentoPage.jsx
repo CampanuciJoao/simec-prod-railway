@@ -42,10 +42,10 @@ function GerenciamentoPage() {
       path: '/gerenciamento/integracoes',
     },
     {
-      id: 'alertas-ge',
-      label: 'Alertas GE',
+      id: 'alertas',
+      label: 'Alertas',
       icon: <FontAwesomeIcon icon={faBan} />,
-      path: '/gerenciamento/alertas-ge',
+      path: '/gerenciamento/alertas',
     },
   ];
 
