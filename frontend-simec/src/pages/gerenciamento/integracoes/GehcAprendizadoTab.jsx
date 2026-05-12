@@ -144,71 +144,97 @@ function StatusGeral({ status, pipelines }) {
   );
 }
 
-function ListaPipelines({ pipelines, acaoPipeline, onPausar, onRetomar, onDisparar }) {
+function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, onRetomar, onDisparar }) {
   if (!pipelines?.length) return null;
 
   return (
     <div className="space-y-2">
       {pipelines.map((p) => {
         const acao = acaoPipeline[p.pipeline];
+        const feedback = feedbackPipeline?.[p.pipeline];
         const podePausar = p.ativo;
         // Pipeline 'global' nao tem job para disparar — e so kill switch.
         const podeDisparar = p.ativo && p.pipeline !== 'global';
+        // Cor da borda muda quando ha feedback recente (pisca destaque).
+        const borderColor = feedback?.tipo === 'success'
+          ? 'var(--color-success)'
+          : feedback?.tipo === 'error'
+            ? 'var(--color-danger)'
+            : (p.ativo ? 'var(--border-soft)' : 'var(--color-warning)');
         return (
           <div
             key={p.pipeline}
-            className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-4 py-3"
-            style={{
-              borderColor: p.ativo ? 'var(--border-soft)' : 'var(--color-warning)',
-              backgroundColor: 'var(--bg-surface-soft)',
-            }}
+            className="rounded-2xl border px-4 py-3 transition-colors"
+            style={{ borderColor, backgroundColor: 'var(--bg-surface-soft)' }}
           >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <FontAwesomeIcon
-                  icon={p.ativo ? faCircleCheck : faCirclePause}
-                  style={{ color: p.ativo ? 'var(--color-success)' : 'var(--color-warning)' }}
-                />
-                <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  {p.label}
-                </p>
-              </div>
-              {!p.ativo && (
-                <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Pausado {relativo(p.pausadoEm)}
-                  {p.pausadoPor?.nome && ` por ${p.pausadoPor.nome}`}
-                  {p.motivoPausa && ` · ${p.motivoPausa}`}
-                </p>
-              )}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              {podeDisparar && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => onDisparar(p.pipeline)}
-                  disabled={!!acao}
-                  title="Forçar execução agora (sem esperar o cron)"
-                >
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
                   <FontAwesomeIcon
-                    icon={acao === 'disparando' ? faSpinner : faBolt}
-                    spin={acao === 'disparando'}
+                    icon={p.ativo ? faCircleCheck : faCirclePause}
+                    style={{ color: p.ativo ? 'var(--color-success)' : 'var(--color-warning)' }}
                   />
-                  <span className="ml-1 text-xs">Rodar agora</span>
-                </Button>
-              )}
-              {podePausar ? (
-                <Button type="button" variant="secondary" onClick={() => onPausar(p.pipeline, p.label)} disabled={!!acao}>
-                  <FontAwesomeIcon icon={acao === 'pausando' ? faSpinner : faCirclePause} spin={acao === 'pausando'} />
-                  Pausar
-                </Button>
-              ) : (
-                <Button type="button" variant="primary" onClick={() => onRetomar(p.pipeline)} disabled={!!acao}>
-                  <FontAwesomeIcon icon={acao === 'retomando' ? faSpinner : faCirclePlay} spin={acao === 'retomando'} />
-                  Retomar
-                </Button>
-              )}
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {p.label}
+                  </p>
+                </div>
+                {!p.ativo && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    Pausado {relativo(p.pausadoEm)}
+                    {p.pausadoPor?.nome && ` por ${p.pausadoPor.nome}`}
+                    {p.motivoPausa && ` · ${p.motivoPausa}`}
+                  </p>
+                )}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {podeDisparar && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => onDisparar(p.pipeline)}
+                    disabled={!!acao}
+                    title="Forçar execução agora (sem esperar o cron)"
+                  >
+                    <FontAwesomeIcon
+                      icon={acao === 'disparando' ? faSpinner : faBolt}
+                      spin={acao === 'disparando'}
+                    />
+                    <span className="ml-1 text-xs">
+                      {acao === 'disparando' ? 'Enfileirando...' : 'Rodar agora'}
+                    </span>
+                  </Button>
+                )}
+                {podePausar ? (
+                  <Button type="button" variant="secondary" onClick={() => onPausar(p.pipeline, p.label)} disabled={!!acao}>
+                    <FontAwesomeIcon icon={acao === 'pausando' ? faSpinner : faCirclePause} spin={acao === 'pausando'} />
+                    Pausar
+                  </Button>
+                ) : (
+                  <Button type="button" variant="primary" onClick={() => onRetomar(p.pipeline)} disabled={!!acao}>
+                    <FontAwesomeIcon icon={acao === 'retomando' ? faSpinner : faCirclePlay} spin={acao === 'retomando'} />
+                    Retomar
+                  </Button>
+                )}
+              </div>
             </div>
+
+            {/* Feedback inline pos-disparo: confirma enfileiramento + tempo estimado */}
+            {feedback && (
+              <div
+                className="mt-2 flex items-start gap-2 rounded-xl px-3 py-2 text-xs"
+                style={{
+                  backgroundColor: 'var(--bg-surface)',
+                  color: feedback.tipo === 'success' ? 'var(--color-success)' : 'var(--color-danger)',
+                  borderLeft: `3px solid ${feedback.tipo === 'success' ? 'var(--color-success)' : 'var(--color-danger)'}`,
+                }}
+              >
+                <FontAwesomeIcon
+                  icon={feedback.tipo === 'success' ? faCircleCheck : faTriangleExclamation}
+                  className="mt-0.5 shrink-0"
+                />
+                <span style={{ color: 'var(--text-primary)' }}>{feedback.mensagem}</span>
+              </div>
+            )}
           </div>
         );
       })}
@@ -492,7 +518,8 @@ function GehcAprendizadoTab() {
   const {
     status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
-    acaoPipeline, pausar, retomar, disparar,
+    acaoPipeline, feedbackPipeline,
+    pausar, retomar, disparar,
     darFeedbackInsight, resolverInsight,
   } = useGehcAprendizado();
 
@@ -558,6 +585,7 @@ function GehcAprendizadoTab() {
         <ListaPipelines
           pipelines={pipelines}
           acaoPipeline={acaoPipeline}
+          feedbackPipeline={feedbackPipeline}
           onPausar={(pipeline, label) => setDialogo({ pipeline, label })}
           onRetomar={(pipeline) => retomar(pipeline)}
           onDisparar={(pipeline) => disparar(pipeline)}
