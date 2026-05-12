@@ -45,15 +45,17 @@ function GehcSubAbas() {
 function IntegracoesPage() {
   const [provedor, setProvedor] = useState(PROVEDORES[0].id);
 
+  // Sempre mostra a aba do provedor — mesmo com 1 só. Mantem a hierarquia
+  // visual coerente: usuario ve "GE Healthcare" como aba ativa e as
+  // sub-abas (Configuracao / Aprendizado da IA) renderizadas dentro dela.
+  // Quando Canon/Siemens/Philips entrarem, basta adicionar em PROVEDORES.
   return (
     <div className="space-y-4">
-      {PROVEDORES.length > 1 && (
-        <ResponsiveTabs
-          tabs={PROVEDORES.map((p) => ({ id: p.id, label: p.label }))}
-          activeTab={provedor}
-          onChange={setProvedor}
-        />
-      )}
+      <ResponsiveTabs
+        tabs={PROVEDORES.map((p) => ({ id: p.id, label: p.label }))}
+        activeTab={provedor}
+        onChange={setProvedor}
+      />
 
       {provedor === 'gehc' && <GehcSubAbas />}
     </div>
