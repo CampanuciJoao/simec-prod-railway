@@ -299,8 +299,11 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
     //     <div class="...__wrapper">  numero SR + 'Documentos disponiveis'
     //     <div class="...__holder">   <button>Detalhes</button> <button>Download</button>
     //   </div>
-    // Aguarda pelo menos 1 card aparecer.
+    // Aguarda pelo menos 1 card aparecer COM CONTEUDO HIDRATADO (numero SR
+    // visivel) — sem isso, snapshotar items pode pegar skeletons placeholders
+    // de SPA ainda em hidratacao.
     const itemSelector = '.ge-equipment-service-history__item';
+    const numeroSelector = '.ge-equipment-service-history__number';
     const temItem = await page.locator(itemSelector).first()
       .waitFor({ state: 'visible', timeout: 20_000 })
       .then(() => true).catch(() => false);
@@ -308,6 +311,17 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
     if (!temItem) {
       return { capturados: 0, processadas: 0, erro: 'lista_sem_items_de_servico' };
     }
+
+    // Aguarda hidratacao real: pelo menos 1 numero SR com texto nao-vazio
+    // dentro de algum card. Fallback de 5s — se nao hidratar, ja era.
+    await page.waitForFunction(
+      (sel) => {
+        const els = document.querySelectorAll(sel);
+        return [...els].some(el => /\d{5,}/.test(el.textContent || ''));
+      },
+      numeroSelector,
+      { timeout: 5_000 },
+    ).catch(() => {});
 
     // Pega TODOS os cards de OS visiveis e processa um a um.
     const items = await page.locator(itemSelector).all();
