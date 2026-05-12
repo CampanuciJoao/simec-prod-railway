@@ -51,6 +51,9 @@ router.get('/status', async (req, res) => {
       pdfsComErro,
       ultimoPdfBaixado,
       ultimaSync,
+      pdfsExtraidos,
+      pdfsComCausaCategoria,
+      ultimaExtracao,
     ] = await Promise.all([
       prisma.gehcOrdemServico.count({ where: { tenantId } }),
       prisma.gehcPdfDocumento.count({ where: { tenantId } }),
@@ -68,9 +71,19 @@ router.get('/status', async (req, res) => {
         orderBy: { sincronizadoEm: 'desc' },
         select: { sincronizadoEm: true },
       }),
+      prisma.gehcPdfExtraido.count({ where: { tenantId, extraidoEm: { not: null } } }),
+      prisma.gehcPdfExtraido.count({
+        where: { tenantId, rootCauseCategory: { not: null } },
+      }),
+      prisma.gehcPdfExtraido.findFirst({
+        where: { tenantId, extraidoEm: { not: null } },
+        orderBy: { extraidoEm: 'desc' },
+        select: { extraidoEm: true },
+      }),
     ]);
 
-    const cobertura = totalOs > 0 ? Math.round((pdfsBaixados / totalOs) * 100) : null;
+    const coberturaPdf       = totalOs > 0       ? Math.round((pdfsBaixados / totalOs) * 100)         : null;
+    const coberturaExtracao  = pdfsBaixados > 0  ? Math.round((pdfsExtraidos / pdfsBaixados) * 100)   : null;
 
     res.json({
       tenantId,
@@ -78,12 +91,41 @@ router.get('/status', async (req, res) => {
       totalPdfs,
       pdfsBaixados,
       pdfsComErro,
-      coberturaPct: cobertura,
-      ultimoPdfBaixadoEm: ultimoPdfBaixado?.baixadoEm || null,
-      ultimaSyncEm:       ultimaSync?.sincronizadoEm || null,
+      coberturaPct: coberturaPdf,
+      pdfsExtraidos,
+      pdfsComCausaCategoria,
+      coberturaExtracaoPct: coberturaExtracao,
+      ultimoPdfBaixadoEm:  ultimoPdfBaixado?.baixadoEm  || null,
+      ultimaSyncEm:        ultimaSync?.sincronizadoEm   || null,
+      ultimaExtracaoEm:    ultimaExtracao?.extraidoEm    || null,
     });
   } catch (err) {
     console.error('[GEHC_APRENDIZADO] /status:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/aprendizado/causas ─────────────────────────────────────────
+// Agregacao de causa-raiz por categoria normalizada (taxonomia LLM).
+// Resposta: top categorias com contagem total + por equipamento.
+router.get('/causas', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  try {
+    const agregadosBrutos = await prisma.gehcPdfExtraido.groupBy({
+      by: ['rootCauseCategory'],
+      where: { tenantId, rootCauseCategory: { not: null } },
+      _count: { _all: true },
+      orderBy: { _count: { rootCauseCategory: 'desc' } },
+    });
+
+    const agregados = agregadosBrutos.map((a) => ({
+      categoria: a.rootCauseCategory,
+      total:     a._count._all,
+    }));
+
+    res.json({ categorias: agregados });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /causas:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -108,14 +150,28 @@ router.get('/equipamentos', async (req, res) => {
     });
 
     const linhas = await Promise.all(equipamentos.map(async (eq) => {
-      const baixados = await prisma.gehcPdfDocumento.count({
-        where: { tenantId, equipamentoId: eq.id, baixadoEm: { not: null } },
-      });
-      const ultimaOs = await prisma.gehcOrdemServico.findFirst({
-        where: { tenantId, equipamentoId: eq.id },
-        orderBy: { requestedAt: 'desc' },
-        select: { requestedAt: true },
-      });
+      const [baixados, ultimaOs, causasAgregadas] = await Promise.all([
+        prisma.gehcPdfDocumento.count({
+          where: { tenantId, equipamentoId: eq.id, baixadoEm: { not: null } },
+        }),
+        prisma.gehcOrdemServico.findFirst({
+          where: { tenantId, equipamentoId: eq.id },
+          orderBy: { requestedAt: 'desc' },
+          select: { requestedAt: true },
+        }),
+        // Agrega causas extraidas por equipamento (via JOIN gehc_pdf_documentos)
+        prisma.gehcPdfExtraido.groupBy({
+          by: ['rootCauseCategory'],
+          where: {
+            tenantId,
+            rootCauseCategory: { not: null },
+            pdfDocumento: { equipamentoId: eq.id },
+          },
+          _count: { _all: true },
+          orderBy: { _count: { rootCauseCategory: 'desc' } },
+          take: 3,
+        }),
+      ]);
       return {
         id:           eq.id,
         tag:          eq.tag,
@@ -130,6 +186,10 @@ router.get('/equipamentos', async (req, res) => {
           ? Math.round((baixados / eq._count.gehcOrdensServico) * 100)
           : null,
         ultimaOsEm:   ultimaOs?.requestedAt || null,
+        causasTop:    causasAgregadas.map((c) => ({
+          categoria: c.rootCauseCategory,
+          total:     c._count._all,
+        })),
       };
     }));
 
@@ -165,12 +225,27 @@ router.get('/equipamentos/:id', async (req, res) => {
       include: {
         pdfDocumentos: {
           select: {
+            id: true,
             documentId: true,
             fileName: true,
             baixadoEm: true,
             tentativas: true,
             ultimoErro: true,
             fileSizeBytes: true,
+            extraido: {
+              select: {
+                rootCauseCategory: true,
+                rootCauseRaw:      true,
+                equipmentStatus:   true,
+                engineerFullName:  true,
+                actionsTaken:      true,
+                measurementsJson:  true,
+                partsReplacedJson: true,
+                totalMinutes:      true,
+                extraidoEm:        true,
+                llmError:          true,
+              },
+            },
           },
         },
       },

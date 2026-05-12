@@ -12,14 +12,16 @@
 import prisma from '../prismaService.js';
 
 export const PIPELINE_NAMES = Object.freeze({
-  GLOBAL:           'global',
-  GEHC_CAPTURA_PDF: 'gehc_captura_pdf',
-  // Próximos PRs: 'gehc_extracao_pdf', 'knowledge_layer', 'preditivo_treino'.
+  GLOBAL:            'global',
+  GEHC_CAPTURA_PDF:  'gehc_captura_pdf',
+  GEHC_EXTRACAO_PDF: 'gehc_extracao_pdf',
+  // Próximos PRs: 'knowledge_layer', 'preditivo_treino'.
 });
 
 const PIPELINE_LABELS = Object.freeze({
-  global:             'IA (kill switch)',
-  gehc_captura_pdf:   'Captura de PDFs GE',
+  global:              'IA (kill switch)',
+  gehc_captura_pdf:    'Captura de PDFs GE',
+  gehc_extracao_pdf:   'Extração de causa-raiz dos PDFs',
 });
 
 function getLabel(pipeline) {
