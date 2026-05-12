@@ -1,5 +1,5 @@
 // Cliente GraphQL específico para descoberta dos documentos (PDFs) de uma OS GE.
-// O download em si NÃO é feito pelo GraphQL — após a `documentDownload` mutation
+// O download em si NÃO é feito pelo GraphQL — após a `downloadDocument` mutation
 // retornar 202 (assíncrono), o portal renderiza um popup com link para uma URL
 // S3 pré-assinada que entrega o PDF. Por isso o download de fato precisa do
 // Playwright (gehcDocumentDownloader.js).
@@ -11,12 +11,22 @@
 //
 // Útil para idempotência: marcamos como já baixado pelo documentId e nunca
 // duplicamos.
+//
+// IMPORTANTE: a API espera `serviceRequestNumber` (que é o serviceTrackingNumber
+// no nosso schema, ex: "17159687") — NAO o `gehcServiceId` UUID (ex:
+// "500Ur00000fLPDaIAO"). Quem chama precisa passar o tracking number correto.
+// Schema confirmado via captura do payload real do portal MyEquipment 360.
 
 const CDX_URL = 'https://cx-us-prd-services.cloud.gehealthcare.com/la-prd-shared-services-cdx-api-gateway';
 
 const QUERY_DOCUMENT_SEARCH = `
-  query documentSearch($queryContext: DocumentSearchQuery!) {
-    documentSearch(queryContext: $queryContext) {
+  query getDocumentSearch($serviceRequestNumber: String!, $source: String!, $documentType: [String!]!, $locale: String!) {
+    documentSearch(
+      serviceRequestNumber: $serviceRequestNumber
+      source: $source
+      documentType: $documentType
+      locale: $locale
+    ) {
       status
       results {
         totalCount
@@ -36,6 +46,10 @@ const QUERY_DOCUMENT_SEARCH = `
   }
 `;
 
+// Tipos de documento que o portal busca por padrao — cobre tanto PMs (planejadas)
+// quanto corretivas (nao planejadas). Mesma lista usada pelo portal real.
+const DOCUMENT_TYPES_PADRAO = ['Preventive Maintenance Form', 'Service Report'];
+
 function buildHeaders(accessToken, idToken) {
   return {
     'Content-Type': 'application/json',
@@ -50,16 +64,32 @@ function buildHeaders(accessToken, idToken) {
 /**
  * Lista documentos disponíveis para uma OS GE no portal.
  * Retorna [] se a OS não tem documentos publicados ainda.
+ *
+ * @param {object} args
+ * @param {string} args.serviceRequestNumber - tracking number da OS (ex: "17159687")
+ * @param {string} args.accessToken
+ * @param {string} args.idToken
+ * @param {string} [args.source='SERVICEMAX']
+ * @param {string[]} [args.documentTypes] - tipos a buscar (default: PM + Service Report)
+ * @param {string} [args.locale='pt-br']
  */
 export async function listarDocumentosDaOS({
-  serviceRequestId,
+  serviceRequestNumber,
   accessToken,
   idToken,
+  source = 'SERVICEMAX',
+  documentTypes = DOCUMENT_TYPES_PADRAO,
+  locale = 'pt-br',
 }) {
+  if (!serviceRequestNumber) {
+    throw new Error('serviceRequestNumber obrigatorio (use o tracking number da OS, ex: "17159687")');
+  }
+
   const variables = {
-    queryContext: {
-      serviceRequestId: String(serviceRequestId),
-    },
+    serviceRequestNumber: String(serviceRequestNumber),
+    source,
+    documentType: documentTypes,
+    locale,
   };
 
   let res;
@@ -68,7 +98,7 @@ export async function listarDocumentosDaOS({
       method:  'POST',
       headers: buildHeaders(accessToken, idToken),
       body:    JSON.stringify({
-        operationName: 'documentSearch',
+        operationName: 'getDocumentSearch',
         query:         QUERY_DOCUMENT_SEARCH,
         variables,
       }),
@@ -96,3 +126,5 @@ export async function listarDocumentosDaOS({
     source:       d.source,
   }));
 }
+
+export const DOCUMENT_TYPES_PADRAO_EXPORT = DOCUMENT_TYPES_PADRAO;
