@@ -9,6 +9,7 @@ import {
   getAprendizadoEquipamentos,
   getAprendizadoAtividade,
   getAprendizadoPipelines,
+  getAprendizadoCausas,
   postPausarPipeline,
   postRetomarPipeline,
 } from '@/services/api/gehcAprendizadoApi';
@@ -20,6 +21,7 @@ export function useGehcAprendizado() {
   const [pipelines, setPipelines]         = useState([]);
   const [equipamentos, setEquipamentos]   = useState([]);
   const [atividade, setAtividade]         = useState([]);
+  const [causas, setCausas]               = useState([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState(null);
   const [acaoPipeline, setAcaoPipeline]   = useState({}); // { [pipeline]: 'pausando'|'retomando' }
@@ -27,16 +29,18 @@ export function useGehcAprendizado() {
   const carregar = useCallback(async () => {
     try {
       setError(null);
-      const [s, ps, eqs, atv] = await Promise.all([
+      const [s, ps, eqs, atv, cs] = await Promise.all([
         getAprendizadoStatus(),
         getAprendizadoPipelines(),
         getAprendizadoEquipamentos(),
         getAprendizadoAtividade(),
+        getAprendizadoCausas(),
       ]);
       setStatus(s);
       setPipelines(ps?.pipelines || []);
       setEquipamentos(eqs?.equipamentos || []);
       setAtividade(atv?.itens || []);
+      setCausas(cs?.categorias || []);
     } catch (err) {
       setError(err?.response?.data?.error || err.message);
     } finally {
@@ -83,7 +87,7 @@ export function useGehcAprendizado() {
   }, [carregar]);
 
   return {
-    status, pipelines, equipamentos, atividade,
+    status, pipelines, equipamentos, atividade, causas,
     loading, error,
     acaoPipeline,
     pausar, retomar,

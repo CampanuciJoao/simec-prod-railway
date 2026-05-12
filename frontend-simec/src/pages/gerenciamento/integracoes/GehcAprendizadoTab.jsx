@@ -10,6 +10,8 @@ import {
   faSpinner,
   faTriangleExclamation,
   faClockRotateLeft,
+  faChartPie,
+  faMagnifyingGlassChart,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -34,6 +36,25 @@ function relativo(data) {
   if (diffMs < 3600_000) return `${Math.round(diffMs / 60_000)} min atrás`;
   if (diffMs < 86_400_000) return `${Math.round(diffMs / 3600_000)} h atrás`;
   return `${Math.round(diffMs / 86_400_000)} d atrás`;
+}
+
+// Mapa categoria normalizada -> label PT-BR amigavel.
+const LABELS_CAUSAS = {
+  infra_chiller_cliente: 'Chiller predial do cliente',
+  cryo_compressor:       'Compressor do criostato',
+  magneto_helio:         'Hélio / criogenia',
+  bobina:                'Bobinas',
+  gradiente:             'Sistema de gradiente',
+  rf:                    'Cadeia RF',
+  mesa_mecanica:         'Mesa do paciente',
+  software:              'Software / host',
+  rede_dados:            'Rede / dados',
+  infra_eletrica:        'Infraestrutura elétrica',
+  desconhecido:          'Não categorizado',
+};
+
+function labelCausa(cat) {
+  return LABELS_CAUSAS[cat] || cat || '—';
 }
 
 // ─── Modal de motivo (pausa) ─────────────────────────────────────────────────
@@ -187,7 +208,7 @@ function TabelaEquipamentos({ equipamentos }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[640px] text-sm">
+      <table className="w-full min-w-[760px] text-sm">
         <thead>
           <tr style={{ color: 'var(--text-muted)' }} className="text-left text-xs uppercase tracking-wide">
             <th className="py-2 pr-4">Equipamento</th>
@@ -195,6 +216,7 @@ function TabelaEquipamentos({ equipamentos }) {
             <th className="py-2 pr-4 text-right">OSs</th>
             <th className="py-2 pr-4 text-right">PDFs</th>
             <th className="py-2 pr-4 text-right">Cobertura</th>
+            <th className="py-2 pr-4">Causas dominantes</th>
             <th className="py-2 pr-4">Última OS</th>
           </tr>
         </thead>
@@ -223,12 +245,53 @@ function TabelaEquipamentos({ equipamentos }) {
                 {eq.coberturaPct === null ? '—' : `${eq.coberturaPct}%`}
               </td>
               <td className="py-2 pr-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+                {eq.causasTop?.length
+                  ? eq.causasTop.map((c) => `${c.total}× ${labelCausa(c.categoria)}`).join(' · ')
+                  : '—'}
+              </td>
+              <td className="py-2 pr-4 text-xs" style={{ color: 'var(--text-muted)' }}>
                 {eq.ultimaOsEm ? formatarDataHora(eq.ultimaOsEm) : '—'}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+    </div>
+  );
+}
+
+// ─── Bloco de causas-raiz agregadas ─────────────────────────────────────────
+
+function CausasAgregadas({ causas }) {
+  if (!causas?.length) {
+    return (
+      <InlineEmptyState message="A IA ainda nao identificou causas-raiz. Conforme PDFs forem extraidos, esta visao se preenche." />
+    );
+  }
+
+  const total = causas.reduce((acc, c) => acc + c.total, 0);
+
+  return (
+    <div className="space-y-2">
+      {causas.map((c) => {
+        const pct = total > 0 ? Math.round((c.total / total) * 100) : 0;
+        return (
+          <div key={c.categoria} className="space-y-1">
+            <div className="flex items-baseline justify-between text-sm">
+              <span style={{ color: 'var(--text-primary)' }}>{labelCausa(c.categoria)}</span>
+              <span style={{ color: 'var(--text-muted)' }} className="text-xs tabular-nums">
+                {c.total} OS · {pct}%
+              </span>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded" style={{ backgroundColor: 'var(--bg-surface-soft)' }}>
+              <div
+                className="h-full"
+                style={{ width: `${pct}%`, backgroundColor: 'var(--brand-primary)' }}
+              />
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -302,7 +365,7 @@ function FeedAtividade({ itens }) {
 
 function GehcAprendizadoTab() {
   const {
-    status, pipelines, equipamentos, atividade,
+    status, pipelines, equipamentos, atividade, causas,
     loading, error,
     acaoPipeline, pausar, retomar,
   } = useGehcAprendizado();
@@ -350,14 +413,14 @@ function GehcAprendizadoTab() {
           value={String(status?.pdfsBaixados ?? 0)}
         />
         <InfoCard
-          icon={faBrain}
-          label="Cobertura"
-          value={status?.coberturaPct === null || status?.coberturaPct === undefined ? '—' : `${status.coberturaPct}%`}
+          icon={faMagnifyingGlassChart}
+          label="PDFs analisados"
+          value={String(status?.pdfsExtraidos ?? 0)}
         />
         <InfoCard
-          icon={faTriangleExclamation}
-          label="Falhas pendentes"
-          value={String(status?.pdfsComErro ?? 0)}
+          icon={faBrain}
+          label="Causas identificadas"
+          value={String(status?.pdfsComCausaCategoria ?? 0)}
         />
       </ResponsiveGrid>
 
@@ -374,10 +437,18 @@ function GehcAprendizadoTab() {
         />
       </PageSection>
 
+      {/* Causas-raiz dominantes */}
+      <PageSection
+        title="Padrões de causa-raiz"
+        description="Categorias normalizadas que a IA identificou nos PDFs analisados. Use para enxergar o que mais derruba sua frota."
+      >
+        <CausasAgregadas causas={causas} />
+      </PageSection>
+
       {/* Equipamentos */}
       <PageSection
         title="Equipamentos analisados"
-        description="Cobertura de PDF por equipamento. Menor cobertura primeiro — esses são os que a IA tem menos contexto para aprender."
+        description="Cobertura de PDF por equipamento + causas dominantes. Menor cobertura primeiro — esses são os que a IA tem menos contexto para aprender."
       >
         <TabelaEquipamentos equipamentos={equipamentos} />
       </PageSection>

@@ -9,6 +9,9 @@ export const getAprendizadoStatus = () =>
 export const getAprendizadoEquipamentos = () =>
   api.get('/gehc/aprendizado/equipamentos').then((r) => r.data);
 
+export const getAprendizadoCausas = () =>
+  api.get('/gehc/aprendizado/causas').then((r) => r.data);
+
 export const getAprendizadoEquipamentoDetalhes = (equipamentoId) =>
   api.get(`/gehc/aprendizado/equipamentos/${equipamentoId}`).then((r) => r.data);
 
