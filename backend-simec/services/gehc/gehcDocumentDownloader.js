@@ -24,8 +24,10 @@ import { obterTokensGehc } from './gehcAuthService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
 
 const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com.br/account';
-const PORTAL_OS_URL    = (assetId, srId) =>
-  `https://www.gehealthcare.com.br/account/myequipment-360?assetId=${assetId}&srId=${srId}`;
+// Lista de OS do equipamento na aba 'Servico'. Mais eficiente que abrir 1
+// pagina por OS — todas com 'Documentos disponiveis' aparecem juntas.
+const PORTAL_LISTA_OS_URL = (assetId) =>
+  `https://www.gehealthcare.com.br/account/myequipment-360?assetId=${assetId}#service-tab`;
 
 const RATE_LIMIT_OS_MS     = 3_000;   // espera entre OSs no mesmo tenant
 const RATE_LIMIT_TENANT_MS = 15_000;  // espera entre tenants
@@ -143,8 +145,10 @@ const RE_TITULO_POPUP   = /fazer\s+o\s+download\s+dos\s+documentos/i;
 const RE_BOTAO_DOWNLOAD = /^(download|baixar)$/i;
 
 async function clicarBotaoDownloadDaOs({ page }) {
-  // Aguarda SPA terminar de renderizar.
-  await page.waitForLoadState('networkidle', { timeout: TRIGGER_TIMEOUT_MS }).catch(() => {});
+  // Pequena pausa para o framework SPA terminar de hidratar a tela depois
+  // do navigate. NAO usar 'networkidle' — em SPAs com analytics/websockets
+  // o estado idle nunca chega e o timeout estoura.
+  await page.waitForTimeout(2_000);
 
   // Detecta redirect para tela de login — sessao Salesforce nao foi
   // estabelecida ou expirou. Curto-circuita com erro claro em vez de
@@ -245,140 +249,236 @@ async function lerStreamComoBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
-// ─── Captura de uma OS ───────────────────────────────────────────────────────
+// ─── Captura de TODAS as OSs de um equipamento (1 navegacao) ────────────────
+//
+// Estrategia objetiva: navegar UMA vez para a lista de OSs do equipamento
+// e baixar todos os PDFs visiveis com 'Documentos disponiveis'. Em vez de
+// abrir 1 pagina por OS (Playwright + SPA + analytics = ~30s cada), aqui
+// e 1 pagina por equipamento + N cliques rapidos no mesmo DOM.
+//
+// Como 'Documentos disponiveis' so aparece para OS com PDFs ja publicados
+// pelo GE, o filtro fica natural — nao gastamos tempo com OSs vazias.
 
-async function capturarPdfsDeOS({ context, tenantId, ordemServico, equipamento, tokens }) {
-  const assetId        = equipamento.gehcAssetId;
-  const srId           = ordemServico.gehcServiceId;            // UUID interno (500Ur...) — usado na URL do portal
-  const trackingNumber = ordemServico.trackingNumber;           // numero amigavel (17159687) — exigido pelo documentSearch
+async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens }) {
+  const assetId = equipamento.gehcAssetId;
+  if (!assetId) return { capturados: 0, processadas: 0, erro: 'sem_asset_id' };
+  if (!ordens.length) return { capturados: 0, processadas: 0, erro: null };
 
-  if (!assetId || !srId) {
-    return { capturados: 0, erro: 'sem_asset_ou_sr_id' };
+  // Mapa trackingNumber -> ordem (para encontrar a ordem ao processar a row)
+  const ordensPorTracking = new Map();
+  for (const o of ordens) {
+    if (o.trackingNumber) ordensPorTracking.set(String(o.trackingNumber), o);
   }
-  if (!trackingNumber) {
-    return { capturados: 0, erro: 'sem_tracking_number (necessario para documentSearch)' };
-  }
-
-  // 1. Pergunta ao GraphQL quais documentos a OS tem (sem abrir browser).
-  let docs = [];
-  try {
-    docs = await listarDocumentosDaOS({
-      serviceRequestNumber: trackingNumber,
-      accessToken:          tokens.accessToken,
-      idToken:              tokens.idToken,
-    });
-  } catch (err) {
-    return { capturados: 0, erro: `documentSearch_failed: ${err.message}` };
+  if (ordensPorTracking.size === 0) {
+    return { capturados: 0, processadas: 0, erro: 'nenhuma_os_com_tracking_number' };
   }
 
-  if (!docs.length) {
-    return { capturados: 0, erro: null }; // OS sem documentos publicados
-  }
-
-  // 2. Filtra documentos que já estão baixados (idempotência via documentId).
-  const ja = await prisma.gehcPdfDocumento.findMany({
-    where: { documentId: { in: docs.map((d) => d.documentId) }, baixadoEm: { not: null } },
-    select: { documentId: true },
-  });
-  const jaBaixados = new Set(ja.map((d) => d.documentId));
-  const pendentes = docs.filter((d) => !jaBaixados.has(d.documentId));
-
-  if (!pendentes.length) {
-    return { capturados: 0, erro: null }; // tudo já baixado
-  }
-
-  // 3. Abre página da OS e baixa os pendentes, um por vez.
   const page = await context.newPage();
   let capturados = 0;
+  let processadas = 0;
   const erros = [];
 
   try {
-    await page.goto(PORTAL_OS_URL(assetId, srId), {
-      waitUntil: 'networkidle',
-      timeout: 60_000,
+    await page.goto(PORTAL_LISTA_OS_URL(assetId), {
+      waitUntil: 'domcontentloaded',
+      timeout: 30_000,
     });
 
-    for (let i = 0; i < pendentes.length; i++) {
-      const doc = pendentes[i];
-      // Reabrir popup pra cada download (fecha sozinho após cada DOWNLOAD).
+    // SPA do Salesforce hidratar — pequena pausa fixa em vez de networkidle
+    // (que nunca chega em SPAs com analytics/websockets).
+    await page.waitForTimeout(3_000);
+
+    // Detecta redirect para tela de login
+    const urlAtual = page.url();
+    if (urlAtual.includes('logon.gehealthcare.com') || urlAtual.includes('loginflow')) {
+      return { capturados: 0, processadas: 0, erro: `sessao_perdida: ${urlAtual.slice(0, 80)}` };
+    }
+
+    // Aguarda PELO MENOS 1 indicador "Documentos disponiveis" aparecer.
+    // Se nao aparecer em 20s, nenhum dos documentos esperados esta na lista
+    // visivel — equipamento sem OSs com PDF publicado, ou paginacao escondendo.
+    const re = /documentos?\s+dispon[ií]ve(l|is)/i;
+    const temIndicador = await page
+      .getByText(re).first()
+      .waitFor({ state: 'visible', timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+
+    if (!temIndicador) {
+      return { capturados: 0, processadas: 0, erro: 'lista_sem_documentos_disponiveis' };
+    }
+
+    // Pega TODAS as ocorrencias de "Documentos disponiveis" e processa uma a uma.
+    const indicadores = await page.getByText(re).all();
+    console.log(`[GEHC_PDF] ${equipamento.tag || equipamento.id}: ${indicadores.length} OS(s) com 'Documentos disponiveis' visiveis na lista.`);
+
+    for (const indicador of indicadores) {
       try {
-        const download = await baixarUmDocumentoPorPopup({ page, indiceDocumento: i });
-        if (!download) {
-          // OS sem botao 'Documentos disponiveis' visivel no portal —
-          // pode ser OS antiga, sem documentos publicados, ou mudanca de UI.
-          // Nao persiste erro: na proxima rodada tenta de novo silenciosamente.
-          erros.push(`${doc.documentId}: popup_indisponivel (sem documentos no portal)`);
+        // Sobe na arvore ate encontrar um container que contenha o numero da OS
+        // (formato 'SR<numero>') E o botao Download.
+        const card = indicador.locator('xpath=ancestor::*[descendant::*[contains(translate(text(), "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "sr") and (descendant-or-self::* or following-sibling::*)]][1]')
+          .first();
+
+        // Extrai o numero visivel na area (Nº SR12345678)
+        const textoCard = await card.textContent({ timeout: 3_000 }).catch(() => '');
+        const matchSR = textoCard?.match(/SR\s*0*(\d{5,})/i);
+        if (!matchSR) {
+          erros.push('row_sem_tracking_visivel');
           continue;
         }
-        const buffer = await lerStreamComoBuffer(await download.createReadStream());
+        const trackingNumber = matchSR[1];
+        const ordem = ordensPorTracking.get(trackingNumber);
+        if (!ordem) {
+          // OS na lista mas nao no nosso conjunto (ja baixada ou fora da janela)
+          continue;
+        }
 
-        const documentId = doc.documentId;
-        const fileName   = doc.fileName || download.suggestedFilename();
-        const fileHash   = crypto.createHash('sha256').update(buffer).digest('hex');
-        const r2Key      = r2KeyParaPdf({ tenantId, gehcServiceId: srId, documentId });
+        // Resolve documentos do GraphQL (idempotencia + filename real).
+        let docsPendentes = [];
+        try {
+          const docs = await listarDocumentosDaOS({
+            serviceRequestNumber: trackingNumber,
+            accessToken: getTokens()?.accessToken,
+            idToken: getTokens()?.idToken,
+          });
+          if (docs.length) {
+            const ja = await prisma.gehcPdfDocumento.findMany({
+              where: { documentId: { in: docs.map((d) => d.documentId) }, baixadoEm: { not: null } },
+              select: { documentId: true },
+            });
+            const jaSet = new Set(ja.map((d) => d.documentId));
+            docsPendentes = docs.filter((d) => !jaSet.has(d.documentId));
+          }
+        } catch (err) {
+          erros.push(`SR${trackingNumber}: documentSearch ${err.message}`);
+          continue;
+        }
 
-        await uploadToR2(r2Key, buffer, 'application/pdf');
+        if (!docsPendentes.length) continue; // nada a fazer
 
-        await prisma.gehcPdfDocumento.upsert({
-          where: { documentId },
-          create: {
-            tenantId,
-            equipamentoId:  equipamento.id,
-            ordemServicoId: ordemServico.id,
-            documentId,
-            fileName,
-            fileHash,
-            fileSizeBytes:  buffer.length,
-            r2Key,
-            baixadoEm:      new Date(),
-            tentativas:     1,
-            ultimaTentativaEm: new Date(),
-            ultimoErro:     null,
-          },
-          update: {
-            equipamentoId:  equipamento.id,
-            ordemServicoId: ordemServico.id,
-            fileName,
-            fileHash,
-            fileSizeBytes:  buffer.length,
-            r2Key,
-            baixadoEm:      new Date(),
-            tentativas:     { increment: 1 },
-            ultimaTentativaEm: new Date(),
-            ultimoErro:     null,
-          },
-        });
+        // Clica no botao Download desta linha
+        const downloadBtn = card.locator('button, a').filter({ hasText: /^(download|baixar)$/i }).first();
+        const visivel = await downloadBtn.isVisible({ timeout: 3_000 }).catch(() => false);
+        if (!visivel) {
+          erros.push(`SR${trackingNumber}: botao_download_nao_visivel`);
+          continue;
+        }
 
-        capturados++;
+        // Para cada documento pendente da OS, faz 1 ciclo de clique+download
+        for (let i = 0; i < docsPendentes.length; i++) {
+          const doc = docsPendentes[i];
+          processadas++;
+          try {
+            const download = await disparaDownloadDoBotao({ page, downloadBtn, indiceDocumento: i });
+            if (!download) {
+              erros.push(`${doc.documentId}: nada_baixado`);
+              continue;
+            }
+            const buffer = await lerStreamComoBuffer(await download.createReadStream());
+            const fileName = doc.fileName || download.suggestedFilename();
+            const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
+            const r2Key = r2KeyParaPdf({ tenantId, gehcServiceId: ordem.gehcServiceId, documentId: doc.documentId });
+
+            await uploadToR2(r2Key, buffer, 'application/pdf');
+
+            await prisma.gehcPdfDocumento.upsert({
+              where: { documentId: doc.documentId },
+              create: {
+                tenantId,
+                equipamentoId: equipamento.id,
+                ordemServicoId: ordem.id,
+                documentId: doc.documentId,
+                fileName, fileHash, fileSizeBytes: buffer.length, r2Key,
+                baixadoEm: new Date(),
+                tentativas: 1,
+                ultimaTentativaEm: new Date(),
+                ultimoErro: null,
+              },
+              update: {
+                fileName, fileHash, fileSizeBytes: buffer.length, r2Key,
+                baixadoEm: new Date(),
+                tentativas: { increment: 1 },
+                ultimaTentativaEm: new Date(),
+                ultimoErro: null,
+              },
+            });
+            capturados++;
+          } catch (err) {
+            erros.push(`${doc.documentId}: ${err.message?.slice(0, 100)}`);
+            await prisma.gehcPdfDocumento.upsert({
+              where: { documentId: doc.documentId },
+              create: {
+                tenantId,
+                equipamentoId: equipamento.id,
+                ordemServicoId: ordem.id,
+                documentId: doc.documentId,
+                fileName: doc.fileName,
+                tentativas: 1,
+                ultimaTentativaEm: new Date(),
+                ultimoErro: err.message?.slice(0, 1000),
+              },
+              update: {
+                tentativas: { increment: 1 },
+                ultimaTentativaEm: new Date(),
+                ultimoErro: err.message?.slice(0, 1000),
+              },
+            }).catch(() => {});
+          }
+        }
       } catch (err) {
-        erros.push(`${doc.documentId}: ${err.message}`);
-
-        // Persiste a falha para podermos ver na UI e retentar depois.
-        await prisma.gehcPdfDocumento.upsert({
-          where: { documentId: doc.documentId },
-          create: {
-            tenantId,
-            equipamentoId:  equipamento.id,
-            ordemServicoId: ordemServico.id,
-            documentId:     doc.documentId,
-            fileName:       doc.fileName,
-            tentativas:     1,
-            ultimaTentativaEm: new Date(),
-            ultimoErro:     err.message?.slice(0, 1000),
-          },
-          update: {
-            tentativas:     { increment: 1 },
-            ultimaTentativaEm: new Date(),
-            ultimoErro:     err.message?.slice(0, 1000),
-          },
-        });
+        erros.push(`row: ${err.message?.slice(0, 100)}`);
       }
     }
   } finally {
     await page.close().catch(() => {});
   }
 
-  return { capturados, erro: erros.length ? erros.join(' | ') : null };
+  return { capturados, processadas, erro: erros.length ? erros.join(' | ').slice(0, 500) : null };
+}
+
+// Variavel modulo para compartilhar tokens entre chamadas dentro do mesmo backfill.
+// Setado pelo orquestrador (executarBackfillPdfs) antes de chamar capturarPdfsDeEquipamento.
+let _tokensCorrentes = null;
+function getTokens() { return _tokensCorrentes; }
+
+// Helper que aciona o botao Download e captura o download — cobre 2 cenarios:
+// (a) baixa direto (1 PDF), (b) abre popup com checkboxes (multiplos PDFs).
+async function disparaDownloadDoBotao({ page, downloadBtn, indiceDocumento }) {
+  // Tenta capturar download imediato OU detectar popup
+  const popupAntes = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
+
+  // Clica e espera ate 5s pelo download direto
+  const promiseDownload = page.waitForEvent('download', { timeout: 5_000 }).catch(() => null);
+  await downloadBtn.click().catch(() => {});
+
+  const downloadDireto = await promiseDownload;
+  if (downloadDireto) return downloadDireto;
+
+  // Nao baixou direto — verificar se popup abriu
+  await page.waitForTimeout(1_500);
+  const popupDepois = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
+
+  if (popupDepois > popupAntes) {
+    // Popup aberto — marcar checkbox correto e clicar DOWNLOAD do popup
+    const checkboxes = page.locator('input[type="checkbox"]');
+    const total = await checkboxes.count();
+    if (total === 0 || indiceDocumento >= total) return null;
+
+    for (let i = 0; i < total; i++) {
+      const cb = checkboxes.nth(i);
+      if (await cb.isChecked()) await cb.uncheck().catch(() => {});
+    }
+    await checkboxes.nth(indiceDocumento).check().catch(() => {});
+
+    const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
+    const [download] = await Promise.all([
+      page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
+      botaoPopup.click(),
+    ]);
+    return download;
+  }
+
+  return null;
 }
 
 // ─── Backfill orquestrado ────────────────────────────────────────────────────
@@ -451,34 +551,48 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
   let processadas = 0;
   let capturados  = 0;
 
+  // Disponibiliza tokens para capturarPdfsDeEquipamento usar nas chamadas
+  // GraphQL (documentSearch). Resetado no finally.
+  _tokensCorrentes = tokens;
+
+  // Agrupa OSs pendentes por equipamento — assim abrimos UMA pagina por
+  // equipamento em vez de uma por OS.
+  const porEquipamento = new Map();
+  for (const o of ordens) {
+    const eqId = o.equipamento.id;
+    if (!porEquipamento.has(eqId)) porEquipamento.set(eqId, { equipamento: o.equipamento, ordens: [] });
+    porEquipamento.get(eqId).ordens.push(o);
+  }
+
   try {
-    for (const ordem of ordens) {
-      // Re-checa pausa a cada iteração — permite parada quente.
+    for (const { equipamento, ordens: ordensDoEquipamento } of porEquipamento.values()) {
+      // Re-checa pausa a cada equipamento — permite parada quente.
       if (!(await estaAtivo(PIPELINE_NAMES.GEHC_CAPTURA_PDF, tenantId))) {
         console.log(`[GEHC_PDF] Pipeline pausado durante execucao — interrompendo.`);
         break;
       }
 
-      const resultado = await capturarPdfsDeOS({
+      const resultado = await capturarPdfsDeEquipamento({
         context: session.context,
         tenantId,
-        ordemServico: ordem,
-        equipamento:  ordem.equipamento,
-        tokens,
+        equipamento,
+        ordens: ordensDoEquipamento,
       });
 
-      processadas++;
-      capturados += resultado.capturados;
+      processadas += resultado.processadas || 0;
+      capturados  += resultado.capturados  || 0;
 
-      const tag = ordem.equipamento.tag || ordem.equipamento.id;
+      const tag = equipamento.tag || equipamento.id;
       console.log(
-        `[GEHC_PDF] OS ${ordem.gehcServiceId} (${tag}): ` +
-        `${resultado.capturados} PDF(s) capturados${resultado.erro ? ` · erro: ${resultado.erro}` : ''}`
+        `[GEHC_PDF] Equipamento ${tag}: ${resultado.capturados} PDF(s) capturados ` +
+        `(${resultado.processadas} processadas de ${ordensDoEquipamento.length} OSs pendentes)` +
+        `${resultado.erro ? ` · erro: ${resultado.erro}` : ''}`
       );
 
       await sleep(RATE_LIMIT_OS_MS);
     }
   } finally {
+    _tokensCorrentes = null;
     await session.browser.close().catch(() => {});
   }
 
