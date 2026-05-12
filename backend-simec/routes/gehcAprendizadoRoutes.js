@@ -13,6 +13,7 @@ import {
   pausar,
   retomar,
 } from '../services/ai/aiPipelineState.js';
+import { perguntarIaSobreEquipamento } from '../services/ai/ragSearchService.js';
 
 const router = express.Router();
 
@@ -101,6 +102,97 @@ router.get('/status', async (req, res) => {
     });
   } catch (err) {
     console.error('[GEHC_APRENDIZADO] /status:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/aprendizado/insights ──────────────────────────────────────
+// Lista insights ativos da IA (sem resolvedoEm). Ordenado por severidade
+// (critical > high > medium > low) e geradoEm desc.
+router.get('/insights', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  try {
+    const insights = await prisma.iaInsight.findMany({
+      where: { tenantId, resolvidoEm: null },
+      include: {
+        equipamento: { select: { id: true, tag: true, apelido: true, modelo: true } },
+      },
+      orderBy: [{ geradoEm: 'desc' }],
+    });
+
+    const ordemSev = { critical: 0, high: 1, medium: 2, low: 3, info: 4 };
+    insights.sort((a, b) => (ordemSev[a.severidade] ?? 9) - (ordemSev[b.severidade] ?? 9));
+
+    res.json({ insights });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /insights:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PATCH /api/gehc/aprendizado/insights/:id/feedback ────────────────────────
+// Engenheiro marca util / inutil / falso positivo. Vira ground truth para
+// retreinamento futuro.
+router.patch('/insights/:id/feedback', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { id } = req.params;
+  const { util } = req.body || {};
+
+  if (typeof util !== 'boolean') {
+    return res.status(400).json({ error: 'Campo "util" (boolean) obrigatorio.' });
+  }
+
+  try {
+    const insight = await prisma.iaInsight.findFirst({ where: { id, tenantId } });
+    if (!insight) return res.status(404).json({ error: 'Insight nao encontrado.' });
+
+    const atualizado = await prisma.iaInsight.update({
+      where: { id },
+      data: { feedbackUtil: util, feedbackEm: new Date() },
+    });
+    res.json({ ok: true, insight: atualizado });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PATCH /api/gehc/aprendizado/insights/:id/resolver ────────────────────────
+// Marca insight como resolvido manualmente (engenheiro tomou acao).
+// Proximo run do insightsGenerator pode regerar se a condicao persistir.
+router.patch('/insights/:id/resolver', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { id } = req.params;
+  try {
+    const insight = await prisma.iaInsight.findFirst({ where: { id, tenantId } });
+    if (!insight) return res.status(404).json({ error: 'Insight nao encontrado.' });
+
+    const atualizado = await prisma.iaInsight.update({
+      where: { id },
+      data: { resolvidoEm: new Date() },
+    });
+    res.json({ ok: true, insight: atualizado });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/aprendizado/ia/ask ───────────────────────────────────────
+// Pergunta livre + RAG sobre o Knowledge Layer.
+// Body: { pergunta, equipamentoId? }
+router.post('/ia/ask', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { pergunta, equipamentoId } = req.body || {};
+
+  if (!pergunta || typeof pergunta !== 'string') {
+    return res.status(400).json({ error: 'Campo "pergunta" obrigatorio.' });
+  }
+
+  try {
+    const r = await perguntarIaSobreEquipamento({ tenantId, pergunta, equipamentoId });
+    if (!r.ok) return res.status(503).json({ error: r.motivo });
+    res.json(r);
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /ia/ask:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
