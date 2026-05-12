@@ -260,13 +260,16 @@ export async function iniciarJobsDeAlertas() {
       'gehc-capturar-pdfs',
       {},
       {
-        repeat: { cron: '0 4 * * *' },
+        // 2x ao dia: 04:00 UTC (madrugada BRT) e 16:00 UTC (final tarde BRT).
+        // Backfill historico completa em metade do tempo, e OSs novas do dia
+        // sao baixadas no mesmo dia em vez de so no dia seguinte.
+        repeat: { cron: '0 4,16 * * *' },
         removeOnComplete: 10,
         removeOnFail: 10,
       }
     );
 
-    console.log('[QUEUE] Job GEHC (gehc-capturar-pdfs) agendado diariamente às 04:00 UTC.');
+    console.log('[QUEUE] Job GEHC (gehc-capturar-pdfs) agendado 2x/dia (04:00 e 16:00 UTC).');
 
     // Extracao de causa-raiz / medicoes a partir dos PDFs ja baixados.
     // Roda diariamente as 05:00 UTC, 1h depois da captura, para que os PDFs

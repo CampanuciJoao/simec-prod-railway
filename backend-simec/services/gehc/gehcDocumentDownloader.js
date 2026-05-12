@@ -500,16 +500,25 @@ async function disparaDownloadDoBotao({ page, downloadBtn, indiceDocumento }) {
 // ─── Backfill orquestrado ────────────────────────────────────────────────────
 
 /**
- * Roda backfill de PDFs para um tenant. RMs primeiro, depois resto.
- * Resumível: pula OSs cujo PDF já está baixado.
+ * Roda backfill de PDFs para um tenant.
+ * Distribui as OSs ENTRE equipamentos (top N por equipamento) em vez de
+ * concentrar tudo em poucos — assim a IA ganha contexto horizontal mais
+ * rapidamente. Resumível: pula OSs cujo PDF já está baixado.
  *
  * @param {string} tenantId
  * @param {object} opts
- * @param {string[]} [opts.modalidades] - ex: ['MR'] (default: tudo, RM primeiro)
+ * @param {string[]} [opts.modalidades] - ex: ['MR'] (default: tudo)
  * @param {number} [opts.diasAtras=180]
- * @param {number} [opts.limite=50] - número máximo de OSs por execução
+ * @param {number} [opts.limite=50] - número máximo TOTAL de OSs por execução
+ * @param {number} [opts.maxPorEquipamento=5] - cap de OSs por equipamento por execução
  */
-export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 180, limite = 50 } = {}) {
+export async function executarBackfillPdfs({
+  tenantId,
+  modalidades,
+  diasAtras = 180,
+  limite = 50,
+  maxPorEquipamento = 5,
+} = {}) {
   if (!tenantId) throw new Error('tenantId obrigatorio');
 
   const ativo = await estaAtivo(PIPELINE_NAMES.GEHC_CAPTURA_PDF, tenantId);
@@ -520,26 +529,51 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
 
   const dataCorte = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000);
 
-  const ordens = await prisma.gehcOrdemServico.findMany({
+  // Busca um pool maior do que o limite, ordenado pelas mais recentes — depois
+  // distribuimos por equipamento na aplicacao.
+  const poolBruto = await prisma.gehcOrdemServico.findMany({
     where: {
       tenantId,
       requestedAt: { gte: dataCorte },
-      // Só OSs cujo equipamento existe e tem assetId.
       equipamento: {
         gehcAssetId: { not: null },
         ...(modalidades?.length ? { tipo: { in: modalidades } } : {}),
       },
-      // Só OSs que ainda não têm nenhum PDF baixado.
       pdfDocumentos: { none: { baixadoEm: { not: null } } },
     },
     include: { equipamento: true },
-    orderBy: [
-      // Prioridade: RMs primeiro (modality MR no GE), depois resto.
-      { equipamento: { tipo: 'asc' } },
-      { requestedAt: 'desc' },
-    ],
-    take: limite,
+    orderBy: [{ requestedAt: 'desc' }],
+    take: limite * 5,  // pool 5x maior pra ter folga ao distribuir
   });
+
+  // Distribuicao round-robin entre equipamentos:
+  //   1. Agrupa por equipamento (mantendo ordem por data)
+  //   2. Pega top N de cada equipamento (cap por eq)
+  //   3. Round-robin: pega 1 de cada, repete ate atingir limite total
+  const porEq = new Map();
+  for (const o of poolBruto) {
+    const eqId = o.equipamentoId;
+    if (!porEq.has(eqId)) porEq.set(eqId, []);
+    const lista = porEq.get(eqId);
+    if (lista.length < maxPorEquipamento) lista.push(o);
+  }
+
+  const distribuidas = [];
+  let temMaisOSs = true;
+  let i = 0;
+  while (temMaisOSs && distribuidas.length < limite) {
+    temMaisOSs = false;
+    for (const lista of porEq.values()) {
+      if (i < lista.length) {
+        distribuidas.push(lista[i]);
+        temMaisOSs = true;
+        if (distribuidas.length >= limite) break;
+      }
+    }
+    i++;
+  }
+
+  const ordens = distribuidas;
 
   if (!ordens.length) {
     console.log(`[GEHC_PDF] Nada a fazer para tenant ${tenantId} (todas as OSs já têm PDF).`);
