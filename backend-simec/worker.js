@@ -126,12 +126,18 @@ const alertasWorker = new Worker(
       // Captura noturna de PDFs de OS GE para alimentar a IA preditiva.
       // O downloader internamente respeita o estado de pausa do pipeline
       // (PIPELINE_NAMES.GEHC_CAPTURA_PDF) — se desativado, devolve cedo.
+      // Heartbeat: ping a cada 30s para o BullMQ saber que ainda esta ativo.
+      const heartbeat = setInterval(() => {
+        job?.updateProgress({ heartbeat: Date.now() }).catch(() => {});
+      }, 30_000);
       try {
-        const r = await executarBackfillTodosTenants({ diasAtras: 180, limite: 50 });
+        const r = await executarBackfillTodosTenants({ diasAtras: 180, limite: 20 });
         return { ok: true, ...r };
       } catch (err) {
         console.error('[GEHC_PDF_WORKER] Erro:', err.message);
         return { ok: false, erro: err.message };
+      } finally {
+        clearInterval(heartbeat);
       }
     }
 
@@ -284,6 +290,13 @@ const alertasWorker = new Worker(
     concurrency: 5,
     autorun: true,
     limiter: { max: 5, duration: 5000 },
+    // lockDuration default do BullMQ e 30s. Jobs que abrem Playwright
+    // (gehc-capturar-pdfs, gehc-monitorar-saude) podem demorar varios
+    // minutos. Lock alto evita que o BullMQ marque como 'stalled'.
+    // O lock e renovado automaticamente em metade desse tempo.
+    lockDuration: 15 * 60 * 1000,  // 15 min
+    stalledInterval: 30 * 1000,    // checa stalled a cada 30s (default)
+    maxStalledCount: 1,            // 1 chance antes de marcar como falhado
   }
 );
 
