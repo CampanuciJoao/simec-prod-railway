@@ -117,6 +117,37 @@ export async function retomar(pipeline, { tenantId = null, usuarioId } = {}) {
 }
 
 /**
+ * Registra o resultado de uma execucao do pipeline (sucesso ou falha).
+ * Workers chamam isso ao final de cada job para que o painel mostre
+ * "ultima execucao: ok ha 5 min · 12 PDFs · 32s" sem precisar de logs.
+ *
+ * Cria a linha do estado se nao existir (mantendo ativo=true por default).
+ */
+export async function registrarExecucao(pipeline, { ok, mensagem, metrics, duracaoMs, tenantId = null } = {}) {
+  if (!Object.values(PIPELINE_NAMES).includes(pipeline)) return;
+
+  const dadosExec = {
+    ultimaExecucaoEm:        new Date(),
+    ultimaExecucaoOk:        ok === true,
+    ultimaExecucaoMensagem:  mensagem ? String(mensagem).slice(0, 500) : null,
+    ultimaExecucaoMetrics:   metrics ?? null,
+    ultimaExecucaoDuracaoMs: typeof duracaoMs === 'number' ? Math.round(duracaoMs) : null,
+  };
+
+  const existente = await buscarEstado(pipeline, tenantId);
+  if (existente) {
+    await prisma.aiPipelineEstado.update({
+      where: { id: existente.id },
+      data:  dadosExec,
+    });
+  } else {
+    await prisma.aiPipelineEstado.create({
+      data: { tenantId, pipeline, ativo: true, ...dadosExec },
+    });
+  }
+}
+
+/**
  * Lista o estado atual de todos os pipelines conhecidos para um tenant.
  * Inclui a definição mesmo quando não há linha persistida (default: ativo).
  */
@@ -149,6 +180,12 @@ export async function listarEstados({ tenantId = null } = {}) {
       motivoPausa:   linha?.motivoPausa || null,
       retomadoEm:    linha?.retomadoEm  || null,
       retomadoPor:   linha?.retomadoPor || null,
+      // Telemetria da ultima execucao
+      ultimaExecucaoEm:        linha?.ultimaExecucaoEm        || null,
+      ultimaExecucaoOk:        linha?.ultimaExecucaoOk        ?? null,
+      ultimaExecucaoMensagem:  linha?.ultimaExecucaoMensagem  || null,
+      ultimaExecucaoMetrics:   linha?.ultimaExecucaoMetrics   || null,
+      ultimaExecucaoDuracaoMs: linha?.ultimaExecucaoDuracaoMs ?? null,
     };
   });
 }

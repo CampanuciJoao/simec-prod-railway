@@ -43,6 +43,13 @@ function relativo(data) {
   return `${Math.round(diffMs / 86_400_000)} d atrás`;
 }
 
+function formatarDuracao(ms) {
+  if (ms == null) return '—';
+  if (ms < 1000) return `${ms}ms`;
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`;
+  return `${Math.round(ms / 60_000)}min`;
+}
+
 // Mapa categoria normalizada -> label PT-BR amigavel.
 const LABELS_CAUSAS = {
   infra_chiller_cliente: 'Chiller predial do cliente',
@@ -183,6 +190,25 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
                     Pausado {relativo(p.pausadoEm)}
                     {p.pausadoPor?.nome && ` por ${p.pausadoPor.nome}`}
                     {p.motivoPausa && ` · ${p.motivoPausa}`}
+                  </p>
+                )}
+                {p.ativo && p.ultimaExecucaoEm && (
+                  <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    <FontAwesomeIcon
+                      icon={p.ultimaExecucaoOk ? faCircleCheck : faTriangleExclamation}
+                      className="mr-1"
+                      style={{
+                        color: p.ultimaExecucaoOk ? 'var(--color-success)' : 'var(--color-danger)',
+                      }}
+                    />
+                    Última execução: {p.ultimaExecucaoOk ? 'ok' : 'falhou'} {relativo(p.ultimaExecucaoEm)}
+                    {p.ultimaExecucaoMensagem && ` · ${p.ultimaExecucaoMensagem}`}
+                    {p.ultimaExecucaoDuracaoMs != null && ` · ${formatarDuracao(p.ultimaExecucaoDuracaoMs)}`}
+                  </p>
+                )}
+                {p.ativo && !p.ultimaExecucaoEm && p.pipeline !== 'global' && (
+                  <p className="mt-1 text-xs italic" style={{ color: 'var(--text-muted)' }}>
+                    Aguardando primeira execução
                   </p>
                 )}
               </div>
