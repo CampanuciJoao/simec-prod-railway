@@ -13,6 +13,7 @@ import {
   getAprendizadoInsights,
   patchInsightFeedback,
   patchInsightResolver,
+  postLimparTodosInsights,
   postPausarPipeline,
   postRetomarPipeline,
   postDispararPipeline,
@@ -101,6 +102,17 @@ export function useGehcAprendizado() {
     }
   }, [carregar]);
 
+  const limparTodosInsights = useCallback(async (motivo) => {
+    try {
+      const r = await postLimparTodosInsights(motivo);
+      await carregar();
+      return r;
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+      throw err;
+    }
+  }, [carregar]);
+
   useEffect(() => {
     carregar();
     const id = setInterval(carregar, REFRESH_INTERVAL_MS);
@@ -174,7 +186,7 @@ export function useGehcAprendizado() {
     acaoPipeline,
     feedbackPipeline,
     pausar, retomar, disparar,
-    darFeedbackInsight, resolverInsight,
+    darFeedbackInsight, resolverInsight, limparTodosInsights,
     recarregar: carregar,
   };
 }

@@ -216,9 +216,26 @@ async function detectarRiscoAlto({ tenantId, equipamentoId }) {
     select: { severidade: true, ocorridoEm: true, fonte: true, tipoEvento: true },
   });
 
+  // DEDUPLICACAO POR DIA + TIPO: telemetria gera 1 snapshot a cada 30min, e
+  // sem dedup um equipamento offline por 1 dia inteiro acumulava 48 eventos
+  // 'compressor_off' high — score artificialmente inflado para milhares.
+  // Aqui contamos no maximo 1 evento por (dia, tipo_evento), mantendo o
+  // de maior severidade.
+  const eventosUnicos = new Map();
+  for (const ev of eventos) {
+    const dia = ev.ocorridoEm.toISOString().slice(0, 10);
+    const chave = `${dia}|${ev.tipoEvento}`;
+    const existente = eventosUnicos.get(chave);
+    const pesoNovo = PESO_SEVERIDADE[ev.severidade] ?? 0;
+    const pesoExistente = existente ? (PESO_SEVERIDADE[existente.severidade] ?? 0) : -1;
+    if (!existente || pesoNovo > pesoExistente) {
+      eventosUnicos.set(chave, ev);
+    }
+  }
+
   // Score = soma de pesos com decaimento por recencia (1 -> 0.5 ao longo da janela)
   let score = 0;
-  for (const ev of eventos) {
+  for (const ev of eventosUnicos.values()) {
     const peso = PESO_SEVERIDADE[ev.severidade] ?? 0;
     const idadeDias = (Date.now() - ev.ocorridoEm.getTime()) / 86_400_000;
     const fator = Math.max(0.3, 1 - (idadeDias / JANELA_RISCO_DIAS) * 0.5);
@@ -240,21 +257,25 @@ async function detectarRiscoAlto({ tenantId, equipamentoId }) {
     return null;
   }
 
+  const eventosDeduplicados = [...eventosUnicos.values()];
+  const breakdownDedup = ['critical', 'high', 'medium', 'low'].map((s) => ({
+    severidade: s,
+    total: eventosDeduplicados.filter((e) => e.severidade === s).length,
+  })).filter((b) => b.total > 0);
+
   return upsertInsight({
     tenantId, equipamentoId,
     tipo: 'risco_alto',
     severidade: scoreFinal >= 60 ? 'critical' : 'high',
     titulo: `Score de risco preditivo: ${scoreFinal}`,
-    descricao: `Equipamento acumulou eventos de severidade alta nos últimos ${JANELA_RISCO_DIAS} dias. Score considera severidade ponderada e recência.`,
+    descricao: `Equipamento acumulou ${eventosDeduplicados.length} dia(s) com eventos de severidade nos últimos ${JANELA_RISCO_DIAS} dias. Score considera severidade ponderada e recência (1 evento por dia/tipo).`,
     recomendacao: 'Revisar histórico recente do equipamento (corretivas, anomalias de telemetria, acionamentos de terceiro) e considerar avaliação técnica antes da próxima falha.',
     evidencia: {
       scoreFinal,
       janelaDias: JANELA_RISCO_DIAS,
-      totalEventos: eventos.length,
-      breakdown: ['critical', 'high', 'medium', 'low'].map((s) => ({
-        severidade: s,
-        total: eventos.filter((e) => e.severidade === s).length,
-      })),
+      diasComEventos: eventosDeduplicados.length,
+      totalEventosBrutos: eventos.length,
+      breakdown: breakdownDedup,
     },
     validoAteDias: 30,
   });
