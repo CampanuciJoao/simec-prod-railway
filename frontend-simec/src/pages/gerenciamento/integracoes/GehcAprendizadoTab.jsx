@@ -12,6 +12,10 @@ import {
   faClockRotateLeft,
   faChartPie,
   faMagnifyingGlassChart,
+  faLightbulb,
+  faThumbsUp,
+  faThumbsDown,
+  faCheck,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -260,6 +264,107 @@ function TabelaEquipamentos({ equipamentos }) {
   );
 }
 
+// ─── Bloco de insights da IA ────────────────────────────────────────────────
+
+const CORES_SEVERIDADE = {
+  critical: 'var(--color-danger)',
+  high:     'var(--color-danger)',
+  medium:   'var(--color-warning)',
+  low:      'var(--text-muted)',
+  info:     'var(--text-muted)',
+};
+
+const LABELS_TIPO_INSIGHT = {
+  reincidencia_causa:       'Reincidência de causa',
+  anomalia_helio:           'Anomalia de hélio',
+  risco_alto:               'Risco alto',
+  sem_pm_recente:           'Sem preventiva recente',
+  acionamento_freq_terceiro: 'Acionamento frequente de terceiro',
+};
+
+function CartaoInsight({ insight, onFeedback, onResolver }) {
+  const cor = CORES_SEVERIDADE[insight.severidade] || 'var(--text-muted)';
+  const eq  = insight.equipamento;
+  return (
+    <div
+      className="rounded-2xl border px-4 py-3 space-y-2"
+      style={{ borderColor: cor, backgroundColor: 'var(--bg-surface-soft)' }}
+    >
+      <div className="flex items-start gap-2">
+        <FontAwesomeIcon icon={faLightbulb} className="mt-1 shrink-0" style={{ color: cor }} />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-baseline gap-x-2">
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              {insight.titulo}
+            </span>
+            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+              · {LABELS_TIPO_INSIGHT[insight.tipo] || insight.tipo}
+            </span>
+          </div>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {eq?.apelido || eq?.tag || '—'} ({eq?.modelo || '—'}) · há {relativo(insight.geradoEm)}
+          </p>
+        </div>
+      </div>
+
+      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{insight.descricao}</p>
+
+      {insight.recomendacao && (
+        <p className="text-sm rounded-xl px-3 py-2"
+           style={{ backgroundColor: 'var(--bg-surface)', color: 'var(--text-primary)', borderLeft: `3px solid ${cor}` }}>
+          <strong>Recomendação:</strong> {insight.recomendacao}
+        </p>
+      )}
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <div className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+          <span>Útil?</span>
+          <button
+            type="button"
+            onClick={() => onFeedback(insight.id, true)}
+            className="rounded px-2 py-1 hover:bg-white/5"
+            style={{ color: insight.feedbackUtil === true ? 'var(--color-success)' : 'var(--text-muted)' }}
+          >
+            <FontAwesomeIcon icon={faThumbsUp} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onFeedback(insight.id, false)}
+            className="rounded px-2 py-1 hover:bg-white/5"
+            style={{ color: insight.feedbackUtil === false ? 'var(--color-danger)' : 'var(--text-muted)' }}
+          >
+            <FontAwesomeIcon icon={faThumbsDown} />
+          </button>
+        </div>
+        <Button type="button" variant="ghost" onClick={() => onResolver(insight.id)}>
+          <FontAwesomeIcon icon={faCheck} />
+          <span className="ml-1 text-xs">Marcar resolvido</span>
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ListaInsights({ insights, onFeedback, onResolver }) {
+  if (!insights?.length) {
+    return (
+      <InlineEmptyState message="A IA ainda nao gerou insights. Conforme eventos forem acumulados (PDFs extraidos + telemetria), padroes vao aparecer aqui." />
+    );
+  }
+  return (
+    <div className="space-y-3">
+      {insights.map((ins) => (
+        <CartaoInsight
+          key={ins.id}
+          insight={ins}
+          onFeedback={onFeedback}
+          onResolver={onResolver}
+        />
+      ))}
+    </div>
+  );
+}
+
 // ─── Bloco de causas-raiz agregadas ─────────────────────────────────────────
 
 function CausasAgregadas({ causas }) {
@@ -365,9 +470,10 @@ function FeedAtividade({ itens }) {
 
 function GehcAprendizadoTab() {
   const {
-    status, pipelines, equipamentos, atividade, causas,
+    status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
     acaoPipeline, pausar, retomar,
+    darFeedbackInsight, resolverInsight,
   } = useGehcAprendizado();
 
   const [dialogo, setDialogo] = useState(null); // { pipeline, label } | null
@@ -434,6 +540,18 @@ function GehcAprendizadoTab() {
           acaoPipeline={acaoPipeline}
           onPausar={(pipeline, label) => setDialogo({ pipeline, label })}
           onRetomar={(pipeline) => retomar(pipeline)}
+        />
+      </PageSection>
+
+      {/* Insights da IA */}
+      <PageSection
+        title="Insights da IA"
+        description="Recomendações geradas automaticamente. Marque útil/inútil para a IA aprender com seu feedback."
+      >
+        <ListaInsights
+          insights={insights}
+          onFeedback={darFeedbackInsight}
+          onResolver={resolverInsight}
         />
       </PageSection>
 

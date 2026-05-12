@@ -10,6 +10,9 @@ import {
   getAprendizadoAtividade,
   getAprendizadoPipelines,
   getAprendizadoCausas,
+  getAprendizadoInsights,
+  patchInsightFeedback,
+  patchInsightResolver,
   postPausarPipeline,
   postRetomarPipeline,
 } from '@/services/api/gehcAprendizadoApi';
@@ -22,6 +25,7 @@ export function useGehcAprendizado() {
   const [equipamentos, setEquipamentos]   = useState([]);
   const [atividade, setAtividade]         = useState([]);
   const [causas, setCausas]               = useState([]);
+  const [insights, setInsights]           = useState([]);
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState(null);
   const [acaoPipeline, setAcaoPipeline]   = useState({}); // { [pipeline]: 'pausando'|'retomando' }
@@ -29,24 +33,44 @@ export function useGehcAprendizado() {
   const carregar = useCallback(async () => {
     try {
       setError(null);
-      const [s, ps, eqs, atv, cs] = await Promise.all([
+      const [s, ps, eqs, atv, cs, ins] = await Promise.all([
         getAprendizadoStatus(),
         getAprendizadoPipelines(),
         getAprendizadoEquipamentos(),
         getAprendizadoAtividade(),
         getAprendizadoCausas(),
+        getAprendizadoInsights(),
       ]);
       setStatus(s);
       setPipelines(ps?.pipelines || []);
       setEquipamentos(eqs?.equipamentos || []);
       setAtividade(atv?.itens || []);
       setCausas(cs?.categorias || []);
+      setInsights(ins?.insights || []);
     } catch (err) {
       setError(err?.response?.data?.error || err.message);
     } finally {
       setLoading(false);
     }
   }, []);
+
+  const darFeedbackInsight = useCallback(async (id, util) => {
+    try {
+      await patchInsightFeedback(id, util);
+      await carregar();
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+    }
+  }, [carregar]);
+
+  const resolverInsight = useCallback(async (id) => {
+    try {
+      await patchInsightResolver(id);
+      await carregar();
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+    }
+  }, [carregar]);
 
   useEffect(() => {
     carregar();
@@ -87,10 +111,11 @@ export function useGehcAprendizado() {
   }, [carregar]);
 
   return {
-    status, pipelines, equipamentos, atividade, causas,
+    status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
     acaoPipeline,
     pausar, retomar,
+    darFeedbackInsight, resolverInsight,
     recarregar: carregar,
   };
 }
