@@ -157,6 +157,31 @@ router.patch('/insights/:id/feedback', async (req, res) => {
   }
 });
 
+// ─── POST /api/gehc/aprendizado/insights/limpar-todos ────────────────────────
+// Marca todos insights ativos do tenant como resolvidos. Util para zerar apos
+// fix de logica de detector que gerou falsos positivos. Proxima execucao do
+// ia-gerar-insights re-cria APENAS os que ainda forem validos pelos novos
+// criterios.
+router.post('/insights/limpar-todos', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const usuarioId = req.usuario.id;
+  try {
+    const r = await prisma.iaInsight.updateMany({
+      where: { tenantId, resolvidoEm: null },
+      data:  { resolvidoEm: new Date() },
+    });
+    await logAuditoria({
+      tenantId, autorId: usuarioId,
+      acao: 'AI_INSIGHTS_LIMPOS_EM_LOTE',
+      entidadeId: 'todos',
+      detalhes: { resolvidos: r.count, motivo: req.body?.motivo || 'limpeza_manual' },
+    });
+    res.json({ ok: true, resolvidos: r.count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── PATCH /api/gehc/aprendizado/insights/:id/resolver ────────────────────────
 // Marca insight como resolvido manualmente (engenheiro tomou acao).
 // Proximo run do insightsGenerator pode regerar se a condicao persistir.
