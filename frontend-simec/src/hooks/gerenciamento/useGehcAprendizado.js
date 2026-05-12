@@ -15,6 +15,7 @@ import {
   patchInsightResolver,
   postPausarPipeline,
   postRetomarPipeline,
+  postDispararPipeline,
 } from '@/services/api/gehcAprendizadoApi';
 
 const REFRESH_INTERVAL_MS = 60_000;
@@ -94,6 +95,26 @@ export function useGehcAprendizado() {
     }
   }, [carregar]);
 
+  const disparar = useCallback(async (pipeline) => {
+    setAcaoPipeline((s) => ({ ...s, [pipeline]: 'disparando' }));
+    try {
+      await postDispararPipeline(pipeline);
+      // Aguarda alguns segundos antes de recarregar — da tempo do worker
+      // pegar o job e o estado refletir nas KPIs.
+      setTimeout(() => carregar(), 4000);
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+    } finally {
+      setTimeout(() => {
+        setAcaoPipeline((s) => {
+          const novo = { ...s };
+          delete novo[pipeline];
+          return novo;
+        });
+      }, 4000);
+    }
+  }, [carregar]);
+
   const retomar = useCallback(async (pipeline, { escopo = 'tenant' } = {}) => {
     setAcaoPipeline((s) => ({ ...s, [pipeline]: 'retomando' }));
     try {
@@ -114,7 +135,7 @@ export function useGehcAprendizado() {
     status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
     acaoPipeline,
-    pausar, retomar,
+    pausar, retomar, disparar,
     darFeedbackInsight, resolverInsight,
     recarregar: carregar,
   };

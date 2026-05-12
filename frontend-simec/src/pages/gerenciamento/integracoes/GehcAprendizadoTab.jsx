@@ -16,6 +16,7 @@ import {
   faThumbsUp,
   faThumbsDown,
   faCheck,
+  faBolt,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -143,7 +144,7 @@ function StatusGeral({ status, pipelines }) {
   );
 }
 
-function ListaPipelines({ pipelines, acaoPipeline, onPausar, onRetomar }) {
+function ListaPipelines({ pipelines, acaoPipeline, onPausar, onRetomar, onDisparar }) {
   if (!pipelines?.length) return null;
 
   return (
@@ -151,6 +152,8 @@ function ListaPipelines({ pipelines, acaoPipeline, onPausar, onRetomar }) {
       {pipelines.map((p) => {
         const acao = acaoPipeline[p.pipeline];
         const podePausar = p.ativo;
+        // Pipeline 'global' nao tem job para disparar — e so kill switch.
+        const podeDisparar = p.ativo && p.pipeline !== 'global';
         return (
           <div
             key={p.pipeline}
@@ -178,17 +181,34 @@ function ListaPipelines({ pipelines, acaoPipeline, onPausar, onRetomar }) {
                 </p>
               )}
             </div>
-            {podePausar ? (
-              <Button type="button" variant="secondary" onClick={() => onPausar(p.pipeline, p.label)} disabled={!!acao}>
-                <FontAwesomeIcon icon={acao === 'pausando' ? faSpinner : faCirclePause} spin={acao === 'pausando'} />
-                Pausar
-              </Button>
-            ) : (
-              <Button type="button" variant="primary" onClick={() => onRetomar(p.pipeline)} disabled={!!acao}>
-                <FontAwesomeIcon icon={acao === 'retomando' ? faSpinner : faCirclePlay} spin={acao === 'retomando'} />
-                Retomar
-              </Button>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {podeDisparar && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onDisparar(p.pipeline)}
+                  disabled={!!acao}
+                  title="Forçar execução agora (sem esperar o cron)"
+                >
+                  <FontAwesomeIcon
+                    icon={acao === 'disparando' ? faSpinner : faBolt}
+                    spin={acao === 'disparando'}
+                  />
+                  <span className="ml-1 text-xs">Rodar agora</span>
+                </Button>
+              )}
+              {podePausar ? (
+                <Button type="button" variant="secondary" onClick={() => onPausar(p.pipeline, p.label)} disabled={!!acao}>
+                  <FontAwesomeIcon icon={acao === 'pausando' ? faSpinner : faCirclePause} spin={acao === 'pausando'} />
+                  Pausar
+                </Button>
+              ) : (
+                <Button type="button" variant="primary" onClick={() => onRetomar(p.pipeline)} disabled={!!acao}>
+                  <FontAwesomeIcon icon={acao === 'retomando' ? faSpinner : faCirclePlay} spin={acao === 'retomando'} />
+                  Retomar
+                </Button>
+              )}
+            </div>
           </div>
         );
       })}
@@ -472,7 +492,7 @@ function GehcAprendizadoTab() {
   const {
     status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
-    acaoPipeline, pausar, retomar,
+    acaoPipeline, pausar, retomar, disparar,
     darFeedbackInsight, resolverInsight,
   } = useGehcAprendizado();
 
@@ -540,6 +560,7 @@ function GehcAprendizadoTab() {
           acaoPipeline={acaoPipeline}
           onPausar={(pipeline, label) => setDialogo({ pipeline, label })}
           onRetomar={(pipeline) => retomar(pipeline)}
+          onDisparar={(pipeline) => disparar(pipeline)}
         />
       </PageSection>
 
