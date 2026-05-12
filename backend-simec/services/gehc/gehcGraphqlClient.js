@@ -161,7 +161,9 @@ export async function fetchServiceHistory({ assetId, accessToken, idToken, tenan
         filter: {
           assetIds:          [assetId],
           serviceStateCodes: ['ST01', 'ST02', 'ST03', 'ST04', 'ST05'],
-          serviceTypeCodes:  ['SE03', 'SE05'],
+          // SE02 = preventiva (PM), SE03/SE05 = corretiva. Importamos as três
+          // para alimentar o Knowledge Layer da IA com o histórico completo.
+          serviceTypeCodes:  ['SE02', 'SE03', 'SE05'],
         },
         pageOffset: { cursorMark, rows },
         sort: { requestedDateTime: 'desc' },
