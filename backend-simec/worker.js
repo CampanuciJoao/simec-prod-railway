@@ -38,6 +38,24 @@ const alertasQueueEvents = new QueueEvents('alertas-fila', {
   connection,
 });
 
+/**
+ * Envolve um handler longo em heartbeat: chama job.updateProgress() a cada
+ * `intervalMs` para o BullMQ saber que o worker continua vivo e renovar o
+ * lock. Permite manter `lockDuration` curto no Worker (recuperacao rapida
+ * em caso de crash) sem matar handlers que demoram minutos.
+ *
+ * Usar em qualquer handler que possa demorar mais que ~lockDuration/2.
+ */
+async function withHeartbeat(job, fn, intervalMs = 25_000) {
+  const heartbeat = setInterval(() => {
+    job?.updateProgress({ heartbeat: Date.now() }).catch(() => {});
+  }, intervalMs);
+  try {
+    return await fn();
+  } finally {
+    clearInterval(heartbeat);
+  }
+}
 
 const alertasWorker = new Worker(
   'alertas-fila',
@@ -83,204 +101,218 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'gehc-monitorar-saude') {
-      const tenants = await prisma.tenant.findMany({
-        where: { ativo: true },
-        select: { id: true },
-      });
-
-      const resultados = [];
-      for (const tenant of tenants) {
-        try {
-          await monitorarSaudeGehc({ tenantId: tenant.id });
-          resultados.push({ tenantId: tenant.id, ok: true });
-        } catch (err) {
-          console.error(`[GEHC_WORKER] Erro tenant ${tenant.id}:`, err.message);
-          resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+      return withHeartbeat(job, async () => {
+        const tenants = await prisma.tenant.findMany({
+          where: { ativo: true },
+          select: { id: true },
+        });
+        const resultados = [];
+        for (const tenant of tenants) {
+          try {
+            await monitorarSaudeGehc({ tenantId: tenant.id });
+            resultados.push({ tenantId: tenant.id, ok: true });
+          } catch (err) {
+            console.error(`[GEHC_WORKER] Erro tenant ${tenant.id}:`, err.message);
+            resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+          }
         }
-      }
-
-      return { ok: true, tenants: resultados.length, resultados };
+        return { ok: true, tenants: resultados.length, resultados };
+      });
     }
 
     if (job?.name === 'gehc-sync-dados') {
-      const tenants = await prisma.tenant.findMany({
-        where: { ativo: true },
-        select: { id: true },
-      });
-
-      const resultados = [];
-      for (const tenant of tenants) {
-        try {
-          const r = await sincronizarDadosGehc({ tenantId: tenant.id });
-          resultados.push({ tenantId: tenant.id, ok: true, total: r?.total ?? 0 });
-        } catch (err) {
-          console.error(`[GEHC_SYNC_WORKER] Erro tenant ${tenant.id}:`, err.message);
-          resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+      return withHeartbeat(job, async () => {
+        const tenants = await prisma.tenant.findMany({
+          where: { ativo: true },
+          select: { id: true },
+        });
+        const resultados = [];
+        for (const tenant of tenants) {
+          try {
+            const r = await sincronizarDadosGehc({ tenantId: tenant.id });
+            resultados.push({ tenantId: tenant.id, ok: true, total: r?.total ?? 0 });
+          } catch (err) {
+            console.error(`[GEHC_SYNC_WORKER] Erro tenant ${tenant.id}:`, err.message);
+            resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
+          }
         }
-      }
-
-      return { ok: true, tenants: resultados.length, resultados };
+        return { ok: true, tenants: resultados.length, resultados };
+      });
     }
 
     if (job?.name === 'gehc-capturar-pdfs') {
       // Captura noturna de PDFs de OS GE para alimentar a IA preditiva.
       // O downloader internamente respeita o estado de pausa do pipeline
       // (PIPELINE_NAMES.GEHC_CAPTURA_PDF) — se desativado, devolve cedo.
-      // Heartbeat: ping a cada 30s para o BullMQ saber que ainda esta ativo.
-      const heartbeat = setInterval(() => {
-        job?.updateProgress({ heartbeat: Date.now() }).catch(() => {});
-      }, 30_000);
-      try {
-        const r = await executarBackfillTodosTenants({ diasAtras: 180, limite: 20 });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error('[GEHC_PDF_WORKER] Erro:', err.message);
-        return { ok: false, erro: err.message };
-      } finally {
-        clearInterval(heartbeat);
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await executarBackfillTodosTenants({ diasAtras: 180, limite: 20 });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error('[GEHC_PDF_WORKER] Erro:', err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'gehc-capturar-pdfs-tenant' && job?.data?.tenantId) {
       // Trigger pontual usado por endpoint admin ou eventos do sistema.
       // Mantemos opcional ainda que o cron diario cubra o caso geral.
-      try {
-        const r = await executarBackfillPdfs({
-          tenantId: job.data.tenantId,
-          diasAtras: job.data.diasAtras || 180,
-          limite: job.data.limite || 50,
-          modalidades: job.data.modalidades,
-        });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error(`[GEHC_PDF_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await executarBackfillPdfs({
+            tenantId: job.data.tenantId,
+            diasAtras: job.data.diasAtras || 180,
+            limite: job.data.limite || 50,
+            modalidades: job.data.modalidades,
+          });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error(`[GEHC_PDF_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'gehc-extrair-pdfs') {
       // Cron noturno: extrai causa-raiz + medicoes dos PDFs ja baixados.
       // Roda 1h depois do gehc-capturar-pdfs para pegar PDFs da mesma noite.
-      try {
-        const r = await executarExtracaoTodosTenants({ limite: 100 });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error('[GEHC_EXTRACAO_WORKER] Erro:', err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await executarExtracaoTodosTenants({ limite: 100 });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error('[GEHC_EXTRACAO_WORKER] Erro:', err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'gehc-extrair-pdfs-tenant' && job?.data?.tenantId) {
-      try {
-        const r = await executarExtracaoPdfsTenant({
-          tenantId: job.data.tenantId,
-          limite: job.data.limite || 100,
-        });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error(`[GEHC_EXTRACAO_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await executarExtracaoPdfsTenant({
+            tenantId: job.data.tenantId,
+            limite: job.data.limite || 100,
+          });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error(`[GEHC_EXTRACAO_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'knowledge-layer-sync') {
       // Sync horario do Knowledge Layer: consolida eventos das 5 fontes em
       // evento_equipamento. Idempotente, barato (so leitura + upsert).
-      try {
-        const r = await sincronizarKnowledgeLayerTodosTenants();
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error('[KL_WORKER] Erro:', err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await sincronizarKnowledgeLayerTodosTenants();
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error('[KL_WORKER] Erro:', err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'knowledge-layer-sync-tenant' && job?.data?.tenantId) {
-      try {
-        const r = await sincronizarKnowledgeLayerTenant({ tenantId: job.data.tenantId });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error(`[KL_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await sincronizarKnowledgeLayerTenant({ tenantId: job.data.tenantId });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error(`[KL_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'ia-gerar-embeddings') {
-      try {
-        const r = await gerarEmbeddingsTodosTenants({ limite: 200 });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error('[IA_EMBEDDINGS_WORKER] Erro:', err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await gerarEmbeddingsTodosTenants({ limite: 200 });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error('[IA_EMBEDDINGS_WORKER] Erro:', err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'ia-gerar-embeddings-tenant' && job?.data?.tenantId) {
-      try {
-        const r = await gerarEmbeddingsTenant({
-          tenantId: job.data.tenantId,
-          limite: job.data.limite || 200,
-        });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error(`[IA_EMBEDDINGS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await gerarEmbeddingsTenant({
+            tenantId: job.data.tenantId,
+            limite: job.data.limite || 200,
+          });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error(`[IA_EMBEDDINGS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'ia-gerar-insights') {
-      try {
-        const r = await gerarInsightsTodosTenants();
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error('[IA_INSIGHTS_WORKER] Erro:', err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await gerarInsightsTodosTenants();
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error('[IA_INSIGHTS_WORKER] Erro:', err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'ia-gerar-insights-tenant' && job?.data?.tenantId) {
-      try {
-        const r = await gerarInsightsTenant({ tenantId: job.data.tenantId });
-        return { ok: true, ...r };
-      } catch (err) {
-        console.error(`[IA_INSIGHTS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
-        return { ok: false, erro: err.message };
-      }
+      return withHeartbeat(job, async () => {
+        try {
+          const r = await gerarInsightsTenant({ tenantId: job.data.tenantId });
+          return { ok: true, ...r };
+        } catch (err) {
+          console.error(`[IA_INSIGHTS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+          return { ok: false, erro: err.message };
+        }
+      });
     }
 
     if (job?.name === 'gehc-discovery-diario') {
       // Roda discovery apenas para tenants que já tenham credenciais GE
       // configuradas — sem credenciais o discovery falha em capturar tokens
       // e não traz valor. Reduz ruído nos logs.
-      const tenants = await prisma.tenant.findMany({
-        where: { ativo: true },
-        select: { id: true },
-      });
-
-      const resultados = [];
-      for (const tenant of tenants) {
-        try {
-          const temCreds = await temCredenciaisConfiguradas(tenant.id);
-          if (!temCreds) {
-            resultados.push({ tenantId: tenant.id, ok: true, skipped: 'sem_credenciais' });
-            continue;
+      return withHeartbeat(job, async () => {
+        const tenants = await prisma.tenant.findMany({
+          where: { ativo: true },
+          select: { id: true },
+        });
+        const resultados = [];
+        for (const tenant of tenants) {
+          try {
+            const temCreds = await temCredenciaisConfiguradas(tenant.id);
+            if (!temCreds) {
+              resultados.push({ tenantId: tenant.id, ok: true, skipped: 'sem_credenciais' });
+              continue;
+            }
+            const r = await descobrirEquipamentosGehc(tenant.id);
+            resultados.push({
+              tenantId: tenant.id,
+              ok: true,
+              vinculados: r.vinculados.length,
+              jaVinculados: r.jaVinculados.length,
+              semMatch: r.semMatch.length,
+              pendentesConfirmacao: r.pendentesConfirmacao.length,
+            });
+          } catch (err) {
+            console.error(`[GEHC_DISCOVERY_WORKER] Erro tenant ${tenant.id}:`, err.message);
+            resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
           }
-          const r = await descobrirEquipamentosGehc(tenant.id);
-          resultados.push({
-            tenantId: tenant.id,
-            ok: true,
-            vinculados: r.vinculados.length,
-            jaVinculados: r.jaVinculados.length,
-            semMatch: r.semMatch.length,
-            pendentesConfirmacao: r.pendentesConfirmacao.length,
-          });
-        } catch (err) {
-          console.error(`[GEHC_DISCOVERY_WORKER] Erro tenant ${tenant.id}:`, err.message);
-          resultados.push({ tenantId: tenant.id, ok: false, erro: err.message });
         }
-      }
-
-      return { ok: true, tenants: resultados.length, resultados };
+        return { ok: true, tenants: resultados.length, resultados };
+      });
     }
 
     return processarAlertasEEnviarNotificacoes();
@@ -290,13 +322,14 @@ const alertasWorker = new Worker(
     concurrency: 5,
     autorun: true,
     limiter: { max: 5, duration: 5000 },
-    // lockDuration default do BullMQ e 30s. Jobs que abrem Playwright
-    // (gehc-capturar-pdfs, gehc-monitorar-saude) podem demorar varios
-    // minutos. Lock alto evita que o BullMQ marque como 'stalled'.
-    // O lock e renovado automaticamente em metade desse tempo.
-    lockDuration: 15 * 60 * 1000,  // 15 min
-    stalledInterval: 30 * 1000,    // checa stalled a cada 30s (default)
-    maxStalledCount: 1,            // 1 chance antes de marcar como falhado
+    // lockDuration mantem-se proximo do default (60s) para que recuperacao
+    // de jobs curtos apos crash continue rapida. Handlers longos
+    // (Playwright, sync GE, embeddings) usam withHeartbeat() abaixo para
+    // renovar o lock explicitamente — evita 'stalled' sem regredir
+    // tempo de retry global.
+    lockDuration: 60 * 1000,       // 60s (era 30s default)
+    stalledInterval: 30 * 1000,
+    maxStalledCount: 1,
   }
 );
 
