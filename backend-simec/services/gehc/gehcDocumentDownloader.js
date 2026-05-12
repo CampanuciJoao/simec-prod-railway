@@ -120,55 +120,83 @@ export async function abrirSessaoAutenticada(tenantId) {
 
 // ─── Download de um documento específico ─────────────────────────────────────
 
-// Selectors robustos: regex case-insensitive + alternativas separadas por virgula.
-// O texto pode aparecer com diferentes capitalizacoes ou variantes de acento.
-const RE_TRIGGER_POPUP = /documentos?\s+dispon[ií]ve(l|is)/i;
-const RE_TITULO_POPUP  = /fazer\s+o\s+download\s+dos\s+documentos/i;
+// Selectors do portal MyEquipment 360.
+// ATENCAO: o texto "Documentos disponíveis" na lista de OSs e apenas LABEL
+// informativa (em verde), NAO um botao clicavel. O elemento clicavel real
+// e o botao "Download" ao lado direito da linha. Ao clicar nele, abre o
+// popup "Fazer o download dos documentos" com checkboxes.
+const RE_TITULO_POPUP   = /fazer\s+o\s+download\s+dos\s+documentos/i;
 const RE_BOTAO_DOWNLOAD = /^(download|baixar)$/i;
 
-async function abrirPopupDocumentos(page) {
-  // Aguarda SPA terminar de carregar antes de procurar.
+async function clicarBotaoDownloadDaOs({ page }) {
+  // Aguarda SPA terminar de renderizar.
   await page.waitForLoadState('networkidle', { timeout: TRIGGER_TIMEOUT_MS }).catch(() => {});
 
-  // Se popup ja esta aberto, nao precisa clicar.
+  // Se o popup ja esta aberto (caso raro), nao precisa clicar.
   const popupJaAberto = await page.getByText(RE_TITULO_POPUP).count() > 0;
   if (popupJaAberto) return true;
 
-  // Procura o trigger via regex case-insensitive (cobre 'Documentos disponiveis',
-  // 'Documentos Disponíveis', etc.). Tambem tenta o role generico clicavel.
-  const triggers = [
-    page.getByText(RE_TRIGGER_POPUP).first(),
-    page.locator('a, button').filter({ hasText: RE_TRIGGER_POPUP }).first(),
+  // Procura o botao "Download" da OS (clicavel, em a/button) — varias
+  // estrategias de selector em ordem de preferencia. O texto "Documentos
+  // disponíveis" e ignorado intencionalmente (e label, nao botao).
+  const tentativas = [
+    page.getByRole('button', { name: RE_BOTAO_DOWNLOAD }).first(),
+    page.getByRole('link',   { name: RE_BOTAO_DOWNLOAD }).first(),
+    page.locator('button').filter({ hasText: RE_BOTAO_DOWNLOAD }).first(),
+    page.locator('a').filter({ hasText: RE_BOTAO_DOWNLOAD }).first(),
   ];
 
-  let abriu = false;
-  for (const trigger of triggers) {
+  for (const trigger of tentativas) {
     try {
       await trigger.waitFor({ state: 'visible', timeout: TRIGGER_TIMEOUT_MS });
       await trigger.click({ timeout: TRIGGER_TIMEOUT_MS });
-      await page.getByText(RE_TITULO_POPUP).waitFor({ timeout: POPUP_TIMEOUT_MS });
-      abriu = true;
-      break;
+      // Aguarda popup abrir; se nao abrir em 5s, talvez tenha baixado direto
+      await page.getByText(RE_TITULO_POPUP).waitFor({ timeout: 5_000 }).catch(() => {});
+      return true;
     } catch { /* tenta proximo selector */ }
   }
 
-  return abriu;
+  // Ultimo recurso: dump de debug para diagnostico (so URL e contagem de
+  // botoes, nao o HTML completo para nao explodir log).
+  try {
+    const url = page.url();
+    const totalBotoes = await page.locator('button, a').count();
+    const textosVisiveis = await page.locator('button, a').allInnerTexts();
+    const previewTextos = textosVisiveis.slice(0, 20).filter(Boolean).map((t) => t.trim()).join(' | ');
+    console.warn(`[GEHC_PDF_DEBUG] popup_indisponivel em ${url} — ${totalBotoes} botoes/links visiveis. Preview: ${previewTextos}`);
+  } catch { /* ignora erros do debug */ }
+
+  return false;
 }
 
 async function baixarUmDocumentoPorPopup({ page, indiceDocumento }) {
-  const popupOk = await abrirPopupDocumentos(page);
-  if (!popupOk) {
-    // Provavelmente OS sem documentos publicados ainda no portal — caso
-    // esperado, retorna null para o caller tratar como "nada a baixar"
-    // sem persistir como erro.
+  const ok = await clicarBotaoDownloadDaOs({ page });
+  if (!ok) {
+    // Provavelmente OS sem documentos publicados ainda no portal, ou layout
+    // diferente do esperado — caso nao-bloqueante, retorna null.
     return null;
   }
 
-  // Desmarca tudo, marca só o índice solicitado.
+  // Caso especial: clicar no Download da lista pode baixar 1 arquivo direto
+  // (sem popup) quando a OS tem apenas 1 documento. Detectamos via timeout
+  // curto antes de tentar interagir com checkboxes.
+  const popupVisivel = (await page.getByText(RE_TITULO_POPUP).count()) > 0;
+  if (!popupVisivel) {
+    // Nao apareceu popup — espera download direto disparado pelo botao.
+    try {
+      const download = await page.waitForEvent('download', { timeout: 8_000 });
+      return download;
+    } catch {
+      // Nao baixou nem abriu popup — falha real.
+      return null;
+    }
+  }
+
+  // Caso comum: popup aberto, marcar 1 checkbox e clicar DOWNLOAD do popup.
   const checkboxes = page.locator('input[type="checkbox"]');
   const total = await checkboxes.count();
   if (total === 0) {
-    return null; // popup abriu mas nao tem documentos — sem PDFs
+    return null;
   }
   for (let i = 0; i < total; i++) {
     const cb = checkboxes.nth(i);
@@ -179,11 +207,11 @@ async function baixarUmDocumentoPorPopup({ page, indiceDocumento }) {
   }
   await checkboxes.nth(indiceDocumento).check();
 
-  const botaoDownload = page.locator('button').filter({ hasText: RE_BOTAO_DOWNLOAD }).first();
+  const botaoDownloadPopup = page.locator('button').filter({ hasText: RE_BOTAO_DOWNLOAD }).last();
 
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
-    botaoDownload.click(),
+    botaoDownloadPopup.click(),
   ]);
 
   return download;
