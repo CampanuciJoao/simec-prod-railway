@@ -30,7 +30,8 @@ const PORTAL_OS_URL    = (assetId, srId) =>
 const RATE_LIMIT_OS_MS     = 7_000;   // espera entre OSs no mesmo tenant
 const RATE_LIMIT_TENANT_MS = 30_000;  // espera entre tenants
 const DOWNLOAD_TIMEOUT_MS  = 60_000;  // tempo máx aguardando o `download` event
-const POPUP_TIMEOUT_MS     = 15_000;  // tempo máx aguardando popup abrir
+const POPUP_TIMEOUT_MS     = 30_000;  // tempo máx aguardando popup abrir (SPA pode demorar)
+const TRIGGER_TIMEOUT_MS   = 30_000;  // tempo máx procurando botao 'Documentos disponiveis'
 
 const R2_PREFIX = 'gehc-pdfs';
 
@@ -119,18 +120,56 @@ export async function abrirSessaoAutenticada(tenantId) {
 
 // ─── Download de um documento específico ─────────────────────────────────────
 
+// Selectors robustos: regex case-insensitive + alternativas separadas por virgula.
+// O texto pode aparecer com diferentes capitalizacoes ou variantes de acento.
+const RE_TRIGGER_POPUP = /documentos?\s+dispon[ií]ve(l|is)/i;
+const RE_TITULO_POPUP  = /fazer\s+o\s+download\s+dos\s+documentos/i;
+const RE_BOTAO_DOWNLOAD = /^(download|baixar)$/i;
+
+async function abrirPopupDocumentos(page) {
+  // Aguarda SPA terminar de carregar antes de procurar.
+  await page.waitForLoadState('networkidle', { timeout: TRIGGER_TIMEOUT_MS }).catch(() => {});
+
+  // Se popup ja esta aberto, nao precisa clicar.
+  const popupJaAberto = await page.getByText(RE_TITULO_POPUP).count() > 0;
+  if (popupJaAberto) return true;
+
+  // Procura o trigger via regex case-insensitive (cobre 'Documentos disponiveis',
+  // 'Documentos Disponíveis', etc.). Tambem tenta o role generico clicavel.
+  const triggers = [
+    page.getByText(RE_TRIGGER_POPUP).first(),
+    page.locator('a, button').filter({ hasText: RE_TRIGGER_POPUP }).first(),
+  ];
+
+  let abriu = false;
+  for (const trigger of triggers) {
+    try {
+      await trigger.waitFor({ state: 'visible', timeout: TRIGGER_TIMEOUT_MS });
+      await trigger.click({ timeout: TRIGGER_TIMEOUT_MS });
+      await page.getByText(RE_TITULO_POPUP).waitFor({ timeout: POPUP_TIMEOUT_MS });
+      abriu = true;
+      break;
+    } catch { /* tenta proximo selector */ }
+  }
+
+  return abriu;
+}
+
 async function baixarUmDocumentoPorPopup({ page, indiceDocumento }) {
-  // Garante popup aberto.
-  const popupAberto = await page.locator('text=Fazer o download dos documentos').count();
-  if (!popupAberto) {
-    const trigger = page.locator('text=Documentos disponíveis').first();
-    await trigger.click({ timeout: POPUP_TIMEOUT_MS });
-    await page.locator('text=Fazer o download dos documentos').waitFor({ timeout: POPUP_TIMEOUT_MS });
+  const popupOk = await abrirPopupDocumentos(page);
+  if (!popupOk) {
+    // Provavelmente OS sem documentos publicados ainda no portal — caso
+    // esperado, retorna null para o caller tratar como "nada a baixar"
+    // sem persistir como erro.
+    return null;
   }
 
   // Desmarca tudo, marca só o índice solicitado.
   const checkboxes = page.locator('input[type="checkbox"]');
   const total = await checkboxes.count();
+  if (total === 0) {
+    return null; // popup abriu mas nao tem documentos — sem PDFs
+  }
   for (let i = 0; i < total; i++) {
     const cb = checkboxes.nth(i);
     if (await cb.isChecked()) await cb.uncheck();
@@ -140,9 +179,11 @@ async function baixarUmDocumentoPorPopup({ page, indiceDocumento }) {
   }
   await checkboxes.nth(indiceDocumento).check();
 
+  const botaoDownload = page.locator('button').filter({ hasText: RE_BOTAO_DOWNLOAD }).first();
+
   const [download] = await Promise.all([
     page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
-    page.locator('button:has-text("DOWNLOAD"), button:has-text("Download")').first().click(),
+    botaoDownload.click(),
   ]);
 
   return download;
@@ -212,6 +253,13 @@ async function capturarPdfsDeOS({ context, tenantId, ordemServico, equipamento, 
       // Reabrir popup pra cada download (fecha sozinho após cada DOWNLOAD).
       try {
         const download = await baixarUmDocumentoPorPopup({ page, indiceDocumento: i });
+        if (!download) {
+          // OS sem botao 'Documentos disponiveis' visivel no portal —
+          // pode ser OS antiga, sem documentos publicados, ou mudanca de UI.
+          // Nao persiste erro: na proxima rodada tenta de novo silenciosamente.
+          erros.push(`${doc.documentId}: popup_indisponivel (sem documentos no portal)`);
+          continue;
+        }
         const buffer = await lerStreamComoBuffer(await download.createReadStream());
 
         const documentId = doc.documentId;
