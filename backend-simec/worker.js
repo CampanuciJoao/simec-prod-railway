@@ -11,6 +11,7 @@ import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
 import { executarBackfillTodosTenants, executarBackfillPdfs } from './services/gehc/gehcDocumentDownloader.js';
 import { executarExtracaoTodosTenants, executarExtracaoPdfsTenant } from './services/gehc/gehcPdfExtractionOrchestrator.js';
+import { sincronizarKnowledgeLayerTodosTenants, sincronizarKnowledgeLayerTenant } from './services/knowledgeLayer/knowledgeLayerSync.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -170,6 +171,28 @@ const alertasWorker = new Worker(
         return { ok: true, ...r };
       } catch (err) {
         console.error(`[GEHC_EXTRACAO_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'knowledge-layer-sync') {
+      // Sync horario do Knowledge Layer: consolida eventos das 5 fontes em
+      // evento_equipamento. Idempotente, barato (so leitura + upsert).
+      try {
+        const r = await sincronizarKnowledgeLayerTodosTenants();
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[KL_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'knowledge-layer-sync-tenant' && job?.data?.tenantId) {
+      try {
+        const r = await sincronizarKnowledgeLayerTenant({ tenantId: job.data.tenantId });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error(`[KL_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
         return { ok: false, erro: err.message };
       }
     }
