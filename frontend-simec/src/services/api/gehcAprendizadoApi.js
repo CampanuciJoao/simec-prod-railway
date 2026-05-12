@@ -39,6 +39,9 @@ export const postPausarPipeline = (pipeline, { motivo, escopo = 'tenant' } = {})
 export const postRetomarPipeline = (pipeline, { escopo = 'tenant' } = {}) =>
   api.post(`/gehc/aprendizado/pipelines/${pipeline}/retomar`, { escopo }).then((r) => r.data);
 
+export const postDispararPipeline = (pipeline) =>
+  api.post(`/gehc/aprendizado/pipelines/${pipeline}/disparar`).then((r) => r.data);
+
 // URL absoluta do PDF servido pelo backend (stream do R2).
 // Usar em <a href={...}> para abrir em nova aba ou baixar.
 export const urlPdfDocumento = (documentId) =>
