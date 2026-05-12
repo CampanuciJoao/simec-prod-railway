@@ -259,7 +259,7 @@ async function lerStreamComoBuffer(stream) {
 // Como 'Documentos disponiveis' so aparece para OS com PDFs ja publicados
 // pelo GE, o filtro fica natural — nao gastamos tempo com OSs vazias.
 
-async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens }) {
+async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens, tokens }) {
   const assetId = equipamento.gehcAssetId;
   if (!assetId) return { capturados: 0, processadas: 0, erro: 'sem_asset_id' };
   if (!ordens.length) return { capturados: 0, processadas: 0, erro: null };
@@ -294,36 +294,34 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
       return { capturados: 0, processadas: 0, erro: `sessao_perdida: ${urlAtual.slice(0, 80)}` };
     }
 
-    // Aguarda PELO MENOS 1 indicador "Documentos disponiveis" aparecer.
-    // Se nao aparecer em 20s, nenhum dos documentos esperados esta na lista
-    // visivel — equipamento sem OSs com PDF publicado, ou paginacao escondendo.
-    const re = /documentos?\s+dispon[ií]ve(l|is)/i;
-    const temIndicador = await page
-      .getByText(re).first()
+    // Selector ESTAVEL descoberto via inspecao do DOM real do portal:
+    //   <div class="ge-equipment-service-history__item">       <- card completo
+    //     <div class="...__wrapper">  numero SR + 'Documentos disponiveis'
+    //     <div class="...__holder">   <button>Detalhes</button> <button>Download</button>
+    //   </div>
+    // Aguarda pelo menos 1 card aparecer.
+    const itemSelector = '.ge-equipment-service-history__item';
+    const temItem = await page.locator(itemSelector).first()
       .waitFor({ state: 'visible', timeout: 20_000 })
-      .then(() => true)
-      .catch(() => false);
+      .then(() => true).catch(() => false);
 
-    if (!temIndicador) {
-      return { capturados: 0, processadas: 0, erro: 'lista_sem_documentos_disponiveis' };
+    if (!temItem) {
+      return { capturados: 0, processadas: 0, erro: 'lista_sem_items_de_servico' };
     }
 
-    // Pega TODAS as ocorrencias de "Documentos disponiveis" e processa uma a uma.
-    const indicadores = await page.getByText(re).all();
-    console.log(`[GEHC_PDF] ${equipamento.tag || equipamento.id}: ${indicadores.length} OS(s) com 'Documentos disponiveis' visiveis na lista.`);
+    // Pega TODOS os cards de OS visiveis e processa um a um.
+    const items = await page.locator(itemSelector).all();
+    console.log(`[GEHC_PDF] ${equipamento.tag || equipamento.id}: ${items.length} card(s) de OS visiveis na lista.`);
 
-    for (const indicador of indicadores) {
+    for (const item of items) {
       try {
-        // Sobe na arvore ate encontrar um container que contenha o numero da OS
-        // (formato 'SR<numero>') E o botao Download.
-        const card = indicador.locator('xpath=ancestor::*[descendant::*[contains(translate(text(), "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "abcdefghijklmnopqrstuvwxyz"), "sr") and (descendant-or-self::* or following-sibling::*)]][1]')
-          .first();
-
-        // Extrai o numero visivel na area (Nº SR12345678)
-        const textoCard = await card.textContent({ timeout: 3_000 }).catch(() => '');
-        const matchSR = textoCard?.match(/SR\s*0*(\d{5,})/i);
+        // Numero da OS sai do .ge-equipment-service-history__number — formato:
+        // <div><span>Nº SR</span>17386673</div>
+        const textoNumero = await item.locator('.ge-equipment-service-history__number')
+          .textContent({ timeout: 3_000 }).catch(() => '');
+        const matchSR = textoNumero?.match(/(\d{5,})/);
         if (!matchSR) {
-          erros.push('row_sem_tracking_visivel');
+          // Card sem numero visivel — pula (provavelmente loading skeleton)
           continue;
         }
         const trackingNumber = matchSR[1];
@@ -333,13 +331,21 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
           continue;
         }
 
+        // So tem botao Download se 'Documentos disponiveis' estiver presente
+        // no card (filtro natural — OS sem PDF nem chega aqui).
+        const temDocsDisponiveis = await item
+          .locator('.ge-equipment-service-history-activity-info__title')
+          .filter({ hasText: /documentos?\s+dispon[ií]ve/i })
+          .count() > 0;
+        if (!temDocsDisponiveis) continue;
+
         // Resolve documentos do GraphQL (idempotencia + filename real).
         let docsPendentes = [];
         try {
           const docs = await listarDocumentosDaOS({
             serviceRequestNumber: trackingNumber,
-            accessToken: getTokens()?.accessToken,
-            idToken: getTokens()?.idToken,
+            accessToken: tokens?.accessToken,
+            idToken: tokens?.idToken,
           });
           if (docs.length) {
             const ja = await prisma.gehcPdfDocumento.findMany({
@@ -356,8 +362,9 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
 
         if (!docsPendentes.length) continue; // nada a fazer
 
-        // Clica no botao Download desta linha
-        const downloadBtn = card.locator('button, a').filter({ hasText: /^(download|baixar)$/i }).first();
+        // Botao Download esta no .ge-equipment-service-history__holder do card.
+        const downloadBtn = item.locator('.ge-equipment-service-history__holder button')
+          .filter({ hasText: /^(download|baixar)$/i }).first();
         const visivel = await downloadBtn.isVisible({ timeout: 3_000 }).catch(() => false);
         if (!visivel) {
           erros.push(`SR${trackingNumber}: botao_download_nao_visivel`);
@@ -435,11 +442,6 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
 
   return { capturados, processadas, erro: erros.length ? erros.join(' | ').slice(0, 500) : null };
 }
-
-// Variavel modulo para compartilhar tokens entre chamadas dentro do mesmo backfill.
-// Setado pelo orquestrador (executarBackfillPdfs) antes de chamar capturarPdfsDeEquipamento.
-let _tokensCorrentes = null;
-function getTokens() { return _tokensCorrentes; }
 
 // Helper que aciona o botao Download e captura o download — cobre 2 cenarios:
 // (a) baixa direto (1 PDF), (b) abre popup com checkboxes (multiplos PDFs).
@@ -551,10 +553,6 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
   let processadas = 0;
   let capturados  = 0;
 
-  // Disponibiliza tokens para capturarPdfsDeEquipamento usar nas chamadas
-  // GraphQL (documentSearch). Resetado no finally.
-  _tokensCorrentes = tokens;
-
   // Agrupa OSs pendentes por equipamento — assim abrimos UMA pagina por
   // equipamento em vez de uma por OS.
   const porEquipamento = new Map();
@@ -572,11 +570,15 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
         break;
       }
 
+      // Tokens passados explicitamente (NAO via variavel global) — evita
+      // race condition entre backfills concorrentes (worker tem
+      // concurrency: 5) e cross-tenant credential leak.
       const resultado = await capturarPdfsDeEquipamento({
         context: session.context,
         tenantId,
         equipamento,
         ordens: ordensDoEquipamento,
+        tokens,
       });
 
       processadas += resultado.processadas || 0;
@@ -592,7 +594,6 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
       await sleep(RATE_LIMIT_OS_MS);
     }
   } finally {
-    _tokensCorrentes = null;
     await session.browser.close().catch(() => {});
   }
 
