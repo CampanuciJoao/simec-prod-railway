@@ -292,6 +292,28 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-extrair-pdfs) agendado diariamente às 05:00 UTC.');
 
+    // Knowledge Layer: consolida eventos de 5 fontes diferentes em uma
+    // timeline unica por equipamento. Roda hora em hora — barato, so leitura
+    // + upsert idempotente. Mantem a memoria da IA fresca o dia todo.
+    const repeatables8 = await queue.getRepeatableJobs();
+    for (const job of repeatables8) {
+      if (job.name === 'knowledge-layer-sync') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'knowledge-layer-sync',
+      {},
+      {
+        repeat: { every: 60 * 60 * 1000 },
+        removeOnComplete: 24,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job KL (knowledge-layer-sync) agendado a cada 1h.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {

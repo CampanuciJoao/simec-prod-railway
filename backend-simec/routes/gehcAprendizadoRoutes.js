@@ -105,6 +105,37 @@ router.get('/status', async (req, res) => {
   }
 });
 
+// ─── GET /api/gehc/aprendizado/timeline/:equipamentoId ───────────────────────
+// Timeline unificada do Knowledge Layer para um equipamento. Read-only — usada
+// para inspecao (admin/debug) e como base para o RAG do chatbot (PR4).
+router.get('/timeline/:equipamentoId', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { equipamentoId } = req.params;
+  const limite = Math.min(Number(req.query.limite) || 100, 500);
+  try {
+    const equipamento = await prisma.equipamento.findFirst({
+      where: { tenantId, id: equipamentoId },
+      select: { id: true, tag: true, apelido: true, modelo: true, gehcAssetId: true },
+    });
+    if (!equipamento) return res.status(404).json({ error: 'Equipamento não encontrado.' });
+
+    const eventos = await prisma.eventoEquipamento.findMany({
+      where: { tenantId, equipamentoId },
+      orderBy: { ocorridoEm: 'desc' },
+      take: limite,
+    });
+
+    res.json({
+      equipamento,
+      total: eventos.length,
+      eventos,
+    });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /timeline:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/gehc/aprendizado/causas ─────────────────────────────────────────
 // Agregacao de causa-raiz por categoria normalizada (taxonomia LLM).
 // Resposta: top categorias com contagem total + por equipamento.
