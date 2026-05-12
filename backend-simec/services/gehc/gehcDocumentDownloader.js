@@ -27,11 +27,11 @@ const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com.br/account';
 const PORTAL_OS_URL    = (assetId, srId) =>
   `https://www.gehealthcare.com.br/account/myequipment-360?assetId=${assetId}&srId=${srId}`;
 
-const RATE_LIMIT_OS_MS     = 7_000;   // espera entre OSs no mesmo tenant
-const RATE_LIMIT_TENANT_MS = 30_000;  // espera entre tenants
+const RATE_LIMIT_OS_MS     = 3_000;   // espera entre OSs no mesmo tenant
+const RATE_LIMIT_TENANT_MS = 15_000;  // espera entre tenants
 const DOWNLOAD_TIMEOUT_MS  = 60_000;  // tempo máx aguardando o `download` event
 const POPUP_TIMEOUT_MS     = 30_000;  // tempo máx aguardando popup abrir (SPA pode demorar)
-const TRIGGER_TIMEOUT_MS   = 30_000;  // tempo máx procurando botao 'Documentos disponiveis'
+const TRIGGER_TIMEOUT_MS   = 20_000;  // tempo máx procurando botao Download
 
 const R2_PREFIX = 'gehc-pdfs';
 
