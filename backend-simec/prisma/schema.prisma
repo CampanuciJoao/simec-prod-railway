@@ -1044,6 +1044,14 @@ model AiPipelineEstado {
   motivoPausa   String?   @db.Text @map("motivo_pausa")
   retomadoEm    DateTime? @map("retomado_em")
   retomadoPorId String?   @map("retomado_por_id")
+  // Telemetria da ultima execucao (atualizado por registrarExecucao()
+  // a cada fim de job — sucesso ou falha). Visivel no painel pra admin
+  // saber se o pipeline esta funcionando sem precisar de logs.
+  ultimaExecucaoEm        DateTime? @map("ultima_execucao_em")
+  ultimaExecucaoOk        Boolean?  @map("ultima_execucao_ok")
+  ultimaExecucaoMensagem  String?   @db.Text @map("ultima_execucao_mensagem")
+  ultimaExecucaoMetrics   Json?     @map("ultima_execucao_metrics")
+  ultimaExecucaoDuracaoMs Int?      @map("ultima_execucao_duracao_ms")
   updatedAt     DateTime  @updatedAt
 
   tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)

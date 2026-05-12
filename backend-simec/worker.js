@@ -14,6 +14,7 @@ import { executarExtracaoTodosTenants, executarExtracaoPdfsTenant } from './serv
 import { sincronizarKnowledgeLayerTodosTenants, sincronizarKnowledgeLayerTenant } from './services/knowledgeLayer/knowledgeLayerSync.js';
 import { gerarEmbeddingsTodosTenants, gerarEmbeddingsTenant } from './services/ai/eventoEmbeddingsWorker.js';
 import { gerarInsightsTodosTenants, gerarInsightsTenant } from './services/ai/insightsGenerator.js';
+import { registrarExecucao, PIPELINE_NAMES } from './services/ai/aiPipelineState.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -43,8 +44,6 @@ const alertasQueueEvents = new QueueEvents('alertas-fila', {
  * `intervalMs` para o BullMQ saber que o worker continua vivo e renovar o
  * lock. Permite manter `lockDuration` curto no Worker (recuperacao rapida
  * em caso de crash) sem matar handlers que demoram minutos.
- *
- * Usar em qualquer handler que possa demorar mais que ~lockDuration/2.
  */
 async function withHeartbeat(job, fn, intervalMs = 25_000) {
   const heartbeat = setInterval(() => {
@@ -55,6 +54,52 @@ async function withHeartbeat(job, fn, intervalMs = 25_000) {
   } finally {
     clearInterval(heartbeat);
   }
+}
+
+/**
+ * Combina heartbeat + registro de execucao (sucesso/falha + metricas) em
+ * ai_pipeline_estados. UI exibe esses dados no card do pipeline para o
+ * admin saber se rodou sem precisar de logs.
+ *
+ * @param {object} job - job BullMQ atual
+ * @param {string} pipeline - PIPELINE_NAMES.* (chave para registrar)
+ * @param {Function} fn - async () => result. Result tipico:
+ *                         { ok, ...metricas } (ex: capturados, processadas)
+ */
+async function comTelemetria(job, pipeline, fn) {
+  const inicio = Date.now();
+  let resultado;
+  let erro;
+  try {
+    resultado = await withHeartbeat(job, fn);
+    return resultado;
+  } catch (err) {
+    erro = err;
+    throw err;
+  } finally {
+    const duracaoMs = Date.now() - inicio;
+    const ok = !erro && resultado?.ok !== false;
+    const mensagem = erro
+      ? `Falha: ${erro.message?.slice(0, 200)}`
+      : (resultado?.motivo || resumoMetricas(resultado));
+    const { ok: _ignore, motivo: _ignore2, ...metrics } = (resultado || {});
+    registrarExecucao(pipeline, { ok, mensagem, metrics, duracaoMs })
+      .catch(() => {});  // nunca bloqueia o handler em caso de falha de log
+  }
+}
+
+// Constroi mensagem curta de sumario das metricas para mostrar na UI
+function resumoMetricas(r) {
+  if (!r || typeof r !== 'object') return null;
+  const partes = [];
+  if (typeof r.capturados === 'number')  partes.push(`${r.capturados} capturados`);
+  if (typeof r.sucessos === 'number')    partes.push(`${r.sucessos} ok`);
+  if (typeof r.processados === 'number') partes.push(`${r.processados} processados`);
+  if (typeof r.processadas === 'number') partes.push(`${r.processadas} OS(s)`);
+  if (typeof r.tenants === 'number')     partes.push(`${r.tenants} tenant(s)`);
+  if (typeof r.equipamentos === 'number') partes.push(`${r.equipamentos} eq(s)`);
+  if (typeof r.equipamentosAnalisados === 'number') partes.push(`${r.equipamentosAnalisados} eq(s)`);
+  return partes.length ? partes.join(' · ') : null;
 }
 
 const alertasWorker = new Worker(
@@ -146,7 +191,7 @@ const alertasWorker = new Worker(
       // (PIPELINE_NAMES.GEHC_CAPTURA_PDF) — se desativado, devolve cedo.
       // limite 50 + maxPorEquipamento 5 = backfill horizontal (cobre mais
       // equipamentos por execucao em vez de concentrar em poucos).
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.GEHC_CAPTURA_PDF, async () => {
         try {
           const r = await executarBackfillTodosTenants({
             diasAtras: 180,
@@ -164,7 +209,7 @@ const alertasWorker = new Worker(
     if (job?.name === 'gehc-capturar-pdfs-tenant' && job?.data?.tenantId) {
       // Trigger pontual usado por endpoint admin ou eventos do sistema.
       // Mantemos opcional ainda que o cron diario cubra o caso geral.
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.GEHC_CAPTURA_PDF, async () => {
         try {
           const r = await executarBackfillPdfs({
             tenantId: job.data.tenantId,
@@ -183,7 +228,7 @@ const alertasWorker = new Worker(
     if (job?.name === 'gehc-extrair-pdfs') {
       // Cron noturno: extrai causa-raiz + medicoes dos PDFs ja baixados.
       // Roda 1h depois do gehc-capturar-pdfs para pegar PDFs da mesma noite.
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.GEHC_EXTRACAO_PDF, async () => {
         try {
           const r = await executarExtracaoTodosTenants({ limite: 100 });
           return { ok: true, ...r };
@@ -195,7 +240,7 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'gehc-extrair-pdfs-tenant' && job?.data?.tenantId) {
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.GEHC_EXTRACAO_PDF, async () => {
         try {
           const r = await executarExtracaoPdfsTenant({
             tenantId: job.data.tenantId,
@@ -212,7 +257,7 @@ const alertasWorker = new Worker(
     if (job?.name === 'knowledge-layer-sync') {
       // Sync horario do Knowledge Layer: consolida eventos das 5 fontes em
       // evento_equipamento. Idempotente, barato (so leitura + upsert).
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.KNOWLEDGE_LAYER, async () => {
         try {
           const r = await sincronizarKnowledgeLayerTodosTenants();
           return { ok: true, ...r };
@@ -224,7 +269,7 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'knowledge-layer-sync-tenant' && job?.data?.tenantId) {
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.KNOWLEDGE_LAYER, async () => {
         try {
           const r = await sincronizarKnowledgeLayerTenant({ tenantId: job.data.tenantId });
           return { ok: true, ...r };
@@ -236,7 +281,7 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'ia-gerar-embeddings') {
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.IA_EMBEDDINGS, async () => {
         try {
           const r = await gerarEmbeddingsTodosTenants({ limite: 200 });
           return { ok: true, ...r };
@@ -248,7 +293,7 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'ia-gerar-embeddings-tenant' && job?.data?.tenantId) {
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.IA_EMBEDDINGS, async () => {
         try {
           const r = await gerarEmbeddingsTenant({
             tenantId: job.data.tenantId,
@@ -263,7 +308,7 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'ia-gerar-insights') {
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.IA_INSIGHTS, async () => {
         try {
           const r = await gerarInsightsTodosTenants();
           return { ok: true, ...r };
@@ -275,7 +320,7 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'ia-gerar-insights-tenant' && job?.data?.tenantId) {
-      return withHeartbeat(job, async () => {
+      return comTelemetria(job, PIPELINE_NAMES.IA_INSIGHTS, async () => {
         try {
           const r = await gerarInsightsTenant({ tenantId: job.data.tenantId });
           return { ok: true, ...r };
