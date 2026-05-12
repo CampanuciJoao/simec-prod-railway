@@ -32,7 +32,10 @@ export async function removerCredenciais(tenantId) {
   });
 }
 
-async function lerCredenciais(tenantId) {
+// Exportado para que outros módulos (ex: gehcDocumentDownloader) possam abrir
+// uma sessão Playwright autenticada reusando as mesmas credenciais sem
+// reimplementar a leitura+descriptografia.
+export async function lerCredenciais(tenantId) {
   const row = await prisma.gehcToken.findUnique({
     where:  { tenantId },
     select: { gehcLogin: true, gehcPassword: true },

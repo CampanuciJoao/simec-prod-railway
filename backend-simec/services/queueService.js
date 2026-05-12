@@ -244,6 +244,30 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-discovery-diario) agendado diariamente às 02:30 UTC.');
 
+    // Captura de PDFs de OS GE para alimentar a IA preditiva — diário às 04:00 UTC.
+    // Roda DEPOIS do gehc-sync-dados (02:00) para que as OSs novas já estejam
+    // persistidas; baixa os PDFs delas via Playwright e armazena no R2.
+    // Resumível: cada execução pega até 50 OSs sem PDF por tenant. Backfill
+    // histórico de uma frota nova leva algumas noites para se completar.
+    const repeatables6 = await queue.getRepeatableJobs();
+    for (const job of repeatables6) {
+      if (job.name === 'gehc-capturar-pdfs') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'gehc-capturar-pdfs',
+      {},
+      {
+        repeat: { cron: '0 4 * * *' },
+        removeOnComplete: 10,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job GEHC (gehc-capturar-pdfs) agendado diariamente às 04:00 UTC.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {
