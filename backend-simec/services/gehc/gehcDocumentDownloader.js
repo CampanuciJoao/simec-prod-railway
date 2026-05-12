@@ -529,43 +529,61 @@ export async function executarBackfillPdfs({
 
   const dataCorte = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000);
 
-  // Busca um pool maior do que o limite, ordenado pelas mais recentes — depois
-  // distribuimos por equipamento na aplicacao.
-  const poolBruto = await prisma.gehcOrdemServico.findMany({
+  // Estrategia anterior: pool global com take: limite*5 + agrupamento na app.
+  // Falha quando 1 equipamento concentra as OSs mais recentes (ex: MRR11625
+  // com 200 OSs preenche o pool, outros equipamentos com OSs ligeiramente
+  // mais antigas ficam permanentemente fora). Codex apontou no PR #42.
+  //
+  // Estrategia atual: query por equipamento. Garante top N por equipamento
+  // independente da distribuicao temporal, depois faz round-robin.
+  //   1. Lista equipamentos com >=1 OS pendente
+  //   2. Para cada um, busca top maxPorEquipamento OSs mais recentes
+  //   3. Round-robin entre equipamentos ate atingir limite global
+  const eqsComPendentes = await prisma.equipamento.findMany({
     where: {
       tenantId,
-      requestedAt: { gte: dataCorte },
-      equipamento: {
-        gehcAssetId: { not: null },
-        ...(modalidades?.length ? { tipo: { in: modalidades } } : {}),
+      gehcAssetId: { not: null },
+      ...(modalidades?.length ? { tipo: { in: modalidades } } : {}),
+      gehcOrdensServico: {
+        some: {
+          requestedAt: { gte: dataCorte },
+          pdfDocumentos: { none: { baixadoEm: { not: null } } },
+        },
       },
-      pdfDocumentos: { none: { baixadoEm: { not: null } } },
     },
-    include: { equipamento: true },
-    orderBy: [{ requestedAt: 'desc' }],
-    take: limite * 5,  // pool 5x maior pra ter folga ao distribuir
+    select: { id: true, tag: true, tipo: true },
   });
 
-  // Distribuicao round-robin entre equipamentos:
-  //   1. Agrupa por equipamento (mantendo ordem por data)
-  //   2. Pega top N de cada equipamento (cap por eq)
-  //   3. Round-robin: pega 1 de cada, repete ate atingir limite total
-  const porEq = new Map();
-  for (const o of poolBruto) {
-    const eqId = o.equipamentoId;
-    if (!porEq.has(eqId)) porEq.set(eqId, []);
-    const lista = porEq.get(eqId);
-    if (lista.length < maxPorEquipamento) lista.push(o);
+  if (!eqsComPendentes.length) {
+    console.log(`[GEHC_PDF] Nada a fazer para tenant ${tenantId} (todas as OSs já têm PDF).`);
+    return { processadas: 0, capturados: 0 };
   }
 
+  // Pool por equipamento (em paralelo)
+  const poolPorEq = await Promise.all(eqsComPendentes.map(async (eq) => {
+    const ordens = await prisma.gehcOrdemServico.findMany({
+      where: {
+        tenantId,
+        equipamentoId: eq.id,
+        requestedAt: { gte: dataCorte },
+        pdfDocumentos: { none: { baixadoEm: { not: null } } },
+      },
+      include: { equipamento: true },
+      orderBy: { requestedAt: 'desc' },
+      take: maxPorEquipamento,
+    });
+    return ordens;
+  }));
+
+  // Round-robin: pega ordem[i] de cada eq, depois ordem[i+1], ate atingir limite
   const distribuidas = [];
   let temMaisOSs = true;
   let i = 0;
   while (temMaisOSs && distribuidas.length < limite) {
     temMaisOSs = false;
-    for (const lista of porEq.values()) {
-      if (i < lista.length) {
-        distribuidas.push(lista[i]);
+    for (const ordensDoEq of poolPorEq) {
+      if (i < ordensDoEq.length) {
+        distribuidas.push(ordensDoEq[i]);
         temMaisOSs = true;
         if (distribuidas.length >= limite) break;
       }
