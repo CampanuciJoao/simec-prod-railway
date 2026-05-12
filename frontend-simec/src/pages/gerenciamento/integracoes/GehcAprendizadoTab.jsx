@@ -520,7 +520,7 @@ function GehcAprendizadoTab() {
     loading, error,
     acaoPipeline, feedbackPipeline,
     pausar, retomar, disparar,
-    darFeedbackInsight, resolverInsight,
+    darFeedbackInsight, resolverInsight, limparTodosInsights,
   } = useGehcAprendizado();
 
   const [dialogo, setDialogo] = useState(null); // { pipeline, label } | null
@@ -596,6 +596,21 @@ function GehcAprendizadoTab() {
       <PageSection
         title="Insights da IA"
         description="Recomendações geradas automaticamente. Marque útil/inútil para a IA aprender com seu feedback."
+        actions={
+          insights?.length > 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={async () => {
+                if (!window.confirm(`Limpar todos os ${insights.length} insights ativos? A próxima geração só recriará os que ainda forem válidos.`)) return;
+                const r = await limparTodosInsights('limpeza_manual_admin');
+                window.alert(`${r?.resolvidos ?? 0} insight(s) marcados como resolvidos.`);
+              }}
+            >
+              Limpar todos
+            </Button>
+          ) : null
+        }
       >
         <ListaInsights
           insights={insights}

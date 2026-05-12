@@ -21,6 +21,9 @@ export const patchInsightFeedback = (id, util) =>
 export const patchInsightResolver = (id) =>
   api.patch(`/gehc/aprendizado/insights/${id}/resolver`).then((r) => r.data);
 
+export const postLimparTodosInsights = (motivo) =>
+  api.post('/gehc/aprendizado/insights/limpar-todos', { motivo }).then((r) => r.data);
+
 export const postIaAsk = ({ pergunta, equipamentoId }) =>
   api.post('/gehc/aprendizado/ia/ask', { pergunta, equipamentoId }).then((r) => r.data);
 
