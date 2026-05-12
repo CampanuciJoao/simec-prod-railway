@@ -144,9 +144,15 @@ const alertasWorker = new Worker(
       // Captura noturna de PDFs de OS GE para alimentar a IA preditiva.
       // O downloader internamente respeita o estado de pausa do pipeline
       // (PIPELINE_NAMES.GEHC_CAPTURA_PDF) — se desativado, devolve cedo.
+      // limite 50 + maxPorEquipamento 5 = backfill horizontal (cobre mais
+      // equipamentos por execucao em vez de concentrar em poucos).
       return withHeartbeat(job, async () => {
         try {
-          const r = await executarBackfillTodosTenants({ diasAtras: 180, limite: 20 });
+          const r = await executarBackfillTodosTenants({
+            diasAtras: 180,
+            limite: 50,
+            maxPorEquipamento: 5,
+          });
           return { ok: true, ...r };
         } catch (err) {
           console.error('[GEHC_PDF_WORKER] Erro:', err.message);
