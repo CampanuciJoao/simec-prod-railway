@@ -157,20 +157,24 @@ async function lerStreamComoBuffer(stream) {
 // ─── Captura de uma OS ───────────────────────────────────────────────────────
 
 async function capturarPdfsDeOS({ context, tenantId, ordemServico, equipamento, tokens }) {
-  const assetId = equipamento.gehcAssetId;
-  const srId    = ordemServico.gehcServiceId;
+  const assetId        = equipamento.gehcAssetId;
+  const srId           = ordemServico.gehcServiceId;            // UUID interno (500Ur...) — usado na URL do portal
+  const trackingNumber = ordemServico.trackingNumber;           // numero amigavel (17159687) — exigido pelo documentSearch
 
   if (!assetId || !srId) {
     return { capturados: 0, erro: 'sem_asset_ou_sr_id' };
+  }
+  if (!trackingNumber) {
+    return { capturados: 0, erro: 'sem_tracking_number (necessario para documentSearch)' };
   }
 
   // 1. Pergunta ao GraphQL quais documentos a OS tem (sem abrir browser).
   let docs = [];
   try {
     docs = await listarDocumentosDaOS({
-      serviceRequestId: srId,
-      accessToken:      tokens.accessToken,
-      idToken:          tokens.idToken,
+      serviceRequestNumber: trackingNumber,
+      accessToken:          tokens.accessToken,
+      idToken:              tokens.idToken,
     });
   } catch (err) {
     return { capturados: 0, erro: `documentSearch_failed: ${err.message}` };
