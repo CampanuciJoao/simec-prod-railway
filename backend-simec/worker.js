@@ -9,6 +9,7 @@ import { monitorarSaudeGehc } from './services/gehc/gehcMonitor.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
+import { executarBackfillTodosTenants, executarBackfillPdfs } from './services/gehc/gehcDocumentDownloader.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -115,6 +116,36 @@ const alertasWorker = new Worker(
       }
 
       return { ok: true, tenants: resultados.length, resultados };
+    }
+
+    if (job?.name === 'gehc-capturar-pdfs') {
+      // Captura noturna de PDFs de OS GE para alimentar a IA preditiva.
+      // O downloader internamente respeita o estado de pausa do pipeline
+      // (PIPELINE_NAMES.GEHC_CAPTURA_PDF) — se desativado, devolve cedo.
+      try {
+        const r = await executarBackfillTodosTenants({ diasAtras: 180, limite: 50 });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[GEHC_PDF_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'gehc-capturar-pdfs-tenant' && job?.data?.tenantId) {
+      // Trigger pontual usado por endpoint admin ou eventos do sistema.
+      // Mantemos opcional ainda que o cron diario cubra o caso geral.
+      try {
+        const r = await executarBackfillPdfs({
+          tenantId: job.data.tenantId,
+          diasAtras: job.data.diasAtras || 180,
+          limite: job.data.limite || 50,
+          modalidades: job.data.modalidades,
+        });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error(`[GEHC_PDF_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+        return { ok: false, erro: err.message };
+      }
     }
 
     if (job?.name === 'gehc-discovery-diario') {
