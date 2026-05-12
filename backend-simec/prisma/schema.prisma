@@ -54,6 +54,9 @@ model Tenant {
   gehcAlertaSuspensoes     GehcAlertaSuspensao[]
   gehcPdfDocumentos        GehcPdfDocumento[]
   gehcPdfExtraidos         GehcPdfExtraido[]
+  eventosEquipamento       EventoEquipamento[]
+  eventoEmbeddings         EventoEquipamentoEmbedding[]
+  iaInsights               IaInsight[]
   telegramNotificacoes     TelegramNotificacao[]
   telegramVinculacaoTokens TelegramVinculacaoToken[]
   alertConfigs             AlertConfig[]
@@ -185,6 +188,8 @@ model Equipamento {
   gehcOrdensServico  GehcOrdemServico[]
   gehcUtilizacao     GehcUtilizacaoMensal[]
   gehcPdfDocumentos  GehcPdfDocumento[]
+  eventosEquipamento EventoEquipamento[]
+  iaInsights         IaInsight[]
 
   @@unique([tenantId, tag])
   @@unique([tenantId, aeTitle])
@@ -915,6 +920,119 @@ model GehcPdfExtraido {
 //   - "gehc_captura_pdf"  → captura via Playwright (PR atual)
 //   - "gehc_extracao_pdf" → extração estruturada (PR futuro)
 //   - "knowledge_layer"   → consolidação de eventos (PR futuro)
+
+// ─── Knowledge Layer — timeline unificada de eventos por equipamento ────────
+//
+// Materializacao read-only mantida pelo knowledgeLayerSync. Recebe entradas de
+// 5 produtores (PDF GE extraido, telemetria GE, OS interna SIMEC, visita de
+// terceiro, alerta de saude) num formato comum, para que o modelo preditivo e
+// o RAG do chatbot consumam tudo com uma unica query.
+//
+// Convencoes:
+//   fonte: 'pdf_ge' | 'telemetria_ge' | 'os_simec' | 'visita_terceiro' | 'alerta_telemetria'
+//   tipoEvento: subtipo dentro da fonte (ex: 'corretiva_ge', 'pm_ge',
+//     'anomalia_helio', 'compressor_off', 'os_aberta', 'os_concluida',
+//     'visita_agendada', 'visita_concluida', 'alerta_helio_critico')
+//   severidade: 'info' | 'low' | 'medium' | 'high' | 'critical'
+//   refFonteTipo + refFonteId: ponteiro auditavel para a linha original
+//
+// Idempotencia garantida pelo unique (refFonteTipo, refFonteId, tipoEvento).
+// Podemos truncar e reconstruir sem perda — fonte de verdade fica nas tabelas
+// originais.
+
+model EventoEquipamento {
+  id             String   @id @default(uuid())
+  tenantId       String
+  equipamentoId  String   @map("equipamento_id")
+
+  ocorridoEm     DateTime @map("ocorrido_em")
+  fonte          String
+  tipoEvento     String   @map("tipo_evento")
+  severidade     String   @default("info")
+  causaCategoria String?  @map("causa_categoria")
+  resumo         String
+  detalhesJson   Json?    @map("detalhes_json")
+
+  refFonteTipo   String   @map("ref_fonte_tipo")
+  refFonteId     String   @map("ref_fonte_id")
+
+  createdAt      DateTime @default(now())
+
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  embedding   EventoEquipamentoEmbedding?
+
+  @@unique([refFonteTipo, refFonteId, tipoEvento], name: "evento_equipamento_origem_tipo")
+  @@index([tenantId, equipamentoId, ocorridoEm(sort: Desc)])
+  @@index([tenantId, fonte, ocorridoEm(sort: Desc)])
+  @@index([tenantId, causaCategoria])
+  @@index([tenantId, severidade, ocorridoEm(sort: Desc)])
+  @@map("evento_equipamento")
+}
+
+// ─── Embeddings dos eventos (para RAG e busca por similaridade) ─────────────
+//
+// 1:1 com EventoEquipamento. Embedding salvo como JSONB array de floats —
+// suficiente para datasets ate ~10k eventos com calculo de similaridade na
+// aplicacao. Migracao para pgvector sera PR isolado quando a frota crescer.
+
+model EventoEquipamentoEmbedding {
+  id                  String   @id @default(uuid())
+  tenantId            String
+  eventoEquipamentoId String   @unique @map("evento_equipamento_id")
+
+  embedding           Json     // array de N floats (N = dim)
+  model               String
+  dim                 Int
+  inputText           String   @db.Text @map("input_text")
+
+  geradoEm            DateTime @default(now()) @map("gerado_em")
+  createdAt           DateTime @default(now())
+
+  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  evento              EventoEquipamento @relation(fields: [eventoEquipamentoId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("evento_equipamento_embedding")
+}
+
+// ─── Insights da IA — recomendacoes derivadas dos padroes ───────────────────
+//
+// Saidas do worker preditivo. 1 insight ativo por (equipamento, tipo) — quando
+// regerado, atualiza. Resolvido fica quando o problema sai do radar (ex: helio
+// volta ao normal, OS preventiva foi feita).
+//
+// feedback_util captura "thumbs up/down" do engenheiro — vira ground truth
+// para retreinamento futuro.
+
+model IaInsight {
+  id            String    @id @default(uuid())
+  tenantId      String
+  equipamentoId String    @map("equipamento_id")
+
+  tipo          String    // 'reincidencia_causa' | 'anomalia_helio' | 'risco_alto' | etc
+  severidade    String    @default("medium")
+  titulo        String
+  descricao     String    @db.Text
+  recomendacao  String?   @db.Text
+  evidenciaJson Json?     @map("evidencia_json")
+
+  geradoEm      DateTime  @default(now()) @map("gerado_em")
+  validoAte     DateTime? @map("valido_ate")
+  resolvidoEm   DateTime? @map("resolvido_em")
+  feedbackUtil  Boolean?  @map("feedback_util")
+  feedbackEm    DateTime? @map("feedback_em")
+
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento   Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, severidade, geradoEm(sort: Desc)])
+  @@index([tenantId, resolvidoEm])
+  @@map("ia_insights")
+}
 
 model AiPipelineEstado {
   id            String    @id @default(uuid())
