@@ -53,6 +53,7 @@ model Tenant {
   gehcUtilizacao       GehcUtilizacaoMensal[]
   gehcAlertaSuspensoes     GehcAlertaSuspensao[]
   gehcPdfDocumentos        GehcPdfDocumento[]
+  gehcPdfExtraidos         GehcPdfExtraido[]
   telegramNotificacoes     TelegramNotificacao[]
   telegramVinculacaoTokens TelegramVinculacaoToken[]
   alertConfigs             AlertConfig[]
@@ -826,11 +827,80 @@ model GehcPdfDocumento {
   tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento  Equipamento      @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
   ordemServico GehcOrdemServico @relation(fields: [ordemServicoId], references: [id], onDelete: Cascade)
+  extraido     GehcPdfExtraido?
 
   @@index([tenantId, equipamentoId])
   @@index([tenantId, ordemServicoId])
   @@index([baixadoEm])
   @@map("gehc_pdf_documentos")
+}
+
+// ─── GE Health Cloud — Extração estruturada do PDF (insumo direto da IA) ─────
+//
+// 1:1 com GehcPdfDocumento. Camada 1 (regex sobre texto cru) + Camada 2 (LLM
+// normaliza causa-raiz em taxonomia + extrai medições/peças). Versionada para
+// permitir reprocessamento quando o extrator melhorar.
+//
+// Taxonomia atual de root_cause_category (string-based, evolui sem migration):
+//   - infra_chiller_cliente   - falha de chiller predial do hospital
+//   - cryo_compressor          - compressor do criostato (LCC, helium)
+//   - magneto_helio            - nivel/pressao de helio fora de spec
+//   - bobina                   - bobinas (corpo, cabeça, etc)
+//   - gradiente                - amplificador/sistema de gradiente
+//   - rf                       - cadeia RF (transmissor/receptor)
+//   - mesa_mecanica            - mesa do paciente (correia, motor)
+//   - software                 - falha de SW/host/MRU
+//   - rede_dados               - conectividade, DICOM, fluxo de imagem
+//   - infra_eletrica           - energia, no-break, aterramento
+//   - desconhecido             - LLM nao conseguiu categorizar com confianca
+
+model GehcPdfExtraido {
+  id              String  @id @default(uuid())
+  tenantId        String
+  pdfDocumentoId  String  @unique @map("pdf_documento_id")
+
+  // Camada 1: regex
+  caseNumber       String?  @map("case_number")
+  woNumber         String?  @map("wo_number")
+  serviceType      String?  @map("service_type")
+  equipmentStatus  String?  @map("equipment_status")
+  systemId         String?  @map("system_id")
+  serialNumber     String?  @map("serial_number")
+  engineerFullName String?  @map("engineer_full_name")
+  problemReported  String?  @db.Text @map("problem_reported")
+  problemAnalyzed  String?  @db.Text @map("problem_analyzed")
+  actionsTaken     String?  @db.Text @map("actions_taken")
+  rootCauseRaw     String?  @db.Text @map("root_cause_raw")
+  testsPerformed   String?  @db.Text @map("tests_performed")
+  totalMinutes     Int?     @map("total_minutes")
+  openedAt         DateTime? @map("opened_at")
+
+  // Camada 2: LLM
+  rootCauseCategory String?  @map("root_cause_category")
+  measurementsJson  Json?    @map("measurements_json")
+  partsReplacedJson Json?    @map("parts_replaced_json")
+  llmExtractedAt    DateTime? @map("llm_extracted_at")
+  llmModel          String?  @map("llm_model")
+  llmError          String?  @db.Text @map("llm_error")
+
+  // Versionamento
+  extractorVersion  Int      @default(1) @map("extractor_version")
+  rawTextHash       String?  @map("raw_text_hash")
+  extractionError   String?  @db.Text @map("extraction_error")
+  extraidoEm        DateTime? @map("extraido_em")
+  tentativas        Int      @default(0)
+  ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pdfDocumento GehcPdfDocumento @relation(fields: [pdfDocumentoId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, rootCauseCategory])
+  @@index([tenantId, extraidoEm])
+  @@index([extractorVersion, extraidoEm])
+  @@map("gehc_pdf_extraidos")
 }
 
 // ─── IA — Estado dos pipelines automáticos ───────────────────────────────────
