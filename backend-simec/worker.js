@@ -10,6 +10,7 @@ import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
 import { executarBackfillTodosTenants, executarBackfillPdfs } from './services/gehc/gehcDocumentDownloader.js';
+import { executarExtracaoTodosTenants, executarExtracaoPdfsTenant } from './services/gehc/gehcPdfExtractionOrchestrator.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -144,6 +145,31 @@ const alertasWorker = new Worker(
         return { ok: true, ...r };
       } catch (err) {
         console.error(`[GEHC_PDF_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'gehc-extrair-pdfs') {
+      // Cron noturno: extrai causa-raiz + medicoes dos PDFs ja baixados.
+      // Roda 1h depois do gehc-capturar-pdfs para pegar PDFs da mesma noite.
+      try {
+        const r = await executarExtracaoTodosTenants({ limite: 100 });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[GEHC_EXTRACAO_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'gehc-extrair-pdfs-tenant' && job?.data?.tenantId) {
+      try {
+        const r = await executarExtracaoPdfsTenant({
+          tenantId: job.data.tenantId,
+          limite: job.data.limite || 100,
+        });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error(`[GEHC_EXTRACAO_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
         return { ok: false, erro: err.message };
       }
     }

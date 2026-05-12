@@ -268,6 +268,30 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-capturar-pdfs) agendado diariamente às 04:00 UTC.');
 
+    // Extracao de causa-raiz / medicoes a partir dos PDFs ja baixados.
+    // Roda diariamente as 05:00 UTC, 1h depois da captura, para que os PDFs
+    // novos da noite ja estejam no R2 prontos pra extrair.
+    // Reprocessamento automatico: PDFs ja extraidos com extractorVersion
+    // antigo entram na fila ao subir uma versao nova do extrator.
+    const repeatables7 = await queue.getRepeatableJobs();
+    for (const job of repeatables7) {
+      if (job.name === 'gehc-extrair-pdfs') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'gehc-extrair-pdfs',
+      {},
+      {
+        repeat: { cron: '0 5 * * *' },
+        removeOnComplete: 10,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job GEHC (gehc-extrair-pdfs) agendado diariamente às 05:00 UTC.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {
