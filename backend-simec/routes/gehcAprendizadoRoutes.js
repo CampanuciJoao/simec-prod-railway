@@ -14,6 +14,7 @@ import {
   retomar,
 } from '../services/ai/aiPipelineState.js';
 import { perguntarIaSobreEquipamento } from '../services/ai/ragSearchService.js';
+import { dispararPipeline } from '../services/ai/pipelineDispatcher.js';
 
 const router = express.Router();
 
@@ -498,6 +499,39 @@ router.post('/pipelines/:pipeline/pausar', admin, async (req, res) => {
       detalhes: { escopo: escopoFinal === null ? 'global' : 'tenant', motivo },
     });
     res.json({ ok: true, estado });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/aprendizado/pipelines/:pipeline/disparar ──────────────────
+// Forca execucao agora de um pipeline (sem esperar o cron). Util para
+// validacao, manutencao e debug. O cron continua agendado normalmente —
+// isso adiciona UMA execucao avulsa em paralelo.
+router.post('/pipelines/:pipeline/disparar', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const usuarioId = req.usuario.id;
+  const { pipeline } = req.params;
+
+  if (!pipelineValido(pipeline)) {
+    return res.status(400).json({ error: `Pipeline desconhecido: ${pipeline}` });
+  }
+  if (pipeline === 'global') {
+    return res.status(400).json({ error: 'Pipeline "global" e kill switch — nao tem job para disparar.' });
+  }
+
+  try {
+    const r = await dispararPipeline(pipeline);
+    if (!r.ok) return res.status(503).json({ error: r.motivo });
+
+    await logAuditoria({
+      tenantId, autorId: usuarioId,
+      acao: 'AI_PIPELINE_DISPARADO',
+      entidadeId: pipeline,
+      detalhes: { jobId: r.jobId, jobName: r.jobName },
+    });
+
+    res.json({ ok: true, jobId: r.jobId, jobName: r.jobName });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
