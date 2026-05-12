@@ -529,17 +529,16 @@ export async function executarBackfillPdfs({
 
   const dataCorte = new Date(Date.now() - diasAtras * 24 * 60 * 60 * 1000);
 
-  // Estrategia anterior: pool global com take: limite*5 + agrupamento na app.
-  // Falha quando 1 equipamento concentra as OSs mais recentes (ex: MRR11625
-  // com 200 OSs preenche o pool, outros equipamentos com OSs ligeiramente
-  // mais antigas ficam permanentemente fora). Codex apontou no PR #42.
-  //
-  // Estrategia atual: query por equipamento. Garante top N por equipamento
-  // independente da distribuicao temporal, depois faz round-robin.
-  //   1. Lista equipamentos com >=1 OS pendente
-  //   2. Para cada um, busca top maxPorEquipamento OSs mais recentes
-  //   3. Round-robin entre equipamentos ate atingir limite global
-  const eqsComPendentes = await prisma.equipamento.findMany({
+  // Algoritmo (atende reviews Codex PRs #42, #46):
+  //   1. Lista equipamentos com pelo menos 1 OS pendente
+  //   2. Ordena por 'menos recentemente capturado primeiro' (eqs nunca
+  //      capturados vem antes; depois os com PDF mais antigo) — garante
+  //      rotacao justa entre execucoes, sem starvation
+  //   3. CAP de fan-out: pega so os primeiros N (= limite/maxPorEquipamento
+  //      + folga). Evita 200 queries simultaneas saturando connection pool
+  //   4. Para cada eq selecionado, busca top maxPorEquipamento OSs em paralelo
+  //   5. Round-robin para preencher o limite global
+  const eqsCandidatos = await prisma.equipamento.findMany({
     where: {
       tenantId,
       gehcAssetId: { not: null },
@@ -551,15 +550,44 @@ export async function executarBackfillPdfs({
         },
       },
     },
-    select: { id: true, tag: true, tipo: true },
+    select: {
+      id: true, tag: true, tipo: true,
+      gehcPdfDocumentos: {
+        where: { baixadoEm: { not: null } },
+        orderBy: { baixadoEm: 'desc' },
+        take: 1,
+        select: { baixadoEm: true },
+      },
+    },
   });
 
-  if (!eqsComPendentes.length) {
+  if (!eqsCandidatos.length) {
     console.log(`[GEHC_PDF] Nada a fazer para tenant ${tenantId} (todas as OSs já têm PDF).`);
     return { processadas: 0, capturados: 0 };
   }
 
-  // Pool por equipamento (em paralelo)
+  // Ordenacao justa: nulls first (nunca capturados), depois asc (mais antigo
+  // primeiro). Garante que eqs ignorados em execucoes anteriores avancam.
+  eqsCandidatos.sort((a, b) => {
+    const ua = a.gehcPdfDocumentos[0]?.baixadoEm;
+    const ub = b.gehcPdfDocumentos[0]?.baixadoEm;
+    if (!ua && !ub) return 0;
+    if (!ua) return -1;
+    if (!ub) return 1;
+    return ua.getTime() - ub.getTime();
+  });
+
+  // Cap fan-out: nunca dispara mais queries que o necessario para o limite.
+  // Folga de 2 eqs cobre casos onde algum eq tem menos de maxPorEquipamento OSs.
+  const maxEqs = Math.ceil(limite / maxPorEquipamento) + 2;
+  const eqsComPendentes = eqsCandidatos.slice(0, maxEqs);
+
+  console.log(
+    `[GEHC_PDF] Tenant ${tenantId}: ${eqsCandidatos.length} eq(s) com pendentes; ` +
+    `processando ${eqsComPendentes.length} nesta execucao (rotacao por ultima captura).`
+  );
+
+  // Pool por equipamento (em paralelo, fan-out limitado)
   const poolPorEq = await Promise.all(eqsComPendentes.map(async (eq) => {
     const ordens = await prisma.gehcOrdemServico.findMany({
       where: {
