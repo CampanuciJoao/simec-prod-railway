@@ -332,16 +332,22 @@ function GehcAprendizadoTab() {
       <StatusGeral status={status} pipelines={pipelines} />
 
       {/* KPIs */}
+      {/*
+        Convertemos para string porque InfoCard interpreta `0` como falsy
+        e renderiza "N/A". Para esta tela queremos ver explicitamente "0"
+        (zero PDFs, zero falhas) — significa "sistema funcionando, ainda
+        sem dados", não "informacao indisponivel".
+      */}
       <ResponsiveGrid cols={{ base: 2, md: 4 }}>
         <InfoCard
           icon={faFilePdf}
           label="OSs sincronizadas"
-          value={status?.totalOs ?? 0}
+          value={String(status?.totalOs ?? 0)}
         />
         <InfoCard
           icon={faFilePdf}
           label="PDFs baixados"
-          value={status?.pdfsBaixados ?? 0}
+          value={String(status?.pdfsBaixados ?? 0)}
         />
         <InfoCard
           icon={faBrain}
@@ -351,7 +357,7 @@ function GehcAprendizadoTab() {
         <InfoCard
           icon={faTriangleExclamation}
           label="Falhas pendentes"
-          value={status?.pdfsComErro ?? 0}
+          value={String(status?.pdfsComErro ?? 0)}
         />
       </ResponsiveGrid>
 
