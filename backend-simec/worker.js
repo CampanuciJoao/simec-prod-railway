@@ -13,6 +13,7 @@ import { executarBackfillTodosTenants, executarBackfillPdfs } from './services/g
 import { executarExtracaoTodosTenants, executarExtracaoPdfsTenant } from './services/gehc/gehcPdfExtractionOrchestrator.js';
 import { sincronizarKnowledgeLayerTodosTenants, sincronizarKnowledgeLayerTenant } from './services/knowledgeLayer/knowledgeLayerSync.js';
 import { gerarEmbeddingsTodosTenants, gerarEmbeddingsTenant } from './services/ai/eventoEmbeddingsWorker.js';
+import { gerarInsightsTodosTenants, gerarInsightsTenant } from './services/ai/insightsGenerator.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -217,6 +218,26 @@ const alertasWorker = new Worker(
         return { ok: true, ...r };
       } catch (err) {
         console.error(`[IA_EMBEDDINGS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'ia-gerar-insights') {
+      try {
+        const r = await gerarInsightsTodosTenants();
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[IA_INSIGHTS_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'ia-gerar-insights-tenant' && job?.data?.tenantId) {
+      try {
+        const r = await gerarInsightsTenant({ tenantId: job.data.tenantId });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error(`[IA_INSIGHTS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
         return { ok: false, erro: err.message };
       }
     }

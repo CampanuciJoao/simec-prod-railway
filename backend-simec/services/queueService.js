@@ -337,6 +337,29 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job IA (ia-gerar-embeddings) agendado diariamente às 06:00 UTC.');
 
+    // IA: gera insights preditivos com base nos eventos do Knowledge Layer.
+    // 5 detectores rodando: reincidencia, anomalia helio, risco alto, sem PM,
+    // acionamento frequente de terceiro. Roda 4x ao dia para manter o painel
+    // fresco (custo zero — so leitura + upsert).
+    const repeatables10 = await queue.getRepeatableJobs();
+    for (const job of repeatables10) {
+      if (job.name === 'ia-gerar-insights') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'ia-gerar-insights',
+      {},
+      {
+        repeat: { every: 6 * 60 * 60 * 1000 },
+        removeOnComplete: 8,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job IA (ia-gerar-insights) agendado a cada 6h.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {
