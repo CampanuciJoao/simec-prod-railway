@@ -12,6 +12,8 @@ import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
 import { executarBackfillTodosTenants, executarBackfillPdfs } from './services/gehc/gehcDocumentDownloader.js';
 import { executarExtracaoTodosTenants, executarExtracaoPdfsTenant } from './services/gehc/gehcPdfExtractionOrchestrator.js';
 import { sincronizarKnowledgeLayerTodosTenants, sincronizarKnowledgeLayerTenant } from './services/knowledgeLayer/knowledgeLayerSync.js';
+import { gerarEmbeddingsTodosTenants, gerarEmbeddingsTenant } from './services/ai/eventoEmbeddingsWorker.js';
+import { gerarInsightsTodosTenants, gerarInsightsTenant } from './services/ai/insightsGenerator.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
 import { logQueueState } from './services/redis/queueUtils.js';
@@ -193,6 +195,49 @@ const alertasWorker = new Worker(
         return { ok: true, ...r };
       } catch (err) {
         console.error(`[KL_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'ia-gerar-embeddings') {
+      try {
+        const r = await gerarEmbeddingsTodosTenants({ limite: 200 });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[IA_EMBEDDINGS_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'ia-gerar-embeddings-tenant' && job?.data?.tenantId) {
+      try {
+        const r = await gerarEmbeddingsTenant({
+          tenantId: job.data.tenantId,
+          limite: job.data.limite || 200,
+        });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error(`[IA_EMBEDDINGS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'ia-gerar-insights') {
+      try {
+        const r = await gerarInsightsTodosTenants();
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[IA_INSIGHTS_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
+    }
+
+    if (job?.name === 'ia-gerar-insights-tenant' && job?.data?.tenantId) {
+      try {
+        const r = await gerarInsightsTenant({ tenantId: job.data.tenantId });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error(`[IA_INSIGHTS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
         return { ok: false, erro: err.message };
       }
     }

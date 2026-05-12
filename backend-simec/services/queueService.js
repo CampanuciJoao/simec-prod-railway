@@ -314,6 +314,52 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job KL (knowledge-layer-sync) agendado a cada 1h.');
 
+    // IA: gera embeddings dos eventos novos do Knowledge Layer.
+    // Roda 1x por dia as 06:00 UTC, 1h depois do gehc-extrair-pdfs e
+    // suficientemente longe de horario de pico do tenant. Custo: ~$0.01/dia
+    // mesmo para frota grande.
+    const repeatables9 = await queue.getRepeatableJobs();
+    for (const job of repeatables9) {
+      if (job.name === 'ia-gerar-embeddings') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'ia-gerar-embeddings',
+      {},
+      {
+        repeat: { cron: '0 6 * * *' },
+        removeOnComplete: 10,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job IA (ia-gerar-embeddings) agendado diariamente às 06:00 UTC.');
+
+    // IA: gera insights preditivos com base nos eventos do Knowledge Layer.
+    // 5 detectores rodando: reincidencia, anomalia helio, risco alto, sem PM,
+    // acionamento frequente de terceiro. Roda 4x ao dia para manter o painel
+    // fresco (custo zero — so leitura + upsert).
+    const repeatables10 = await queue.getRepeatableJobs();
+    for (const job of repeatables10) {
+      if (job.name === 'ia-gerar-insights') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'ia-gerar-insights',
+      {},
+      {
+        repeat: { every: 6 * 60 * 60 * 1000 },
+        removeOnComplete: 8,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job IA (ia-gerar-insights) agendado a cada 6h.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {

@@ -12,6 +12,18 @@ export const getAprendizadoEquipamentos = () =>
 export const getAprendizadoCausas = () =>
   api.get('/gehc/aprendizado/causas').then((r) => r.data);
 
+export const getAprendizadoInsights = () =>
+  api.get('/gehc/aprendizado/insights').then((r) => r.data);
+
+export const patchInsightFeedback = (id, util) =>
+  api.patch(`/gehc/aprendizado/insights/${id}/feedback`, { util }).then((r) => r.data);
+
+export const patchInsightResolver = (id) =>
+  api.patch(`/gehc/aprendizado/insights/${id}/resolver`).then((r) => r.data);
+
+export const postIaAsk = ({ pergunta, equipamentoId }) =>
+  api.post('/gehc/aprendizado/ia/ask', { pergunta, equipamentoId }).then((r) => r.data);
+
 export const getAprendizadoEquipamentoDetalhes = (equipamentoId) =>
   api.get(`/gehc/aprendizado/equipamentos/${equipamentoId}`).then((r) => r.data);
 

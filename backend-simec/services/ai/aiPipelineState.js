@@ -16,7 +16,8 @@ export const PIPELINE_NAMES = Object.freeze({
   GEHC_CAPTURA_PDF:  'gehc_captura_pdf',
   GEHC_EXTRACAO_PDF: 'gehc_extracao_pdf',
   KNOWLEDGE_LAYER:   'knowledge_layer',
-  // Próximo PR: 'preditivo_treino'.
+  IA_EMBEDDINGS:     'ia_embeddings',
+  IA_INSIGHTS:       'ia_insights',
 });
 
 const PIPELINE_LABELS = Object.freeze({
@@ -24,6 +25,8 @@ const PIPELINE_LABELS = Object.freeze({
   gehc_captura_pdf:    'Captura de PDFs GE',
   gehc_extracao_pdf:   'Extração de causa-raiz dos PDFs',
   knowledge_layer:     'Consolidação da memória da IA',
+  ia_embeddings:       'Indexação semântica (RAG)',
+  ia_insights:         'Geração de insights preditivos',
 });
 
 function getLabel(pipeline) {
