@@ -259,7 +259,7 @@ async function lerStreamComoBuffer(stream) {
 // Como 'Documentos disponiveis' so aparece para OS com PDFs ja publicados
 // pelo GE, o filtro fica natural — nao gastamos tempo com OSs vazias.
 
-async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens }) {
+async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens, tokens }) {
   const assetId = equipamento.gehcAssetId;
   if (!assetId) return { capturados: 0, processadas: 0, erro: 'sem_asset_id' };
   if (!ordens.length) return { capturados: 0, processadas: 0, erro: null };
@@ -338,8 +338,8 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
         try {
           const docs = await listarDocumentosDaOS({
             serviceRequestNumber: trackingNumber,
-            accessToken: getTokens()?.accessToken,
-            idToken: getTokens()?.idToken,
+            accessToken: tokens?.accessToken,
+            idToken: tokens?.idToken,
           });
           if (docs.length) {
             const ja = await prisma.gehcPdfDocumento.findMany({
@@ -435,11 +435,6 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
 
   return { capturados, processadas, erro: erros.length ? erros.join(' | ').slice(0, 500) : null };
 }
-
-// Variavel modulo para compartilhar tokens entre chamadas dentro do mesmo backfill.
-// Setado pelo orquestrador (executarBackfillPdfs) antes de chamar capturarPdfsDeEquipamento.
-let _tokensCorrentes = null;
-function getTokens() { return _tokensCorrentes; }
 
 // Helper que aciona o botao Download e captura o download — cobre 2 cenarios:
 // (a) baixa direto (1 PDF), (b) abre popup com checkboxes (multiplos PDFs).
@@ -551,10 +546,6 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
   let processadas = 0;
   let capturados  = 0;
 
-  // Disponibiliza tokens para capturarPdfsDeEquipamento usar nas chamadas
-  // GraphQL (documentSearch). Resetado no finally.
-  _tokensCorrentes = tokens;
-
   // Agrupa OSs pendentes por equipamento — assim abrimos UMA pagina por
   // equipamento em vez de uma por OS.
   const porEquipamento = new Map();
@@ -572,11 +563,15 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
         break;
       }
 
+      // Tokens passados explicitamente (NAO via variavel global) — evita
+      // race condition entre backfills concorrentes (worker tem
+      // concurrency: 5) e cross-tenant credential leak.
       const resultado = await capturarPdfsDeEquipamento({
         context: session.context,
         tenantId,
         equipamento,
         ordens: ordensDoEquipamento,
+        tokens,
       });
 
       processadas += resultado.processadas || 0;
@@ -592,7 +587,6 @@ export async function executarBackfillPdfs({ tenantId, modalidades, diasAtras = 
       await sleep(RATE_LIMIT_OS_MS);
     }
   } finally {
-    _tokensCorrentes = null;
     await session.browser.close().catch(() => {});
   }
 
