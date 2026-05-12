@@ -88,6 +88,17 @@ async function realizarLoginNaPagina(page, login, password) {
     () => !document.querySelector('input[type="password"]'),
     { timeout: 30_000 }
   ).catch(() => {});
+
+  // CRITICO: navegar para /myequipment e aguardar networkidle ESTABELECE a
+  // sessao Salesforce/SFM. Sem este passo, navegar para
+  // myequipment-360?assetId=...&srId=... cai na tela de login (URL
+  // logon.gehealthcare.com/loginflow/...). Mesma estrategia usada por
+  // gehcAuthService.capturarTokensViaPlaywright que ja funciona em prod.
+  await page.goto('https://www.gehealthcare.com.br/myequipment', {
+    waitUntil: 'domcontentloaded',
+    timeout: 60_000,
+  }).catch(() => {});
+  await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
 }
 
 /**
@@ -114,8 +125,11 @@ export async function abrirSessaoAutenticada(tenantId) {
     throw err;
   }
 
-  await loginPage.close();
-  return { browser, context };
+  // NAO fechar a loginPage — ela mantem viva a sessao SFM no contexto.
+  // Algumas implementacoes do Salesforce requerem ao menos uma aba ativa
+  // para renovar tokens silenciosamente. Reusamos no callsite quando
+  // possivel, e fechamos so apos terminar tudo.
+  return { browser, context, loginPage };
 }
 
 // ─── Download de um documento específico ─────────────────────────────────────
@@ -131,6 +145,14 @@ const RE_BOTAO_DOWNLOAD = /^(download|baixar)$/i;
 async function clicarBotaoDownloadDaOs({ page }) {
   // Aguarda SPA terminar de renderizar.
   await page.waitForLoadState('networkidle', { timeout: TRIGGER_TIMEOUT_MS }).catch(() => {});
+
+  // Detecta redirect para tela de login — sessao Salesforce nao foi
+  // estabelecida ou expirou. Curto-circuita com erro claro em vez de
+  // ficar buscando seletores num formulario de login.
+  const urlAtual = page.url();
+  if (urlAtual.includes('logon.gehealthcare.com') || urlAtual.includes('loginflow')) {
+    throw new Error(`sessao_perdida: navegacao caiu em ${urlAtual.slice(0, 80)}...`);
+  }
 
   // Se o popup ja esta aberto (caso raro), nao precisa clicar.
   const popupJaAberto = await page.getByText(RE_TITULO_POPUP).count() > 0;
