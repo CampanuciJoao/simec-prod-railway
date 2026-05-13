@@ -500,8 +500,11 @@ function CausasAgregadas({ causas, onSelecionarCategoria }) {
 
 // ─── Drawer de drill-down ────────────────────────────────────────────────────
 
-function DrillDownCausa({ categoria, items, loading, onClose }) {
+function DrillDownCausa({ categoria, items, totalPdfs, loading, onClose }) {
   if (!categoria) return null;
+
+  const totalOs = items?.length ?? 0;
+  const sufixoPdfs = totalPdfs && totalPdfs !== totalOs ? ` · ${totalPdfs} PDFs analisados` : '';
 
   return (
     <div
@@ -517,7 +520,7 @@ function DrillDownCausa({ categoria, items, loading, onClose }) {
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
-              Causa-raiz · {items?.length ?? 0} OS
+              Causa-raiz · {totalOs} OS{sufixoPdfs}
             </p>
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
               {labelCausa(categoria)}

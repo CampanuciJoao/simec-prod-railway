@@ -550,7 +550,7 @@ router.get('/causas/:categoria', async (req, res) => {
     });
 
     // Achata pra resposta mais limpa.
-    const items = extracoes.map((e) => ({
+    const itemsBrutos = extracoes.map((e) => ({
       id: e.id,
       caseNumber: e.caseNumber,
       woNumber: e.woNumber,
@@ -577,7 +577,34 @@ router.get('/causas/:categoria', async (req, res) => {
       temArquivoR2: Boolean(e.pdfDocumento?.r2Key),
     }));
 
-    res.json({ categoria, total: items.length, items });
+    // Dedup por gehcServiceId: cada OS GE pode ter varios PDFs (Service
+    // Report + Activity Sheet etc), todos com conteudo praticamente
+    // identico. Mostra so o mais recente por OS e devolve o total de PDFs
+    // contribuintes para transparencia.
+    const porOs = new Map();
+    for (const it of itemsBrutos) {
+      const chave = it.gehcServiceId || it.id;
+      const existente = porOs.get(chave);
+      if (!existente) {
+        porOs.set(chave, { ...it, pdfsContribuintes: 1 });
+      } else {
+        existente.pdfsContribuintes += 1;
+        // Mantem a extracao mais recente (extraidoEm desc)
+        const novaMaisRecente =
+          (it.extraidoEm && (!existente.extraidoEm || new Date(it.extraidoEm) > new Date(existente.extraidoEm)));
+        if (novaMaisRecente) {
+          porOs.set(chave, { ...it, pdfsContribuintes: existente.pdfsContribuintes });
+        }
+      }
+    }
+    const items = Array.from(porOs.values());
+
+    res.json({
+      categoria,
+      total: items.length,            // OSs distintas
+      totalPdfs: itemsBrutos.length,  // PDFs analisados
+      items,
+    });
   } catch (err) {
     console.error('[GEHC_APRENDIZADO] /causas/:categoria:', err.message);
     res.status(500).json({ error: err.message });

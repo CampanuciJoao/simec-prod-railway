@@ -383,6 +383,19 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
 
         if (!docsPendentes.length) continue; // nada a fazer
 
+        // Cada OS GE pode ter varios documentos (Service Report, Activity
+        // Sheet, etc), todos com conteudo praticamente identico. Para a IA
+        // 1 PDF por OS basta — economiza download, R2 nao usado mas storage
+        // do banco fica menor, evita duplicacao no drill-down.
+        // listarDocumentosDaOS retorna em ordem de relevancia do portal,
+        // entao o primeiro eh o mais informativo (Service Report).
+        if (docsPendentes.length > 1) {
+          console.log(
+            `[GEHC_PDF] SR${trackingNumber}: ${docsPendentes.length} documentos disponiveis, baixando so o primeiro (${docsPendentes[0].documentId}).`
+          );
+          docsPendentes = docsPendentes.slice(0, 1);
+        }
+
         // Botao Download esta no .ge-equipment-service-history__holder do card.
         const downloadBtn = item.locator('.ge-equipment-service-history__holder button')
           .filter({ hasText: /^(download|baixar)$/i }).first();
