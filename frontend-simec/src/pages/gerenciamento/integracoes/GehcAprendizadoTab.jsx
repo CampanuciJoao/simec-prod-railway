@@ -24,9 +24,11 @@ import {
   InfoCard,
   InlineEmptyState,
   LoadingState,
+  ModalConfirmacao,
   PageSection,
   ResponsiveGrid,
 } from '@/components/ui';
+import { useToast } from '@/contexts/ToastContext';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useGehcAprendizado } from '@/hooks/gerenciamento/useGehcAprendizado';
 import { urlPdfDocumento } from '@/services/api/gehcAprendizadoApi';
@@ -569,6 +571,39 @@ function GehcAprendizadoTab() {
   } = useGehcAprendizado();
 
   const [dialogo, setDialogo] = useState(null); // { pipeline, label } | null
+  // Confirmações destrutivas em batch — uma flag por ação
+  const [confirmacao, setConfirmacao] = useState(null); // 'descartar' | 'limpar' | 'resetar' | null
+  const [executandoBatch, setExecutandoBatch] = useState(false);
+  const { addToast } = useToast();
+
+  const fecharConfirmacao = () => {
+    if (executandoBatch) return;
+    setConfirmacao(null);
+  };
+
+  const executarConfirmacao = async () => {
+    setExecutandoBatch(true);
+    try {
+      if (confirmacao === 'descartar') {
+        const r = await descartarTodosInsights('descarte_manual_admin');
+        addToast(`${r?.descartados ?? 0} insight(s) descartado(s) como incorretos.`, 'success');
+      } else if (confirmacao === 'limpar') {
+        const r = await limparTodosInsights('limpeza_manual_admin');
+        addToast(`${r?.resolvidos ?? 0} insight(s) marcados como resolvidos.`, 'success');
+      } else if (confirmacao === 'resetar') {
+        const r = await resetarExtracoes('reset_manual_admin');
+        addToast(
+          `Reset concluído — ${r?.extracoesRemovidas ?? 0} extrações, ${r?.eventosRemovidos ?? 0} eventos, ${r?.embeddingsRemovidos ?? 0} embeddings, ${r?.insightsResolvidos ?? 0} insights.`,
+          'success',
+        );
+      }
+      setConfirmacao(null);
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message || 'Falha ao executar a ação.', 'error');
+    } finally {
+      setExecutandoBatch(false);
+    }
+  };
 
   if (loading) return <LoadingState message="Carregando dados da IA..." />;
 
@@ -647,11 +682,7 @@ function GehcAprendizadoTab() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={async () => {
-                  if (!window.confirm(`Descartar todos os ${insights.length} insights como incorretos? A IA recebe feedback negativo (não-útil) para todos.`)) return;
-                  const r = await descartarTodosInsights('descarte_manual_admin');
-                  window.alert(`${r?.descartados ?? 0} insight(s) descartados.`);
-                }}
+                onClick={() => setConfirmacao('descartar')}
                 title="Descarta como falso positivo: marca feedbackUtil=false para a IA aprender que estavam errados"
               >
                 Descartar todos como incorretos
@@ -659,11 +690,8 @@ function GehcAprendizadoTab() {
               <Button
                 type="button"
                 variant="ghost"
-                onClick={async () => {
-                  if (!window.confirm(`Limpar todos os ${insights.length} insights ativos? Trata como 'resolvidos' (engenheiro tomou ação). A próxima geração só recriará os que ainda forem válidos.`)) return;
-                  const r = await limparTodosInsights('limpeza_manual_admin');
-                  window.alert(`${r?.resolvidos ?? 0} insight(s) marcados como resolvidos.`);
-                }}
+                onClick={() => setConfirmacao('limpar')}
+                title="Marca como resolvidos (problema real foi tratado)"
               >
                 Limpar todos (resolvidos)
               </Button>
@@ -687,11 +715,7 @@ function GehcAprendizadoTab() {
           <Button
             type="button"
             variant="ghost"
-            onClick={async () => {
-              if (!window.confirm('Resetar a análise de causa-raiz? Apaga todas as extrações dos PDFs + eventos derivados + embeddings. Os PDFs originais permanecem; rode "Extração LLM" depois para reprocessar do zero.')) return;
-              const r = await resetarExtracoes('reset_manual_admin');
-              window.alert(`Reset concluído.\n• ${r?.extracoesRemovidas ?? 0} extrações apagadas\n• ${r?.eventosRemovidos ?? 0} eventos do KL removidos\n• ${r?.embeddingsRemovidos ?? 0} embeddings limpos\n• ${r?.insightsResolvidos ?? 0} insights resolvidos\n\nRode "Extração LLM" para reprocessar.`);
-            }}
+            onClick={() => setConfirmacao('resetar')}
             title="Apaga as extrações e eventos derivados de PDF; PDFs originais ficam preservados"
           >
             Resetar análise
@@ -729,6 +753,41 @@ function GehcAprendizadoTab() {
           }}
         />
       )}
+
+      <ModalConfirmacao
+        isOpen={confirmacao === 'descartar'}
+        onClose={fecharConfirmacao}
+        onConfirm={executarConfirmacao}
+        title="Descartar todos os insights como incorretos?"
+        message={`Os ${insights?.length ?? 0} insight(s) ativo(s) receberão feedback negativo (não-útil) e serão fechados. Use isto quando os insights estiverem manifestamente errados — a IA registra o feedback para evolução futura.`}
+        confirmText={executandoBatch ? 'Descartando…' : 'Descartar todos'}
+        cancelText="Cancelar"
+        isDestructive
+        confirmDisabled={executandoBatch}
+      />
+
+      <ModalConfirmacao
+        isOpen={confirmacao === 'limpar'}
+        onClose={fecharConfirmacao}
+        onConfirm={executarConfirmacao}
+        title="Marcar todos os insights como resolvidos?"
+        message={`Os ${insights?.length ?? 0} insight(s) ativo(s) serão marcados como resolvidos (engenheiro tomou ação). A próxima execução do gerador só recriará os que ainda forem válidos pela regra atual.`}
+        confirmText={executandoBatch ? 'Limpando…' : 'Marcar como resolvidos'}
+        cancelText="Cancelar"
+        confirmDisabled={executandoBatch}
+      />
+
+      <ModalConfirmacao
+        isOpen={confirmacao === 'resetar'}
+        onClose={fecharConfirmacao}
+        onConfirm={executarConfirmacao}
+        title="Resetar análise de causa-raiz?"
+        message='Apaga todas as extrações dos PDFs, eventos derivados e embeddings. Os PDFs originais permanecem armazenados. Em seguida rode "Extração LLM" no painel de pipelines para reprocessar do zero com a taxonomia atual.'
+        confirmText={executandoBatch ? 'Resetando…' : 'Resetar análise'}
+        cancelText="Cancelar"
+        isDestructive
+        confirmDisabled={executandoBatch}
+      />
     </div>
   );
 }
