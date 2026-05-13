@@ -124,18 +124,62 @@ async function produzirEventosPdfGE({ tenantId }) {
 
 // ─── Produtor 2: Telemetria GE (anomalias) ──────────────────────────────────
 //
-// Para nao explodir a tabela com 1 evento por snapshot (sao a cada 30min),
-// emitimos eventos so quando ha condicao anormal: helio fora de spec,
-// compressor off, magneto offline. O score preditivo mais sofisticado sai
-// no PR4 — aqui usamos limiares simples.
+// IMPORTANTE: telemetria de helio/compressor/magneto/coolant SO FAZ SENTIDO
+// para RMs. TC, raio-X, mamografia, densitometro, PET-CT, AW Server e
+// medicina nuclear NAO tem hélio nem magneto. Bug anterior (2026-05-13)
+// criou ~130 eventos 'magneto_helio' falsos por equipamento nao-RM e
+// gerou dezenas de insights de risco_alto absurdos. Filtramos pela
+// modalidade aqui para nunca mais acontecer.
+//
+// Causa-raiz por tipo de evento:
+//   helio_*, magneto_offline, temp_coolant -> magneto_helio (problema da maquina)
+//   compressor_off                          -> cryo_compressor (compressor GE)
+//   (Chiller externo do cliente vem dos PDFs, nao da telemetria.)
+
+const CAUSA_POR_TIPO_TELEMETRIA = Object.freeze({
+  helio_critico:            'magneto_helio',
+  helio_baixo:              'magneto_helio',
+  compressor_off:           'cryo_compressor',
+  magneto_offline:          'magneto_helio',
+  temperatura_coolant_alta: 'magneto_helio',
+});
+
+// Match por nome de tipo do equipamento (campo Equipamento.tipo).
+// Cobertura: 'Ressonância Magnética', 'RM', 'Ressonancia Magnetica', etc.
+const RM_FILTER = {
+  OR: [
+    { tipo: { contains: 'Ressonância', mode: 'insensitive' } },
+    { tipo: { contains: 'Ressonancia', mode: 'insensitive' } },
+    { tipo: { contains: 'RM',          mode: 'insensitive' } },
+  ],
+};
 
 async function produzirEventosTelemetriaGE({ tenantId }) {
-  // Olha so snapshots dos ultimos 7 dias para nao retroprocessar tudo a cada
-  // execucao. O cron roda diariamente, entao 7d cobre rebuilds com folga.
-  const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  // ─── LIMPEZA RETROATIVA ──────────────────────────────────────────────────
+  // Remove eventos de telemetria de equipamentos NAO-RM (legado do bug
+  // anterior). Idempotente — proxima execucao nao tera nada para limpar.
+  // Executa antes de criar novos para nao deixar lixo no banco.
+  const limpeza = await prisma.eventoEquipamento.deleteMany({
+    where: {
+      tenantId,
+      fonte: 'telemetria_ge',
+      equipamento: { NOT: RM_FILTER },
+    },
+  });
+  if (limpeza.count > 0) {
+    console.log(`[KL_TELEMETRIA] Removidos ${limpeza.count} evento(s) de telemetria de equipamentos nao-RM (limpeza retroativa).`);
+  }
 
+  // Olha so snapshots dos ultimos 7 dias para nao retroprocessar tudo a cada
+  // execucao. O cron roda a cada 1h, entao 7d cobre rebuilds com folga.
+  // FILTRO: apenas RMs.
+  const desde = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const snapshots = await prisma.gehcSaudeSnapshot.findMany({
-    where: { tenantId, capturedAt: { gte: desde } },
+    where: {
+      tenantId,
+      capturedAt: { gte: desde },
+      equipamento: RM_FILTER,
+    },
     select: {
       id: true,
       equipamentoId: true,
@@ -173,12 +217,18 @@ async function produzirEventosTelemetriaGE({ tenantId }) {
         }
       }
 
-      if (s.compressorStatus && s.compressorStatus.toUpperCase() !== 'ON') {
-        eventos.push({
-          tipoEvento: 'compressor_off',
-          severidade: 'high',
-          resumo: `Compressor ${s.compressorStatus}`,
-        });
+      // compressor_off: requer status string nao-vazio que NAO seja 'ON'.
+      // Tolera variantes 'OK', 'Healthy' como equivalente a ON (alguns
+      // equipamentos GE retornam isso).
+      if (typeof s.compressorStatus === 'string' && s.compressorStatus.trim()) {
+        const st = s.compressorStatus.trim().toUpperCase();
+        if (!['ON', 'OK', 'HEALTHY', 'NORMAL'].includes(st)) {
+          eventos.push({
+            tipoEvento: 'compressor_off',
+            severidade: 'high',
+            resumo: `Compressor ${s.compressorStatus}`,
+          });
+        }
       }
 
       if (s.magnetOnline === false) {
@@ -205,7 +255,7 @@ async function produzirEventosTelemetriaGE({ tenantId }) {
           fonte: 'telemetria_ge',
           tipoEvento: ev.tipoEvento,
           severidade: ev.severidade,
-          causaCategoria: 'magneto_helio',
+          causaCategoria: CAUSA_POR_TIPO_TELEMETRIA[ev.tipoEvento] || null,
           resumo: ev.resumo,
           detalhesJson: {
             heliumLevelPct:    s.heliumLevelPct,
