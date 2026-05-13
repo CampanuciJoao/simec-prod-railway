@@ -172,7 +172,7 @@ async function detectarReincidenciaCausa({ tenantId, equipamentoId }) {
   }
 
   const recomendacaoPorCausa = {
-    infra_chiller_cliente: 'Esta reincidência indica problema de infraestrutura predial (chiller). Recomenda-se notificar o cliente para inspeção do sistema de refrigeração do prédio — não é falha do magneto.',
+    infra_chiller_cliente: 'Reincidência aponta para o chiller externo de água gelada (responsabilidade do cliente) que refrigera a sala/máquina — não é falha interna do magneto. Notificar o cliente para inspeção do sistema de chillers externos.',
     cryo_compressor:       'Compressor do criostato apresenta reincidência. Considere troca preventiva do compressor antes da próxima falha.',
     magneto_helio:         'Reincidência em parâmetros de hélio. Avaliar refill antecipado e inspeção do sistema de criogenia.',
     bobina:                'Reincidência em bobinas. Pode indicar conector ou cabeamento com falha intermitente — solicitar inspeção dedicada.',

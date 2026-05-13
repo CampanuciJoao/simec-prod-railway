@@ -52,7 +52,7 @@ function formatarDuracao(ms) {
 
 // Mapa categoria normalizada -> label PT-BR amigavel.
 const LABELS_CAUSAS = {
-  infra_chiller_cliente: 'Chiller predial do cliente',
+  infra_chiller_cliente: 'Chiller externo de água gelada (cliente)',
   cryo_compressor:       'Compressor do criostato',
   magneto_helio:         'Hélio / criogenia',
   bobina:                'Bobinas',
@@ -354,7 +354,7 @@ const LABELS_TIPO_INSIGHT = {
   acionamento_freq_terceiro: 'Acionamento frequente de terceiro',
 };
 
-function CartaoInsight({ insight, onFeedback, onResolver }) {
+function CartaoInsight({ insight, onFeedback, onResolver, onDescartar }) {
   const cor = CORES_SEVERIDADE[insight.severidade] || 'var(--text-muted)';
   const eq  = insight.equipamento;
   return (
@@ -408,16 +408,32 @@ function CartaoInsight({ insight, onFeedback, onResolver }) {
             <FontAwesomeIcon icon={faThumbsDown} />
           </button>
         </div>
-        <Button type="button" variant="ghost" onClick={() => onResolver(insight.id)}>
-          <FontAwesomeIcon icon={faCheck} />
-          <span className="ml-1 text-xs">Marcar resolvido</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onDescartar(insight.id)}
+            title="Descartar — sinaliza para a IA que este insight era falso positivo"
+          >
+            <FontAwesomeIcon icon={faTriangleExclamation} />
+            <span className="ml-1 text-xs">Descartar (incorreto)</span>
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onResolver(insight.id)}
+            title="Marcar como resolvido — sinaliza que o problema real foi tratado"
+          >
+            <FontAwesomeIcon icon={faCheck} />
+            <span className="ml-1 text-xs">Marcar resolvido</span>
+          </Button>
+        </div>
       </div>
     </div>
   );
 }
 
-function ListaInsights({ insights, onFeedback, onResolver }) {
+function ListaInsights({ insights, onFeedback, onResolver, onDescartar }) {
   if (!insights?.length) {
     return (
       <InlineEmptyState message="A IA ainda nao gerou insights. Conforme eventos forem acumulados (PDFs extraidos + telemetria), padroes vao aparecer aqui." />
@@ -431,6 +447,7 @@ function ListaInsights({ insights, onFeedback, onResolver }) {
           insight={ins}
           onFeedback={onFeedback}
           onResolver={onResolver}
+          onDescartar={onDescartar}
         />
       ))}
     </div>
@@ -546,7 +563,9 @@ function GehcAprendizadoTab() {
     loading, error,
     acaoPipeline, feedbackPipeline,
     pausar, retomar, disparar,
-    darFeedbackInsight, resolverInsight, limparTodosInsights,
+    darFeedbackInsight, resolverInsight, descartarInsight,
+    limparTodosInsights, descartarTodosInsights,
+    resetarExtracoes,
   } = useGehcAprendizado();
 
   const [dialogo, setDialogo] = useState(null); // { pipeline, label } | null
@@ -624,17 +643,31 @@ function GehcAprendizadoTab() {
         description="Recomendações geradas automaticamente. Marque útil/inútil para a IA aprender com seu feedback."
         actions={
           insights?.length > 0 ? (
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={async () => {
-                if (!window.confirm(`Limpar todos os ${insights.length} insights ativos? A próxima geração só recriará os que ainda forem válidos.`)) return;
-                const r = await limparTodosInsights('limpeza_manual_admin');
-                window.alert(`${r?.resolvidos ?? 0} insight(s) marcados como resolvidos.`);
-              }}
-            >
-              Limpar todos
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={async () => {
+                  if (!window.confirm(`Descartar todos os ${insights.length} insights como incorretos? A IA recebe feedback negativo (não-útil) para todos.`)) return;
+                  const r = await descartarTodosInsights('descarte_manual_admin');
+                  window.alert(`${r?.descartados ?? 0} insight(s) descartados.`);
+                }}
+                title="Descarta como falso positivo: marca feedbackUtil=false para a IA aprender que estavam errados"
+              >
+                Descartar todos como incorretos
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={async () => {
+                  if (!window.confirm(`Limpar todos os ${insights.length} insights ativos? Trata como 'resolvidos' (engenheiro tomou ação). A próxima geração só recriará os que ainda forem válidos.`)) return;
+                  const r = await limparTodosInsights('limpeza_manual_admin');
+                  window.alert(`${r?.resolvidos ?? 0} insight(s) marcados como resolvidos.`);
+                }}
+              >
+                Limpar todos (resolvidos)
+              </Button>
+            </div>
           ) : null
         }
       >
@@ -642,6 +675,7 @@ function GehcAprendizadoTab() {
           insights={insights}
           onFeedback={darFeedbackInsight}
           onResolver={resolverInsight}
+          onDescartar={descartarInsight}
         />
       </PageSection>
 
@@ -649,6 +683,20 @@ function GehcAprendizadoTab() {
       <PageSection
         title="Padrões de causa-raiz"
         description="Categorias normalizadas que a IA identificou nos PDFs analisados. Use para enxergar o que mais derruba sua frota."
+        actions={
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={async () => {
+              if (!window.confirm('Resetar a análise de causa-raiz? Apaga todas as extrações dos PDFs + eventos derivados + embeddings. Os PDFs originais permanecem; rode "Extração LLM" depois para reprocessar do zero.')) return;
+              const r = await resetarExtracoes('reset_manual_admin');
+              window.alert(`Reset concluído.\n• ${r?.extracoesRemovidas ?? 0} extrações apagadas\n• ${r?.eventosRemovidos ?? 0} eventos do KL removidos\n• ${r?.embeddingsRemovidos ?? 0} embeddings limpos\n• ${r?.insightsResolvidos ?? 0} insights resolvidos\n\nRode "Extração LLM" para reprocessar.`);
+            }}
+            title="Apaga as extrações e eventos derivados de PDF; PDFs originais ficam preservados"
+          >
+            Resetar análise
+          </Button>
+        }
       >
         <CausasAgregadas causas={causas} />
       </PageSection>

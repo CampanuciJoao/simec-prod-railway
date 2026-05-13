@@ -21,8 +21,17 @@ export const patchInsightFeedback = (id, util) =>
 export const patchInsightResolver = (id) =>
   api.patch(`/gehc/aprendizado/insights/${id}/resolver`).then((r) => r.data);
 
+export const patchInsightDescartar = (id) =>
+  api.patch(`/gehc/aprendizado/insights/${id}/descartar`).then((r) => r.data);
+
 export const postLimparTodosInsights = (motivo) =>
   api.post('/gehc/aprendizado/insights/limpar-todos', { motivo }).then((r) => r.data);
+
+export const postDescartarTodosInsights = (motivo) =>
+  api.post('/gehc/aprendizado/insights/descartar-todos', { motivo }).then((r) => r.data);
+
+export const postResetarExtracoes = (motivo) =>
+  api.post('/gehc/aprendizado/extracoes/resetar', { motivo }).then((r) => r.data);
 
 export const postIaAsk = ({ pergunta, equipamentoId }) =>
   api.post('/gehc/aprendizado/ia/ask', { pergunta, equipamentoId }).then((r) => r.data);

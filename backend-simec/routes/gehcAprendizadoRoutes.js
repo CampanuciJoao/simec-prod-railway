@@ -157,6 +157,56 @@ router.patch('/insights/:id/feedback', async (req, res) => {
   }
 });
 
+// ─── PATCH /api/gehc/aprendizado/insights/:id/descartar ──────────────────────
+// Descarta o insight como FALSO POSITIVO. Diferente de "resolver" (que
+// significa que o problema real foi tratado), descartar registra
+// feedbackUtil=false — sinaliza para a IA que esse insight nao deveria
+// ter sido gerado.
+router.patch('/insights/:id/descartar', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { id } = req.params;
+  try {
+    const insight = await prisma.iaInsight.findFirst({ where: { id, tenantId } });
+    if (!insight) return res.status(404).json({ error: 'Insight nao encontrado.' });
+
+    const atualizado = await prisma.iaInsight.update({
+      where: { id },
+      data: {
+        resolvidoEm:  new Date(),
+        feedbackUtil: false,
+        feedbackEm:   new Date(),
+      },
+    });
+    res.json({ ok: true, insight: atualizado });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/aprendizado/insights/descartar-todos ─────────────────────
+// Descarta todos insights ativos como falsos positivos. Util para limpar
+// uma onda de erros sem dar feedback positivo a IA.
+router.post('/insights/descartar-todos', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const usuarioId = req.usuario.id;
+  try {
+    const agora = new Date();
+    const r = await prisma.iaInsight.updateMany({
+      where: { tenantId, resolvidoEm: null },
+      data:  { resolvidoEm: agora, feedbackUtil: false, feedbackEm: agora },
+    });
+    await logAuditoria({
+      tenantId, autorId: usuarioId,
+      acao: 'AI_INSIGHTS_DESCARTADOS_EM_LOTE',
+      entidadeId: 'todos',
+      detalhes: { descartados: r.count, motivo: req.body?.motivo || 'descarte_manual' },
+    });
+    res.json({ ok: true, descartados: r.count });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── POST /api/gehc/aprendizado/insights/limpar-todos ────────────────────────
 // Marca todos insights ativos do tenant como resolvidos. Util para zerar apos
 // fix de logica de detector que gerou falsos positivos. Proxima execucao do
@@ -178,6 +228,66 @@ router.post('/insights/limpar-todos', admin, async (req, res) => {
     });
     res.json({ ok: true, resolvidos: r.count });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/aprendizado/extracoes/resetar ────────────────────────────
+// Apaga TODAS as extracoes de PDF (gehcPdfExtraido) do tenant + eventos do
+// Knowledge Layer derivados de PDFs (refFonteTipo='gehc_pdf') + embeddings
+// associados a esses eventos. Insights ativos sao marcados como resolvidos.
+//
+// Os PDFs originais (gehcPdfDocumento) NAO sao apagados — proxima rodada
+// do extrator LLM os reprocessa do zero. Use isso quando a taxonomia muda
+// ou os resultados estao manifestamente incorretos.
+router.post('/extracoes/resetar', admin, async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const usuarioId = req.usuario.id;
+
+  try {
+    const eventosPdf = await prisma.eventoEquipamento.findMany({
+      where: { tenantId, refFonteTipo: 'gehc_pdf' },
+      select: { id: true },
+    });
+    const eventoIds = eventosPdf.map((e) => e.id);
+
+    const [embeddingsDel, eventosDel, extracoesDel, insightsDel] = await prisma.$transaction([
+      prisma.eventoEquipamentoEmbedding.deleteMany({
+        where: { tenantId, eventoId: { in: eventoIds } },
+      }),
+      prisma.eventoEquipamento.deleteMany({
+        where: { tenantId, refFonteTipo: 'gehc_pdf' },
+      }),
+      prisma.gehcPdfExtraido.deleteMany({ where: { tenantId } }),
+      prisma.iaInsight.updateMany({
+        where: { tenantId, resolvidoEm: null },
+        data:  { resolvidoEm: new Date() },
+      }),
+    ]);
+
+    await logAuditoria({
+      tenantId, autorId: usuarioId,
+      acao: 'AI_EXTRACOES_RESETADAS',
+      entidadeId: 'todos',
+      detalhes: {
+        embeddingsRemovidos: embeddingsDel.count,
+        eventosRemovidos:    eventosDel.count,
+        extracoesRemovidas:  extracoesDel.count,
+        insightsResolvidos:  insightsDel.count,
+        motivo: req.body?.motivo || 'reset_manual',
+      },
+    });
+
+    res.json({
+      ok: true,
+      embeddingsRemovidos: embeddingsDel.count,
+      eventosRemovidos:    eventosDel.count,
+      extracoesRemovidas:  extracoesDel.count,
+      insightsResolvidos:  insightsDel.count,
+      mensagem: 'Reset concluido. Rode "Extracao LLM" para reprocessar os PDFs do zero.',
+    });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] Erro ao resetar extracoes:', err);
     res.status(500).json({ error: err.message });
   }
 });

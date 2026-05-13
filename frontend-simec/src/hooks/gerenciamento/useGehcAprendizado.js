@@ -13,7 +13,10 @@ import {
   getAprendizadoInsights,
   patchInsightFeedback,
   patchInsightResolver,
+  patchInsightDescartar,
   postLimparTodosInsights,
+  postDescartarTodosInsights,
+  postResetarExtracoes,
   postPausarPipeline,
   postRetomarPipeline,
   postDispararPipeline,
@@ -102,9 +105,40 @@ export function useGehcAprendizado() {
     }
   }, [carregar]);
 
+  const descartarInsight = useCallback(async (id) => {
+    try {
+      await patchInsightDescartar(id);
+      await carregar();
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+    }
+  }, [carregar]);
+
   const limparTodosInsights = useCallback(async (motivo) => {
     try {
       const r = await postLimparTodosInsights(motivo);
+      await carregar();
+      return r;
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+      throw err;
+    }
+  }, [carregar]);
+
+  const descartarTodosInsights = useCallback(async (motivo) => {
+    try {
+      const r = await postDescartarTodosInsights(motivo);
+      await carregar();
+      return r;
+    } catch (err) {
+      setError(err?.response?.data?.error || err.message);
+      throw err;
+    }
+  }, [carregar]);
+
+  const resetarExtracoes = useCallback(async (motivo) => {
+    try {
+      const r = await postResetarExtracoes(motivo);
       await carregar();
       return r;
     } catch (err) {
@@ -186,7 +220,9 @@ export function useGehcAprendizado() {
     acaoPipeline,
     feedbackPipeline,
     pausar, retomar, disparar,
-    darFeedbackInsight, resolverInsight, limparTodosInsights,
+    darFeedbackInsight, resolverInsight, descartarInsight,
+    limparTodosInsights, descartarTodosInsights,
+    resetarExtracoes,
     recarregar: carregar,
   };
 }
