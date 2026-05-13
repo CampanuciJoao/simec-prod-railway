@@ -12,7 +12,10 @@ import { DEFAULTS as ALERT_DEFAULTS, getConfig as getAlertConfig } from '../aler
  */
 export const THRESHOLDS = ALERT_DEFAULTS.GEHC;
 
-const OFFLINE_THRESHOLD_MS = 6 * 60 * 60 * 1000; // 6 horas
+// 72h: equipamentos GE ficam naturalmente offline em finais de semana
+// (uso clinico interrompido). Alerta antes disso gera ruido. 72h cobre
+// fim de semana inteiro + 1 dia util de margem antes de notificar.
+const OFFLINE_THRESHOLD_MS = 72 * 60 * 60 * 1000; // 72 horas
 
 // Labels agrupados por métrica: permite saber quais alertas resolver quando a condição normaliza
 const LABELS_POR_METRICA = {
@@ -274,7 +277,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
     }
   }
 
-  // Alerta de equipamento offline prolongado (>6h)
+  // Alerta de equipamento offline prolongado (>72h — cobre finais de semana)
   const alertaOfflineId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, 'equipamento-offline');
   if (snapshot.equipmentOnline === true) {
     const { count } = await prisma.alerta.deleteMany({
@@ -297,8 +300,8 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
           data: {
             id: alertaOfflineId,
             tenantId,
-            titulo: `Equipamento offline há mais de 6h — ${equipamentoNome}`,
-            subtitulo: 'Verifique a conectividade do equipamento com o portal GE Healthcare.',
+            titulo: `Equipamento offline há mais de 72h — ${equipamentoNome}`,
+            subtitulo: 'Verifique a conectividade com o portal GE Healthcare. Janela de 72h cobre finais de semana e feriados — alerta indica problema persistente.',
             data: agora,
             prioridade: ALERT_PRIORIDADES.ALTA,
             tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
