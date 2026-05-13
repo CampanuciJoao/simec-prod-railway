@@ -10,14 +10,15 @@ import {
   fetchUtilizationData,
 } from './gehcGraphqlClient.js';
 import { STATUS_INATIVOS } from '../equipamento/equipamentoStatus.js';
-import { ehEquipamentoRM } from '../equipamento/equipamentoModalidade.js';
+import { ehEquipamentoRM, RM_FILTER } from '../equipamento/equipamentoModalidade.js';
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
 function temDadosSuficientes(snapshot) {
   if (!snapshot) return false;
-  // Conectividade sozinha já é dado válido (registra offline no histórico)
-  if (snapshot.equipmentOnline !== null && snapshot.equipmentOnline !== undefined) return true;
+  // Snapshot so vale se traz pelo menos uma metrica de saude RM. Conectividade
+  // sozinha (equipmentOnline) nao basta — sem helio/cryo nao e informacao
+  // acionavel para o usuario nem para detectores.
   return [
     snapshot.heliumLevelPct,
     snapshot.heliumPressurePsi,
@@ -51,11 +52,15 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
     }
   }
 
-  // Pula equipamentos Vendidos ou Desativados — sem alertas/captura.
+  // Captura de saude so faz sentido em RM (helio, cryo, compressor,
+  // temperatura). Para TC/RX/MN o portal devolveria so 'equipmentOnline',
+  // o que nao e informativo. Vinculacao e sync de contrato/OS continuam
+  // funcionando para todas as modalidades GE; apenas a saude/snapshot fica
+  // restrita a RM.
+  // Pula tambem Vendidos/Desativados.
   const filtroStatus = { status: { notIn: STATUS_INATIVOS } };
-  const where = tenantId
-    ? { tenantId, gehcAssetId: { not: null }, ...filtroStatus }
-    : { gehcAssetId: { not: null }, ...filtroStatus };
+  const baseWhere = { gehcAssetId: { not: null }, ...filtroStatus, ...RM_FILTER };
+  const where = tenantId ? { tenantId, ...baseWhere } : baseWhere;
 
   const equipamentos = await prisma.equipamento.findMany({
     where,
@@ -71,11 +76,11 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
   });
 
   if (equipamentos.length === 0) {
-    console.log('[GEHC_MONITOR] Nenhum equipamento com gehcAssetId cadastrado.');
+    console.log('[GEHC_MONITOR] Nenhuma RM GE vinculada — nada a capturar (TC/RX/MN nao geram snapshot de saude).');
     return;
   }
 
-  console.log(`[GEHC_MONITOR] Iniciando monitoramento paralelo de ${equipamentos.length} equipamento(s) GE.`);
+  console.log(`[GEHC_MONITOR] Iniciando monitoramento paralelo de ${equipamentos.length} RM GE.`);
 
   const resultados = await Promise.allSettled(equipamentos.map(async (eq) => {
     const nome = eq.apelido || eq.modelo || eq.id;

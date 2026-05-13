@@ -15,6 +15,10 @@ import { gerarPdfSaudeEquipamentoBuffer } from '../services/pdf/pdfDocumentServi
 
 const router = express.Router();
 
+// Snapshot e considerado "valido" apenas se tem pelo menos uma metrica de
+// saude RM (helio, cryo, compressor, etc). Conectividade pura
+// (equipmentOnline) nao basta — para o usuario, "Online" sem nenhum dado
+// de criogenia nao e informacao acionavel.
 const whereSnapshotValido = {
   OR: [
     { heliumLevelPct: { not: null } },
@@ -24,7 +28,6 @@ const whereSnapshotValido = {
     { coolantFlowGpm: { not: null } },
     { cryocoolerStatus: { not: null } },
     { magnetOnline: { not: null } },
-    { equipmentOnline: { not: null } },
   ],
 };
 
