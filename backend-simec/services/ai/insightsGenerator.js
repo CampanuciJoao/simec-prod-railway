@@ -31,6 +31,7 @@
 
 import prisma from '../prismaService.js';
 import { estaAtivo, PIPELINE_NAMES } from './aiPipelineState.js';
+import { ehEquipamentoRM } from '../equipamento/equipamentoModalidade.js';
 
 const JANELA_REINCIDENCIA_DIAS  = 180;
 const MIN_EVENTOS_REINCIDENCIA  = 2;
@@ -65,13 +66,7 @@ const TIPOS_MANUTENCAO_CONCLUIDA = [
 // Causas de reincidencia que so fazem sentido em equipamentos de Ressonancia
 // Magnetica. Se o equipamento nao for RM, sao ignoradas pelo detector.
 const CAUSAS_RM_ESPECIFICAS = new Set(['magneto_helio', 'cryo_compressor']);
-
-const RM_TIPO_REGEX = /(resson[aâ]ncia|^|\s)rm($|\s)/i;
-function ehEquipamentoRM(tipo) {
-  if (!tipo) return false;
-  const t = String(tipo).trim();
-  return RM_TIPO_REGEX.test(t) || /resson[aâ]ncia/i.test(t);
-}
+// ehEquipamentoRM importado de ../equipamento/equipamentoModalidade.js
 
 async function obterDataUltimaManutencao({ tenantId, equipamentoId, desde }) {
   const ev = await prisma.eventoEquipamento.findFirst({
@@ -355,6 +350,23 @@ async function detectarRiscoAlto({ tenantId, equipamentoId }) {
 // ─── Detector 4: sem PM recente ─────────────────────────────────────────────
 
 async function detectarSemPmRecente({ tenantId, equipamentoId }) {
+  // Equipamento GE sem contrato de manutencao ativo nao tem expectativa de
+  // PM externa — pular o detector. Sem isso, gera falso positivo eterno
+  // pois pm_ge nunca aparecera.
+  const eq = await prisma.equipamento.findUnique({
+    where: { tenantId_id: { tenantId, id: equipamentoId } },
+    select: { gehcAssetId: true, gehcContrato: { select: { contractExpiration: true } } },
+  });
+  const ehGE = Boolean(eq?.gehcAssetId);
+  const contratoExpira = eq?.gehcContrato?.contractExpiration ?? null;
+  const contratoAtivo = contratoExpira === null
+    ? Boolean(eq?.gehcContrato) // existe contrato sem data de expiracao
+    : contratoExpira > new Date();
+  if (ehGE && !contratoAtivo) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'sem_pm_recente' });
+    return null;
+  }
+
   const desde = diasAtras(PM_OK_HORIZONTE_DIAS);
   const evPm = await prisma.eventoEquipamento.findFirst({
     where: {

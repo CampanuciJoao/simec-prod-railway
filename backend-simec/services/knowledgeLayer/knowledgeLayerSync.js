@@ -18,6 +18,7 @@
 
 import prisma from '../prismaService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
+import { RM_FILTER } from '../equipamento/equipamentoModalidade.js';
 
 // ─── Helpers comuns ──────────────────────────────────────────────────────────
 
@@ -144,15 +145,7 @@ const CAUSA_POR_TIPO_TELEMETRIA = Object.freeze({
   temperatura_coolant_alta: 'magneto_helio',
 });
 
-// Match por nome de tipo do equipamento (campo Equipamento.tipo).
-// Cobertura: 'Ressonância Magnética', 'RM', 'Ressonancia Magnetica', etc.
-const RM_FILTER = {
-  OR: [
-    { tipo: { contains: 'Ressonância', mode: 'insensitive' } },
-    { tipo: { contains: 'Ressonancia', mode: 'insensitive' } },
-    { tipo: { contains: 'RM',          mode: 'insensitive' } },
-  ],
-};
+// RM_FILTER importado de services/equipamento/equipamentoModalidade.js
 
 async function produzirEventosTelemetriaGE({ tenantId }) {
   // ─── LIMPEZA RETROATIVA ──────────────────────────────────────────────────

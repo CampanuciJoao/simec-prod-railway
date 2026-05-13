@@ -10,6 +10,7 @@ import {
   fetchUtilizationData,
 } from './gehcGraphqlClient.js';
 import { STATUS_INATIVOS } from '../equipamento/equipamentoStatus.js';
+import { ehEquipamentoRM } from '../equipamento/equipamentoModalidade.js';
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
@@ -122,8 +123,7 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
         },
       });
 
-      const tipoNorm = (eq.tipo ?? '').toLowerCase();
-      const eRessonancia = tipoNorm.includes('ressonância') || tipoNorm.includes('ressonancia') || tipoNorm.includes('rm');
+      const eRessonancia = ehEquipamentoRM(eq.tipo);
 
       const { criados, mudouContagem } = await processarAlertasGehc({
         tenantId:        eq.tenantId,
