@@ -28,20 +28,18 @@ const whereSnapshotValido = {
   ],
 };
 
-// Filtro para RMs GE: fabricante contém "GE" + tipo é "Ressonância Magnética" ou contém "RM"
+// Filtro para equipamentos GE de qualquer modalidade (TC, RM, RX, MN, etc).
+// Telemetria especializada (helio/cryo) continua restrita a RM no Knowledge
+// Layer; aqui o foco e contrato/uptime/PMs/OS, que se aplicam a todos.
 const whereRmGe = {
   fabricante: { contains: 'GE', mode: 'insensitive' },
-  OR: [
-    { tipo: { contains: 'Ressonância', mode: 'insensitive' } },
-    { tipo: { contains: 'RM',      mode: 'insensitive' } },
-  ],
 };
 
 // ─── GET /api/gehc/status ─────────────────────────────────────────────────────
 router.get('/status', async (req, res) => {
   const tenantId = req.usuario.tenantId;
   try {
-    const [total, vinculados, semVinculo, totalSnapshots, alertasAtivos, snapshotsValidos, temToken] =
+    const [total, vinculados, semVinculo, vinculadosLista, totalSnapshots, alertasAtivos, snapshotsValidos, temToken] =
       await Promise.all([
         prisma.equipamento.count({
           where: { tenantId, ...whereRmGe },
@@ -52,6 +50,11 @@ router.get('/status', async (req, res) => {
         prisma.equipamento.findMany({
           where: { tenantId, ...whereRmGe, gehcAssetId: null },
           select: { id: true, tag: true, apelido: true, modelo: true },
+        }),
+        prisma.equipamento.findMany({
+          where: { tenantId, gehcAssetId: { not: null } },
+          select: { id: true, tag: true, apelido: true, modelo: true, gehcAssetId: true },
+          orderBy: [{ apelido: 'asc' }, { tag: 'asc' }],
         }),
         prisma.gehcSaudeSnapshot.count({ where: { tenantId } }),
         prisma.alerta.count({ where: { tenantId, tipo: 'GEHC_SAUDE' } }),
@@ -102,6 +105,7 @@ router.get('/status', async (req, res) => {
     res.json({
       rmsGe: { total, vinculadas: vinculados, semVinculo: semVinculo.length },
       rmsSeVinculo: semVinculo,
+      rmsVinculadas: vinculadosLista,
       snapshots: {
         total: totalSnapshots,
         equipamentosSincronizados: equipamentosSincronizadosIds.size,

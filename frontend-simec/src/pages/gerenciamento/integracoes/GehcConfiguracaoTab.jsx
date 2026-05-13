@@ -485,8 +485,17 @@ function GehcConfiguracaoTab() {
 
   const pendentesConfirmacao = resultDiscovery?.ok ? (resultDiscovery.detalhes?.pendentesConfirmacao ?? []) : [];
   const semMatchDiscovery    = resultDiscovery?.ok ? (resultDiscovery.detalhes?.semMatch ?? []) : [];
-  const jaVinculados         = resultDiscovery?.ok ? (resultDiscovery.detalhes?.jaVinculados ?? []) : [];
   const semVinculoLista      = status?.rmsSeVinculo ?? [];
+  // Fonte de verdade da lista de vinculados: /status (atualiza apos qualquer
+  // vincular/desvincular). Fallback para o resultado do ultimo discovery
+  // quando o status ainda nao foi recarregado.
+  const jaVinculados = (status?.rmsVinculadas ?? []).map((eq) => ({
+    simecId: eq.id,
+    tag: eq.tag,
+    apelido: eq.apelido,
+    modelo: eq.modelo,
+    gehcAssetId: eq.gehcAssetId,
+  }));
 
   return (
     <div className="space-y-6">

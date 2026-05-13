@@ -144,14 +144,20 @@ export function useIntegracoesGehc() {
     }
   }, [carregarStatus]);
 
-  const removerPendenteConfirmacao = useCallback((equipamentoId) => {
+  // Remove o equipamento das listas locais do ultimo discovery (pendentes
+  // de confirmacao + sem match) para que a UI reflita o vinculo manual sem
+  // precisar rodar discovery de novo.
+  const removerDoCacheDiscovery = useCallback((equipamentoId) => {
     setResultDiscovery(prev => {
-      if (!prev?.detalhes?.pendentesConfirmacao) return prev;
+      if (!prev?.detalhes) return prev;
+      const filtrar = (lista) =>
+        Array.isArray(lista) ? lista.filter(e => e.simecId !== equipamentoId) : lista;
       return {
         ...prev,
         detalhes: {
           ...prev.detalhes,
-          pendentesConfirmacao: prev.detalhes.pendentesConfirmacao.filter(e => e.simecId !== equipamentoId),
+          pendentesConfirmacao: filtrar(prev.detalhes.pendentesConfirmacao),
+          semMatch: filtrar(prev.detalhes.semMatch),
         },
       };
     });
@@ -161,7 +167,7 @@ export function useIntegracoesGehc() {
     setVincularState(s => ({ ...s, [equipamentoId]: { running: true, error: null } }));
     try {
       await putVincularEquipamento(equipamentoId, gehcAssetId);
-      removerPendenteConfirmacao(equipamentoId);
+      removerDoCacheDiscovery(equipamentoId);
       await carregarStatus();
       setVincularState(s => ({ ...s, [equipamentoId]: { running: false, error: null } }));
     } catch (err) {
@@ -170,13 +176,13 @@ export function useIntegracoesGehc() {
         [equipamentoId]: { running: false, error: err?.response?.data?.error ?? err.message },
       }));
     }
-  }, [carregarStatus, removerPendenteConfirmacao]);
+  }, [carregarStatus, removerDoCacheDiscovery]);
 
   const desvincularEquipamento = useCallback(async (equipamentoId) => {
     setVincularState(s => ({ ...s, [equipamentoId]: { running: true, error: null } }));
     try {
       await deleteDesvincularEquipamento(equipamentoId);
-      removerPendenteConfirmacao(equipamentoId);
+      removerDoCacheDiscovery(equipamentoId);
       await carregarStatus();
       setVincularState(s => ({ ...s, [equipamentoId]: { running: false, error: null } }));
     } catch (err) {
@@ -185,7 +191,7 @@ export function useIntegracoesGehc() {
         [equipamentoId]: { running: false, error: err?.response?.data?.error ?? err.message },
       }));
     }
-  }, [carregarStatus, removerPendenteConfirmacao]);
+  }, [carregarStatus, removerDoCacheDiscovery]);
 
   return {
     status,
