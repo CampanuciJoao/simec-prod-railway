@@ -2,24 +2,42 @@
 
 /**
  * Middleware para validar os dados recebidos no corpo da requisição (body)
- * Ele utiliza o motor de validação Zod para garantir a integridade do banco.
+ * usando Zod. O response segue o padrao do resto do sistema:
+ *   { message: string, fieldErrors: { [campo]: string } }
+ * permitindo que a UI (que ja le esses campos) exiba o erro especifico em
+ * vez de um toast generico.
  */
 const validate = (schema) => (req, res, next) => {
-  // Executa a validação de forma segura (não interrompe o código)
   const result = schema.safeParse(req.body);
 
-  // Se a validação falhar, interrompe e avisa o erro
   if (!result.success) {
-    return res.status(400).json({ 
-      error: "Erro de validação nos dados enviados", 
-      detalhes: result.error.flatten().fieldErrors 
+    const flat = result.error.flatten();
+    // Reduz para 1 mensagem por campo (a UI espera string, nao array)
+    const fieldErrors = {};
+    for (const [campo, msgs] of Object.entries(flat.fieldErrors || {})) {
+      if (Array.isArray(msgs) && msgs.length > 0) fieldErrors[campo] = msgs[0];
+    }
+
+    // Mensagem geral: usa o primeiro erro de campo (se houver) ou os
+    // formErrors (validacoes que nao se prendem a um campo, ex: superRefine).
+    const primeiraMensagemCampo = Object.values(fieldErrors)[0];
+    const formErrors = Array.isArray(flat.formErrors) ? flat.formErrors : [];
+    const message =
+      primeiraMensagemCampo ||
+      formErrors[0] ||
+      'Dados invalidos.';
+
+    return res.status(400).json({
+      message,
+      fieldErrors,
+      // mantido para compatibilidade com clientes antigos que liam `error`/`detalhes`
+      error: 'Erro de validação nos dados enviados',
+      detalhes: flat.fieldErrors,
     });
   }
 
-  // Se estiver tudo ok, guarda os dados limpos e prossegue para a rota
   req.validatedData = result.data;
   next();
 };
 
-// Exportação padrão para uso com "import validate from ..."
 export default validate;
