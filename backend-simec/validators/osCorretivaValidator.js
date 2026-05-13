@@ -1,6 +1,10 @@
 import { z } from 'zod';
 
-const STATUS_EQUIPAMENTO_ABERTURA = ['Inoperante', 'UsoLimitado', 'EmManutencao'];
+// Operante e aceito para casos de "incidente registrado sem impacto
+// operacional" (ex: firmware reset que nao parou o exame mas precisa
+// constar no historico). Para Operante, o status do equipamento nao
+// muda no sistema.
+const STATUS_EQUIPAMENTO_ABERTURA = ['Operante', 'Inoperante', 'UsoLimitado', 'EmManutencao'];
 
 export const abrirOsSchema = z.object({
   equipamentoId: z.string().min(1, 'Equipamento é obrigatório.'),

@@ -80,8 +80,12 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
     return { ok: false, status: 404, message: 'Equipamento não encontrado.' };
   }
 
-  if (equipamento.status === 'Desativado') {
-    return { ok: false, status: 422, message: 'Não é possível abrir OS para equipamento desativado.' };
+  if (equipamento.status === 'Desativado' || equipamento.status === 'Vendido') {
+    return {
+      ok: false,
+      status: 422,
+      message: `Não é possível abrir OS para equipamento com status "${equipamento.status}".`,
+    };
   }
 
   const total = await contarOsDoTenant(tenantId);
