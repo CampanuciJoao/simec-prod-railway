@@ -253,7 +253,7 @@ router.post('/extracoes/resetar', admin, async (req, res) => {
 
     const [embeddingsDel, eventosDel, extracoesDel, insightsDel] = await prisma.$transaction([
       prisma.eventoEquipamentoEmbedding.deleteMany({
-        where: { tenantId, eventoId: { in: eventoIds } },
+        where: { tenantId, eventoEquipamentoId: { in: eventoIds } },
       }),
       prisma.eventoEquipamento.deleteMany({
         where: { tenantId, refFonteTipo: 'gehc_pdf' },
