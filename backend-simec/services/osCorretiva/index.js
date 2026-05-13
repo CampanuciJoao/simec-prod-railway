@@ -24,6 +24,7 @@ import {
   validarAgendarVisita,
   validarRegistrarResultado,
   validarConcluirOs,
+  validarMoverOsEquipamento,
 } from '../../validators/osCorretivaValidator.js';
 
 function gerarNumeroOs({ tag, sequencia }) {
@@ -86,6 +87,10 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
   const total = await contarOsDoTenant(tenantId);
   const numeroOS = gerarNumeroOs({ tag: equipamento.tag, sequencia: total + 1 });
 
+  const dataHoraInicioEvento = v.data.dataHoraInicioEvento
+    ? new Date(v.data.dataHoraInicioEvento)
+    : null;
+
   const novaOs = await prisma.$transaction(async (tx) => {
     const os = await tx.osCorretiva.create({
       data: {
@@ -98,6 +103,7 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
         status: 'Aberta',
         tipo: 'Ocorrencia',
         autorId: usuarioId,
+        dataHoraInicioEvento,
       },
     });
 
@@ -122,8 +128,13 @@ export async function abrirOsCorretivaService({ tenantId, usuarioId, dados }) {
     impactaAnalise: true,
     referenciaId: novaOs.id,
     referenciaTipo: 'os_corretiva',
-    metadata: { numeroOS, solicitante: v.data.solicitante, statusEquipamentoAbertura: v.data.statusEquipamentoAbertura },
-    dataEvento: novaOs.dataHoraAbertura,
+    metadata: {
+      numeroOS,
+      solicitante: v.data.solicitante,
+      statusEquipamentoAbertura: v.data.statusEquipamentoAbertura,
+      ...(dataHoraInicioEvento ? { dataHoraInicioEvento: dataHoraInicioEvento.toISOString() } : {}),
+    },
+    dataEvento: dataHoraInicioEvento || novaOs.dataHoraAbertura,
   });
 
   await registrarLog({
@@ -433,12 +444,16 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     };
   }
 
+  const dataHoraConclusao = v.data.dataHoraConclusao
+    ? new Date(v.data.dataHoraConclusao)
+    : new Date();
+
   await prisma.$transaction(async (tx) => {
     await tx.osCorretiva.update({
       where: { tenantId_id: { tenantId, id: osId } },
       data: {
         status: 'Concluida',
-        dataHoraConclusao: new Date(),
+        dataHoraConclusao,
         observacoesFinais: v.data.observacoesFinais || null,
       },
     });
@@ -463,7 +478,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     referenciaId: osId,
     referenciaTipo: 'os_corretiva',
     metadata: { resultado: 'Operante', origem: 'resolucao_interna' },
-    dataEvento: new Date(),
+    dataEvento: dataHoraConclusao,
   });
 
   await registrarLog({
@@ -542,6 +557,151 @@ export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, mo
   });
 
   await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
+  await reprocessarAlertas(tenantId);
+
+  const completa = await buscarOsPorId({ tenantId, osId });
+  return { ok: true, data: completa };
+}
+
+// ─── Mover OS para outro equipamento ─────────────────────────────────────────
+//
+// Caso de uso: OS aberta no equipamento errado por engano. Permite reatribuir
+// para outro equipamento do mesmo tenant enquanto a OS estiver em
+// {Aberta, EmAndamento}. Cria evento no historico de vida de AMBOS os
+// equipamentos (saida do origem, entrada no destino) para rastreabilidade.
+//
+// Restricoes:
+// - status da OS deve ser Aberta ou EmAndamento (apos isso, abrir nova OS)
+// - se houver visitas de terceiro, mantem todas (movem junto)
+// - reverte status do equipamento ORIGEM para Operante; aplica
+//   statusEquipamentoAbertura no DESTINO (tira ele de Operante)
+// - motivo eh obrigatorio e fica no audit trail
+
+export async function moverOsEquipamentoService({ tenantId, usuarioId, osId, dados }) {
+  const v = validarMoverOsEquipamento(dados);
+  if (!v.ok) return { ok: false, status: 400, message: v.message, fieldErrors: v.fieldErrors };
+
+  const os = await buscarOsResumo({ tenantId, osId });
+  if (!os) return { ok: false, status: 404, message: 'OS Corretiva não encontrada.' };
+
+  const STATUS_PERMITIDOS = ['Aberta', 'EmAndamento'];
+  if (!STATUS_PERMITIDOS.includes(os.status)) {
+    return {
+      ok: false,
+      status: 422,
+      message: `Só é possível mover OS com status ${STATUS_PERMITIDOS.join(' ou ')}. Status atual: ${os.status}.`,
+    };
+  }
+
+  if (v.data.novoEquipamentoId === os.equipamentoId) {
+    return { ok: false, status: 422, message: 'O novo equipamento é o mesmo da OS atual.' };
+  }
+
+  const [origem, destino] = await Promise.all([
+    prisma.equipamento.findFirst({
+      where: { tenantId, id: os.equipamentoId },
+      select: { id: true, tag: true, modelo: true, apelido: true },
+    }),
+    prisma.equipamento.findFirst({
+      where: { tenantId, id: v.data.novoEquipamentoId },
+      select: { id: true, tag: true, modelo: true, apelido: true, status: true },
+    }),
+  ]);
+
+  if (!destino) return { ok: false, status: 404, message: 'Equipamento de destino não encontrado.' };
+  if (destino.status === 'Desativado' || destino.status === 'Vendido') {
+    return {
+      ok: false,
+      status: 422,
+      message: `Não é possível mover OS para equipamento com status "${destino.status}".`,
+    };
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.osCorretiva.update({
+      where: { tenantId_id: { tenantId, id: osId } },
+      data: { equipamentoId: v.data.novoEquipamentoId },
+    });
+
+    // Reverte equipamento origem para Operante (se estava bloqueado pela OS).
+    await tx.equipamento.update({
+      where: { id: os.equipamentoId },
+      data: { status: 'Operante' },
+    });
+
+    // Aplica o status de abertura ao novo equipamento (mesmo status que a OS
+    // havia imposto ao original).
+    await tx.equipamento.update({
+      where: { id: v.data.novoEquipamentoId },
+      data: { status: os.statusEquipamentoAbertura },
+    });
+  });
+
+  const motivo = v.data.motivo.trim();
+  const rotuloOrigem = origem ? (origem.apelido || origem.tag || origem.modelo) : 'origem desconhecida';
+  const rotuloDestino = destino.apelido || destino.tag || destino.modelo;
+
+  // Evento no equipamento ORIGEM (quem perdeu a OS)
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: os.equipamentoId,
+    tipoEvento: 'os_corretiva_movida_saida',
+    categoria: 'manutencao',
+    subcategoria: 'reatribuicao',
+    titulo: `OS ${os.numeroOS} movida para outro equipamento`,
+    descricao: `OS reatribuída para "${rotuloDestino}". Motivo: ${motivo}`,
+    origem: 'usuario',
+    status: os.status,
+    impactaAnalise: true,
+    referenciaId: osId,
+    referenciaTipo: 'os_corretiva',
+    metadata: {
+      numeroOS: os.numeroOS,
+      direcao: 'saida',
+      equipamentoOrigemId: os.equipamentoId,
+      equipamentoDestinoId: destino.id,
+      equipamentoDestinoRotulo: rotuloDestino,
+      motivo,
+      usuarioId,
+    },
+    dataEvento: new Date(),
+  });
+
+  // Evento no equipamento DESTINO (quem recebeu a OS)
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: destino.id,
+    tipoEvento: 'os_corretiva_movida_entrada',
+    categoria: 'manutencao',
+    subcategoria: 'reatribuicao',
+    titulo: `OS ${os.numeroOS} recebida de outro equipamento`,
+    descricao: `OS reatribuída deste "${rotuloOrigem}". Motivo: ${motivo}`,
+    origem: 'usuario',
+    status: os.status,
+    impactaAnalise: true,
+    referenciaId: osId,
+    referenciaTipo: 'os_corretiva',
+    metadata: {
+      numeroOS: os.numeroOS,
+      direcao: 'entrada',
+      equipamentoOrigemId: os.equipamentoId,
+      equipamentoOrigemRotulo: rotuloOrigem,
+      equipamentoDestinoId: destino.id,
+      motivo,
+      usuarioId,
+    },
+    dataEvento: new Date(),
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDIÇÃO',
+    entidade: 'OsCorretiva',
+    entidadeId: osId,
+    detalhes: `OS ${os.numeroOS} movida de "${rotuloOrigem}" para "${rotuloDestino}". Motivo: ${motivo}`,
+  });
+
   await reprocessarAlertas(tenantId);
 
   const completa = await buscarOsPorId({ tenantId, osId });

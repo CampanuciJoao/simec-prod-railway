@@ -72,12 +72,22 @@ export function adaptarListaOsCorretivasResponse(items) {
 function buildTimeline(os) {
   const eventos = [];
 
+  // Se a OS foi registrada retroativamente, a timeline usa a hora real do
+  // evento; caso contrario, a hora de abertura no sistema.
+  const dataHoraEvento = os.dataHoraInicioEvento || os.dataHoraAbertura;
+  const isRetroativo = Boolean(os.dataHoraInicioEvento);
   eventos.push({
     tipo: 'abertura',
-    dataHora: os.dataHoraAbertura,
+    dataHora: dataHoraEvento,
     titulo: `OS aberta — Status do equipamento: ${STATUS_EQUIPAMENTO_LABELS[os.statusEquipamentoAbertura] || os.statusEquipamentoAbertura}`,
     descricao: `Solicitante: ${os.solicitante}. Problema: ${os.descricaoProblema}`,
-    meta: { solicitante: os.solicitante },
+    meta: {
+      solicitante: os.solicitante,
+      ...(isRetroativo ? {
+        registroRetroativo: true,
+        dataHoraRegistro: os.dataHoraAbertura,
+      } : {}),
+    },
   });
 
   for (const nota of os.notas || []) {

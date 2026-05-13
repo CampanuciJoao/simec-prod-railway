@@ -16,6 +16,8 @@ const INITIAL_FORM = {
   solicitante: '',
   descricaoProblema: '',
   statusEquipamentoAbertura: '',
+  // datetime-local string (yyyy-MM-ddTHH:mm). Vazio = usa hora atual no backend.
+  dataHoraInicioEvento: '',
 };
 
 export function useAbrirOsCorretivaPage() {
@@ -48,7 +50,14 @@ export function useAbrirOsCorretivaPage() {
 
     setSubmitting(true);
     try {
-      const novaOs = await criarOsCorretiva(form);
+      // Converte datetime-local (sem timezone) para ISO em UTC. Vazio omite.
+      const payload = { ...form };
+      if (form.dataHoraInicioEvento) {
+        payload.dataHoraInicioEvento = new Date(form.dataHoraInicioEvento).toISOString();
+      } else {
+        delete payload.dataHoraInicioEvento;
+      }
+      const novaOs = await criarOsCorretiva(payload);
       addToast(`OS ${novaOs.numeroOS} aberta com sucesso.`, 'success');
       navigate(`/manutencoes/ocorrencia/${novaOs.id}`);
     } catch (err) {

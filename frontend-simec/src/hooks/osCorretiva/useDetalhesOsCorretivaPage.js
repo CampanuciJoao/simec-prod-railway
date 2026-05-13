@@ -7,6 +7,7 @@ import {
   concluirOsCorretiva,
   cancelarOsCorretiva,
   downloadPdfOsCorretiva,
+  moverOsCorretivaEquipamento,
 } from '../../services/api/osCorretivaApi';
 import { useModal } from '../shared/useModal';
 import { useToast } from '../../contexts/ToastContext';
@@ -25,6 +26,7 @@ export function useDetalhesOsCorretivaPage(osId) {
   const resultadoModal = useModal();
   const concluirModal = useModal();
   const cancelarModal = useModal();
+  const moverModal = useModal();
 
   const fetchOs = useCallback(async () => {
     if (!osId) return;
@@ -129,6 +131,23 @@ export function useDetalhesOsCorretivaPage(osId) {
     }
   }, [osId, addToast, cancelarModal, fetchOs]);
 
+  const handleMoverEquipamento = useCallback(async (dados) => {
+    setSubmitting(true);
+    setFieldErrors({});
+    try {
+      await moverOsCorretivaEquipamento(osId, dados);
+      addToast('OS movida para o novo equipamento.', 'success');
+      moverModal.closeModal();
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao mover OS.';
+      setFieldErrors(err?.response?.data?.fieldErrors || {});
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, moverModal, fetchOs]);
+
   const handleExportarPdf = useCallback(async () => {
     try {
       const response = await downloadPdfOsCorretiva(osId);
@@ -156,11 +175,13 @@ export function useDetalhesOsCorretivaPage(osId) {
     resultadoModal,
     concluirModal,
     cancelarModal,
+    moverModal,
     handleAdicionarNota,
     handleAgendarVisita,
     handleRegistrarResultado,
     handleConcluirOs,
     handleCancelarOs,
+    handleMoverEquipamento,
     handleExportarPdf,
     refetch: fetchOs,
   };

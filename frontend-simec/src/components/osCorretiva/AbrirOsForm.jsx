@@ -137,6 +137,19 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
         </div>
 
         <div>
+          <Input
+            label="Hora do evento (ocorrência)"
+            type="datetime-local"
+            value={form.dataHoraInicioEvento}
+            onChange={(e) => onChange('dataHoraInicioEvento', e.target.value)}
+            error={fieldErrors.dataHoraInicioEvento}
+          />
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Quando o problema realmente aconteceu. Deixe vazio para usar a hora atual. Útil para registrar ocorrências resolvidas antes do cadastro no sistema.
+          </p>
+        </div>
+
+        <div>
           <Select
             label="Status do equipamento na abertura *"
             placeholder=""

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFilePdf, faClipboardList, faTruck, faCheck, faBan } from '@fortawesome/free-solid-svg-icons';
+import { faArrowLeft, faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
@@ -10,6 +10,7 @@ import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTe
 import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/ConfirmacaoFinalVisitaCorretiva';
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
 import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
+import MoverOsEquipamentoModal from '@/components/osCorretiva/MoverOsEquipamentoModal';
 import { PageLayout, PageState, Button } from '@/components/ui';
 
 const STATUS_COLORS = {
@@ -77,6 +78,15 @@ function DetalhesOsCorretivaPage() {
         submitting={page.submitting}
       />
 
+      <MoverOsEquipamentoModal
+        isOpen={page.moverModal.isOpen}
+        onClose={page.moverModal.closeModal}
+        onConfirm={page.handleMoverEquipamento}
+        submitting={page.submitting}
+        fieldErrors={page.fieldErrors}
+        osAtual={os}
+      />
+
       <PageLayout padded>
         {/* Cabeçalho */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -122,6 +132,19 @@ function DetalhesOsCorretivaPage() {
                   <FontAwesomeIcon icon={faClipboardList} />
                   Registrar andamento
                 </Button>
+
+                {/* Mover OS: aberta no equipamento errado — só status iniciais */}
+                {(os.status === 'Aberta' || os.status === 'EmAndamento') && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={page.moverModal.openModal}
+                    title="Reatribuir esta OS para outro equipamento"
+                  >
+                    <FontAwesomeIcon icon={faRightLeft} />
+                    Mover OS
+                  </Button>
+                )}
 
                 {/* Agendar visita: só disponível se não está aguardando terceiro */}
                 {os.status !== 'AguardandoTerceiro' && (

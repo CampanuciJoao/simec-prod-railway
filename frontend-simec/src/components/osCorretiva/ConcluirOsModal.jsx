@@ -2,19 +2,26 @@ import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
-import { Drawer, Button, Textarea } from '@/components/ui';
+import { Drawer, Button, Input, Textarea } from '@/components/ui';
 
 function ConcluirOsModal({ isOpen, onClose, onConfirm, submitting }) {
   const [observacoesFinais, setObservacoesFinais] = useState('');
+  const [dataHoraConclusao, setDataHoraConclusao] = useState('');
 
   function handleClose() {
     setObservacoesFinais('');
+    setDataHoraConclusao('');
     onClose();
   }
 
   async function handleConfirm() {
-    await onConfirm({ observacoesFinais: observacoesFinais || undefined });
+    const payload = { observacoesFinais: observacoesFinais || undefined };
+    if (dataHoraConclusao) {
+      payload.dataHoraConclusao = new Date(dataHoraConclusao).toISOString();
+    }
+    await onConfirm(payload);
     setObservacoesFinais('');
+    setDataHoraConclusao('');
   }
 
   return (
@@ -48,6 +55,16 @@ function ConcluirOsModal({ isOpen, onClose, onConfirm, submitting }) {
             </p>
           </div>
         </div>
+
+        <Input
+          label="Hora da conclusão"
+          type="datetime-local"
+          value={dataHoraConclusao}
+          onChange={(e) => setDataHoraConclusao(e.target.value)}
+        />
+        <p className="-mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+          Quando o problema foi efetivamente resolvido. Deixe vazio para usar a hora atual.
+        </p>
 
         <Textarea
           label="Observações finais"

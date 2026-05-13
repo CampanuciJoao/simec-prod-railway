@@ -27,6 +27,9 @@ export const concluirOsCorretiva = (id, data) =>
 export const cancelarOsCorretiva = (id, motivoCancelamento) =>
   api.post(`/os-corretiva/${id}/cancelar`, { motivoCancelamento }).then((res) => res.data);
 
+export const moverOsCorretivaEquipamento = (id, { novoEquipamentoId, motivo }) =>
+  api.patch(`/os-corretiva/${id}/equipamento`, { novoEquipamentoId, motivo }).then((res) => res.data);
+
 export const excluirOsCorretiva = (id) =>
   api.delete(`/os-corretiva/${id}`).then((res) => res.data);
 

@@ -11,6 +11,17 @@ export const abrirOsSchema = z.object({
       message: `Status do equipamento deve ser: ${STATUS_EQUIPAMENTO_ABERTURA.join(', ')}.`,
     }),
   }),
+  // Hora real do evento (quando o problema aconteceu). Pode ser anterior a
+  // "agora" (registro retroativo); nao pode ser futuro.
+  dataHoraInicioEvento: z.string().datetime({ message: 'Data/hora do evento inválida.' }).optional(),
+}).superRefine((data, ctx) => {
+  if (data.dataHoraInicioEvento && new Date(data.dataHoraInicioEvento) > new Date()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dataHoraInicioEvento'],
+      message: 'A hora do evento não pode ser futura.',
+    });
+  }
 });
 
 export function validarAbrirOs(payload) {
@@ -126,7 +137,36 @@ export function validarRegistrarResultado(payload) {
 
 export const concluirOsSchema = z.object({
   observacoesFinais: z.string().max(2000).optional(),
+  // Hora real em que a OS foi concluida. Pode ser anterior a "agora" para
+  // registro retroativo (problema resolvido fisicamente antes de fechar no
+  // sistema). Nao pode ser futura.
+  dataHoraConclusao: z.string().datetime({ message: 'Data/hora de conclusão inválida.' }).optional(),
+}).superRefine((data, ctx) => {
+  if (data.dataHoraConclusao && new Date(data.dataHoraConclusao) > new Date()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dataHoraConclusao'],
+      message: 'A hora de conclusão não pode ser futura.',
+    });
+  }
 });
+
+// Validator para mover OS para outro equipamento.
+export const moverOsEquipamentoSchema = z.object({
+  novoEquipamentoId: z.string().min(1, 'Novo equipamento é obrigatório.'),
+  motivo: z.string().min(3, 'Motivo é obrigatório (mínimo 3 caracteres).').max(500),
+});
+
+export function validarMoverOsEquipamento(payload) {
+  const result = moverOsEquipamentoSchema.safeParse(payload);
+  if (result.success) return { ok: true, data: result.data };
+  const fieldErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (key) fieldErrors[key] = issue.message;
+  }
+  return { ok: false, message: 'Dados inválidos para mover OS.', fieldErrors };
+}
 
 export function validarConcluirOs(payload) {
   const result = concluirOsSchema.safeParse(payload);

@@ -1312,6 +1312,10 @@ model OsCorretiva {
   descricaoProblema         String            @map("descricao_problema") @db.Text
   statusEquipamentoAbertura StatusEquipamento @map("status_equipamento_abertura")
   dataHoraAbertura          DateTime          @default(now()) @map("data_hora_abertura")
+  // Quando o problema realmente aconteceu. Pode ser anterior a dataHoraAbertura
+  // (registro retroativo). Usado por KPIs operacionais; quando nulo, fallback
+  // para dataHoraAbertura.
+  dataHoraInicioEvento      DateTime?         @map("data_hora_inicio_evento")
   status                    StatusOsCorretiva @default(Aberta)
   tipo                      TipoOsCorretiva   @default(Ocorrencia)
   dataHoraConclusao         DateTime?         @map("data_hora_conclusao")

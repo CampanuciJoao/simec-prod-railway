@@ -7,6 +7,7 @@ import {
   agendarVisitaSchema,
   registrarResultadoSchema,
   concluirOsSchema,
+  moverOsEquipamentoSchema,
 } from '../validators/osCorretivaValidator.js';
 import {
   listarOsCorretivasService,
@@ -19,6 +20,7 @@ import {
   concluirOsCorretivaService,
   cancelarOsCorretivaService,
   excluirOsCorretivaService,
+  moverOsEquipamentoService,
 } from '../services/osCorretiva/index.js';
 import {
   adaptarOsCorretivaResponse,
@@ -188,6 +190,27 @@ router.post('/:id/concluir', validate(concluirOsSchema), async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_CONCLUIR_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao concluir OS Corretiva.' });
+  }
+});
+
+router.patch('/:id/equipamento', validate(moverOsEquipamentoSchema), async (req, res) => {
+  try {
+    const resultado = await moverOsEquipamentoService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      osId: req.params.id,
+      dados: req.validatedData,
+    });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+        ...(resultado.fieldErrors ? { fieldErrors: resultado.fieldErrors } : {}),
+      });
+    }
+    return res.json(adaptarOsCorretivaResponse(resultado.data));
+  } catch (error) {
+    console.error('[OS_CORRETIVA_MOVER_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao mover OS para outro equipamento.' });
   }
 });
 
