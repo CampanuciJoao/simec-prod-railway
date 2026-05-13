@@ -36,6 +36,9 @@ export const postResetarExtracoes = (motivo) =>
 export const getExtracoesDiagnostico = () =>
   api.get('/gehc/aprendizado/extracoes/diagnostico').then((r) => r.data);
 
+export const getCausaDetalhe = (categoria) =>
+  api.get(`/gehc/aprendizado/causas/${encodeURIComponent(categoria)}`).then((r) => r.data);
+
 export const postIaAsk = ({ pergunta, equipamentoId }) =>
   api.post('/gehc/aprendizado/ia/ask', { pergunta, equipamentoId }).then((r) => r.data);
 

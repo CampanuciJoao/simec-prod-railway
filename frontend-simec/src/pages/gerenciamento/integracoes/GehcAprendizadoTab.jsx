@@ -31,7 +31,7 @@ import {
 import { useToast } from '@/contexts/ToastContext';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useGehcAprendizado } from '@/hooks/gerenciamento/useGehcAprendizado';
-import { urlPdfDocumento, getExtracoesDiagnostico } from '@/services/api/gehcAprendizadoApi';
+import { urlPdfDocumento, getExtracoesDiagnostico, getCausaDetalhe } from '@/services/api/gehcAprendizadoApi';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -458,7 +458,7 @@ function ListaInsights({ insights, onFeedback, onResolver, onDescartar }) {
 
 // ─── Bloco de causas-raiz agregadas ─────────────────────────────────────────
 
-function CausasAgregadas({ causas }) {
+function CausasAgregadas({ causas, onSelecionarCategoria }) {
   if (!causas?.length) {
     return (
       <InlineEmptyState message="A IA ainda nao identificou causas-raiz. Conforme PDFs forem extraidos, esta visao se preenche." />
@@ -472,7 +472,13 @@ function CausasAgregadas({ causas }) {
       {causas.map((c) => {
         const pct = total > 0 ? Math.round((c.total / total) * 100) : 0;
         return (
-          <div key={c.categoria} className="space-y-1">
+          <button
+            key={c.categoria}
+            type="button"
+            onClick={() => onSelecionarCategoria?.(c.categoria)}
+            className="w-full space-y-1 rounded-lg p-2 text-left transition-colors hover:bg-white/5"
+            title={`Ver as ${c.total} OS classificadas como ${labelCausa(c.categoria)}`}
+          >
             <div className="flex items-baseline justify-between text-sm">
               <span style={{ color: 'var(--text-primary)' }}>{labelCausa(c.categoria)}</span>
               <span style={{ color: 'var(--text-muted)' }} className="text-xs tabular-nums">
@@ -485,9 +491,128 @@ function CausasAgregadas({ causas }) {
                 style={{ width: `${pct}%`, backgroundColor: 'var(--brand-primary)' }}
               />
             </div>
-          </div>
+          </button>
         );
       })}
+    </div>
+  );
+}
+
+// ─── Drawer de drill-down ────────────────────────────────────────────────────
+
+function DrillDownCausa({ categoria, items, loading, onClose }) {
+  if (!categoria) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-[1100] flex justify-end backdrop-blur-[2px]"
+      style={{ backgroundColor: 'rgba(2, 6, 23, 0.55)' }}
+      onClick={onClose}
+    >
+      <div
+        className="h-full w-full max-w-2xl overflow-y-auto p-6"
+        style={{ backgroundColor: 'var(--bg-surface)', boxShadow: 'var(--shadow-lg)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              Causa-raiz · {items?.length ?? 0} OS
+            </p>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
+              {labelCausa(categoria)}
+            </h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full px-3 py-1 text-sm"
+            style={{ color: 'var(--text-muted)', backgroundColor: 'var(--bg-surface-soft)' }}
+          >
+            Fechar
+          </button>
+        </div>
+
+        {loading && <LoadingState message="Carregando OSs..." />}
+
+        {!loading && (!items || items.length === 0) && (
+          <InlineEmptyState message="Nenhuma OS encontrada nessa categoria." />
+        )}
+
+        {!loading && items && items.length > 0 && (
+          <ul className="space-y-3">
+            {items.map((it) => (
+              <li
+                key={it.id}
+                className="rounded-xl border p-3"
+                style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+              >
+                <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+                  <div className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                    {it.equipamento?.apelido || it.equipamento?.tag || '—'}
+                    <span className="ml-2 text-xs font-normal" style={{ color: 'var(--text-muted)' }}>
+                      ({it.equipamento?.modelo || '—'})
+                    </span>
+                  </div>
+                  <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                    OS {it.gehcServiceId || it.trackingNumber || '—'}
+                  </span>
+                </div>
+
+                <div className="mb-2 flex flex-wrap gap-x-3 gap-y-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  {it.openedAt && <span>Aberta em {new Date(it.openedAt).toLocaleDateString('pt-BR')}</span>}
+                  {it.engineerFullName && <span>Eng.: {it.engineerFullName}</span>}
+                  {it.serviceTypeCode && <span>Tipo: {it.serviceTypeCode}</span>}
+                  {typeof it.llmConfianca === 'number' && (
+                    <span title="Confiança do LLM nesta classificação">
+                      Confiança LLM: {Math.round(it.llmConfianca * 100)}%
+                    </span>
+                  )}
+                </div>
+
+                {it.llmRaciocinio && (
+                  <p
+                    className="mb-2 rounded-lg border-l-4 p-2 text-xs italic"
+                    style={{
+                      backgroundColor: 'var(--bg-surface)',
+                      borderColor: 'var(--brand-primary)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  >
+                    <strong>Raciocínio do LLM:</strong> {it.llmRaciocinio}
+                  </p>
+                )}
+
+                {it.rootCauseRaw && (
+                  <p className="mb-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <strong>Causa-raiz reportada:</strong> {it.rootCauseRaw}
+                  </p>
+                )}
+
+                {it.problemReported && (
+                  <p className="mb-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <strong>Problema:</strong>{' '}
+                    {it.problemReported.length > 280 ? `${it.problemReported.slice(0, 280)}...` : it.problemReported}
+                  </p>
+                )}
+
+                {it.actionsTaken && (
+                  <p className="mb-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <strong>Ações tomadas:</strong>{' '}
+                    {it.actionsTaken.length > 280 ? `${it.actionsTaken.slice(0, 280)}...` : it.actionsTaken}
+                  </p>
+                )}
+
+                {Array.isArray(it.partsReplaced) && it.partsReplaced.length > 0 && (
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <strong>Peças trocadas:</strong> {it.partsReplaced.join(', ')}
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   );
 }
@@ -576,7 +701,29 @@ function GehcAprendizadoTab() {
   const [executandoBatch, setExecutandoBatch] = useState(false);
   const [diagnostico, setDiagnostico] = useState(null);
   const [carregandoDiagnostico, setCarregandoDiagnostico] = useState(false);
+  const [drillCategoria, setDrillCategoria] = useState(null);
+  const [drillItems, setDrillItems] = useState([]);
+  const [carregandoDrill, setCarregandoDrill] = useState(false);
   const { addToast } = useToast();
+
+  const abrirDrillDown = async (categoria) => {
+    setDrillCategoria(categoria);
+    setDrillItems([]);
+    setCarregandoDrill(true);
+    try {
+      const data = await getCausaDetalhe(categoria);
+      setDrillItems(data?.items || []);
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message || 'Falha ao carregar OSs.', 'error');
+    } finally {
+      setCarregandoDrill(false);
+    }
+  };
+
+  const fecharDrillDown = () => {
+    setDrillCategoria(null);
+    setDrillItems([]);
+  };
 
   const carregarDiagnostico = async () => {
     setCarregandoDiagnostico(true);
@@ -724,7 +871,7 @@ function GehcAprendizadoTab() {
       {/* Causas-raiz dominantes */}
       <PageSection
         title="Padrões de causa-raiz"
-        description="Categorias normalizadas que a IA identificou nos PDFs analisados. Use para enxergar o que mais derruba sua frota."
+        description="Categorias normalizadas que a IA identificou nos PDFs analisados. Clique em uma categoria para ver as OSs específicas e o raciocínio do LLM."
         actions={
           <div className="flex flex-wrap gap-2">
             <Button
@@ -747,7 +894,7 @@ function GehcAprendizadoTab() {
           </div>
         }
       >
-        <CausasAgregadas causas={causas} />
+        <CausasAgregadas causas={causas} onSelecionarCategoria={abrirDrillDown} />
       </PageSection>
 
       {/* Equipamentos */}
@@ -812,6 +959,13 @@ function GehcAprendizadoTab() {
         cancelText="Cancelar"
         isDestructive
         confirmDisabled={executandoBatch}
+      />
+
+      <DrillDownCausa
+        categoria={drillCategoria}
+        items={drillItems}
+        loading={carregandoDrill}
+        onClose={fecharDrillDown}
       />
 
       <ModalConfirmacao

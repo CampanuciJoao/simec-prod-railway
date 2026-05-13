@@ -499,6 +499,91 @@ router.get('/causas', async (req, res) => {
   }
 });
 
+// ─── GET /api/gehc/aprendizado/causas/:categoria ──────────────────────────────
+// Drill-down: devolve as OSs/PDFs classificados naquela categoria, com
+// evidencia (raciocinio do LLM, trecho do problema, acoes tomadas) para
+// rastreabilidade.
+router.get('/causas/:categoria', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const { categoria } = req.params;
+  try {
+    const extracoes = await prisma.gehcPdfExtraido.findMany({
+      where: { tenantId, rootCauseCategory: categoria },
+      orderBy: { extraidoEm: 'desc' },
+      take: 100,
+      select: {
+        id: true,
+        pdfDocumentoId: true,
+        caseNumber: true,
+        woNumber: true,
+        serviceType: true,
+        equipmentStatus: true,
+        engineerFullName: true,
+        problemReported: true,
+        problemAnalyzed: true,
+        actionsTaken: true,
+        rootCauseRaw: true,
+        openedAt: true,
+        rootCauseCategory: true,
+        llmConfianca: true,
+        llmRaciocinio: true,
+        partsReplacedJson: true,
+        extraidoEm: true,
+        pdfDocumento: {
+          select: {
+            documentId: true,
+            fileName: true,
+            r2Key: true,
+            equipamento: { select: { id: true, tag: true, apelido: true, modelo: true } },
+            ordemServico: {
+              select: {
+                gehcServiceId: true,
+                trackingNumber: true,
+                problemDescription: true,
+                requestedAt: true,
+                serviceTypeCode: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Achata pra resposta mais limpa.
+    const items = extracoes.map((e) => ({
+      id: e.id,
+      caseNumber: e.caseNumber,
+      woNumber: e.woNumber,
+      serviceType: e.serviceType,
+      serviceTypeCode: e.pdfDocumento?.ordemServico?.serviceTypeCode,
+      equipmentStatus: e.equipmentStatus,
+      engineerFullName: e.engineerFullName,
+      problemReported: e.problemReported,
+      problemAnalyzed: e.problemAnalyzed,
+      actionsTaken: e.actionsTaken,
+      rootCauseRaw: e.rootCauseRaw,
+      llmConfianca: e.llmConfianca,
+      llmRaciocinio: e.llmRaciocinio,
+      partsReplaced: e.partsReplacedJson,
+      openedAt: e.openedAt,
+      extraidoEm: e.extraidoEm,
+      gehcServiceId: e.pdfDocumento?.ordemServico?.gehcServiceId,
+      trackingNumber: e.pdfDocumento?.ordemServico?.trackingNumber,
+      problemDescriptionOs: e.pdfDocumento?.ordemServico?.problemDescription,
+      requestedAt: e.pdfDocumento?.ordemServico?.requestedAt,
+      equipamento: e.pdfDocumento?.equipamento,
+      pdfDocumentId: e.pdfDocumento?.documentId,
+      pdfFileName: e.pdfDocumento?.fileName,
+      temArquivoR2: Boolean(e.pdfDocumento?.r2Key),
+    }));
+
+    res.json({ categoria, total: items.length, items });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /causas/:categoria:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── GET /api/gehc/aprendizado/equipamentos ───────────────────────────────────
 // Lista equipamentos com cobertura de PDF (ordenado por menor cobertura primeiro
 // — quem precisa de mais atenção fica no topo).

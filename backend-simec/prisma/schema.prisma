@@ -883,6 +883,8 @@ model GehcPdfExtraido {
 
   // Camada 2: LLM
   rootCauseCategory String?  @map("root_cause_category")
+  llmConfianca      Float?   @map("llm_confianca")
+  llmRaciocinio     String?  @db.Text @map("llm_raciocinio")
   measurementsJson  Json?    @map("measurements_json")
   partsReplacedJson Json?    @map("parts_replaced_json")
   llmExtractedAt    DateTime? @map("llm_extracted_at")

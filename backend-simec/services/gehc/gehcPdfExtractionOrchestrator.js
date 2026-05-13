@@ -84,6 +84,8 @@ export async function extrairUmPdf({ pdfDocumento, buffer: bufferInline = null }
 
     // Camada 2 (pode ser null se LLM falhou)
     rootCauseCategory: llm.ok ? llm.dados.rootCauseCategory : null,
+    llmConfianca:      llm.ok ? (llm.dados.confianca ?? null)  : null,
+    llmRaciocinio:     llm.ok ? (llm.dados.raciocinio ?? null) : null,
     measurementsJson:  llm.ok ? llm.dados.measurements      : null,
     partsReplacedJson: llm.ok ? llm.dados.partsReplaced     : null,
     llmExtractedAt:    llm.ok ? new Date()                  : null,
