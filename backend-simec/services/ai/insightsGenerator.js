@@ -47,6 +47,45 @@ const PM_OK_HORIZONTE_DIAS      = 270;
 const JANELA_ACIONAMENTO_DIAS   = 90;
 const MIN_ACIONAMENTOS          = 3;
 
+// Tipos de evento que indicam manutencao concluida — qualquer fonte. Eventos
+// anteriores a uma manutencao concluida sao descartados nos detectores que
+// medem "estado atual" do equipamento (risco_alto, reincidencia_causa).
+// Premissa: tecnico que entrou no equipamento tipicamente inspeciona e ajusta
+// alem do escopo declarado, entao reseta o relogio dos sintomas anteriores.
+const TIPOS_MANUTENCAO_CONCLUIDA = [
+  'pm_ge',
+  'corretiva_ge',
+  'manutencao_concluida_preventiva',
+  'manutencao_concluida_corretiva',
+  'manutencao_concluida_desconhecida',
+  'os_corretiva_concluida',
+  'visita_terceiro_concluida',
+];
+
+// Causas de reincidencia que so fazem sentido em equipamentos de Ressonancia
+// Magnetica. Se o equipamento nao for RM, sao ignoradas pelo detector.
+const CAUSAS_RM_ESPECIFICAS = new Set(['magneto_helio', 'cryo_compressor']);
+
+const RM_TIPO_REGEX = /(resson[aâ]ncia|^|\s)rm($|\s)/i;
+function ehEquipamentoRM(tipo) {
+  if (!tipo) return false;
+  const t = String(tipo).trim();
+  return RM_TIPO_REGEX.test(t) || /resson[aâ]ncia/i.test(t);
+}
+
+async function obterDataUltimaManutencao({ tenantId, equipamentoId, desde }) {
+  const ev = await prisma.eventoEquipamento.findFirst({
+    where: {
+      tenantId, equipamentoId,
+      ocorridoEm: { gte: desde },
+      tipoEvento: { in: TIPOS_MANUTENCAO_CONCLUIDA },
+    },
+    orderBy: { ocorridoEm: 'desc' },
+    select: { ocorridoEm: true },
+  });
+  return ev?.ocorridoEm || null;
+}
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function diasAtras(n) {
@@ -90,18 +129,35 @@ async function resolverInsightSeExistir({ tenantId, equipamentoId, tipo }) {
 
 async function detectarReincidenciaCausa({ tenantId, equipamentoId }) {
   const desde = diasAtras(JANELA_REINCIDENCIA_DIAS);
+
+  // Reset por manutencao: ignora eventos anteriores a manutencao concluida
+  // (tecnico endereco o problema, reincidencia anterior nao deve ressuscitar).
+  const ultimaManutencao = await obterDataUltimaManutencao({ tenantId, equipamentoId, desde });
+  const filtroData = ultimaManutencao
+    ? { gt: ultimaManutencao }
+    : { gte: desde };
+
+  const eq = await prisma.equipamento.findUnique({
+    where: { tenantId_id: { tenantId, id: equipamentoId } },
+    select: { tipo: true },
+  });
+  const isRM = ehEquipamentoRM(eq?.tipo);
+
   const eventos = await prisma.eventoEquipamento.findMany({
     where: {
       tenantId, equipamentoId,
       causaCategoria: { not: null },
-      ocorridoEm: { gte: desde },
+      ocorridoEm: filtroData,
     },
     orderBy: { ocorridoEm: 'desc' },
   });
 
-  // Agrupa por causaCategoria
+  // Agrupa por causaCategoria, descartando causas RM-especificas em
+  // equipamentos nao-RM (defesa em profundidade contra cadastro errado
+  // de tipo ou eventos legados de telemetria).
   const porCausa = new Map();
   for (const ev of eventos) {
+    if (CAUSAS_RM_ESPECIFICAS.has(ev.causaCategoria) && !isRM) continue;
     const lista = porCausa.get(ev.causaCategoria) || [];
     lista.push(ev);
     porCausa.set(ev.causaCategoria, lista);
@@ -211,8 +267,20 @@ async function detectarAnomaliaHelio({ tenantId, equipamentoId }) {
 
 async function detectarRiscoAlto({ tenantId, equipamentoId }) {
   const desde = diasAtras(JANELA_RISCO_DIAS);
+
+  // Reset por manutencao: descarta eventos anteriores a manutencao concluida.
+  const ultimaManutencao = await obterDataUltimaManutencao({ tenantId, equipamentoId, desde });
+  const filtroData = ultimaManutencao
+    ? { gt: ultimaManutencao }
+    : { gte: desde };
+
   const eventos = await prisma.eventoEquipamento.findMany({
-    where: { tenantId, equipamentoId, ocorridoEm: { gte: desde } },
+    where: {
+      tenantId, equipamentoId,
+      ocorridoEm: filtroData,
+      // Nao conta os proprios eventos de manutencao no score
+      tipoEvento: { notIn: TIPOS_MANUTENCAO_CONCLUIDA },
+    },
     select: { severidade: true, ocorridoEm: true, fonte: true, tipoEvento: true },
   });
 
@@ -268,7 +336,9 @@ async function detectarRiscoAlto({ tenantId, equipamentoId }) {
     tipo: 'risco_alto',
     severidade: scoreFinal >= 60 ? 'critical' : 'high',
     titulo: `Score de risco preditivo: ${scoreFinal}`,
-    descricao: `Equipamento acumulou ${eventosDeduplicados.length} dia(s) com eventos de severidade nos últimos ${JANELA_RISCO_DIAS} dias. Score considera severidade ponderada e recência (1 evento por dia/tipo).`,
+    descricao: ultimaManutencao
+      ? `Desde a última manutenção concluída (${ultimaManutencao.toISOString().slice(0, 10)}), o equipamento acumulou ${eventosDeduplicados.length} dia(s) com eventos de severidade. Score considera severidade ponderada e recência (1 evento por dia/tipo).`
+      : `Equipamento acumulou ${eventosDeduplicados.length} dia(s) com eventos de severidade nos últimos ${JANELA_RISCO_DIAS} dias. Score considera severidade ponderada e recência (1 evento por dia/tipo).`,
     recomendacao: 'Revisar histórico recente do equipamento (corretivas, anomalias de telemetria, acionamentos de terceiro) e considerar avaliação técnica antes da próxima falha.',
     evidencia: {
       scoreFinal,
@@ -276,6 +346,7 @@ async function detectarRiscoAlto({ tenantId, equipamentoId }) {
       diasComEventos: eventosDeduplicados.length,
       totalEventosBrutos: eventos.length,
       breakdown: breakdownDedup,
+      ultimaManutencaoConcluida: ultimaManutencao || null,
     },
     validoAteDias: 30,
   });
@@ -373,6 +444,43 @@ export async function gerarInsightsTenant({ tenantId } = {}) {
 
   const ativo = await estaAtivo(PIPELINE_NAMES.IA_INSIGHTS, tenantId);
   if (!ativo) return { motivo: 'pipeline_pausado', equipamentos: 0 };
+
+  // Limpeza retroativa: resolve insights 'reincidencia_causa' com causa
+  // RM-especifica em equipamentos que NAO sao de Ressonancia Magnetica
+  // (sobras de versoes anteriores do detector ou cadastro errado de tipo).
+  const insightsForaContexto = await prisma.iaInsight.findMany({
+    where: {
+      tenantId,
+      tipo: 'reincidencia_causa',
+      resolvidoEm: null,
+    },
+    select: { id: true, equipamentoId: true, evidenciaJson: true },
+  });
+
+  if (insightsForaContexto.length > 0) {
+    const eqIdsAfetados = [...new Set(insightsForaContexto.map((i) => i.equipamentoId))];
+    const equips = await prisma.equipamento.findMany({
+      where: { tenantId, id: { in: eqIdsAfetados } },
+      select: { id: true, tipo: true },
+    });
+    const tipoPorId = new Map(equips.map((e) => [e.id, e.tipo]));
+
+    const idsParaResolver = insightsForaContexto
+      .filter((i) => {
+        const causa = i.evidenciaJson?.causa;
+        if (!CAUSAS_RM_ESPECIFICAS.has(causa)) return false;
+        return !ehEquipamentoRM(tipoPorId.get(i.equipamentoId));
+      })
+      .map((i) => i.id);
+
+    if (idsParaResolver.length > 0) {
+      await prisma.iaInsight.updateMany({
+        where: { id: { in: idsParaResolver } },
+        data: { resolvidoEm: new Date() },
+      });
+      console.log(`[IA_INSIGHTS] Limpeza: ${idsParaResolver.length} insight(s) reincidencia_causa RM em equipamentos nao-RM resolvidos.`);
+    }
+  }
 
   // So roda para equipamentos que (a) tem pelo menos 1 evento no
   // Knowledge Layer E (b) NAO estao Vendidos/Desativados.

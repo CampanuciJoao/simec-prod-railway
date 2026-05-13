@@ -22,7 +22,7 @@ async function buscarContextoTenant(tenantId) {
   const [equipamentosRisco, manutencoesPendentes, equipamentosSemManutencao] = await Promise.all([
     prisma.equipamento.findMany({
       where: { tenantId, riskLevel: 'Alto' },
-      select: { modelo: true, tag: true, setor: true, riskScore: true, unidade: { select: { nomeSistema: true } } },
+      select: { id: true, modelo: true, tag: true, setor: true, riskScore: true, unidade: { select: { nomeSistema: true } } },
       take: 5,
       orderBy: { riskScore: 'desc' },
     }),
@@ -37,7 +37,7 @@ async function buscarContextoTenant(tenantId) {
         numeroOS: true,
         tipo: true,
         dataHoraAgendamentoInicio: true,
-        equipamento: { select: { modelo: true, unidade: { select: { nomeSistema: true } } } },
+        equipamento: { select: { id: true, modelo: true, tag: true, unidade: { select: { nomeSistema: true } } } },
       },
       take: 10,
       orderBy: { dataHoraAgendamentoInicio: 'asc' },
@@ -54,12 +54,18 @@ async function buscarContextoTenant(tenantId) {
           },
         },
       },
-      select: { modelo: true, tag: true, setor: true, unidade: { select: { nomeSistema: true } } },
+      select: { id: true, modelo: true, tag: true, setor: true, unidade: { select: { nomeSistema: true } } },
       take: 5,
     }),
   ]);
 
   return { equipamentosRisco, manutencoesPendentes, equipamentosSemManutencao };
+}
+
+function rotuloEquipamento(e) {
+  const tag = e.tag ? ` [${e.tag}]` : '';
+  const unid = e.unidade?.nomeSistema ? ` — ${e.unidade.nomeSistema}` : '';
+  return `${e.modelo}${tag}${unid}`;
 }
 
 function montarResumoContexto({ equipamentosRisco, manutencoesPendentes, equipamentosSemManutencao }) {
@@ -68,7 +74,7 @@ function montarResumoContexto({ equipamentosRisco, manutencoesPendentes, equipam
   if (equipamentosRisco.length > 0) {
     linhas.push(`Equipamentos com risco alto (${equipamentosRisco.length}):`);
     for (const e of equipamentosRisco) {
-      linhas.push(`  - ${e.modelo} (${e.unidade?.nomeSistema || '-'} / ${e.setor || '-'}) score=${e.riskScore ?? '?'}`);
+      linhas.push(`  - ${rotuloEquipamento(e)} (setor: ${e.setor || '-'}) score=${e.riskScore ?? '?'}`);
     }
   }
 
@@ -76,18 +82,49 @@ function montarResumoContexto({ equipamentosRisco, manutencoesPendentes, equipam
     linhas.push(`\nOS agendadas atrasadas (${manutencoesPendentes.length}):`);
     for (const m of manutencoesPendentes) {
       const dt = m.dataHoraAgendamentoInicio?.toISOString().slice(0, 10) || '-';
-      linhas.push(`  - OS ${m.numeroOS} | ${m.tipo} | ${m.equipamento?.modelo || '-'} (${m.equipamento?.unidade?.nomeSistema || '-'}) | previsto: ${dt}`);
+      linhas.push(`  - OS ${m.numeroOS} | ${m.tipo} | ${rotuloEquipamento(m.equipamento || {})} | previsto: ${dt}`);
     }
   }
 
   if (equipamentosSemManutencao.length > 0) {
     linhas.push(`\nEquipamentos sem manutenção nos últimos 90 dias (${equipamentosSemManutencao.length}):`);
     for (const e of equipamentosSemManutencao) {
-      linhas.push(`  - ${e.modelo} (${e.unidade?.nomeSistema || '-'} / ${e.setor || '-'})`);
+      linhas.push(`  - ${rotuloEquipamento(e)} (setor: ${e.setor || '-'})`);
     }
   }
 
   return linhas.length > 0 ? linhas.join('\n') : null;
+}
+
+// Indexa equipamentos por tag/modelo para casar com o que o LLM retornou
+function indexarEquipamentosDoContexto(contexto) {
+  const map = new Map(); // chaveLower -> { id, label }
+  const adicionar = (e) => {
+    if (!e?.id) return;
+    const label = rotuloEquipamento(e);
+    if (e.tag) map.set(String(e.tag).toLowerCase(), { id: e.id, label });
+    if (e.modelo) map.set(String(e.modelo).toLowerCase(), { id: e.id, label });
+  };
+  contexto.equipamentosRisco.forEach(adicionar);
+  contexto.equipamentosSemManutencao.forEach(adicionar);
+  contexto.manutencoesPendentes.forEach((m) => adicionar(m.equipamento));
+  return map;
+}
+
+function resolverEquipamentosDoInsight(refsLLM, indice) {
+  if (!Array.isArray(refsLLM)) return [];
+  const vistos = new Set();
+  const out = [];
+  for (const ref of refsLLM) {
+    if (typeof ref !== 'string') continue;
+    const chave = ref.trim().toLowerCase();
+    const match = indice.get(chave);
+    if (match && !vistos.has(match.id)) {
+      vistos.add(match.id);
+      out.push(match);
+    }
+  }
+  return out;
 }
 
 async function gerarInsightsComLlm(resumo) {
@@ -101,12 +138,19 @@ ${resumo}
 
 Retorne APENAS um JSON com esta estrutura:
 [
-  { "titulo": "Título curto do insight", "subtitulo": "Descrição acionável em uma linha", "prioridade": "Alta" },
-  { "titulo": "...", "subtitulo": "...", "prioridade": "Media" }
+  {
+    "titulo": "Título curto do insight",
+    "subtitulo": "Descrição acionável em uma linha (NÃO escreva 'os 5 equipamentos listados' — cite tags/modelos concretos quando aplicável)",
+    "prioridade": "Alta",
+    "equipamentos": ["TAG ou MODELO exato", "..."]
+  }
 ]
 
-Valores possíveis para prioridade: "Alta", "Media", "Baixa".
-Gere apenas insights relevantes e práticos, em português.`;
+Regras:
+- "equipamentos" é OBRIGATÓRIO quando o insight se refere a um conjunto específico do contexto. Use a TAG (entre colchetes nos dados) se disponível, senão o MODELO. Não invente equipamentos.
+- Se o insight for sistêmico (não vinculado a um equipamento específico), retorne "equipamentos": [].
+- Valores possíveis para prioridade: "Alta", "Media", "Baixa".
+- Gere apenas insights relevantes e práticos, em português.`;
 
   try {
     const resultado = await generateJsonWithLlm(prompt);
@@ -136,25 +180,48 @@ async function processarTenant(tenant) {
     const insights = await gerarInsightsComLlm(resumo);
     if (!insights.length) return 0;
 
+    const indiceEquipamentos = indexarEquipamentosDoContexto(contexto);
+
     for (let i = 0; i < insights.length; i++) {
-      const { titulo, subtitulo, prioridade } = insights[i];
+      const { titulo, subtitulo, prioridade, equipamentos } = insights[i];
       if (!titulo) continue;
 
       const alertaId = gerarAlertaId(tenantId, i);
       const jaExiste = await alertaJaExiste(alertaId);
       if (jaExiste) continue;
 
+      const eqsResolvidos = resolverEquipamentosDoInsight(equipamentos, indiceEquipamentos);
+
+      // Subtitulo enriquecido: anexa lista de equipamentos quando o LLM
+      // citou referencias e elas casaram com o contexto.
+      let subtituloFinal = subtitulo || null;
+      if (eqsResolvidos.length > 0) {
+        const lista = eqsResolvidos.slice(0, 5).map((e) => e.label).join(' • ');
+        const sufixo = eqsResolvidos.length > 5 ? ` (+${eqsResolvidos.length - 5})` : '';
+        subtituloFinal = subtituloFinal
+          ? `${subtituloFinal} — Equipamentos: ${lista}${sufixo}`
+          : `Equipamentos: ${lista}${sufixo}`;
+      }
+
+      // Link: se houver exatamente 1 equipamento, vai direto para os
+      // detalhes; caso contrario, leva para a lista geral (a UI da pagina
+      // de equipamentos permite filtrar por status/risco).
+      const link = eqsResolvidos.length === 1
+        ? `/equipamentos/detalhes/${eqsResolvidos[0].id}`
+        : '/equipamentos';
+
       await prisma.alerta.create({
         data: {
           id: alertaId,
           tenantId,
           titulo,
-          subtitulo: subtitulo || null,
+          subtitulo: subtituloFinal,
           data: new Date(),
           prioridade: prioridade || ALERT_PRIORIDADES.MEDIA,
           tipo: 'Recomendação',
           tipoCategoria: TIPOCATEGORIA_INSIGHT,
           tipoEvento: TIPOEVENTO_INSIGHT,
+          link,
           emailEnviado: false,
         },
       });
