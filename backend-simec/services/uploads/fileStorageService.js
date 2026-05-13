@@ -44,3 +44,16 @@ export function deleteStoredFile(key) {
     console.error('[R2_DELETE_ERROR]', key, err)
   );
 }
+
+// Variante await-able usada em fluxos de limpeza onde precisamos garantir
+// (e relatar) o resultado antes de prosseguir (ex: reset de extracoes).
+export async function deleteFromR2(key) {
+  if (!key || typeof key !== 'string') return false;
+  try {
+    await r2.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: key }));
+    return true;
+  } catch (err) {
+    console.error('[R2_DELETE_ERROR]', key, err);
+    return false;
+  }
+}

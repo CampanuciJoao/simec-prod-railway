@@ -28,21 +28,26 @@ async function bufferDoR2(key) {
 }
 
 // ─── Extracao de UM PDF (orquestracao) ───────────────────────────────────────
-
-export async function extrairUmPdf({ pdfDocumento }) {
+//
+// Aceita um buffer opcional para o caso novo (extracao inline no momento do
+// download — PDFs nao sao mais persistidos em R2). Quando o buffer nao vem,
+// tenta carregar do R2 via r2Key (caminho legado para PDFs antigos enquanto
+// existirem no bucket).
+export async function extrairUmPdf({ pdfDocumento, buffer: bufferInline = null }) {
   const { id: pdfDocumentoId, tenantId, r2Key } = pdfDocumento;
 
-  if (!r2Key) {
-    return { ok: false, erro: 'pdf_sem_r2_key' };
-  }
+  let buffer = bufferInline;
 
-  // 1. Baixa o PDF do R2.
-  let buffer;
-  try {
-    buffer = await bufferDoR2(r2Key);
-  } catch (err) {
-    await registrarFalhaExtracao({ pdfDocumentoId, tenantId, erro: `r2_get_failed: ${err.message}` });
-    return { ok: false, erro: `r2_get_failed: ${err.message}` };
+  if (!buffer) {
+    if (!r2Key) {
+      return { ok: false, erro: 'pdf_sem_r2_key_e_sem_buffer' };
+    }
+    try {
+      buffer = await bufferDoR2(r2Key);
+    } catch (err) {
+      await registrarFalhaExtracao({ pdfDocumentoId, tenantId, erro: `r2_get_failed: ${err.message}` });
+      return { ok: false, erro: `r2_get_failed: ${err.message}` };
+    }
   }
 
   // 2. Camada 1: regex.

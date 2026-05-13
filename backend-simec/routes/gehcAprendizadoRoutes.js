@@ -6,7 +6,7 @@
 import express from 'express';
 import prisma from '../services/prismaService.js';
 import { admin } from '../middleware/authMiddleware.js';
-import { getFromR2 } from '../services/uploads/fileStorageService.js';
+import { getFromR2, deleteFromR2 } from '../services/uploads/fileStorageService.js';
 import {
   PIPELINE_NAMES,
   listarEstados,
@@ -233,58 +233,88 @@ router.post('/insights/limpar-todos', admin, async (req, res) => {
 });
 
 // ─── POST /api/gehc/aprendizado/extracoes/resetar ────────────────────────────
-// Apaga TODAS as extracoes de PDF (gehcPdfExtraido) do tenant + eventos do
-// Knowledge Layer derivados de PDFs (refFonteTipo='gehc_pdf') + embeddings
-// associados a esses eventos. Insights ativos sao marcados como resolvidos.
+// Apaga as extracoes de PDF + eventos do Knowledge Layer derivados de PDFs
+// (refFonteTipo='gehc_pdf_extraido') + embeddings associados + arquivos PDF
+// no R2 + registros gehcPdfDocumento. Insights ativos sao marcados como
+// resolvidos.
 //
-// Os PDFs originais (gehcPdfDocumento) NAO sao apagados — proxima rodada
-// do extrator LLM os reprocessa do zero. Use isso quando a taxonomia muda
-// ou os resultados estao manifestamente incorretos.
+// Diferente de antes, agora o reset eh COMPLETO: como o pipeline novo nao
+// salva mais PDFs no R2 (extracao inline durante download), manter os PDFs
+// e gehcPdfDocumento legados sem extracao nao serve para nada. Para
+// reprocessar, eh necessario rodar "Captura de PDFs GE" para baixar tudo
+// de novo.
 router.post('/extracoes/resetar', admin, async (req, res) => {
   const tenantId = req.usuario.tenantId;
   const usuarioId = req.usuario.id;
 
   try {
-    const eventosPdf = await prisma.eventoEquipamento.findMany({
-      where: { tenantId, refFonteTipo: 'gehc_pdf' },
-      select: { id: true },
-    });
-    const eventoIds = eventosPdf.map((e) => e.id);
-
-    const [embeddingsDel, eventosDel, extracoesDel, insightsDel] = await prisma.$transaction([
-      prisma.eventoEquipamentoEmbedding.deleteMany({
-        where: { tenantId, eventoEquipamentoId: { in: eventoIds } },
+    // 1. Coleta IDs e r2Keys ANTES das deletes (precisamos para apagar do R2
+    //    e dos embeddings).
+    const [eventosPdf, pdfDocumentos] = await Promise.all([
+      prisma.eventoEquipamento.findMany({
+        where: { tenantId, refFonteTipo: 'gehc_pdf_extraido' },
+        select: { id: true },
       }),
-      prisma.eventoEquipamento.deleteMany({
-        where: { tenantId, refFonteTipo: 'gehc_pdf' },
-      }),
-      prisma.gehcPdfExtraido.deleteMany({ where: { tenantId } }),
-      prisma.iaInsight.updateMany({
-        where: { tenantId, resolvidoEm: null },
-        data:  { resolvidoEm: new Date() },
+      prisma.gehcPdfDocumento.findMany({
+        where: { tenantId, r2Key: { not: null } },
+        select: { id: true, r2Key: true },
       }),
     ]);
+    const eventoIds = eventosPdf.map((e) => e.id);
+    const r2KeysParaApagar = pdfDocumentos.map((p) => p.r2Key).filter(Boolean);
+
+    // 2. Apaga registros do banco em transacao.
+    const [embeddingsDel, eventosDel, extracoesDel, documentosDel, insightsDel] =
+      await prisma.$transaction([
+        prisma.eventoEquipamentoEmbedding.deleteMany({
+          where: { tenantId, eventoEquipamentoId: { in: eventoIds } },
+        }),
+        prisma.eventoEquipamento.deleteMany({
+          where: { tenantId, refFonteTipo: 'gehc_pdf_extraido' },
+        }),
+        prisma.gehcPdfExtraido.deleteMany({ where: { tenantId } }),
+        prisma.gehcPdfDocumento.deleteMany({ where: { tenantId } }),
+        prisma.iaInsight.updateMany({
+          where: { tenantId, resolvidoEm: null },
+          data:  { resolvidoEm: new Date() },
+        }),
+      ]);
+
+    // 3. Apaga arquivos do R2 (best-effort; falhas individuais ja sao
+    //    logadas em deleteFromR2). Roda em paralelo limitado para nao
+    //    saturar a conexao.
+    let arquivosR2Removidos = 0;
+    const LOTE = 25;
+    for (let i = 0; i < r2KeysParaApagar.length; i += LOTE) {
+      const lote = r2KeysParaApagar.slice(i, i + LOTE);
+      const resultados = await Promise.all(lote.map((k) => deleteFromR2(k)));
+      arquivosR2Removidos += resultados.filter(Boolean).length;
+    }
 
     await logAuditoria({
       tenantId, autorId: usuarioId,
       acao: 'AI_EXTRACOES_RESETADAS',
       entidadeId: 'todos',
       detalhes: {
-        embeddingsRemovidos: embeddingsDel.count,
-        eventosRemovidos:    eventosDel.count,
-        extracoesRemovidas:  extracoesDel.count,
-        insightsResolvidos:  insightsDel.count,
+        embeddingsRemovidos:  embeddingsDel.count,
+        eventosRemovidos:     eventosDel.count,
+        extracoesRemovidas:   extracoesDel.count,
+        documentosRemovidos:  documentosDel.count,
+        arquivosR2Removidos,
+        insightsResolvidos:   insightsDel.count,
         motivo: req.body?.motivo || 'reset_manual',
       },
     });
 
     res.json({
       ok: true,
-      embeddingsRemovidos: embeddingsDel.count,
-      eventosRemovidos:    eventosDel.count,
-      extracoesRemovidas:  extracoesDel.count,
-      insightsResolvidos:  insightsDel.count,
-      mensagem: 'Reset concluido. Rode "Extracao LLM" para reprocessar os PDFs do zero.',
+      embeddingsRemovidos:  embeddingsDel.count,
+      eventosRemovidos:     eventosDel.count,
+      extracoesRemovidas:   extracoesDel.count,
+      documentosRemovidos:  documentosDel.count,
+      arquivosR2Removidos,
+      insightsResolvidos:   insightsDel.count,
+      mensagem: 'Reset concluido. Rode "Captura de PDFs GE" para baixar e extrair tudo do zero.',
     });
   } catch (err) {
     console.error('[GEHC_APRENDIZADO] Erro ao resetar extracoes:', err);
@@ -584,6 +614,9 @@ router.get('/atividade', async (req, res) => {
       fileSizeBytes: d.fileSizeBytes,
       tentativas: d.tentativas,
       ultimoErro: d.ultimoErro,
+      // PDFs novos nao sao mais persistidos no R2 (extracao inline). Apenas
+      // legados ainda podem ser abertos.
+      temArquivoR2: Boolean(d.r2Key),
     }));
 
     res.json({ itens });

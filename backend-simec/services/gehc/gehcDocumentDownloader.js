@@ -1,4 +1,4 @@
-// Captura PDFs de OS GE via Playwright headless e armazena no Cloudflare R2.
+// Captura PDFs de OS GE via Playwright headless e extrai conteudo na hora.
 //
 // Por que Playwright e não fetch puro?
 // O fluxo de download do portal GE é:
@@ -13,15 +13,20 @@
 // O nome do arquivo segue o padrão MRR11625_CR_CSR_ServReq_17159687_20260325_069Ur00000YSvPeIAL.pdf,
 // onde o ID do documento (069Ur...IAL) sempre fecha a string. Usamos isso para
 // extrair o documentId canônico e garantir idempotência.
+//
+// Armazenamento: o PDF NAO eh persistido (R2 ficou para tras). Logo apos o
+// download em memoria chamamos extrairUmPdf() com o buffer; o conteudo
+// extraido vai para gehcPdfExtraido e o buffer eh descartado. gehcPdfDocumento
+// continua sendo gravado para dedup e auditoria, mas com r2Key=null.
 
 import { chromium } from 'playwright';
 import crypto from 'crypto';
 import prisma from '../prismaService.js';
 import { lerCredenciais } from './gehcAuthService.js';
-import { uploadToR2 } from '../uploads/fileStorageService.js';
 import { listarDocumentosDaOS } from './gehcDocumentClient.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
+import { extrairUmPdf } from './gehcPdfExtractionOrchestrator.js';
 
 const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com.br/account';
 // Lista de OS do equipamento na aba 'Servico'. Mais eficiente que abrir 1
@@ -35,6 +40,8 @@ const DOWNLOAD_TIMEOUT_MS  = 60_000;  // tempo máx aguardando o `download` even
 const POPUP_TIMEOUT_MS     = 30_000;  // tempo máx aguardando popup abrir (SPA pode demorar)
 const TRIGGER_TIMEOUT_MS   = 20_000;  // tempo máx procurando botao Download
 
+// R2_PREFIX e r2KeyParaPdf permanecem para compatibilidade com PDFs legados
+// que ainda existirem no bucket (limpeza explicita via endpoint dedicado).
 const R2_PREFIX = 'gehc-pdfs';
 
 // ─── Helpers de identidade ───────────────────────────────────────────────────
@@ -398,31 +405,45 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
             const buffer = await lerStreamComoBuffer(await download.createReadStream());
             const fileName = doc.fileName || download.suggestedFilename();
             const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
-            const r2Key = r2KeyParaPdf({ tenantId, gehcServiceId: ordem.gehcServiceId, documentId: doc.documentId });
 
-            await uploadToR2(r2Key, buffer, 'application/pdf');
-
-            await prisma.gehcPdfDocumento.upsert({
+            // PDF NAO vai para R2: mantemos so metadados + extracao inline.
+            // r2Key permanece null. Reprocessamento futuro nao tera o arquivo
+            // disponivel — exige rebaixar do GE.
+            const pdfDocumento = await prisma.gehcPdfDocumento.upsert({
               where: { documentId: doc.documentId },
               create: {
                 tenantId,
                 equipamentoId: equipamento.id,
                 ordemServicoId: ordem.id,
                 documentId: doc.documentId,
-                fileName, fileHash, fileSizeBytes: buffer.length, r2Key,
+                fileName, fileHash, fileSizeBytes: buffer.length, r2Key: null,
                 baixadoEm: new Date(),
                 tentativas: 1,
                 ultimaTentativaEm: new Date(),
                 ultimoErro: null,
               },
               update: {
-                fileName, fileHash, fileSizeBytes: buffer.length, r2Key,
+                fileName, fileHash, fileSizeBytes: buffer.length, r2Key: null,
                 baixadoEm: new Date(),
                 tentativas: { increment: 1 },
                 ultimaTentativaEm: new Date(),
                 ultimoErro: null,
               },
             });
+
+            // Extracao inline com o buffer em memoria. Falha aqui nao bloqueia
+            // o download (gehcPdfDocumento ja foi gravado); o orchestrator
+            // pode fazer retry depois para o que falhou (mas sem R2, o retry
+            // exigira rebaixar — gehcPdfExtraido fica registrando o erro).
+            try {
+              const r = await extrairUmPdf({ pdfDocumento, buffer });
+              if (!r.ok) {
+                console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: extracao inline falhou — ${r.erro}`);
+              }
+            } catch (extErr) {
+              console.error(`[GEHC_DOWNLOAD] ${doc.documentId}: erro inesperado na extracao inline:`, extErr.message);
+            }
+
             capturados++;
           } catch (err) {
             erros.push(`${doc.documentId}: ${err.message?.slice(0, 100)}`);

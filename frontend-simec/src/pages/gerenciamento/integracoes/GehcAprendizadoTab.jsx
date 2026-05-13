@@ -538,7 +538,7 @@ function FeedAtividade({ itens }) {
                   {item.ultimoErro} (tentativas: {item.tentativas})
                 </p>
               )}
-              {!isFalha && !isPendente && item.fileName && (
+              {!isFalha && !isPendente && item.temArquivoR2 && item.fileName && (
                 <a
                   href={urlPdfDocumento(item.fileName.replace(/\.pdf$/i, '').split('_').pop())}
                   target="_blank"
