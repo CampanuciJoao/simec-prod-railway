@@ -12,6 +12,7 @@ import {
   temCredenciaisConfiguradas,
 } from '../services/gehc/gehcAuthService.js';
 import { gerarPdfSaudeEquipamentoBuffer } from '../services/pdf/pdfDocumentService.js';
+import { RM_FILTER } from '../services/equipamento/equipamentoModalidade.js';
 
 const router = express.Router();
 
@@ -68,6 +69,7 @@ router.get('/status', async (req, res) => {
             equipamento: {
               gehcAssetId: { not: null },
               ...whereRmGe,
+              ...RM_FILTER,
             },
           },
           orderBy: { capturedAt: 'desc' },
