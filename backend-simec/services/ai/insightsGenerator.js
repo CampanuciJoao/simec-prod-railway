@@ -350,13 +350,19 @@ async function detectarRiscoAlto({ tenantId, equipamentoId }) {
 // ─── Detector 4: sem PM recente ─────────────────────────────────────────────
 
 async function detectarSemPmRecente({ tenantId, equipamentoId }) {
+  const eq = await prisma.equipamento.findUnique({
+    where: { tenantId_id: { tenantId, id: equipamentoId } },
+    select: {
+      gehcAssetId: true,
+      createdAt: true,
+      dataInstalacao: true,
+      gehcContrato: { select: { contractExpiration: true } },
+    },
+  });
+
   // Equipamento GE sem contrato de manutencao ativo nao tem expectativa de
   // PM externa — pular o detector. Sem isso, gera falso positivo eterno
   // pois pm_ge nunca aparecera.
-  const eq = await prisma.equipamento.findUnique({
-    where: { tenantId_id: { tenantId, id: equipamentoId } },
-    select: { gehcAssetId: true, gehcContrato: { select: { contractExpiration: true } } },
-  });
   const ehGE = Boolean(eq?.gehcAssetId);
   const contratoExpira = eq?.gehcContrato?.contractExpiration ?? null;
   const contratoAtivo = contratoExpira === null
@@ -367,7 +373,20 @@ async function detectarSemPmRecente({ tenantId, equipamentoId }) {
     return null;
   }
 
+  // Equipamento muito novo no SIMEC nao tem historico suficiente para
+  // afirmar que nao houve PM. Usa o mais recente entre createdAt (entrada
+  // no SIMEC) e dataInstalacao (instalacao fisica) como referencia: se
+  // qualquer um for mais recente que 'desde', o equipamento nao esta no
+  // sistema/operante ha tempo suficiente para esperar PM atrasada.
   const desde = diasAtras(PM_OK_HORIZONTE_DIAS);
+  const referenciasInicio = [eq?.createdAt, eq?.dataInstalacao].filter(Boolean);
+  const inicioMonitoramento = referenciasInicio.length
+    ? new Date(Math.max(...referenciasInicio.map((d) => d.getTime())))
+    : null;
+  if (inicioMonitoramento && inicioMonitoramento > desde) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'sem_pm_recente' });
+    return null;
+  }
   const evPm = await prisma.eventoEquipamento.findFirst({
     where: {
       tenantId, equipamentoId,
