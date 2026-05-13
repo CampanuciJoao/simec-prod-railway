@@ -175,14 +175,19 @@ export async function iniciarJobsDeAlertas() {
       'gehc-monitorar-saude',
       {},
       {
-        repeat: { every: 30 * 60 * 1000 },
+        // Portal GE atualiza dados de saude (helio, pressao, compressor) a
+        // cada ~2h. Polling mais frequente nao traz dado novo — gera carga
+        // sem ganho. Ajustado de 30min para 2h.
+        repeat: { every: 2 * 60 * 60 * 1000 },
         removeOnComplete: 50,
         removeOnFail: 20,
       }
     );
 
-    // Captura imediata no startup — só dispara se o último snapshot tem mais de 25min
-    const STARTUP_THRESHOLD_MS = 25 * 60 * 1000;
+    // Captura imediata no startup — só dispara se o último snapshot tem mais
+    // de 90min (~1h30). Ajustado pra acompanhar o cron de 2h: redeploys
+    // frequentes nao geram captura redundante quando ja tem snapshot recente.
+    const STARTUP_THRESHOLD_MS = 90 * 60 * 1000;
     const ultimoSnapshot = await prisma.gehcSaudeSnapshot.findFirst({
       orderBy: { capturedAt: 'desc' },
       select: { capturedAt: true },
@@ -200,7 +205,7 @@ export async function iniciarJobsDeAlertas() {
       );
     }
 
-    console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 30min + captura imediata no startup.');
+    console.log('[QUEUE] Job GEHC (gehc-monitorar-saude) agendado a cada 2h + captura imediata no startup se snapshot >90min.');
 
     // Sync completo de contratos, OS e utilização — uma vez por dia às 02:00 UTC
     const repeatables4 = await queue.getRepeatableJobs();
