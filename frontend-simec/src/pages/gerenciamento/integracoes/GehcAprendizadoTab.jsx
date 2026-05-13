@@ -31,7 +31,7 @@ import {
 import { useToast } from '@/contexts/ToastContext';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useGehcAprendizado } from '@/hooks/gerenciamento/useGehcAprendizado';
-import { urlPdfDocumento } from '@/services/api/gehcAprendizadoApi';
+import { urlPdfDocumento, getExtracoesDiagnostico } from '@/services/api/gehcAprendizadoApi';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -574,7 +574,21 @@ function GehcAprendizadoTab() {
   // Confirmações destrutivas em batch — uma flag por ação
   const [confirmacao, setConfirmacao] = useState(null); // 'descartar' | 'limpar' | 'resetar' | null
   const [executandoBatch, setExecutandoBatch] = useState(false);
+  const [diagnostico, setDiagnostico] = useState(null);
+  const [carregandoDiagnostico, setCarregandoDiagnostico] = useState(false);
   const { addToast } = useToast();
+
+  const carregarDiagnostico = async () => {
+    setCarregandoDiagnostico(true);
+    try {
+      const data = await getExtracoesDiagnostico();
+      setDiagnostico(data);
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message || 'Falha ao buscar diagnóstico.', 'error');
+    } finally {
+      setCarregandoDiagnostico(false);
+    }
+  };
 
   const fecharConfirmacao = () => {
     if (executandoBatch) return;
@@ -712,14 +726,25 @@ function GehcAprendizadoTab() {
         title="Padrões de causa-raiz"
         description="Categorias normalizadas que a IA identificou nos PDFs analisados. Use para enxergar o que mais derruba sua frota."
         actions={
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={() => setConfirmacao('resetar')}
-            title="Apaga as extrações e eventos derivados de PDF; PDFs originais ficam preservados"
-          >
-            Resetar análise
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={carregarDiagnostico}
+              disabled={carregandoDiagnostico}
+              title="Mostra contagens detalhadas (PDFs baixados, extraídos, com erro) para diagnosticar inconsistências"
+            >
+              {carregandoDiagnostico ? 'Carregando...' : 'Diagnóstico'}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmacao('resetar')}
+              title="Apaga as extrações e eventos derivados de PDF; PDFs originais ficam preservados"
+            >
+              Resetar análise
+            </Button>
+          </div>
         }
       >
         <CausasAgregadas causas={causas} />
@@ -788,6 +813,34 @@ function GehcAprendizadoTab() {
         isDestructive
         confirmDisabled={executandoBatch}
       />
+
+      <ModalConfirmacao
+        isOpen={Boolean(diagnostico)}
+        onClose={() => setDiagnostico(null)}
+        onConfirm={() => {
+          if (diagnostico) {
+            navigator.clipboard.writeText(JSON.stringify(diagnostico, null, 2)).catch(() => {});
+            addToast('JSON copiado para a área de transferência.', 'success');
+          }
+        }}
+        title="Diagnóstico das extrações"
+        message="Estado atual da pipeline de PDFs. Copie o JSON e envie para análise."
+        confirmText="Copiar JSON"
+        cancelText="Fechar"
+      >
+        {diagnostico && (
+          <pre
+            className="max-h-[400px] overflow-auto rounded-lg p-3 text-[11px]"
+            style={{
+              backgroundColor: 'var(--bg-surface-soft)',
+              color: 'var(--text-primary)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            {JSON.stringify(diagnostico, null, 2)}
+          </pre>
+        )}
+      </ModalConfirmacao>
     </div>
   );
 }
