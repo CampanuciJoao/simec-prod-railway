@@ -49,15 +49,35 @@ function TimelineItem({ evento, timezone }) {
 
       {/* Conteúdo */}
       <div className="pb-6 min-w-0 flex-1">
-        <p className="text-xs font-medium mb-0.5" style={{ color: 'var(--text-muted)' }}>
-          {fmt(evento.dataHora)}
-        </p>
+        <div className="flex flex-wrap items-baseline gap-2 mb-0.5">
+          <p className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+            {fmt(evento.dataHora)}
+          </p>
+          {evento.meta?.registroRetroativo && (
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{
+                backgroundColor: 'var(--color-warning-surface)',
+                color: 'var(--color-warning)',
+                border: '1px solid var(--color-warning-soft)',
+              }}
+              title={`Registrado no sistema em ${fmt(evento.meta.dataHoraRegistro)}`}
+            >
+              Registro retroativo
+            </span>
+          )}
+        </div>
         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {evento.titulo}
         </p>
         {descricaoTexto && (
           <p className="mt-1 text-sm whitespace-pre-wrap" style={{ color: 'var(--text-secondary)' }}>
             {descricaoTexto}
+          </p>
+        )}
+        {evento.meta?.registroRetroativo && evento.meta?.dataHoraRegistro && (
+          <p className="mt-1 text-xs italic" style={{ color: 'var(--text-muted)' }}>
+            Registrado no sistema em {fmt(evento.meta.dataHoraRegistro)}.
           </p>
         )}
         {resumoOs && (

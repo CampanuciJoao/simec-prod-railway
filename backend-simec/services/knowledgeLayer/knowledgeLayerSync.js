@@ -329,7 +329,7 @@ async function produzirEventosOSInterna({ tenantId }) {
     select: {
       id: true, equipamentoId: true, numeroOS: true, descricaoProblema: true,
       statusEquipamentoAbertura: true, status: true, tipo: true,
-      dataHoraAbertura: true, dataHoraConclusao: true,
+      dataHoraAbertura: true, dataHoraInicioEvento: true, dataHoraConclusao: true,
     },
   });
 
@@ -341,10 +341,15 @@ async function produzirEventosOSInterna({ tenantId }) {
         : o.statusEquipamentoAbertura === 'UsoLimitado' ? 'medium'
         : 'low';
 
+      // KPIs (MTTR, reincidencia) usam a hora real do problema quando o
+      // usuario informou (registro retroativo); senao caem em
+      // dataHoraAbertura (hora de criacao no SIMEC).
+      const ocorridoEm = o.dataHoraInicioEvento || o.dataHoraAbertura;
+
       const r = await upsertEvento({
         tenantId,
         equipamentoId: o.equipamentoId,
-        ocorridoEm: o.dataHoraAbertura,
+        ocorridoEm,
         fonte: 'os_simec',
         tipoEvento,
         severidade,
