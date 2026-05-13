@@ -12,6 +12,11 @@ export const addEquipamento = (equipamentoData) =>
 export const updateEquipamento = (id, equipamentoData) =>
   api.put(`/equipamentos/${id}`, equipamentoData).then((res) => res.data);
 
+export const patchEquipamentoStatus = (id, formData) =>
+  api.patch(`/equipamentos/${id}/status`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((res) => res.data);
+
 export const deleteEquipamento = (id) =>
   api.delete(`/equipamentos/${id}`).then((res) => res.data);
 
