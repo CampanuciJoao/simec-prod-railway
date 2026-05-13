@@ -36,7 +36,8 @@ const PORTAL_LISTA_OS_URL = (assetId) =>
 
 const RATE_LIMIT_OS_MS     = 3_000;   // espera entre OSs no mesmo tenant
 const RATE_LIMIT_TENANT_MS = 15_000;  // espera entre tenants
-const DOWNLOAD_TIMEOUT_MS  = 60_000;  // tempo máx aguardando o `download` event
+const DOWNLOAD_TIMEOUT_MS  = 120_000; // tempo máx aguardando o `download` event
+                                      // (portal GE intermitente; 60s era curto)
 const POPUP_TIMEOUT_MS     = 30_000;  // tempo máx aguardando popup abrir (SPA pode demorar)
 const TRIGGER_TIMEOUT_MS   = 20_000;  // tempo máx procurando botao Download
 
@@ -459,7 +460,19 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
 
             capturados++;
           } catch (err) {
-            erros.push(`${doc.documentId}: ${err.message?.slice(0, 100)}`);
+            // Mensagem amigavel pro feed da UI; stack completo so vai pro
+            // log do Railway. Reduz ruido no painel de Atividade.
+            const erroAmigavel = (() => {
+              const msg = err.message || '';
+              if (/timeout/i.test(msg) && /download/i.test(msg)) {
+                return 'Timeout esperando o download iniciar (portal GE não respondeu).';
+              }
+              if (/timeout/i.test(msg)) return `Timeout: ${msg.split('\n')[0].slice(0, 120)}`;
+              if (/popup/i.test(msg)) return 'Popup de download não abriu a tempo.';
+              return msg.split('\n')[0].slice(0, 200) || 'Falha desconhecida no download.';
+            })();
+            erros.push(`${doc.documentId}: ${erroAmigavel}`);
+            console.error(`[GEHC_DOWNLOAD] ${doc.documentId} falhou:`, err.message);
             await prisma.gehcPdfDocumento.upsert({
               where: { documentId: doc.documentId },
               create: {
@@ -470,12 +483,12 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
                 fileName: doc.fileName,
                 tentativas: 1,
                 ultimaTentativaEm: new Date(),
-                ultimoErro: err.message?.slice(0, 1000),
+                ultimoErro: erroAmigavel,
               },
               update: {
                 tentativas: { increment: 1 },
                 ultimaTentativaEm: new Date(),
-                ultimoErro: err.message?.slice(0, 1000),
+                ultimoErro: erroAmigavel,
               },
             }).catch(() => {});
           }
