@@ -65,8 +65,12 @@ async function withHeartbeat(job, fn, intervalMs = 25_000) {
  * @param {string} pipeline - PIPELINE_NAMES.* (chave para registrar)
  * @param {Function} fn - async () => result. Result tipico:
  *                         { ok, ...metricas } (ex: capturados, processadas)
+ * @param {object} [opts]
+ * @param {string|null} [opts.tenantId] - quando informado, telemetria fica na
+ *   linha do tenant (e nao na global). Obrigatorio para handlers *-tenant
+ *   para evitar cross-tenant info leak.
  */
-async function comTelemetria(job, pipeline, fn) {
+async function comTelemetria(job, pipeline, fn, { tenantId = null } = {}) {
   const inicio = Date.now();
   let resultado;
   let erro;
@@ -79,11 +83,25 @@ async function comTelemetria(job, pipeline, fn) {
   } finally {
     const duracaoMs = Date.now() - inicio;
     const ok = !erro && resultado?.ok !== false;
-    const mensagem = erro
-      ? `Falha: ${erro.message?.slice(0, 200)}`
-      : (resultado?.motivo || resumoMetricas(resultado));
-    const { ok: _ignore, motivo: _ignore2, ...metrics } = (resultado || {});
-    registrarExecucao(pipeline, { ok, mensagem, metrics, duracaoMs })
+
+    // Mensagem prioriza, em ordem:
+    //  1. Exception thrown → "Falha: <stack curta>"
+    //  2. Handler retornou { ok:false, erro:'...' } sem throw → "Falha: <erro>"
+    //  3. Pipeline pausado (motivo) → "<motivo>"
+    //  4. Sumario das metricas
+    let mensagem;
+    if (erro) {
+      mensagem = `Falha: ${erro.message?.slice(0, 200) ?? 'erro_desconhecido'}`;
+    } else if (!ok && resultado?.erro) {
+      mensagem = `Falha: ${String(resultado.erro).slice(0, 200)}`;
+    } else {
+      mensagem = resultado?.motivo || resumoMetricas(resultado);
+    }
+
+    // Remove campos de controle do payload de metricas (mantem so dados uteis).
+    const { ok: _ok, motivo: _motivo, erro: _erro, ...metrics } = (resultado || {});
+
+    registrarExecucao(pipeline, { ok, mensagem, metrics, duracaoMs, tenantId })
       .catch(() => {});  // nunca bloqueia o handler em caso de falha de log
   }
 }
@@ -222,7 +240,7 @@ const alertasWorker = new Worker(
           console.error(`[GEHC_PDF_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
           return { ok: false, erro: err.message };
         }
-      });
+      }, { tenantId: job.data.tenantId });
     }
 
     if (job?.name === 'gehc-extrair-pdfs') {
@@ -251,7 +269,7 @@ const alertasWorker = new Worker(
           console.error(`[GEHC_EXTRACAO_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
           return { ok: false, erro: err.message };
         }
-      });
+      }, { tenantId: job.data.tenantId });
     }
 
     if (job?.name === 'knowledge-layer-sync') {
@@ -277,7 +295,7 @@ const alertasWorker = new Worker(
           console.error(`[KL_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
           return { ok: false, erro: err.message };
         }
-      });
+      }, { tenantId: job.data.tenantId });
     }
 
     if (job?.name === 'ia-gerar-embeddings') {
@@ -304,7 +322,7 @@ const alertasWorker = new Worker(
           console.error(`[IA_EMBEDDINGS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
           return { ok: false, erro: err.message };
         }
-      });
+      }, { tenantId: job.data.tenantId });
     }
 
     if (job?.name === 'ia-gerar-insights') {
@@ -328,7 +346,7 @@ const alertasWorker = new Worker(
           console.error(`[IA_INSIGHTS_WORKER] Erro tenant ${job.data.tenantId}:`, err.message);
           return { ok: false, erro: err.message };
         }
-      });
+      }, { tenantId: job.data.tenantId });
     }
 
     if (job?.name === 'gehc-discovery-diario') {
