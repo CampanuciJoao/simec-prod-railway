@@ -157,6 +157,86 @@ router.patch('/insights/:id/feedback', async (req, res) => {
   }
 });
 
+// ─── GET /api/gehc/aprendizado/extracoes/diagnostico ─────────────────────────
+// Snapshot do estado da pipeline de PDFs para o tenant. Util quando os KPIs
+// nao batem (ex: PDFs baixados mas 0 analisados) e nao se tem acesso ao log.
+router.get('/extracoes/diagnostico', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+
+  try {
+    const [
+      docsTotal,
+      docsComR2,
+      docsSemR2,
+      docsComErro,
+      extracoesTotal,
+      extracoesOk,
+      extracoesComErro,
+      extracoesSemLlm,
+      ultimoDoc,
+      ultimaExtracaoOk,
+      amostrasErro,
+      amostrasLlmErro,
+    ] = await Promise.all([
+      prisma.gehcPdfDocumento.count({ where: { tenantId } }),
+      prisma.gehcPdfDocumento.count({ where: { tenantId, r2Key: { not: null } } }),
+      prisma.gehcPdfDocumento.count({ where: { tenantId, r2Key: null } }),
+      prisma.gehcPdfDocumento.count({ where: { tenantId, ultimoErro: { not: null } } }),
+      prisma.gehcPdfExtraido.count({ where: { tenantId } }),
+      prisma.gehcPdfExtraido.count({ where: { tenantId, extraidoEm: { not: null }, extractionError: null } }),
+      prisma.gehcPdfExtraido.count({ where: { tenantId, extractionError: { not: null } } }),
+      prisma.gehcPdfExtraido.count({ where: { tenantId, extraidoEm: { not: null }, llmError: { not: null } } }),
+      prisma.gehcPdfDocumento.findFirst({
+        where: { tenantId },
+        orderBy: { updatedAt: 'desc' },
+        select: { documentId: true, fileName: true, baixadoEm: true, r2Key: true, ultimoErro: true, tentativas: true, updatedAt: true },
+      }),
+      prisma.gehcPdfExtraido.findFirst({
+        where: { tenantId, extraidoEm: { not: null } },
+        orderBy: { extraidoEm: 'desc' },
+        select: { id: true, pdfDocumentoId: true, extraidoEm: true, rootCauseCategory: true, llmError: true },
+      }),
+      prisma.gehcPdfExtraido.findMany({
+        where: { tenantId, extractionError: { not: null } },
+        select: { pdfDocumentoId: true, extractionError: true, tentativas: true, ultimaTentativaEm: true },
+        orderBy: { ultimaTentativaEm: 'desc' },
+        take: 5,
+      }),
+      prisma.gehcPdfExtraido.findMany({
+        where: { tenantId, extraidoEm: { not: null }, llmError: { not: null } },
+        select: { pdfDocumentoId: true, llmError: true },
+        orderBy: { extraidoEm: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    res.json({
+      tenantId,
+      documentos: {
+        total: docsTotal,
+        comR2KeyLegado: docsComR2,
+        semR2KeyNovo: docsSemR2,
+        comErroDownload: docsComErro,
+        ultimoDocumento: ultimoDoc,
+      },
+      extracoes: {
+        total: extracoesTotal,
+        sucesso: extracoesOk,
+        comErroExtracao: extracoesComErro,
+        sucessoMasSemLlm: extracoesSemLlm,
+        ultimaSucesso: ultimaExtracaoOk,
+      },
+      amostraDeErros: {
+        extracao: amostrasErro,
+        llm: amostrasLlmErro,
+      },
+    });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /extracoes/diagnostico:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── PATCH /api/gehc/aprendizado/insights/:id/descartar ──────────────────────
 // Descarta o insight como FALSO POSITIVO. Diferente de "resolver" (que
 // significa que o problema real foi tratado), descartar registra
