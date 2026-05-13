@@ -621,6 +621,172 @@ router.delete('/:id/historico/:eventoId', admin, async (req, res) => {
 });
 
 // ==============================
+// PATCH STATUS (mudanca de ciclo de vida)
+// Aceita multipart para anexar documentos (ex.: nota fiscal de venda).
+// Body fields: novoStatus, motivo, comprador (apenas para Vendido)
+// ==============================
+const STATUS_VALIDOS = ['Operante', 'Inoperante', 'EmManutencao', 'UsoLimitado', 'Desativado', 'Vendido'];
+const STATUS_INATIVOS = ['Vendido', 'Desativado'];
+
+router.patch(
+  '/:id/status',
+  uploadFor('equipamentos'),
+  async (req, res, next) => {
+    const { id } = req.params;
+    const tenantId = req.usuario.tenantId;
+    const usuarioId = req.usuario.id;
+
+    const novoStatus = normalizarTexto(req.body?.novoStatus);
+    const motivo = normalizarTexto(req.body?.motivo);
+    const comprador = normalizarTexto(req.body?.comprador);
+
+    try {
+      if (!novoStatus || !STATUS_VALIDOS.includes(novoStatus)) {
+        return res.status(400).json({
+          message: `Status invalido. Valores aceitos: ${STATUS_VALIDOS.join(', ')}.`,
+        });
+      }
+      if (novoStatus === 'Vendido' && !comprador) {
+        return res.status(400).json({
+          message: 'Para registrar venda e obrigatorio informar o comprador.',
+        });
+      }
+      if (STATUS_INATIVOS.includes(novoStatus) && !motivo) {
+        return res.status(400).json({
+          message: 'Informe um motivo/comentario para registrar a mudanca de status.',
+        });
+      }
+
+      const equipamento = await prisma.equipamento.findFirst({
+        where: { id, tenantId },
+        select: { id: true, modelo: true, tag: true, status: true },
+      });
+
+      if (!equipamento) {
+        return res.status(404).json({ message: 'Equipamento nao encontrado.' });
+      }
+
+      if (equipamento.status === novoStatus) {
+        return res.status(409).json({
+          message: `Equipamento ja esta com status "${novoStatus}".`,
+        });
+      }
+
+      // Upload de anexos antes da transacao para falhar cedo em caso de erro de R2.
+      let anexosCriados = [];
+      if (Array.isArray(req.files) && req.files.length > 0) {
+        await adicionarAnexos({
+          resource: 'equipamentos',
+          tenantId,
+          usuarioId,
+          entityId: id,
+          files: req.files,
+        });
+        // Guarda apenas os nomes originais dos arquivos enviados nesta requisicao;
+        // a lista completa de anexos do equipamento e retornada por buscarEquipamentoCompleto.
+        anexosCriados = req.files.map((f) => ({ nomeOriginal: f.originalname }));
+      }
+
+      const statusAnterior = equipamento.status;
+      const tornouSeInativo = STATUS_INATIVOS.includes(novoStatus);
+      const saiuDeInativo = STATUS_INATIVOS.includes(statusAnterior) && !tornouSeInativo;
+
+      const tipoEvento = novoStatus === 'Vendido'
+        ? 'equipamento_vendido'
+        : novoStatus === 'Desativado'
+          ? 'equipamento_desativado'
+          : saiuDeInativo
+            ? 'equipamento_reativado'
+            : 'mudanca_status';
+
+      const subcategoria = novoStatus === 'Vendido'
+        ? 'venda'
+        : novoStatus === 'Desativado'
+          ? 'desativacao'
+          : saiuDeInativo
+            ? 'reativacao'
+            : 'mudanca_operacional';
+
+      const titulo = novoStatus === 'Vendido'
+        ? `Equipamento vendido${comprador ? ` para ${comprador}` : ''}`
+        : novoStatus === 'Desativado'
+          ? 'Equipamento desativado'
+          : saiuDeInativo
+            ? `Equipamento reativado (status: ${novoStatus})`
+            : `Status alterado para ${novoStatus}`;
+
+      const partesDescricao = [
+        `Status alterado de "${statusAnterior}" para "${novoStatus}".`,
+      ];
+      if (comprador) partesDescricao.push(`Comprador: ${comprador}.`);
+      if (motivo) partesDescricao.push(`Motivo/comentario: ${motivo}`);
+      if (anexosCriados.length > 0) {
+        partesDescricao.push(`Documento(s) anexado(s): ${anexosCriados.map((a) => a.nomeOriginal).join(', ')}.`);
+      }
+      const descricao = partesDescricao.join(' ');
+
+      const agora = new Date();
+
+      await prisma.$transaction(async (tx) => {
+        await tx.equipamento.update({
+          where: { tenantId_id: { tenantId, id } },
+          data: { status: novoStatus },
+        });
+
+        await registrarEventoHistoricoAtivo({
+          db: tx,
+          tenantId,
+          equipamentoId: id,
+          tipoEvento,
+          categoria: 'ciclo_vida',
+          subcategoria,
+          titulo,
+          descricao,
+          origem: 'usuario',
+          status: novoStatus,
+          impactaAnalise: tornouSeInativo || saiuDeInativo,
+          metadata: {
+            statusAnterior,
+            statusNovo: novoStatus,
+            motivo: motivo || null,
+            comprador: novoStatus === 'Vendido' ? comprador : null,
+            anexos: anexosCriados,
+            usuarioId,
+          },
+          dataEvento: agora,
+        });
+
+        // Resolve insights ativos quando equipamento entra em status inativo
+        if (tornouSeInativo) {
+          await tx.iaInsight.updateMany({
+            where: { tenantId, equipamentoId: id, resolvidoEm: null },
+            data: { resolvidoEm: agora },
+          });
+        }
+      });
+
+      await registrarLog({
+        tenantId,
+        usuarioId,
+        acao: 'MUDANCA_STATUS',
+        entidade: 'Equipamento',
+        entidadeId: id,
+        detalhes: `Status de "${equipamento.modelo}" alterado de ${statusAnterior} para ${novoStatus}.`,
+      });
+
+      const equipamentoCompleto = await buscarEquipamentoCompleto(tenantId, id);
+      return res.json(equipamentoCompleto);
+    } catch (error) {
+      console.error('[EQUIP_STATUS_PATCH_ERROR]', error);
+      if (error.status) {
+        return res.status(error.status).json({ message: error.message });
+      }
+      return next(error);
+    }
+  }
+);
+
+// ==============================
 // POST CRIAR
 // ==============================
 router.post('/', validate(equipamentoSchema), async (req, res) => {
