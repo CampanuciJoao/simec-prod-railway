@@ -542,6 +542,8 @@ export async function executarBackfillPdfs({
     where: {
       tenantId,
       gehcAssetId: { not: null },
+      // Pula equipamentos Vendidos ou Desativados — sem captura de PDF.
+      status: { notIn: ['Vendido', 'Desativado'] },
       ...(modalidades?.length ? { tipo: { in: modalidades } } : {}),
       gehcOrdensServico: {
         some: {

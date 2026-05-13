@@ -178,11 +178,15 @@ async function sincronizarEquipamento(eq, tokens) {
 
 // ─── Sync de todos os equipamentos vinculados do tenant ──────────────────────
 
+// Pula equipamentos Vendidos ou Desativados — sem sync de OS/contrato/util.
+const STATUS_INATIVOS = ['Vendido', 'Desativado'];
+
 export async function sincronizarDadosGehc({ tenantId } = {}) {
 
+  const filtroStatus = { status: { notIn: STATUS_INATIVOS } };
   const where = tenantId
-    ? { tenantId, gehcAssetId: { not: null } }
-    : { gehcAssetId: { not: null } };
+    ? { tenantId, gehcAssetId: { not: null }, ...filtroStatus }
+    : { gehcAssetId: { not: null }, ...filtroStatus };
 
   const equipamentos = await prisma.equipamento.findMany({
     where,

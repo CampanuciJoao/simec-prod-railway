@@ -374,9 +374,13 @@ export async function gerarInsightsTenant({ tenantId } = {}) {
   const ativo = await estaAtivo(PIPELINE_NAMES.IA_INSIGHTS, tenantId);
   if (!ativo) return { motivo: 'pipeline_pausado', equipamentos: 0 };
 
-  // So roda para equipamentos que tem pelo menos 1 evento no Knowledge Layer
+  // So roda para equipamentos que (a) tem pelo menos 1 evento no
+  // Knowledge Layer E (b) NAO estao Vendidos/Desativados.
   const eqsComEventos = await prisma.eventoEquipamento.findMany({
-    where: { tenantId },
+    where: {
+      tenantId,
+      equipamento: { status: { notIn: ['Vendido', 'Desativado'] } },
+    },
     select: { equipamentoId: true },
     distinct: ['equipamentoId'],
   });

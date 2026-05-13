@@ -9,6 +9,7 @@ import {
   fetchUptimeData,
   fetchUtilizationData,
 } from './gehcGraphqlClient.js';
+import { STATUS_INATIVOS } from '../equipamento/equipamentoStatus.js';
 
 const GEHC_BASE_URL = 'https://www.gehealthcare.com.br';
 
@@ -49,9 +50,11 @@ export async function monitorarSaudeGehc({ tenantId, rodarDiscovery = false, acc
     }
   }
 
+  // Pula equipamentos Vendidos ou Desativados — sem alertas/captura.
+  const filtroStatus = { status: { notIn: STATUS_INATIVOS } };
   const where = tenantId
-    ? { tenantId, gehcAssetId: { not: null } }
-    : { gehcAssetId: { not: null } };
+    ? { tenantId, gehcAssetId: { not: null }, ...filtroStatus }
+    : { gehcAssetId: { not: null }, ...filtroStatus };
 
   const equipamentos = await prisma.equipamento.findMany({
     where,
