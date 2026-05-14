@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 import {
   faChartLine,
+  faClipboardCheck,
   faFileMedical,
   faHeartPulse,
   faHistory,
@@ -9,11 +10,27 @@ import {
   faShieldAlt,
 } from '@fortawesome/free-solid-svg-icons';
 
+const MODALIDADES_COM_CQ = new Set([
+  'Mamografia',
+  'Tomografia Computadorizada',
+  'Raio-X',
+  'Densitometro Osseo',
+  'Ressonancia Magnetica',
+  'Ressonância Magnética',
+  'Ultrassom',
+  'Ultrassonografia',
+]);
+
 import { useEquipamentoDetalhes } from './useEquipamentoDetalhes';
 
 export function useDetalhesEquipamentoPage() {
   const { equipamentoId } = useParams();
-  const [abaAtiva, setAbaAtiva] = useState('visaoGeral');
+  const location = useLocation();
+  const [abaAtiva, setAbaAtiva] = useState(location.state?.tab || 'visaoGeral');
+
+  useEffect(() => {
+    if (location.state?.tab) setAbaAtiva(location.state.tab);
+  }, [location.state?.tab]);
 
   const {
     equipamento,
@@ -32,6 +49,9 @@ export function useDetalhesEquipamentoPage() {
     ];
     if (equipamento?.gehcAssetId) {
       base.push({ id: 'saudeGehc', label: 'Saúde GE', icon: faHeartPulse });
+    }
+    if (equipamento?.tipo && MODALIDADES_COM_CQ.has(equipamento.tipo)) {
+      base.push({ id: 'controleQualidade', label: 'Controle de Qualidade', icon: faClipboardCheck });
     }
     return base;
   }, [equipamento]);

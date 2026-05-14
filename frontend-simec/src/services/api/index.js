@@ -6,6 +6,7 @@ export * from './authApi';
 export * from './biApi';
 export * from './cepApi';
 export * from './contratosApi';
+export * from './controleQualidadeApi';
 export * from './dashboardApi';
 export * from './emailsNotificacaoApi';
 export * from './equipamentosApi';
