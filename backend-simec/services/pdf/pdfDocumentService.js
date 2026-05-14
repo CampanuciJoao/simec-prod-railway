@@ -891,7 +891,13 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
       drawGroupHeader(doc, unidadeNome);
       drawTable(doc, {
         headers: ['Modelo', 'Tipo', 'Serie / Tag', 'Fabricante', 'Status'],
-        columnWidths: [150, 75, 120, 95, 55],
+        // Largura redistribuida para evitar quebra no meio de palavra:
+        // Tipo precisa de ~100 para 'Tomografia Computadorizada' caber em
+        // 2 linhas; Status precisa de ~75 para 'Desativado'/'EmManutencao'
+        // caberem em 1. Modelo, Serie/Tag e Fabricante reduzem um pouco
+        // para compensar (texto desses costuma ser curto).
+        // Soma = 495px (igual ao layout anterior, dentro das margens).
+        columnWidths: [130, 100, 110, 80, 75],
         rows: itens.map((item) => [
           safeText(item?.modelo),
           safeText(item?.tipo),
