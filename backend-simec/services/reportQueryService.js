@@ -165,6 +165,7 @@ export async function buscarInventarioEquipamentos({
   tenantId,
   unidadeId,
   fabricante,
+  tipo,
   status,
 }) {
   if (!tenantId) {
@@ -182,6 +183,13 @@ export async function buscarInventarioEquipamentos({
   if (fabricante) {
     whereClause.fabricante = {
       contains: fabricante,
+      mode: 'insensitive',
+    };
+  }
+
+  if (tipo) {
+    whereClause.tipo = {
+      contains: tipo,
       mode: 'insensitive',
     };
   }

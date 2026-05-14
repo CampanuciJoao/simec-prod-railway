@@ -15,6 +15,7 @@ export function useRelatoriosPage() {
     tipoRelatorio: 'inventarioEquipamentos',
     unidadeId: '',
     fabricante: '',
+    tipo: '',
     tipoManutencao: '',
     dataInicio: '',
     dataFim: '',
@@ -22,6 +23,7 @@ export function useRelatoriosPage() {
 
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [fabricantesUnicos, setFabricantesUnicos] = useState([]);
+  const [tiposUnicos, setTiposUnicos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingFiltros, setLoadingFiltros] = useState(true);
   const [resultadoRelatorio, setResultadoRelatorio] = useState(null);
@@ -57,7 +59,16 @@ export function useRelatoriosPage() {
           ),
         ].sort();
 
+        const tipos = [
+          ...new Set(
+            (equipamentosData?.items || [])
+              .map((eq) => eq.tipo)
+              .filter(Boolean)
+          ),
+        ].sort();
+
         setFabricantesUnicos(fabricantes);
+        setTiposUnicos(tipos);
       } catch (err) {
         const message = getErrorMessage(
           err,
@@ -128,6 +139,11 @@ export function useRelatoriosPage() {
     [fabricantesUnicos]
   );
 
+  const tiposOptions = useMemo(
+    () => tiposUnicos.map((t) => ({ value: t, label: t })),
+    [tiposUnicos]
+  );
+
   const unidadesOptions = useMemo(
     () =>
       unidadesDisponiveis.map((u) => ({
@@ -195,6 +211,13 @@ export function useRelatoriosPage() {
             value: filtros.fabricante,
           }
         : null,
+      filtros.tipo
+        ? {
+            key: 'tipo',
+            label: `Tipo: ${filtros.tipo}`,
+            value: filtros.tipo,
+          }
+        : null,
       filtros.dataInicio
         ? {
             key: 'dataInicio',
@@ -221,6 +244,7 @@ export function useRelatoriosPage() {
       tipoRelatorio: 'inventarioEquipamentos',
       unidadeId: '',
       fabricante: '',
+      tipo: '',
       tipoManutencao: '',
       dataInicio: '',
       dataFim: '',
@@ -235,6 +259,7 @@ export function useRelatoriosPage() {
     resultadoRelatorio,
     error,
     fabricantesOptions,
+    tiposOptions,
     unidadesOptions,
     tipoRelatorioOptions,
     metricas,

@@ -56,6 +56,7 @@ function RelatoriosPage() {
               tipoRelatorioOptions={page.tipoRelatorioOptions}
               unidadesOptions={page.unidadesOptions}
               fabricantesOptions={page.fabricantesOptions}
+              tiposOptions={page.tiposOptions}
               onChange={page.handleFiltroChange}
               onSubmit={page.handleGerarRelatorio}
               loading={page.loading}

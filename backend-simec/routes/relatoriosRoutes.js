@@ -51,6 +51,7 @@ router.post('/gerar', async (req, res) => {
         tenantId,
         unidadeId: unidadeId || null,
         fabricante: fabricante ? String(fabricante).trim() : null,
+        tipo: tipo ? String(tipo).trim() : null,
         status: status ? String(status).trim() : null,
       });
     }

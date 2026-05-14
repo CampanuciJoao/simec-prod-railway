@@ -30,11 +30,13 @@ function RelatoriosFiltersSection({
   tipoRelatorioOptions,
   unidadesOptions,
   fabricantesOptions,
+  tiposOptions = [],
   onChange,
   onSubmit,
   loading = false,
 }) {
   const isManutencoes = filtros.tipoRelatorio === 'manutencoesRealizadas';
+  const isInventario = filtros.tipoRelatorio === 'inventarioEquipamentos';
 
   return (
     <PageSection
@@ -87,6 +89,23 @@ function RelatoriosFiltersSection({
             </Select>
           </Field>
 
+          {isInventario && (
+            <Field label="Tipo">
+              <Select
+                name="tipo"
+                value={filtros.tipo || ''}
+                onChange={onChange}
+              >
+                <option value="">Todos</option>
+                {tiposOptions.map((t) => (
+                  <option key={t.value} value={t.value}>
+                    {t.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
           {isManutencoes ? (
             <Field label="Data início">
               <DateInput
@@ -127,6 +146,7 @@ RelatoriosFiltersSection.propTypes = {
   tipoRelatorioOptions: PropTypes.array.isRequired,
   unidadesOptions: PropTypes.array.isRequired,
   fabricantesOptions: PropTypes.array.isRequired,
+  tiposOptions: PropTypes.array,
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool,

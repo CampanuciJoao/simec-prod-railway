@@ -298,6 +298,7 @@ export async function obterDadosPdfRelatorio({ tenantId, filtros = {} }) {
     equipamentoId,
     tipoManutencao,
     fabricante,
+    tipo,
     status,
   } = filtros;
 
@@ -310,6 +311,7 @@ export async function obterDadosPdfRelatorio({ tenantId, filtros = {} }) {
       tenantId,
       unidadeId: unidadeId || null,
       fabricante: fabricante ? String(fabricante).trim() : null,
+      tipo: tipo ? String(tipo).trim() : null,
       status: status ? String(status).trim() : null,
     });
 
@@ -323,6 +325,7 @@ export async function obterDadosPdfRelatorio({ tenantId, filtros = {} }) {
       filtros: {
         unidadeId: unidadeId || null,
         fabricante: fabricante || null,
+        tipo: tipo || null,
         tipoManutencao: null,
         equipamentoId: null,
         status: status || null,
