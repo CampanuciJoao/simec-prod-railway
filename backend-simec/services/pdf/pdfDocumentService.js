@@ -320,10 +320,17 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
 
   normalizedRows.forEach((row, rowIndex) => {
     const cells = headers.map((_, index) => safeText(row[index] ?? '-'));
+
+    // Calcula altura usando exatamente a mesma fonte/tamanho do render da
+    // celula (Helvetica 9). Sem isso, heightOfString herdava o estado
+    // anterior (Helvetica-Bold 8 do header) e subdimensionava — texto
+    // vazava da celula ("Bomba Injetora de Contraste" virava "Bomba
+    // Injetora de", "Desativado" virava "Desativad o").
+    doc.font('Helvetica').fontSize(9);
     const heights = cells.map((cell, index) =>
       doc.heightOfString(cell, {
         width: columnWidths[index] - paddingX * 2,
-        align: index === 0 ? 'left' : 'left',
+        align: 'left',
       })
     );
 
@@ -866,10 +873,21 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
     }
     const gruposOrdenados = Object.keys(grupos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
 
+    // Altura minima por bloco: header da unidade (24) + cabecalho da
+    // tabela (24+10) + ao menos 3 linhas (~30 cada com texto longo) = ~150.
+    // Se nao couber esse minimo no que sobra da pagina atual, pula para
+    // a proxima — evita "1 linha solitaria embaixo, resto na proxima".
+    const ALTURA_MINIMA_BLOCO = 150;
+
     for (const unidadeNome of gruposOrdenados) {
       const itens = grupos[unidadeNome].sort((a, b) =>
         safeText(a?.modelo).localeCompare(safeText(b?.modelo), 'pt-BR')
       );
+
+      if (doc.y + ALTURA_MINIMA_BLOCO > getMaxY(doc)) {
+        doc.addPage();
+      }
+
       drawGroupHeader(doc, unidadeNome);
       drawTable(doc, {
         headers: ['Modelo', 'Tipo', 'Serie / Tag', 'Fabricante', 'Status'],
