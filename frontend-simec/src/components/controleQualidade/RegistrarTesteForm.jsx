@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faPaperclip } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faTrash, faPaperclip, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
 
 import {
   Drawer,
@@ -17,6 +17,7 @@ import {
   criarTesteCq,
   uploadAnexoTesteCq,
   getTiposTeste,
+  extrairLaudoCq,
 } from '@/services/api';
 
 const RESULTADOS = [
@@ -63,6 +64,9 @@ function RegistrarTesteForm({
   const [salvando, setSalvando] = useState(false);
   const [erros, setErros] = useState({});
   const [erroGeral, setErroGeral] = useState(null);
+  const [extraindo, setExtraindo] = useState(false);
+  const [iaAlertas, setIaAlertas] = useState([]);
+  const [camposIa, setCamposIa] = useState(new Set()); // tracks campos preenchidos pela IA
 
   const equipamentoSelecionado = useMemo(
     () => equipamentos.find((e) => e.id === equipamentoId) || null,
@@ -89,6 +93,8 @@ function RegistrarTesteForm({
       setArquivos([]);
       setErros({});
       setErroGeral(null);
+      setIaAlertas([]);
+      setCamposIa(new Set());
     } else {
       setEquipamentoId(equipamentoIdInicial || '');
       setTipoTesteId('');
@@ -104,6 +110,8 @@ function RegistrarTesteForm({
       setArquivos([]);
       setErros({});
       setErroGeral(null);
+      setIaAlertas([]);
+      setCamposIa(new Set());
     }
   }, [open, testeBase, equipamentoIdInicial]);
 
@@ -140,6 +148,63 @@ function RegistrarTesteForm({
   };
 
   const removerArquivo = (i) => setArquivos((prev) => prev.filter((_, idx) => idx !== i));
+
+  const aplicarCamposIa = (dados, alertas, tiposCarregados) => {
+    const usados = new Set();
+    if (dados.numeroLaudo) { setNumeroLaudo(dados.numeroLaudo); usados.add('numeroLaudo'); }
+    if (dados.empresaExecutora) { setEmpresaExecutora(dados.empresaExecutora); usados.add('empresaExecutora'); }
+    if (dados.responsavelNome) { setResponsavelNome(dados.responsavelNome); usados.add('responsavelNome'); }
+    if (dados.responsavelRegistro) { setResponsavelRegistro(dados.responsavelRegistro); usados.add('responsavelRegistro'); }
+    if (dados.validadeMeses) { setValidadeMeses(String(dados.validadeMeses)); usados.add('validadeMeses'); }
+    if (dados.dataExecucao) { setDataExecucao(dados.dataExecucao); usados.add('dataExecucao'); }
+    if (dados.resultado) { setResultado(dados.resultado); usados.add('resultado'); }
+
+    if (dados.codigoTipoSugerido) {
+      const tipo = tiposCarregados.find((t) => t.codigo === dados.codigoTipoSugerido);
+      if (tipo) { setTipoTesteId(tipo.id); usados.add('tipoTesteId'); }
+    }
+
+    if (Array.isArray(dados.pendenciasAcao) && dados.pendenciasAcao.length > 0) {
+      setPendencias(dados.pendenciasAcao.map((p) => ({ descricao: p.descricao, resolvido: false })));
+      usados.add('pendenciasAcao');
+    }
+
+    setCamposIa(usados);
+    setIaAlertas(alertas || []);
+  };
+
+  const handleExtrairLaudo = async () => {
+    const arquivoPdf = arquivos.find((f) => f.type === 'application/pdf');
+    if (!arquivoPdf) return;
+
+    setExtraindo(true);
+    setIaAlertas([]);
+    setErroGeral(null);
+    try {
+      const r = await extrairLaudoCq(arquivoPdf);
+      // Garante que tipos estao carregados (extrator pode sugerir codigo de
+      // qualquer modalidade — recarrega sem filtro para resolver match)
+      const tiposCompletos = await getTiposTeste();
+      setTipos(tiposCompletos);
+      aplicarCamposIa(r.dados || {}, r.alertas || [], tiposCompletos);
+    } catch (e) {
+      setErroGeral(e?.response?.data?.message || 'Erro ao extrair laudo via IA.');
+    } finally {
+      setExtraindo(false);
+    }
+  };
+
+  // Wrapper para limpar marcacao de IA quando usuario edita o campo
+  const desmarcarIa = (campo) => {
+    if (camposIa.has(campo)) {
+      const novo = new Set(camposIa);
+      novo.delete(campo);
+      setCamposIa(novo);
+    }
+  };
+
+  const hintIa = (campo) =>
+    camposIa.has(campo) ? 'Sugerido pela IA — revise' : undefined;
 
   const handleSalvar = async () => {
     setSalvando(true);
@@ -238,10 +303,10 @@ function RegistrarTesteForm({
           </Select>
         </FormFieldShell>
 
-        <FormFieldShell label="Tipo de teste" required error={erros.tipoTesteId}>
+        <FormFieldShell label="Tipo de teste" required error={erros.tipoTesteId} hint={hintIa('tipoTesteId')}>
           <Select
             value={tipoTesteId}
-            onChange={(e) => setTipoTesteId(e.target.value)}
+            onChange={(e) => { setTipoTesteId(e.target.value); desmarcarIa('tipoTesteId'); }}
             disabled={loadingTipos || !equipamentoId}
           >
             <option value="">
@@ -262,16 +327,16 @@ function RegistrarTesteForm({
         </FormFieldShell>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormFieldShell label="Data de execução" required error={erros.dataExecucao}>
+          <FormFieldShell label="Data de execução" required error={erros.dataExecucao} hint={hintIa('dataExecucao')}>
             <DateInput
               value={dataExecucao}
-              onChange={(e) => setDataExecucao(e.target.value)}
+              onChange={(e) => { setDataExecucao(e.target.value); desmarcarIa('dataExecucao'); }}
               max={todayISO()}
             />
           </FormFieldShell>
 
-          <FormFieldShell label="Resultado" required error={erros.resultado}>
-            <Select value={resultado} onChange={(e) => setResultado(e.target.value)}>
+          <FormFieldShell label="Resultado" required error={erros.resultado} hint={hintIa('resultado')}>
+            <Select value={resultado} onChange={(e) => { setResultado(e.target.value); desmarcarIa('resultado'); }}>
               {RESULTADOS.map((r) => (
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
@@ -280,13 +345,17 @@ function RegistrarTesteForm({
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormFieldShell label="Validade (meses)" hint="Vazio = usa frequência padrão" error={erros.validadeMeses}>
+          <FormFieldShell
+            label="Validade (meses)"
+            hint={hintIa('validadeMeses') || 'Vazio = usa frequência padrão'}
+            error={erros.validadeMeses}
+          >
             <Input
               type="number"
               min="1"
               max="120"
               value={validadeMeses}
-              onChange={(e) => setValidadeMeses(e.target.value)}
+              onChange={(e) => { setValidadeMeses(e.target.value); desmarcarIa('validadeMeses'); }}
               placeholder={tipoSelecionado ? `${Math.round(tipoSelecionado.frequenciaDias / 30)}` : ''}
             />
           </FormFieldShell>
@@ -296,35 +365,35 @@ function RegistrarTesteForm({
           </FormFieldShell>
         </div>
 
-        <FormFieldShell label="Número do laudo" error={erros.numeroLaudo}>
+        <FormFieldShell label="Número do laudo" error={erros.numeroLaudo} hint={hintIa('numeroLaudo')}>
           <Input
             value={numeroLaudo}
-            onChange={(e) => setNumeroLaudo(e.target.value)}
+            onChange={(e) => { setNumeroLaudo(e.target.value); desmarcarIa('numeroLaudo'); }}
             placeholder="Ex: LRMD/SP/2026/ME/0238"
           />
         </FormFieldShell>
 
-        <FormFieldShell label="Empresa executora" error={erros.empresaExecutora}>
+        <FormFieldShell label="Empresa executora" error={erros.empresaExecutora} hint={hintIa('empresaExecutora')}>
           <Input
             value={empresaExecutora}
-            onChange={(e) => setEmpresaExecutora(e.target.value)}
+            onChange={(e) => { setEmpresaExecutora(e.target.value); desmarcarIa('empresaExecutora'); }}
             placeholder="Ex: FM Serviços de Física Médica"
           />
         </FormFieldShell>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <FormFieldShell label="Responsável (nome)" error={erros.responsavelNome}>
+          <FormFieldShell label="Responsável (nome)" error={erros.responsavelNome} hint={hintIa('responsavelNome')}>
             <Input
               value={responsavelNome}
-              onChange={(e) => setResponsavelNome(e.target.value)}
+              onChange={(e) => { setResponsavelNome(e.target.value); desmarcarIa('responsavelNome'); }}
               placeholder="Nome completo do físico médico"
             />
           </FormFieldShell>
 
-          <FormFieldShell label="Registro profissional" error={erros.responsavelRegistro}>
+          <FormFieldShell label="Registro profissional" error={erros.responsavelRegistro} hint={hintIa('responsavelRegistro')}>
             <Input
               value={responsavelRegistro}
-              onChange={(e) => setResponsavelRegistro(e.target.value)}
+              onChange={(e) => { setResponsavelRegistro(e.target.value); desmarcarIa('responsavelRegistro'); }}
               placeholder="Ex: ABFM RX 201/843"
             />
           </FormFieldShell>
@@ -360,20 +429,38 @@ function RegistrarTesteForm({
           </div>
         </FormFieldShell>
 
-        {/* Anexos */}
+        {/* Anexos + extracao IA */}
         <FormFieldShell label="Laudo PDF (até 5 arquivos)">
-          <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
-            style={{ borderColor: 'var(--border-default)' }}>
-            <FontAwesomeIcon icon={faPaperclip} />
-            <span>Selecionar arquivos</span>
-            <input
-              type="file"
-              multiple
-              accept="application/pdf,image/jpeg,image/png"
-              className="hidden"
-              onChange={handleArquivos}
-            />
-          </label>
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--border-default)' }}
+            >
+              <FontAwesomeIcon icon={faPaperclip} />
+              <span>Selecionar arquivos</span>
+              <input
+                type="file"
+                multiple
+                accept="application/pdf,image/jpeg,image/png"
+                className="hidden"
+                onChange={handleArquivos}
+              />
+            </label>
+
+            {arquivos.some((f) => f.type === 'application/pdf') ? (
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={handleExtrairLaudo}
+                disabled={extraindo}
+                title="Lê o PDF e pré-preenche os campos do formulário"
+              >
+                <FontAwesomeIcon icon={faWandMagicSparkles} />
+                <span className="ml-2">{extraindo ? 'Extraindo...' : 'Extrair com IA'}</span>
+              </Button>
+            ) : null}
+          </div>
+
           {arquivos.length > 0 ? (
             <ul className="mt-2 space-y-1 text-sm" style={{ color: 'var(--text-muted)' }}>
               {arquivos.map((f, i) => (
@@ -391,6 +478,21 @@ function RegistrarTesteForm({
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {iaAlertas.length > 0 ? (
+            <div
+              className="mt-3 rounded-xl px-3 py-2 text-xs"
+              style={{
+                backgroundColor: 'var(--color-warning-soft)',
+                color: 'var(--color-warning)',
+              }}
+            >
+              <strong>IA precisa de revisão:</strong>
+              <ul className="mt-1 list-disc pl-5">
+                {iaAlertas.map((a, i) => <li key={i}>{a}</li>)}
+              </ul>
+            </div>
           ) : null}
         </FormFieldShell>
       </div>

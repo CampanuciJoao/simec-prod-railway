@@ -59,6 +59,18 @@ export const adicionarPendenciaCq = (testeId, descricao) =>
     .post(`/controle-qualidade/testes/${testeId}/pendencias`, { descricao })
     .then((r) => r.data);
 
+// Extracao LLM (sincrona) — nao persiste, so pre-preenche
+export const extrairLaudoCq = (file) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api
+    .post('/controle-qualidade/extrair-laudo', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60_000,
+    })
+    .then((r) => r.data);
+};
+
 // Anexos
 export const uploadAnexoTesteCq = (testeId, formData) =>
   api

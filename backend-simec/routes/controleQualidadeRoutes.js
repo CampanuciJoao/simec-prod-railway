@@ -29,7 +29,8 @@ import {
   atualizarTipoService,
 } from '../services/controleQualidade/tiposTesteService.js';
 
-import { buscarTestePorId } from '../services/controleQualidade/controleQualidadeRepository.js';
+import { buscarTestePorId, listarTipos } from '../services/controleQualidade/controleQualidadeRepository.js';
+import { extrairLaudoCq } from '../services/controleQualidade/laudoLlmExtractor.js';
 
 const router = express.Router();
 router.use(proteger);
@@ -274,6 +275,43 @@ router.post('/testes/:id/pendencias', async (req, res) => {
   } catch (e) {
     console.error('[CQ_PENDENCIA_CREATE_ERROR]', e);
     return res.status(500).json({ message: 'Erro ao adicionar pendencia.' });
+  }
+});
+
+// ─── Extracao LLM de laudo (sincrono, nao persiste) ────────────────────────
+//
+// Recebe 1 PDF via multipart, roda LLM, devolve campos sugeridos para o
+// RegistrarTesteForm pre-preencher. PDF nao eh salvo aqui — usuario fara
+// upload normal via /testes/:id/anexos depois de salvar o teste.
+router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const file = (req.files || [])[0];
+    if (!file) {
+      return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
+    }
+
+    const catalogoTipos = await listarTipos({ tenantId, somenteAtivos: true });
+
+    const r = await extrairLaudoCq({
+      pdfBuffer: file.buffer,
+      tenantId,
+      catalogoTipos: catalogoTipos.map((t) => ({
+        id: t.id, codigo: t.codigo, nome: t.nome, modalidade: t.modalidade,
+      })),
+    });
+
+    if (!r.ok) {
+      return res.status(422).json({ message: 'Falha ao extrair laudo.', erro: r.erro });
+    }
+
+    return res.json({
+      dados: r.dados,
+      alertas: r.alertas || [],
+    });
+  } catch (e) {
+    console.error('[CQ_EXTRAIR_LAUDO_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao extrair laudo.' });
   }
 });
 

@@ -40,11 +40,11 @@ export function getLlmRuntimeInfo() {
   };
 }
 
-export async function generateTextWithLlm(prompt) {
+export async function generateTextWithLlm(prompt, options = {}) {
   const provider = getActiveLlmProvider();
 
   try {
-    return await provider.generateText(prompt);
+    return await provider.generateText(prompt, options);
   } catch (error) {
     const fallbackProvider = getFallbackLlmProvider();
 
@@ -56,16 +56,17 @@ export async function generateTextWithLlm(prompt) {
       `[LLM_FALLBACK] provider=${provider.name} falhou; tentando fallback=${fallbackProvider.name}`
     );
 
-    return fallbackProvider.generateText(prompt);
+    return fallbackProvider.generateText(prompt, options);
   }
 }
 
 /**
  * Gera JSON estruturado via LLM com parse seguro.
  * Os providers já retornam JSON válido via JSON mode — sem necessidade de regex.
+ * options.tenantId/feature sao repassados ao provider para log de uso.
  */
-export async function generateJsonWithLlm(prompt) {
-  const text = await generateTextWithLlm(prompt);
+export async function generateJsonWithLlm(prompt, options = {}) {
+  const text = await generateTextWithLlm(prompt, options);
 
   try {
     return JSON.parse(text);
