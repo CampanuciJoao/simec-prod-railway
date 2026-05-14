@@ -67,6 +67,7 @@ function RegistrarTesteForm({
   const [extraindo, setExtraindo] = useState(false);
   const [iaAlertas, setIaAlertas] = useState([]);
   const [camposIa, setCamposIa] = useState(new Set()); // tracks campos preenchidos pela IA
+  const [pdfExtraido, setPdfExtraido] = useState(null); // identidade name|size do ultimo PDF processado
 
   const equipamentoSelecionado = useMemo(
     () => equipamentos.find((e) => e.id === equipamentoId) || null,
@@ -122,6 +123,7 @@ function RegistrarTesteForm({
       setErroGeral(null);
       setIaAlertas([]);
       setCamposIa(new Set());
+      setPdfExtraido(null);
     } else {
       setEquipamentoId(equipamentoIdInicial || '');
       setTipoTesteId('');
@@ -139,6 +141,7 @@ function RegistrarTesteForm({
       setErroGeral(null);
       setIaAlertas([]);
       setCamposIa(new Set());
+      setPdfExtraido(null);
     }
   }, [open, testeBase, equipamentoIdInicial]);
 
@@ -200,10 +203,8 @@ function RegistrarTesteForm({
     setIaAlertas(alertas || []);
   };
 
-  const handleExtrairLaudo = async () => {
-    const arquivoPdf = arquivos.find((f) => f.type === 'application/pdf');
+  const handleExtrairLaudo = async (arquivoPdf) => {
     if (!arquivoPdf) return;
-
     setExtraindo(true);
     setIaAlertas([]);
     setErroGeral(null);
@@ -220,6 +221,20 @@ function RegistrarTesteForm({
       setExtraindo(false);
     }
   };
+
+  // Auto-extracao: ao adicionar/trocar o primeiro PDF da lista, dispara LLM
+  // automaticamente. Identidade do PDF = name|size para nao re-extrair quando
+  // a lista muda mas o PDF principal continua o mesmo.
+  useEffect(() => {
+    if (!open || extraindo) return;
+    const primeiroPdf = arquivos.find((f) => f.type === 'application/pdf');
+    if (!primeiroPdf) return;
+    const identidade = `${primeiroPdf.name}|${primeiroPdf.size}`;
+    if (identidade === pdfExtraido) return;
+    setPdfExtraido(identidade);
+    handleExtrairLaudo(primeiroPdf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [arquivos, open]);
 
   // Wrapper para limpar marcacao de IA quando usuario edita o campo
   const desmarcarIa = (campo) => {
@@ -314,6 +329,66 @@ function RegistrarTesteForm({
             {erroGeral}
           </div>
         ) : null}
+
+        {/* Upload do laudo no topo: ao selecionar PDF, IA pre-preenche os campos */}
+        <FormFieldShell
+          label="Laudo PDF"
+          hint="Importe o PDF e a IA pré-preenche os campos abaixo automaticamente. Aceita até 5 arquivos."
+        >
+          <div className="flex flex-wrap items-center gap-2">
+            <label
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
+              style={{ borderColor: 'var(--border-default)' }}
+            >
+              <FontAwesomeIcon icon={extraindo ? faWandMagicSparkles : faPaperclip} spin={extraindo} />
+              <span>
+                {extraindo ? 'Lendo PDF com IA...' : 'Importar PDF do laudo'}
+              </span>
+              <input
+                type="file"
+                multiple
+                accept="application/pdf,image/jpeg,image/png"
+                className="hidden"
+                onChange={handleArquivos}
+                disabled={extraindo}
+              />
+            </label>
+          </div>
+
+          {arquivos.length > 0 ? (
+            <ul className="mt-2 space-y-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+              {arquivos.map((f, i) => (
+                <li key={i} className="flex items-center justify-between rounded-lg px-2 py-1"
+                  style={{ backgroundColor: 'var(--bg-surface-soft)' }}>
+                  <span className="truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    onClick={() => removerArquivo(i)}
+                    className="ml-2 text-xs"
+                    style={{ color: 'var(--color-danger)' }}
+                  >
+                    Remover
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+
+          {iaAlertas.length > 0 ? (
+            <div
+              className="mt-3 rounded-xl px-3 py-2 text-xs"
+              style={{
+                backgroundColor: 'var(--color-warning-soft)',
+                color: 'var(--color-warning)',
+              }}
+            >
+              <strong>IA precisa de revisão:</strong>
+              <ul className="mt-1 list-disc pl-5">
+                {iaAlertas.map((a, i) => <li key={i}>{a}</li>)}
+              </ul>
+            </div>
+          ) : null}
+        </FormFieldShell>
 
         <FormFieldShell label="Equipamento" required error={erros.equipamentoId}>
           <Select
@@ -460,72 +535,6 @@ function RegistrarTesteForm({
           </div>
         </FormFieldShell>
 
-        {/* Anexos + extracao IA */}
-        <FormFieldShell label="Laudo PDF (até 5 arquivos)">
-          <div className="flex flex-wrap items-center gap-2">
-            <label
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
-              style={{ borderColor: 'var(--border-default)' }}
-            >
-              <FontAwesomeIcon icon={faPaperclip} />
-              <span>Selecionar arquivos</span>
-              <input
-                type="file"
-                multiple
-                accept="application/pdf,image/jpeg,image/png"
-                className="hidden"
-                onChange={handleArquivos}
-              />
-            </label>
-
-            {arquivos.some((f) => f.type === 'application/pdf') ? (
-              <Button
-                variant="secondary"
-                size="sm"
-                onClick={handleExtrairLaudo}
-                disabled={extraindo}
-                title="Lê o PDF e pré-preenche os campos do formulário"
-              >
-                <FontAwesomeIcon icon={faWandMagicSparkles} />
-                <span className="ml-2">{extraindo ? 'Extraindo...' : 'Extrair com IA'}</span>
-              </Button>
-            ) : null}
-          </div>
-
-          {arquivos.length > 0 ? (
-            <ul className="mt-2 space-y-1 text-sm" style={{ color: 'var(--text-muted)' }}>
-              {arquivos.map((f, i) => (
-                <li key={i} className="flex items-center justify-between rounded-lg px-2 py-1"
-                  style={{ backgroundColor: 'var(--bg-surface-soft)' }}>
-                  <span className="truncate">{f.name}</span>
-                  <button
-                    type="button"
-                    onClick={() => removerArquivo(i)}
-                    className="ml-2 text-xs"
-                    style={{ color: 'var(--color-danger)' }}
-                  >
-                    Remover
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : null}
-
-          {iaAlertas.length > 0 ? (
-            <div
-              className="mt-3 rounded-xl px-3 py-2 text-xs"
-              style={{
-                backgroundColor: 'var(--color-warning-soft)',
-                color: 'var(--color-warning)',
-              }}
-            >
-              <strong>IA precisa de revisão:</strong>
-              <ul className="mt-1 list-disc pl-5">
-                {iaAlertas.map((a, i) => <li key={i}>{a}</li>)}
-              </ul>
-            </div>
-          ) : null}
-        </FormFieldShell>
       </div>
     </Drawer>
   );
