@@ -73,6 +73,33 @@ function RegistrarTesteForm({
     [equipamentos, equipamentoId]
   );
 
+  // Agrupa equipamentos por unidade para usar <optgroup> no select.
+  // Ordem: unidade A→Z, depois apelido (se houver) ou modelo A→Z.
+  const equipamentosPorUnidade = useMemo(() => {
+    const grupos = new Map();
+    for (const eq of equipamentos) {
+      const unidade = eq.unidade?.nomeSistema || 'Sem unidade';
+      if (!grupos.has(unidade)) grupos.set(unidade, []);
+      grupos.get(unidade).push(eq);
+    }
+    for (const lista of grupos.values()) {
+      lista.sort((a, b) => {
+        const aLabel = (a.apelido || a.modelo || '').toLowerCase();
+        const bLabel = (b.apelido || b.modelo || '').toLowerCase();
+        return aLabel.localeCompare(bLabel, 'pt-BR');
+      });
+    }
+    return [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
+  }, [equipamentos]);
+
+  const equipamentoOptionLabel = (eq) => {
+    const partes = [];
+    if (eq.apelido) partes.push(eq.apelido);
+    partes.push(eq.modelo || 'Sem modelo');
+    if (eq.tag) partes[partes.length - 1] += ` (${eq.tag})`;
+    return `${partes.join(' · ')} — ${eq.tipo || 'Sem modalidade'}`;
+  };
+
   const modalidadeFiltro = equipamentoSelecionado?.tipo || modalidadeInicial || null;
 
   // Pre-popula com testeBase (uso: 'Renovar este teste')
@@ -293,12 +320,16 @@ function RegistrarTesteForm({
             value={equipamentoId}
             onChange={(e) => setEquipamentoId(e.target.value)}
             disabled={!!equipamentoIdInicial}
+            placeholder="Selecione um equipamento..."
           >
-            <option value="">Selecione um equipamento...</option>
-            {equipamentos.map((eq) => (
-              <option key={eq.id} value={eq.id}>
-                {eq.modelo}{eq.tag ? ` (${eq.tag})` : ''} — {eq.tipo}
-              </option>
+            {equipamentosPorUnidade.map(([unidade, lista]) => (
+              <optgroup key={unidade} label={unidade}>
+                {lista.map((eq) => (
+                  <option key={eq.id} value={eq.id}>
+                    {equipamentoOptionLabel(eq)}
+                  </option>
+                ))}
+              </optgroup>
             ))}
           </Select>
         </FormFieldShell>

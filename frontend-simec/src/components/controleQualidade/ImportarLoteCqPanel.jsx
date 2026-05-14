@@ -112,6 +112,33 @@ function ImportarLoteCqPanel() {
     return m;
   }, [tipos]);
 
+  // Equipamentos agrupados por unidade — mesma logica do RegistrarTesteForm,
+  // para o usuario achar o equipamento certo num lote grande.
+  const equipamentosPorUnidade = useMemo(() => {
+    const grupos = new Map();
+    for (const eq of equipamentos) {
+      const u = eq.unidade?.nomeSistema || 'Sem unidade';
+      if (!grupos.has(u)) grupos.set(u, []);
+      grupos.get(u).push(eq);
+    }
+    for (const lista of grupos.values()) {
+      lista.sort((a, b) => {
+        const aLabel = (a.apelido || a.modelo || '').toLowerCase();
+        const bLabel = (b.apelido || b.modelo || '').toLowerCase();
+        return aLabel.localeCompare(bLabel, 'pt-BR');
+      });
+    }
+    return [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
+  }, [equipamentos]);
+
+  const equipamentoLabel = (eq) => {
+    const partes = [];
+    if (eq.apelido) partes.push(eq.apelido);
+    partes.push(eq.modelo || 'Sem modelo');
+    if (eq.tag) partes[partes.length - 1] += ` (${eq.tag})`;
+    return `${partes.join(' · ')} — ${eq.tipo || 'Sem modalidade'}`;
+  };
+
   const tiposPorModalidade = useMemo(() => {
     const m = new Map();
     tipos.forEach((t) => {
@@ -397,12 +424,16 @@ function ImportarLoteCqPanel() {
                             <Select
                               value={e.equipamentoId || ''}
                               onChange={(ev) => updateEdit(it.tempId, 'equipamentoId', ev.target.value)}
+                              placeholder="Selecione..."
                             >
-                              <option value="">Selecione...</option>
-                              {equipamentos.map((eq) => (
-                                <option key={eq.id} value={eq.id}>
-                                  {eq.modelo} {eq.tag ? `(${eq.tag})` : ''} — {eq.tipo}
-                                </option>
+                              {equipamentosPorUnidade.map(([unidade, lista]) => (
+                                <optgroup key={unidade} label={unidade}>
+                                  {lista.map((eq) => (
+                                    <option key={eq.id} value={eq.id}>
+                                      {equipamentoLabel(eq)}
+                                    </option>
+                                  ))}
+                                </optgroup>
                               ))}
                             </Select>
                             {it.matchCriterio ? (
