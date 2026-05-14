@@ -18,6 +18,7 @@ import {
   Badge,
   ModalConfirmacao,
   Textarea,
+  GlobalFilterBar,
 } from '@/components/ui';
 
 import {
@@ -152,75 +153,58 @@ function ControleQualidadeFrotaTab() {
     <div className="space-y-6">
       <ControleQualidadeKpiGrid metricas={metricas} />
 
-      <PageSection>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="min-w-[200px]">
-            <label className="text-xs font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
-              Buscar
-            </label>
-            <Input
-              value={filtros.search}
-              onChange={(e) => setFiltros((f) => ({ ...f, search: e.target.value }))}
-              placeholder="Modelo, tag, laudo, responsável..."
-            />
-          </div>
-          <div className="min-w-[160px]">
-            <label className="text-xs font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
-              Modalidade
-            </label>
-            <Select
-              value={filtros.modalidade}
-              onChange={(e) => setFiltros((f) => ({ ...f, modalidade: e.target.value }))}
-            >
-              <option value="">Todas</option>
-              {modalidades.map((m) => <option key={m} value={m}>{m}</option>)}
-            </Select>
-          </div>
-          <div className="min-w-[150px]">
-            <label className="text-xs font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
-              Resultado
-            </label>
-            <Select
-              value={filtros.resultado}
-              onChange={(e) => setFiltros((f) => ({ ...f, resultado: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              <option value="Aprovado">Aprovado</option>
-              <option value="AprovadoComRestricoes">Aprov. c/ restrições</option>
-              <option value="Reprovado">Reprovado</option>
-            </Select>
-          </div>
-          <div className="min-w-[150px]">
-            <label className="text-xs font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
-              Vencimento
-            </label>
-            <Select
-              value={filtros.statusVencimento}
-              onChange={(e) => setFiltros((f) => ({ ...f, statusVencimento: e.target.value }))}
-            >
-              <option value="">Todos</option>
-              <option value="vencido">Vencido</option>
-              <option value="vencendo">Vencendo (≤30d)</option>
-              <option value="em_dia">Em dia</option>
-            </Select>
-          </div>
-          <div className="ml-auto flex gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => setPdfModal({ open: true, unidadeId: '', responsavel: '', exportando: false })}
-              disabled={unidades.length === 0}
-              title="Gera PDF de conformidade ANVISA RDC 611/2022 por unidade"
-            >
-              <FontAwesomeIcon icon={faFilePdf} />
-              <span className="ml-2">Exportar PDF</span>
-            </Button>
-            <Button onClick={() => { setDrawerEquipamentoId(null); setDrawerOpen(true); }}>
-              <FontAwesomeIcon icon={faPlus} />
-              <span className="ml-2">Registrar teste</span>
-            </Button>
-          </div>
-        </div>
-      </PageSection>
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <Button
+          variant="secondary"
+          onClick={() => setPdfModal({ open: true, unidadeId: '', responsavel: '', exportando: false })}
+          disabled={unidades.length === 0}
+          title="Gera PDF de conformidade ANVISA RDC 611/2022 por unidade"
+        >
+          <FontAwesomeIcon icon={faFilePdf} />
+          <span className="ml-2">Exportar PDF</span>
+        </Button>
+        <Button onClick={() => { setDrawerEquipamentoId(null); setDrawerOpen(true); }}>
+          <FontAwesomeIcon icon={faPlus} />
+          <span className="ml-2">Registrar CQ</span>
+        </Button>
+      </div>
+
+      <GlobalFilterBar
+        searchTerm={filtros.search}
+        onSearchChange={(e) => setFiltros((f) => ({ ...f, search: e.target.value }))}
+        searchPlaceholder="Modelo, tag, laudo, responsável..."
+        selectFilters={[
+          {
+            id: 'modalidade',
+            label: 'Modalidade',
+            value: filtros.modalidade,
+            onChange: (v) => setFiltros((f) => ({ ...f, modalidade: v })),
+            options: modalidades.map((m) => ({ value: m, label: m })),
+          },
+          {
+            id: 'resultado',
+            label: 'Resultado',
+            value: filtros.resultado,
+            onChange: (v) => setFiltros((f) => ({ ...f, resultado: v })),
+            options: [
+              { value: 'Aprovado', label: 'Aprovado' },
+              { value: 'AprovadoComRestricoes', label: 'Aprov. c/ restrições' },
+              { value: 'Reprovado', label: 'Reprovado' },
+            ],
+          },
+          {
+            id: 'statusVencimento',
+            label: 'Vencimento',
+            value: filtros.statusVencimento,
+            onChange: (v) => setFiltros((f) => ({ ...f, statusVencimento: v })),
+            options: [
+              { value: 'vencido', label: 'Vencido' },
+              { value: 'vencendo', label: 'Vencendo (≤30d)' },
+              { value: 'em_dia', label: 'Em dia' },
+            ],
+          },
+        ]}
+      />
 
       <PageSection title="Testes registrados">
         {testesFiltrados.length === 0 ? (
