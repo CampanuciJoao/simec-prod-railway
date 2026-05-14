@@ -138,14 +138,35 @@ function RegistrarTesteForm({
     }
   }, [open, testeBase, equipamentoIdInicial]);
 
-  // Carrega tipos sempre que abrir/mudar modalidade
+  // Carrega tipos sempre que abrir/mudar modalidade. Quando a modalidade do
+  // equipamento nao tem tipos cadastrados (ex: PET/CT, Cintilografo — fora
+  // do escopo RDC 611), faz fallback para o catalogo completo para que o
+  // usuario consiga escolher manualmente em vez de ficar sem opcoes.
   useEffect(() => {
     if (!open) return;
+    let cancelled = false;
     setLoadingTipos(true);
-    getTiposTeste(modalidadeFiltro ? { modalidade: modalidadeFiltro } : {})
-      .then((data) => setTipos(Array.isArray(data) ? data : []))
-      .catch(() => setTipos([]))
-      .finally(() => setLoadingTipos(false));
+    (async () => {
+      try {
+        const filtrados = modalidadeFiltro
+          ? await getTiposTeste({ modalidade: modalidadeFiltro })
+          : await getTiposTeste();
+        if (cancelled) return;
+        if (Array.isArray(filtrados) && filtrados.length > 0) {
+          setTipos(filtrados);
+        } else if (modalidadeFiltro) {
+          const todos = await getTiposTeste();
+          if (!cancelled) setTipos(Array.isArray(todos) ? todos : []);
+        } else {
+          setTipos([]);
+        }
+      } catch {
+        if (!cancelled) setTipos([]);
+      } finally {
+        if (!cancelled) setLoadingTipos(false);
+      }
+    })();
+    return () => { cancelled = true; };
   }, [open, modalidadeFiltro]);
 
   const tipoSelecionado = useMemo(
@@ -403,10 +424,8 @@ function RegistrarTesteForm({
             value={tipoTesteId}
             onChange={(e) => { setTipoTesteId(e.target.value); desmarcarIa('tipoTesteId'); }}
             disabled={loadingTipos || !equipamentoId}
+            placeholder={loadingTipos ? 'Carregando...' : 'Selecione o tipo...'}
           >
-            <option value="">
-              {loadingTipos ? 'Carregando...' : 'Selecione o tipo...'}
-            </option>
             {tipos.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.codigo} — {t.nome}
