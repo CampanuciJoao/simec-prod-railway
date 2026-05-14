@@ -28,6 +28,7 @@ function AppTopbar({
   onOpenAlert,
   onMarkAsRead,
   onDismiss,
+  onMarkAllAsRead,
 }) {
   return (
     <header
@@ -84,6 +85,7 @@ function AppTopbar({
                 onOpenAlert={onOpenAlert}
                 onMarkAsRead={onMarkAsRead}
                 onDismiss={onDismiss}
+                onMarkAllAsRead={onMarkAllAsRead}
               />
             </div>
 
@@ -123,6 +125,7 @@ AppTopbar.propTypes = {
   onOpenAlert: PropTypes.func.isRequired,
   onMarkAsRead: PropTypes.func.isRequired,
   onDismiss: PropTypes.func.isRequired,
+  onMarkAllAsRead: PropTypes.func,
 };
 
 export default AppTopbar;

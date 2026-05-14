@@ -13,6 +13,7 @@ import {
   getAlertas,
   getResumoAlertas,
   updateStatusAlerta,
+  marcarTodosAlertasComoVistos,
 } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -208,6 +209,25 @@ export function AlertasProvider({ children }) {
     }
   }, [carregarAlertas]);
 
+  const marcarTodosVistos = useCallback(async () => {
+    // Optimistic UI: limpa contagem na hora; em caso de erro, recarrega.
+    const snapshot = alertas;
+    const naoVistosAnterior = naoVistos;
+
+    setAlertas((prev) => prev.map((a) => ({ ...a, status: 'Visto' })));
+    setNaoVistos(0);
+
+    try {
+      await marcarTodosAlertasComoVistos();
+      await carregarAlertas();
+    } catch (error) {
+      console.error('[ALERTAS_CONTEXT_MARCAR_TODOS_ERROR]', error);
+      setAlertas(snapshot);
+      setNaoVistos(naoVistosAnterior);
+      throw error;
+    }
+  }, [alertas, naoVistos, carregarAlertas]);
+
   const value = useMemo(
     () => ({
       alertas,
@@ -216,9 +236,10 @@ export function AlertasProvider({ children }) {
       sseConnected,
       updateStatus,
       dismissAlerta,
+      marcarTodosVistos,
       refetchAlertas: carregarAlertas,
     }),
-    [alertas, naoVistos, loading, sseConnected, updateStatus, dismissAlerta, carregarAlertas]
+    [alertas, naoVistos, loading, sseConnected, updateStatus, dismissAlerta, marcarTodosVistos, carregarAlertas]
   );
 
   return (

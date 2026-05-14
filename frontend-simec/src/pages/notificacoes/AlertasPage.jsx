@@ -1,9 +1,11 @@
 import React from 'react';
-import { faBell } from '@fortawesome/free-solid-svg-icons';
+import { faBell, faCheckDouble } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 
 import { useAlertasPage } from '@/hooks/alertas/useAlertasPage';
 
 import {
+  Button,
   GlobalFilterBar,
   PageHeader,
   PageLayout,
@@ -45,6 +47,19 @@ function AlertasPage() {
           title="Alertas do Sistema"
           subtitle="Acompanhe, filtre e trate notificações operacionais e recomendações inteligentes"
           icon={faBell}
+          actions={
+            page.metricas.naoVistos > 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={page.marcarTodosComoLidos}
+                title="Marca todos os alertas como lidos para você"
+              >
+                <FontAwesomeIcon icon={faCheckDouble} />
+                Marcar todos como lidos
+              </Button>
+            ) : null
+          }
         />
 
         <AlertasKpiGrid

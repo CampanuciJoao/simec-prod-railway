@@ -32,6 +32,7 @@ function AppLayout() {
     sseConnected = false,
     updateStatus,
     dismissAlerta,
+    marcarTodosVistos,
   } = useAlertas();
 
   const [alertsOpen, setAlertsOpen] = useState(false);
@@ -145,6 +146,14 @@ function AppLayout() {
     [dismissAlerta]
   );
 
+  const handleMarkAllAsRead = useCallback(async () => {
+    try {
+      await marcarTodosVistos();
+    } catch (error) {
+      console.error('[APP_LAYOUT_MARK_ALL_ERROR]', error);
+    }
+  }, [marcarTodosVistos]);
+
   return (
     <GuardiaoAceiteTermos>
       <div
@@ -173,6 +182,7 @@ function AppLayout() {
             onOpenAlert={handleOpenAlertDetails}
             onMarkAsRead={handleMarkAsRead}
             onDismiss={handleDismiss}
+            onMarkAllAsRead={handleMarkAllAsRead}
           />
 
           <AppBreadcrumb items={breadcrumbItems} />

@@ -19,7 +19,7 @@ function getFiltrosIniciais() {
 
 export function useAlertasPage() {
   const { addToast } = useToast();
-  const { refetchAlertas } = useAlertas();
+  const { refetchAlertas, marcarTodosVistos } = useAlertas();
 
   const [alertas, setAlertas]       = useState([]);
   const [metricas, setMetricas]     = useState({ total: 0, naoVistos: 0, vistos: 0, criticos: 0, recomendacoes: 0 });
@@ -123,6 +123,17 @@ export function useAlertasPage() {
     }
   }, [addToast, refetchAlertas]);
 
+  const marcarTodosComoLidos = useCallback(async () => {
+    try {
+      await marcarTodosVistos?.();
+      // recarrega a pagina para refletir contagens (KPIs) e lista atual
+      await fetchPage(paramsRef.current.page, paramsRef.current.searchTerm, paramsRef.current.filtros);
+      addToast('Todos os alertas marcados como lidos.', 'success');
+    } catch {
+      addToast('Erro ao marcar todos como lidos.', 'error');
+    }
+  }, [marcarTodosVistos, addToast, fetchPage]);
+
   return {
     alertas,
     alertasFiltrados: alertas,
@@ -146,5 +157,6 @@ export function useAlertasPage() {
 
     updateStatus,
     dismissAlerta: dismissItem,
+    marcarTodosComoLidos,
   };
 }

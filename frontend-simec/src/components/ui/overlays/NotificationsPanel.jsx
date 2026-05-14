@@ -24,6 +24,7 @@ function NotificationsPanel({
   onOpenAlert,
   onMarkAsRead,
   onDismiss,
+  onMarkAllAsRead,
 }) {
   const tz = useTenantTimezone();
   const alertasRecentes = Array.isArray(alertas) ? alertas.slice(0, 8) : [];
@@ -74,6 +75,16 @@ function NotificationsPanel({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
+                {contadorNaoVistos > 0 && onMarkAllAsRead && (
+                  <button
+                    type="button"
+                    onClick={onMarkAllAsRead}
+                    className="text-xs font-semibold text-blue-600 transition hover:underline"
+                    title="Marca todas as notificações como lidas para você"
+                  >
+                    Marcar todas como lidas
+                  </button>
+                )}
                 <Link
                   to="/alertas"
                   onClick={onClose}
@@ -206,6 +217,7 @@ NotificationsPanel.propTypes = {
   onOpenAlert: PropTypes.func.isRequired,
   onMarkAsRead: PropTypes.func.isRequired,
   onDismiss: PropTypes.func.isRequired,
+  onMarkAllAsRead: PropTypes.func,
 };
 
 export default NotificationsPanel;

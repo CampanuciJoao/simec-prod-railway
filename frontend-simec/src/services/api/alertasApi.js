@@ -12,5 +12,8 @@ export const updateStatusAlerta = (alertaId, status) =>
 export const dismissAlerta = (alertaId) =>
   updateStatusAlerta(alertaId, 'Visto');
 
+export const marcarTodosAlertasComoVistos = () =>
+  api.post('/alertas/marcar-todos-vistos').then((res) => res.data);
+
 export const getHistoricoAlertas = (params = {}) =>
   api.get('/alertas/historico', { params }).then((res) => res.data);

@@ -8,6 +8,7 @@ import {
   listarAlertasService,
   resumirAlertasService,
   atualizarStatusAlertaService,
+  marcarTodosAlertasComoVistosService,
 } from '../services/alertas/alertasService.js';
 
 const router = express.Router();
@@ -168,6 +169,23 @@ router.get('/historico', async (req, res) => {
   } catch (error) {
     console.error('[ALERTA_HISTORICO_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar histórico de alertas.' });
+  }
+});
+
+// Marca TODOS os alertas do tenant como vistos para o usuario logado.
+router.post('/marcar-todos-vistos', async (req, res) => {
+  try {
+    const resultado = await marcarTodosAlertasComoVistosService({
+      tenantId: req.usuario.tenantId,
+      userId:   req.usuario.id,
+    });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({ message: resultado.message });
+    }
+    return res.json(resultado.data);
+  } catch (error) {
+    console.error('[ALERTAS_MARCAR_TODOS_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao marcar alertas como vistos.' });
   }
 });
 
