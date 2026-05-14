@@ -3,12 +3,14 @@ import prisma from '../services/prismaService.js';
 import { proteger } from '../middleware/authMiddleware.js';
 import {
   gerarPdfBIBuffer,
+  gerarPdfConformidadeCqBuffer,
   gerarPdfHistoricoEquipamentoBuffer,
   gerarPdfOcorrenciaBuffer,
   gerarPdfOSManutencaoBuffer,
   gerarPdfRelatorioBuffer,
   gerarPdfUtilizacaoGehcBuffer,
 } from '../services/pdf/pdfDocumentService.js';
+import { obterDadosPdfConformidadeCq } from '../services/pdf/conformidadeCqPdfService.js';
 import {
   obterDadosPdfBI,
   obterDadosPdfHistoricoEquipamento,
@@ -60,6 +62,8 @@ function mapErrorToResponse(res, error, fallbackMessage) {
     OCORRENCIA_NAO_ENCONTRADA: [404, 'Ocorrencia nao encontrada.'],
     ORCAMENTO_ID_INVALIDO: [400, 'O id do orcamento e obrigatorio.'],
     ORCAMENTO_NAO_ENCONTRADO: [404, 'Orcamento nao encontrado.'],
+    UNIDADE_OBRIGATORIA: [400, 'A unidade e obrigatoria para o relatorio de conformidade.'],
+    UNIDADE_NAO_ENCONTRADA: [404, 'Unidade nao encontrada.'],
   };
 
   const [status, message] = knownStatus[error?.message] || [500, fallbackMessage];
@@ -325,6 +329,30 @@ router.get('/gehc-utilizacao', async (req, res) => {
   } catch (err) {
     console.error('[PDF_GEHC_UTILIZACAO]', err.message);
     return res.status(500).json({ message: 'Erro ao gerar PDF de utilização GE.' });
+  }
+});
+
+// PDF de Conformidade ANVISA RDC 611/2022 (Controle de Qualidade) — 1 por unidade
+router.post('/conformidade-cq', async (req, res) => {
+  try {
+    const { unidadeId, responsavelTecnico } = req.body || {};
+
+    const dados = await obterDadosPdfConformidadeCq({
+      tenantId: req.usuario.tenantId,
+      unidadeId,
+    });
+
+    const buffer = await gerarPdfConformidadeCqBuffer(
+      { ...dados, responsavelTecnico: responsavelTecnico || null },
+      getPdfOptions(req)
+    );
+
+    const dataIso = new Date().toISOString().slice(0, 10);
+    const slug = (dados.unidade.nomeSistema || 'unidade').replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+    return sendPdf(res, buffer, `conformidade_cq_${slug}_${dataIso}.pdf`);
+  } catch (error) {
+    console.error('[PDF_CONFORMIDADE_CQ_ERROR]', error);
+    return mapErrorToResponse(res, error, 'Erro ao gerar PDF de conformidade.');
   }
 });
 

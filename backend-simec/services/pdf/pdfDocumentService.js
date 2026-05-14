@@ -1254,3 +1254,125 @@ export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
 
   return finalizeDocument(doc);
 }
+
+// ─── Relatorio de Conformidade Controle de Qualidade (RDC ANVISA 611/2022) ──
+//
+// Estrutura por unidade: cabecalho institucional + sumario (KPI cards) +
+// secao por modalidade com tabela de testes + secao de pendencias abertas.
+// Usa o footer padrao com linha de "Assinatura do Responsavel Tecnico".
+//
+// Payload esperado:
+//   {
+//     unidade: { nomeSistema, endereco?, cnpj? },
+//     responsavelTecnico?: string,
+//     emitidoEm: Date,
+//     resumo: { totalEquipamentos, conformes, vencidos, reprovacoesPendentes, pendenciasAbertas, percentualConforme },
+//     porModalidade: [
+//       {
+//         modalidade: string,
+//         testes: [
+//           { equipamentoModelo, equipamentoTag, tipoCodigo, tipoNome, dataExecucao, proximoVencimento, resultado, statusLabel }
+//         ]
+//       }
+//     ],
+//     pendencias: [
+//       { equipamentoModelo, equipamentoTag, tipoCodigo, descricao, diasAberta, numeroLaudo? }
+//     ]
+//   }
+export async function gerarPdfConformidadeCqBuffer(payload, options = {}) {
+  const title = 'RELATÓRIO DE CONFORMIDADE — CONTROLE DE QUALIDADE';
+  const doc = createDocument(title, options);
+  const { locale, timeZone } = options;
+
+  // Bloco da norma logo no topo
+  drawParagraph(
+    doc,
+    'Documento gerado automaticamente pelo SIMEC com base nos registros de Controle de Qualidade do tenant. ' +
+      'Conformidade avaliada segundo RDC ANVISA 611/2022 e Instrução Normativa IN 90/2021. ' +
+      'Os laudos de origem permanecem arquivados no sistema por no mínimo 5 anos.'
+  );
+
+  // Identificacao da unidade
+  drawSectionTitle(doc, 'Unidade auditada');
+  drawInfoGrid(
+    doc,
+    [
+      { label: 'Unidade', value: payload?.unidade?.nomeSistema },
+      { label: 'CNPJ', value: payload?.unidade?.cnpj || '—' },
+      { label: 'Endereço', value: payload?.unidade?.endereco || '—' },
+      { label: 'Emitido em', value: formatDateTime(payload?.emitidoEm || new Date(), locale, timeZone) },
+    ],
+    2
+  );
+
+  // Sumario executivo
+  drawSectionTitle(doc, 'Resumo executivo');
+  const r = payload?.resumo || {};
+  drawKpiCards(doc, [
+    { label: 'Equipamentos regulados', value: safeText(r.totalEquipamentos, 0), color: COLORS.blue },
+    {
+      label: 'Conformidade',
+      value: r.percentualConforme != null ? `${r.percentualConforme}%` : '—',
+      color: (r.percentualConforme ?? 0) >= 90 ? COLORS.green : (r.percentualConforme ?? 0) >= 70 ? COLORS.amber : COLORS.red,
+      desc: `${safeText(r.conformes, 0)} conforme(s)`,
+    },
+    { label: 'Testes vencidos', value: safeText(r.vencidos, 0), color: COLORS.red },
+    { label: 'Reprovações pendentes', value: safeText(r.reprovacoesPendentes, 0), color: COLORS.red },
+    { label: 'Pendências abertas', value: safeText(r.pendenciasAbertas, 0), color: COLORS.amber },
+  ]);
+
+  // Tabelas por modalidade
+  const modalidades = Array.isArray(payload?.porModalidade) ? payload.porModalidade : [];
+  if (modalidades.length === 0) {
+    drawSectionTitle(doc, 'Testes registrados');
+    drawParagraph(doc, 'Nenhum teste de Controle de Qualidade registrado para esta unidade.');
+  } else {
+    for (const m of modalidades) {
+      const testes = Array.isArray(m?.testes) ? m.testes : [];
+      if (doc.y + 150 > getMaxY(doc)) doc.addPage();
+
+      drawGroupHeader(doc, m.modalidade || 'Modalidade não identificada', `${testes.length} registro(s)`);
+      drawTable(doc, {
+        headers: ['Equipamento', 'Tipo de teste', 'Última execução', 'Próx. vencimento', 'Resultado', 'Status'],
+        columnWidths: [125, 110, 70, 70, 60, 60],
+        rows: testes.map((t) => [
+          `${safeText(t.equipamentoModelo)}${t.equipamentoTag ? `\n${t.equipamentoTag}` : ''}`,
+          `${safeText(t.tipoCodigo)}\n${safeText(t.tipoNome, '')}`,
+          formatDate(t.dataExecucao, locale, timeZone),
+          formatDate(t.proximoVencimento, locale, timeZone),
+          safeText(t.resultado, 'Pendente'),
+          safeText(t.statusLabel, '—'),
+        ]),
+        emptyMessage: 'Nenhum teste para esta modalidade.',
+      });
+    }
+  }
+
+  // Pendencias abertas
+  const pendencias = Array.isArray(payload?.pendencias) ? payload.pendencias : [];
+  if (pendencias.length > 0) {
+    if (doc.y + 100 > getMaxY(doc)) doc.addPage();
+    drawSectionTitle(doc, 'Pendências de laudo em aberto');
+    drawTable(doc, {
+      headers: ['Equipamento', 'Tipo', 'Descrição', 'Aberta há', 'Laudo'],
+      columnWidths: [110, 75, 200, 50, 60],
+      rows: pendencias.map((p) => [
+        `${safeText(p.equipamentoModelo)}${p.equipamentoTag ? `\n${p.equipamentoTag}` : ''}`,
+        safeText(p.tipoCodigo),
+        safeText(p.descricao),
+        p.diasAberta != null ? `${p.diasAberta}d` : '—',
+        safeText(p.numeroLaudo, '—'),
+      ]),
+      emptyMessage: 'Sem pendências abertas.',
+    });
+  }
+
+  // Bloco do responsavel tecnico (acima da assinatura do footer)
+  if (payload?.responsavelTecnico) {
+    if (doc.y + 60 > getMaxY(doc)) doc.addPage();
+    drawSectionTitle(doc, 'Responsável técnico declarado');
+    drawParagraph(doc, payload.responsavelTecnico);
+  }
+
+  return finalizeDocument(doc);
+}
