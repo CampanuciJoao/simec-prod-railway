@@ -6,6 +6,7 @@ import {
   faBell,
   faBellSlash,
   faCheck,
+  faCheckDouble,
   faClock,
   faEye,
   faXmark,
@@ -74,20 +75,21 @@ function NotificationsPanel({
                 </p>
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1">
                 {onMarkAllAsRead && alertasRecentes.length > 0 && (
                   <button
                     type="button"
                     onClick={onMarkAllAsRead}
                     disabled={contadorNaoVistos === 0}
-                    className="text-xs font-semibold text-blue-600 transition hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-slate-400"
                     title={
                       contadorNaoVistos === 0
                         ? 'Todos os alertas já estão lidos'
-                        : `Marca os ${contadorNaoVistos} não-visto(s) como lidos`
+                        : `Marcar todas como lidas (${contadorNaoVistos})`
                     }
+                    aria-label="Marcar todas como lidas"
                   >
-                    Marcar todas como lidas
+                    <FontAwesomeIcon icon={faCheckDouble} />
                   </button>
                 )}
                 <Link
