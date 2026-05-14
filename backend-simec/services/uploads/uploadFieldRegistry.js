@@ -83,6 +83,18 @@ export const UPLOAD_FIELD_REGISTRY = {
     logEntity: 'TesteQualidade',
     relationField: 'testeQualidadeId',
   },
+
+  // Importacao em lote: ate 50 PDFs por lote, so PDF (sem imagens)
+  controleQualidadeImport: {
+    resource: 'controleQualidadeImport',
+    fieldName: 'file',
+    folder: 'tmp/cq-import',
+    maxCount: 50,
+    maxFileSize: DEFAULT_MAX_FILE_SIZE,
+    allowedMimeTypes: ['application/pdf'],
+    logEntity: 'TesteQualidadeImport',
+    relationField: null,
+  },
 };
 
 export function getUploadResourceConfig(resource) {

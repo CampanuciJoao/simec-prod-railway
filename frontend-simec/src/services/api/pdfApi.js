@@ -47,6 +47,16 @@ export const exportarBIPDF = () =>
     'BI_ESTRATEGICO_SIMEC.pdf'
   );
 
+export const exportarConformidadeCqPDF = ({ unidadeId, responsavelTecnico = null }) =>
+  baixarPdf(
+    {
+      url: '/pdfs/conformidade-cq',
+      method: 'post',
+      data: { unidadeId, responsavelTecnico },
+    },
+    'conformidade_cq.pdf'
+  );
+
 export const exportarUtilizacaoGehcPDF = (meses = 12) =>
   baixarPdf(
     { url: '/pdfs/gehc-utilizacao', method: 'get', params: { meses } },

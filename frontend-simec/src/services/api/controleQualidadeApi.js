@@ -59,6 +59,40 @@ export const adicionarPendenciaCq = (testeId, descricao) =>
     .post(`/controle-qualidade/testes/${testeId}/pendencias`, { descricao })
     .then((r) => r.data);
 
+// Extracao LLM (sincrona) — nao persiste, so pre-preenche
+export const extrairLaudoCq = (file) => {
+  const fd = new FormData();
+  fd.append('file', file);
+  return api
+    .post('/controle-qualidade/extrair-laudo', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60_000,
+    })
+    .then((r) => r.data);
+};
+
+// Importacao em lote (admin)
+export const extrairLoteCq = (files) => {
+  const fd = new FormData();
+  files.forEach((f) => fd.append('file', f));
+  return api
+    .post('/controle-qualidade/importacao/extrair-lote', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 600_000, // ate 10min para 50 PDFs
+    })
+    .then((r) => r.data);
+};
+
+export const criarLoteCq = (items) =>
+  api
+    .post('/controle-qualidade/importacao/criar-lote', { items })
+    .then((r) => r.data);
+
+export const descartarLoteCq = (r2Keys) =>
+  api
+    .post('/controle-qualidade/importacao/descartar-lote', { r2Keys })
+    .then((r) => r.data);
+
 // Anexos
 export const uploadAnexoTesteCq = (testeId, formData) =>
   api

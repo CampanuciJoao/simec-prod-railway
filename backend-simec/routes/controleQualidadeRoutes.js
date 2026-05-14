@@ -29,7 +29,13 @@ import {
   atualizarTipoService,
 } from '../services/controleQualidade/tiposTesteService.js';
 
-import { buscarTestePorId } from '../services/controleQualidade/controleQualidadeRepository.js';
+import { buscarTestePorId, listarTipos } from '../services/controleQualidade/controleQualidadeRepository.js';
+import { extrairLaudoCq } from '../services/controleQualidade/laudoLlmExtractor.js';
+import {
+  extrairLoteService,
+  criarLoteService,
+  descartarLoteService,
+} from '../services/controleQualidade/importacaoLoteService.js';
 
 const router = express.Router();
 router.use(proteger);
@@ -274,6 +280,89 @@ router.post('/testes/:id/pendencias', async (req, res) => {
   } catch (e) {
     console.error('[CQ_PENDENCIA_CREATE_ERROR]', e);
     return res.status(500).json({ message: 'Erro ao adicionar pendencia.' });
+  }
+});
+
+// ─── Extracao LLM de laudo (sincrono, nao persiste) ────────────────────────
+//
+// Recebe 1 PDF via multipart, roda LLM, devolve campos sugeridos para o
+// RegistrarTesteForm pre-preencher. PDF nao eh salvo aqui — usuario fara
+// upload normal via /testes/:id/anexos depois de salvar o teste.
+router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+    const file = (req.files || [])[0];
+    if (!file) {
+      return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
+    }
+
+    const catalogoTipos = await listarTipos({ tenantId, somenteAtivos: true });
+
+    const r = await extrairLaudoCq({
+      pdfBuffer: file.buffer,
+      tenantId,
+      catalogoTipos: catalogoTipos.map((t) => ({
+        id: t.id, codigo: t.codigo, nome: t.nome, modalidade: t.modalidade,
+      })),
+    });
+
+    if (!r.ok) {
+      return res.status(422).json({ message: 'Falha ao extrair laudo.', erro: r.erro });
+    }
+
+    return res.json({
+      dados: r.dados,
+      alertas: r.alertas || [],
+    });
+  } catch (e) {
+    console.error('[CQ_EXTRAIR_LAUDO_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao extrair laudo.' });
+  }
+});
+
+// ─── Importacao em lote (admin) ─────────────────────────────────────────────
+
+// Etapa 1: extrai N PDFs e devolve lista para revisao do usuario.
+// Salva PDFs em R2 temp para serem referenciados na criacao final.
+router.post('/importacao/extrair-lote', admin, uploadFor('controleQualidadeImport'), async (req, res) => {
+  try {
+    const r = await extrairLoteService({
+      tenantId: req.usuario.tenantId,
+      files: req.files || [],
+    });
+    if (!r.ok) return res.status(400).json({ message: r.erro });
+    return res.json(r);
+  } catch (e) {
+    console.error('[CQ_IMPORT_EXTRAIR_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao extrair lote.' });
+  }
+});
+
+// Etapa 2: usuario revisou — cria os testes confirmados.
+router.post('/importacao/criar-lote', admin, async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const r = await criarLoteService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      items,
+    });
+    if (!r.ok) return res.status(400).json({ message: r.erro });
+    return res.json(r);
+  } catch (e) {
+    console.error('[CQ_IMPORT_CRIAR_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao criar lote.' });
+  }
+});
+
+// Cleanup: descarta R2 temp se usuario fechou a tela sem salvar
+router.post('/importacao/descartar-lote', admin, async (req, res) => {
+  try {
+    const r = await descartarLoteService({ r2Keys: req.body?.r2Keys || [] });
+    return res.json(r);
+  } catch (e) {
+    console.error('[CQ_IMPORT_DESCARTAR_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao descartar lote.' });
   }
 });
 

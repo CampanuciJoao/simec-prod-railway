@@ -6,6 +6,7 @@ import {
   faClipboardList,
   faExternalLinkAlt,
   faTrash,
+  faFilePdf,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -25,6 +26,8 @@ import {
   excluirTesteCq,
 } from '@/services/api';
 import { getEquipamentos } from '@/services/api/equipamentosApi';
+import { getUnidades } from '@/services/api/unidadesApi';
+import { exportarConformidadeCqPDF } from '@/services/api/pdfApi';
 
 import ControleQualidadeKpiGrid from './ControleQualidadeKpiGrid';
 import RegistrarTesteForm from './RegistrarTesteForm';
@@ -69,18 +72,23 @@ function ControleQualidadeFrotaTab() {
 
   const [excluirModal, setExcluirModal] = useState({ open: false, teste: null, motivo: '' });
 
+  const [unidades, setUnidades] = useState([]);
+  const [pdfModal, setPdfModal] = useState({ open: false, unidadeId: '', responsavel: '', exportando: false });
+
   const carregar = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [dashRes, testesRes, eqRes] = await Promise.all([
+      const [dashRes, testesRes, eqRes, unidadesRes] = await Promise.all([
         getDashboardCq(),
         listarTestesCq({ pageSize: 100 }),
         getEquipamentos({ pageSize: 500 }),
+        getUnidades().catch(() => []),
       ]);
       setMetricas(dashRes || {});
       setTestes(testesRes?.items || []);
       setEquipamentos(eqRes?.items || []);
+      setUnidades(Array.isArray(unidadesRes) ? unidadesRes : (unidadesRes?.items || []));
     } catch (e) {
       setError(e?.response?.data?.message || 'Erro ao carregar Controle de Qualidade.');
     } finally {
@@ -196,7 +204,16 @@ function ControleQualidadeFrotaTab() {
               <option value="em_dia">Em dia</option>
             </Select>
           </div>
-          <div className="ml-auto">
+          <div className="ml-auto flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => setPdfModal({ open: true, unidadeId: '', responsavel: '', exportando: false })}
+              disabled={unidades.length === 0}
+              title="Gera PDF de conformidade ANVISA RDC 611/2022 por unidade"
+            >
+              <FontAwesomeIcon icon={faFilePdf} />
+              <span className="ml-2">Exportar PDF</span>
+            </Button>
             <Button onClick={() => { setDrawerEquipamentoId(null); setDrawerOpen(true); }}>
               <FontAwesomeIcon icon={faPlus} />
               <span className="ml-2">Registrar teste</span>
@@ -311,6 +328,59 @@ function ControleQualidadeFrotaTab() {
         equipamentoIdInicial={drawerEquipamentoId}
         onCreated={() => carregar()}
       />
+
+      <ModalConfirmacao
+        isOpen={pdfModal.open}
+        onClose={() => setPdfModal({ open: false, unidadeId: '', responsavel: '', exportando: false })}
+        onConfirm={async () => {
+          if (!pdfModal.unidadeId) return;
+          setPdfModal((s) => ({ ...s, exportando: true }));
+          try {
+            await exportarConformidadeCqPDF({
+              unidadeId: pdfModal.unidadeId,
+              responsavelTecnico: pdfModal.responsavel?.trim() || null,
+            });
+            setPdfModal({ open: false, unidadeId: '', responsavel: '', exportando: false });
+          } catch (e) {
+            alert(e?.response?.data?.message || 'Erro ao gerar PDF.');
+            setPdfModal((s) => ({ ...s, exportando: false }));
+          }
+        }}
+        title="Exportar PDF de Conformidade ANVISA"
+        message="O PDF consolida todos os equipamentos regulados da unidade selecionada (Mamografia, TC, RX, Densitometria, RM, US) com status de conformidade RDC 611/2022 e pendências abertas."
+        confirmText={pdfModal.exportando ? 'Gerando...' : 'Gerar PDF'}
+        confirmDisabled={!pdfModal.unidadeId || pdfModal.exportando}
+      >
+        <div className="mt-3 space-y-3">
+          <div>
+            <label className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Unidade *
+            </label>
+            <Select
+              value={pdfModal.unidadeId}
+              onChange={(e) => setPdfModal((s) => ({ ...s, unidadeId: e.target.value }))}
+            >
+              <option value="">Selecione a unidade...</option>
+              {unidades.map((u) => (
+                <option key={u.id} value={u.id}>{u.nomeSistema}</option>
+              ))}
+            </Select>
+          </div>
+          <div>
+            <label className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Responsável técnico (opcional)
+            </label>
+            <Input
+              value={pdfModal.responsavel}
+              onChange={(e) => setPdfModal((s) => ({ ...s, responsavel: e.target.value }))}
+              placeholder="Nome e registro do físico médico responsável"
+            />
+            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Aparece acima da linha de assinatura no rodapé do PDF.
+            </p>
+          </div>
+        </div>
+      </ModalConfirmacao>
 
       <ModalConfirmacao
         isOpen={excluirModal.open}
