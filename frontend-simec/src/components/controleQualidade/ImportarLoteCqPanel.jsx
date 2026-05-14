@@ -26,6 +26,8 @@ import {
 } from '@/services/api';
 import { getEquipamentos } from '@/services/api/equipamentosApi';
 
+import { equipamentoLabel, equipamentoSortKey } from './equipamentoLabel';
+
 const RESULTADOS = ['Aprovado', 'AprovadoComRestricoes', 'Reprovado'];
 
 function todayISO() {
@@ -122,22 +124,12 @@ function ImportarLoteCqPanel() {
       grupos.get(u).push(eq);
     }
     for (const lista of grupos.values()) {
-      lista.sort((a, b) => {
-        const aLabel = (a.apelido || a.modelo || '').toLowerCase();
-        const bLabel = (b.apelido || b.modelo || '').toLowerCase();
-        return aLabel.localeCompare(bLabel, 'pt-BR');
-      });
+      lista.sort((a, b) =>
+        equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR')
+      );
     }
     return [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
   }, [equipamentos]);
-
-  const equipamentoLabel = (eq) => {
-    const partes = [];
-    if (eq.apelido) partes.push(eq.apelido);
-    partes.push(eq.modelo || 'Sem modelo');
-    if (eq.tag) partes[partes.length - 1] += ` (${eq.tag})`;
-    return `${partes.join(' · ')} — ${eq.tipo || 'Sem modalidade'}`;
-  };
 
   const tiposPorModalidade = useMemo(() => {
     const m = new Map();

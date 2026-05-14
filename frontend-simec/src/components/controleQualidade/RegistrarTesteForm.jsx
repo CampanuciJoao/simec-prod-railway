@@ -20,6 +20,8 @@ import {
   extrairLaudoCq,
 } from '@/services/api';
 
+import { equipamentoLabel, equipamentoSortKey } from './equipamentoLabel';
+
 const RESULTADOS = [
   { value: 'Aprovado', label: 'Aprovado' },
   { value: 'AprovadoComRestricoes', label: 'Aprovado com restrições' },
@@ -75,7 +77,7 @@ function RegistrarTesteForm({
   );
 
   // Agrupa equipamentos por unidade para usar <optgroup> no select.
-  // Ordem: unidade A→Z, depois apelido (se houver) ou modelo A→Z.
+  // Ordem: unidade A→Z, depois pelo label (apelido ou tipo) A→Z.
   const equipamentosPorUnidade = useMemo(() => {
     const grupos = new Map();
     for (const eq of equipamentos) {
@@ -84,22 +86,12 @@ function RegistrarTesteForm({
       grupos.get(unidade).push(eq);
     }
     for (const lista of grupos.values()) {
-      lista.sort((a, b) => {
-        const aLabel = (a.apelido || a.modelo || '').toLowerCase();
-        const bLabel = (b.apelido || b.modelo || '').toLowerCase();
-        return aLabel.localeCompare(bLabel, 'pt-BR');
-      });
+      lista.sort((a, b) =>
+        equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR')
+      );
     }
     return [...grupos.entries()].sort(([a], [b]) => a.localeCompare(b, 'pt-BR'));
   }, [equipamentos]);
-
-  const equipamentoOptionLabel = (eq) => {
-    const partes = [];
-    if (eq.apelido) partes.push(eq.apelido);
-    partes.push(eq.modelo || 'Sem modelo');
-    if (eq.tag) partes[partes.length - 1] += ` (${eq.tag})`;
-    return `${partes.join(' · ')} — ${eq.tipo || 'Sem modalidade'}`;
-  };
 
   const modalidadeFiltro = equipamentoSelecionado?.tipo || modalidadeInicial || null;
 
@@ -401,7 +393,7 @@ function RegistrarTesteForm({
               <optgroup key={unidade} label={unidade}>
                 {lista.map((eq) => (
                   <option key={eq.id} value={eq.id}>
-                    {equipamentoOptionLabel(eq)}
+                    {equipamentoLabel(eq)}
                   </option>
                 ))}
               </optgroup>
