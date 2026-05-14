@@ -95,7 +95,7 @@ function EquipamentosPage() {
         <GlobalFilterBar
           searchTerm={page.searchTerm}
           onSearchChange={page.onSearchChange}
-          searchPlaceholder="Buscar por modelo, tag ou unidade..."
+          searchPlaceholder="Buscar por modelo, apelido, tag ou unidade..."
           selectFilters={page.selectFiltersConfig}
         />
 

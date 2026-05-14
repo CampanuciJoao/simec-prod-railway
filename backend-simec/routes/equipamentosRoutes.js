@@ -56,31 +56,14 @@ function buildEquipamentosWhereClause(tenantId, query = {}) {
 
   if (search) {
     where.OR = [
-      {
-        modelo: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        tag: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        aeTitle: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
+      { modelo:  { contains: search, mode: 'insensitive' } },
+      { tag:     { contains: search, mode: 'insensitive' } },
+      { apelido: { contains: search, mode: 'insensitive' } },
+      { aeTitle: { contains: search, mode: 'insensitive' } },
       {
         unidade: {
           is: {
-            nomeSistema: {
-              contains: search,
-              mode: 'insensitive',
-            },
+            nomeSistema: { contains: search, mode: 'insensitive' },
           },
         },
       },
