@@ -2,12 +2,13 @@ import prisma from '../prismaService.js';
 import { enviarMensagem, formatarAlerta, telegramConfigurado } from './telegramService.js';
 
 const CATEGORIA_FLAG = {
-  MANUTENCAO:   'recebeAlertasManutencao',
-  CONTRATO:     'recebeAlertasContrato',
-  SEGURO:       'recebeAlertasSeguro',
-  GEHC_SAUDE:   'recebeAlertasGehc',
-  OS_CORRETIVA: 'recebeAlertasOsCorretiva',
-  RECOMENDACAO: 'recebeAlertasRecomendacao',
+  MANUTENCAO:         'recebeAlertasManutencao',
+  CONTRATO:           'recebeAlertasContrato',
+  SEGURO:             'recebeAlertasSeguro',
+  GEHC_SAUDE:         'recebeAlertasGehc',
+  OS_CORRETIVA:       'recebeAlertasOsCorretiva',
+  RECOMENDACAO:       'recebeAlertasRecomendacao',
+  CONTROLE_QUALIDADE: 'recebeAlertasControleQualidade',
 };
 
 // Despacho dirigido aos tenants que tiveram mudanca na ultima rodada de

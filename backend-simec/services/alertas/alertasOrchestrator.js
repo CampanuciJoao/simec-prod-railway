@@ -4,6 +4,7 @@ import {
   gerarAlertasContrato,
   gerarAlertasRecomendacao,
   gerarAlertasOsCorretiva,
+  gerarAlertasControleQualidade,
 } from './index.js';
 
 import { gerarInsightsInteligentes } from './proactivityAgent.js';
@@ -80,6 +81,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     contratosResult,
     recomendacoesResult,
     osCorretivaResult,
+    controleQualidadeResult,
     insightsResult,
   ] = await Promise.all([
     executarEtapa('manutencoes', gerarAlertasManutencao),
@@ -87,6 +89,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     executarEtapa('contratos', gerarAlertasContrato),
     executarEtapa('recomendacoes', gerarAlertasRecomendacao),
     executarEtapa('os_corretiva', gerarAlertasOsCorretiva),
+    executarEtapa('controle_qualidade', gerarAlertasControleQualidade),
     executarEtapa('insights_ia', gerarInsightsInteligentes),
   ]);
 
@@ -95,6 +98,7 @@ export async function processarAlertasEEnviarNotificacoes() {
   const contratos = contratosResult.total;
   const recomendacoes = recomendacoesResult.total;
   const osCorretiva = osCorretivaResult.total;
+  const controleQualidade = controleQualidadeResult.total;
   const insights = insightsResult.total;
 
   const ok =
@@ -103,10 +107,11 @@ export async function processarAlertasEEnviarNotificacoes() {
     contratosResult.ok &&
     recomendacoesResult.ok &&
     osCorretivaResult.ok &&
+    controleQualidadeResult.ok &&
     insightsResult.ok;
 
   const totalGeral =
-    manutencoes + seguros + contratos + recomendacoes + osCorretiva + insights;
+    manutencoes + seguros + contratos + recomendacoes + osCorretiva + controleQualidade + insights;
 
   const tenantsAfetados = coletarTenantsUnicos(
     manutencoesResult,
@@ -114,6 +119,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     contratosResult,
     recomendacoesResult,
     osCorretivaResult,
+    controleQualidadeResult,
     insightsResult
   );
 
@@ -125,7 +131,7 @@ export async function processarAlertasEEnviarNotificacoes() {
   }
 
   console.log(
-    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | os_corretiva=${osCorretiva} | insights_ia=${insights} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
+    `[ALERTAS] Finalizado | manutencoes=${manutencoes} | seguros=${seguros} | contratos=${contratos} | recomendacoes=${recomendacoes} | os_corretiva=${osCorretiva} | controle_qualidade=${controleQualidade} | insights_ia=${insights} | total=${totalGeral} | tenantsAfetados=${tenantsAfetados.length} | ok=${ok}`
   );
 
   return {
@@ -136,6 +142,7 @@ export async function processarAlertasEEnviarNotificacoes() {
     contratos,
     recomendacoes,
     osCorretiva,
+    controleQualidade,
     insights,
     tenantsAfetados,
     detalhes: {
@@ -163,6 +170,11 @@ export async function processarAlertasEEnviarNotificacoes() {
         ok: osCorretivaResult.ok,
         total: osCorretivaResult.total,
         erro: osCorretivaResult.erro?.message || null,
+      },
+      controle_qualidade: {
+        ok: controleQualidadeResult.ok,
+        total: controleQualidadeResult.total,
+        erro: controleQualidadeResult.erro?.message || null,
       },
       insights_ia: {
         ok: insightsResult.ok,

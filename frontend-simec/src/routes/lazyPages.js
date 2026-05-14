@@ -92,6 +92,9 @@ export const IntegracoesPage = React.lazy(() =>
 export const ConfiguracaoAlertasPage = React.lazy(() =>
   import('@/pages/gerenciamento/ConfiguracaoAlertasPage')
 );
+export const ControleQualidadeAdminPage = React.lazy(() =>
+  import('@/pages/controleQualidade/ControleQualidadeAdminPage')
+);
 export const AuditoriaDetalhadaPage = React.lazy(() =>
   import('@/pages/auditoria/AuditoriaDetalhadaPage')
 );

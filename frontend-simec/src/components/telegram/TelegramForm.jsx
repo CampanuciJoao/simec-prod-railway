@@ -15,15 +15,17 @@ const ESTADO_INICIAL = {
   recebeAlertasGehc:         true,
   recebeAlertasOsCorretiva:  false,
   recebeAlertasRecomendacao: false,
+  recebeAlertasControleQualidade: true,
 };
 
 const TOGGLES = [
-  { key: 'recebeAlertasContrato',     label: 'Alertas de contratos',      desc: 'Vencimentos e eventos de contratos.' },
-  { key: 'recebeAlertasManutencao',   label: 'Alertas de manutenções',    desc: 'Manutenções programadas, pendentes ou críticas.' },
-  { key: 'recebeAlertasSeguro',       label: 'Alertas de seguros',        desc: 'Vigência e vencimento de apólices.' },
-  { key: 'recebeAlertasGehc',         label: 'Saúde GEHC',                desc: 'Hélio, compressor, temperatura e conectividade das RMs.' },
-  { key: 'recebeAlertasOsCorretiva',  label: 'OS Corretiva',              desc: 'Visitas e ordens de serviço corretivo.' },
-  { key: 'recebeAlertasRecomendacao', label: 'Recomendações',             desc: 'Sugestões geradas automaticamente pelo sistema.' },
+  { key: 'recebeAlertasContrato',          label: 'Alertas de contratos',      desc: 'Vencimentos e eventos de contratos.' },
+  { key: 'recebeAlertasManutencao',        label: 'Alertas de manutenções',    desc: 'Manutenções programadas, pendentes ou críticas.' },
+  { key: 'recebeAlertasSeguro',            label: 'Alertas de seguros',        desc: 'Vigência e vencimento de apólices.' },
+  { key: 'recebeAlertasGehc',              label: 'Saúde GEHC',                desc: 'Hélio, compressor, temperatura e conectividade das RMs.' },
+  { key: 'recebeAlertasOsCorretiva',       label: 'OS Corretiva',              desc: 'Visitas e ordens de serviço corretivo.' },
+  { key: 'recebeAlertasRecomendacao',      label: 'Recomendações',             desc: 'Sugestões geradas automaticamente pelo sistema.' },
+  { key: 'recebeAlertasControleQualidade', label: 'Controle de Qualidade',     desc: 'Vencimentos e reprovações de testes regulatórios (RDC 611/2022).' },
 ];
 
 function ToggleField({ checked, onChange, label, description }) {
@@ -83,6 +85,7 @@ function TelegramForm({ initialData = null, onSubmit, onCancel, isSubmitting = f
         recebeAlertasGehc:         Boolean(formData.recebeAlertasGehc),
         recebeAlertasOsCorretiva:  Boolean(formData.recebeAlertasOsCorretiva),
         recebeAlertasRecomendacao: Boolean(formData.recebeAlertasRecomendacao),
+        recebeAlertasControleQualidade: Boolean(formData.recebeAlertasControleQualidade),
       };
       if (!isEditing) payload.chatId = String(formData.chatId).trim();
       await onSubmit(payload);

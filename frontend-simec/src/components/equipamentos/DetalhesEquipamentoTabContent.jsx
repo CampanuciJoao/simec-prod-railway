@@ -7,6 +7,7 @@ import {
   TabVisaoGeral,
 } from '@/components/equipamentos/tabs';
 import TabSaudeGehc from '@/components/equipamentos/tabs/TabSaudeGehc';
+import { ControleQualidadeEquipamentoTab } from '@/components/controleQualidade';
 
 function DetalhesEquipamentoTabContent({
   abaAtiva,
@@ -31,6 +32,9 @@ function DetalhesEquipamentoTabContent({
     historico:  <TabHistorico equipamento={equipamento} />,
     cobertura:  <TabCobertura equipamento={equipamento} />,
     saudeGehc:  <TabSaudeGehc equipamentoId={equipamentoId} equipamento={equipamento} />,
+    controleQualidade: equipamento ? (
+      <ControleQualidadeEquipamentoTab equipamento={equipamento} />
+    ) : null,
   };
 
   return tabContentMap[abaAtiva] || null;

@@ -4,6 +4,7 @@ import AdminRoute from '@/components/routes/AdminRoute';
 import {
   CadastrosGeraisPage,
   ConfiguracaoAlertasPage,
+  ControleQualidadeAdminPage,
   GerenciamentoPage,
   GerenciarUsuariosPage,
   IntegracoesPage,
@@ -28,6 +29,7 @@ function AdminRouteElements() {
       <Route path="auditoria"   element={<LogAuditoriaPage />} />
       <Route path="integracoes" element={<IntegracoesPage />} />
       <Route path="alertas"     element={<ConfiguracaoAlertasPage />} />
+      <Route path="controle-qualidade" element={<ControleQualidadeAdminPage />} />
       {/* Redirect da URL antiga para a nova — preserva bookmarks. */}
       <Route path="alertas-ge"  element={<Navigate to="../alertas" replace />} />
     </Route>

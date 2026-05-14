@@ -61,6 +61,8 @@ model Tenant {
   telegramVinculacaoTokens TelegramVinculacaoToken[]
   alertConfigs             AlertConfig[]
   aiPipelineEstados        AiPipelineEstado[]
+  tiposTesteQualidade      TipoTesteQualidade[]
+  testesQualidade          TesteQualidade[]
 
   @@map("tenants")
 }
@@ -139,6 +141,8 @@ model Usuario {
   aiPipelinesPausados     AiPipelineEstado[] @relation("AiPipelinePausadoPor")
   aiPipelinesRetomados    AiPipelineEstado[] @relation("AiPipelineRetomadoPor")
   aceitesTermos           AceiteTermo[]
+  testesQualidadeAutor    TesteQualidade[]   @relation("TesteQualidadeAutor")
+  testesQualidadeDeletados TesteQualidade[]  @relation("TesteQualidadeDeletadoPor")
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -191,6 +195,7 @@ model Equipamento {
   gehcPdfDocumentos  GehcPdfDocumento[]
   eventosEquipamento EventoEquipamento[]
   iaInsights         IaInsight[]
+  testesQualidade    TesteQualidade[]
 
   @@unique([tenantId, tag])
   @@unique([tenantId, aeTitle])
@@ -537,31 +542,34 @@ model LogAuditoria {
 }
 
 model Anexo {
-  id            String   @id @default(uuid())
-  tenantId      String
-  nomeOriginal  String   @map("nome_original")
-  path          String   @unique
-  tipoMime      String   @map("tipo_mime")
-  unidadeId     String?  @map("unidade_id")
-  equipamentoId String?  @map("equipamento_id")
-  manutencaoId  String?  @map("manutencao_id")
-  seguroId      String?  @map("seguro_id")
-  contratoId    String?  @map("contrato_id")
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id               String   @id @default(uuid())
+  tenantId         String
+  nomeOriginal     String   @map("nome_original")
+  path             String   @unique
+  tipoMime         String   @map("tipo_mime")
+  unidadeId        String?  @map("unidade_id")
+  equipamentoId    String?  @map("equipamento_id")
+  manutencaoId     String?  @map("manutencao_id")
+  seguroId         String?  @map("seguro_id")
+  contratoId       String?  @map("contrato_id")
+  testeQualidadeId String?  @map("teste_qualidade_id")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  contrato    Contrato?    @relation(fields: [tenantId, contratoId], references: [tenantId, id], onDelete: Cascade)
-  equipamento Equipamento? @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
-  manutencao  Manutencao?  @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
-  seguro      Seguro?      @relation(fields: [tenantId, seguroId], references: [tenantId, id], onDelete: Cascade)
-  unidade     Unidade?     @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+  tenant         Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contrato       Contrato?       @relation(fields: [tenantId, contratoId], references: [tenantId, id], onDelete: Cascade)
+  equipamento    Equipamento?    @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  manutencao     Manutencao?     @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  seguro         Seguro?         @relation(fields: [tenantId, seguroId], references: [tenantId, id], onDelete: Cascade)
+  unidade        Unidade?        @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+  testeQualidade TesteQualidade? @relation(fields: [tenantId, testeQualidadeId], references: [tenantId, id], onDelete: Cascade)
 
   @@index([tenantId, unidadeId])
   @@index([tenantId, equipamentoId])
   @@index([tenantId, manutencaoId])
   @@index([tenantId, seguroId])
   @@index([tenantId, contratoId])
+  @@index([tenantId, testeQualidadeId])
   @@map("anexos")
 }
 
@@ -1401,12 +1409,13 @@ model TelegramNotificacao {
   nome     String?
   ativo    Boolean @default(true)
 
-  recebeAlertasContrato     Boolean @default(true)
-  recebeAlertasManutencao   Boolean @default(true)
-  recebeAlertasSeguro       Boolean @default(true)
-  recebeAlertasGehc         Boolean @default(true)
-  recebeAlertasOsCorretiva  Boolean @default(false)
-  recebeAlertasRecomendacao Boolean @default(false)
+  recebeAlertasContrato          Boolean @default(true)
+  recebeAlertasManutencao        Boolean @default(true)
+  recebeAlertasSeguro            Boolean @default(true)
+  recebeAlertasGehc              Boolean @default(true)
+  recebeAlertasOsCorretiva       Boolean @default(false)
+  recebeAlertasRecomendacao      Boolean @default(false)
+  recebeAlertasControleQualidade Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1459,4 +1468,93 @@ model AceiteTermo {
   @@index([usuarioId])
   @@index([documento, versao])
   @@map("aceites_termos")
+}
+
+// ─── Controle de Qualidade (RDC ANVISA 611/2022) ─────────────────────────────
+//
+// Modulo regulatorio para gestao dos testes obrigatorios de equipamentos de
+// radiodiagnostico. Cobre Mamografia, TC, RX, Densitometria, e tambem testes
+// recomendados (nao regulados por RDC) para RM e Ultrassom.
+//
+// Catalogo (TipoTesteQualidade) eh tenant-specific com seed inicial padrao
+// RDC 611/2022. Cliente pode adicionar tipos proprios.
+//
+// Cada execucao (TesteQualidade) eh um registro independente. Renovacao cria
+// novo registro; anterior fica no historico para auditoria. PDFs anexados
+// retencao minima 5 anos (LGPD seçao 8 da Politica de Privacidade).
+
+enum ResultadoTesteQualidade {
+  Aprovado
+  AprovadoComRestricoes
+  Reprovado
+}
+
+model TipoTesteQualidade {
+  id                String   @id @default(uuid())
+  tenantId          String
+  codigo            String   // ex: "MAMO_LR_QUADRIENAL"
+  nome              String   // ex: "Levantamento Radiometrico Ambiental"
+  modalidade        String   // ex: "Mamografia" - bate com Equipamento.tipo
+  frequenciaDias    Int      @map("frequencia_dias") // 30, 180, 365, 1460...
+  obrigatorio       Boolean  @default(false) // exigido por norma
+  normaReferencia   String?  @map("norma_referencia") // ex: "RDC 611/2022"
+  responsavelTipico String?  @map("responsavel_tipico") // ex: "Fisico medico"
+  descricao         String?  @db.Text
+  ativo             Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  testes TesteQualidade[]
+
+  @@unique([tenantId, codigo])
+  @@index([tenantId, modalidade, ativo])
+  @@map("tipos_testes_qualidade")
+}
+
+model TesteQualidade {
+  id                  String                  @id @default(uuid())
+  tenantId            String
+  equipamentoId       String                  @map("equipamento_id")
+  tipoTesteId         String                  @map("tipo_teste_id")
+  // Campos de execucao (nullable enquanto for "fantasma" do programa
+  // recem-ativado e ainda nao houve primeira execucao real).
+  dataExecucao        DateTime?               @db.Date @map("data_execucao")
+  proximoVencimento   DateTime?               @db.Date @map("proximo_vencimento")
+  resultado           ResultadoTesteQualidade?
+  // Identificacao do laudo emitido pelo fisico/empresa
+  numeroLaudo         String?                 @map("numero_laudo")
+  empresaExecutora    String?                 @map("empresa_executora")
+  responsavelNome     String?                 @map("responsavel_nome")
+  responsavelRegistro String?                 @map("responsavel_registro") // ABFM, CRM, CRF
+  // Validade pode ser menor que frequencia padrao se fisico determinar
+  validadeMeses       Int?                    @map("validade_meses")
+  observacoes         String?                 @db.Text
+  // Pendencias da secao "Recomendacoes - Providenciar X" do laudo.
+  // Cada item: { descricao, resolvido, criadoEm, dataResolucao?, observacao?, resolvidoPor? }
+  pendenciasAcao      Json?                   @map("pendencias_acao")
+  autorRegistroId     String?                 @map("autor_registro_id")
+  // Soft delete com justificativa obrigatoria. Anexos PDF preservados ate
+  // hard delete via cron de retencao (5 anos apos dataExecucao).
+  deletadoEm          DateTime?               @map("deletado_em")
+  deletadoPorId       String?                 @map("deletado_por_id")
+  motivoExclusao      String?                 @db.Text @map("motivo_exclusao")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento   Equipamento        @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  tipoTeste     TipoTesteQualidade @relation(fields: [tipoTesteId], references: [id])
+  autorRegistro Usuario?           @relation("TesteQualidadeAutor", fields: [autorRegistroId], references: [id], onDelete: SetNull)
+  deletadoPor   Usuario?           @relation("TesteQualidadeDeletadoPor", fields: [deletadoPorId], references: [id], onDelete: SetNull)
+  anexos        Anexo[]
+
+  @@unique([tenantId, id])
+  @@index([tenantId, equipamentoId, dataExecucao(sort: Desc)])
+  @@index([tenantId, proximoVencimento])
+  @@index([tenantId, resultado, proximoVencimento])
+  @@index([tenantId, deletadoEm])
+  @@map("testes_qualidade")
 }

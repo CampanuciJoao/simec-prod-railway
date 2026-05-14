@@ -22,6 +22,7 @@ import {
   registrarEventoHistoricoAtivo,
 } from '../services/historicoAtivoService.js';
 import { normalizarOpcional, normalizarTexto } from '../services/shared/textUtils.js';
+import { calcularCqStatusBatch } from '../services/controleQualidade/index.js';
 
 const router = express.Router();
 
@@ -396,10 +397,18 @@ router.get('/', async (req, res) => {
 
     const unidadeMap = new Map(unidades.map((unidade) => [unidade.id, unidade]));
     const anexosPorEquipamento = agruparAnexosPorEquipamento(anexos);
+
+    // cqStatus por equipamento (derivado de TesteQualidade) — usado pelo
+    // EquipamentoCard para colorir border/badge quando ha problema de CQ.
+    const cqStatusMap = equipamentoIds.length > 0
+      ? await calcularCqStatusBatch({ tenantId, equipamentoIds })
+      : new Map();
+
     const items = rawItems.map((item) => ({
       ...item,
       unidade: unidadeMap.get(item.unidadeId) || null,
       anexos: anexosPorEquipamento[item.id] || [],
+      cqStatus: cqStatusMap.get(item.id) || 'ok',
     }));
 
     const metricas = statusSummary.reduce(

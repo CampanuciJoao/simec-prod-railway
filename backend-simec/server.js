@@ -35,6 +35,7 @@ import alertConfigRoutes from './routes/alertConfigRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
 import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
 import lgpdRoutes from './routes/lgpdRoutes.js';
+import controleQualidadeRoutes from './routes/controleQualidadeRoutes.js';
 
 import cookieParser from 'cookie-parser';
 
@@ -188,6 +189,7 @@ app.use('/api/gehc/aprendizado', gehcAprendizadoRoutes);
 app.use('/api/gehc', gehcRoutes);
 app.use('/api/alert-config', alertConfigRoutes);
 app.use('/api/telegram', telegramRoutes);
+app.use('/api/controle-qualidade', controleQualidadeRoutes);
 
 app.use('/api', (req, res) => {
   console.warn(`[404] ${req.method} ${req.originalUrl} — rota não encontrada`);
