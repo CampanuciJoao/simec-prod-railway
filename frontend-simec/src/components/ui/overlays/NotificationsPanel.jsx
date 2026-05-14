@@ -75,12 +75,17 @@ function NotificationsPanel({
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
-                {contadorNaoVistos > 0 && onMarkAllAsRead && (
+                {onMarkAllAsRead && alertasRecentes.length > 0 && (
                   <button
                     type="button"
                     onClick={onMarkAllAsRead}
-                    className="text-xs font-semibold text-blue-600 transition hover:underline"
-                    title="Marca todas as notificações como lidas para você"
+                    disabled={contadorNaoVistos === 0}
+                    className="text-xs font-semibold text-blue-600 transition hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
+                    title={
+                      contadorNaoVistos === 0
+                        ? 'Todos os alertas já estão lidos'
+                        : `Marca os ${contadorNaoVistos} não-visto(s) como lidos`
+                    }
                   >
                     Marcar todas como lidas
                   </button>

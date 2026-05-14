@@ -48,12 +48,17 @@ function AlertasPage() {
           subtitle="Acompanhe, filtre e trate notificações operacionais e recomendações inteligentes"
           icon={faBell}
           actions={
-            page.metricas.naoVistos > 0 ? (
+            page.metricas.total > 0 ? (
               <Button
                 type="button"
                 variant="secondary"
                 onClick={page.marcarTodosComoLidos}
-                title="Marca todos os alertas como lidos para você"
+                disabled={page.metricas.naoVistos === 0}
+                title={
+                  page.metricas.naoVistos === 0
+                    ? 'Todos os alertas já estão lidos'
+                    : `Marca os ${page.metricas.naoVistos} alerta(s) não vistos como lidos`
+                }
               >
                 <FontAwesomeIcon icon={faCheckDouble} />
                 Marcar todos como lidos
