@@ -1,7 +1,7 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPaperclip, faXmark, faCloudArrowUp } from '@fortawesome/free-solid-svg-icons';
+import { faPaperclip, faXmark } from '@fortawesome/free-solid-svg-icons';
 
 import { useSeguroForm } from '@/hooks/seguros/useSeguroForm';
 import { TIPO_SEGURO_OPTIONS, COBERTURA_FIELDS } from '@/utils/seguros';
@@ -9,6 +9,7 @@ import { TIPO_SEGURO_OPTIONS, COBERTURA_FIELDS } from '@/utils/seguros';
 import {
   CurrencyInput,
   DateInput,
+  FileDropZone,
   FormActions,
   FormSection,
   Input,
@@ -76,35 +77,10 @@ function SeguroForm({
   } = useSeguroForm({ initialData, isEditing, equipamentosDisponiveis });
 
   const [pendingFiles, setPendingFiles] = useState([]);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef(null);
-
-  const ACCEPTED_EXTENSIONS = /\.(pdf|jpe?g|png|docx?)$/i;
 
   const addFiles = useCallback((files) => {
-    const valid = files.filter((f) => ACCEPTED_EXTENSIONS.test(f.name));
-    if (valid.length) setPendingFiles((prev) => [...prev, ...valid]);
+    if (files.length) setPendingFiles((prev) => [...prev, ...files]);
   }, []);
-
-  const handleFileAdd = (e) => {
-    addFiles(Array.from(e.target.files || []));
-    e.target.value = '';
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    addFiles(Array.from(e.dataTransfer.files));
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false);
-  };
 
   const handleFileRemove = (index) => {
     setPendingFiles((prev) => prev.filter((_, i) => i !== index));
@@ -311,42 +287,14 @@ function SeguroForm({
             </div>
           ) : null}
 
-          <div
-            onDrop={handleDrop}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors"
-            style={{
-              borderColor: isDragOver ? 'var(--brand-primary)' : 'var(--border-soft)',
-              backgroundColor: isDragOver ? 'var(--brand-primary-soft)' : 'var(--bg-surface-soft)',
-            }}
-          >
-            <FontAwesomeIcon
-              icon={faCloudArrowUp}
-              className="text-3xl"
-              style={{ color: isDragOver ? 'var(--brand-primary)' : 'var(--text-muted)' }}
-            />
-            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-              Arraste um arquivo aqui ou{' '}
-              <label
-                className="cursor-pointer font-medium underline-offset-2 hover:underline"
-                style={{ color: 'var(--brand-primary)' }}
-              >
-                clique para selecionar
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  multiple
-                  onChange={handleFileAdd}
-                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
-                />
-              </label>
-            </p>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-              PDF, JPG, PNG, DOC, DOCX
-            </p>
-          </div>
+          <FileDropZone
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+            label="Arraste um arquivo aqui ou"
+            ctaLabel="clique para selecionar"
+            hint="PDF, JPG, PNG, DOC, DOCX"
+            onFiles={addFiles}
+          />
         </div>
       </FormSection>
 

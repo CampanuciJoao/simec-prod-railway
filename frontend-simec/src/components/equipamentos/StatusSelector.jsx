@@ -4,7 +4,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faChevronDown,
   faSpinner,
-  faPaperclip,
   faTrash,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -12,6 +11,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { patchEquipamentoStatus } from '@/services/api';
 import {
   Button,
+  FileDropZone,
   Input,
   ModalConfirmacao,
   Select,
@@ -123,12 +123,7 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
     setStatusPendente(novo);
   };
 
-  const handleArquivosChange = (event) => {
-    const lista = Array.from(event.target.files || []);
-    setArquivos(lista);
-    // permite re-selecionar o mesmo arquivo se removido
-    event.target.value = '';
-  };
+  const handleArquivosChange = (lista) => setArquivos(lista);
 
   const removerArquivo = (idx) => {
     setArquivos((prev) => prev.filter((_, i) => i !== idx));
@@ -267,24 +262,13 @@ function StatusSelector({ equipamento, onSuccessUpdate }) {
             >
               Anexos (opcional)
             </label>
-            <label
-              className="inline-flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm"
-              style={{
-                borderColor: 'var(--border-soft)',
-                color: 'var(--text-secondary)',
-                backgroundColor: 'var(--bg-surface-soft)',
-              }}
-            >
-              <FontAwesomeIcon icon={faPaperclip} />
-              <span>Selecionar arquivos</span>
-              <input
-                type="file"
-                multiple
-                className="hidden"
-                onChange={handleArquivosChange}
-                disabled={isUpdating}
-              />
-            </label>
+            <FileDropZone
+              multiple
+              disabled={isUpdating}
+              label="Arraste arquivos aqui ou"
+              ctaLabel="clique para selecionar"
+              onFiles={handleArquivosChange}
+            />
 
             {arquivos.length > 0 ? (
               <ul className="mt-2 space-y-1 text-sm" style={{ color: 'var(--text-secondary)' }}>

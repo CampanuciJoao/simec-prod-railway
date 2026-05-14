@@ -1,4 +1,4 @@
-import React, { useRef, useState, useCallback } from 'react';
+import React, { useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
@@ -7,8 +7,9 @@ import {
   faFileLines,
   faTrashAlt,
   faDownload,
-  faCloudArrowUp,
 } from '@fortawesome/free-solid-svg-icons';
+
+import FileDropZone from '@/components/ui/primitives/FileDropZone';
 
 function getAttachmentIcon(filename = '', mimeType = '') {
   const nome = String(filename || '').toLowerCase();
@@ -45,86 +46,25 @@ function CompactAttachmentList({
   getAttachmentUrl,
   className = '',
 }) {
-  const inputRef = useRef(null);
-  const [isDragOver, setIsDragOver] = useState(false);
-
   const dispatchFiles = useCallback(async (files) => {
     if (!files.length || typeof onUpload !== 'function') return;
-    try {
-      await onUpload(multiple ? files : files[0]);
-    } finally {
-      if (inputRef.current) inputRef.current.value = '';
-    }
+    await onUpload(multiple ? files : files[0]);
   }, [onUpload, multiple]);
-
-  const handleInputChange = async (e) => {
-    await dispatchFiles(Array.from(e.target.files || []));
-  };
-
-  const handleDrop = async (e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    if (isUploading) return;
-    await dispatchFiles(Array.from(e.dataTransfer.files));
-  };
-
-  const handleDragOver = (e) => {
-    e.preventDefault();
-    if (!isUploading) setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e) => {
-    if (!e.currentTarget.contains(e.relatedTarget)) setIsDragOver(false);
-  };
 
   return (
     <div className={['space-y-3', className].join(' ')}>
       {/* Drop zone */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        className="flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed px-6 py-8 text-center transition-colors"
-        style={{
-          borderColor: isDragOver ? 'var(--brand-primary)' : 'var(--border-soft)',
-          backgroundColor: isDragOver ? 'var(--brand-primary-soft)' : 'var(--bg-surface-soft)',
-          opacity: isUploading ? 0.6 : 1,
-          cursor: isUploading ? 'not-allowed' : 'default',
-        }}
-      >
-        <FontAwesomeIcon
-          icon={faCloudArrowUp}
-          className="text-3xl"
-          style={{ color: isDragOver ? 'var(--brand-primary)' : 'var(--text-muted)' }}
-        />
-
-        <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          {isUploading ? 'Enviando...' : (
-            <>
-              Arraste um arquivo aqui ou{' '}
-              <label
-                className="cursor-pointer font-medium underline-offset-2 hover:underline"
-                style={{ color: isUploading ? 'var(--text-muted)' : 'var(--brand-primary)', pointerEvents: isUploading ? 'none' : 'auto' }}
-              >
-                {uploadLabel}
-                <input
-                  ref={inputRef}
-                  type="file"
-                  className="hidden"
-                  multiple={multiple}
-                  accept={accept}
-                  onChange={handleInputChange}
-                  disabled={isUploading}
-                />
-              </label>
-            </>
-          )}
-        </p>
-
-        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-          PDF, JPG, PNG, DOC, DOCX
-        </p>
-      </div>
+      <FileDropZone
+        accept={accept}
+        multiple={multiple}
+        disabled={isUploading}
+        loading={isUploading}
+        loadingLabel="Enviando..."
+        label="Arraste um arquivo aqui ou"
+        ctaLabel={uploadLabel}
+        hint="PDF, JPG, PNG, DOC, DOCX"
+        onFiles={dispatchFiles}
+      />
 
       {/* File list */}
       {attachments.length > 0 ? (

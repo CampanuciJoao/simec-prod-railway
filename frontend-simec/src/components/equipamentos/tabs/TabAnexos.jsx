@@ -2,8 +2,6 @@ import React from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPaperclip,
-  faUpload,
-  faSpinner,
   faFilePdf,
   faFileImage,
   faFileWord,
@@ -16,10 +14,9 @@ import { useResourceAnexos } from '@/hooks/shared/useResourceAnexos';
 import AnexosList from '@/components/equipamentos/AnexosList';
 
 import {
-  ActionBar,
+  FileDropZone,
   ModalConfirmacao,
   PageSection,
-  Button,
 } from '@/components/ui';
 
 const API_BASE_URL_DOWNLOAD =
@@ -73,13 +70,11 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
     anexos,
     error,
     isSubmitting,
-    inputRef,
     deleteModalOpen,
     anexoSelecionado,
-    openFileDialog,
     openDeleteModal,
     closeDeleteModal,
-    handleInputChange,
+    uploadFiles,
     confirmDelete,
   } = useResourceAnexos({
     resource: 'equipamentos',
@@ -133,30 +128,15 @@ function TabAnexos({ equipamentoId, anexosIniciais = [], onUpdate }) {
             </div>
           </div>
 
-          <ActionBar
-            right={(
-              <Button
-                type="button"
-                size="sm"
-                onClick={openFileDialog}
-                disabled={isSubmitting}
-              >
-                <FontAwesomeIcon
-                  icon={isSubmitting ? faSpinner : faUpload}
-                  spin={isSubmitting}
-                />
-                {isSubmitting ? 'Enviando...' : 'Anexar arquivo'}
-              </Button>
-            )}
-          />
-
-          <input
-            type="file"
+          <FileDropZone
             multiple
-            ref={inputRef}
-            className="hidden"
-            onChange={handleInputChange}
             disabled={isSubmitting}
+            loading={isSubmitting}
+            loadingLabel="Enviando..."
+            label="Arraste arquivos aqui ou"
+            ctaLabel="clique para anexar"
+            hint="PDF, imagens, Word, Excel ou texto"
+            onFiles={uploadFiles}
           />
 
           {error ? (
