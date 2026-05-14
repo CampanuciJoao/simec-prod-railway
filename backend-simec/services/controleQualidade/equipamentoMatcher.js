@@ -1,77 +1,85 @@
-// Heuristica de matching de equipamento para fluxos de extracao LLM (single
-// PDF + lote). Compartilhada entre /extrair-laudo e /importacao/extrair-lote
-// para que o usuario tenha o equipamento pre-selecionado em ambos os casos.
+// Matching de equipamento para fluxos de extracao LLM (single + lote).
 //
-// Estrategia:
-//   1. Tenta achar a UNIDADE pelo CNPJ -> endereco -> cidade do laudo. Se
-//      encontrar, usa como filtro adicional (drasticamente reduz falsos
-//      positivos em tenants com varios sites).
-//   2. Match de equipamento dentro do escopo (unidade + tenant) na ordem:
-//      a. Serial exato em tag/numeroPatrimonio/apelido      -> 0.95
-//      b. Unidade + sala (setor) match com 1 unico         -> 0.92
-//         (sala costuma ter 1 unico equipamento — ex: "PET/CT" -> PET)
-//      c. (unidade + modalidade) com 1 unico equipamento    -> 0.90
-//         (ex: tem 1 so TC nesta unidade -> bingo)
-//      d. Modelo + fabricante (1 unico)                     -> 0.70
-//      e. Modelo + modalidade (1 unico)                     -> 0.55
-//      f. Modelo + unidade (qualquer modalidade)            -> 0.50
-//         fallback p/ divergencia de classificacao SIMEC vs laudo
+// Estrategia de scoring composto:
+//   1. Resolve a UNIDADE (CNPJ -> endereco -> cidade) do laudo. Filtra
+//      candidatos para essa unidade (ou tenant inteiro se nao resolveu).
+//   2. Pontua cada candidato em 5 sinais independentes:
+//        serial (0.50)  — exato; parcial (substring) vale 0.30
+//        modelo (0.40)  — exato; substring qualquer direcao vale 0.25
+//        fabricante (0.10) — exato OU substring qualquer direcao
+//        modalidade (0.10) — exato (eq.tipo === modalidade)
+//        sala (0.15)    — setor casa (contains qualquer direcao)
+//   3. Retorna o candidato com maior score se >= 0.30 E margem >= 0.10
+//      sobre o segundo (evita ambiguidade).
 //
-// Retorna { equipamento, score, criterio } ou null.
+// Vantagens sobre o cascade anterior:
+//   - "Discovery 710" especifico vence "TC generico" mesmo se o TC generico
+//     bater em sala/modalidade.
+//   - Tolera divergencias de cadastro: tipo "Tomografia" vs "Tomografia
+//     Computadorizada", ou setor faltando, sem invalidar todo o match.
+//   - Margem de 0.10 evita escolher entre 2 candidatos quase-empate.
 
 import prisma from '../prismaService.js';
+
+function normalizar(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .trim();
+}
+
+function normalizarSala(s) {
+  return normalizar(s).replace(/^sala\s+/i, '').replace(/\s+/g, ' ');
+}
 
 function normalizarCnpj(s) {
   return String(s || '').replace(/\D/g, '');
 }
 
-// Extrai cidade do "Cidade/UF" tipico do PDF (ex: "Dourados/MS" -> "Dourados").
 function extrairCidade(s) {
   if (!s) return null;
   const m = String(s).match(/^([^/,-]+)\s*[/,-]/);
   return m ? m[1].trim() : String(s).trim();
 }
 
+function casaContainsBidi(a, b) {
+  const na = normalizar(a);
+  const nb = normalizar(b);
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
 async function acharUnidade({ tenantId, unidadeIdentificada }) {
   if (!unidadeIdentificada) return null;
   const cnpjLimpo = normalizarCnpj(unidadeIdentificada.cnpj);
 
-  // 1. CNPJ exato (mais confiavel — comparacao por digitos para tolerar
-  //    formatacoes diferentes "03.304.188/0001-50" vs "03304188000150")
+  // CNPJ exato (digitos)
   if (cnpjLimpo && cnpjLimpo.length >= 11) {
-    const candidatos = await prisma.unidade.findMany({
+    const us = await prisma.unidade.findMany({
       where: { tenantId, cnpj: { not: null } },
       select: { id: true, nomeSistema: true, cnpj: true, cidade: true, logradouro: true },
     });
-    const exato = candidatos.find((u) => normalizarCnpj(u.cnpj) === cnpjLimpo);
+    const exato = us.find((u) => normalizarCnpj(u.cnpj) === cnpjLimpo);
     if (exato) return exato;
   }
 
-  // 2. Endereco (logradouro contains) — case insensitive, comparado contra
-  //    o "Rua X, 1234 - Cidade/UF" do laudo
+  // Logradouro contains
   if (unidadeIdentificada.endereco) {
-    // tenta extrair so o nome da rua (sem numero) para increase match rate
     const ruaMatch = String(unidadeIdentificada.endereco).match(/^([^,\d]+?)(?:\s*,|\s+\d)/);
     const rua = (ruaMatch?.[1] || unidadeIdentificada.endereco).trim();
     if (rua.length > 5) {
       const u = await prisma.unidade.findFirst({
-        where: {
-          tenantId,
-          logradouro: { contains: rua, mode: 'insensitive' },
-        },
+        where: { tenantId, logradouro: { contains: rua, mode: 'insensitive' } },
       });
       if (u) return u;
     }
   }
 
-  // 3. Cidade — fallback fraco, so funciona se houver 1 unica unidade na cidade
+  // Cidade unica
   const cidade = extrairCidade(unidadeIdentificada.cidade || unidadeIdentificada.endereco);
   if (cidade && cidade.length > 2) {
     const us = await prisma.unidade.findMany({
-      where: {
-        tenantId,
-        cidade: { contains: cidade, mode: 'insensitive' },
-      },
+      where: { tenantId, cidade: { contains: cidade, mode: 'insensitive' } },
     });
     if (us.length === 1) return us[0];
   }
@@ -79,23 +87,66 @@ async function acharUnidade({ tenantId, unidadeIdentificada }) {
   return null;
 }
 
-// Normaliza string de sala/setor: minusculo, sem acento, sem espacos extras,
-// sem prefixo "sala". "Sala PET/CT" e "pet/ct" viram "pet/ct" — comparaveis.
-function normalizarSala(s) {
-  return String(s || '')
-    .toLowerCase()
-    .normalize('NFD').replace(/[̀-ͯ]/g, '')
-    .replace(/^sala\s+/i, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+// Pontua um candidato. Retorna { score, sinais: [...] } com lista textual
+// dos sinais que bateram (vai pro criterio).
+function scorePeloLaudo(eq, { serial, modelo, fabricante, modalidade, sala }) {
+  let score = 0;
+  const sinais = [];
 
-// Compara 2 salas considerando 1 conter o outro (ex: "PET/CT" inclui "PET").
-function salaCasaCom(salaLaudo, setorEquipamento) {
-  const a = normalizarSala(salaLaudo);
-  const b = normalizarSala(setorEquipamento);
-  if (!a || !b) return false;
-  return a === b || a.includes(b) || b.includes(a);
+  if (serial) {
+    const serialNorm = normalizar(serial);
+    const campos = [eq.tag, eq.numeroPatrimonio, eq.apelido]
+      .filter(Boolean)
+      .map(normalizar);
+    if (campos.some((c) => c === serialNorm)) {
+      score += 0.50;
+      sinais.push('serial_exato');
+    } else if (
+      serialNorm.length >= 4 &&
+      campos.some((c) => c.includes(serialNorm) || serialNorm.includes(c))
+    ) {
+      score += 0.30;
+      sinais.push('serial_parcial');
+    }
+  }
+
+  if (modelo && eq.modelo) {
+    const m = normalizar(modelo);
+    const em = normalizar(eq.modelo);
+    if (em === m) {
+      score += 0.40;
+      sinais.push('modelo_exato');
+    } else if (m.length >= 3 && (em.includes(m) || m.includes(em))) {
+      score += 0.25;
+      sinais.push('modelo_parcial');
+    }
+  }
+
+  if (fabricante && eq.fabricante && casaContainsBidi(fabricante, eq.fabricante)) {
+    score += 0.10;
+    sinais.push('fabricante');
+  }
+
+  if (modalidade && eq.tipo) {
+    if (normalizar(modalidade) === normalizar(eq.tipo)) {
+      score += 0.10;
+      sinais.push('modalidade_exata');
+    } else if (casaContainsBidi(modalidade, eq.tipo)) {
+      score += 0.05;
+      sinais.push('modalidade_parcial');
+    }
+  }
+
+  if (sala && eq.setor) {
+    const ns = normalizarSala(sala);
+    const nset = normalizarSala(eq.setor);
+    if (ns === nset || ns.includes(nset) || nset.includes(ns)) {
+      score += 0.15;
+      sinais.push('sala');
+    }
+  }
+
+  return { score, sinais };
 }
 
 export async function matchEquipamento({
@@ -107,102 +158,53 @@ export async function matchEquipamento({
   sala = null,
   unidadeIdentificada = null,
 }) {
-  // Tenta resolver a unidade primeiro — drasticamente reduz falsos positivos
-  // em tenants com varios sites (ex: Cerdil tem Sede + MTZ + Cassems Navirai).
+  // Resolve unidade — filtro forte
   const unidade = await acharUnidade({ tenantId, unidadeIdentificada });
-  const filtroUnidade = unidade ? { unidadeId: unidade.id } : {};
 
-  // 1. Serial exato em tag/patrimonio/apelido (independe de unidade — serial
-  //    eh global e nao se repete entre equipamentos)
-  if (serial) {
-    const eq = await prisma.equipamento.findFirst({
-      where: {
-        tenantId,
-        OR: [
-          { tag: { equals: serial, mode: 'insensitive' } },
-          { numeroPatrimonio: { equals: serial, mode: 'insensitive' } },
-          { apelido: { equals: serial, mode: 'insensitive' } },
-        ],
-        ...(modalidade ? { tipo: modalidade } : {}),
-      },
-    });
-    if (eq) return { equipamento: eq, score: 0.95, criterio: 'serial_exato' };
+  // Universo de candidatos: prefere unidade resolvida; sem ela, considera
+  // tenant inteiro (fallback para laudos sem identificacao de cliente clara).
+  const candidatos = await prisma.equipamento.findMany({
+    where: {
+      tenantId,
+      ...(unidade ? { unidadeId: unidade.id } : {}),
+    },
+    select: {
+      id: true, modelo: true, tag: true, apelido: true, tipo: true,
+      fabricante: true, setor: true, numeroPatrimonio: true, unidadeId: true,
+    },
+  });
+
+  if (candidatos.length === 0) return null;
+
+  const sinais = { serial, modelo, fabricante, modalidade, sala };
+  const scored = candidatos
+    .map((eq) => ({ eq, ...scorePeloLaudo(eq, sinais) }))
+    .filter((c) => c.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (scored.length === 0) return null;
+
+  const top = scored[0];
+  const segundo = scored[1];
+
+  // Threshold + margem para evitar match ambiguo entre quase-empates.
+  // 0.30 = pelo menos 1 sinal forte (modelo_parcial) ou 2 fracos.
+  // 0.10 = top precisa estar claramente acima do segundo.
+  if (top.score < 0.30) return null;
+  if (segundo && top.score - segundo.score < 0.10) {
+    return {
+      equipamento: null,
+      score: top.score,
+      criterio: 'multiplos_candidatos_proximos',
+      candidatos: scored.slice(0, 3).map((c) => ({
+        modelo: c.eq.modelo, tag: c.eq.tag, score: c.score,
+      })),
+    };
   }
 
-  // 2. Sala (setor) match na unidade — sala costuma ser unica por unidade.
-  //    Ex: laudo diz "Sala: PET/CT" -> acha o equipamento cujo setor contem
-  //    "PET" ou "PET/CT". Se houver 1 unico hit, eh quase certamente ele,
-  //    mesmo que modelo/fabricante divirjam do cadastro.
-  if (sala && unidade) {
-    const eqsUnidade = await prisma.equipamento.findMany({
-      where: { tenantId, unidadeId: unidade.id, setor: { not: null } },
-      select: { id: true, setor: true, modelo: true, tag: true, apelido: true, tipo: true, fabricante: true, unidadeId: true, numeroPatrimonio: true },
-    });
-    const candidatos = eqsUnidade.filter((e) => salaCasaCom(sala, e.setor));
-    if (candidatos.length === 1) {
-      return { equipamento: candidatos[0], score: 0.92, criterio: 'unidade_sala' };
-    }
-  }
-
-  // 3. Unidade + modalidade unica (caso muito comum — "tem 1 so TC na unidade X")
-  if (unidade && modalidade) {
-    const eqs = await prisma.equipamento.findMany({
-      where: { tenantId, unidadeId: unidade.id, tipo: modalidade },
-    });
-    if (eqs.length === 1) {
-      return { equipamento: eqs[0], score: 0.9, criterio: 'unidade_modalidade_unico' };
-    }
-  }
-
-  // 4. Modelo + fabricante (modalidade obrigatoria — evita falso positivo)
-  if (modelo && fabricante && modalidade) {
-    const eqs = await prisma.equipamento.findMany({
-      where: {
-        tenantId,
-        ...filtroUnidade,
-        tipo: modalidade,
-        modelo: { contains: modelo, mode: 'insensitive' },
-        fabricante: { contains: fabricante, mode: 'insensitive' },
-      },
-    });
-    if (eqs.length === 1) return { equipamento: eqs[0], score: 0.7, criterio: 'modelo_fabricante' };
-    if (eqs.length > 1) {
-      return {
-        equipamento: null,
-        score: 0.4,
-        criterio: 'multiplos_candidatos',
-        candidatos: eqs.length,
-      };
-    }
-  }
-
-  // 5. Modelo + modalidade
-  if (modelo && modalidade) {
-    const eqs = await prisma.equipamento.findMany({
-      where: {
-        tenantId,
-        ...filtroUnidade,
-        tipo: modalidade,
-        modelo: { contains: modelo, mode: 'insensitive' },
-      },
-    });
-    if (eqs.length === 1) return { equipamento: eqs[0], score: 0.55, criterio: 'modelo_modalidade' };
-  }
-
-  // 6. Modelo + unidade (sem modalidade) — fallback para casos de divergencia
-  //    de classificacao. Ex: laudo diz 'PET/CT' mas SIMEC tem o equipamento
-  //    cadastrado como 'SPECT/Cintilografo'. Se houver 1 unico equipamento
-  //    com esse modelo na unidade, eh quase certamente ele.
-  if (modelo && unidade) {
-    const eqs = await prisma.equipamento.findMany({
-      where: {
-        tenantId,
-        unidadeId: unidade.id,
-        modelo: { contains: modelo, mode: 'insensitive' },
-      },
-    });
-    if (eqs.length === 1) return { equipamento: eqs[0], score: 0.5, criterio: 'modelo_unidade' };
-  }
-
-  return null;
+  return {
+    equipamento: top.eq,
+    score: Math.min(0.95, top.score),
+    criterio: top.sinais.join('+') || 'score',
+  };
 }
