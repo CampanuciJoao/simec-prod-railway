@@ -3,3 +3,4 @@ export * from './seguro/index.js';
 export * from './contrato/index.js';
 export * from './recomendacao/index.js';
 export * from './osCorretiva/index.js';
+export * from './controleQualidade/index.js';

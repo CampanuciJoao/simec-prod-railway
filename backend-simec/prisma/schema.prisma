@@ -1409,12 +1409,13 @@ model TelegramNotificacao {
   nome     String?
   ativo    Boolean @default(true)
 
-  recebeAlertasContrato     Boolean @default(true)
-  recebeAlertasManutencao   Boolean @default(true)
-  recebeAlertasSeguro       Boolean @default(true)
-  recebeAlertasGehc         Boolean @default(true)
-  recebeAlertasOsCorretiva  Boolean @default(false)
-  recebeAlertasRecomendacao Boolean @default(false)
+  recebeAlertasContrato          Boolean @default(true)
+  recebeAlertasManutencao        Boolean @default(true)
+  recebeAlertasSeguro            Boolean @default(true)
+  recebeAlertasGehc              Boolean @default(true)
+  recebeAlertasOsCorretiva       Boolean @default(false)
+  recebeAlertasRecomendacao      Boolean @default(false)
+  recebeAlertasControleQualidade Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

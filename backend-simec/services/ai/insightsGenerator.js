@@ -32,6 +32,7 @@
 import prisma from '../prismaService.js';
 import { estaAtivo, PIPELINE_NAMES } from './aiPipelineState.js';
 import { ehEquipamentoRM } from '../equipamento/equipamentoModalidade.js';
+import { MODALIDADES_REGULADAS_RDC611, MODALIDADES_COM_CQ } from '../controleQualidade/index.js';
 
 const JANELA_REINCIDENCIA_DIAS  = 180;
 const MIN_EVENTOS_REINCIDENCIA  = 2;
@@ -456,6 +457,304 @@ async function detectarAcionamentoFreqTerceiro({ tenantId, equipamentoId }) {
   });
 }
 
+// ─── Detectores de Controle de Qualidade (RDC 611/2022) ────────────────────
+
+const JANELA_PADRAO_REPROVACAO_DIAS = 365;
+const MIN_REPROVACOES_PADRAO        = 2;
+const JANELA_RENOVACAO_IMINENTE_DIAS = 60;
+const MIN_TESTES_RENOVACAO          = 2;
+const PENDENCIA_ATRASADA_DIAS       = 90;
+
+// Helper: pega vencimentos ATIVOS (registro mais recente por tipoTeste) de
+// um equipamento. Usa logica simples em JS apos buscar todos os testes nao
+// deletados — mesma estrategia do calcularCqStatusBatch do service.
+async function obterVencimentosAtivos({ tenantId, equipamentoId }) {
+  const testes = await prisma.testeQualidade.findMany({
+    where: { tenantId, equipamentoId, deletadoEm: null },
+    select: {
+      id: true,
+      tipoTesteId: true,
+      dataExecucao: true,
+      proximoVencimento: true,
+      resultado: true,
+      pendenciasAcao: true,
+      numeroLaudo: true,
+      tipoTeste: { select: { codigo: true, nome: true, obrigatorio: true } },
+    },
+  });
+
+  const porTipo = new Map();
+  for (const t of testes) {
+    const ex = porTipo.get(t.tipoTesteId);
+    const eMaisRecente =
+      !ex ||
+      (t.dataExecucao && (!ex.dataExecucao || new Date(t.dataExecucao) > new Date(ex.dataExecucao)));
+    if (eMaisRecente) porTipo.set(t.tipoTesteId, t);
+  }
+  return [...porTipo.values()];
+}
+
+// 6.A cq_reprovado_pendente — reprovacao ativa (mais recente por tipo)
+async function detectarCqReprovadoPendente({ tenantId, equipamentoId }) {
+  const ativos = await obterVencimentosAtivos({ tenantId, equipamentoId });
+  const reprovados = ativos.filter((t) => t.resultado === 'Reprovado');
+
+  if (reprovados.length === 0) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_reprovado_pendente' });
+    return null;
+  }
+
+  return upsertInsight({
+    tenantId, equipamentoId,
+    tipo: 'cq_reprovado_pendente',
+    severidade: 'critical',
+    titulo: `${reprovados.length} teste(s) de qualidade reprovado(s) pendente(s)`,
+    descricao: `Equipamento possui ${reprovados.length} reprovação(ões) ativa(s) sem reteste aprovando: ${reprovados.map((r) => r.tipoTeste?.codigo).join(', ')}.`,
+    recomendacao: 'Programar reteste com físico médico o quanto antes. Operar com teste reprovado pode caracterizar não-conformidade ANVISA (RDC 611/2022).',
+    evidencia: {
+      reprovados: reprovados.map((r) => ({
+        testeId: r.id,
+        codigo: r.tipoTeste?.codigo,
+        nome: r.tipoTeste?.nome,
+        dataExecucao: r.dataExecucao,
+        numeroLaudo: r.numeroLaudo,
+      })),
+    },
+    validoAteDias: 30,
+  });
+}
+
+// 6.B cq_padrao_reprovacao — >=2 reprovacoes do MESMO tipo em 12 meses
+async function detectarCqPadraoReprovacao({ tenantId, equipamentoId }) {
+  const desde = diasAtras(JANELA_PADRAO_REPROVACAO_DIAS);
+  const reprovacoes = await prisma.testeQualidade.findMany({
+    where: {
+      tenantId, equipamentoId,
+      deletadoEm: null,
+      resultado: 'Reprovado',
+      dataExecucao: { gte: desde },
+    },
+    select: {
+      id: true, tipoTesteId: true, dataExecucao: true, numeroLaudo: true,
+      tipoTeste: { select: { codigo: true, nome: true } },
+    },
+  });
+
+  const porTipo = new Map();
+  for (const r of reprovacoes) {
+    const lista = porTipo.get(r.tipoTesteId) || [];
+    lista.push(r);
+    porTipo.set(r.tipoTesteId, lista);
+  }
+
+  let pior = null;
+  for (const [, lista] of porTipo) {
+    if (lista.length >= MIN_REPROVACOES_PADRAO && (!pior || lista.length > pior.length)) {
+      pior = lista;
+    }
+  }
+
+  if (!pior) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_padrao_reprovacao' });
+    return null;
+  }
+
+  const tipo = pior[0].tipoTeste;
+
+  return upsertInsight({
+    tenantId, equipamentoId,
+    tipo: 'cq_padrao_reprovacao',
+    severidade: 'high',
+    titulo: `${pior.length}× reprovação em ${tipo?.codigo}`,
+    descricao: `Padrão de reprovação detectado: ${pior.length} laudos do tipo "${tipo?.nome}" reprovados nos últimos 12 meses. Sugere problema crônico no equipamento.`,
+    recomendacao: 'Avaliar manutenção corretiva profunda no componente associado a este teste antes do próximo laudo. Reincidência indica que a causa-raiz não foi tratada.',
+    evidencia: {
+      tipoCodigo: tipo?.codigo,
+      reprovacoes: pior.slice(0, 5).map((r) => ({
+        id: r.id, dataExecucao: r.dataExecucao, numeroLaudo: r.numeroLaudo,
+      })),
+      janelaDias: JANELA_PADRAO_REPROVACAO_DIAS,
+    },
+    validoAteDias: 60,
+  });
+}
+
+// 6.C cq_lacuna_programa — equipamento de modalidade regulada SEM programa
+// ativo OU faltando algum teste obrigatorio
+async function detectarCqLacunaPrograma({ tenantId, equipamentoId }) {
+  const eq = await prisma.equipamento.findUnique({
+    where: { tenantId_id: { tenantId, id: equipamentoId } },
+    select: { tipo: true, status: true },
+  });
+  if (!eq || !MODALIDADES_REGULADAS_RDC611.includes(eq.tipo)) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_lacuna_programa' });
+    return null;
+  }
+
+  const obrigatorios = await prisma.tipoTesteQualidade.findMany({
+    where: { tenantId, modalidade: eq.tipo, ativo: true, obrigatorio: true },
+    select: { id: true, codigo: true, nome: true },
+  });
+
+  if (obrigatorios.length === 0) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_lacuna_programa' });
+    return null;
+  }
+
+  const existentes = await prisma.testeQualidade.findMany({
+    where: {
+      tenantId, equipamentoId, deletadoEm: null,
+      tipoTesteId: { in: obrigatorios.map((o) => o.id) },
+    },
+    select: { tipoTesteId: true },
+    distinct: ['tipoTesteId'],
+  });
+  const idsExistentes = new Set(existentes.map((e) => e.tipoTesteId));
+  const faltantes = obrigatorios.filter((o) => !idsExistentes.has(o.id));
+
+  if (faltantes.length === 0) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_lacuna_programa' });
+    return null;
+  }
+
+  return upsertInsight({
+    tenantId, equipamentoId,
+    tipo: 'cq_lacuna_programa',
+    severidade: 'medium',
+    titulo: `${faltantes.length} teste(s) obrigatório(s) sem programa`,
+    descricao: `Equipamento ${eq.tipo} regulado pela RDC 611/2022 está sem programa para: ${faltantes.map((f) => f.codigo).join(', ')}.`,
+    recomendacao: 'Ativar o programa padrão de Controle de Qualidade na ficha do equipamento para criar registros e habilitar alertas de vencimento.',
+    evidencia: {
+      modalidade: eq.tipo,
+      faltantes: faltantes.map((f) => ({ codigo: f.codigo, nome: f.nome })),
+    },
+    validoAteDias: 90,
+  });
+}
+
+// 6.D cq_risco_nao_conformidade — teste OBRIGATORIO vencido (operacao em
+// irregularidade ANVISA)
+async function detectarCqRiscoNaoConformidade({ tenantId, equipamentoId }) {
+  const ativos = await obterVencimentosAtivos({ tenantId, equipamentoId });
+  const agora = new Date();
+  const vencidosObrigatorios = ativos.filter(
+    (t) =>
+      t.tipoTeste?.obrigatorio &&
+      t.proximoVencimento &&
+      new Date(t.proximoVencimento) < agora
+  );
+
+  if (vencidosObrigatorios.length === 0) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_risco_nao_conformidade' });
+    return null;
+  }
+
+  return upsertInsight({
+    tenantId, equipamentoId,
+    tipo: 'cq_risco_nao_conformidade',
+    severidade: 'critical',
+    titulo: `${vencidosObrigatorios.length} teste(s) obrigatório(s) vencido(s)`,
+    descricao: `Equipamento operando com testes obrigatórios vencidos: ${vencidosObrigatorios.map((t) => t.tipoTeste?.codigo).join(', ')}. Risco de auto de infração ANVISA (RDC 611/2022).`,
+    recomendacao: 'Renovar os laudos vencidos imediatamente. Documentar agendamento com físico médico para mitigar exposição em caso de fiscalização.',
+    evidencia: {
+      vencidos: vencidosObrigatorios.map((t) => ({
+        testeId: t.id,
+        codigo: t.tipoTeste?.codigo,
+        proximoVencimento: t.proximoVencimento,
+        diasVencido: Math.floor((agora - new Date(t.proximoVencimento)) / 86_400_000),
+      })),
+    },
+    validoAteDias: 14,
+  });
+}
+
+// 6.E cq_renovacao_iminente — multiplos testes vencendo em janela de 60d
+// (sugere campanha de fisico medico unica)
+async function detectarCqRenovacaoIminente({ tenantId, equipamentoId }) {
+  const ativos = await obterVencimentosAtivos({ tenantId, equipamentoId });
+  const agora = new Date();
+  const limite = new Date();
+  limite.setDate(limite.getDate() + JANELA_RENOVACAO_IMINENTE_DIAS);
+
+  const proximos = ativos.filter(
+    (t) =>
+      t.proximoVencimento &&
+      new Date(t.proximoVencimento) >= agora &&
+      new Date(t.proximoVencimento) <= limite
+  );
+
+  if (proximos.length < MIN_TESTES_RENOVACAO) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_renovacao_iminente' });
+    return null;
+  }
+
+  return upsertInsight({
+    tenantId, equipamentoId,
+    tipo: 'cq_renovacao_iminente',
+    severidade: 'medium',
+    titulo: `${proximos.length} testes vencem em até ${JANELA_RENOVACAO_IMINENTE_DIAS} dias`,
+    descricao: `Janela de renovação concentrada: ${proximos.map((t) => t.tipoTeste?.codigo).join(', ')}. Agendar uma única visita de físico médico reduz custo e tempo de parada.`,
+    recomendacao: 'Considerar agendar campanha única com físico médico para executar todos os testes próximos do vencimento de uma vez.',
+    evidencia: {
+      janelaDias: JANELA_RENOVACAO_IMINENTE_DIAS,
+      testes: proximos.map((t) => ({
+        codigo: t.tipoTeste?.codigo,
+        proximoVencimento: t.proximoVencimento,
+      })),
+    },
+    validoAteDias: 30,
+  });
+}
+
+// 6.F cq_pendencia_atrasada — pendencia do laudo aberta ha >90d
+async function detectarCqPendenciaAtrasada({ tenantId, equipamentoId }) {
+  const testes = await prisma.testeQualidade.findMany({
+    where: { tenantId, equipamentoId, deletadoEm: null, pendenciasAcao: { not: null } },
+    select: {
+      id: true, numeroLaudo: true, pendenciasAcao: true,
+      tipoTeste: { select: { codigo: true, nome: true } },
+    },
+  });
+
+  const limite = new Date();
+  limite.setDate(limite.getDate() - PENDENCIA_ATRASADA_DIAS);
+
+  const atrasadas = [];
+  for (const t of testes) {
+    if (!Array.isArray(t.pendenciasAcao)) continue;
+    for (const p of t.pendenciasAcao) {
+      if (p.resolvido) continue;
+      const criado = p.criadoEm ? new Date(p.criadoEm) : null;
+      if (criado && criado < limite) {
+        atrasadas.push({
+          testeId: t.id,
+          codigo: t.tipoTeste?.codigo,
+          numeroLaudo: t.numeroLaudo,
+          descricao: p.descricao,
+          criadoEm: p.criadoEm,
+          diasAberta: Math.floor((Date.now() - criado.getTime()) / 86_400_000),
+        });
+      }
+    }
+  }
+
+  if (atrasadas.length === 0) {
+    await resolverInsightSeExistir({ tenantId, equipamentoId, tipo: 'cq_pendencia_atrasada' });
+    return null;
+  }
+
+  return upsertInsight({
+    tenantId, equipamentoId,
+    tipo: 'cq_pendencia_atrasada',
+    severidade: 'medium',
+    titulo: `${atrasadas.length} pendência(s) de laudo aberta(s) há +90 dias`,
+    descricao: `Recomendações de laudos físicos não foram resolvidas: ${atrasadas.slice(0, 3).map((a) => `"${a.descricao}" (${a.diasAberta}d)`).join('; ')}${atrasadas.length > 3 ? '...' : ''}.`,
+    recomendacao: 'Resolver as pendências marcando como concluídas na aba de Controle de Qualidade. Pendências em aberto comprometem a defesa em fiscalização ANVISA.',
+    evidencia: { pendencias: atrasadas.slice(0, 10) },
+    validoAteDias: 30,
+  });
+}
+
 // ─── Orquestrador por equipamento ───────────────────────────────────────────
 
 async function gerarInsightsParaEquipamento({ tenantId, equipamentoId }) {
@@ -465,6 +764,12 @@ async function gerarInsightsParaEquipamento({ tenantId, equipamentoId }) {
     detectarRiscoAlto({ tenantId, equipamentoId }),
     detectarSemPmRecente({ tenantId, equipamentoId }),
     detectarAcionamentoFreqTerceiro({ tenantId, equipamentoId }),
+    detectarCqReprovadoPendente({ tenantId, equipamentoId }),
+    detectarCqPadraoReprovacao({ tenantId, equipamentoId }),
+    detectarCqLacunaPrograma({ tenantId, equipamentoId }),
+    detectarCqRiscoNaoConformidade({ tenantId, equipamentoId }),
+    detectarCqRenovacaoIminente({ tenantId, equipamentoId }),
+    detectarCqPendenciaAtrasada({ tenantId, equipamentoId }),
   ]);
 }
 
@@ -513,20 +818,35 @@ export async function gerarInsightsTenant({ tenantId } = {}) {
     }
   }
 
-  // So roda para equipamentos que (a) tem pelo menos 1 evento no
-  // Knowledge Layer E (b) NAO estao Vendidos/Desativados.
-  const eqsComEventos = await prisma.eventoEquipamento.findMany({
-    where: {
-      tenantId,
-      equipamento: { status: { notIn: ['Vendido', 'Desativado'] } },
-    },
-    select: { equipamentoId: true },
-    distinct: ['equipamentoId'],
-  });
+  // Universo de equipamentos: (a) com evento no Knowledge Layer OU
+  // (b) com modalidade que exige Controle de Qualidade — para que detectores
+  // CQ alcancem equipamentos sem historico ainda. Filtra Vendido/Desativado.
+  const [eqsComEventos, eqsComCq] = await Promise.all([
+    prisma.eventoEquipamento.findMany({
+      where: {
+        tenantId,
+        equipamento: { status: { notIn: ['Vendido', 'Desativado'] } },
+      },
+      select: { equipamentoId: true },
+      distinct: ['equipamentoId'],
+    }),
+    prisma.equipamento.findMany({
+      where: {
+        tenantId,
+        status: { notIn: ['Vendido', 'Desativado'] },
+        tipo: { in: MODALIDADES_COM_CQ },
+      },
+      select: { id: true },
+    }),
+  ]);
 
-  console.log(`[IA_INSIGHTS] Tenant=${tenantId} — analisando ${eqsComEventos.length} equipamento(s).`);
+  const idsUnicos = new Set();
+  for (const e of eqsComEventos) idsUnicos.add(e.equipamentoId);
+  for (const e of eqsComCq) idsUnicos.add(e.id);
 
-  for (const { equipamentoId } of eqsComEventos) {
+  console.log(`[IA_INSIGHTS] Tenant=${tenantId} — analisando ${idsUnicos.size} equipamento(s).`);
+
+  for (const equipamentoId of idsUnicos) {
     if (!(await estaAtivo(PIPELINE_NAMES.IA_INSIGHTS, tenantId))) break;
     try {
       await gerarInsightsParaEquipamento({ tenantId, equipamentoId });
@@ -535,7 +855,7 @@ export async function gerarInsightsTenant({ tenantId } = {}) {
     }
   }
 
-  return { equipamentos: eqsComEventos.length };
+  return { equipamentos: idsUnicos.size };
 }
 
 export async function gerarInsightsTodosTenants() {

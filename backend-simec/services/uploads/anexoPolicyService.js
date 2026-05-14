@@ -60,6 +60,24 @@ const RESOURCE_POLICIES = {
       }),
     describe: (entity) => `OS ${entity.numeroOS || entity.id}`,
   },
+
+  controleQualidade: {
+    relationField: 'testeQualidadeId',
+    entityName: 'Teste de Qualidade',
+    findById: async ({ tenantId, entityId }) =>
+      prisma.testeQualidade.findFirst({
+        where: { id: entityId, tenantId, deletadoEm: null },
+        select: {
+          id: true,
+          numeroLaudo: true,
+          tipoTeste: { select: { codigo: true } },
+        },
+      }),
+    describe: (entity) =>
+      `Teste ${entity.tipoTeste?.codigo || ''}${
+        entity.numeroLaudo ? ` (${entity.numeroLaudo})` : ''
+      }`.trim(),
+  },
 };
 
 export function getResourcePolicy(resource) {

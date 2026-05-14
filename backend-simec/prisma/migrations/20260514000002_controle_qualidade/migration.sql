@@ -104,6 +104,10 @@ ALTER TABLE "testes_qualidade"
   FOREIGN KEY ("deletado_por_id") REFERENCES "usuarios"("id")
   ON DELETE SET NULL ON UPDATE CASCADE;
 
+-- ─── Flag de Telegram para opt-in de alertas CQ por destinatario ────────────
+ALTER TABLE "telegram_notificacoes"
+  ADD COLUMN "recebeAlertasControleQualidade" BOOLEAN NOT NULL DEFAULT true;
+
 -- ─── FK em anexos para vincular laudos PDF aos testes ───────────────────────
 ALTER TABLE "anexos"
   ADD COLUMN "teste_qualidade_id" TEXT;

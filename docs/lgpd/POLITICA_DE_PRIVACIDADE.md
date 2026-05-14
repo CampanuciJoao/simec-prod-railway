@@ -1,12 +1,12 @@
 ---
-versao: 1.0.0
+versao: 1.1.0
 vigenteDesde: 2026-05-14
 documento: politica_privacidade
 ---
 
 # Política de Privacidade do SIMEC
 
-**Versão 1.0.0 — vigente desde 14 de maio de 2026.**
+**Versão 1.1.0 — vigente desde 14 de maio de 2026.**
 
 A presente Política de Privacidade descreve como o **SIMEC** ("Sistema", "nós") trata dados pessoais dos seus usuários, em conformidade com a **Lei nº 13.709/2018 — Lei Geral de Proteção de Dados Pessoais (LGPD)**.
 
@@ -92,6 +92,7 @@ Nenhum dado pessoal sensível é transferido. Quando enviamos texto operacional 
 | Dados de usuários ativos | Enquanto durar o contrato | Execução do contrato |
 | Logs de auditoria e operação | 5 anos | Norma técnica de equipamento médico, defesa em processos |
 | Histórico de manutenção (OSs, eventos, PDFs extraídos) | 10 anos | Vida útil padrão do equipamento + obrigações regulatórias |
+| Laudos de Controle de Qualidade (CQ) regulatórios | 5 anos após data de execução, ou 5 anos após desativação do equipamento (o que for maior) | RDC ANVISA 611/2022, IN 90/2021 e responsabilidade técnica do físico médico |
 | Backups | 90 dias | Recuperação operacional |
 
 Após o prazo, os dados são **anonimizados ou eliminados**. Logs estatísticos agregados (sem identificação) podem ser mantidos para fins de melhoria do produto, sem prazo definido.

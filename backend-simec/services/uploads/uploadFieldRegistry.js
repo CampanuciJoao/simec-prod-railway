@@ -72,6 +72,17 @@ export const UPLOAD_FIELD_REGISTRY = {
     logEntity: 'Manutenção',
     relationField: 'manutencaoId',
   },
+
+  controleQualidade: {
+    resource: 'controleQualidade',
+    fieldName: 'file',
+    folder: 'testes_qualidade',
+    maxCount: 5,
+    maxFileSize: DEFAULT_MAX_FILE_SIZE,
+    allowedMimeTypes: ['application/pdf', 'image/jpeg', 'image/png'],
+    logEntity: 'TesteQualidade',
+    relationField: 'testeQualidadeId',
+  },
 };
 
 export function getUploadResourceConfig(resource) {
