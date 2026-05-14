@@ -26,6 +26,7 @@ export {
   Button,
   Card,
   Checkbox,
+  ComboboxAutocomplete,
   CurrencyInput,
   DateInput,
   FormFieldShell,

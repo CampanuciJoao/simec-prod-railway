@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 
 import {
   Checkbox,
+  ComboboxAutocomplete,
   DateInput,
   FormActions,
   FormSection,
@@ -157,23 +158,15 @@ function EquipamentoForm({
             placeholder="Ex.: Tomógrafo da UTI"
           />
 
-          <div>
-            <Input
-              label="Fabricante"
-              value={formData.fabricante}
-              onChange={(e) => handleChange('fabricante', e.target.value)}
-              onBlur={normalizeFabricante}
-              placeholder="Ex.: Siemens"
-              list="fabricantes-datalist"
-            />
-            {fabricantes.length > 0 && (
-              <datalist id="fabricantes-datalist">
-                {fabricantes.map((f) => (
-                  <option key={f} value={f} />
-                ))}
-              </datalist>
-            )}
-          </div>
+          <ComboboxAutocomplete
+            label="Fabricante"
+            value={formData.fabricante}
+            options={fabricantes}
+            onChange={(v) => handleChange('fabricante', v)}
+            onBlur={normalizeFabricante}
+            placeholder="Ex.: Siemens"
+            emptyMessage="Nenhum fabricante cadastrado ainda"
+          />
         </ResponsiveGrid>
       </FormSection>
 
