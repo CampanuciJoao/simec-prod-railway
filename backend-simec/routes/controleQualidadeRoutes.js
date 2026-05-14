@@ -320,11 +320,13 @@ router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) =
       serial:     r.dados.serialIdentificado,
       fabricante: r.dados.fabricanteIdentificado,
       modalidade: r.dados.modalidade,
+      sala:       r.dados.salaIdentificada,
       unidadeIdentificada: r.dados.unidadeIdentificada,
     });
 
-    // unidadeIdentificada eh interno (so para matching) — nao retornar pro form
-    const { unidadeIdentificada: _, ...dadosPublicos } = r.dados;
+    // unidadeIdentificada e salaIdentificada sao internos (so para matching)
+    // — nao retornar pro form pra nao poluir o cadastro
+    const { unidadeIdentificada: _u, salaIdentificada: _s, ...dadosPublicos } = r.dados;
 
     return res.json({
       dados: dadosPublicos,

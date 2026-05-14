@@ -35,6 +35,7 @@ const respostaSchema = z.object({
   modeloIdentificado:  z.string().nullish(),
   serialIdentificado:  z.string().nullish(),
   fabricanteIdentificado: z.string().nullish(),
+  salaIdentificada:    z.string().nullish(),
   unidadeIdentificada: z.object({
     razaoSocial: z.string().nullish(),
     cnpj:        z.string().nullish(),
@@ -66,22 +67,26 @@ REGRAS:
 2. "numeroLaudo" tem formato tipico XXMD/SP/YYYY/ME/NNNN (ex: LRMD/SP/2024/ME/0238).
    PROCURE em todo o documento incluindo cabecalho e rodape. Tambem pode aparecer
    como "Relatorio Nº", "Laudo Nº", "Documento Nº", "Protocolo".
-3. "responsavelNome" e "responsavelRegistro" — o fisico medico responsavel
-   pelo laudo. ATENCAO: na maior parte dos laudos brasileiros, o nome aparece
-   em DUAS formas e voce deve combinar para identificar:
-   a. Em bloco de ASSINATURA DIGITAL no rodape, formato:
-      "Assinado de forma digital por NOME SOBRENOME COMPLETO:cpf numero"
-      "NOME SOBRENOME COMPLETO" (em CAPS, frequentemente com cpf grudado).
-   b. Logo abaixo, em texto normal, com cargo:
-      "Fernando dos Santos de Menezes"
-      "Fisico Medico e Responsavel Tecnico"
-   Prefira a forma capitalizada (b). Se so houver a CAPS (a), normalize
-   para "Title Case". Cargos tipicos: "Fisico Medico", "Responsavel Tecnico",
-   "Supervisor de Protecao Radiologica".
+3. "responsavelNome" e "responsavelRegistro" — quem EXECUTOU e ASSINOU o
+   laudo, NAO o responsavel institucional do estabelecimento.
+   ATENCAO IMPORTANTE: laudos brasileiros frequentemente listam DOIS
+   responsaveis diferentes:
+   a. "Responsavel Tecnico" do ESTABELECIMENTO — geralmente um medico
+      diretor da clinica com registro CRM. Aparece nos "DADOS DO CLIENTE"
+      ou cabecalho institucional. Ex: "Res. Tecnico (RT): Dr. Luiz Dias
+      Dutra, CRM: 4060-MS". *** NAO USE ESSE. ***
+   b. O FISICO MEDICO que executou o teste e assinou o laudo. Geralmente
+      tem registro ABFM ou CRF, nao CRM. Pode aparecer:
+      - Em bloco de assinatura digital no rodape ("Assinado de forma
+        digital por NOME EM CAPS:cpf"), seguido por nome em Title Case
+        e cargo "Fisico Medico e Responsavel Tecnico".
+      - Em assinatura escaneada/manuscrita ao final, com nome digitado
+        abaixo + registro: "Vitor Marinelli Belonezi / ABFM RX 291/1220
+        / Especialista em Fisica do Radiodiagnostico".
+   *** PREFIRA SEMPRE ABFM > CRF > CRBM > CRM. Se houver ABFM no documento,
+   esse eh o responsavel correto. Se so houver CRM, use-o como fallback. ***
    "responsavelRegistro" eh o registro profissional — formato tipico
-   "ABFM RX 201/843", "ABFM/RX 201/843", "CRM 5975-MS", "CRF 1234".
-   Pode aparecer junto ao nome ou em bloco separado de "Identificacao do
-   responsavel tecnico" / "Profissional responsavel".
+   "ABFM RX 201/843", "ABFM/RX 201/843", "ABFM RX 291/1220", "CRF 1234".
 4. "modalidade" deve ser EXATAMENTE uma destas (ou null):
    - "Mamografia"
    - "Tomografia Computadorizada"
@@ -95,11 +100,25 @@ REGRAS:
    - "Aprovado" se laudo declara conformidade total
    - "AprovadoComRestricoes" se aprova mas lista restricoes/condicionais
    - "Reprovado" se reprova ou aponta nao-conformidade critica
-7. "validadeMeses": se o laudo declarar validade explicita (ex: "valido por
-   12 meses" ou "validade ate 2026-05"), converta para meses. Caso contrario null.
+7. "validadeMeses": se o laudo declarar validade explicita, converta para meses:
+   - "1 ano", "anual" -> 12
+   - "2 anos" -> 24
+   - "4 anos", "quadrienal" -> 48
+   - "6 meses", "semestral" -> 6
+   - "valido por 12 meses" -> 12
+   - "validade ate 2026-05" -> calcular meses ate la
+   Tabela de validade dentro do PDF tem coluna "Validade" com cada teste —
+   pegue o maior valor declarado. Caso contrario null.
 8. "dataExecucao": data em que o teste foi efetivamente realizado (ISO YYYY-MM-DD).
    Se houver multiplas datas, use a data principal do teste (nao da emissao,
    nao da assinatura digital).
+   ACEITA varios formatos brasileiros:
+   - "22/08/2025" -> "2025-08-22"
+   - "26 maio, 2020" / "26 de maio de 2020" -> "2020-05-26"
+   - "agosto 2025" (mes/ano) -> use dia 1: "2025-08-01"
+   Meses por extenso: janeiro=01, fevereiro=02, marco=03, abril=04,
+   maio=05, junho=06, julho=07, agosto=08, setembro=09, outubro=10,
+   novembro=11, dezembro=12.
 9. "pendenciasAcao": busque secao "Recomendacoes — Providenciar" ou similar.
    Cada item da lista vira { "descricao": "texto da recomendacao" }.
    Se nao houver pendencias, retorne array vazio [].
@@ -107,16 +126,22 @@ REGRAS:
 11. "observacoesIa": opcional, ate 200 chars — alguma nota relevante para o
     revisor humano (ex: "data de emissao difere da data de execucao", "nome
     extraido apenas da assinatura digital").
-12. "modeloIdentificado", "serialIdentificado", "fabricanteIdentificado":
+12. "modeloIdentificado", "serialIdentificado", "fabricanteIdentificado",
+    "salaIdentificada":
     extraia se o laudo identifica o equipamento testado. Procure em sessoes
     como "DADOS DO EQUIPAMENTO", "Identificacao do equipamento",
     "Equipamento", "Sistema avaliado". Exemplos:
-      - "Tomografo GE Discovery 710, serial: HC1234"
-      - "Mamografo Hologic Selenia 3D, NS 56789"
-      - "Aparelho: Optima MR450w, S/N: ABC123"
-      - Bloco tabular com "Marca: GE / Modelo: Discovery 710 / Nº de Série: 35411817M2"
+      - "Tomografo GE Discovery 710, serial: HC1234, Sala TC"
+      - "Mamografo Hologic Selenia 3D, NS 56789, Sala Mamografia"
+      - Bloco tabular com "Marca: GE / Modelo: Discovery / Sala: PET/CT"
     fabricante normalmente eh GE/GE Healthcare, Philips, Siemens, Hologic,
-    Toshiba/Canon, Shimadzu. Use null se nao houver dado claro.
+    Toshiba/Canon, Shimadzu.
+    "salaIdentificada" eh a sala/setor onde o equipamento esta instalado
+    (rotulos: "Sala", "Local", "Setor", "Ambiente"). Exemplos de valores:
+    "PET/CT", "Sala TC", "Mamografia", "Raio-X 1", "RM 3T". Eh uma pista
+    forte para o matcher: cada sala tipicamente tem 1 unico equipamento na
+    unidade. Use null se nao houver. NAO inclua o prefixo "Sala" no valor —
+    devolva so o nome (ex: "PET/CT", nao "Sala PET/CT").
 13. "unidadeIdentificada": extraia o cliente/local onde o equipamento esta
     instalado. Procure secoes "DADOS DO CLIENTE", "Cliente", "Identificacao",
     "Razao Social", "Endereco", "CNPJ". Exemplo tipico:
@@ -253,6 +278,7 @@ export async function extrairLaudoCq({ pdfBuffer, tenantId, catalogoTipos }) {
       modeloIdentificado:  d.modeloIdentificado || null,
       serialIdentificado:  d.serialIdentificado || null,
       fabricanteIdentificado: d.fabricanteIdentificado || null,
+      salaIdentificada:    d.salaIdentificada || null,
       unidadeIdentificada: d.unidadeIdentificada
         ? {
             razaoSocial: d.unidadeIdentificada.razaoSocial || null,

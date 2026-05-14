@@ -8,10 +8,14 @@
 //      positivos em tenants com varios sites).
 //   2. Match de equipamento dentro do escopo (unidade + tenant) na ordem:
 //      a. Serial exato em tag/numeroPatrimonio/apelido      -> 0.95
-//      b. (unidade + modalidade) com 1 unico equipamento    -> 0.90
+//      b. Unidade + sala (setor) match com 1 unico         -> 0.92
+//         (sala costuma ter 1 unico equipamento — ex: "PET/CT" -> PET)
+//      c. (unidade + modalidade) com 1 unico equipamento    -> 0.90
 //         (ex: tem 1 so TC nesta unidade -> bingo)
-//      c. Modelo + fabricante (1 unico)                     -> 0.70
-//      d. Modelo (1 unico)                                  -> 0.55
+//      d. Modelo + fabricante (1 unico)                     -> 0.70
+//      e. Modelo + modalidade (1 unico)                     -> 0.55
+//      f. Modelo + unidade (qualquer modalidade)            -> 0.50
+//         fallback p/ divergencia de classificacao SIMEC vs laudo
 //
 // Retorna { equipamento, score, criterio } ou null.
 
@@ -75,12 +79,32 @@ async function acharUnidade({ tenantId, unidadeIdentificada }) {
   return null;
 }
 
+// Normaliza string de sala/setor: minusculo, sem acento, sem espacos extras,
+// sem prefixo "sala". "Sala PET/CT" e "pet/ct" viram "pet/ct" — comparaveis.
+function normalizarSala(s) {
+  return String(s || '')
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/^sala\s+/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Compara 2 salas considerando 1 conter o outro (ex: "PET/CT" inclui "PET").
+function salaCasaCom(salaLaudo, setorEquipamento) {
+  const a = normalizarSala(salaLaudo);
+  const b = normalizarSala(setorEquipamento);
+  if (!a || !b) return false;
+  return a === b || a.includes(b) || b.includes(a);
+}
+
 export async function matchEquipamento({
   tenantId,
   modelo,
   serial,
   fabricante,
   modalidade,
+  sala = null,
   unidadeIdentificada = null,
 }) {
   // Tenta resolver a unidade primeiro — drasticamente reduz falsos positivos
@@ -105,7 +129,22 @@ export async function matchEquipamento({
     if (eq) return { equipamento: eq, score: 0.95, criterio: 'serial_exato' };
   }
 
-  // 2. Unidade + modalidade unica (caso muito comum — "tem 1 so TC na unidade X")
+  // 2. Sala (setor) match na unidade — sala costuma ser unica por unidade.
+  //    Ex: laudo diz "Sala: PET/CT" -> acha o equipamento cujo setor contem
+  //    "PET" ou "PET/CT". Se houver 1 unico hit, eh quase certamente ele,
+  //    mesmo que modelo/fabricante divirjam do cadastro.
+  if (sala && unidade) {
+    const eqsUnidade = await prisma.equipamento.findMany({
+      where: { tenantId, unidadeId: unidade.id, setor: { not: null } },
+      select: { id: true, setor: true, modelo: true, tag: true, apelido: true, tipo: true, fabricante: true, unidadeId: true, numeroPatrimonio: true },
+    });
+    const candidatos = eqsUnidade.filter((e) => salaCasaCom(sala, e.setor));
+    if (candidatos.length === 1) {
+      return { equipamento: candidatos[0], score: 0.92, criterio: 'unidade_sala' };
+    }
+  }
+
+  // 3. Unidade + modalidade unica (caso muito comum — "tem 1 so TC na unidade X")
   if (unidade && modalidade) {
     const eqs = await prisma.equipamento.findMany({
       where: { tenantId, unidadeId: unidade.id, tipo: modalidade },
@@ -115,7 +154,7 @@ export async function matchEquipamento({
     }
   }
 
-  // 3. Modelo + fabricante (modalidade obrigatoria — evita falso positivo)
+  // 4. Modelo + fabricante (modalidade obrigatoria — evita falso positivo)
   if (modelo && fabricante && modalidade) {
     const eqs = await prisma.equipamento.findMany({
       where: {
@@ -137,7 +176,7 @@ export async function matchEquipamento({
     }
   }
 
-  // 4. Modelo + modalidade
+  // 5. Modelo + modalidade
   if (modelo && modalidade) {
     const eqs = await prisma.equipamento.findMany({
       where: {
@@ -148,6 +187,21 @@ export async function matchEquipamento({
       },
     });
     if (eqs.length === 1) return { equipamento: eqs[0], score: 0.55, criterio: 'modelo_modalidade' };
+  }
+
+  // 6. Modelo + unidade (sem modalidade) — fallback para casos de divergencia
+  //    de classificacao. Ex: laudo diz 'PET/CT' mas SIMEC tem o equipamento
+  //    cadastrado como 'SPECT/Cintilografo'. Se houver 1 unico equipamento
+  //    com esse modelo na unidade, eh quase certamente ele.
+  if (modelo && unidade) {
+    const eqs = await prisma.equipamento.findMany({
+      where: {
+        tenantId,
+        unidadeId: unidade.id,
+        modelo: { contains: modelo, mode: 'insensitive' },
+      },
+    });
+    if (eqs.length === 1) return { equipamento: eqs[0], score: 0.5, criterio: 'modelo_unidade' };
   }
 
   return null;
