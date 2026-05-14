@@ -22,60 +22,12 @@ import {
 import { adicionarAnexos } from '../uploads/anexoService.js';
 
 import { extrairLaudoCq } from './laudoLlmExtractor.js';
+import { matchEquipamento } from './equipamentoMatcher.js';
 import { listarTipos } from './controleQualidadeRepository.js';
 import { criarTesteService } from './index.js';
 
 function tmpKey(tenantId, tempId) {
   return `tmp/cq-import/${tenantId}/${tempId}.pdf`;
-}
-
-// Heuristica de matching: prioriza serial > modelo+fabricante > modelo.
-// Retorna { equipamento, score } com score em [0..1].
-async function matchEquipamento({ tenantId, modelo, serial, fabricante, modalidade }) {
-  if (!serial && !modelo) return null;
-
-  // 1. Match por serial/tag exato
-  if (serial) {
-    const eq = await prisma.equipamento.findFirst({
-      where: {
-        tenantId,
-        OR: [
-          { tag: { equals: serial, mode: 'insensitive' } },
-          { numeroPatrimonio: { equals: serial, mode: 'insensitive' } },
-        ],
-        ...(modalidade ? { tipo: modalidade } : {}),
-      },
-    });
-    if (eq) return { equipamento: eq, score: 0.95, criterio: 'serial_exato' };
-  }
-
-  // 2. Match por modelo + fabricante (modalidade obrigatoria pra evitar falso positivo)
-  if (modelo && fabricante && modalidade) {
-    const eqs = await prisma.equipamento.findMany({
-      where: {
-        tenantId,
-        tipo: modalidade,
-        modelo: { contains: modelo, mode: 'insensitive' },
-        fabricante: { contains: fabricante, mode: 'insensitive' },
-      },
-    });
-    if (eqs.length === 1) return { equipamento: eqs[0], score: 0.7, criterio: 'modelo_fabricante' };
-    if (eqs.length > 1) return { equipamento: null, score: 0.4, criterio: 'multiplos_candidatos', candidatos: eqs.length };
-  }
-
-  // 3. Match por modelo + modalidade
-  if (modelo && modalidade) {
-    const eqs = await prisma.equipamento.findMany({
-      where: {
-        tenantId,
-        tipo: modalidade,
-        modelo: { contains: modelo, mode: 'insensitive' },
-      },
-    });
-    if (eqs.length === 1) return { equipamento: eqs[0], score: 0.55, criterio: 'modelo_modalidade' };
-  }
-
-  return null;
 }
 
 /**

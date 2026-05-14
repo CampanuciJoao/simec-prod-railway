@@ -171,7 +171,7 @@ function RegistrarTesteForm({
 
   const removerArquivo = (i) => setArquivos((prev) => prev.filter((_, idx) => idx !== i));
 
-  const aplicarCamposIa = (dados, alertas, tiposCarregados) => {
+  const aplicarCamposIa = (dados, alertas, tiposCarregados, equipamentoSugerido) => {
     const usados = new Set();
     if (dados.numeroLaudo) { setNumeroLaudo(dados.numeroLaudo); usados.add('numeroLaudo'); }
     if (dados.empresaExecutora) { setEmpresaExecutora(dados.empresaExecutora); usados.add('empresaExecutora'); }
@@ -180,6 +180,14 @@ function RegistrarTesteForm({
     if (dados.validadeMeses) { setValidadeMeses(String(dados.validadeMeses)); usados.add('validadeMeses'); }
     if (dados.dataExecucao) { setDataExecucao(dados.dataExecucao); usados.add('dataExecucao'); }
     if (dados.resultado) { setResultado(dados.resultado); usados.add('resultado'); }
+
+    // Equipamento sugerido vem do matching server-side por serial/modelo+fabricante.
+    // Nao sobrescreve se o usuario abriu o form ja com equipamento pre-definido
+    // (caso 'renovar este teste' a partir da ficha do equipamento).
+    if (equipamentoSugerido?.id && !equipamentoIdInicial) {
+      setEquipamentoId(equipamentoSugerido.id);
+      usados.add('equipamentoId');
+    }
 
     if (dados.codigoTipoSugerido) {
       const tipo = tiposCarregados.find((t) => t.codigo === dados.codigoTipoSugerido);
@@ -206,7 +214,7 @@ function RegistrarTesteForm({
       // qualquer modalidade — recarrega sem filtro para resolver match)
       const tiposCompletos = await getTiposTeste();
       setTipos(tiposCompletos);
-      aplicarCamposIa(r.dados || {}, r.alertas || [], tiposCompletos);
+      aplicarCamposIa(r.dados || {}, r.alertas || [], tiposCompletos, r.equipamentoSugerido);
     } catch (e) {
       setErroGeral(e?.response?.data?.message || 'Erro ao extrair laudo via IA.');
     } finally {
@@ -371,10 +379,10 @@ function RegistrarTesteForm({
           ) : null}
         </FormFieldShell>
 
-        <FormFieldShell label="Equipamento" required error={erros.equipamentoId}>
+        <FormFieldShell label="Equipamento" required error={erros.equipamentoId} hint={hintIa('equipamentoId')}>
           <Select
             value={equipamentoId}
-            onChange={(e) => setEquipamentoId(e.target.value)}
+            onChange={(e) => { setEquipamentoId(e.target.value); desmarcarIa('equipamentoId'); }}
             disabled={!!equipamentoIdInicial}
             placeholder="Selecione um equipamento..."
           >

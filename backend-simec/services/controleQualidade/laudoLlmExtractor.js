@@ -58,8 +58,24 @@ um formulario de cadastro no sistema SIMEC.
 REGRAS:
 1. Se nao tiver certeza de um campo, retorne null. NAO invente valores.
 2. "numeroLaudo" tem formato tipico XXMD/SP/YYYY/ME/NNNN (ex: LRMD/SP/2024/ME/0238).
-3. "responsavelRegistro" eh o registro profissional do fisico medico — formato
-   tipico "ABFM RX 201/843" ou "CRM 5975-MS" ou similar.
+   PROCURE em todo o documento incluindo cabecalho e rodape. Tambem pode aparecer
+   como "Relatorio Nº", "Laudo Nº", "Documento Nº", "Protocolo".
+3. "responsavelNome" e "responsavelRegistro" — o fisico medico responsavel
+   pelo laudo. ATENCAO: na maior parte dos laudos brasileiros, o nome aparece
+   em DUAS formas e voce deve combinar para identificar:
+   a. Em bloco de ASSINATURA DIGITAL no rodape, formato:
+      "Assinado de forma digital por NOME SOBRENOME COMPLETO:cpf numero"
+      "NOME SOBRENOME COMPLETO" (em CAPS, frequentemente com cpf grudado).
+   b. Logo abaixo, em texto normal, com cargo:
+      "Fernando dos Santos de Menezes"
+      "Fisico Medico e Responsavel Tecnico"
+   Prefira a forma capitalizada (b). Se so houver a CAPS (a), normalize
+   para "Title Case". Cargos tipicos: "Fisico Medico", "Responsavel Tecnico",
+   "Supervisor de Protecao Radiologica".
+   "responsavelRegistro" eh o registro profissional — formato tipico
+   "ABFM RX 201/843", "ABFM/RX 201/843", "CRM 5975-MS", "CRF 1234".
+   Pode aparecer junto ao nome ou em bloco separado de "Identificacao do
+   responsavel tecnico" / "Profissional responsavel".
 4. "modalidade" deve ser EXATAMENTE uma destas (ou null):
    - "Mamografia"
    - "Tomografia Computadorizada"
@@ -76,18 +92,24 @@ REGRAS:
 7. "validadeMeses": se o laudo declarar validade explicita (ex: "valido por
    12 meses" ou "validade ate 2026-05"), converta para meses. Caso contrario null.
 8. "dataExecucao": data em que o teste foi efetivamente realizado (ISO YYYY-MM-DD).
-   Se houver multiplas datas, use a data principal do teste (nao da emissao).
+   Se houver multiplas datas, use a data principal do teste (nao da emissao,
+   nao da assinatura digital).
 9. "pendenciasAcao": busque secao "Recomendacoes — Providenciar" ou similar.
    Cada item da lista vira { "descricao": "texto da recomendacao" }.
    Se nao houver pendencias, retorne array vazio [].
 10. "confianca": float 0-1 — sua confianca global na extracao.
 11. "observacoesIa": opcional, ate 200 chars — alguma nota relevante para o
-    revisor humano (ex: "data de emissao difere da data de execucao", "responsavel
-    sem registro CRM/ABFM identificado").
+    revisor humano (ex: "data de emissao difere da data de execucao", "nome
+    extraido apenas da assinatura digital").
 12. "modeloIdentificado", "serialIdentificado", "fabricanteIdentificado":
-    extraia se o laudo identifica o equipamento testado (ex: "Mamografo
-    Hologic Selenia 3D, serial: 12345"). Servirao para matching com o
-    cadastro do SIMEC. Use null se nao houver dado claro.
+    extraia se o laudo identifica o equipamento testado. Procure em sessoes
+    como "Identificacao do equipamento", "Dados do equipamento", "Sistema
+    avaliado". Exemplos:
+      - "Tomografo GE Discovery 710, serial: HC1234"
+      - "Mamografo Hologic Selenia 3D, NS 56789"
+      - "Aparelho: Optima MR450w, S/N: ABC123"
+    fabricante normalmente eh GE/GE Healthcare, Philips, Siemens, Hologic,
+    Toshiba/Canon, Shimadzu. Use null se nao houver dado claro.
 
 CATALOGO DE TIPOS DE TESTE DISPONIVEIS:
 ${catalogoResumo}

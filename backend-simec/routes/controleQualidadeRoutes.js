@@ -31,6 +31,7 @@ import {
 
 import { buscarTestePorId, listarTipos } from '../services/controleQualidade/controleQualidadeRepository.js';
 import { extrairLaudoCq } from '../services/controleQualidade/laudoLlmExtractor.js';
+import { matchEquipamento } from '../services/controleQualidade/equipamentoMatcher.js';
 import {
   extrairLoteService,
   criarLoteService,
@@ -310,9 +311,28 @@ router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) =
       return res.status(422).json({ message: 'Falha ao extrair laudo.', erro: r.erro });
     }
 
+    // Tenta casar com algum equipamento do tenant para pre-selecionar no form
+    const match = await matchEquipamento({
+      tenantId,
+      modelo:     r.dados.modeloIdentificado,
+      serial:     r.dados.serialIdentificado,
+      fabricante: r.dados.fabricanteIdentificado,
+      modalidade: r.dados.modalidade,
+    });
+
     return res.json({
       dados: r.dados,
       alertas: r.alertas || [],
+      equipamentoSugerido: match?.equipamento
+        ? {
+            id: match.equipamento.id,
+            modelo: match.equipamento.modelo,
+            tag: match.equipamento.tag,
+            tipo: match.equipamento.tipo,
+            fabricante: match.equipamento.fabricante,
+          }
+        : null,
+      matchCriterio: match?.criterio || null,
     });
   } catch (e) {
     console.error('[CQ_EXTRAIR_LAUDO_ERROR]', e);
