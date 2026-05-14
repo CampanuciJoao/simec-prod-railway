@@ -5,6 +5,7 @@ export { default as Checkbox } from './Checkbox';
 export { default as ComboboxAutocomplete } from './ComboboxAutocomplete';
 export { default as CurrencyInput } from './CurrencyInput';
 export { default as DateInput } from './DateInput';
+export { default as FileDropZone } from './FileDropZone';
 export { default as FormFieldShell } from './FormFieldShell';
 export { default as Input } from './Input';
 export { default as Select } from './Select';

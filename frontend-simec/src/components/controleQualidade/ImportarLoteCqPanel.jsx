@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
-  faUpload,
   faTrash,
   faCheck,
-  faSpinner,
   faTriangleExclamation,
   faCircleCheck,
 } from '@fortawesome/free-solid-svg-icons';
@@ -16,6 +14,7 @@ import {
   Select,
   DateInput,
   Badge,
+  FileDropZone,
 } from '@/components/ui';
 
 import {
@@ -60,10 +59,7 @@ function ImportarLoteCqPanel() {
       .finally(() => setLoadingMeta(false));
   }, []);
 
-  const handleFiles = (e) => {
-    const novos = Array.from(e.target.files || []).filter(
-      (f) => f.type === 'application/pdf'
-    );
+  const handleFiles = (novos) => {
     setFiles((prev) => [...prev, ...novos].slice(0, 50));
   };
 
@@ -273,38 +269,30 @@ function ImportarLoteCqPanel() {
             os registros. Custo: ~US$0,001 por PDF (gpt-4.1-mini).
           </p>
 
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <label
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
-              style={{ borderColor: 'var(--border-default)' }}
-            >
-              <FontAwesomeIcon icon={faUpload} />
-              <span>Selecionar PDFs</span>
-              <input
-                type="file"
-                multiple
-                accept="application/pdf"
-                className="hidden"
-                onChange={handleFiles}
-              />
-            </label>
+          <div className="mt-3">
+            <FileDropZone
+              accept="application/pdf"
+              multiple
+              disabled={extraindo}
+              loading={extraindo}
+              loadingLabel={`Extraindo ${files.length} PDF(s)...`}
+              label="Arraste os PDFs aqui ou"
+              ctaLabel="clique para selecionar"
+              hint="Apenas PDF — até 50 arquivos por lote"
+              onFiles={handleFiles}
+            />
 
-            <Button
-              onClick={handleExtrair}
-              disabled={files.length === 0 || extraindo}
-            >
-              {extraindo ? (
-                <>
-                  <FontAwesomeIcon icon={faSpinner} spin />
-                  <span className="ml-2">Extraindo {files.length} PDF(s)...</span>
-                </>
-              ) : (
-                <>
-                  <FontAwesomeIcon icon={faCheck} />
-                  <span className="ml-2">Extrair {files.length} PDF(s)</span>
-                </>
-              )}
-            </Button>
+            <div className="mt-3 flex justify-end">
+              <Button
+                onClick={handleExtrair}
+                disabled={files.length === 0 || extraindo}
+              >
+                <FontAwesomeIcon icon={faCheck} />
+                <span className="ml-2">
+                  {extraindo ? 'Extraindo...' : `Extrair ${files.length} PDF(s)`}
+                </span>
+              </Button>
+            </div>
           </div>
 
           {files.length > 0 ? (

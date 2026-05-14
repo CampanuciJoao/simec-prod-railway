@@ -29,6 +29,7 @@ export {
   ComboboxAutocomplete,
   CurrencyInput,
   DateInput,
+  FileDropZone,
   FormFieldShell,
   Input,
   Pagination,

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faPlus, faTrash, faPaperclip, faWandMagicSparkles } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faTrash } from '@fortawesome/free-solid-svg-icons';
 
 import {
   Drawer,
@@ -10,6 +10,7 @@ import {
   Select,
   Textarea,
   DateInput,
+  FileDropZone,
   FormFieldShell,
 } from '@/components/ui';
 
@@ -164,8 +165,7 @@ function RegistrarTesteForm({
   const atualizarPendencia = (i, valor) =>
     setPendencias((p) => p.map((it, idx) => (idx === i ? { ...it, descricao: valor } : it)));
 
-  const handleArquivos = (e) => {
-    const files = Array.from(e.target.files || []);
+  const handleArquivos = (files) => {
     setArquivos((prev) => [...prev, ...files].slice(0, 5));
   };
 
@@ -322,30 +322,19 @@ function RegistrarTesteForm({
           </div>
         ) : null}
 
-        {/* Upload do laudo no topo: ao selecionar PDF, IA pre-preenche os campos */}
-        <FormFieldShell
-          label="Laudo PDF"
-          hint="Importe o PDF e a IA pré-preenche os campos abaixo automaticamente. Aceita até 5 arquivos."
-        >
-          <div className="flex flex-wrap items-center gap-2">
-            <label
-              className="inline-flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm"
-              style={{ borderColor: 'var(--border-default)' }}
-            >
-              <FontAwesomeIcon icon={extraindo ? faWandMagicSparkles : faPaperclip} spin={extraindo} />
-              <span>
-                {extraindo ? 'Lendo PDF com IA...' : 'Importar PDF do laudo'}
-              </span>
-              <input
-                type="file"
-                multiple
-                accept="application/pdf,image/jpeg,image/png"
-                className="hidden"
-                onChange={handleArquivos}
-                disabled={extraindo}
-              />
-            </label>
-          </div>
+        {/* Upload do laudo no topo: ao selecionar/arrastar PDF, IA pre-preenche os campos */}
+        <FormFieldShell label="Laudo PDF">
+          <FileDropZone
+            accept="application/pdf,image/jpeg,image/png"
+            multiple
+            disabled={extraindo}
+            loading={extraindo}
+            loadingLabel="Lendo PDF com IA..."
+            label="Arraste o PDF do laudo aqui ou"
+            ctaLabel="clique para importar"
+            hint="A IA pré-preenche os campos abaixo automaticamente. Até 5 arquivos."
+            onFiles={handleArquivos}
+          />
 
           {arquivos.length > 0 ? (
             <ul className="mt-2 space-y-1 text-sm" style={{ color: 'var(--text-muted)' }}>
