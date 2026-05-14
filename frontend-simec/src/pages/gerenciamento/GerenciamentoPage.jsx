@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBan,
   faBuilding,
+  faClipboardCheck,
   faCogs,
   faPlug,
   faPlus,
@@ -46,6 +47,12 @@ function GerenciamentoPage() {
       label: 'Alertas',
       icon: <FontAwesomeIcon icon={faBan} />,
       path: '/gerenciamento/alertas',
+    },
+    {
+      id: 'controle-qualidade',
+      label: 'Controle de Qualidade',
+      icon: <FontAwesomeIcon icon={faClipboardCheck} />,
+      path: '/gerenciamento/controle-qualidade',
     },
   ];
 
