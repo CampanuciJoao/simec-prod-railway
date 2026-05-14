@@ -84,6 +84,7 @@ export async function extrairLoteService({ tenantId, files }) {
       serial:      r.dados.serialIdentificado,
       fabricante:  r.dados.fabricanteIdentificado,
       modalidade:  r.dados.modalidade,
+      unidadeIdentificada: r.dados.unidadeIdentificada,
     });
 
     resultados.push({

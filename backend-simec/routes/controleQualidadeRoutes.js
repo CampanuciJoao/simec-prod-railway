@@ -311,17 +311,23 @@ router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) =
       return res.status(422).json({ message: 'Falha ao extrair laudo.', erro: r.erro });
     }
 
-    // Tenta casar com algum equipamento do tenant para pre-selecionar no form
+    // Tenta casar com algum equipamento do tenant para pre-selecionar no form.
+    // unidadeIdentificada do laudo (cliente) eh usada para filtrar o universo
+    // — em tenants multi-site, "TC na unidade Cerdil Dourados" basta.
     const match = await matchEquipamento({
       tenantId,
       modelo:     r.dados.modeloIdentificado,
       serial:     r.dados.serialIdentificado,
       fabricante: r.dados.fabricanteIdentificado,
       modalidade: r.dados.modalidade,
+      unidadeIdentificada: r.dados.unidadeIdentificada,
     });
 
+    // unidadeIdentificada eh interno (so para matching) — nao retornar pro form
+    const { unidadeIdentificada: _, ...dadosPublicos } = r.dados;
+
     return res.json({
-      dados: r.dados,
+      dados: dadosPublicos,
       alertas: r.alertas || [],
       equipamentoSugerido: match?.equipamento
         ? {

@@ -35,6 +35,12 @@ const respostaSchema = z.object({
   modeloIdentificado:  z.string().nullish(),
   serialIdentificado:  z.string().nullish(),
   fabricanteIdentificado: z.string().nullish(),
+  unidadeIdentificada: z.object({
+    razaoSocial: z.string().nullish(),
+    cnpj:        z.string().nullish(),
+    endereco:    z.string().nullish(),
+    cidade:      z.string().nullish(),
+  }).nullish(),
   pendenciasAcao:      z.array(z.object({
     descricao: z.string().min(1).max(500),
   })).nullish(),
@@ -103,13 +109,33 @@ REGRAS:
     extraido apenas da assinatura digital").
 12. "modeloIdentificado", "serialIdentificado", "fabricanteIdentificado":
     extraia se o laudo identifica o equipamento testado. Procure em sessoes
-    como "Identificacao do equipamento", "Dados do equipamento", "Sistema
-    avaliado". Exemplos:
+    como "DADOS DO EQUIPAMENTO", "Identificacao do equipamento",
+    "Equipamento", "Sistema avaliado". Exemplos:
       - "Tomografo GE Discovery 710, serial: HC1234"
       - "Mamografo Hologic Selenia 3D, NS 56789"
       - "Aparelho: Optima MR450w, S/N: ABC123"
+      - Bloco tabular com "Marca: GE / Modelo: Discovery 710 / Nº de Série: 35411817M2"
     fabricante normalmente eh GE/GE Healthcare, Philips, Siemens, Hologic,
     Toshiba/Canon, Shimadzu. Use null se nao houver dado claro.
+13. "unidadeIdentificada": extraia o cliente/local onde o equipamento esta
+    instalado. Procure secoes "DADOS DO CLIENTE", "Cliente", "Identificacao",
+    "Razao Social", "Endereco", "CNPJ". Exemplo tipico:
+      "Razao Social: CERDIL - Centro de Radiologia e Diagnostico por Imagem Ltda"
+      "CNPJ: 03.304.188/0001-50"
+      "Endereco: Rua Dr. Antonio Emilio de Figueiredo, 2280 - Dourados/MS"
+    Estruture como {
+      "razaoSocial": "...",
+      "cnpj": "apenas digitos ou XX.XXX.XXX/XXXX-XX",
+      "endereco": "logradouro completo",
+      "cidade": "cidade/UF se separavel"
+    }. Campo nao identificado vira null. Esta info NAO aparece no formulario
+    — eh usada internamente para filtrar o equipamento certo entre tenants
+    com varios sites.
+14. "empresaExecutora" frequentemente aparece no CABECALHO de TODAS as
+    paginas como nome da empresa que assinou o laudo (ex:
+    "FM - SERVICOS DE FISICA MEDICA E PROTECAO RADIOLOGICA",
+    "MRA Divisao de Consultoria"). NAO confunda com a "Razao Social" do
+    cliente (que vai em unidadeIdentificada).
 
 CATALOGO DE TIPOS DE TESTE DISPONIVEIS:
 ${catalogoResumo}
@@ -227,6 +253,14 @@ export async function extrairLaudoCq({ pdfBuffer, tenantId, catalogoTipos }) {
       modeloIdentificado:  d.modeloIdentificado || null,
       serialIdentificado:  d.serialIdentificado || null,
       fabricanteIdentificado: d.fabricanteIdentificado || null,
+      unidadeIdentificada: d.unidadeIdentificada
+        ? {
+            razaoSocial: d.unidadeIdentificada.razaoSocial || null,
+            cnpj:        d.unidadeIdentificada.cnpj || null,
+            endereco:    d.unidadeIdentificada.endereco || null,
+            cidade:      d.unidadeIdentificada.cidade || null,
+          }
+        : null,
     },
     alertas,
   };
