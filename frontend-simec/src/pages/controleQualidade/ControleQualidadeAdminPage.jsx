@@ -6,6 +6,7 @@ import {
   faTrashRestore,
   faSave,
   faRotateLeft,
+  faFileImport,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -28,8 +29,11 @@ import {
   restaurarTesteCq,
 } from '@/services/api';
 
+import ImportarLoteCqPanel from '@/components/controleQualidade/ImportarLoteCqPanel';
+
 const TABS = [
   { id: 'catalogo', label: 'Catálogo de tipos', icon: <FontAwesomeIcon icon={faList} /> },
+  { id: 'importar', label: 'Importar histórico (lote)', icon: <FontAwesomeIcon icon={faFileImport} /> },
   { id: 'excluidos', label: 'Registros excluídos', icon: <FontAwesomeIcon icon={faTrashRestore} /> },
 ];
 
@@ -52,7 +56,9 @@ function ControleQualidadeAdminPage() {
 
         <ResponsiveTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
-        {activeTab === 'catalogo' ? <CatalogoTab /> : <ExcluidosTab />}
+        {activeTab === 'catalogo' ? <CatalogoTab /> : null}
+        {activeTab === 'importar' ? <ImportarLoteCqPanel /> : null}
+        {activeTab === 'excluidos' ? <ExcluidosTab /> : null}
       </div>
     </PageLayout>
   );

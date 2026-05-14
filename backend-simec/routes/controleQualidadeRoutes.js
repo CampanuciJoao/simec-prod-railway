@@ -31,6 +31,11 @@ import {
 
 import { buscarTestePorId, listarTipos } from '../services/controleQualidade/controleQualidadeRepository.js';
 import { extrairLaudoCq } from '../services/controleQualidade/laudoLlmExtractor.js';
+import {
+  extrairLoteService,
+  criarLoteService,
+  descartarLoteService,
+} from '../services/controleQualidade/importacaoLoteService.js';
 
 const router = express.Router();
 router.use(proteger);
@@ -312,6 +317,52 @@ router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) =
   } catch (e) {
     console.error('[CQ_EXTRAIR_LAUDO_ERROR]', e);
     return res.status(500).json({ message: 'Erro ao extrair laudo.' });
+  }
+});
+
+// ─── Importacao em lote (admin) ─────────────────────────────────────────────
+
+// Etapa 1: extrai N PDFs e devolve lista para revisao do usuario.
+// Salva PDFs em R2 temp para serem referenciados na criacao final.
+router.post('/importacao/extrair-lote', admin, uploadFor('controleQualidadeImport'), async (req, res) => {
+  try {
+    const r = await extrairLoteService({
+      tenantId: req.usuario.tenantId,
+      files: req.files || [],
+    });
+    if (!r.ok) return res.status(400).json({ message: r.erro });
+    return res.json(r);
+  } catch (e) {
+    console.error('[CQ_IMPORT_EXTRAIR_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao extrair lote.' });
+  }
+});
+
+// Etapa 2: usuario revisou — cria os testes confirmados.
+router.post('/importacao/criar-lote', admin, async (req, res) => {
+  try {
+    const items = Array.isArray(req.body?.items) ? req.body.items : [];
+    const r = await criarLoteService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      items,
+    });
+    if (!r.ok) return res.status(400).json({ message: r.erro });
+    return res.json(r);
+  } catch (e) {
+    console.error('[CQ_IMPORT_CRIAR_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao criar lote.' });
+  }
+});
+
+// Cleanup: descarta R2 temp se usuario fechou a tela sem salvar
+router.post('/importacao/descartar-lote', admin, async (req, res) => {
+  try {
+    const r = await descartarLoteService({ r2Keys: req.body?.r2Keys || [] });
+    return res.json(r);
+  } catch (e) {
+    console.error('[CQ_IMPORT_DESCARTAR_ERROR]', e);
+    return res.status(500).json({ message: 'Erro ao descartar lote.' });
   }
 });
 

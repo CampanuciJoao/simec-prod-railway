@@ -32,6 +32,9 @@ const respostaSchema = z.object({
   resultado:           z.enum(RESULTADOS).nullish(),
   modalidade:          z.string().nullish(),
   codigoTipoSugerido:  z.string().nullish(),
+  modeloIdentificado:  z.string().nullish(),
+  serialIdentificado:  z.string().nullish(),
+  fabricanteIdentificado: z.string().nullish(),
   pendenciasAcao:      z.array(z.object({
     descricao: z.string().min(1).max(500),
   })).nullish(),
@@ -81,6 +84,10 @@ REGRAS:
 11. "observacoesIa": opcional, ate 200 chars — alguma nota relevante para o
     revisor humano (ex: "data de emissao difere da data de execucao", "responsavel
     sem registro CRM/ABFM identificado").
+12. "modeloIdentificado", "serialIdentificado", "fabricanteIdentificado":
+    extraia se o laudo identifica o equipamento testado (ex: "Mamografo
+    Hologic Selenia 3D, serial: 12345"). Servirao para matching com o
+    cadastro do SIMEC. Use null se nao houver dado claro.
 
 CATALOGO DE TIPOS DE TESTE DISPONIVEIS:
 ${catalogoResumo}
@@ -195,6 +202,9 @@ export async function extrairLaudoCq({ pdfBuffer, tenantId, catalogoTipos }) {
       pendenciasAcao:      Array.isArray(d.pendenciasAcao) ? d.pendenciasAcao : [],
       confianca:           d.confianca ?? null,
       observacoesIa:       d.observacoesIa || null,
+      modeloIdentificado:  d.modeloIdentificado || null,
+      serialIdentificado:  d.serialIdentificado || null,
+      fabricanteIdentificado: d.fabricanteIdentificado || null,
     },
     alertas,
   };
