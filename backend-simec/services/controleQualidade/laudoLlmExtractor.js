@@ -95,7 +95,20 @@ REGRAS:
    - "Ressonancia Magnetica"
    - "Ultrassom"
 5. "codigoTipoSugerido" deve ser EXATAMENTE um codigo do catalogo abaixo (ou null
-   se nao casar). Use o tipo mais especifico que combina com o conteudo do laudo.
+   se nao casar). REGRA DE ESCOLHA:
+   - O catalogo tem 3 categorias por modalidade:
+     * CQ_<MOD>  — Controle de Qualidade (umbrella, testes fisicos do equipamento)
+     * LR_<MOD>  — Levantamento Radiometrico Ambiental (radiacao saindo das salas)
+     * EPI_<MOD> — Eficiencia de Blindagem (aventais e protetores de tireoide)
+   - Se o laudo abrange MULTIPLAS frentes em um documento unico (ex: testes
+     fisicos do equipamento + dose + uniformidade + EPIs + LR todos juntos)
+     -> use sempre CQ_<MOD>. Esta eh a categoria umbrella.
+   - Se o laudo eh PONTUAL e claramente sobre apenas UM tipo:
+     * So levantamento radiometrico ambiental -> LR_<MOD>
+     * So avaliacao de EPIs / aventais plumbiferos -> EPI_<MOD>
+     * Apenas testes fisicos de constancia / phantom / dose -> CQ_<MOD>
+   - O titulo do laudo geralmente diz: "Testes de Constancia", "Controle
+     de Qualidade", "Levantamento Radiometrico", "Avaliacao de EPIs", etc.
 6. "resultado":
    - "Aprovado" se laudo declara conformidade total
    - "AprovadoComRestricoes" se aprova mas lista restricoes/condicionais
