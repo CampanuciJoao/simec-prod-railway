@@ -3,6 +3,7 @@ import IORedis from 'ioredis';
 import dotenv from 'dotenv';
 import { processarAlertasEEnviarNotificacoes } from './services/alertas/alertasOrchestrator.js';
 import { processarAlertasManutencaoDoTenant } from './services/alertas/manutencao/index.js';
+import { dispararPendenciasTelegramTodos } from './services/telegram/telegramAlertService.js';
 import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
 import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
 import { monitorarSaudeGehc } from './services/gehc/gehcMonitor.js';
@@ -382,6 +383,15 @@ const alertasWorker = new Worker(
         }
         return { ok: true, tenants: resultados.length, resultados };
       });
+    }
+
+    if (job?.name === 'telegram-drenar-pendencias') {
+      // Roda a cada 1min independente do orchestrator. Garante que
+      // alertas pendentes (telegramEnviado=false) sejam reenviados mesmo
+      // quando o tenant nao teve mudanca na rodada — evita o bug em que
+      // alertas ficam represados ate alguma rodada futura "afetar" o
+      // tenant e drenar tudo de uma vez.
+      return dispararPendenciasTelegramTodos();
     }
 
     return processarAlertasEEnviarNotificacoes();

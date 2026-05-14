@@ -116,7 +116,7 @@ export async function iniciarJobsDeAlertas() {
 
     const repeatables = await queue.getRepeatableJobs();
     for (const job of repeatables) {
-      if (job.name === 'processar-alertas-recorrente') {
+      if (job.name === 'processar-alertas-recorrente' || job.name === 'telegram-drenar-pendencias') {
         await queue.removeRepeatableByKey(job.key);
       }
     }
@@ -131,6 +131,20 @@ export async function iniciarJobsDeAlertas() {
         },
         removeOnComplete: 50,
         removeOnFail: 50,
+      }
+    );
+
+    // Drenagem dedicada do Telegram (a cada 1min). Garante que alertas
+    // pendentes nao fiquem represados em tenants "sem mudanca" entre
+    // rodadas do orchestrator.
+    await queue.add(
+      'telegram-drenar-pendencias',
+      {},
+      {
+        jobId: 'telegram-drenar-pendencias',
+        repeat: { every: 60000 },
+        removeOnComplete: 20,
+        removeOnFail: 20,
       }
     );
 

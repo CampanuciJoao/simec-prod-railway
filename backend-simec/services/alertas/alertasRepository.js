@@ -60,7 +60,11 @@ export async function listarAlertasPaginado({ tenantId, userId, baseline, page, 
           select: { visto: true, dataVisto: true },
         },
       },
-      orderBy: { data: 'desc' },
+      // Ordena por data do evento (DESC) e desempata por createdAt (DESC).
+      // Sem o desempate, alertas da mesma manutencao (todos com data =
+      // dataHoraAgendamentoInicio) saiam em ordem indefinida — o alerta
+      // mais recente (ex: "iniciada") aparecia abaixo do "1h antes".
+      orderBy: [{ data: 'desc' }, { createdAt: 'desc' }],
       skip,
       take: pageSize,
     }),

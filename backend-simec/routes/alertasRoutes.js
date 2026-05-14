@@ -149,7 +149,9 @@ router.get('/historico', async (req, res) => {
     const [data, total] = await Promise.all([
       prisma.alertaHistorico.findMany({
         where,
-        orderBy: { dataAlerta: 'desc' },
+        // Desempate por dataArquivado garante ordem estavel quando varios
+        // alertas tem o mesmo dataAlerta (ex: pre-eventos da mesma manutencao).
+        orderBy: [{ dataAlerta: 'desc' }, { dataArquivado: 'desc' }],
         skip:  (page - 1) * pageSize,
         take:  pageSize,
       }),
