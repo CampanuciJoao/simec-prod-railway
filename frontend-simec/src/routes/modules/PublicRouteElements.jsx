@@ -1,6 +1,7 @@
 import { Navigate, Route } from 'react-router-dom';
 
 import {
+  DocumentoLegalPage,
   ForgotPasswordPage,
   LoginPage,
   ResetPasswordPage,
@@ -24,6 +25,15 @@ function PublicRouteElements({ isAuthenticated }) {
         element={
           isAuthenticated ? <Navigate to="/" replace /> : <ResetPasswordPage />
         }
+      />
+      {/* Paginas legais publicas (LGPD) — acessiveis sem login. */}
+      <Route
+        path="/privacidade"
+        element={<DocumentoLegalPage documento="politica_privacidade" />}
+      />
+      <Route
+        path="/termos"
+        element={<DocumentoLegalPage documento="termos_uso" />}
       />
     </>
   );

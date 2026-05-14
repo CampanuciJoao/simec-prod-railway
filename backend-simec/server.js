@@ -34,6 +34,7 @@ import gehcAprendizadoRoutes from './routes/gehcAprendizadoRoutes.js';
 import alertConfigRoutes from './routes/alertConfigRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
 import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
+import lgpdRoutes from './routes/lgpdRoutes.js';
 
 import cookieParser from 'cookie-parser';
 
@@ -137,6 +138,8 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/telegram/webhook', telegramWebhookRoute);
+// LGPD: documentos legais (publicos) + aceites (proteger interno na rota)
+app.use('/api/lgpd', lgpdRoutes);
 
 app.use(proteger);
 

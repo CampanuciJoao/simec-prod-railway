@@ -11,6 +11,7 @@ import ChatBot from '@/components/ui/chat/ChatBot';
 import { Sidebar } from '@/components/ui';
 import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
 import AppTopbar from '@/components/layouts/AppTopbar';
+import GuardiaoAceiteTermos from '@/components/lgpd/GuardiaoAceiteTermos';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useAlertas } from '@/contexts/AlertasContext';
@@ -145,7 +146,7 @@ function AppLayout() {
   );
 
   return (
-    <>
+    <GuardiaoAceiteTermos>
       <div
         className="flex min-h-screen"
         style={{ backgroundColor: 'var(--bg-app)' }}
@@ -185,7 +186,7 @@ function AppLayout() {
       <div className="fixed bottom-4 right-4 z-50">
         <ChatBot />
       </div>
-    </>
+    </GuardiaoAceiteTermos>
   );
 }
 

@@ -7,6 +7,9 @@ export const ForgotPasswordPage = React.lazy(() =>
 export const ResetPasswordPage = React.lazy(() =>
   import('@/pages/auth/ResetPasswordPage')
 );
+export const DocumentoLegalPage = React.lazy(() =>
+  import('@/pages/lgpd/DocumentoLegalPage')
+);
 export const DashboardPage = React.lazy(() =>
   import('@/pages/dashboard/DashboardPage')
 );

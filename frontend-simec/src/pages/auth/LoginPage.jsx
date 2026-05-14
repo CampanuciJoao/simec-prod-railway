@@ -101,6 +101,19 @@ function LoginPage() {
             Esqueceu sua senha?
             </Link>
           </div>
+
+          <div
+            className="mt-4 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px]"
+            style={{ color: '#64748b' }}
+          >
+            <Link to="/privacidade" className="hover:underline">
+              Política de Privacidade
+            </Link>
+            <span>·</span>
+            <Link to="/termos" className="hover:underline">
+              Termos de Uso
+            </Link>
+          </div>
         </div>
       </div>
     </AuthLayout>

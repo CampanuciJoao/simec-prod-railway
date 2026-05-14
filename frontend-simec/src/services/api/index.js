@@ -11,6 +11,7 @@ export * from './emailsNotificacaoApi';
 export * from './equipamentosApi';
 export * from './historicoAtivoApi';
 export * from './helpApi';
+export * from './lgpdApi';
 export * from './manutencoesApi';
 export * from './pdfApi';
 export * from './relatoriosApi';

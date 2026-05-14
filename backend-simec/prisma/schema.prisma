@@ -138,6 +138,7 @@ model Usuario {
   orcamentosComoAprovador Orcamento[] @relation("OrcamentoAprovador")
   aiPipelinesPausados     AiPipelineEstado[] @relation("AiPipelinePausadoPor")
   aiPipelinesRetomados    AiPipelineEstado[] @relation("AiPipelineRetomadoPor")
+  aceitesTermos           AceiteTermo[]
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -1429,4 +1430,33 @@ model TelegramVinculacaoToken {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("telegram_vinculacao_tokens")
+}
+
+// ─── LGPD — Aceites de termos legais ─────────────────────────────────────────
+//
+// Registra o aceite do usuario a cada versao de documento legal (Politica de
+// Privacidade, Termos de Uso). Quando o documento sobe de versao, o sistema
+// detecta que o usuario nao tem aceite da nova versao e pede no proximo
+// acesso. O texto vigente fica versionado em docs/lgpd/ no repo (nao no
+// banco), e a versao em uso eh lida em runtime pelo backend.
+enum DocumentoLegal {
+  politica_privacidade
+  termos_uso
+}
+
+model AceiteTermo {
+  id         String         @id @default(uuid())
+  usuarioId  String         @map("usuario_id")
+  documento  DocumentoLegal
+  versao     String
+  aceitoEm   DateTime       @default(now()) @map("aceito_em")
+  ip         String?
+  userAgent  String?        @map("user_agent") @db.Text
+
+  usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
+
+  @@unique([usuarioId, documento, versao])
+  @@index([usuarioId])
+  @@index([documento, versao])
+  @@map("aceites_termos")
 }
