@@ -18,7 +18,44 @@ import { z } from 'zod';
 import prisma from '../../prismaService.js';
 import { generateJsonWithLlm } from '../../ai/llmService.js';
 import { criarManutencaoService } from '../index.js';
-import { existeConflitoAgendamento } from '../manutencaoRepository.js';
+
+// Status considerados "em conflito" no contexto de IMPORTADOR. Inclui
+// Concluida porque o caso de uso aqui é criar agendas futuras a partir de um
+// calendário do fornecedor — se a OS daquele equipamento/horário já foi
+// concluída, isso quase sempre indica importação duplicada (vide incidente
+// com PMRR-0010 vs PMRR-0003 em 2026-05-14). Diferente da checagem global em
+// manutencaoRepository.existeConflitoAgendamento, que permite reagendar
+// sobre uma janela já concluída.
+const STATUS_CONFLITO_IMPORT = [
+  'Pendente',
+  'Agendada',
+  'EmAndamento',
+  'AguardandoConfirmacao',
+  'Concluida',
+];
+
+async function buscarConflitoImport({ tenantId, equipamentoId, startUtc, endUtc }) {
+  return prisma.manutencao.findFirst({
+    where: {
+      tenantId,
+      equipamentoId,
+      status: { in: STATUS_CONFLITO_IMPORT },
+      AND: [
+        { dataHoraAgendamentoInicio: { lt: endUtc } },
+        {
+          OR: [
+            { dataHoraAgendamentoFim: { gt: startUtc } },
+            {
+              dataHoraAgendamentoFim: null,
+              dataHoraAgendamentoInicio: { lt: endUtc },
+            },
+          ],
+        },
+      ],
+    },
+    select: { id: true, numeroOS: true, status: true },
+  });
+}
 
 const TIPOS_PERMITIDOS = ['Preventiva', 'Calibracao', 'Inspecao'];
 
@@ -291,6 +328,8 @@ export async function extrairLoteService({ tenantId, files }) {
       continue;
     }
 
+    const hojeIso = new Date().toISOString().slice(0, 10);
+
     const entradasEnriquecidas = parseResult.entradas.map((e) => {
       const tempId = proximoId();
       const matchUnidade = casarUnidade(e.unidadeNome, catalogo.unidades);
@@ -302,6 +341,11 @@ export async function extrairLoteService({ tenantId, files }) {
       );
 
       const alertas = [];
+      if (e.data && e.data < hojeIso) {
+        alertas.push(
+          `Data ${e.data} está no passado — preventivas devem ser agendadas a partir de hoje (${hojeIso}).`
+        );
+      }
       if (!matchUnidade) {
         alertas.push(`Unidade "${e.unidadeNome}" não encontrada no cadastro.`);
       } else if (matchUnidade.score < 0.7) {
@@ -386,6 +430,10 @@ export async function criarLoteService({ tenantId, usuarioId, items }) {
   const pulados = [];
   const falhas = [];
 
+  // Hoje no fuso do servidor — agendamento com data anterior a isso é
+  // sempre suspeito (calendário trazido com mês passado, planilha velha).
+  const hojeIso = new Date().toISOString().slice(0, 10);
+
   for (const raw of items) {
     const parsed = itemCriacaoSchema.safeParse(raw);
     if (!parsed.success) {
@@ -398,6 +446,15 @@ export async function criarLoteService({ tenantId, usuarioId, items }) {
     }
     const item = parsed.data;
 
+    if (item.agendamentoDataInicioLocal < hojeIso) {
+      pulados.push({
+        tempId: item.tempId,
+        motivo: 'data_no_passado',
+        detalhes: `Data ${item.agendamentoDataInicioLocal} é anterior a hoje (${hojeIso}).`,
+      });
+      continue;
+    }
+
     try {
       const startUtc = new Date(
         `${item.agendamentoDataInicioLocal}T${item.agendamentoHoraInicioLocal}:00`
@@ -405,7 +462,7 @@ export async function criarLoteService({ tenantId, usuarioId, items }) {
       const endUtc = new Date(
         `${item.agendamentoDataFimLocal}T${item.agendamentoHoraFimLocal}:00`
       );
-      const conflito = await existeConflitoAgendamento({
+      const conflito = await buscarConflitoImport({
         tenantId,
         equipamentoId: item.equipamentoId,
         startUtc,
@@ -414,8 +471,15 @@ export async function criarLoteService({ tenantId, usuarioId, items }) {
       if (conflito) {
         pulados.push({
           tempId: item.tempId,
-          motivo: 'conflito_agendamento',
-          osExistente: { id: conflito.id, numeroOS: conflito.numeroOS },
+          motivo:
+            conflito.status === 'Concluida'
+              ? 'ja_existe_os_concluida'
+              : 'conflito_agendamento',
+          osExistente: {
+            id: conflito.id,
+            numeroOS: conflito.numeroOS,
+            status: conflito.status,
+          },
         });
         continue;
       }

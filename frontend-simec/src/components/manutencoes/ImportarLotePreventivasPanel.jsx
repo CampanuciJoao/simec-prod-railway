@@ -1113,12 +1113,29 @@ function SumarioStage({ sumario, onFechar }) {
       ) : null}
 
       {detalhes?.pulados?.length > 0 ? (
-        <Bloco titulo="Puladas (já existia OS)" tone="warning">
-          {detalhes.pulados.map((p, i) => (
-            <li key={i}>
-              Já existe OS <strong>{p.osExistente?.numeroOS || p.tempId}</strong> nesse horário.
-            </li>
-          ))}
+        <Bloco titulo="Puladas" tone="warning">
+          {detalhes.pulados.map((p, i) => {
+            if (p.motivo === 'data_no_passado') {
+              return (
+                <li key={i}>
+                  Data no passado — {p.detalhes || 'agendamento anterior a hoje.'}
+                </li>
+              );
+            }
+            if (p.motivo === 'ja_existe_os_concluida') {
+              return (
+                <li key={i}>
+                  Já existe OS concluída <strong>{p.osExistente?.numeroOS}</strong> nesse horário.
+                </li>
+              );
+            }
+            return (
+              <li key={i}>
+                Já existe OS <strong>{p.osExistente?.numeroOS || p.tempId}</strong> nesse horário
+                {p.osExistente?.status ? ` (status: ${p.osExistente.status})` : ''}.
+              </li>
+            );
+          })}
         </Bloco>
       ) : null}
 
