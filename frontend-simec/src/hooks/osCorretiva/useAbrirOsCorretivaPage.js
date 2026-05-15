@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { criarOsCorretiva } from '../../services/api/osCorretivaApi';
 import { useToast } from '../../contexts/ToastContext';
 
@@ -22,9 +22,24 @@ const INITIAL_FORM = {
 
 export function useAbrirOsCorretivaPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useToast();
 
-  const [form, setForm] = useState(INITIAL_FORM);
+  // Pré-preenchimento vindo de uma recomendação do agente (sem persistir
+  // até o usuário clicar em "Abrir OS" neste formulário).
+  const recomendacaoPayload = location.state?.recomendacao?.payload || null;
+  const formInicial = recomendacaoPayload
+    ? {
+        ...INITIAL_FORM,
+        equipamentoId: recomendacaoPayload.equipamentoId || '',
+        solicitante: recomendacaoPayload.solicitante || '',
+        descricaoProblema: recomendacaoPayload.descricaoProblema || '',
+        statusEquipamentoAbertura:
+          recomendacaoPayload.statusEquipamentoAbertura || '',
+      }
+    : INITIAL_FORM;
+
+  const [form, setForm] = useState(formInicial);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({});
 

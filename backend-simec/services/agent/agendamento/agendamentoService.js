@@ -8,7 +8,7 @@ import { buildResumoConfirmacao } from './ui/resumoBuilder.js';
 import { validarHorarioFuturo } from './validators/horarioValidator.js';
 import { resolverEntidades } from '../shared/entityResolver.js';
 import {
-  criarManutencaoNoBanco,
+  montarRecomendacaoManutencao,
   validarPayloadAgendamentoDoAgente,
 } from '../workflow/dbManager.js';
 import {
@@ -703,10 +703,9 @@ export const AgendamentoService = {
           });
         }
 
-        const manutencao = await criarManutencaoNoBanco(
-          estado,
-          contextoUsuario
-        );
+        // O agente NÃO persiste a OS — devolve uma recomendação para o front
+        // abrir o modal de agendamento já preenchido e o usuário confirmar.
+        const recomendacao = montarRecomendacaoManutencao(estado);
 
         await UserAgentMemoryRepository.upsertMemoria(sessionKey, {
           tenantId,
@@ -720,18 +719,17 @@ export const AgendamentoService = {
         });
 
         const mensagemResposta =
-          '✅ **Perfeito! Agendamento realizado com sucesso.** A Ordem de Serviço foi gerada e o ativo atualizado no sistema.';
+          '✨ **Recomendação pronta.** Clique em **Abrir agendamento** para revisar e salvar a OS, ou em **Cancelar** para descartar.';
 
-        const stateFinal = {
-          ...estado,
-          manutencaoId: manutencao.id,
-          numeroOS: manutencao.numeroOS,
-        };
+        const stateFinal = { ...estado };
 
         const meta = buildBaseMeta(stateFinal, {
-          reason: 'SCHEDULE_CREATED',
-          manutencaoId: manutencao.id,
-          numeroOS: manutencao.numeroOS,
+          reason: 'RECOMMENDATION_READY',
+          recomendacao,
+          actions: [
+            { id: 'abrir_agendamento', label: 'Abrir agendamento', variant: 'primary' },
+            { id: 'cancelar', label: 'Cancelar', variant: 'secondary' },
+          ],
         });
 
         await AgentSessionRepository.salvarSessao(sessao.id, {
@@ -750,9 +748,7 @@ export const AgendamentoService = {
         await AgentSessionRepository.finalizarSessao(sessao.id);
 
         logAgentStage('AGENDAMENTO_SUCCESS', stageContext, {
-          decision: 'SCHEDULE_CREATED',
-          manutencaoId: manutencao.id,
-          numeroOS: manutencao.numeroOS,
+          decision: 'RECOMMENDATION_READY',
           step: STEPS.FINALIZADO,
         });
 

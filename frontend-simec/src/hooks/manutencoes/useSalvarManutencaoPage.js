@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 
 import { useToast } from '@/contexts/ToastContext';
 import {
@@ -13,11 +13,27 @@ import {
 export function useSalvarManutencaoPage() {
   const { manutencaoId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addToast } = useToast();
 
   const isEditing = Boolean(manutencaoId);
 
-  const [initialData, setInitialData] = useState(null);
+  // Pré-preenchimento vindo de recomendação do agente (location.state.recomendacao).
+  // O agente nunca cria — o payload chega aqui e o usuário confirma manualmente.
+  const recomendacaoState = location.state?.recomendacao || null;
+  const recomendacaoInicial =
+    !isEditing && recomendacaoState?.payload
+      ? {
+          ...recomendacaoState.payload,
+          // contexto traz unidadeId, que ajuda o form a filtrar equipamentos.
+          unidadeId:
+            recomendacaoState.payload?.unidadeId ||
+            recomendacaoState.contexto?.unidadeId ||
+            '',
+        }
+      : null;
+
+  const [initialData, setInitialData] = useState(recomendacaoInicial);
   const [equipamentos, setEquipamentos] = useState([]);
   const [unidades, setUnidades] = useState([]);
   const [loading, setLoading] = useState(true);

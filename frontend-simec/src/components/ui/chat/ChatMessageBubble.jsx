@@ -21,8 +21,18 @@ function ChatMessageBubble({
 }) {
   const isUser = role === 'user';
   const suggestions = Array.isArray(meta?.suggestions) ? meta.suggestions : [];
+  const actions = Array.isArray(meta?.actions) ? meta.actions : [];
   const preview = meta?.preview || null;
   const contextoPDF = meta?.contextoPDF || null;
+
+  const handleActionClick = (action) => {
+    if (!onTriggerAction || !action?.id) return;
+    onTriggerAction({
+      acao: action.id,
+      contexto: contexto || null,
+      meta,
+    });
+  };
 
   // Quando a mensagem traz preview, o botao 'Baixar PDF' do card aciona
   // a acao sugerida pelo backend. Deriva acao/contexto de meta.contextoPDF
@@ -96,6 +106,34 @@ function ChatMessageBubble({
             />
           ) : null}
         </div>
+
+        {!isUser && actions.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {actions.map((action) => {
+              const isPrimary = action.variant === 'primary';
+              return (
+                <button
+                  key={action.id}
+                  type="button"
+                  onClick={() => handleActionClick(action)}
+                  className={[
+                    'rounded-full px-4 py-1.5 text-xs font-semibold transition hover:-translate-y-[1px]',
+                    isPrimary
+                      ? 'bg-cyan-600 text-white shadow-sm hover:bg-cyan-700'
+                      : 'border bg-white text-slate-700 hover:bg-slate-50',
+                  ].join(' ')}
+                  style={
+                    !isPrimary
+                      ? { borderColor: 'var(--border-soft)' }
+                      : undefined
+                  }
+                >
+                  {action.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         {!isUser && suggestions.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
