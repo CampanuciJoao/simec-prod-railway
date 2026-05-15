@@ -177,6 +177,7 @@ router.get('/extracoes/diagnostico', async (req, res) => {
       ultimaExtracaoOk,
       amostrasErro,
       amostrasLlmErro,
+      amostrasDownloadErro,
     ] = await Promise.all([
       prisma.gehcPdfDocumento.count({ where: { tenantId } }),
       prisma.gehcPdfDocumento.count({ where: { tenantId, r2Key: { not: null } } }),
@@ -208,6 +209,21 @@ router.get('/extracoes/diagnostico', async (req, res) => {
         orderBy: { extraidoEm: 'desc' },
         take: 5,
       }),
+      // Amostras dos ultimos erros do DOWNLOADER — diferente da extracao.
+      // Contem mensagem amigavel salva pelo gehcDocumentDownloader.
+      prisma.gehcPdfDocumento.findMany({
+        where: { tenantId, ultimoErro: { not: null } },
+        select: {
+          documentId: true,
+          fileName: true,
+          ultimoErro: true,
+          tentativas: true,
+          ultimaTentativaEm: true,
+          equipamento: { select: { tag: true, modelo: true } },
+        },
+        orderBy: { ultimaTentativaEm: 'desc' },
+        take: 10,
+      }),
     ]);
 
     res.json({
@@ -227,6 +243,7 @@ router.get('/extracoes/diagnostico', async (req, res) => {
         ultimaSucesso: ultimaExtracaoOk,
       },
       amostraDeErros: {
+        download: amostrasDownloadErro,
         extracao: amostrasErro,
         llm: amostrasLlmErro,
       },
