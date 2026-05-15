@@ -48,7 +48,7 @@ function ManutencoesTab({ tab, isAdmin, onDeleteManutencao, onDeleteOs }) {
   return (
     <PageSection>
       <div className="space-y-6">
-        <KpiGrid>
+        <KpiGrid cols={5}>
           <KpiCard
             icon={faClock}
             title="Total"
