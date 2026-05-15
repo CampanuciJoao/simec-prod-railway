@@ -50,6 +50,17 @@ function buildEquipamentosWhereClause(tenantId, query = {}) {
   const unidadeId = normalizarOpcional(query?.unidadeId);
   const search = normalizarOpcional(query?.search);
 
+  // Filtro por lista de IDs — usado por entradas drill-down (ex: "Sem
+  // programa CQ" leva à lista de equipamentos especificos). Aceita "ids" como
+  // CSV ou repetição de query string (?ids=a&ids=b).
+  let ids = query?.ids;
+  if (typeof ids === 'string') {
+    ids = ids.split(',').map((s) => s.trim()).filter(Boolean);
+  }
+  if (Array.isArray(ids) && ids.length > 0) {
+    where.id = { in: ids };
+  }
+
   if (status) where.status = status;
   if (tipo) where.tipo = tipo;
   if (fabricante) where.fabricante = fabricante;

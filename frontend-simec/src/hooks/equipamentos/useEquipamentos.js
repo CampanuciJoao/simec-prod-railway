@@ -16,6 +16,7 @@ function buildQueryParams({
   filtros,
   sortConfig,
   page,
+  idsFiltro,
 }) {
   return {
     page,
@@ -25,6 +26,10 @@ function buildQueryParams({
     tipo: filtros.tipo || undefined,
     fabricante: filtros.fabricante || undefined,
     status: filtros.status || undefined,
+    ids:
+      Array.isArray(idsFiltro) && idsFiltro.length > 0
+        ? idsFiltro.join(',')
+        : undefined,
     sortBy: sortConfig.key || 'modelo',
     sortDirection:
       sortConfig.direction === 'descending' ? 'desc' : 'asc',
@@ -64,6 +69,16 @@ export const useEquipamentos = (initialState = {}) => {
     fabricante: initialState.filtros?.fabricante || '',
     status: initialState.filtros?.status || '',
   });
+
+  // Restrição opcional a uma lista de IDs (drill-down a partir de outra
+  // tela — ex: "Equipamentos sem programa CQ"). Quando definido, o backend
+  // limita a busca a esses IDs; demais filtros refinam dentro do conjunto.
+  const [idsFiltro, setIdsFiltro] = useState(
+    Array.isArray(initialState.idsFiltro) ? initialState.idsFiltro : null
+  );
+  const [idsFiltroLabel, setIdsFiltroLabel] = useState(
+    initialState.idsFiltroLabel || null
+  );
   const [sortConfig, setSortConfig] = useState({
     key: 'modelo',
     direction: 'ascending',
@@ -95,6 +110,7 @@ export const useEquipamentos = (initialState = {}) => {
             filtros,
             sortConfig,
             page,
+            idsFiltro,
           })
         );
 
@@ -147,7 +163,7 @@ export const useEquipamentos = (initialState = {}) => {
         setLoadingMore(false);
       }
     },
-    [addToast, filtros, searchTerm, sortConfig]
+    [addToast, filtros, searchTerm, sortConfig, idsFiltro]
   );
 
   const debouncedFetch = useMemo(
@@ -207,6 +223,16 @@ export const useEquipamentos = (initialState = {}) => {
     setFiltros,
     refetch: () => fetchData({ page: 1, append: false }),
     carregarMais,
+    idsFiltro,
+    idsFiltroLabel,
+    setIdsFiltro: (ids, label = null) => {
+      setIdsFiltro(Array.isArray(ids) && ids.length > 0 ? ids : null);
+      setIdsFiltroLabel(label);
+    },
+    limparIdsFiltro: () => {
+      setIdsFiltro(null);
+      setIdsFiltroLabel(null);
+    },
     controles: {
       searchTerm,
       filtros,

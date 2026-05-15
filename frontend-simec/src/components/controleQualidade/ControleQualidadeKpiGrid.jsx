@@ -57,8 +57,9 @@ function ControleQualidadeKpiGrid({ metricas, activeKpi, onSelectKpi }) {
         icon={faClipboardList}
         title="Sem programa"
         value={metricas?.semPrograma ?? 0}
-        subtitle="Equipamentos regulados"
+        subtitle="Ver equipamentos regulados"
         tone="orange"
+        onClick={handle('semPrograma')}
       />
     </KpiGrid>
   );

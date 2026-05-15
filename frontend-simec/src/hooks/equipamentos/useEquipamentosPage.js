@@ -43,7 +43,23 @@ export function useEquipamentosPage() {
     controles,
     removerEquipamento,
     atualizarStatusLocalmente,
+    idsFiltro,
+    idsFiltroLabel,
+    setIdsFiltro,
+    limparIdsFiltro,
   } = useEquipamentos(initialState);
+
+  // Aplica filtro por IDs vindo via navegação (ex: clique em "Sem programa CQ"
+  // em /equipamentos abre a página de Cadastrados filtrando apenas os IDs
+  // recebidos).
+  useEffect(() => {
+    const ids = location.state?.equipamentoIds;
+    const label = location.state?.equipamentoIdsLabel;
+    if (Array.isArray(ids) && ids.length > 0) {
+      setIdsFiltro(ids, label || 'Equipamentos selecionados');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     sessionStorage.setItem(
@@ -189,14 +205,26 @@ export function useEquipamentosPage() {
       });
     }
 
+    if (idsFiltro && idsFiltro.length > 0) {
+      filtrosAtivos.push({
+        key: 'ids',
+        value: 'ids',
+        label: `${idsFiltroLabel || 'Lista restrita'} (${idsFiltro.length})`,
+      });
+    }
+
     return filtrosAtivos;
-  }, [controles.filtros, unidadesDisponiveis]);
+  }, [controles.filtros, unidadesDisponiveis, idsFiltro, idsFiltroLabel]);
 
   const clearFilter = useCallback(
     (key) => {
+      if (key === 'ids') {
+        limparIdsFiltro();
+        return;
+      }
       controles.handleFilterChange(key, '');
     },
-    [controles]
+    [controles, limparIdsFiltro]
   );
 
   const clearAllFilters = useCallback(() => {
@@ -204,7 +232,8 @@ export function useEquipamentosPage() {
     controles.handleFilterChange('tipo', '');
     controles.handleFilterChange('fabricante', '');
     controles.handleFilterChange('status', '');
-  }, [controles]);
+    limparIdsFiltro();
+  }, [controles, limparIdsFiltro]);
 
   const onSearchChange = useCallback(
     (event) => {

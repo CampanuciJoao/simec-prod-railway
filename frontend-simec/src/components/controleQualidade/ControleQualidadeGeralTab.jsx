@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus,
@@ -76,6 +76,7 @@ function statusVencimento(testes) {
 }
 
 function ControleQualidadeGeralTab() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [metricas, setMetricas] = useState({});
@@ -137,7 +138,21 @@ function ControleQualidadeGeralTab() {
 
   // Cada KPI clicável aplica seu filtro e zera os filtros conflitantes
   // (resultado/statusVencimento), preservando modalidade e busca.
+  // "Sem programa" é diferente: navega para a aba de Equipamentos cadastrados
+  // com filtro de IDs (são equipamentos sem testes registrados — não filtra
+  // a tabela de "Testes registrados" aqui).
   const handleSelectKpi = useCallback((key) => {
+    if (key === 'semPrograma') {
+      const ids = (metricas?.equipamentosSemPrograma || []).map((eq) => eq.id);
+      if (ids.length === 0) return;
+      navigate('/equipamentos', {
+        state: {
+          equipamentoIds: ids,
+          equipamentoIdsLabel: 'Sem programa CQ',
+        },
+      });
+      return;
+    }
     setFiltros((f) => {
       const base = { ...f, resultado: '', statusVencimento: '' };
       if (key === 'aprovados') base.resultado = 'Aprovado';
@@ -146,7 +161,7 @@ function ControleQualidadeGeralTab() {
       else if (key === 'vencidos') base.statusVencimento = 'vencido';
       return base;
     });
-  }, []);
+  }, [metricas, navigate]);
 
   const testesFiltrados = useMemo(() => {
     return testes.filter((t) => {
