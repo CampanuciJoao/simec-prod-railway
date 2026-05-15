@@ -36,6 +36,16 @@ export function useTabManutencoes() {
   const osc = useOsCorretiva({ tipoFixo: 'Corretiva' });
   const deleteModal = useModal();
 
+  // Status filtrados que se aplicam a OsCorretiva-Corretiva. Quando o
+  // usuário escolhe um status só de Manutenção (Pendente / Agendada /
+  // EmAndamento / AguardandoConfirmacao), a lista de OsCorretiva é
+  // suprimida localmente — caso contrário ela traria tudo (filtro zerado)
+  // e poluiria a aba com itens fora do recorte.
+  const oscStatusAplicavel = useMemo(() => {
+    const s = manut.filtros?.status;
+    return !s || s === 'aguardando' || s === 'Concluida' || s === 'Cancelada';
+  }, [manut.filtros?.status]);
+
   // ─── Items unificados ────────────────────────────────────────────────────
   const unifiedItems = useMemo(() => {
     const m = manut.manutencoes.map((item) => ({
@@ -43,17 +53,19 @@ export function useTabManutencoes() {
       _kind: 'manutencao',
       _sortDate: item.dataHoraAgendamentoInicio || item.createdAt || '',
     }));
-    const o = osc.osCorretivas.map((item) => ({
-      ...item,
-      _kind: 'osCorretiva',
-      _sortDate: item.dataHoraAbertura || item.createdAt || '',
-    }));
+    const o = oscStatusAplicavel
+      ? osc.osCorretivas.map((item) => ({
+          ...item,
+          _kind: 'osCorretiva',
+          _sortDate: item.dataHoraAbertura || item.createdAt || '',
+        }))
+      : [];
     return [...m, ...o].sort((a, b) => {
       if (!a._sortDate) return 1;
       if (!b._sortDate) return -1;
       return new Date(b._sortDate) - new Date(a._sortDate);
     });
-  }, [manut.manutencoes, osc.osCorretivas]);
+  }, [manut.manutencoes, osc.osCorretivas, oscStatusAplicavel]);
 
   // ─── KPIs combinados ─────────────────────────────────────────────────────
   const metricas = useMemo(() => ({
@@ -211,11 +223,14 @@ export function useTabManutencoes() {
 
   // ─── Paginação / carregar mais ───────────────────────────────────────────
   const totalCarregado = unifiedItems.length;
-  const totalGeral = (manut.pagination?.total ?? 0) + (osc.pagination?.total ?? 0);
+  const totalGeral =
+    (manut.pagination?.total ?? 0) +
+    (oscStatusAplicavel ? osc.pagination?.total ?? 0 : 0);
   const hasNextPage = Boolean(
-    manut.pagination?.hasNextPage || osc.pagination?.hasNextPage
+    manut.pagination?.hasNextPage ||
+      (oscStatusAplicavel && osc.pagination?.hasNextPage)
   );
-  const loadingMore = manut.loadingMore || osc.loadingMore;
+  const loadingMore = manut.loadingMore || (oscStatusAplicavel && osc.loadingMore);
   const loading = (manut.loading || osc.loading) && totalCarregado === 0;
   const error = manut.error;
 

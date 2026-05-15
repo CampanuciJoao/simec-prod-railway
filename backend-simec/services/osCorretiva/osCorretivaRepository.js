@@ -63,10 +63,17 @@ export async function buscarOsResumo({ tenantId, osId }) {
 // alimenta o card "Aguardando" na lista de manutenções.
 export const OS_CORRETIVA_STATUS_AGUARDANDO = ['Aberta', 'EmAndamento', 'AguardandoTerceiro'];
 
+// Status considerados "em andamento" para a aba Ocorrências (que filtra
+// tipo='Ocorrencia' e portanto nunca tem AguardandoTerceiro).
+export const OS_CORRETIVA_STATUS_EM_ANDAMENTO = ['Aberta', 'EmAndamento'];
+
 function expandirFiltroStatusOsCorretiva(status) {
   if (!status) return null;
   if (status === 'aguardando') {
     return { in: OS_CORRETIVA_STATUS_AGUARDANDO };
+  }
+  if (status === 'em_andamento') {
+    return { in: OS_CORRETIVA_STATUS_EM_ANDAMENTO };
   }
   return status;
 }

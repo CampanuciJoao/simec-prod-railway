@@ -10,8 +10,9 @@ import { useOsCorretiva } from '@/hooks/osCorretiva/useOsCorretiva';
 import { useModal } from '@/hooks/shared/useModal';
 
 const STATUS_LABELS = {
+  em_andamento: 'Em andamento',
   Aberta: 'Aberta',
-  EmAndamento: 'Em andamento',
+  EmAndamento: 'Em andamento (com nota)',
   Concluida: 'Concluída',
   Cancelada: 'Cancelada',
 };
@@ -50,8 +51,9 @@ export function useTabOcorrencias() {
   // Para o filtro real, só os status puros são enviados.
   const selectFilters = useMemo(() => {
     const statusOptions = [
+      { value: 'em_andamento', label: 'Em andamento' },
       { value: 'Aberta', label: 'Aberta' },
-      { value: 'EmAndamento', label: 'Em Andamento' },
+      { value: 'EmAndamento', label: 'Em andamento (com nota)' },
       { value: 'Concluida', label: 'Concluída' },
       { value: 'Cancelada', label: 'Cancelada' },
     ];
@@ -106,11 +108,11 @@ export function useTabOcorrencias() {
   const activeKpi = useMemo(() => {
     const s = osc.filtros.status;
     if (!s) return 'total';
+    if (s === 'em_andamento') return 'emAndamento';
     if (s === 'Concluida') return 'concluidas';
     if (s === 'Cancelada') return 'canceladas';
-    // 'Aberta' e 'EmAndamento' caem em "Em andamento", mas não temos como
-    // pintar os 2 como ativos com um único valor — fica indicado quando o
-    // dropdown está aplicado e o card "Total" perde o highlight.
+    // status puro (Aberta/EmAndamento) selecionado pelo dropdown — também
+    // cai visualmente no card "Em andamento" para coerência.
     if (s === 'Aberta' || s === 'EmAndamento') return 'emAndamento';
     return null;
   }, [osc.filtros.status]);
@@ -118,10 +120,8 @@ export function useTabOcorrencias() {
   const handleSelectKpi = useCallback((kpiKey) => {
     const mapa = {
       total: '',
-      // "Em andamento" no card representa Aberta+EmAndamento. Como o backend
-      // só filtra 1 status, ao clicar zeramos o filtro de status e o usuário
-      // ainda enxerga o todo — a sinalização vem do contador do card.
-      emAndamento: '',
+      // Pseudo-status que o backend expande para (Aberta + EmAndamento).
+      emAndamento: 'em_andamento',
       concluidas: 'Concluida',
       canceladas: 'Cancelada',
     };
