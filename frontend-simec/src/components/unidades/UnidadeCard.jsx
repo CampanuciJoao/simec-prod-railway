@@ -43,8 +43,14 @@ function MetaItem({ icon, label, value, title = value }) {
         </div>
 
         <div
-          className="mt-1 break-words text-sm font-medium leading-6"
-          style={{ color: 'var(--text-primary)' }}
+          className="mt-1 text-sm font-medium leading-6"
+          style={{
+            color: 'var(--text-primary)',
+            // overflowWrap:anywhere garante quebra em qualquer ponto da
+            // string em mobile (enderecos longos vazavam pro lado em iOS).
+            overflowWrap: 'anywhere',
+            wordBreak: 'break-word',
+          }}
           title={title || ''}
         >
           {value || '—'}
@@ -92,8 +98,8 @@ function UnidadeCard({ unidade, onEdit, onDelete }) {
               }}
               title={unidade.nomeFantasia || 'Sem nome fantasia'}
             >
-              <FontAwesomeIcon icon={faBuilding} />
-              <span className="min-w-0 truncate whitespace-nowrap">
+              <FontAwesomeIcon icon={faBuilding} className="shrink-0" />
+              <span className="min-w-0 truncate">
                 {unidade.nomeFantasia || 'Sem nome fantasia'}
               </span>
             </span>

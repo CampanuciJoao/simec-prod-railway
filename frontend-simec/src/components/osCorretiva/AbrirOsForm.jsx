@@ -110,7 +110,10 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
           options={unidadesOptions}
         />
 
-        <div className="grid grid-cols-3 gap-3">
+        {/* Em mobile (< sm) os 2 selects empilham — em telas estreitas, lado
+            a lado cortava ambos os textos. Em sm+ vira grid 1+2 (apelido
+            estreito, equipamento largo). */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div>
             <Select
               label="Apelido"
@@ -124,7 +127,7 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
               disabled={!selectedUnidade || semApelidos}
             />
           </div>
-          <div className="col-span-2">
+          <div className="sm:col-span-2">
             <Select
               label="Equipamento *"
               placeholder=""
