@@ -49,6 +49,22 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
     return equipamentos.filter((eq) => eq.apelido === selectedApelido);
   }, [equipamentos, selectedApelido]);
 
+  // Auto-seleciona o equipamento quando o apelido escolhido tem 1 unico
+  // equipamento (caso comum — apelido eh tipicamente unico por unidade).
+  // Se houver multiplos com o mesmo apelido, o usuario escolhe manualmente.
+  useEffect(() => {
+    if (!selectedApelido) return;
+    if (equipamentosFiltrados.length === 1) {
+      const unico = equipamentosFiltrados[0];
+      if (form.equipamentoId !== unico.id) onChange('equipamentoId', unico.id);
+    } else if (equipamentosFiltrados.length > 1 && form.equipamentoId) {
+      // Multiplos candidatos — limpa a selecao previa para forcar escolha
+      const aindaValido = equipamentosFiltrados.some((eq) => eq.id === form.equipamentoId);
+      if (!aindaValido) onChange('equipamentoId', '');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedApelido, equipamentosFiltrados]);
+
   const unidadesOptions = [
     { value: '', label: 'Selecione a unidade' },
     ...unidades.map((u) => ({ value: u.id, label: u.nomeSistema })),
