@@ -54,6 +54,7 @@ model Tenant {
   gehcAlertaSuspensoes     GehcAlertaSuspensao[]
   gehcPdfDocumentos        GehcPdfDocumento[]
   gehcPdfExtraidos         GehcPdfExtraido[]
+  gehcDownloadLogs         GehcDownloadLog[]
   eventosEquipamento       EventoEquipamento[]
   eventoEmbeddings         EventoEquipamentoEmbedding[]
   iaInsights               IaInsight[]
@@ -918,6 +919,57 @@ model GehcPdfExtraido {
   @@index([tenantId, extraidoEm])
   @@index([extractorVersion, extraidoEm])
   @@map("gehc_pdf_extraidos")
+}
+
+// ─── GE Health Cloud — Log estruturado do downloader ─────────────────────────
+//
+// Cada tentativa de download (inline retry incluso) gera 1 log com a
+// categoria do resultado, timeline das etapas executadas (botao achado,
+// popup aberto, checkbox marcado, etc) e duracao. Permite diagnostico sem
+// precisar de log do Railway. Tambem alimenta o detector de FALHA_SISTEMICA
+// (quando varios docs consecutivos falham as 3 tentativas, eh provavel
+// problema maior — sessao perdida, portal mudou, etc).
+//
+// Categorias possiveis:
+//   SUCESSO                 — download e extracao ok
+//   TIMEOUT_DOWNLOAD        — Playwright nao recebeu evento 'download' a tempo
+//   POPUP_NAO_ABRIU         — botao Download clicado, popup nao apareceu
+//   BOTAO_NAO_ENCONTRADO    — botao Download nao visivel no card
+//   SESSAO_PERDIDA          — redirect para tela de login do GE
+//   DOCUMENT_SEARCH_FALHOU  — query GraphQL listarDocumentosDaOS falhou
+//   EXTRACAO_FALHOU         — download ok, mas pdf-parse/LLM falhou
+//   FALHA_SISTEMICA         — N docs consecutivos falharam (cron quebrou)
+//   OUTRO                   — erro nao categorizado
+
+model GehcDownloadLog {
+  id              String   @id @default(uuid())
+  tenantId        String
+  documentId      String?
+  fileName        String?
+  equipamentoId   String?
+  ordemServicoId  String?
+  trackingNumber  String?
+
+  categoria       String
+  mensagem        String?  @db.Text
+  etapasJson      String?  @db.Text
+  duracaoMs       Int?
+  tentativaN      Int      @default(1)
+
+  // Marcado como true quando o mesmo documentId baixar com sucesso depois.
+  // Usado pra estatistica de % de sucesso eventual.
+  resolvido       Boolean  @default(false)
+  resolvidoEm     DateTime?
+
+  createdAt       DateTime @default(now())
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, categoria])
+  @@index([tenantId, resolvido, createdAt(sort: Desc)])
+  @@index([documentId])
+  @@map("gehc_download_logs")
 }
 
 // ─── IA — Estado dos pipelines automáticos ───────────────────────────────────

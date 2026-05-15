@@ -129,29 +129,40 @@ export async function limparSegurosAntigos() {
   return result.count;
 }
 
+// Importado dinamicamente para evitar dependencia circular caso o
+// gehcDownloadLogger venha a importar algo desse cleanup.
+async function purgarLogsDownloaderGehc() {
+  const { purgarLogsAntigos } = await import('../gehc/gehcDownloadLogger.js');
+  const r = await purgarLogsAntigos();
+  return r.purgados || 0;
+}
+
 export async function executarCleanupCompleto() {
   console.log('[CLEANUP] Iniciando rotina de retenção de dados...');
 
-  const [alertas, sessoes, mensagens, seguros] = await Promise.allSettled([
+  const [alertas, sessoes, mensagens, seguros, logsDownloader] = await Promise.allSettled([
     limparAlertasAntigos(),
     limparSessoesAgente(),
     limparMensagensOrfas(),
     limparSegurosAntigos(),
+    purgarLogsDownloaderGehc(),
   ]);
 
   const totalAlerts  = alertas.status  === 'fulfilled' ? alertas.value  : 0;
   const totalSessoes = sessoes.status  === 'fulfilled' ? sessoes.value  : 0;
   const totalMsgs    = mensagens.status === 'fulfilled' ? mensagens.value : 0;
   const totalSeguros = seguros.status  === 'fulfilled' ? seguros.value  : 0;
+  const totalLogsDl  = logsDownloader.status === 'fulfilled' ? logsDownloader.value : 0;
 
   if (alertas.status  === 'rejected') console.error('[CLEANUP] Erro em alertas:',  alertas.reason?.message);
   if (sessoes.status  === 'rejected') console.error('[CLEANUP] Erro em sessões:',  sessoes.reason?.message);
   if (mensagens.status === 'rejected') console.error('[CLEANUP] Erro em mensagens:', mensagens.reason?.message);
   if (seguros.status  === 'rejected') console.error('[CLEANUP] Erro em seguros:',  seguros.reason?.message);
+  if (logsDownloader.status === 'rejected') console.error('[CLEANUP] Erro em logs downloader:', logsDownloader.reason?.message);
 
   console.log(
-    `[CLEANUP] Concluído | alertas=${totalAlerts} | sessões=${totalSessoes} | mensagens=${totalMsgs} | seguros=${totalSeguros}`
+    `[CLEANUP] Concluído | alertas=${totalAlerts} | sessões=${totalSessoes} | mensagens=${totalMsgs} | seguros=${totalSeguros} | logsDownloader=${totalLogsDl}`
   );
 
-  return { alertas: totalAlerts, sessoes: totalSessoes, mensagens: totalMsgs, seguros: totalSeguros };
+  return { alertas: totalAlerts, sessoes: totalSessoes, mensagens: totalMsgs, seguros: totalSeguros, logsDownloader: totalLogsDl };
 }

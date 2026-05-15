@@ -157,6 +157,59 @@ router.patch('/insights/:id/feedback', async (req, res) => {
   }
 });
 
+// ─── GET /api/gehc/aprendizado/logs-downloader ───────────────────────────────
+// Lista logs estruturados do gehcDocumentDownloader (1 entry por tentativa
+// inline). Filtros opcionais: categoria, resolvido, desdeDias, limite.
+router.get('/logs-downloader', async (req, res) => {
+  const tenantId = req.usuario.tenantId;
+  const categoria = req.query?.categoria || null;
+  const resolvido = req.query?.resolvido != null
+    ? String(req.query.resolvido) === 'true'
+    : null;
+  const desdeDias = Math.min(Number(req.query?.desdeDias) || 7, 180);
+  const limite = Math.min(Number(req.query?.limite) || 50, 200);
+
+  try {
+    const desde = new Date(Date.now() - desdeDias * 86_400_000);
+    const where = { tenantId, createdAt: { gte: desde } };
+    if (categoria) where.categoria = categoria;
+    if (resolvido !== null) where.resolvido = resolvido;
+
+    const [items, totalPorCategoria] = await Promise.all([
+      prisma.gehcDownloadLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: limite,
+      }),
+      prisma.gehcDownloadLog.groupBy({
+        by: ['categoria'],
+        where: { tenantId, createdAt: { gte: desde } },
+        _count: { id: true },
+      }),
+    ]);
+
+    const itemsParsed = items.map((l) => ({
+      ...l,
+      etapas: l.etapasJson ? JSON.parse(l.etapasJson) : null,
+      etapasJson: undefined,
+    }));
+
+    res.json({
+      tenantId,
+      filtros: { categoria, resolvido, desdeDias, limite },
+      totalPorCategoria: totalPorCategoria.reduce((acc, c) => {
+        acc[c.categoria] = c._count.id;
+        return acc;
+      }, {}),
+      total: items.length,
+      items: itemsParsed,
+    });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /logs-downloader:', err);
+    res.status(500).json({ message: 'Erro ao buscar logs do downloader.' });
+  }
+});
+
 // ─── GET /api/gehc/aprendizado/extracoes/diagnostico ─────────────────────────
 // Snapshot do estado da pipeline de PDFs para o tenant. Util quando os KPIs
 // nao batem (ex: PDFs baixados mas 0 analisados) e nao se tem acesso ao log.

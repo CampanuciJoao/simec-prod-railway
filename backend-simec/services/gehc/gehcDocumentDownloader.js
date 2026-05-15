@@ -27,6 +27,17 @@ import { listarDocumentosDaOS } from './gehcDocumentClient.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
 import { extrairUmPdf } from './gehcPdfExtractionOrchestrator.js';
+import {
+  CATEGORIAS_LOG,
+  novaTimeline,
+  registrarLog,
+  marcarComoResolvido,
+  categorizarErro,
+} from './gehcDownloadLogger.js';
+import {
+  dispararAlertaFalhaSistemica,
+  resolverAlertaFalhaSistemica,
+} from './gehcDownloaderAlerter.js';
 
 const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com.br/account';
 // Lista de OS do equipamento na aba 'Servico'. Mais eficiente que abrir 1
@@ -45,8 +56,29 @@ const TRIGGER_TIMEOUT_MS   = 20_000;  // tempo máx procurando botao Download
 // o documento por X dias. Evita gastar Playwright todo ciclo tentando
 // docs que provavelmente estao com problema permanente no portal GE
 // (S3 expirado, OS marcada como restrita, PDF corrompido, etc).
-const CIRCUIT_BREAKER_TENTATIVAS = 5;
+const CIRCUIT_BREAKER_TENTATIVAS = 10;       // mais permissivo (3 inline x ~3 ciclos)
 const CIRCUIT_BREAKER_DIAS_QUARENTENA = 7;
+
+// Retry inline por documento dentro de uma execucao. Escalonado: a 1a
+// tentativa eh imediata, depois espera RETRY_BACKOFF_MS[i] entre tentativas.
+const RETRY_INLINE_MAX = 3;
+const RETRY_BACKOFF_MS = [0, 30_000, 60_000]; // antes da 1a, 2a, 3a tentativa
+
+// Detector inline de falha sistemica: se N docs CONSECUTIVOS esgotam
+// suas 3 tentativas, eh provavel problema maior (sessao, layout, portal
+// fora). Quebra a execucao e gera alerta interno (sem Telegram).
+const FALHAS_CONSECUTIVAS_PARA_SISTEMICO = 3;
+
+// Categorias de erro PERMANENTE — nao adianta fazer retry inline.
+// SESSAO_PERDIDA tenta re-login no proximo ciclo; layout exige fix.
+const CATEGORIAS_PERMANENTES = new Set([
+  'BOTAO_NAO_ENCONTRADO',
+]);
+
+// Categorias que se beneficiam de re-login inline (nao adianta retry sem auth).
+const CATEGORIAS_REAUTH = new Set([
+  'SESSAO_PERDIDA',
+]);
 
 // R2_PREFIX e r2KeyParaPdf permanecem para compatibilidade com PDFs legados
 // que ainda existirem no bucket (limpeza explicita via endpoint dedicado).
@@ -264,6 +296,188 @@ async function lerStreamComoBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
+// Tenta baixar UM documento, registrando timeline das etapas executadas.
+// Retorna { ok, categoria, mensagem, etapas, duracaoMs, buffer? }.
+// NUNCA lanca — falhas sao categorizadas no return.
+async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
+  const t = novaTimeline();
+  try {
+    // 1. Verifica se o botao Download eh visivel
+    const visivel = await downloadBtn.isVisible({ timeout: 3_000 }).catch(() => false);
+    t.marcar('botao_visivel', { ok: visivel });
+    if (!visivel) {
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.BOTAO_NAO_ENCONTRADO,
+        mensagem: 'Botão Download não está visível no card.',
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+
+    // 2. Clica e tenta capturar download direto OU detectar popup
+    const popupAntes = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
+    const promiseDownload = page.waitForEvent('download', { timeout: 5_000 }).catch(() => null);
+    await downloadBtn.click().catch(() => {});
+    t.marcar('botao_clicado');
+
+    const downloadDireto = await promiseDownload;
+    if (downloadDireto) {
+      t.marcar('download_direto', { ok: true });
+      const buffer = await lerStreamComoBuffer(await downloadDireto.createReadStream());
+      t.marcar('buffer_lido', { bytes: buffer.length });
+      const fim = t.finalizar();
+      return {
+        ok: true,
+        categoria: CATEGORIAS_LOG.SUCESSO,
+        mensagem: null,
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+        buffer,
+        download: downloadDireto,
+      };
+    }
+
+    // 3. Espera popup
+    await page.waitForTimeout(1_500);
+    const popupDepois = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
+    const popupAbriu = popupDepois > popupAntes;
+    t.marcar('popup_detectado', { ok: popupAbriu });
+
+    if (!popupAbriu) {
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.POPUP_NAO_ABRIU,
+        mensagem: 'Popup de download não abriu após click no botão.',
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+
+    // 4. Marca o checkbox correto
+    const checkboxes = page.locator('input[type="checkbox"]');
+    const total = await checkboxes.count();
+    t.marcar('checkboxes_listados', { total });
+    if (total === 0 || indiceDocumento >= total) {
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.POPUP_NAO_ABRIU,
+        mensagem: `Popup sem checkboxes válidos (total=${total}, indice=${indiceDocumento}).`,
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+    for (let i = 0; i < total; i++) {
+      const cb = checkboxes.nth(i);
+      if (await cb.isChecked()) await cb.uncheck().catch(() => {});
+    }
+    await checkboxes.nth(indiceDocumento).check().catch(() => {});
+    t.marcar('checkbox_marcado', { indice: indiceDocumento });
+
+    // 5. Clica DOWNLOAD do popup e espera o evento
+    const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
+    let download;
+    try {
+      [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
+        botaoPopup.click(),
+      ]);
+    } catch (err) {
+      t.marcar('download_event_timeout', { ok: false, erro: err.message?.slice(0, 100) });
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+        mensagem: `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s esperando evento download após click no popup.`,
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+    t.marcar('download_event', { ok: true });
+
+    const buffer = await lerStreamComoBuffer(await download.createReadStream());
+    t.marcar('buffer_lido', { bytes: buffer.length });
+
+    const fim = t.finalizar();
+    return {
+      ok: true,
+      categoria: CATEGORIAS_LOG.SUCESSO,
+      mensagem: null,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+      buffer,
+      download,
+    };
+  } catch (err) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: categorizarErro(err.message),
+      mensagem: err.message?.slice(0, 200) || 'Erro inesperado',
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+}
+
+function sleep_ms(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+// Wrapper com retry inline 3x + escalonamento + transient/permanent.
+// Registra log estruturado por TENTATIVA (3 logs no caso de 3 falhas).
+// Retorna { ok, ultimoResultado, tentativasFeitas }.
+async function baixarComRetry({
+  page, downloadBtn, doc, indice,
+  tenantId, equipamento, ordem, trackingNumber,
+}) {
+  let ultimo = null;
+  for (let tentativa = 1; tentativa <= RETRY_INLINE_MAX; tentativa++) {
+    if (tentativa > 1) {
+      const espera = RETRY_BACKOFF_MS[tentativa - 1] || 60_000;
+      console.log(`[GEHC_DOWNLOAD] ${doc.documentId} tentativa ${tentativa}/${RETRY_INLINE_MAX} apos ${espera / 1000}s...`);
+      await sleep_ms(espera);
+    }
+
+    const r = await tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento: indice });
+    ultimo = r;
+
+    // Log estruturado dessa tentativa
+    await registrarLog({
+      tenantId,
+      documentId: doc.documentId,
+      fileName: doc.fileName,
+      equipamentoId: equipamento.id,
+      ordemServicoId: ordem.id,
+      trackingNumber,
+      categoria: r.categoria,
+      mensagem: r.mensagem,
+      etapas: r.etapas,
+      duracaoMs: r.duracaoMs,
+      tentativaN: tentativa,
+    });
+
+    if (r.ok) return { ok: true, ultimoResultado: r, tentativasFeitas: tentativa };
+
+    // Permanente — nao adianta retry inline
+    if (CATEGORIAS_PERMANENTES.has(r.categoria)) {
+      console.log(`[GEHC_DOWNLOAD] ${doc.documentId}: erro permanente ${r.categoria}, abortando retry.`);
+      return { ok: false, ultimoResultado: r, tentativasFeitas: tentativa };
+    }
+
+    // Sessao perdida — nao adianta retry sem novo auth.
+    // Volta pro caller que decide se re-autentica e continua, ou aborta.
+    if (CATEGORIAS_REAUTH.has(r.categoria)) {
+      console.log(`[GEHC_DOWNLOAD] ${doc.documentId}: sessao perdida, retry inline interrompido.`);
+      return { ok: false, ultimoResultado: r, tentativasFeitas: tentativa, requerReauth: true };
+    }
+  }
+  return { ok: false, ultimoResultado: ultimo, tentativasFeitas: RETRY_INLINE_MAX };
+}
+
 // ─── Captura de TODAS as OSs de um equipamento (1 navegacao) ────────────────
 //
 // Estrategia objetiva: navegar UMA vez para a lista de OSs do equipamento
@@ -274,7 +488,7 @@ async function lerStreamComoBuffer(stream) {
 // Como 'Documentos disponiveis' so aparece para OS com PDFs ja publicados
 // pelo GE, o filtro fica natural — nao gastamos tempo com OSs vazias.
 
-async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens, tokens }) {
+async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens, tokens, contadorFalhasConsecutivas }) {
   const assetId = equipamento.gehcAssetId;
   if (!assetId) return { capturados: 0, processadas: 0, erro: 'sem_asset_id' };
   if (!ordens.length) return { capturados: 0, processadas: 0, erro: null };
@@ -435,97 +649,94 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
         // Botao Download esta no .ge-equipment-service-history__holder do card.
         const downloadBtn = item.locator('.ge-equipment-service-history__holder button')
           .filter({ hasText: /^(download|baixar)$/i }).first();
-        const visivel = await downloadBtn.isVisible({ timeout: 3_000 }).catch(() => false);
-        if (!visivel) {
-          erros.push(`SR${trackingNumber}: botao_download_nao_visivel`);
-          continue;
-        }
 
-        // Para cada documento pendente da OS, faz 1 ciclo de clique+download
+        // Para cada documento pendente da OS — usa wrapper com retry inline
+        // 3x + log estruturado por tentativa + transient/permanent.
         for (let i = 0; i < docsPendentes.length; i++) {
           const doc = docsPendentes[i];
           processadas++;
-          try {
-            const download = await disparaDownloadDoBotao({ page, downloadBtn, indiceDocumento: i });
-            if (!download) {
-              erros.push(`${doc.documentId}: nada_baixado`);
-              continue;
-            }
-            const buffer = await lerStreamComoBuffer(await download.createReadStream());
-            const fileName = doc.fileName || download.suggestedFilename();
-            const fileHash = crypto.createHash('sha256').update(buffer).digest('hex');
 
-            // PDF NAO vai para R2: mantemos so metadados + extracao inline.
-            // r2Key permanece null. Reprocessamento futuro nao tera o arquivo
-            // disponivel — exige rebaixar do GE.
+          const retryResult = await baixarComRetry({
+            page, downloadBtn, doc, indice: i,
+            tenantId, equipamento, ordem, trackingNumber,
+          });
+
+          if (retryResult.ok) {
+            // SUCESSO — persiste documento, dispara extracao inline,
+            // marca logs anteriores desse documentId como resolvidos
+            const r = retryResult.ultimoResultado;
+            const fileName = doc.fileName || (r.download ? r.download.suggestedFilename() : 'sem_nome.pdf');
+            const fileHash = crypto.createHash('sha256').update(r.buffer).digest('hex');
+
             const pdfDocumento = await prisma.gehcPdfDocumento.upsert({
               where: { documentId: doc.documentId },
               create: {
-                tenantId,
-                equipamentoId: equipamento.id,
-                ordemServicoId: ordem.id,
-                documentId: doc.documentId,
-                fileName, fileHash, fileSizeBytes: buffer.length, r2Key: null,
+                tenantId, equipamentoId: equipamento.id, ordemServicoId: ordem.id,
+                documentId: doc.documentId, fileName, fileHash,
+                fileSizeBytes: r.buffer.length, r2Key: null,
                 baixadoEm: new Date(),
-                tentativas: 1,
-                ultimaTentativaEm: new Date(),
-                ultimoErro: null,
+                tentativas: retryResult.tentativasFeitas,
+                ultimaTentativaEm: new Date(), ultimoErro: null,
               },
               update: {
-                fileName, fileHash, fileSizeBytes: buffer.length, r2Key: null,
+                fileName, fileHash, fileSizeBytes: r.buffer.length, r2Key: null,
                 baixadoEm: new Date(),
-                tentativas: { increment: 1 },
-                ultimaTentativaEm: new Date(),
-                ultimoErro: null,
+                tentativas: { increment: retryResult.tentativasFeitas },
+                ultimaTentativaEm: new Date(), ultimoErro: null,
               },
             });
 
-            // Extracao inline com o buffer em memoria. Falha aqui nao bloqueia
-            // o download (gehcPdfDocumento ja foi gravado); o orchestrator
-            // pode fazer retry depois para o que falhou (mas sem R2, o retry
-            // exigira rebaixar — gehcPdfExtraido fica registrando o erro).
             try {
-              const r = await extrairUmPdf({ pdfDocumento, buffer });
-              if (!r.ok) {
-                console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: extracao inline falhou — ${r.erro}`);
-              }
+              const ext = await extrairUmPdf({ pdfDocumento, buffer: r.buffer });
+              if (!ext.ok) console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: extracao inline falhou — ${ext.erro}`);
             } catch (extErr) {
-              console.error(`[GEHC_DOWNLOAD] ${doc.documentId}: erro inesperado na extracao inline:`, extErr.message);
+              console.error(`[GEHC_DOWNLOAD] ${doc.documentId}: erro extracao:`, extErr.message);
             }
 
+            await marcarComoResolvido({ tenantId, documentId: doc.documentId });
             capturados++;
-          } catch (err) {
-            // Mensagem amigavel pro feed da UI; stack completo so vai pro
-            // log do Railway. Reduz ruido no painel de Atividade.
-            const erroAmigavel = (() => {
-              const msg = err.message || '';
-              if (/timeout/i.test(msg) && /download/i.test(msg)) {
-                return 'Timeout esperando o download iniciar (portal GE não respondeu).';
-              }
-              if (/timeout/i.test(msg)) return `Timeout: ${msg.split('\n')[0].slice(0, 120)}`;
-              if (/popup/i.test(msg)) return 'Popup de download não abriu a tempo.';
-              return msg.split('\n')[0].slice(0, 200) || 'Falha desconhecida no download.';
-            })();
-            erros.push(`${doc.documentId}: ${erroAmigavel}`);
-            console.error(`[GEHC_DOWNLOAD] ${doc.documentId} falhou:`, err.message);
-            await prisma.gehcPdfDocumento.upsert({
-              where: { documentId: doc.documentId },
-              create: {
+            // Reset do contador de falhas consecutivas — voltou a funcionar
+            if (contadorFalhasConsecutivas) contadorFalhasConsecutivas.value = 0;
+            continue;
+          }
+
+          // FALHA apos retry — atualiza pdfDocumento + incrementa contador
+          const r = retryResult.ultimoResultado;
+          const erroAmigavel = r.mensagem || 'Falha desconhecida.';
+          erros.push(`${doc.documentId}: ${r.categoria} — ${erroAmigavel}`);
+
+          await prisma.gehcPdfDocumento.upsert({
+            where: { documentId: doc.documentId },
+            create: {
+              tenantId, equipamentoId: equipamento.id, ordemServicoId: ordem.id,
+              documentId: doc.documentId, fileName: doc.fileName,
+              tentativas: retryResult.tentativasFeitas,
+              ultimaTentativaEm: new Date(),
+              ultimoErro: `[${r.categoria}] ${erroAmigavel}`.slice(0, 500),
+            },
+            update: {
+              tentativas: { increment: retryResult.tentativasFeitas },
+              ultimaTentativaEm: new Date(),
+              ultimoErro: `[${r.categoria}] ${erroAmigavel}`.slice(0, 500),
+            },
+          }).catch(() => {});
+
+          // Detector de FALHA_SISTEMICA: incrementa contador de falhas
+          // consecutivas. Se atingir limite, sinaliza pra cima quebrar
+          // a execucao (evita gastar Playwright em problema sistemico).
+          if (contadorFalhasConsecutivas) {
+            contadorFalhasConsecutivas.value++;
+            if (contadorFalhasConsecutivas.value >= FALHAS_CONSECUTIVAS_PARA_SISTEMICO) {
+              console.error(
+                `[GEHC_DOWNLOAD] FALHA_SISTEMICA detectada — ${contadorFalhasConsecutivas.value} docs consecutivos falharam todas as ${RETRY_INLINE_MAX} tentativas. Quebrando execucao.`
+              );
+              await registrarLog({
                 tenantId,
-                equipamentoId: equipamento.id,
-                ordemServicoId: ordem.id,
-                documentId: doc.documentId,
-                fileName: doc.fileName,
-                tentativas: 1,
-                ultimaTentativaEm: new Date(),
-                ultimoErro: erroAmigavel,
-              },
-              update: {
-                tentativas: { increment: 1 },
-                ultimaTentativaEm: new Date(),
-                ultimoErro: erroAmigavel,
-              },
-            }).catch(() => {});
+                categoria: CATEGORIAS_LOG.FALHA_SISTEMICA,
+                mensagem: `${contadorFalhasConsecutivas.value} docs consecutivos falharam todas as ${RETRY_INLINE_MAX} tentativas. Provavel sessao perdida, layout do portal mudou ou portal fora do ar.`,
+              });
+              return { capturados, processadas, falhaSistemica: true, erro: erros.join(' | ').slice(0, 500) };
+            }
           }
         }
       } catch (err) {
@@ -740,6 +951,11 @@ export async function executarBackfillPdfs({
     porEquipamento.get(eqId).ordens.push(o);
   }
 
+  // Contador compartilhado pra detectar FALHA_SISTEMICA — quebra a execucao
+  // quando N docs CONSECUTIVOS falham todas as 3 tentativas. Suceso reseta.
+  const contadorFalhasConsecutivas = { value: 0 };
+  let falhouSistemica = false;
+
   try {
     for (const { equipamento, ordens: ordensDoEquipamento } of porEquipamento.values()) {
       // Re-checa pausa a cada equipamento — permite parada quente.
@@ -757,6 +973,7 @@ export async function executarBackfillPdfs({
         equipamento,
         ordens: ordensDoEquipamento,
         tokens,
+        contadorFalhasConsecutivas,
       });
 
       processadas += resultado.processadas || 0;
@@ -769,6 +986,15 @@ export async function executarBackfillPdfs({
         `${resultado.erro ? ` · erro: ${resultado.erro}` : ''}`
       );
 
+      // Detector de falha sistemica acionado dentro do equipamento — quebra
+      // o loop sem desperdicar Playwright em mais equipamentos. Alerta sera
+      // criado pelo orchestrator que chama essa funcao.
+      if (resultado.falhaSistemica) {
+        falhouSistemica = true;
+        console.error(`[GEHC_PDF] Backfill abortado por FALHA_SISTEMICA no tenant ${tenantId}.`);
+        break;
+      }
+
       await sleep(RATE_LIMIT_OS_MS);
     }
   } finally {
@@ -776,10 +1002,23 @@ export async function executarBackfillPdfs({
   }
 
   console.log(
-    `[GEHC_PDF] Backfill concluido tenant=${tenantId}: ${processadas} OS(s) processadas, ${capturados} PDF(s) capturados.`
+    `[GEHC_PDF] Backfill concluido tenant=${tenantId}: ${processadas} OS(s) processadas, ${capturados} PDF(s) capturados${falhouSistemica ? ' · FALHA_SISTEMICA' : ''}.`
   );
 
-  return { processadas, capturados };
+  // Alerta interno (sino do SIMEC, sem Telegram). Idempotente — atualiza
+  // alerta unico por tenant. Auto-resolve quando a captura volta a funcionar.
+  if (falhouSistemica) {
+    await dispararAlertaFalhaSistemica({
+      tenantId,
+      mensagem: `Execução abortada após ${contadorFalhasConsecutivas.value} falhas consecutivas. Possíveis causas: sessão GE expirada, layout do portal mudou, ou portal indisponível. Veja /api/gehc/aprendizado/extracoes/diagnostico.`,
+      qtdConsecutivas: contadorFalhasConsecutivas.value,
+    });
+  } else if (capturados > 0) {
+    // Captura voltou a funcionar — limpa alerta antigo (se houver)
+    await resolverAlertaFalhaSistemica({ tenantId });
+  }
+
+  return { processadas, capturados, falhaSistemica: falhouSistemica };
 }
 
 /**
