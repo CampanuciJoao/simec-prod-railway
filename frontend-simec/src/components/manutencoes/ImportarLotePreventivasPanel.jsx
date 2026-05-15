@@ -288,12 +288,16 @@ function ImportarLotePreventivasPanel({ isOpen, onClose, onSuccess }) {
   return (
     <>
       <div
-        className="fixed inset-0 z-[70] flex items-stretch justify-end bg-black/50 backdrop-blur-sm"
+        className="fixed inset-0 z-[70] flex items-stretch justify-end bg-slate-950/80 backdrop-blur-md"
         onClick={handleClose}
       >
         <div
-          className="flex h-full w-full max-w-6xl flex-col overflow-hidden shadow-2xl"
-          style={{ backgroundColor: 'var(--bg-base)' }}
+          className="flex h-full w-full max-w-6xl flex-col overflow-hidden border-l shadow-2xl"
+          style={{
+            backgroundColor: 'var(--bg-surface)',
+            color: 'var(--text-primary)',
+            borderColor: 'var(--border-soft)',
+          }}
           onClick={(e) => e.stopPropagation()}
         >
           <Header onClose={handleClose} stage={stage} />
