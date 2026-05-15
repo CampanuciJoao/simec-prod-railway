@@ -5,6 +5,7 @@ import { faSave } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, Input, Select, Textarea } from '@/components/ui';
 import { getEquipamentos } from '@/services/api/equipamentosApi';
 import { getUnidades } from '@/services/api';
+import { equipamentoLabel, equipamentoSortKey } from '@/utils/equipamentos/equipamentoLabel';
 
 function FieldError({ error }) {
   if (!error) return null;
@@ -76,10 +77,9 @@ function AbrirOsForm({ form, submitting, fieldErrors, statusOptions, onChange, o
         ? 'Nenhum equipamento encontrado'
         : 'Selecione pelo nº de série',
     },
-    ...equipamentosFiltrados.map((eq) => ({
-      value: eq.id,
-      label: eq.apelido ? `${eq.tag} — ${eq.apelido}` : `${eq.tag} (${eq.modelo})`,
-    })),
+    ...[...equipamentosFiltrados]
+      .sort((a, b) => equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR'))
+      .map((eq) => ({ value: eq.id, label: equipamentoLabel(eq) })),
   ];
 
   return (

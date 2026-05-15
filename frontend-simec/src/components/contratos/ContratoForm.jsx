@@ -19,6 +19,7 @@ import {
 } from '@/components/ui';
 
 import ContratoSelectionCard from '@/components/contratos/ContratoSelectionCard';
+import { equipamentoLabel } from '@/utils/equipamentos/equipamentoLabel';
 
 const OPCOES_CATEGORIA = [
   'Manutenção Corretiva',
@@ -191,9 +192,10 @@ function ContratoForm({
             }
             renderLabel={(equipamento) => (
               <div>
-                <div className="font-medium">{equipamento.modelo}</div>
+                <div className="font-medium">{equipamentoLabel(equipamento)}</div>
                 <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                  Tag: {equipamento.tag || 'N/A'}
+                  {equipamento.modelo}
+                  {equipamento.fabricante ? ` · ${equipamento.fabricante}` : ''}
                 </div>
               </div>
             )}

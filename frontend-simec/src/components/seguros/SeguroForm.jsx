@@ -17,6 +17,7 @@ import {
   ResponsiveGrid,
   Select,
 } from '@/components/ui';
+import { equipamentoLabel, equipamentoSortKey } from '@/utils/equipamentos/equipamentoLabel';
 
 const OPCOES_STATUS = [
   { value: 'Ativo', label: 'Ativo' },
@@ -194,10 +195,9 @@ function SeguroForm({
             name="equipamentoId"
             value={formData.equipamentoId || ''}
             onChange={handleChange}
-            options={equipamentosFiltrados.map((eq) => ({
-              value: eq.id,
-              label: `${eq.modelo} — ${eq.tag || 'sem tag'}`,
-            }))}
+            options={[...equipamentosFiltrados]
+              .sort((a, b) => equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR'))
+              .map((eq) => ({ value: eq.id, label: equipamentoLabel(eq) }))}
             placeholder={
               !formData.unidadeId
                 ? 'Selecione a unidade primeiro'

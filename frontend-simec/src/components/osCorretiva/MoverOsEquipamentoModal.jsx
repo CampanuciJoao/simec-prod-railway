@@ -5,6 +5,7 @@ import { faRightLeft, faTriangleExclamation } from '@fortawesome/free-solid-svg-
 import { Drawer, Button, Select, Textarea } from '@/components/ui';
 import { getEquipamentos } from '@/services/api/equipamentosApi';
 import { getUnidades } from '@/services/api';
+import { equipamentoLabel, equipamentoSortKey } from '@/utils/equipamentos/equipamentoLabel';
 
 function MoverOsEquipamentoModal({ isOpen, onClose, onConfirm, submitting, fieldErrors, osAtual }) {
   const [unidades, setUnidades] = useState([]);
@@ -71,10 +72,9 @@ function MoverOsEquipamentoModal({ isOpen, onClose, onConfirm, submitting, field
           ? 'Nenhum equipamento elegível'
           : 'Selecione o novo equipamento',
       },
-      ...equipamentos.map((eq) => ({
-        value: eq.id,
-        label: eq.apelido ? `${eq.tag} — ${eq.apelido}` : `${eq.tag} (${eq.modelo})`,
-      })),
+      ...[...equipamentos]
+        .sort((a, b) => equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR'))
+        .map((eq) => ({ value: eq.id, label: equipamentoLabel(eq) })),
     ],
     [equipamentos, unidadeId],
   );

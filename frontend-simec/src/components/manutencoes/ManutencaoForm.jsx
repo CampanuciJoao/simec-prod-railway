@@ -12,6 +12,7 @@ import {
 } from '@/components/ui';
 
 import { useManutencaoForm } from '@/hooks/manutencoes/useManutencaoForm';
+import { equipamentoLabel, equipamentoSortKey } from '@/utils/equipamentos/equipamentoLabel';
 
 function ManutencaoForm({
   initialData,
@@ -49,10 +50,12 @@ function ManutencaoForm({
     label: unidade.nomeSistema,
   }));
 
-  const equipamentosOptions = (equipamentosFiltrados || []).map((equipamento) => ({
-    value: equipamento.id,
-    label: `${equipamento.modelo} (${equipamento.tag || 'Sem TAG'})`,
-  }));
+  const equipamentosOptions = [...(equipamentosFiltrados || [])]
+    .sort((a, b) => equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR'))
+    .map((equipamento) => ({
+      value: equipamento.id,
+      label: equipamentoLabel(equipamento),
+    }));
 
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
