@@ -10,15 +10,21 @@ import {
 
 import { KpiCard, KpiGrid } from '@/components/ui';
 
-function ControleQualidadeKpiGrid({ metricas }) {
+function ControleQualidadeKpiGrid({ metricas, activeKpi, onSelectKpi }) {
+  const kpiActive = (key) =>
+    activeKpi === key ? 'ring-2 ring-offset-2 ring-offset-transparent' : '';
+  const handle = (key) => () => onSelectKpi?.(key);
+
   return (
-    <KpiGrid className="xl:grid-cols-5">
+    <KpiGrid cols={5}>
       <KpiCard
         icon={faCircleCheck}
         title="Aprovados"
         value={metricas?.aprovados ?? 0}
         subtitle="Em conformidade"
         tone="green"
+        onClick={handle('aprovados')}
+        className={kpiActive('aprovados')}
       />
       <KpiCard
         icon={faCircleXmark}
@@ -26,6 +32,8 @@ function ControleQualidadeKpiGrid({ metricas }) {
         value={metricas?.reprovados ?? 0}
         subtitle="Aguardando reteste"
         tone="red"
+        onClick={handle('reprovados')}
+        className={kpiActive('reprovados')}
       />
       <KpiCard
         icon={faClock}
@@ -33,6 +41,8 @@ function ControleQualidadeKpiGrid({ metricas }) {
         value={metricas?.vencendo30d ?? 0}
         subtitle="Renovação próxima"
         tone="yellow"
+        onClick={handle('vencendo')}
+        className={kpiActive('vencendo')}
       />
       <KpiCard
         icon={faTriangleExclamation}
@@ -40,6 +50,8 @@ function ControleQualidadeKpiGrid({ metricas }) {
         value={metricas?.vencidos ?? 0}
         subtitle="Risco regulatório"
         tone="red"
+        onClick={handle('vencidos')}
+        className={kpiActive('vencidos')}
       />
       <KpiCard
         icon={faClipboardList}
@@ -60,6 +72,8 @@ ControleQualidadeKpiGrid.propTypes = {
     vencidos: PropTypes.number,
     semPrograma: PropTypes.number,
   }),
+  activeKpi: PropTypes.oneOf(['aprovados', 'reprovados', 'vencendo', 'vencidos', null]),
+  onSelectKpi: PropTypes.func,
 };
 
 export default ControleQualidadeKpiGrid;

@@ -39,6 +39,26 @@ const RESULTADO_BADGES = {
   Reprovado:               { variant: 'red', label: 'Reprovado' },
 };
 
+// Prefixos do código do TipoTesteQualidade → categoria humanizada.
+// Codigos seguem o padrão CQ_* (Controle de Qualidade) e LR_* (Levantamento
+// Radiométrico) conforme catálogo simplificado em
+// prisma/migrations/20260514000004_simplificar_catalogo_cq.
+const CATEGORIA_LABELS = {
+  CQ: 'Controle de Qualidade',
+  LR: 'Levantamento Radiométrico',
+};
+
+function categoriaDoTipoTeste(tipoTeste) {
+  if (!tipoTeste) return null;
+  const codigo = tipoTeste.codigo || '';
+  const prefixo = codigo.split('_')[0];
+  if (CATEGORIA_LABELS[prefixo]) return CATEGORIA_LABELS[prefixo];
+  // Fallback: usa a parte antes do "—" do nome ("Controle de Qualidade — TC").
+  const nome = tipoTeste.nome || '';
+  const antesDoTraco = nome.split('—')[0].trim();
+  return antesDoTraco || null;
+}
+
 function fmt(d) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('pt-BR');
@@ -104,6 +124,30 @@ function ControleQualidadeGeralTab() {
     [equipamentos]
   );
 
+  // KPI ativo = derivado dos filtros aplicados. Só destacam-se os 4 cards
+  // com filtro equivalente; "Sem programa" não é filtrável aqui (são
+  // equipamentos regulados sem nenhum teste registrado).
+  const activeKpi = useMemo(() => {
+    if (filtros.resultado === 'Aprovado') return 'aprovados';
+    if (filtros.resultado === 'Reprovado') return 'reprovados';
+    if (filtros.statusVencimento === 'vencendo') return 'vencendo';
+    if (filtros.statusVencimento === 'vencido') return 'vencidos';
+    return null;
+  }, [filtros.resultado, filtros.statusVencimento]);
+
+  // Cada KPI clicável aplica seu filtro e zera os filtros conflitantes
+  // (resultado/statusVencimento), preservando modalidade e busca.
+  const handleSelectKpi = useCallback((key) => {
+    setFiltros((f) => {
+      const base = { ...f, resultado: '', statusVencimento: '' };
+      if (key === 'aprovados') base.resultado = 'Aprovado';
+      else if (key === 'reprovados') base.resultado = 'Reprovado';
+      else if (key === 'vencendo') base.statusVencimento = 'vencendo';
+      else if (key === 'vencidos') base.statusVencimento = 'vencido';
+      return base;
+    });
+  }, []);
+
   const testesFiltrados = useMemo(() => {
     return testes.filter((t) => {
       if (filtros.modalidade && t.tipoTeste?.modalidade !== filtros.modalidade) return false;
@@ -151,7 +195,11 @@ function ControleQualidadeGeralTab() {
 
   return (
     <div className="space-y-6">
-      <ControleQualidadeKpiGrid metricas={metricas} />
+      <ControleQualidadeKpiGrid
+        metricas={metricas}
+        activeKpi={activeKpi}
+        onSelectKpi={handleSelectKpi}
+      />
 
       <div className="flex flex-wrap items-center justify-end gap-2">
         <Button
@@ -231,20 +279,27 @@ function ControleQualidadeGeralTab() {
                   const dias = diasParaVencimento(t.proximoVencimento);
                   const badge = RESULTADO_BADGES[t.resultado];
                   const eq = t.equipamento;
+                  const nomePrincipal = eq?.apelido || eq?.modelo || '—';
+                  const linhaSecundaria = [
+                    eq?.apelido ? eq?.modelo : null,
+                    eq?.tag,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ');
+                  const categoria = categoriaDoTipoTeste(t.tipoTeste);
                   return (
                     <tr key={t.id} style={{ borderTop: '1px solid var(--border-soft)' }}>
                       <td className="px-3 py-2">
-                        <div className="font-semibold">{eq?.modelo || '—'}</div>
-                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {eq?.tag || ''}{eq?.apelido ? ` · ${eq.apelido}` : ''}
-                        </div>
+                        <div className="font-semibold">{nomePrincipal}</div>
+                        {linhaSecundaria ? (
+                          <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                            {linhaSecundaria}
+                          </div>
+                        ) : null}
                       </td>
                       <td className="px-3 py-2">{t.tipoTeste?.modalidade || '—'}</td>
                       <td className="px-3 py-2">
-                        <div className="font-medium">{t.tipoTeste?.codigo}</div>
-                        <div className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                          {t.tipoTeste?.nome}
-                        </div>
+                        <div className="font-medium">{categoria || t.tipoTeste?.codigo || '—'}</div>
                       </td>
                       <td className="px-3 py-2">{fmt(t.dataExecucao)}</td>
                       <td className="px-3 py-2">
