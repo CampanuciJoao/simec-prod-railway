@@ -43,6 +43,19 @@ function mensagemEhConfirmacaoNegativa(msg) {
   );
 }
 
+function mensagemEhCorrecao(msg) {
+  return ['corrigir', 'editar', 'alterar', 'mudar', 'ajustar'].includes(msg);
+}
+
+// 3 botões clicáveis no chat para confirmação final — evita o usuário ter
+// que digitar "sim"/"não"/"corrigir". O label do botão é enviado como
+// mensagem ao agente, que já reconhece essas palavras-chave.
+const ACOES_CONFIRMACAO = [
+  { id: 'sim', label: 'Sim', message: 'Sim', variant: 'primary' },
+  { id: 'nao', label: 'Não', message: 'Não', variant: 'danger' },
+  { id: 'corrigir', label: 'Corrigir', message: 'Corrigir', variant: 'secondary' },
+];
+
 function detectarSeHouveCorrecao(extraido) {
   return (
     !!extraido.tipoManutencao ||
@@ -392,6 +405,37 @@ export const AgendamentoService = {
       extraido.confirmacao = false;
     }
 
+    // "Corrigir" no botão final → volta o estado para coleta sem cancelar,
+    // permitindo o usuário ajustar qualquer dado antes da confirmação final.
+    if (
+      mensagemEhCorrecao(msgNormalizada) &&
+      estado.aguardandoConfirmacao &&
+      estado.step !== STEPS.FINALIZADO
+    ) {
+      estado.step = STEPS.COLETANDO_DADOS;
+      estado.aguardandoConfirmacao = false;
+      estado.confirmacao = null;
+
+      const mensagemResposta =
+        'Sem problema. O que você quer ajustar? (data, hora, equipamento, técnico ou número do chamado)';
+      const meta = buildBaseMeta(estado, { reason: 'AWAITING_CORRECTION' });
+
+      await salvarERegistrarMensagemAgente(
+        sessao.id,
+        estado.step,
+        estado,
+        mensagemResposta,
+        meta
+      );
+
+      logAgentStage('AGENDAMENTO_OUTCOME', stageContext, {
+        decision: 'AWAITING_CORRECTION',
+        step: estado.step,
+      });
+
+      return respostaPadrao(mensagemResposta, { meta });
+    }
+
     logAgentStage('AGENDAMENTO_EXTRACTION', stageContext, {
       extraido,
       normalizedMessage: msgNormalizada,
@@ -640,12 +684,13 @@ export const AgendamentoService = {
         mensagemResposta = buildResumoConfirmacao(estado);
       } else {
         mensagemResposta =
-          'Para finalizar, você confirma os dados do resumo acima? Responda com **Sim** ou **Não**.';
+          'Para finalizar, confirme os dados do resumo acima.';
       }
 
       const meta = buildBaseMeta(estado, {
         aguardandoConfirmacao: true,
         validationSource: 'manutencaoSchema',
+        actions: ACOES_CONFIRMACAO,
       });
 
       await salvarERegistrarMensagemAgente(

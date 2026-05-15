@@ -21,8 +21,17 @@ function ChatMessageBubble({
 }) {
   const isUser = role === 'user';
   const suggestions = Array.isArray(meta?.suggestions) ? meta.suggestions : [];
+  const actions = Array.isArray(meta?.actions) ? meta.actions : [];
   const preview = meta?.preview || null;
   const contextoPDF = meta?.contextoPDF || null;
+
+  // Cada action vira um botão clicável que envia uma mensagem ao agente,
+  // como se o usuário tivesse digitado. Aproveita o pipeline existente.
+  const handleActionClick = (action) => {
+    if (!onSelectSuggestion) return;
+    const text = action?.message || action?.label;
+    if (text) onSelectSuggestion(text);
+  };
 
   // Quando a mensagem traz preview, o botao 'Baixar PDF' do card aciona
   // a acao sugerida pelo backend. Deriva acao/contexto de meta.contextoPDF
@@ -96,6 +105,38 @@ function ChatMessageBubble({
             />
           ) : null}
         </div>
+
+        {!isUser && actions.length > 0 ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {actions.map((action) => {
+              const variant = action.variant || 'secondary';
+              const isPrimary = variant === 'primary';
+              const isDanger = variant === 'danger';
+              return (
+                <button
+                  key={action.id || action.label}
+                  type="button"
+                  onClick={() => handleActionClick(action)}
+                  className={[
+                    'rounded-full px-4 py-1.5 text-xs font-semibold transition hover:-translate-y-[1px]',
+                    isPrimary
+                      ? 'bg-cyan-600 text-white shadow-sm hover:bg-cyan-700'
+                      : isDanger
+                        ? 'bg-rose-600 text-white shadow-sm hover:bg-rose-700'
+                        : 'border bg-white text-slate-700 hover:bg-slate-50',
+                  ].join(' ')}
+                  style={
+                    !isPrimary && !isDanger
+                      ? { borderColor: 'var(--border-soft)' }
+                      : undefined
+                  }
+                >
+                  {action.label}
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
 
         {!isUser && suggestions.length > 0 ? (
           <div className="mt-2 flex flex-wrap gap-2">
