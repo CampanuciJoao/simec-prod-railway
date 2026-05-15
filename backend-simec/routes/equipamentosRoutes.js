@@ -639,9 +639,13 @@ router.patch(
     const tenantId = req.usuario.tenantId;
     const usuarioId = req.usuario.id;
 
-    const novoStatus = normalizarTexto(req.body?.novoStatus);
-    const motivo = normalizarTexto(req.body?.motivo);
-    const comprador = normalizarTexto(req.body?.comprador);
+    // ATENÇÃO: novoStatus precisa preservar o case (PascalCase no enum:
+    // 'Operante', 'Inoperante', 'EmManutencao'...). normalizarTexto faria
+    // toLowerCase + sem acentos — bug histórico que retornava 400 "Status
+    // invalido" para qualquer mudança manual.
+    const novoStatus = String(req.body?.novoStatus || '').trim();
+    const motivo = String(req.body?.motivo || '').trim();
+    const comprador = String(req.body?.comprador || '').trim();
 
     try {
       if (!novoStatus || !STATUS_VALIDOS.includes(novoStatus)) {

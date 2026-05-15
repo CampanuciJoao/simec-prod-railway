@@ -779,6 +779,30 @@ export async function excluirManutencaoService({
     };
   }
 
+  // Antes de remover, devolve o equipamento ao status que ele tinha antes
+  // da OS (gravado em ManutencaoEvento.STATUS_BASE_EQUIPAMENTO na criação).
+  // Sem isso o equipamento ficaria preso no status que a OS impôs (ex:
+  // EmManutencao, Inoperante) mesmo após o registro sumir.
+  try {
+    const statusAnterior = await buscarStatusAnteriorEquipamento({
+      tenantId,
+      manutencaoId,
+    });
+    if (statusAnterior && manut.equipamentoId) {
+      await prisma.equipamento.update({
+        where: { tenantId_id: { tenantId, id: manut.equipamentoId } },
+        data: { status: statusAnterior },
+      });
+    }
+  } catch (err) {
+    console.error(
+      `[MANUTENCAO_EXCLUIR_REVERTER_STATUS_ERROR] manutencao=${manutencaoId}`,
+      err
+    );
+    // Não bloqueia a exclusão — o equipamento fica no status atual e o
+    // usuário pode ajustar manualmente se necessário.
+  }
+
   await limparAlertasOperacionaisDaOS({
     tenantId,
     numeroOS: manut.numeroOS,
