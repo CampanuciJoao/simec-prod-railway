@@ -52,7 +52,8 @@ const ResponsiveGrid = WidthProvider(Responsive);
  * - Ícone num quadrado tonal compacto
  * - Helper text muted
  */
-function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
+function DashboardMiniStat({ icon, label, value, helper, tone = 'default', to, navState }) {
+  const navigate = useNavigate();
   const toneMap = {
     default: { accent: 'var(--brand-primary)', iconSurface: 'var(--brand-primary-soft)', iconText: 'var(--brand-primary)' },
     success: { accent: 'var(--color-success)', iconSurface: 'var(--color-success-soft)', iconText: 'var(--color-success)' },
@@ -61,9 +62,22 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
   };
   const t = toneMap[tone] || toneMap.default;
 
+  const isClickable = Boolean(to);
+  const Wrapper = isClickable ? 'button' : 'div';
+  const wrapperProps = isClickable
+    ? {
+        type: 'button',
+        onClick: () => navigate(to, navState ? { state: navState } : undefined),
+      }
+    : {};
+
   return (
-    <div
-      className="relative rounded-xl border px-3 py-2.5 overflow-hidden transition-all duration-200"
+    <Wrapper
+      {...wrapperProps}
+      className={[
+        'relative rounded-xl border px-3 py-2.5 overflow-hidden transition-all duration-200 text-left w-full',
+        isClickable ? 'cursor-pointer hover:-translate-y-[1px] hover:shadow-md' : '',
+      ].join(' ')}
       style={{
         backgroundColor: 'var(--bg-surface-soft)',
         borderColor: 'var(--border-soft)',
@@ -107,7 +121,7 @@ function DashboardMiniStat({ icon, label, value, helper, tone = 'default' }) {
           {helper}
         </p>
       )}
-    </div>
+    </Wrapper>
   );
 }
 
@@ -499,13 +513,16 @@ function DashboardPage() {
                 : 'Sem equipamentos cadastrados'
             }
             tone="default"
+            to="/equipamentos"
           />
           <DashboardMiniStat
             icon={faWrench}
             label="Em manutenção"
             value={resumo.emManutencao}
-            helper="Equipamentos com OS aberta ou em curso"
+            helper="Equipamentos com status Em manutenção"
             tone="warning"
+            to="/equipamentos"
+            navState={{ filtroStatus: 'EmManutencao' }}
           />
           <DashboardMiniStat
             icon={faTriangleExclamation}
@@ -513,6 +530,8 @@ function DashboardPage() {
             value={resumo.alertasCriticos}
             helper="Prioridade alta sinalizada pelo sistema"
             tone="danger"
+            to="/alertas"
+            navState={{ filtroPrioridade: 'alta' }}
           />
           <DashboardMiniStat
             icon={faFileContract}
@@ -520,6 +539,8 @@ function DashboardPage() {
             value={resumo.contratosVencendo}
             helper="Próximos 60 dias — janela de renegociação"
             tone="default"
+            to="/contratos"
+            navState={{ filtroVencimento: 'vencendo60d' }}
           />
         </div>
 

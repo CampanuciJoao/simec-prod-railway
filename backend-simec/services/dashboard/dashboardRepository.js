@@ -10,11 +10,11 @@ export function buscarResumoDashboard({
     prisma.equipamento.count({
       where: { tenantId },
     }),
-    prisma.manutencao.count({
-      where: {
-        tenantId,
-        status: { in: ['Agendada', 'EmAndamento', 'AguardandoConfirmacao'] },
-      },
+    // Card "Em manutenção" do Dashboard = estado real do parque, não OS
+    // abertas. Conta equipamentos cujo status atual é EmManutencao (i.e.
+    // manutenção iniciada, equipamento bloqueado).
+    prisma.equipamento.count({
+      where: { tenantId, status: 'EmManutencao' },
     }),
     prisma.contrato.count({
       where: {
