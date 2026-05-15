@@ -1,4 +1,5 @@
 ﻿import express from 'express';
+import multer from 'multer';
 
 import { proteger, admin } from '../middleware/authMiddleware.js';
 import validate from '../middleware/validate.js';
@@ -22,13 +23,69 @@ import {
   excluirManutencaoService,
 } from '../services/manutencao/index.js';
 
+import {
+  extrairLoteService as extrairImportacaoLoteService,
+  criarLoteService as criarImportacaoLoteService,
+} from '../services/manutencao/importacaoLote/index.js';
+
 import { buscarManutencaoPorId, deletarManutencao } from '../services/manutencao/manutencaoRepository.js';
 import { adaptarManutencaoResponse } from '../services/manutencaoResponseAdapter.js';
 import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
 
+// Upload em memória só para o endpoint de importação em lote. PDFs/CSVs são
+// parseados e descartados — não persistimos o arquivo.
+const importacaoUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10 MB por arquivo
+    files: 10,
+  },
+});
+
 router.use(proteger);
+
+// ─── Importação em lote de preventivas ─────────────────────────────────────
+router.post(
+  '/importacao/extrair-lote',
+  importacaoUpload.array('arquivos', 10),
+  async (req, res) => {
+    try {
+      const result = await extrairImportacaoLoteService({
+        tenantId: req.usuario.tenantId,
+        files: req.files || [],
+      });
+      if (!result.ok) {
+        return res.status(result.status || 400).json({
+          message: result.message,
+          ...(result.detalhes ? { detalhes: result.detalhes } : {}),
+        });
+      }
+      return res.status(result.status).json(result.data);
+    } catch (error) {
+      console.error('[MANUTENCAO_IMPORT_EXTRAIR_ERROR]', error);
+      return res.status(500).json({ message: 'Erro ao extrair lote.' });
+    }
+  }
+);
+
+router.post('/importacao/criar-lote', async (req, res) => {
+  try {
+    const result = await criarImportacaoLoteService({
+      tenantId: req.usuario.tenantId,
+      usuarioId: req.usuario.id,
+      items: req.body?.items || [],
+    });
+    if (!result.ok) {
+      return res.status(result.status || 400).json({ message: result.message });
+    }
+    return res.status(result.status).json(result.data);
+  } catch (error) {
+    console.error('[MANUTENCAO_IMPORT_CRIAR_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao criar lote.' });
+  }
+});
 
 router.get('/', async (req, res) => {
   try {

@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faExclamationTriangle,
+  faFileImport,
   faPlus,
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
@@ -14,6 +15,7 @@ import { useTabOcorrencias } from '@/hooks/manutencoes/useTabOcorrencias';
 
 // DOMAIN
 import {
+  ImportarLotePreventivasPanel,
   ManutencoesTab,
   OcorrenciasTab,
   ModalConfirmacaoManutencao,
@@ -56,6 +58,8 @@ function ManutencoesPage() {
   const tabManutencoes = useTabManutencoes();
   const tabOcorrencias = useTabOcorrencias();
 
+  const [importOpen, setImportOpen] = useState(false);
+
   const headerActions =
     activeTab === TAB_IDS.OCORRENCIAS ? (
       <Button
@@ -67,14 +71,25 @@ function ManutencoesPage() {
         Registrar ocorrência
       </Button>
     ) : (
-      <Button
-        type="button"
-        onClick={tabManutencoes.goToCreate}
-        className="w-full sm:w-auto justify-center"
-      >
-        <FontAwesomeIcon icon={faPlus} />
-        Agendar nova
-      </Button>
+      <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:w-auto">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={() => setImportOpen(true)}
+          className="w-full sm:w-auto justify-center"
+        >
+          <FontAwesomeIcon icon={faFileImport} />
+          Importar preventivas
+        </Button>
+        <Button
+          type="button"
+          onClick={tabManutencoes.goToCreate}
+          className="w-full sm:w-auto justify-center"
+        >
+          <FontAwesomeIcon icon={faPlus} />
+          Agendar nova
+        </Button>
+      </div>
     );
 
   const tabs = [
@@ -167,6 +182,15 @@ function ManutencoesPage() {
         message={`Deseja excluir a ocorrência ${tabOcorrencias.deleteModal.modalData?.numeroOS}? Esta ação não pode ser desfeita.`}
         confirmText="Excluir"
         isDestructive
+      />
+
+      <ImportarLotePreventivasPanel
+        isOpen={importOpen}
+        onClose={() => setImportOpen(false)}
+        onSuccess={() => {
+          tabManutencoes.refetch?.();
+          tabOcorrencias.refetch?.();
+        }}
       />
 
       <PageLayout padded fullHeight>

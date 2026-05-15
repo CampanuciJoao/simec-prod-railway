@@ -5,6 +5,7 @@ export { default as HistoricoEAnexosManutencaoSection } from './HistoricoEAnexos
 export { default as InformacoesManutencaoSection } from './InformacoesManutencaoSection';
 export { default as ManutencaoForm } from './ManutencaoForm';
 export { default as ModalConfirmacaoManutencao } from './ModalConfirmacaoManutencao';
+export { default as ImportarLotePreventivasPanel } from './ImportarLotePreventivasPanel';
 export { default as ManutencaoCard } from './ManutencaoCard';
 export { default as ManutencoesTab } from './ManutencoesTab';
 export { default as OcorrenciasTab } from './OcorrenciasTab';
