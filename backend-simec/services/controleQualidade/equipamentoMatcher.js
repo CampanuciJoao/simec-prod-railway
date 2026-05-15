@@ -137,12 +137,22 @@ function scorePeloLaudo(eq, { serial, modelo, fabricante, modalidade, sala }) {
     }
   }
 
-  if (sala && eq.setor) {
+  if (sala) {
+    // Sala/Local do laudo casa contra setor OU apelido do equipamento.
+    // Apelido eh unico por unidade no SIMEC (regra do dominio), entao
+    // quando o texto do laudo bate com apelido + unidade resolvida, eh
+    // praticamente determinismo.
     const ns = normalizarSala(sala);
-    const nset = normalizarSala(eq.setor);
-    if (ns === nset || ns.includes(nset) || nset.includes(ns)) {
-      score += 0.15;
-      sinais.push('sala');
+    const candidatos = [eq.setor, eq.apelido].filter(Boolean).map(normalizarSala);
+    const bateu = candidatos.some((c) => c === ns || c.includes(ns) || ns.includes(c));
+    if (bateu) {
+      // Bonus quando casou via apelido em unidade resolvida — pista forte.
+      const viaApelido = eq.apelido && (() => {
+        const na = normalizarSala(eq.apelido);
+        return na === ns || na.includes(ns) || ns.includes(na);
+      })();
+      score += viaApelido ? 0.25 : 0.15;
+      sinais.push(viaApelido ? 'apelido_via_local' : 'sala');
     }
   }
 
