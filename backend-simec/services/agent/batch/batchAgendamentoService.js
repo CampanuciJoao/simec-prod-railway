@@ -1,5 +1,5 @@
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
-import { montarRecomendacaoManutencao } from '../workflow/dbManager.js';
+import { criarManutencaoNoBanco } from '../workflow/dbManager.js';
 import { extrairCamposComIA } from '../agendamento/extractor/index.js';
 import { mergeEstadoAgente } from '../agendamento/state/mergeEstadoAgente.js';
 import { getSessionKey } from '../core/sessionKeys.js';
@@ -42,13 +42,13 @@ function buildResumoLote(estado) {
   if (equips.length > 10) linhas.push(`_...e mais ${equips.length - 10} equipamento(s)_`);
 
   return [
-    `Recomendo **${equips.length} Ordem(ns) de Serviço** do tipo **${estado.tipoManutencao}**:`,
+    `Vou criar **${equips.length} Ordem(ns) de Serviço** do tipo **${estado.tipoManutencao}**:`,
     '',
     linhas.join('\n'),
     '',
     `📅 Data: **${estado.data}** | ⏰ **${estado.horaInicio}** às **${estado.horaFim}**`,
     '',
-    'Clique em **Abrir agendamento em lote** para revisar e salvar, ou em **Cancelar** para descartar.',
+    'Confirma a criação em lote? (**Sim** / **Não**)',
   ].join('\n');
 }
 
@@ -110,10 +110,10 @@ export const BatchAgendamentoService = {
 
     const faltantes = getFaltantes(estado);
 
-    // Confirmação com dados completos — gera lista de recomendações (não persiste)
+    // Confirmação com dados completos — criar OS em lote
     if (ehConfirmacao && faltantes.length === 0) {
-      const recomendacoes = [];
-      const invalidas = [];
+      const criadas = [];
+      const erros = [];
 
       for (const equipamento of estado.equipamentos) {
         const estadoEquip = {
@@ -126,41 +126,33 @@ export const BatchAgendamentoService = {
         };
 
         try {
-          const recomendacao = montarRecomendacaoManutencao(estadoEquip);
-          recomendacoes.push(recomendacao);
+          const manutencao = await criarManutencaoNoBanco(estadoEquip, contextoUsuario);
+          criadas.push({ modelo: equipamento.modelo, numeroOS: manutencao.numeroOS });
         } catch (err) {
-          invalidas.push({ modelo: equipamento.modelo, erro: err.message });
-          console.error(`[BATCH_AGENDAMENTO] Recomendação inválida para ${equipamento.modelo}:`, err.message);
+          erros.push({ modelo: equipamento.modelo, erro: err.message });
+          console.error(`[BATCH_AGENDAMENTO] Erro ao criar OS para ${equipamento.modelo}:`, err.message);
         }
       }
 
       await AgentSessionRepository.finalizarSessao(sessao.id);
 
       let msg;
-      if (recomendacoes.length > 0 && invalidas.length === 0) {
-        msg = `✨ **${recomendacoes.length} recomendação(ões) pronta(s).** Clique em **Abrir agendamento em lote** para revisar e salvar.`;
-      } else if (recomendacoes.length > 0) {
-        msg = `✨ **${recomendacoes.length} recomendação(ões) pronta(s).** ⚠️ ${invalidas.length} equipamento(s) sem dados suficientes: ${invalidas.map((e) => e.modelo).join(', ')}.`;
+      if (criadas.length > 0 && erros.length === 0) {
+        const lista = criadas.slice(0, 5).map((r) => `- OS **${r.numeroOS}** — ${r.modelo}`).join('\n');
+        const mais = criadas.length > 5 ? `\n_...e mais ${criadas.length - 5}_` : '';
+        msg = `✅ **${criadas.length} Ordem(ns) de Serviço criada(s) com sucesso:**\n${lista}${mais}`;
+      } else if (criadas.length > 0) {
+        msg = `✅ **${criadas.length} OS criada(s)** com sucesso. ⚠️ **${erros.length} falha(s)**: ${erros.map((e) => e.modelo).join(', ')}.`;
       } else {
-        msg = `❌ Não consegui montar recomendações válidas. Verifique se os equipamentos possuem todos os dados necessários.`;
+        msg = `❌ Não foi possível criar as OS. Verifique se os equipamentos possuem todos os dados necessários.`;
       }
 
-      const meta = {
+      await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', msg, {
         step: BATCH_STEPS.FINALIZADO,
-        reason: 'BATCH_RECOMMENDATION_READY',
-        recomendacoes,
-        invalidas,
-        actions:
-          recomendacoes.length > 0
-            ? [
-                { id: 'abrir_agendamento_lote', label: 'Abrir agendamento em lote', variant: 'primary' },
-                { id: 'cancelar', label: 'Cancelar', variant: 'secondary' },
-              ]
-            : [{ id: 'cancelar', label: 'Cancelar', variant: 'secondary' }],
-      };
-
-      await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', msg, meta);
-      return resposta(msg, { meta });
+        criadas: criadas.length,
+        erros: erros.length,
+      });
+      return resposta(msg, { meta: { step: BATCH_STEPS.FINALIZADO, criadas: criadas.length, erros: erros.length } });
     }
 
     // Dados completos mas sem confirmação — pede confirmação

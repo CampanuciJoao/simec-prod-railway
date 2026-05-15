@@ -17,6 +17,10 @@ import {
 import { buildResumoAbrirOs, buildResumoAgendarVisita } from './ui/osCorretivaResumo.js';
 import { getSessionKey } from '../core/sessionKeys.js';
 import { listarOsAbertasPorEquipamento } from '../../osCorretiva/osCorretivaRepository.js';
+import {
+  abrirOsCorretivaService,
+  agendarVisitaTerceiroService,
+} from '../../osCorretiva/index.js';
 import { buildUtcIntervalFromLocal, resolveOperationalTimezone } from '../../time/index.js';
 import prisma from '../../prismaService.js';
 
@@ -298,37 +302,32 @@ export const OsCorretivaAgentService = {
         return resposta(resumo);
       }
 
-      // Confirmar → emitir RECOMENDAÇÃO (sem persistir; front abre o modal pra confirmar)
+      // Confirmar → executar
       if (estado.fluxo === 'ABRIR_OS') {
-        const recomendacao = {
-          tipo: 'abrir_os_corretiva',
-          payload: {
+        const resultado = await abrirOsCorretivaService({
+          tenantId,
+          usuarioId,
+          dados: {
             equipamentoId: estado.equipamentoId,
             solicitante: estado.solicitante,
             descricaoProblema: estado.descricaoProblema,
             statusEquipamentoAbertura: estado.statusEquipamentoAbertura,
           },
-          contexto: {
-            equipamentoModelo: estado.equipamentoNome || null,
-            equipamentoTag: estado.tag || null,
-          },
-        };
+        });
 
-        const msg = `✨ **Recomendação pronta — abertura de ocorrência.** Clique em **Abrir ocorrência** para revisar e registrar, ou em **Cancelar** para descartar.`;
-        const meta = {
-          step: STEPS_OS.FINALIZADO,
-          reason: 'RECOMMENDATION_READY',
-          recomendacao,
-          actions: [
-            { id: 'abrir_os_corretiva', label: 'Abrir ocorrência', variant: 'primary' },
-            { id: 'cancelar', label: 'Cancelar', variant: 'secondary' },
-          ],
-        };
+        if (!resultado.ok) {
+          const msg = resultado.message || 'Não foi possível registrar a ocorrência. Por favor, tente novamente.';
+          await salvarERegistrar(sessao.id, estado.step, estado, msg);
+          return resposta(msg);
+        }
 
-        await AgentSessionRepository.salvarSessao(sessao.id, { step: STEPS_OS.FINALIZADO, state: estado });
-        await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', msg, meta);
+        const os = resultado.data;
+        const msg = `✅ **Ocorrência registrada com sucesso!**\n📋 **OS:** ${os.numeroOS}\n🔧 **Equipamento:** ${estado.equipamentoNome || os.equipamento?.modelo || '—'}\n📝 **Problema:** ${estado.descricaoProblema}`;
+
+        await AgentSessionRepository.salvarSessao(sessao.id, { step: STEPS_OS.FINALIZADO, state: { ...estado, osId: os.id, osNumero: os.numeroOS } });
+        await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', msg, { step: STEPS_OS.FINALIZADO, osId: os.id, numeroOS: os.numeroOS });
         await AgentSessionRepository.finalizarSessao(sessao.id);
-        return resposta(msg, { meta });
+        return resposta(msg);
       }
 
       if (estado.fluxo === 'AGENDAR_VISITA') {
@@ -348,36 +347,36 @@ export const OsCorretivaAgentService = {
           return resposta(msg);
         }
 
-        const recomendacao = {
-          tipo: 'agendar_visita_terceiro',
-          payload: {
-            osId: estado.osId,
+        const resultado = await agendarVisitaTerceiroService({
+          tenantId,
+          usuarioId,
+          osId: estado.osId,
+          dados: {
             prestadorNome: estado.prestadorNome,
             dataHoraInicioPrevista: startUtc.toISOString(),
             dataHoraFimPrevista: endUtc.toISOString(),
           },
-          contexto: {
-            osNumero: estado.osNumero,
-            equipamentoTag: estado.tag || null,
-          },
-        };
+        });
+
+        if (!resultado.ok) {
+          let msg = resultado.message || 'Não foi possível agendar a visita.';
+          if (resultado.status === 409) {
+            // Conflito de agenda — limpa horário e volta para coleta
+            estado.data = null; estado.horaInicio = null; estado.horaFim = null;
+            estado.aguardandoConfirmacao = false;
+            estado.step = STEPS_OS.COLETANDO_DADOS;
+          }
+          await salvarERegistrar(sessao.id, estado.step, estado, msg);
+          return resposta(msg);
+        }
 
         const dataFormatada = estado.data ? estado.data.split('-').reverse().join('/') : '—';
-        const msg = `✨ **Recomendação pronta — visita de terceiro.**\n📄 OS ${estado.osNumero} • 🏢 ${estado.prestadorNome} • 📅 ${dataFormatada} das ${estado.horaInicio} às ${estado.horaFim}.\nClique em **Agendar visita** para revisar e salvar, ou em **Cancelar** para descartar.`;
-        const meta = {
-          step: STEPS_OS.FINALIZADO,
-          reason: 'RECOMMENDATION_READY',
-          recomendacao,
-          actions: [
-            { id: 'agendar_visita_terceiro', label: 'Agendar visita', variant: 'primary' },
-            { id: 'cancelar', label: 'Cancelar', variant: 'secondary' },
-          ],
-        };
+        const msg = `✅ **Visita agendada com sucesso!**\n📄 **OS:** ${estado.osNumero}\n🏢 **Prestador:** ${estado.prestadorNome}\n📅 **Data:** ${dataFormatada} das ${estado.horaInicio} às ${estado.horaFim}`;
 
         await AgentSessionRepository.salvarSessao(sessao.id, { step: STEPS_OS.FINALIZADO, state: estado });
-        await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', msg, meta);
+        await AgentSessionRepository.registrarMensagem(sessao.id, 'agent', msg, { step: STEPS_OS.FINALIZADO });
         await AgentSessionRepository.finalizarSessao(sessao.id);
-        return resposta(msg, { meta });
+        return resposta(msg);
       }
     }
 

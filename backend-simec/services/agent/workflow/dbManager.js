@@ -1,3 +1,4 @@
+import { criarManutencaoService } from '../../manutencao/index.js';
 import {
   MANUTENCAO_FIELD_LABELS,
   validarManutencaoPayload,
@@ -59,31 +60,34 @@ export function validarPayloadAgendamentoDoAgente(estado) {
   };
 }
 
-/**
- * Monta uma RECOMENDAÇÃO de manutenção (sem persistir no banco).
- * O agente nunca cria OS por conta própria — apenas valida o payload e
- * devolve para o front, que abre o modal de agendamento pré-preenchido
- * para o usuário confirmar manualmente.
- */
-export function montarRecomendacaoManutencao(estado) {
+export async function criarManutencaoNoBanco(estado, contextoUsuario) {
+  const { tenantId, usuarioId } = contextoUsuario || {};
+
+  if (!tenantId || !usuarioId) {
+    throw new Error('CONTEXTO_USUARIO_INVALIDO_PARA_CRIAR_MANUTENCAO');
+  }
+
   const { payload, validacao } = validarPayloadAgendamentoDoAgente(estado);
 
   if (!validacao.ok) {
-    const error = new Error(validacao.message || 'Dados inválidos para recomendar a manutenção.');
+    const error = new Error(validacao.message || 'Dados inválidos para criação da manutenção.');
     error.code = 'AGENT_VALIDATION_ERROR';
     error.details = validacao;
     throw error;
   }
 
-  return {
-    tipo: 'agendamento_manutencao',
-    payload,
-    contexto: {
-      equipamentoId: estado?.equipamentoId || null,
-      equipamentoModelo: estado?.modelo || estado?.equipamentoNome || null,
-      equipamentoTag: estado?.tag || null,
-      unidadeId: estado?.unidadeId || null,
-      unidadeNome: estado?.unidadeNome || null,
-    },
-  };
+  const resultado = await criarManutencaoService({
+    tenantId,
+    usuarioId,
+    dados: payload,
+  });
+
+  if (!resultado.ok) {
+    const error = new Error(resultado.message || 'Falha ao criar manutenção pelo agente.');
+    error.code = 'MANUTENCAO_SERVICE_ERROR';
+    error.details = resultado;
+    throw error;
+  }
+
+  return resultado.data;
 }

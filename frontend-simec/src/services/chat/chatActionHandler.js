@@ -33,67 +33,6 @@ export async function handleChatAction({
       navigate('/manutencoes/agendar');
       return;
 
-    // ─── Recomendações do agente (nunca persistem direto) ─────────────────
-    case 'abrir_agendamento': {
-      const recomendacao = meta?.recomendacao || null;
-      navigate('/manutencoes/agendar', {
-        state: recomendacao ? { recomendacao } : undefined,
-      });
-      return;
-    }
-
-    case 'abrir_agendamento_lote': {
-      const recomendacoes = Array.isArray(meta?.recomendacoes)
-        ? meta.recomendacoes
-        : [];
-      if (recomendacoes.length === 0) {
-        notify(addToast, 'Nenhuma recomendação válida para abrir.', 'warning');
-        return;
-      }
-      // Sem página dedicada de lote ainda — abre a primeira recomendação e
-      // avisa que as demais ficaram pendentes na conversa.
-      navigate('/manutencoes/agendar', {
-        state: {
-          recomendacao: recomendacoes[0],
-          recomendacoesPendentes: recomendacoes.slice(1),
-        },
-      });
-      if (recomendacoes.length > 1) {
-        notify(
-          addToast,
-          `Abrindo a 1ª de ${recomendacoes.length} recomendações. As demais ficam disponíveis no chat.`,
-          'info'
-        );
-      }
-      return;
-    }
-
-    case 'abrir_os_corretiva': {
-      const recomendacao = meta?.recomendacao || null;
-      navigate('/manutencoes/ocorrencia/abrir', {
-        state: recomendacao ? { recomendacao } : undefined,
-      });
-      return;
-    }
-
-    case 'agendar_visita_terceiro': {
-      const recomendacao = meta?.recomendacao || null;
-      const osId = recomendacao?.payload?.osId;
-      if (!osId) {
-        notify(addToast, 'Recomendação sem OS associada.', 'warning');
-        return;
-      }
-      navigate(`/manutencoes/ocorrencia/${osId}`, {
-        state: { recomendacao },
-      });
-      return;
-    }
-
-    case 'cancelar':
-      notify(addToast, 'Recomendação descartada.', 'info');
-      return;
-    // ──────────────────────────────────────────────────────────────────────
-
     case 'VER_MANUTENCAO':
       if (contexto?.id) {
         navigate(`/manutencoes/detalhes/${contexto.id}`);
