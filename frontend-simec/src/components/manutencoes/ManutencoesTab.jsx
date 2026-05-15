@@ -35,15 +35,6 @@ function ManutencoesTab({ tab, isAdmin, onDeleteManutencao, onDeleteOs }) {
   }
 
   const isEmpty = !tab.loading && !tab.error && tab.items.length === 0;
-  if (tab.error || isEmpty) {
-    return (
-      <PageState
-        error={tab.error?.message || tab.error || ''}
-        isEmpty={isEmpty}
-        emptyMessage="Nenhuma manutenção encontrada."
-      />
-    );
-  }
 
   return (
     <PageSection>
@@ -109,25 +100,33 @@ function ManutencoesTab({ tab, isAdmin, onDeleteManutencao, onDeleteOs }) {
           onClearAll={tab.clearAllFilters}
         />
 
-        <div className="space-y-4">
-          {tab.items.map((item) =>
-            item._kind === 'osCorretiva' ? (
-              <OsCorretivaCard
-                key={`os-${item.id}`}
-                os={item}
-                isAdmin={isAdmin}
-                onDelete={onDeleteOs}
-              />
-            ) : (
-              <ManutencaoCard
-                key={`m-${item.id}`}
-                manutencao={item}
-                isAdmin={isAdmin}
-                onDelete={onDeleteManutencao}
-              />
-            )
-          )}
-        </div>
+        {tab.error || isEmpty ? (
+          <PageState
+            error={tab.error?.message || tab.error || ''}
+            isEmpty={isEmpty}
+            emptyMessage="Nenhuma manutenção encontrada com os filtros atuais."
+          />
+        ) : (
+          <div className="space-y-4">
+            {tab.items.map((item) =>
+              item._kind === 'osCorretiva' ? (
+                <OsCorretivaCard
+                  key={`os-${item.id}`}
+                  os={item}
+                  isAdmin={isAdmin}
+                  onDelete={onDeleteOs}
+                />
+              ) : (
+                <ManutencaoCard
+                  key={`m-${item.id}`}
+                  manutencao={item}
+                  isAdmin={isAdmin}
+                  onDelete={onDeleteManutencao}
+                />
+              )
+            )}
+          </div>
+        )}
 
         <div
           className="flex flex-col items-center justify-center gap-3 text-sm md:flex-row md:justify-between"

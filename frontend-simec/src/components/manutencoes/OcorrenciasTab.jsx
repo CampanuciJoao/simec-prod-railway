@@ -35,15 +35,6 @@ function OcorrenciasTab({ tab, isAdmin, onDeleteOs }) {
   }
 
   const isEmpty = !tab.loading && !tab.error && tab.items.length === 0;
-  if (tab.error || isEmpty) {
-    return (
-      <PageState
-        error={tab.error?.message || tab.error || ''}
-        isEmpty={isEmpty}
-        emptyMessage="Nenhuma ocorrência encontrada."
-      />
-    );
-  }
 
   return (
     <PageSection>
@@ -100,16 +91,24 @@ function OcorrenciasTab({ tab, isAdmin, onDeleteOs }) {
           onClearAll={tab.clearAllFilters}
         />
 
-        <div className="space-y-4">
-          {tab.items.map((item) => (
-            <OsCorretivaCard
-              key={`os-${item.id}`}
-              os={item}
-              isAdmin={isAdmin}
-              onDelete={onDeleteOs}
-            />
-          ))}
-        </div>
+        {tab.error || isEmpty ? (
+          <PageState
+            error={tab.error?.message || tab.error || ''}
+            isEmpty={isEmpty}
+            emptyMessage="Nenhuma ocorrência encontrada com os filtros atuais."
+          />
+        ) : (
+          <div className="space-y-4">
+            {tab.items.map((item) => (
+              <OsCorretivaCard
+                key={`os-${item.id}`}
+                os={item}
+                isAdmin={isAdmin}
+                onDelete={onDeleteOs}
+              />
+            ))}
+          </div>
+        )}
 
         <div
           className="flex flex-col items-center justify-center gap-3 text-sm md:flex-row md:justify-between"
