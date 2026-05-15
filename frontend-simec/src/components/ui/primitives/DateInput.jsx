@@ -53,8 +53,11 @@ function DateInput({
         min={min}
         max={max}
         className={[
-          'ui-transition w-full rounded-xl border px-3 py-2.5 text-sm outline-none',
+          'ui-transition ui-date-input w-full rounded-xl border px-3 text-sm outline-none',
           'disabled:cursor-not-allowed disabled:opacity-70',
+          // min-h fixo para casar com altura do <Input> padrao. Sem isso,
+          // type=date renderiza menor em muitos navegadores (iOS especialmente).
+          'min-h-[42px]',
           className,
         ].join(' ')}
         style={{
@@ -62,6 +65,11 @@ function DateInput({
           borderColor: error ? 'var(--color-danger)' : 'var(--border-default)',
           color: 'var(--text-primary)',
           boxShadow: 'none',
+          // color-scheme: light dark faz o picker do navegador respeitar
+          // o tema do site. Sem isso, em dark mode o calendario nativo
+          // fica branco (feio) e o icone do calendario fica preto sobre
+          // fundo escuro (ilegivel).
+          colorScheme: 'light dark',
         }}
         onFocus={handleFocus}
         onBlur={handleBlur}

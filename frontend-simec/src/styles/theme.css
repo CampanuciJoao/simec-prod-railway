@@ -123,6 +123,23 @@ body {
     transform var(--transition-default);
 }
 
+/* Date input — força o icone do calendario a ser legivel em dark mode.
+   color-scheme:light dark ja resolve na maioria dos navegadores; este
+   filtro extra cobre Safari iOS antigo e WebKit que ignoram color-scheme
+   no ::-webkit-calendar-picker-indicator. */
+:root[data-theme='dark'] .ui-date-input::-webkit-calendar-picker-indicator {
+  filter: invert(0.85) brightness(1.4);
+  cursor: pointer;
+  opacity: 0.75;
+}
+:root[data-theme='dark'] .ui-date-input::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+}
+.ui-date-input::-webkit-date-and-time-value {
+  text-align: left;
+  min-height: 1.2em;
+}
+
 .ui-button {
   background-color: var(--button-bg);
   color: var(--button-text);
