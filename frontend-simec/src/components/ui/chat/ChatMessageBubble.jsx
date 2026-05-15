@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRobot, faUser } from '@fortawesome/free-solid-svg-icons';
 
+import RelatorioPreviewCard from '@/components/ui/chat/RelatorioPreviewCard';
+
 const MarkdownMessageContent = lazy(() =>
   import('@/components/ui/chat/MarkdownMessageContent')
 );
@@ -12,10 +14,30 @@ function ChatMessageBubble({
   content = '',
   createdAt,
   meta = null,
+  contexto = null,
+  acao = null,
   onSelectSuggestion,
+  onTriggerAction,
 }) {
   const isUser = role === 'user';
   const suggestions = Array.isArray(meta?.suggestions) ? meta.suggestions : [];
+  const preview = meta?.preview || null;
+  const contextoPDF = meta?.contextoPDF || null;
+
+  // Quando a mensagem traz preview, o botao 'Baixar PDF' do card aciona
+  // a acao sugerida pelo backend. Deriva acao/contexto de meta.contextoPDF
+  // (o backend nao expoe 'acao' explicito quando ha preview, so contextoPDF).
+  const handleDownloadPreview = async () => {
+    if (!onTriggerAction || !contextoPDF) return;
+    await onTriggerAction({
+      acao: acao || contextoPDF.acaoSugerida,
+      contexto: {
+        ids: contextoPDF.ids,
+        manutencaoId: contextoPDF.idPrincipal,
+      },
+      meta,
+    });
+  };
 
   return (
     <div
@@ -63,6 +85,15 @@ function ChatMessageBubble({
               <MarkdownMessageContent content={content} />
             </Suspense>
           )}
+
+          {/* Preview do relatorio com botao de download — aparece dentro
+              da bolha quando o backend devolve meta.preview */}
+          {!isUser && preview ? (
+            <RelatorioPreviewCard
+              preview={preview}
+              onDownload={handleDownloadPreview}
+            />
+          ) : null}
         </div>
 
         {!isUser && suggestions.length > 0 ? (
@@ -129,7 +160,10 @@ ChatMessageBubble.propTypes = {
   content: PropTypes.string,
   createdAt: PropTypes.string,
   meta: PropTypes.object,
+  contexto: PropTypes.object,
+  acao: PropTypes.string,
   onSelectSuggestion: PropTypes.func,
+  onTriggerAction: PropTypes.func,
 };
 
 export default ChatMessageBubble;

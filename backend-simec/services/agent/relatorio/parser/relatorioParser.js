@@ -155,6 +155,75 @@ function detectarSomenteUltima(lower) {
   return pistas.some((p) => lower.includes(p));
 }
 
+// Pedido explicito de PDF/relatorio para download direto.
+// Quando detectado, o agent ja gera e devolve o link sem perguntar
+// "deseja gerar PDF?".
+function detectarPedidoPdf(lower) {
+  const pistas = [
+    'pdf',
+    'relatorio',
+    'relatório',
+    'baixar',
+    'baixe',
+    'baixe-me',
+    'me da um relatorio',
+    'me de um relatorio',
+    'me da o relatorio',
+    'me envia',
+    'gera um relatorio',
+    'gerar relatorio',
+    'gerar o relatorio',
+    'exportar',
+    'exporta',
+    'imprimir',
+    'imprime',
+  ];
+
+  return pistas.some((p) => lower.includes(p));
+}
+
+// Detecta se a mensagem eh um pedido de AJUSTE em cima de um relatorio
+// anterior (em vez de uma nova consulta do zero). Retorna true quando ha
+// indicios curtos como "agora corretivas", "muda pra ultimos 3 meses",
+// "do equipamento X em vez disso". Usado para mergir com filtros da sessao.
+export function detectarAjusteRelatorio(mensagem) {
+  const lower = mensagem.toLowerCase().trim();
+  if (lower.length > 100) return false; // ajuste tipicamente eh curto
+  const pistas = [
+    'agora ',
+    'em vez',
+    'troca pra',
+    'troca para',
+    'muda pra',
+    'muda para',
+    'muda o ',
+    'mude pra',
+    'mude para',
+    'so as ',
+    'so os ',
+    'apenas ',
+    'mostre só',
+    'mostre so',
+    'no lugar',
+  ];
+  return pistas.some((p) => lower.includes(p));
+}
+
+// Mescla filtros novos sobre os anteriores, preservando o que o usuario
+// nao mencionou. Ex: filtros anteriores tinham equipamentoId X + tipo
+// preventiva + periodo 12m; novo pedido "agora corretivas" -> mantem
+// equipamento e periodo, troca tipo para Corretiva.
+export function mesclarFiltrosRelatorio(anteriores = {}, novos = {}) {
+  return {
+    tipoManutencao: novos.tipoManutencao ?? anteriores.tipoManutencao,
+    unidadeTexto: novos.unidadeTexto ?? anteriores.unidadeTexto,
+    equipamentoTexto: novos.equipamentoTexto ?? anteriores.equipamentoTexto,
+    somenteUltima: novos.somenteUltima ?? anteriores.somenteUltima,
+    periodoInicio: novos.periodoInicio ?? anteriores.periodoInicio,
+    periodoFim: novos.periodoFim ?? anteriores.periodoFim,
+  };
+}
+
 export function extrairFiltrosRelatorio(mensagem) {
   const lower = mensagem.toLowerCase().trim();
 

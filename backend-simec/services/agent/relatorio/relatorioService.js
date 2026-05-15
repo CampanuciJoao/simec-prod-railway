@@ -1,6 +1,10 @@
 import { resolverEntidades } from '../shared/entityResolver.js';
 import { construirFeedbackResolucaoEntidades } from '../shared/entityFeedback.js';
-import { extrairFiltrosRelatorio } from './parser/index.js';
+import {
+  extrairFiltrosRelatorio,
+  detectarAjusteRelatorio,
+  mesclarFiltrosRelatorio,
+} from './parser/index.js';
 import { montarResumoUltima, montarResumoLista } from './presenter/index.js';
 import {
   construirPayloadConsultaUnica,
@@ -79,7 +83,21 @@ export const RelatorioService = {
         return respostaPayload;
       }
 
-      const filtros = extrairFiltrosRelatorio(mensagem);
+      let filtros = extrairFiltrosRelatorio(mensagem);
+
+      // Refinamento sticky: se a mensagem parece um ajuste em cima de um
+      // relatorio anterior ('agora corretivas', 'so as do ano passado'),
+      // mescla os filtros novos sobre os filtros da sessao para nao perder
+      // contexto (equipamento, unidade, etc).
+      const filtrosAnteriores = sessaoExistente?.state?.filtrosAplicados || null;
+      const ehAjuste = filtrosAnteriores && detectarAjusteRelatorio(mensagem);
+      if (ehAjuste) {
+        filtros = mesclarFiltrosRelatorio(filtrosAnteriores, filtros);
+        logAgentStage('RELATORIO_AJUSTE', logContext, {
+          filtrosAnteriores,
+          filtrosMesclados: filtros,
+        });
+      }
 
       if (!filtros.tipoManutencao) {
         filtros.tipoManutencao = 'Preventiva';
@@ -184,7 +202,7 @@ export const RelatorioService = {
         };
       }
 
-      const manutencoes = await buscarListaManutencoesRelatorio({
+      const resultadoBusca = await buscarListaManutencoesRelatorio({
         tenantId,
         dataInicio: filtros.periodoInicio || null,
         dataFim: filtros.periodoFim || null,
@@ -193,22 +211,33 @@ export const RelatorioService = {
         tipoManutencao: filtros.tipoManutencao,
       });
 
+      const manutencoes = resultadoBusca.items;
+
       logAgentStage('RELATORIO_QUERY', logContext, {
         mode: 'LISTA_MANUTENCOES',
         filtros,
         totalResultados: manutencoes.length,
+        totalEncontrado: resultadoBusca.totalEncontrado,
+        limitado: resultadoBusca.limitado,
       });
 
-      const respostaTexto = montarResumoLista(manutencoes, filtros, {
+      const contextoPresenter = {
         unidadeNome: contexto.unidadeNome,
         equipamentoNome:
           contexto.equipamentoNome ||
           contexto.modelo ||
           contexto.tipoEquipamento,
         tenantTimezone,
-      });
+      };
 
-      const payload = construirPayloadLista(manutencoes, filtros, respostaTexto);
+      const respostaTexto = montarResumoLista(manutencoes, filtros, contextoPresenter);
+
+      const payload = construirPayloadLista(
+        resultadoBusca,
+        filtros,
+        respostaTexto,
+        contextoPresenter
+      );
 
       await registrarSessaoRelatorio(
         contextoUsuario,
@@ -218,16 +247,22 @@ export const RelatorioService = {
         sessaoExistente
       );
 
+      // Mensagem com aviso de limite quando houver
+      const avisos = [
+        payload.preview?.resumo?.avisoLimite,
+        payload.preview?.resumo?.avisoPeriodoCapado,
+      ].filter(Boolean);
+      const mensagemFinal = manutencoes.length > 0
+        ? `${respostaTexto}${avisos.length ? ' ' + avisos.join(' ') : ''}`
+        : respostaTexto;
+
       logAgentStage('RELATORIO_RESPONSE', logContext, {
         source: 'listaManutencoes',
-        mensagem: `${respostaTexto}${manutencoes.length > 0 ? ' Deseja gerar PDF?' : ''}`,
+        mensagem: mensagemFinal,
         meta: payload,
       });
 
-      return {
-        mensagem: `${respostaTexto}${manutencoes.length > 0 ? ' Deseja gerar PDF?' : ''}`,
-        meta: payload,
-      };
+      return { mensagem: mensagemFinal, meta: payload };
     } catch (error) {
       logAgentError('RELATORIO_ERROR', error, logContext, {
         mensagem,

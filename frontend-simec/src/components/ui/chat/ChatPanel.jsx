@@ -10,7 +10,7 @@ import ChatMessageBubble from '@/components/ui/chat/ChatMessageBubble';
 import { useChat } from '@/hooks/chat/useChat';
 
 function ChatPanel({ onClose }) {
-  const { messages, sendMessage, resetChat, isTyping } = useChat();
+  const { messages, sendMessage, resetChat, isTyping, triggerActionFromMessage } = useChat();
 
   return (
     <div className="fixed inset-x-3 bottom-3 top-20 z-[80] flex flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl sm:inset-x-auto sm:bottom-6 sm:right-6 sm:top-auto sm:h-[72vh] sm:max-h-[760px] sm:w-[420px]">
@@ -60,6 +60,7 @@ function ChatPanel({ onClose }) {
               key={m.id}
               {...m}
               onSelectSuggestion={(value) => sendMessage(value)}
+              onTriggerAction={triggerActionFromMessage}
             />
           ))}
 

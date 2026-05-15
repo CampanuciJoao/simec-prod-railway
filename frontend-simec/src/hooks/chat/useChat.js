@@ -22,6 +22,7 @@ function createMessage(role, content, extras = {}) {
     createdAt: formatTime(),
     meta: extras.meta || null,
     contexto: extras.contexto || null,
+    acao: extras.acao || null,
   };
 }
 
@@ -66,9 +67,14 @@ export function useChat() {
         appendMessage('assistant', parsed.mensagem || 'Não recebi resposta válida.', {
           meta: parsed.meta,
           contexto: parsed.contexto,
+          acao: parsed.acao,
         });
 
-        if (parsed.acao) {
+        // Quando ha preview, o download eh feito sob clique do usuario
+        // (botao no RelatorioPreviewCard). Nao disparar a acao automatica
+        // — caso contrario o usuario nao consegue ver a preview antes.
+        const temPreview = !!parsed.meta?.preview;
+        if (parsed.acao && !temPreview) {
           await handleChatAction({
             acao: parsed.acao,
             contexto: parsed.contexto,
@@ -113,10 +119,27 @@ export function useChat() {
     }
   }, [isTyping]);
 
+  // Permite acionar a action de uma mensagem sob demanda (ex: clique
+  // no botao 'Baixar PDF' do RelatorioPreviewCard).
+  const triggerActionFromMessage = useCallback(
+    async ({ acao, contexto, meta }) => {
+      if (!acao) return;
+      await handleChatAction({
+        acao,
+        contexto,
+        meta,
+        navigate,
+        addToast,
+      });
+    },
+    [navigate, addToast]
+  );
+
   return {
     messages,
     isTyping,
     sendMessage,
     resetChat,
+    triggerActionFromMessage,
   };
 }

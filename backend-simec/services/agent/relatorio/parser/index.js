@@ -1,1 +1,5 @@
-export { extrairFiltrosRelatorio } from './relatorioParser.js';
+export {
+  extrairFiltrosRelatorio,
+  detectarAjusteRelatorio,
+  mesclarFiltrosRelatorio,
+} from './relatorioParser.js';
