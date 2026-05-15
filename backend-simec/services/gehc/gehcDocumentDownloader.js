@@ -41,6 +41,13 @@ const DOWNLOAD_TIMEOUT_MS  = 120_000; // tempo máx aguardando o `download` even
 const POPUP_TIMEOUT_MS     = 30_000;  // tempo máx aguardando popup abrir (SPA pode demorar)
 const TRIGGER_TIMEOUT_MS   = 20_000;  // tempo máx procurando botao Download
 
+// Circuit breaker — apos N tentativas consecutivas falhando, "quarentena"
+// o documento por X dias. Evita gastar Playwright todo ciclo tentando
+// docs que provavelmente estao com problema permanente no portal GE
+// (S3 expirado, OS marcada como restrita, PDF corrompido, etc).
+const CIRCUIT_BREAKER_TENTATIVAS = 5;
+const CIRCUIT_BREAKER_DIAS_QUARENTENA = 7;
+
 // R2_PREFIX e r2KeyParaPdf permanecem para compatibilidade com PDFs legados
 // que ainda existirem no bucket (limpeza explicita via endpoint dedicado).
 const R2_PREFIX = 'gehc-pdfs';
@@ -370,12 +377,40 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
             idToken: tokens?.idToken,
           });
           if (docs.length) {
-            const ja = await prisma.gehcPdfDocumento.findMany({
-              where: { documentId: { in: docs.map((d) => d.documentId) }, baixadoEm: { not: null } },
-              select: { documentId: true },
+            // 1. Pula docs ja baixados (sucesso final)
+            // 2. Circuit breaker: pula docs com >=5 tentativas falhando se a
+            //    ultima tentativa foi ha menos de 7 dias. Apos 7 dias volta
+            //    a tentar — pode ter se resolvido o problema do lado do GE.
+            const idsRecorrentes = docs.map((d) => d.documentId);
+            const registros = await prisma.gehcPdfDocumento.findMany({
+              where: { documentId: { in: idsRecorrentes } },
+              select: {
+                documentId: true,
+                baixadoEm: true,
+                tentativas: true,
+                ultimaTentativaEm: true,
+              },
             });
-            const jaSet = new Set(ja.map((d) => d.documentId));
-            docsPendentes = docs.filter((d) => !jaSet.has(d.documentId));
+            const limiteQuarentena = new Date();
+            limiteQuarentena.setDate(limiteQuarentena.getDate() - CIRCUIT_BREAKER_DIAS_QUARENTENA);
+            const skipSet = new Set();
+            const quarentena = [];
+            for (const r of registros) {
+              if (r.baixadoEm) { skipSet.add(r.documentId); continue; }
+              if (
+                (r.tentativas ?? 0) >= CIRCUIT_BREAKER_TENTATIVAS &&
+                r.ultimaTentativaEm && r.ultimaTentativaEm > limiteQuarentena
+              ) {
+                skipSet.add(r.documentId);
+                quarentena.push(r.documentId);
+              }
+            }
+            if (quarentena.length > 0) {
+              console.log(
+                `[GEHC_PDF] SR${trackingNumber}: ${quarentena.length} doc(s) em quarentena (>=${CIRCUIT_BREAKER_TENTATIVAS} tentativas, voltam a tentar apos ${CIRCUIT_BREAKER_DIAS_QUARENTENA}d): ${quarentena.join(', ')}`
+              );
+            }
+            docsPendentes = docs.filter((d) => !skipSet.has(d.documentId));
           }
         } catch (err) {
           erros.push(`SR${trackingNumber}: documentSearch ${err.message}`);

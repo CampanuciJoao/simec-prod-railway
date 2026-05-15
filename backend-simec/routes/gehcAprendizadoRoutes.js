@@ -182,7 +182,9 @@ router.get('/extracoes/diagnostico', async (req, res) => {
       prisma.gehcPdfDocumento.count({ where: { tenantId } }),
       prisma.gehcPdfDocumento.count({ where: { tenantId, r2Key: { not: null } } }),
       prisma.gehcPdfDocumento.count({ where: { tenantId, r2Key: null } }),
-      prisma.gehcPdfDocumento.count({ where: { tenantId, ultimoErro: { not: null } } }),
+      prisma.gehcPdfDocumento.count({
+        where: { tenantId, ultimoErro: { not: null }, baixadoEm: null },
+      }),
       prisma.gehcPdfExtraido.count({ where: { tenantId } }),
       prisma.gehcPdfExtraido.count({ where: { tenantId, extraidoEm: { not: null }, extractionError: null } }),
       prisma.gehcPdfExtraido.count({ where: { tenantId, extractionError: { not: null } } }),
