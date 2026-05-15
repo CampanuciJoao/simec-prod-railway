@@ -125,7 +125,7 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
             <InfoCard
               icon={faWrench}
               label="Equipamento"
-              value={manutencao.equipamento?.modelo || '---'}
+              value={manutencao.equipamento?.apelido || manutencao.equipamento?.modelo || '---'}
             />
 
             <InfoCard
