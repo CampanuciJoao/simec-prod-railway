@@ -418,49 +418,100 @@ function HistoricoTimelineList({
                 </Card>
               ) : null}
 
-              {item.notasAndamento?.length ? (
-                <Card surface="soft" className="rounded-2xl">
-                  <div className="flex items-center gap-2">
-                    <FontAwesomeIcon
-                      icon={faCommentDots}
-                      style={{ color: 'var(--brand-primary)' }}
-                    />
-                    <span
-                      className="text-[11px] font-bold uppercase tracking-[0.14em]"
+              {item.notasAndamento?.length ? (() => {
+                // Separa notas em pre/pos-encerramento. Cutoff = dataConclusao
+                // da manutencao (vem de item.referenciaDetalhes ou item).
+                const dataEncerramento =
+                  item.referenciaDetalhes?.dataConclusao ||
+                  item.dataConclusao ||
+                  null;
+                const cutoff = dataEncerramento
+                  ? new Date(dataEncerramento).getTime()
+                  : null;
+                const notasPre = cutoff
+                  ? item.notasAndamento.filter(
+                      (n) => !n.data || new Date(n.data).getTime() <= cutoff
+                    )
+                  : item.notasAndamento;
+                const notasPos = cutoff
+                  ? item.notasAndamento.filter(
+                      (n) => n.data && new Date(n.data).getTime() > cutoff
+                    )
+                  : [];
+
+                const renderNota = (nota, posEncerramento = false) => (
+                  <div
+                    key={`${item.uniqueId}-${nota.id}`}
+                    className="rounded-xl border px-4 py-3"
+                    style={{
+                      borderColor: posEncerramento
+                        ? 'var(--color-warning-soft)'
+                        : 'var(--border-soft)',
+                      backgroundColor: 'var(--bg-surface)',
+                      borderLeftWidth: posEncerramento ? '3px' : '1px',
+                      borderLeftColor: posEncerramento
+                        ? 'var(--color-warning)'
+                        : 'var(--border-soft)',
+                    }}
+                  >
+                    <p
+                      className="text-sm leading-6"
+                      style={{ color: 'var(--text-primary)' }}
+                    >
+                      {nota.nota}
+                    </p>
+                    <div
+                      className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs"
                       style={{ color: 'var(--text-muted)' }}
                     >
-                      Comentarios e notas da OS
-                    </span>
+                      <span>{nota.autor?.nome || 'Sistema'}</span>
+                      {nota.data ? <span>{formatarDataHora(nota.data)}</span> : null}
+                    </div>
                   </div>
+                );
 
-                  <div className="mt-3 space-y-3">
-                    {item.notasAndamento.map((nota) => (
-                      <div
-                        key={`${item.uniqueId}-${nota.id}`}
-                        className="rounded-xl border px-4 py-3"
-                        style={{
-                          borderColor: 'var(--border-soft)',
-                          backgroundColor: 'var(--bg-surface)',
-                        }}
+                return (
+                  <Card surface="soft" className="rounded-2xl">
+                    <div className="flex items-center gap-2">
+                      <FontAwesomeIcon
+                        icon={faCommentDots}
+                        style={{ color: 'var(--brand-primary)' }}
+                      />
+                      <span
+                        className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                        style={{ color: 'var(--text-muted)' }}
                       >
-                        <p
-                          className="text-sm leading-6"
-                          style={{ color: 'var(--text-primary)' }}
-                        >
-                          {nota.nota}
-                        </p>
-                        <div
-                          className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs"
-                          style={{ color: 'var(--text-muted)' }}
-                        >
-                          <span>{nota.autor?.nome || 'Sistema'}</span>
-                          {nota.data ? <span>{formatarDataHora(nota.data)}</span> : null}
-                        </div>
+                        Comentarios e notas da OS
+                      </span>
+                    </div>
+
+                    {notasPre.length > 0 ? (
+                      <div className="mt-3 space-y-3">
+                        {notasPre.map((nota) => renderNota(nota, false))}
                       </div>
-                    ))}
-                  </div>
-                </Card>
-              ) : null}
+                    ) : null}
+
+                    {notasPos.length > 0 ? (
+                      <>
+                        <div
+                          className="mt-4 flex items-center gap-2 border-t pt-3"
+                          style={{ borderColor: 'var(--border-soft)' }}
+                        >
+                          <span
+                            className="text-[11px] font-bold uppercase tracking-[0.14em]"
+                            style={{ color: 'var(--color-warning)' }}
+                          >
+                            Notas de pós-encerramento ({notasPos.length})
+                          </span>
+                        </div>
+                        <div className="mt-2 space-y-3">
+                          {notasPos.map((nota) => renderNota(nota, true))}
+                        </div>
+                      </>
+                    ) : null}
+                  </Card>
+                );
+              })() : null}
 
               {item.anexos?.length ? (
                 <Card surface="soft" className="rounded-2xl">

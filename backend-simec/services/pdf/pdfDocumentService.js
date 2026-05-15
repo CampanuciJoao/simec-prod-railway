@@ -984,16 +984,57 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
   drawSectionTitle(doc, 'Descrição do problema / serviço');
   infoRow(doc, 'Descrição', manutencao?.descricaoProblemaServico || 'Nenhuma descrição informada.');
 
+  // Notas: separa em pre-encerramento (executadas durante a OS) vs
+  // pos-encerramento (adicionadas APOS Concluida/Cancelada — comum quando
+  // engenheiro lembra de algo depois ou cliente reclama de retrabalho).
+  // Visualmente o "Encerramento" fica em destaque e as notas posteriores
+  // viram uma secao separada para nao confundir o auditor.
+  const notas = Array.isArray(manutencao?.notasAndamento) ? manutencao.notasAndamento : [];
+  const dataEncerramento = manutencao?.dataConclusao || manutencao?.dataFimReal || null;
+  const cutoff = dataEncerramento ? new Date(dataEncerramento).getTime() : null;
+  const ehEncerrada = ['Concluida', 'Cancelada'].includes(manutencao?.status);
+
+  const notasPre = cutoff
+    ? notas.filter((n) => !n?.data || new Date(n.data).getTime() <= cutoff)
+    : notas;
+  const notasPos = cutoff
+    ? notas.filter((n) => n?.data && new Date(n.data).getTime() > cutoff)
+    : [];
+
   drawSectionTitle(doc, 'Histórico do chamado / notas técnicas');
   drawTable(doc, {
     headers: ['Data/Hora', 'Responsavel', 'Nota / andamento'],
     columnWidths: [100, 130, 265],
-    rows: (manutencao?.notasAndamento || []).map((nota) => [
+    rows: notasPre.map((nota) => [
       formatDateTime(nota?.data, locale, timeZone),
       safeText(nota?.autor?.nome, 'Sistema'),
       safeText(nota?.nota, '-'),
     ]),
+    emptyMessage: 'Sem notas registradas.',
   });
+
+  // Bloco de encerramento em destaque (so se houver)
+  if (ehEncerrada && dataEncerramento) {
+    drawSectionTitle(doc, `Encerramento da OS — ${manutencao.status}`);
+    infoRow(doc, 'Encerrada em', formatDateTime(dataEncerramento, locale, timeZone));
+    if (manutencao?.tecnicoResponsavel) {
+      infoRow(doc, 'Responsável', manutencao.tecnicoResponsavel);
+    }
+  }
+
+  // Notas pos-encerramento (so renderiza secao se houver)
+  if (notasPos.length > 0) {
+    drawSectionTitle(doc, `Notas de pós-encerramento (${notasPos.length})`);
+    drawTable(doc, {
+      headers: ['Data/Hora', 'Responsavel', 'Nota / andamento'],
+      columnWidths: [100, 130, 265],
+      rows: notasPos.map((nota) => [
+        formatDateTime(nota?.data, locale, timeZone),
+        safeText(nota?.autor?.nome, 'Sistema'),
+        safeText(nota?.nota, '-'),
+      ]),
+    });
+  }
 
   return finalizeDocument(doc);
 }
