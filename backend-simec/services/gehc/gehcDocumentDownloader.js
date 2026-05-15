@@ -813,14 +813,14 @@ async function disparaDownloadDoBotao({ page, downloadBtn, indiceDocumento }) {
  * @param {string} tenantId
  * @param {object} opts
  * @param {string[]} [opts.modalidades] - ex: ['MR'] (default: tudo)
- * @param {number} [opts.diasAtras=180]
+ * @param {number} [opts.diasAtras=365]
  * @param {number} [opts.limite=50] - número máximo TOTAL de OSs por execução
  * @param {number} [opts.maxPorEquipamento=5] - cap de OSs por equipamento por execução
  */
 export async function executarBackfillPdfs({
   tenantId,
   modalidades,
-  diasAtras = 180,
+  diasAtras = 365,
   limite = 50,
   maxPorEquipamento = 5,
 } = {}) {

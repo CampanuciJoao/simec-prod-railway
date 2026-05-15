@@ -212,8 +212,15 @@ const alertasWorker = new Worker(
       // equipamentos por execucao em vez de concentrar em poucos).
       return comTelemetria(job, PIPELINE_NAMES.GEHC_CAPTURA_PDF, async () => {
         try {
+          // Janela de 365d (1 ano) — cobre manutencoes antigas relevantes
+          // para a IA. O backfill nao puxa tudo de uma vez: cada execucao
+          // processa no maximo `limite` OSs, comecando das mais recentes
+          // (orderBy requestedAt desc dentro do equipamento). Conforme as
+          // recentes vao sendo marcadas como baixadas, os ciclos seguintes
+          // descem naturalmente para as mais antigas. Cobertura plena dos
+          // 365d acontece em alguns ciclos do cron 2x/dia.
           const r = await executarBackfillTodosTenants({
-            diasAtras: 180,
+            diasAtras: 365,
             limite: 50,
             maxPorEquipamento: 5,
           });
@@ -232,7 +239,7 @@ const alertasWorker = new Worker(
         try {
           const r = await executarBackfillPdfs({
             tenantId: job.data.tenantId,
-            diasAtras: job.data.diasAtras || 180,
+            diasAtras: job.data.diasAtras || 365,
             limite: job.data.limite || 50,
             modalidades: job.data.modalidades,
           });
