@@ -26,6 +26,17 @@ export const sidebarConfig = [
     icon: faMicrochip,
   },
   {
+    label: 'Manutenções',
+    path: '/manutencoes',
+    icon: faWrench,
+  },
+  {
+    label: 'Alertas',
+    path: '/alertas',
+    icon: faExclamationTriangle,
+    showBadge: true,
+  },
+  {
     label: 'Contratos',
     path: '/contratos',
     icon: faFileContract,
@@ -36,15 +47,9 @@ export const sidebarConfig = [
     icon: faShieldAlt,
   },
   {
-    label: 'Alertas',
-    path: '/alertas',
-    icon: faExclamationTriangle,
-    showBadge: true,
-  },
-  {
-    label: 'Manutencoes',
-    path: '/manutencoes',
-    icon: faWrench,
+    label: 'Relatórios',
+    path: '/relatorios',
+    icon: faChartLine,
   },
   {
     label: 'Indicadores BI',
@@ -55,11 +60,6 @@ export const sidebarConfig = [
     label: 'Orçamentos',
     path: '/orcamentos',
     icon: faFileInvoiceDollar,
-  },
-  {
-    label: 'Relatorios',
-    path: '/relatorios',
-    icon: faChartLine,
   },
   {
     label: 'Ajuda',
