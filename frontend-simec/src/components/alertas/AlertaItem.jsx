@@ -154,13 +154,15 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
 
                 {isRecomendacao ? (
                   <span
-                    className="rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide"
+                    className="inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide shadow-sm"
                     style={{
-                      backgroundColor: 'var(--color-info-surface)',
-                      color: 'var(--color-info)',
+                      background:
+                        'linear-gradient(135deg, var(--color-info), var(--brand-primary))',
+                      color: '#ffffff',
+                      borderColor: 'rgba(255,255,255,0.18)',
                     }}
                   >
-                    Inteligente
+                    ✨ Inteligente
                   </span>
                 ) : null}
               </div>
