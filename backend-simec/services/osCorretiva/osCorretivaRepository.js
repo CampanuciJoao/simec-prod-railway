@@ -93,6 +93,7 @@ export async function listarOsCorretivas({ tenantId, equipamentoId, status, tipo
       where,
       include: {
         ...INCLUDE_EQUIPAMENTO,
+        autor: { select: { nome: true } },
         visitas: { orderBy: { createdAt: 'desc' }, take: 1 },
         _count: { select: { notas: true, visitas: true } },
       },

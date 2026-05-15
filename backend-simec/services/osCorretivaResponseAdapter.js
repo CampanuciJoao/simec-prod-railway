@@ -43,6 +43,16 @@ function adaptarNota(nota) {
   };
 }
 
+function montarAbertoPor(os) {
+  // OsCorretiva ainda não tem o campo origemAbertura (vs. Manutencao);
+  // por enquanto, sempre humano via autor. Quando precisarmos distinguir
+  // IA em OS corretiva, adicionamos origemAbertura via migration.
+  if (os?.autor?.nome) {
+    return { tipo: 'humano', label: os.autor.nome };
+  }
+  return null;
+}
+
 export function adaptarOsCorretivaResponse(os) {
   if (!os) return null;
 
@@ -52,6 +62,7 @@ export function adaptarOsCorretivaResponse(os) {
     tipoLabel: TIPO_OS_LABELS[os.tipo] || os.tipo,
     statusEquipamentoAberturaLabel: STATUS_EQUIPAMENTO_LABELS[os.statusEquipamentoAbertura] || os.statusEquipamentoAbertura,
     statusAtualEquipamentoLabel: STATUS_EQUIPAMENTO_LABELS[os.equipamento?.status] || os.equipamento?.status || null,
+    abertoPor: montarAbertoPor(os),
     notas: (os.notas || []).map(adaptarNota),
     visitas: (os.visitas || []).map(adaptarVisita),
     timeline: buildTimeline(os),
@@ -63,6 +74,7 @@ export function adaptarListaOsCorretivasResponse(items) {
     ...os,
     statusLabel: STATUS_OS_LABELS[os.status] || os.status,
     tipoLabel: TIPO_OS_LABELS[os.tipo] || os.tipo,
+    abertoPor: montarAbertoPor(os),
     ultimaVisita: os.visitas?.[0] ? adaptarVisita(os.visitas[0]) : null,
     totalNotas: os._count?.notas ?? 0,
     totalVisitas: os._count?.visitas ?? 0,

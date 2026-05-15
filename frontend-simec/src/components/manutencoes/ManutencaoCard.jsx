@@ -8,7 +8,9 @@ import {
   faHourglassStart,
   faHospital,
   faHashtag,
+  faRobot,
   faTrashAlt,
+  faUser,
   faWrench,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -32,6 +34,25 @@ const STATUS_BORDER = {
   Agendada:              'var(--brand-primary)',
   Pendente:              'var(--color-warning)',
 };
+
+function AbertoPorChip({ abertoPor }) {
+  if (!abertoPor?.label) return null;
+  const isAgente = abertoPor.tipo === 'agente';
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface-soft)',
+        color: isAgente ? 'var(--color-info)' : 'var(--text-secondary)',
+      }}
+      title={isAgente ? 'Aberta pelo Agente IA' : `Aberta por ${abertoPor.label}`}
+    >
+      <FontAwesomeIcon icon={isAgente ? faRobot : faUser} className="text-[10px]" />
+      <span className="truncate max-w-[140px]">{abertoPor.label}</span>
+    </span>
+  );
+}
 
 function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
   return (
@@ -68,6 +89,7 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
 
                 <StatusBadge value={manutencao.status} />
                 <StatusBadge value={getTipoLabel(manutencao.tipo)} />
+                <AbertoPorChip abertoPor={manutencao.abertoPor} />
               </div>
 
               <p

@@ -168,13 +168,19 @@ export async function buscarManutencaoPorId({
   tenantId,
   manutencaoId,
 }) {
-  return prisma.manutencao.findFirst({
+  const manutencao = await prisma.manutencao.findFirst({
     where: {
       id: manutencaoId,
       tenantId,
     },
     include: getManutencaoDetalhesInclude(tenantId),
   });
+
+  if (manutencao) {
+    await anexarAbertoPorEmManutencoes([manutencao], tenantId);
+  }
+
+  return manutencao;
 }
 
 export async function buscarManutencaoResumo({
@@ -346,6 +352,11 @@ export async function listarManutencoes({
     }),
   ]);
 
+  // Enriquece cada item com abertoPor (humano via LogAuditoria de CRIAÇÃO
+  // ou marcador "Agente IA" quando origemAbertura === 'agente'). Manutenção
+  // não tem autor direto no schema; o log é a fonte da verdade.
+  await anexarAbertoPorEmManutencoes(items, tenantId);
+
   const metricas = statusSummary.reduce(
     (acc, item) => {
       if (MANUTENCAO_STATUS_AGUARDANDO.includes(item.status)) {
@@ -373,6 +384,55 @@ export async function listarManutencoes({
     hasNextPage: skip + items.length < total,
     metricas,
   };
+}
+
+/**
+ * Para cada manutenção em `manutencoes`, define `abertoPor`:
+ *   - { tipo: 'agente', label: 'Agente IA' } se origemAbertura === 'agente'
+ *   - { tipo: 'humano', label: '<nome>' } via primeiro Log de CRIAÇÃO
+ *   - null se não há log e não é agente
+ *
+ * Faz uma única query batch ao LogAuditoria para evitar N+1.
+ * Mutates os items in-place.
+ */
+export async function anexarAbertoPorEmManutencoes(manutencoes, tenantId) {
+  if (!Array.isArray(manutencoes) || manutencoes.length === 0) return;
+
+  const idsParaLog = manutencoes
+    .filter((m) => m.origemAbertura !== 'agente')
+    .map((m) => m.id);
+
+  const nomePorId = {};
+  if (idsParaLog.length > 0) {
+    const logs = await prisma.logAuditoria.findMany({
+      where: {
+        tenantId,
+        entidade: 'Manutenção',
+        acao: 'CRIAÇÃO',
+        entidadeId: { in: idsParaLog },
+      },
+      orderBy: { timestamp: 'asc' },
+      select: {
+        entidadeId: true,
+        autor: { select: { nome: true } },
+      },
+    });
+
+    for (const log of logs) {
+      if (!nomePorId[log.entidadeId] && log.autor?.nome) {
+        nomePorId[log.entidadeId] = log.autor.nome;
+      }
+    }
+  }
+
+  for (const m of manutencoes) {
+    if (m.origemAbertura === 'agente') {
+      m.abertoPor = { tipo: 'agente', label: 'Agente IA' };
+      continue;
+    }
+    const nome = nomePorId[m.id];
+    m.abertoPor = nome ? { tipo: 'humano', label: nome } : null;
+  }
 }
 
 export async function contarManutencoesDoTenant(tenantId) {

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faEye, faTrashAlt, faMicrochip, faHospital,
-  faClock, faUser, faTruck,
+  faClock, faUser, faTruck, faRobot,
 } from '@fortawesome/free-solid-svg-icons';
 import { Button, Card, InfoCard } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
@@ -72,6 +72,30 @@ function OsCorretivaCard({ os, isAdmin, onDelete }) {
                 >
                   {EQ_STATUS_LABELS[os.statusEquipamentoAbertura] || os.statusEquipamentoAbertura}
                 </span>
+                {os.abertoPor?.label ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium"
+                    style={{
+                      borderColor: 'var(--border-soft)',
+                      backgroundColor: 'var(--bg-surface-soft)',
+                      color:
+                        os.abertoPor.tipo === 'agente'
+                          ? 'var(--color-info)'
+                          : 'var(--text-secondary)',
+                    }}
+                    title={
+                      os.abertoPor.tipo === 'agente'
+                        ? 'Aberta pelo Agente IA'
+                        : `Aberta por ${os.abertoPor.label}`
+                    }
+                  >
+                    <FontAwesomeIcon
+                      icon={os.abertoPor.tipo === 'agente' ? faRobot : faUser}
+                      className="text-[10px]"
+                    />
+                    <span className="max-w-[140px] truncate">{os.abertoPor.label}</span>
+                  </span>
+                ) : null}
               </div>
 
               <p className="mt-2 text-sm leading-6" style={{ color: 'var(--text-secondary)' }}>

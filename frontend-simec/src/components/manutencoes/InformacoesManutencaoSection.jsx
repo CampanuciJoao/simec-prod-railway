@@ -96,6 +96,15 @@ function InformacoesManutencaoSection({
               {resumoAgendamento}
             </p>
           ) : null}
+
+          {manutencao?.abertoPor?.label ? (
+            <p className="mt-1">
+              <strong style={{ color: 'var(--text-primary)' }}>Aberta por:</strong>{' '}
+              {manutencao.abertoPor.tipo === 'agente'
+                ? `🤖 ${manutencao.abertoPor.label}`
+                : manutencao.abertoPor.label}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
