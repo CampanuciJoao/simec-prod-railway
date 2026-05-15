@@ -35,7 +35,17 @@ function ManutencoesListSection({
   hasNextPage,
   loadingMore,
   onLoadMore,
+  onSelectKpi,
+  activeKpi,
 }) {
+  const kpiActiveClass = (key) =>
+    activeKpi === key ? 'ring-2 ring-offset-2 ring-offset-transparent' : '';
+
+  const handleKpiClick = (key) => () => {
+    if (typeof onSelectKpi === 'function') return onSelectKpi(key);
+    if (key === 'total' && typeof onClearAll === 'function') onClearAll();
+  };
+
   return (
     <PageSection>
       <div className="space-y-6">
@@ -46,7 +56,8 @@ function ManutencoesListSection({
             value={metricas?.total ?? 0}
             subtitle="Todas as ordens"
             tone="slate"
-            onClick={onClearAll}
+            onClick={handleKpiClick('total')}
+            className={kpiActiveClass('total')}
           />
 
           <KpiCard
@@ -55,6 +66,8 @@ function ManutencoesListSection({
             value={metricas?.aguardando ?? 0}
             subtitle="Pendentes de ação"
             tone="orange"
+            onClick={handleKpiClick('aguardando')}
+            className={kpiActiveClass('aguardando')}
           />
 
           <KpiCard
@@ -63,6 +76,8 @@ function ManutencoesListSection({
             value={metricas?.concluidas ?? 0}
             subtitle="Finalizadas com sucesso"
             tone="green"
+            onClick={handleKpiClick('concluidas')}
+            className={kpiActiveClass('concluidas')}
           />
 
           <KpiCard
@@ -71,6 +86,8 @@ function ManutencoesListSection({
             value={metricas?.canceladas ?? 0}
             subtitle="Ordens encerradas"
             tone="slate"
+            onClick={handleKpiClick('canceladas')}
+            className={kpiActiveClass('canceladas')}
           />
         </KpiGrid>
 
@@ -151,6 +168,8 @@ ManutencoesListSection.propTypes = {
   hasNextPage: PropTypes.bool,
   loadingMore: PropTypes.bool,
   onLoadMore: PropTypes.func,
+  onSelectKpi: PropTypes.func,
+  activeKpi: PropTypes.oneOf(['total', 'aguardando', 'concluidas', 'canceladas', null]),
 };
 
 export default ManutencoesListSection;

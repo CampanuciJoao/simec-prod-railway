@@ -190,6 +190,23 @@ export async function buscarManutencaoResumo({
   });
 }
 
+// Status considerados "aguardando ação" — usados pelo pseudo-status que
+// alimenta o card "Aguardando" na lista de manutenções.
+export const MANUTENCAO_STATUS_AGUARDANDO = [
+  'Pendente',
+  'Agendada',
+  'EmAndamento',
+  'AguardandoConfirmacao',
+];
+
+function expandirFiltroStatusManutencao(status) {
+  if (!status) return null;
+  if (status === 'aguardando') {
+    return { in: MANUTENCAO_STATUS_AGUARDANDO };
+  }
+  return status;
+}
+
 export async function listarManutencoes({
   tenantId,
   equipamentoId,
@@ -213,8 +230,9 @@ export async function listarManutencoes({
     whereClause.tipo = tipo;
   }
 
-  if (status) {
-    whereClause.status = status;
+  const statusFiltro = expandirFiltroStatusManutencao(status);
+  if (statusFiltro !== null) {
+    whereClause.status = statusFiltro;
   }
 
   if (search) {
@@ -302,7 +320,12 @@ export async function listarManutencoes({
 
   const skip = (page - 1) * pageSize;
 
-  const [items, total, statusSummary] = await Promise.all([
+  // Métricas refletem o panorama do tenant ignorando o filtro de status —
+  // os cards de KPI seguem mostrando os totais reais mesmo quando o usuário
+  // está com um status específico aplicado (clicou em um card / dropdown).
+  const { status: _statusIgnorado, ...whereParaMetricas } = whereClause;
+
+  const [items, total, statusSummary, totalSemStatus] = await Promise.all([
     prisma.manutencao.findMany({
       ...queryBase,
       take: pageSize,
@@ -313,24 +336,28 @@ export async function listarManutencoes({
     }),
     prisma.manutencao.groupBy({
       by: ['status'],
-      where: whereClause,
+      where: whereParaMetricas,
       _count: {
         id: true,
       },
+    }),
+    prisma.manutencao.count({
+      where: whereParaMetricas,
     }),
   ]);
 
   const metricas = statusSummary.reduce(
     (acc, item) => {
-      acc.total = total;
+      if (MANUTENCAO_STATUS_AGUARDANDO.includes(item.status)) {
+        acc.aguardando += item._count.id;
+      }
       if (item.status === 'EmAndamento') acc.emAndamento = item._count.id;
-      if (item.status === 'AguardandoConfirmacao') acc.aguardando = item._count.id;
       if (item.status === 'Concluida') acc.concluidas = item._count.id;
       if (item.status === 'Cancelada') acc.canceladas = item._count.id;
       return acc;
     },
     {
-      total,
+      total: totalSemStatus,
       emAndamento: 0,
       aguardando: 0,
       concluidas: 0,

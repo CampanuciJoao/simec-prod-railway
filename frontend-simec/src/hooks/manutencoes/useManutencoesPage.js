@@ -5,8 +5,19 @@ import { useNavigate } from 'react-router-dom';
 import { useModal } from '../shared/useModal';
 import { useManutencoes } from './useManutencoes';
 
+const STATUS_LABELS = {
+  aguardando: 'Aguardando ação',
+  Pendente: 'Em Triagem',
+  Agendada: 'Agendada',
+  EmAndamento: 'Em Andamento',
+  AguardandoConfirmacao: 'Aguardando Confirmação',
+  Concluida: 'Concluída',
+  Cancelada: 'Cancelada',
+};
+
 function formatarLabel(valor) {
   if (!valor) return '';
+  if (STATUS_LABELS[valor]) return STATUS_LABELS[valor];
   return String(valor).replace(/([A-Z])/g, ' $1').trim();
 }
 
@@ -22,6 +33,7 @@ export function useManutencoesPage() {
    */
   const selectFiltersConfig = useMemo(() => {
     const statusOptions = [
+      { value: 'aguardando', label: 'Aguardando ação' },
       { value: 'Pendente', label: 'Em Triagem' },
       { value: 'Agendada', label: 'Agendada' },
       { value: 'EmAndamento', label: 'Em Andamento' },

@@ -59,11 +59,24 @@ export async function buscarOsResumo({ tenantId, osId }) {
   });
 }
 
+// Status considerados "aguardando ação" — usados pelo pseudo-status que
+// alimenta o card "Aguardando" na lista de manutenções.
+export const OS_CORRETIVA_STATUS_AGUARDANDO = ['Aberta', 'EmAndamento', 'AguardandoTerceiro'];
+
+function expandirFiltroStatusOsCorretiva(status) {
+  if (!status) return null;
+  if (status === 'aguardando') {
+    return { in: OS_CORRETIVA_STATUS_AGUARDANDO };
+  }
+  return status;
+}
+
 export async function listarOsCorretivas({ tenantId, equipamentoId, status, tipo, search, page, pageSize }) {
   const where = { tenantId };
 
   if (equipamentoId) where.equipamentoId = equipamentoId;
-  if (status) where.status = status;
+  const statusFiltro = expandirFiltroStatusOsCorretiva(status);
+  if (statusFiltro !== null) where.status = statusFiltro;
   if (tipo) where.tipo = tipo;
   if (search) {
     where.OR = [
@@ -90,13 +103,19 @@ export async function listarOsCorretivas({ tenantId, equipamentoId, status, tipo
     prisma.osCorretiva.count({ where }),
   ]);
 
-  const metricas = await prisma.osCorretiva.groupBy({
-    by: ['status'],
-    where: { tenantId },
-    _count: { id: true },
-  });
+  // Métricas refletem o panorama do tenant ignorando o filtro de status,
+  // mantendo os cards de KPI consistentes mesmo com um status aplicado.
+  const { status: _statusIgnoradoOs, ...whereParaMetricasOs } = where;
+  const [metricas, totalSemStatus] = await Promise.all([
+    prisma.osCorretiva.groupBy({
+      by: ['status'],
+      where: whereParaMetricasOs,
+      _count: { id: true },
+    }),
+    prisma.osCorretiva.count({ where: whereParaMetricasOs }),
+  ]);
 
-  const metricasMap = { Aberta: 0, EmAndamento: 0, AguardandoTerceiro: 0, Concluida: 0 };
+  const metricasMap = { Aberta: 0, EmAndamento: 0, AguardandoTerceiro: 0, Concluida: 0, Cancelada: 0 };
   for (const m of metricas) {
     metricasMap[m.status] = m._count.id;
   }
@@ -108,11 +127,12 @@ export async function listarOsCorretivas({ tenantId, equipamentoId, status, tipo
     pageSize,
     hasNextPage: total > page * pageSize,
     metricas: {
-      total,
+      total: totalSemStatus,
       abertas: metricasMap.Aberta,
       emAndamento: metricasMap.EmAndamento,
       aguardandoTerceiro: metricasMap.AguardandoTerceiro,
       concluidas: metricasMap.Concluida,
+      canceladas: metricasMap.Cancelada,
     },
   };
 }

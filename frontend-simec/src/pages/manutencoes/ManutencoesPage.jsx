@@ -70,10 +70,75 @@ function ManutencoesPage() {
   // Combined metricas: manutenções + OS corretivas counts
   const combinedMetricas = useMemo(() => ({
     total: (page.metricas?.total ?? 0) + (os.metricas?.total ?? 0),
-    aguardando: (page.metricas?.aguardando ?? 0) + (os.metricas?.abertas ?? 0) + (os.metricas?.emAndamento ?? 0),
+    aguardando:
+      (page.metricas?.aguardando ?? 0) +
+      (os.metricas?.abertas ?? 0) +
+      (os.metricas?.emAndamento ?? 0) +
+      (os.metricas?.aguardandoTerceiro ?? 0),
     concluidas: (page.metricas?.concluidas ?? 0) + (os.metricas?.concluidas ?? 0),
-    canceladas: page.metricas?.canceladas ?? 0,
+    canceladas: (page.metricas?.canceladas ?? 0) + (os.metricas?.canceladas ?? 0),
   }), [page.metricas, os.metricas]);
+
+  // KPI ativo = derivado do status atualmente filtrado nos dois hooks.
+  // Para considerar "ativo", os dois filtros precisam estar alinhados na mesma
+  // intenção (Aguardando / Concluída / Cancelada) ou ambos vazios (Total).
+  const activeKpi = useMemo(() => {
+    const sM = page.filtros?.status || '';
+    const sO = os.filtros?.status || '';
+    if (!sM && !sO) return 'total';
+    if (sM === 'aguardando' && sO === 'aguardando') return 'aguardando';
+    if (sM === 'Concluida' && sO === 'Concluida') return 'concluidas';
+    if (sM === 'Cancelada' && sO === 'Cancelada') return 'canceladas';
+    return null;
+  }, [page.filtros?.status, os.filtros?.status]);
+
+  const handleClearAllFilters = () => {
+    page.clearAllFilters();
+    os.handleFilterChange('status', '');
+  };
+
+  const handleRemoveFilter = (key) => {
+    page.clearFilter(key);
+    if (key === 'status') os.handleFilterChange('status', '');
+  };
+
+  // Sincroniza dropdown de Status com o filtro de OS Corretiva quando o valor
+  // selecionado tem equivalência (aguardando/Concluida/Cancelada). Para os
+  // demais status (específicos de manutenção), zera o filtro da OS Corretiva.
+  const selectFiltersSincronizados = useMemo(() => {
+    return (page.selectFiltersConfig || []).map((filtro) => {
+      if (filtro.id !== 'status') return filtro;
+      return {
+        ...filtro,
+        onChange: (value) => {
+          page.controles.handleFilterChange('status', value);
+          const STATUS_COM_EQUIVALENCIA = new Set(['aguardando', 'Concluida', 'Cancelada']);
+          os.handleFilterChange('status', STATUS_COM_EQUIVALENCIA.has(value) ? value : '');
+        },
+      };
+    });
+  }, [page.selectFiltersConfig, page.controles, os]);
+
+  const handleSelectKpi = (kpiKey) => {
+    const statusManutencaoPorKpi = {
+      total: '',
+      aguardando: 'aguardando',
+      concluidas: 'Concluida',
+      canceladas: 'Cancelada',
+    };
+    const statusOsPorKpi = {
+      total: '',
+      aguardando: 'aguardando',
+      concluidas: 'Concluida',
+      canceladas: 'Cancelada',
+    };
+    const statusManutencao = statusManutencaoPorKpi[kpiKey];
+    const statusOs = statusOsPorKpi[kpiKey];
+    if (statusManutencao === undefined) return;
+
+    page.controles.handleFilterChange('status', statusManutencao);
+    os.handleFilterChange('status', statusOs);
+  };
 
   return (
     <>
@@ -115,10 +180,10 @@ function ManutencoesPage() {
                 items={unifiedItems}
                 searchTerm={page.searchTerm}
                 onSearchChange={page.onSearchChange}
-                selectFilters={page.selectFiltersConfig}
+                selectFilters={selectFiltersSincronizados}
                 activeFilters={page.activeFilters}
-                onRemoveFilter={page.clearFilter}
-                onClearAll={page.clearAllFilters}
+                onRemoveFilter={handleRemoveFilter}
+                onClearAll={handleClearAllFilters}
                 onDelete={(item) => page.deleteModal.openModal(item)}
                 onDeleteOs={(o) => osDeleteModal.openModal(o)}
                 isAdmin={isAdmin}
@@ -127,6 +192,8 @@ function ManutencoesPage() {
                 hasNextPage={combinedHasNextPage}
                 loadingMore={combinedLoadingMore}
                 onLoadMore={handleLoadMore}
+                onSelectKpi={handleSelectKpi}
+                activeKpi={activeKpi}
               />
 
               {/* Paginação IBM Maximo style — troca de página sem append */}
