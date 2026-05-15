@@ -986,7 +986,8 @@ model EventoEquipamento {
 //
 // 1:1 com EventoEquipamento. Embedding salvo como JSONB array de floats —
 // suficiente para datasets ate ~10k eventos com calculo de similaridade na
-// aplicacao. Migracao para pgvector sera PR isolado quando a frota crescer.
+// aplicacao. Migracao para pgvector sera PR isolado quando a base de
+// equipamentos crescer.
 
 model EventoEquipamentoEmbedding {
   id                  String   @id @default(uuid())

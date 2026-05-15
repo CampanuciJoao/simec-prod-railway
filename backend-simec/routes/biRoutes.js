@@ -264,14 +264,14 @@ router.get('/indicadores', async (req, res) => {
       };
     });
 
-    // MTBF frota — horas de operação / número total de falhas corretivas
+    // MTBF consolidado — horas de operação / número total de falhas corretivas
     const horasDecorridas = differenceInMinutes(agora, inicioAno) / 60;
     const totalCorretivasFlota = manutencoesCorretivas;
     const mtbfHoras = totalCorretivasFlota > 0
       ? Math.round((horasDecorridas / totalCorretivasFlota) * 10) / 10
       : null;
 
-    // Disponibilidade % frota — (horas totais - downtime) / horas totais
+    // Disponibilidade % consolidada — (horas totais - downtime) / horas totais
     const totalHorasFlota = totalEquipamentos * horasDecorridas;
     const totalDowntimeFlota = Object.values(statsEquip).reduce((a, e) => a + e.horasParado, 0);
     const disponibilidadePct = totalHorasFlota > 0

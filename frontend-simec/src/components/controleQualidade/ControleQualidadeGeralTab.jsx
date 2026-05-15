@@ -55,7 +55,7 @@ function statusVencimento(testes) {
   return null;
 }
 
-function ControleQualidadeFrotaTab() {
+function ControleQualidadeGeralTab() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [metricas, setMetricas] = useState({});
@@ -392,4 +392,4 @@ function ControleQualidadeFrotaTab() {
   );
 }
 
-export default ControleQualidadeFrotaTab;
+export default ControleQualidadeGeralTab;

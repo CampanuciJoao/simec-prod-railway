@@ -267,7 +267,8 @@ export async function iniciarJobsDeAlertas() {
     // Roda DEPOIS do gehc-sync-dados (02:00) para que as OSs novas já estejam
     // persistidas; baixa os PDFs delas via Playwright e armazena no R2.
     // Resumível: cada execução pega até 50 OSs sem PDF por tenant. Backfill
-    // histórico de uma frota nova leva algumas noites para se completar.
+    // histórico de uma base nova de equipamentos leva algumas noites para
+    // se completar.
     const repeatables6 = await queue.getRepeatableJobs();
     for (const job of repeatables6) {
       if (job.name === 'gehc-capturar-pdfs') {
@@ -339,7 +340,7 @@ export async function iniciarJobsDeAlertas() {
     // IA: gera embeddings dos eventos novos do Knowledge Layer.
     // Roda 1x por dia as 06:00 UTC, 1h depois do gehc-extrair-pdfs e
     // suficientemente longe de horario de pico do tenant. Custo: ~$0.01/dia
-    // mesmo para frota grande.
+    // mesmo para parques grandes de equipamentos.
     const repeatables9 = await queue.getRepeatableJobs();
     for (const job of repeatables9) {
       if (job.name === 'ia-gerar-embeddings') {

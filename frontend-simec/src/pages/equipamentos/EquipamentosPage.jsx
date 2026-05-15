@@ -31,7 +31,7 @@ import {
   EquipamentosActiveFiltersBar,
 } from '@/components/equipamentos';
 
-import { ControleQualidadeFrotaTab } from '@/components/controleQualidade';
+import { ControleQualidadeGeralTab } from '@/components/controleQualidade';
 
 const TABS = [
   { id: 'cadastrados', label: 'Equipamentos cadastrados', icon: <FontAwesomeIcon icon={faList} /> },
@@ -99,7 +99,7 @@ function EquipamentosPage() {
         <ResponsiveTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
         {activeTab === 'controleQualidade' ? (
-          <ControleQualidadeFrotaTab />
+          <ControleQualidadeGeralTab />
         ) : (
           <EquipamentosCadastradosTab
             page={page}
