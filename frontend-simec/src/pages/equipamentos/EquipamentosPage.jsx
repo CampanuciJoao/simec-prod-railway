@@ -68,6 +68,16 @@ function EquipamentosPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Quando a página recebe uma navegação com lista de IDs (ex: clique em
+  // "Sem programa CQ" na aba Controle de Qualidade), força a aba ativa para
+  // "cadastrados" — sem isso, se o usuário já estava em /equipamentos na aba
+  // CQ, o componente não remonta e o useState inicial não é reexecutado.
+  useEffect(() => {
+    if (Array.isArray(location.state?.equipamentoIds) && location.state.equipamentoIds.length > 0) {
+      setActiveTab('cadastrados');
+    }
+  }, [location.state?.equipamentoIds]);
+
   return (
     <PageLayout padded fullHeight>
       <div className="space-y-6">
