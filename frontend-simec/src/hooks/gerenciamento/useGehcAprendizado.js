@@ -20,9 +20,18 @@ import {
   postPausarPipeline,
   postRetomarPipeline,
   postDispararPipeline,
+  getJobStatus,
 } from '@/services/api/gehcAprendizadoApi';
 
 const REFRESH_INTERVAL_MS = 60_000;
+// Polling do job apos disparo manual. 4s eh um equilibrio: rapido o
+// suficiente para liberar o botao logo apos jobs curtos (5-30s), e nao
+// agressivo o suficiente para sobrecarregar a API em jobs longos (5min).
+const JOB_POLL_INTERVAL_MS = 4_000;
+// Limite duro: para o polling apos 15 min para nao deixar request aberto
+// indefinidamente. O proximo refresh global (60s) vai capturar o resultado
+// final via /pipelines mesmo se o polling acabar antes do job.
+const JOB_POLL_TIMEOUT_MS = 15 * 60_000;
 
 export function useGehcAprendizado() {
   const [status, setStatus]               = useState(null);
@@ -169,34 +178,97 @@ export function useGehcAprendizado() {
     }
   }, [carregar]);
 
+  // Helper: limpa o estado 'disparando' do pipeline. Usado em varios pontos do
+  // ciclo de vida (sucesso, falha, timeout do polling).
+  const liberarAcao = useCallback((pipeline) => {
+    setAcaoPipeline((s) => {
+      const novo = { ...s };
+      delete novo[pipeline];
+      return novo;
+    });
+  }, []);
+
+  // Polling do estado do job ate ele terminar (executando=false) ou ate
+  // estourar JOB_POLL_TIMEOUT_MS. Mostra feedback de sucesso e recarrega os
+  // KPIs quando o job conclui.
+  const aguardarJobTerminar = useCallback(async (pipeline) => {
+    const inicio = Date.now();
+    let primeiraIteracao = true;
+    while (Date.now() - inicio < JOB_POLL_TIMEOUT_MS) {
+      await new Promise((r) => setTimeout(r, JOB_POLL_INTERVAL_MS));
+      try {
+        const st = await getJobStatus(pipeline);
+        if (!st?.executando) {
+          // Pode ter terminado MUITO rapido (ja nao esta na fila quando
+          // chegamos aqui). Na primeira iteracao toleramos isso — talvez o
+          // worker ainda nao tinha pego. Da +1 ciclo de gracia.
+          if (primeiraIteracao) { primeiraIteracao = false; continue; }
+          return { ok: true };
+        }
+        primeiraIteracao = false;
+      } catch (err) {
+        // Erro de rede — nao desiste imediato; tenta de novo. Se persistir,
+        // o timeout duro vai chutar para fora.
+        primeiraIteracao = false;
+      }
+    }
+    return { ok: false, motivo: 'timeout' };
+  }, []);
+
   const disparar = useCallback(async (pipeline) => {
     setAcaoPipeline((s) => ({ ...s, [pipeline]: 'disparando' }));
+    let enqueueOk = false;
     try {
       const r = await postDispararPipeline(pipeline);
+      enqueueOk = true;
       const horario = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
       const tempoEstimado = TEMPO_ESTIMADO[pipeline] || 'alguns minutos';
       setFeedback(
         pipeline,
         'success',
-        `Job enfileirado às ${horario} (id: ${r?.jobId?.slice(-8) || 'n/a'}). Execução em ${tempoEstimado} — atualize a página depois para ver os resultados.`,
+        `Execução iniciada às ${horario} (estimativa: ${tempoEstimado}). Aguarde o spinner sair para rodar novamente.`,
         90_000,
       );
-      // Aguarda alguns segundos antes de recarregar — da tempo do worker
-      // pegar o job e o estado refletir nas KPIs.
-      setTimeout(() => carregar(), 4000);
     } catch (err) {
-      const mensagem = err?.response?.data?.error || err.message;
-      setFeedback(pipeline, 'error', `Falha ao enfileirar: ${mensagem}`, 30_000);
-    } finally {
-      setTimeout(() => {
-        setAcaoPipeline((s) => {
-          const novo = { ...s };
-          delete novo[pipeline];
-          return novo;
-        });
-      }, 1500);
+      const data = err?.response?.data || {};
+      // 409 jaEmExecucao: nao eh falha de fato — eh estado. Mantemos o botao
+      // bloqueado e iniciamos polling igual, para refletir o job ja existente.
+      if (err?.response?.status === 409 && data.jaEmExecucao) {
+        enqueueOk = true;
+        setFeedback(
+          pipeline,
+          'success',
+          'Já existe uma execução em andamento. O botão libera quando ela terminar.',
+          90_000,
+        );
+      } else {
+        const mensagem = data.error || err.message;
+        setFeedback(pipeline, 'error', `Falha ao enfileirar: ${mensagem}`, 30_000);
+      }
     }
-  }, [carregar]);
+
+    if (!enqueueOk) {
+      liberarAcao(pipeline);
+      return;
+    }
+
+    // Espera o job sair da fila/active. Enquanto isso o botao fica disabled
+    // com spinner.
+    const fim = await aguardarJobTerminar(pipeline);
+    if (fim.ok) {
+      const horario = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      setFeedback(pipeline, 'success', `Execução concluída às ${horario}. Pronto para rodar de novo se precisar.`, 60_000);
+    } else {
+      setFeedback(
+        pipeline,
+        'error',
+        'A execução demorou mais que o esperado — botão liberado. Verifique os KPIs e o feed para ver o resultado.',
+        60_000,
+      );
+    }
+    await carregar().catch(() => {});
+    liberarAcao(pipeline);
+  }, [carregar, liberarAcao, aguardarJobTerminar]);
 
   const retomar = useCallback(async (pipeline, { escopo = 'tenant' } = {}) => {
     setAcaoPipeline((s) => ({ ...s, [pipeline]: 'retomando' }));

@@ -231,7 +231,7 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
                       spin={acao === 'disparando'}
                     />
                     <span className="ml-1 text-xs">
-                      {acao === 'disparando' ? 'Enfileirando...' : 'Rodar agora'}
+                      {acao === 'disparando' ? 'Executando…' : 'Rodar agora'}
                     </span>
                   </Button>
                 )}

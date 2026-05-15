@@ -42,8 +42,40 @@ function getQueue() {
 }
 
 /**
+ * Conta jobs do pipeline em estados que indicam "ainda nao terminou":
+ * waiting (na fila), active (rodando), delayed (agendado para retry).
+ * Retorna { executando, waiting, active, delayed }.
+ */
+export async function statusDoJobDoPipeline(pipeline) {
+  const jobName = PIPELINE_PARA_JOB[pipeline];
+  if (!jobName) {
+    return { executando: false, waiting: 0, active: 0, delayed: 0, jobName: null };
+  }
+
+  const q = getQueue();
+  const [waiting, active, delayed] = await Promise.all([
+    q.getJobs(['waiting'], 0, 100),
+    q.getJobs(['active'], 0, 100),
+    q.getJobs(['delayed'], 0, 100),
+  ]);
+  const w = waiting.filter((j) => j.name === jobName).length;
+  const a = active.filter((j) => j.name === jobName).length;
+  const d = delayed.filter((j) => j.name === jobName).length;
+  return {
+    executando: (w + a + d) > 0,
+    waiting: w,
+    active: a,
+    delayed: d,
+    jobName,
+  };
+}
+
+/**
  * Enfileira um job avulso (nao-recorrente) para o pipeline informado.
- * Retorna { ok: true, jobId } ou { ok: false, motivo }.
+ * Recusa se ja houver job do mesmo nome em waiting/active/delayed —
+ * evita acumulo de execucoes concorrentes (cliques duplos no botao
+ * "Disparar" + concurrency:5 do worker geram trabalho duplicado).
+ * Retorna { ok: true, jobId } | { ok: false, jaEmExecucao: true } | { ok: false, motivo }.
  */
 export async function dispararPipeline(pipeline) {
   const jobName = PIPELINE_PARA_JOB[pipeline];
@@ -52,6 +84,15 @@ export async function dispararPipeline(pipeline) {
   }
 
   try {
+    const status = await statusDoJobDoPipeline(pipeline);
+    if (status.executando) {
+      return {
+        ok: false,
+        jaEmExecucao: true,
+        motivo: `ja_em_execucao (waiting=${status.waiting} active=${status.active} delayed=${status.delayed})`,
+      };
+    }
+
     const q = getQueue();
     const job = await q.add(
       jobName,

@@ -60,6 +60,12 @@ export const postRetomarPipeline = (pipeline, { escopo = 'tenant' } = {}) =>
 export const postDispararPipeline = (pipeline) =>
   api.post(`/gehc/aprendizado/pipelines/${pipeline}/disparar`).then((r) => r.data);
 
+// Polling do estado do job enquanto o botao "Rodar agora" mostra spinner.
+// Retorna { executando, waiting, active, delayed } — quando executando=false
+// o job terminou (ou nunca chegou na fila) e o botao pode ser liberado.
+export const getJobStatus = (pipeline) =>
+  api.get(`/gehc/aprendizado/pipelines/${pipeline}/job-status`).then((r) => r.data);
+
 // URL absoluta do PDF servido pelo backend (stream do R2).
 // Usar em <a href={...}> para abrir em nova aba ou baixar.
 export const urlPdfDocumento = (documentId) =>

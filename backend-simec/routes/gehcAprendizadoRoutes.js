@@ -14,7 +14,7 @@ import {
   retomar,
 } from '../services/ai/aiPipelineState.js';
 import { perguntarIaSobreEquipamento } from '../services/ai/ragSearchService.js';
-import { dispararPipeline } from '../services/ai/pipelineDispatcher.js';
+import { dispararPipeline, statusDoJobDoPipeline } from '../services/ai/pipelineDispatcher.js';
 
 const router = express.Router();
 
@@ -954,7 +954,13 @@ router.post('/pipelines/:pipeline/disparar', admin, async (req, res) => {
 
   try {
     const r = await dispararPipeline(pipeline);
-    if (!r.ok) return res.status(503).json({ error: r.motivo });
+    if (!r.ok) {
+      // 409 quando ja ha job em execucao — front trata como estado, nao erro.
+      if (r.jaEmExecucao) {
+        return res.status(409).json({ error: r.motivo, jaEmExecucao: true });
+      }
+      return res.status(503).json({ error: r.motivo });
+    }
 
     await logAuditoria({
       tenantId, autorId: usuarioId,
@@ -964,6 +970,22 @@ router.post('/pipelines/:pipeline/disparar', admin, async (req, res) => {
     });
 
     res.json({ ok: true, jobId: r.jobId, jobName: r.jobName });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/aprendizado/pipelines/:pipeline/job-status ────────────────
+// Retorna se ha job do pipeline rodando/aguardando. Usado pelo front para
+// fazer polling enquanto o botao "Rodar agora" mostra o spinner.
+router.get('/pipelines/:pipeline/job-status', async (req, res) => {
+  const { pipeline } = req.params;
+  if (!pipelineValido(pipeline)) {
+    return res.status(400).json({ error: `Pipeline desconhecido: ${pipeline}` });
+  }
+  try {
+    const status = await statusDoJobDoPipeline(pipeline);
+    res.json(status);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

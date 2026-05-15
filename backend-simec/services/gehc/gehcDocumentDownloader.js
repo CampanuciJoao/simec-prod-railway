@@ -582,6 +582,18 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
           .count() > 0;
         if (!temDocsDisponiveis) continue;
 
+        // Guard de idempotencia por OS: o portal GE retorna documentIds NOVOS
+        // a cada chamada do documentSearch (mesmo PDF logico, ID novo). A
+        // idempotencia interna abaixo eh por documentId, entao nao protege
+        // contra execucoes concorrentes. Aqui pulamos a OS inteira se ela ja
+        // tem QUALQUER doc baixado — economiza GraphQL + Playwright + LLM.
+        const jaTemBaixadoNaOs = await prisma.gehcPdfDocumento.count({
+          where: { ordemServicoId: ordem.id, baixadoEm: { not: null } },
+        });
+        if (jaTemBaixadoNaOs > 0) {
+          continue;
+        }
+
         // Resolve documentos do GraphQL (idempotencia + filename real).
         let docsPendentes = [];
         try {
