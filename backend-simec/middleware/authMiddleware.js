@@ -36,17 +36,24 @@ export async function invalidateUserCache(userId) {
   }
 }
 
+function extrairToken(req) {
+  // Header padrão Authorization: Bearer <token>
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const tk = authHeader.split(' ')[1];
+    if (tk) return tk;
+  }
+  // Fallback para SSE/EventSource — a API EventSource do browser não
+  // permite enviar header Authorization, então o front passa o token na
+  // query string como ?t=<token>. Usado em /api/alertas/stream.
+  const tk = req.query?.t;
+  if (typeof tk === 'string' && tk.length > 0) return tk;
+  return null;
+}
+
 export const proteger = async (req, res, next) => {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({
-        message: 'Nao autorizado. Nenhum token foi fornecido.',
-      });
-    }
-
-    const token = authHeader.split(' ')[1];
+    const token = extrairToken(req);
 
     if (!token) {
       return res.status(401).json({
