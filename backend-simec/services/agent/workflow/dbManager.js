@@ -45,6 +45,7 @@ export function montarPayloadManutencaoDoAgente(estado) {
     agendamentoDataFimLocal: estado?.data || '',
     agendamentoHoraFimLocal: estado?.horaFim || '',
     status: 'Agendada',
+    origemAbertura: 'agente',
   };
 }
 
