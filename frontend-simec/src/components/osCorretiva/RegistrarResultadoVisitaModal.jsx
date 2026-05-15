@@ -77,7 +77,7 @@ function RegistrarResultadoVisitaModal({ isOpen, onClose, onConfirm, submitting,
           <label className="mb-2 block text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
             Resultado *
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {[
               { value: 'Operante', label: 'Equipamento operante', color: '#16a34a' },
               { value: 'PrazoEstendido', label: 'Estender prazo', color: '#f97316' },

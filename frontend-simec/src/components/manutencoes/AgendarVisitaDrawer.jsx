@@ -71,7 +71,7 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
             Inicio previsto
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <DateInput
               label="Data"
               value={form.agendamentoDataInicioLocal}
@@ -92,7 +92,7 @@ function AgendarVisitaDrawer({ isOpen, onClose, onConfirm, submitting }) {
           <p className="mb-3 text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
             Termino previsto
           </p>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <DateInput
               label="Data"
               value={form.agendamentoDataFimLocal}

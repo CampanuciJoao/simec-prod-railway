@@ -53,7 +53,7 @@ function AgendarVisitaModal({ isOpen, onClose, onConfirm, submitting }) {
       confirmDisabled={!podeSalvar || submitting}
     >
       <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <DateInput
             label="Data de inicio"
             value={form.agendamentoDataInicioLocal}
@@ -68,7 +68,7 @@ function AgendarVisitaModal({ isOpen, onClose, onConfirm, submitting }) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <DateInput
             label="Data de termino"
             value={form.agendamentoDataFimLocal}
@@ -83,7 +83,7 @@ function AgendarVisitaModal({ isOpen, onClose, onConfirm, submitting }) {
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Input
             label="Chamado externo (opcional)"
             value={form.numeroChamado}
