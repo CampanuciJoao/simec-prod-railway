@@ -70,6 +70,7 @@ export function adaptDashboardResponse(response) {
     emManutencao: Number(response?.manutencoesCount ?? 0),
     contratosVencendo: Number(response?.contratosVencendoCount ?? 0),
     alertasAtivos: Number(response?.alertasAtivos ?? 0),
+    alertasCriticos: Number(response?.alertasCriticosCount ?? 0),
     ativos,
     inativos,
     alertas: Array.isArray(response?.alertasRecentes)

@@ -434,7 +434,9 @@ function DashboardPage() {
     const emManutencao      = Number(data.emManutencao || 0);
     const contratosVencendo = Number(data.contratosVencendo || 0);
     const alertasAtivos     = Number(data.alertasAtivos || 0);
-    const alertasCriticos   = (data.alertas || []).filter((a) => a?.prioridade === 'Alta').length;
+    // Vem do backend já contando apenas alertas NÃO VISTOS pelo usuário
+    // atual com prioridade Alta — depois de "marcar como lido" o número cai.
+    const alertasCriticos   = Number(data.alertasCriticos || 0);
     const disponibilidade   = totalEquipamentos > 0 ? Math.round((ativos / totalEquipamentos) * 100) : 0;
     return { totalEquipamentos, ativos, inativos, emManutencao, contratosVencendo, alertasAtivos, alertasCriticos, disponibilidade };
   }, [data]);

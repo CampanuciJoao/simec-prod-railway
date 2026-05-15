@@ -26,20 +26,32 @@ export function buscarResumoDashboard({
         },
       },
     }),
-    prisma.alerta.count({
-      where: {
-        tenantId,
-        NOT: {
-          lidoPorUsuarios: {
-            some: {
-              tenantId,
-              usuarioId: userId,
-              visto: true,
+    // Alertas não vistos por este usuário, contados com breakdown por
+    // prioridade. Devolve { total, alta, media, baixa }.
+    prisma.alerta
+      .groupBy({
+        by: ['prioridade'],
+        where: {
+          tenantId,
+          NOT: {
+            lidoPorUsuarios: {
+              some: { tenantId, usuarioId: userId, visto: true },
             },
           },
         },
-      },
-    }),
+        _count: { id: true },
+      })
+      .then((rows) => {
+        const out = { total: 0, alta: 0, media: 0, baixa: 0 };
+        for (const r of rows) {
+          const qtd = r._count.id;
+          out.total += qtd;
+          if (r.prioridade === 'Alta') out.alta = qtd;
+          else if (r.prioridade === 'Media') out.media = qtd;
+          else if (r.prioridade === 'Baixa') out.baixa = qtd;
+        }
+        return out;
+      }),
     prisma.equipamento.groupBy({
       by: ['status'],
       where: { tenantId },
