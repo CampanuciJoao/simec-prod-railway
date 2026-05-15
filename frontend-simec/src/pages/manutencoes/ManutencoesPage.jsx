@@ -1,213 +1,212 @@
-import React, { useMemo } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import {
+  faExclamationTriangle,
+  faPlus,
+  faWrench,
+} from '@fortawesome/free-solid-svg-icons';
 
 // CONTEXT / HOOKS
 import { useAuth } from '@/contexts/AuthContext';
-import { useManutencoesPage } from '@/hooks/manutencoes/useManutencoesPage';
-import { useOsCorretiva } from '@/hooks/osCorretiva/useOsCorretiva';
-import { useModal } from '@/hooks/shared/useModal';
+import { useTabManutencoes } from '@/hooks/manutencoes/useTabManutencoes';
+import { useTabOcorrencias } from '@/hooks/manutencoes/useTabOcorrencias';
 
 // DOMAIN
 import {
-  ManutencoesListSection,
-  ManutencoesPageHeader,
+  ManutencoesTab,
+  OcorrenciasTab,
   ModalConfirmacaoManutencao,
 } from '@/components/manutencoes';
 
 // UI
-import { PageLayout, PageState, ModalConfirmacao, Pagination, SkeletonList } from '@/components/ui';
+import {
+  Button,
+  ModalConfirmacao,
+  PageHeader,
+  PageLayout,
+  ResponsiveTabs,
+} from '@/components/ui';
+
+const TAB_IDS = {
+  MANUTENCOES: 'manutencoes',
+  OCORRENCIAS: 'ocorrencias',
+};
+
+const VALID_TABS = new Set(Object.values(TAB_IDS));
 
 function ManutencoesPage() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.role === 'admin';
 
-  const page = useManutencoesPage();
-  const os = useOsCorretiva();
-  const osDeleteModal = useModal();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const activeTab = VALID_TABS.has(rawTab) ? rawTab : TAB_IDS.MANUTENCOES;
 
-  const handleConfirmDeleteOs = async () => {
-    const id = osDeleteModal.modalData?.id;
+  const handleTabChange = (tabId) => {
+    const next = new URLSearchParams(searchParams);
+    if (tabId === TAB_IDS.MANUTENCOES) {
+      next.delete('tab');
+    } else {
+      next.set('tab', tabId);
+    }
+    setSearchParams(next, { replace: false });
+  };
+
+  const tabManutencoes = useTabManutencoes();
+  const tabOcorrencias = useTabOcorrencias();
+
+  const headerActions =
+    activeTab === TAB_IDS.OCORRENCIAS ? (
+      <Button
+        type="button"
+        onClick={tabOcorrencias.goToCreate}
+        className="w-full sm:w-auto justify-center"
+      >
+        <FontAwesomeIcon icon={faExclamationTriangle} />
+        Registrar ocorrência
+      </Button>
+    ) : (
+      <Button
+        type="button"
+        onClick={tabManutencoes.goToCreate}
+        className="w-full sm:w-auto justify-center"
+      >
+        <FontAwesomeIcon icon={faPlus} />
+        Agendar nova
+      </Button>
+    );
+
+  const tabs = [
+    {
+      id: TAB_IDS.MANUTENCOES,
+      label: 'Manutenções',
+      badge: tabManutencoes.metricas?.total ?? 0,
+    },
+    {
+      id: TAB_IDS.OCORRENCIAS,
+      label: 'Ocorrências',
+      badge: tabOcorrencias.metricas?.total ?? 0,
+    },
+  ];
+
+  // Delete handlers — refazem refetch das DUAS abas para que a migração
+  // entre Ocorrência ↔ Corretiva (após ações) reflita nos contadores das tabs.
+  const handleConfirmDeleteManutencao = async () => {
+    const id = tabManutencoes.deleteModal.modalData?.id;
     if (!id) return;
     try {
-      await os.removerOs(id);
-      osDeleteModal.closeModal();
+      await tabManutencoes.removerManutencao(id);
+      tabManutencoes.deleteModal.closeModal();
+      tabOcorrencias.refetch?.();
     } catch {
-      // toast shown in hook
+      // toast tratado dentro do hook
     }
   };
 
-  // Merge both lists with a discriminator and a common sort date, newest first
-  const unifiedItems = useMemo(() => {
-    const mItems = page.manutencoes.map((m) => ({
-      ...m,
-      _kind: 'manutencao',
-      _sortDate: m.dataHoraAgendamentoInicio || m.createdAt || '',
-    }));
-    const osItems = os.osCorretivas.map((o) => ({
-      ...o,
-      _kind: 'osCorretiva',
-      _sortDate: o.dataHoraAbertura || o.createdAt || '',
-    }));
-    return [...mItems, ...osItems].sort((a, b) => {
-      if (!a._sortDate) return 1;
-      if (!b._sortDate) return -1;
-      return new Date(b._sortDate) - new Date(a._sortDate);
-    });
-  }, [page.manutencoes, os.osCorretivas]);
-
-  const isLoading = (page.loading || os.loading) && page.manutencoes.length === 0 && os.osCorretivas.length === 0;
-  const hasError = Boolean(page.error);
-  const isEmpty = !page.loading && !os.loading && !page.error && unifiedItems.length === 0;
-
-  const combinedTotal = (page.pagination?.total ?? 0) + (os.pagination?.total ?? 0);
-  const combinedHasNextPage = Boolean(page.pagination?.hasNextPage || os.pagination?.hasNextPage);
-  const combinedLoadingMore = page.loadingMore || os.loadingMore;
-
-  const handleLoadMore = () => {
-    if (page.pagination?.hasNextPage) page.carregarMais();
-    if (os.pagination?.hasNextPage) os.carregarMais();
+  const handleConfirmDeleteOsManutencoes = async () => {
+    const id = tabManutencoes.deleteModal.modalData?.id;
+    if (!id) return;
+    try {
+      await tabManutencoes.removerOs(id);
+      tabManutencoes.deleteModal.closeModal();
+      tabOcorrencias.refetch?.();
+    } catch {
+      // toast tratado
+    }
   };
 
-  // Combined metricas: manutenções + OS corretivas counts
-  const combinedMetricas = useMemo(() => ({
-    total: (page.metricas?.total ?? 0) + (os.metricas?.total ?? 0),
-    aguardando:
-      (page.metricas?.aguardando ?? 0) +
-      (os.metricas?.abertas ?? 0) +
-      (os.metricas?.emAndamento ?? 0) +
-      (os.metricas?.aguardandoTerceiro ?? 0),
-    concluidas: (page.metricas?.concluidas ?? 0) + (os.metricas?.concluidas ?? 0),
-    canceladas: (page.metricas?.canceladas ?? 0) + (os.metricas?.canceladas ?? 0),
-  }), [page.metricas, os.metricas]);
-
-  // KPI ativo = derivado do status atualmente filtrado nos dois hooks.
-  // Para considerar "ativo", os dois filtros precisam estar alinhados na mesma
-  // intenção (Aguardando / Concluída / Cancelada) ou ambos vazios (Total).
-  const activeKpi = useMemo(() => {
-    const sM = page.filtros?.status || '';
-    const sO = os.filtros?.status || '';
-    if (!sM && !sO) return 'total';
-    if (sM === 'aguardando' && sO === 'aguardando') return 'aguardando';
-    if (sM === 'Concluida' && sO === 'Concluida') return 'concluidas';
-    if (sM === 'Cancelada' && sO === 'Cancelada') return 'canceladas';
-    return null;
-  }, [page.filtros?.status, os.filtros?.status]);
-
-  const handleClearAllFilters = () => {
-    page.clearAllFilters();
-    os.handleFilterChange('status', '');
+  const handleConfirmDeleteOsOcorrencias = async () => {
+    const id = tabOcorrencias.deleteModal.modalData?.id;
+    if (!id) return;
+    try {
+      await tabOcorrencias.removerOs(id);
+      tabOcorrencias.deleteModal.closeModal();
+      tabManutencoes.refetch?.();
+    } catch {
+      // toast tratado
+    }
   };
 
-  const handleRemoveFilter = (key) => {
-    page.clearFilter(key);
-    if (key === 'status') os.handleFilterChange('status', '');
-  };
+  // Discrimina pelo _kind injetado nos items unificados pelos hooks de tab.
+  const isDeleteModalManutencao =
+    tabManutencoes.deleteModal.isOpen &&
+    tabManutencoes.deleteModal.modalData?._kind === 'manutencao';
 
-  // Sincroniza dropdown de Status com o filtro de OS Corretiva quando o valor
-  // selecionado tem equivalência (aguardando/Concluida/Cancelada). Para os
-  // demais status (específicos de manutenção), zera o filtro da OS Corretiva.
-  const selectFiltersSincronizados = useMemo(() => {
-    return (page.selectFiltersConfig || []).map((filtro) => {
-      if (filtro.id !== 'status') return filtro;
-      return {
-        ...filtro,
-        onChange: (value) => {
-          page.controles.handleFilterChange('status', value);
-          const STATUS_COM_EQUIVALENCIA = new Set(['aguardando', 'Concluida', 'Cancelada']);
-          os.handleFilterChange('status', STATUS_COM_EQUIVALENCIA.has(value) ? value : '');
-        },
-      };
-    });
-  }, [page.selectFiltersConfig, page.controles, os]);
-
-  const handleSelectKpi = (kpiKey) => {
-    const statusManutencaoPorKpi = {
-      total: '',
-      aguardando: 'aguardando',
-      concluidas: 'Concluida',
-      canceladas: 'Cancelada',
-    };
-    const statusOsPorKpi = {
-      total: '',
-      aguardando: 'aguardando',
-      concluidas: 'Concluida',
-      canceladas: 'Cancelada',
-    };
-    const statusManutencao = statusManutencaoPorKpi[kpiKey];
-    const statusOs = statusOsPorKpi[kpiKey];
-    if (statusManutencao === undefined) return;
-
-    page.controles.handleFilterChange('status', statusManutencao);
-    os.handleFilterChange('status', statusOs);
-  };
+  const isDeleteModalOsCorretivaNaAbaManutencoes =
+    tabManutencoes.deleteModal.isOpen &&
+    tabManutencoes.deleteModal.modalData?._kind === 'osCorretiva';
 
   return (
     <>
+      {/* Modal: confirmar exclusão de Manutencao (aba Manutenções) */}
       <ModalConfirmacaoManutencao
-        isOpen={page.deleteModal.isOpen}
-        onClose={page.deleteModal.closeModal}
-        onConfirm={page.handleConfirmDelete}
-        manutencao={page.deleteModal.modalData}
+        isOpen={isDeleteModalManutencao}
+        onClose={tabManutencoes.deleteModal.closeModal}
+        onConfirm={handleConfirmDeleteManutencao}
+        manutencao={tabManutencoes.deleteModal.modalData}
       />
 
+      {/* Modal: confirmar exclusão de OsCorretiva (aba Manutenções — tipo=Corretiva) */}
       <ModalConfirmacao
-        isOpen={osDeleteModal.isOpen}
-        onClose={osDeleteModal.closeModal}
-        onConfirm={handleConfirmDeleteOs}
+        isOpen={isDeleteModalOsCorretivaNaAbaManutencoes}
+        onClose={tabManutencoes.deleteModal.closeModal}
+        onConfirm={handleConfirmDeleteOsManutencoes}
         title="Excluir OS Corretiva"
-        message={`Deseja excluir a OS ${osDeleteModal.modalData?.numeroOS}? Esta ação não pode ser desfeita.`}
+        message={`Deseja excluir a OS ${tabManutencoes.deleteModal.modalData?.numeroOS}? Esta ação não pode ser desfeita.`}
+        confirmText="Excluir"
+        isDestructive
+      />
+
+      {/* Modal: confirmar exclusão de OsCorretiva (aba Ocorrências — tipo=Ocorrencia) */}
+      <ModalConfirmacao
+        isOpen={tabOcorrencias.deleteModal.isOpen}
+        onClose={tabOcorrencias.deleteModal.closeModal}
+        onConfirm={handleConfirmDeleteOsOcorrencias}
+        title="Excluir ocorrência"
+        message={`Deseja excluir a ocorrência ${tabOcorrencias.deleteModal.modalData?.numeroOS}? Esta ação não pode ser desfeita.`}
         confirmText="Excluir"
         isDestructive
       />
 
       <PageLayout padded fullHeight>
         <div className="space-y-6">
-          <ManutencoesPageHeader
-            onCreate={page.goToCreate}
-            onRegistrarOcorrencia={page.goToRegistrarOcorrencia}
+          <PageHeader
+            title="Gerenciamento de Manutenções"
+            subtitle="Acompanhe e gerencie ordens de serviço do sistema"
+            icon={faWrench}
+            actions={headerActions}
           />
 
-          {isLoading ? (
-            <SkeletonList rows={6} cols={4} />
-          ) : hasError || isEmpty ? (
-            <PageState
-              error={page.error?.message || page.error || ''}
-              isEmpty={isEmpty}
-              emptyMessage="Nenhuma manutenção encontrada."
+          <ResponsiveTabs
+            tabs={tabs}
+            activeTab={activeTab}
+            onChange={handleTabChange}
+          />
+
+          {activeTab === TAB_IDS.OCORRENCIAS ? (
+            <OcorrenciasTab
+              tab={tabOcorrencias}
+              isAdmin={isAdmin}
+              onDeleteOs={(o) => tabOcorrencias.deleteModal.openModal(o)}
             />
           ) : (
-            <div className="space-y-4">
-              <ManutencoesListSection
-                items={unifiedItems}
-                searchTerm={page.searchTerm}
-                onSearchChange={page.onSearchChange}
-                selectFilters={selectFiltersSincronizados}
-                activeFilters={page.activeFilters}
-                onRemoveFilter={handleRemoveFilter}
-                onClearAll={handleClearAllFilters}
-                onDelete={(item) => page.deleteModal.openModal(item)}
-                onDeleteOs={(o) => osDeleteModal.openModal(o)}
-                isAdmin={isAdmin}
-                metricas={combinedMetricas}
-                total={combinedTotal}
-                hasNextPage={combinedHasNextPage}
-                loadingMore={combinedLoadingMore}
-                onLoadMore={handleLoadMore}
-                onSelectKpi={handleSelectKpi}
-                activeKpi={activeKpi}
-              />
-
-              {/* Paginação IBM Maximo style — troca de página sem append */}
-              <div className="flex items-center justify-between pt-2">
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  {combinedTotal > 0 ? `${combinedTotal} ordem(ns) no total` : ''}
-                </p>
-                <Pagination
-                  page={page.pagination?.page ?? 1}
-                  totalPages={page.pagination?.totalPages ?? 1}
-                  onPageChange={page.goToPage}
-                />
-              </div>
-            </div>
+            <ManutencoesTab
+              tab={tabManutencoes}
+              isAdmin={isAdmin}
+              onDeleteManutencao={(item) =>
+                tabManutencoes.deleteModal.openModal({
+                  ...item,
+                  _kind: 'manutencao',
+                })
+              }
+              onDeleteOs={(o) =>
+                tabManutencoes.deleteModal.openModal({
+                  ...o,
+                  _kind: 'osCorretiva',
+                })
+              }
+            />
           )}
         </div>
       </PageLayout>

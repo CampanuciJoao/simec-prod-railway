@@ -5,7 +5,14 @@ import { useToast } from '../../contexts/ToastContext';
 
 const PAGE_SIZE = 12;
 
-export function useOsCorretiva() {
+/**
+ * @param {Object} [options]
+ * @param {'Ocorrencia'|'Corretiva'} [options.tipoFixo]
+ *   Quando passado, o hook fixa o filtro de `tipo` no backend e não expõe esse
+ *   filtro como editável pelo usuário. Útil para abas que cuidam só de um dos
+ *   sabores (Manutenções inclui só tipo=Corretiva; Ocorrências só tipo=Ocorrencia).
+ */
+export function useOsCorretiva({ tipoFixo = null } = {}) {
   const { addToast } = useToast();
 
   const [osCorretivas, setOsCorretivas] = useState([]);
@@ -18,6 +25,7 @@ export function useOsCorretiva() {
     emAndamento: 0,
     aguardandoTerceiro: 0,
     concluidas: 0,
+    canceladas: 0,
   });
   const [pagination, setPagination] = useState({
     page: 1,
@@ -35,17 +43,19 @@ export function useOsCorretiva() {
         append ? setLoadingMore(true) : setLoading(true);
         setError('');
 
+        const tipoQuery = tipoFixo || filtros.tipo || undefined;
+
         const data = await getOsCorretivas({
           page,
           pageSize: PAGE_SIZE,
           search: searchTerm || undefined,
-          tipo: filtros.tipo || undefined,
+          tipo: tipoQuery,
           status: filtros.status || undefined,
         });
 
         const items = Array.isArray(data?.items) ? data.items : [];
         setOsCorretivas((prev) => (append ? [...prev, ...items] : items));
-        setMetricas(data?.metricas || { total: 0, abertas: 0, emAndamento: 0, aguardandoTerceiro: 0, concluidas: 0 });
+        setMetricas(data?.metricas || { total: 0, abertas: 0, emAndamento: 0, aguardandoTerceiro: 0, concluidas: 0, canceladas: 0 });
         setPagination({
           page: data?.page || page,
           pageSize: data?.pageSize || PAGE_SIZE,
@@ -62,7 +72,7 @@ export function useOsCorretiva() {
         setLoadingMore(false);
       }
     },
-    [addToast, filtros, searchTerm]
+    [addToast, filtros, searchTerm, tipoFixo]
   );
 
   const debouncedFetch = useMemo(
