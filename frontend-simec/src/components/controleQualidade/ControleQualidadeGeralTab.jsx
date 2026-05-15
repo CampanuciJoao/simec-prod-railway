@@ -20,6 +20,7 @@ import {
   Textarea,
   GlobalFilterBar,
 } from '@/components/ui';
+import { useToast } from '@/contexts/ToastContext';
 
 import {
   getDashboardCq,
@@ -77,6 +78,7 @@ function statusVencimento(testes) {
 
 function ControleQualidadeGeralTab() {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [metricas, setMetricas] = useState({});
@@ -143,8 +145,25 @@ function ControleQualidadeGeralTab() {
   // a tabela de "Testes registrados" aqui).
   const handleSelectKpi = useCallback((key) => {
     if (key === 'semPrograma') {
-      const ids = (metricas?.equipamentosSemPrograma || []).map((eq) => eq.id);
-      if (ids.length === 0) return;
+      const lista = Array.isArray(metricas?.equipamentosSemPrograma)
+        ? metricas.equipamentosSemPrograma
+        : null;
+
+      if (lista === null) {
+        addToast(
+          'A lista de equipamentos sem programa não veio do servidor. Atualize a página e tente novamente.',
+          'warning'
+        );
+        return;
+      }
+
+      const ids = lista.map((eq) => eq?.id).filter(Boolean);
+
+      if (ids.length === 0) {
+        addToast('Nenhum equipamento regulado está sem programa CQ no momento.', 'info');
+        return;
+      }
+
       navigate('/equipamentos', {
         state: {
           equipamentoIds: ids,
@@ -161,7 +180,7 @@ function ControleQualidadeGeralTab() {
       else if (key === 'vencidos') base.statusVencimento = 'vencido';
       return base;
     });
-  }, [metricas, navigate]);
+  }, [metricas, navigate, addToast]);
 
   const testesFiltrados = useMemo(() => {
     return testes.filter((t) => {
