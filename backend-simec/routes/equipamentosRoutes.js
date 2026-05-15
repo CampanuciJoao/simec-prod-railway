@@ -293,7 +293,13 @@ router.get('/', async (req, res) => {
     const sortDirection =
       normalizarOpcional(req.query?.sortDirection) || 'asc';
 
-    const [rawItems, total, statusSummary, tipos, fabricantes] =
+    // Métricas refletem o panorama do tenant ignorando o filtro de status.
+    // Os cards de KPI seguem mostrando os totais reais mesmo quando o usuário
+    // clicou em um card (ex: "Operantes") — caso contrário o card "Total"
+    // mudaria conforme o filtro e o usuário se perderia.
+    const { status: _statusIgnorado, ...whereParaMetricas } = where;
+
+    const [rawItems, total, statusSummary, totalSemStatus, tipos, fabricantes] =
       await Promise.all([
         prisma.equipamento.findMany({
           where,
@@ -326,11 +332,12 @@ router.get('/', async (req, res) => {
         prisma.equipamento.count({ where }),
         prisma.equipamento.groupBy({
           by: ['status'],
-          where,
+          where: whereParaMetricas,
           _count: {
             id: true,
           },
         }),
+        prisma.equipamento.count({ where: whereParaMetricas }),
         prisma.equipamento.findMany({
           where: {
             tenantId,
@@ -424,7 +431,6 @@ router.get('/', async (req, res) => {
 
     const metricas = statusSummary.reduce(
       (acc, item) => {
-        acc.total = total;
         if (item.status === 'Operante') acc.operantes = item._count.id;
         if (item.status === 'EmManutencao') acc.emManutencao = item._count.id;
         if (item.status === 'Inoperante') acc.inoperantes = item._count.id;
@@ -432,7 +438,7 @@ router.get('/', async (req, res) => {
         return acc;
       },
       {
-        total,
+        total: totalSemStatus,
         operantes: 0,
         emManutencao: 0,
         inoperantes: 0,
