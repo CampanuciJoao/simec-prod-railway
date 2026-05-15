@@ -11,8 +11,11 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-// docs/lgpd fica 3 niveis acima de backend-simec/services/lgpd/
-const DOCS_DIR = path.resolve(__dirname, '..', '..', '..', 'docs', 'lgpd');
+// Os arquivos vivem em backend-simec/docs/lgpd/ — 2 niveis acima de
+// backend-simec/services/lgpd/. Antes era 3 niveis (referenciava docs/ na
+// raiz do repo), mas o build context do Railway eh backend-simec/, entao
+// os arquivos da raiz nao entram na imagem.
+const DOCS_DIR = path.resolve(__dirname, '..', '..', 'docs', 'lgpd');
 
 const ARQUIVO_POR_DOC = {
   politica_privacidade: 'POLITICA_DE_PRIVACIDADE.md',
