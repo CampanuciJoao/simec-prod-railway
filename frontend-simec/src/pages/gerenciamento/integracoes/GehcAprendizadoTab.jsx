@@ -176,8 +176,8 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
             className="rounded-2xl border px-4 py-3 transition-colors"
             style={{ borderColor, backgroundColor: 'var(--bg-surface-soft)' }}
           >
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="min-w-0">
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+              <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
                   <FontAwesomeIcon
                     icon={p.ativo ? faCircleCheck : faCirclePause}
@@ -214,7 +214,9 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
                   </p>
                 )}
               </div>
-              <div className="flex flex-wrap items-center gap-2">
+              {/* Botoes: full-width em mobile (ficam mais legiveis e nao cortam),
+                  inline em sm+ */}
+              <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
                 {podeDisparar && (
                   <Button
                     type="button"
@@ -222,6 +224,7 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
                     onClick={() => onDisparar(p.pipeline)}
                     disabled={!!acao}
                     title="Forçar execução agora (sem esperar o cron)"
+                    className="w-full justify-center sm:w-auto"
                   >
                     <FontAwesomeIcon
                       icon={acao === 'disparando' ? faSpinner : faBolt}
@@ -233,12 +236,24 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
                   </Button>
                 )}
                 {podePausar ? (
-                  <Button type="button" variant="secondary" onClick={() => onPausar(p.pipeline, p.label)} disabled={!!acao}>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => onPausar(p.pipeline, p.label)}
+                    disabled={!!acao}
+                    className="w-full justify-center sm:w-auto"
+                  >
                     <FontAwesomeIcon icon={acao === 'pausando' ? faSpinner : faCirclePause} spin={acao === 'pausando'} />
                     Pausar
                   </Button>
                 ) : (
-                  <Button type="button" variant="primary" onClick={() => onRetomar(p.pipeline)} disabled={!!acao}>
+                  <Button
+                    type="button"
+                    variant="primary"
+                    onClick={() => onRetomar(p.pipeline)}
+                    disabled={!!acao}
+                    className="w-full justify-center sm:w-auto"
+                  >
                     <FontAwesomeIcon icon={acao === 'retomando' ? faSpinner : faCirclePlay} spin={acao === 'retomando'} />
                     Retomar
                   </Button>
@@ -513,7 +528,7 @@ function DrillDownCausa({ categoria, items, totalPdfs, loading, onClose }) {
       onClick={onClose}
     >
       <div
-        className="h-full w-full max-w-2xl overflow-y-auto p-6"
+        className="h-full w-full max-w-2xl overflow-y-auto p-4 sm:p-6"
         style={{ backgroundColor: 'var(--bg-surface)', boxShadow: 'var(--shadow-lg)' }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -798,7 +813,9 @@ function GehcAprendizadoTab() {
         (zero PDFs, zero falhas) — significa "sistema funcionando, ainda
         sem dados", não "informacao indisponivel".
       */}
-      <ResponsiveGrid cols={{ base: 2, md: 4 }}>
+      {/* KPIs: 1 col em mobile estreito (<sm), 2 col em sm, 4 col em md+.
+          Antes 'base: 2' apertava demais valores numericos em iPhone SE. */}
+      <ResponsiveGrid cols={{ base: 1, sm: 2, md: 4 }}>
         <InfoCard
           icon={faFilePdf}
           label="OSs sincronizadas"

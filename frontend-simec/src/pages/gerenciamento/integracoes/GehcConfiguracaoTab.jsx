@@ -279,11 +279,13 @@ function CredenciaisStatus({ configurado, capturedAt, expiresAt, running, onEdit
           </p>
         )}
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:flex">
+      {/* Botoes de acao das credenciais. Em mobile estreito ficam em
+          coluna unica (3 botoes empilhados eh melhor que 3 apertados);
+          em sm+ ficam inline */}
+      <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap">
         <Button type="button" variant="secondary" disabled={running} onClick={onAtualizar} className="justify-center">
           <FontAwesomeIcon icon={faArrowsRotate} />
-          <span className="hidden sm:inline">Atualizar</span>
-          <span className="sm:hidden">Atualizar</span>
+          <span>Atualizar</span>
         </Button>
         <Button type="button" variant="secondary" disabled={running} onClick={onEditar} className="justify-center">
           <FontAwesomeIcon icon={faPenToSquare} />
