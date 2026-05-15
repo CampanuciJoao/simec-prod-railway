@@ -6,6 +6,7 @@ import { BatchAgendamentoService } from '../batch/batchAgendamentoService.js';
 import { AgentSessionRepository } from '../session/agentSessionRepository.js';
 import { respostaAgente } from '../core/agentResponse.js';
 import { adicionarAuditoria } from '../orchestrator/AgentContext.js';
+import { responderConversacional } from '../conversacao/conversacaoService.js';
 
 const SERVICOS = {
   AGENDAMENTO: AgendamentoService,
@@ -21,6 +22,23 @@ async function cancelarSessao(sessao, mensagem) {
   await AgentSessionRepository.registrarMensagem(sessao.id, 'user', mensagem, {
     acao: 'TROCA_DE_INTENCAO',
   });
+}
+
+// Busca o historico recente de mensagens do usuario (de qualquer sessao)
+// para alimentar o fallback conversacional com continuidade.
+async function obterHistoricoRecente(contexto) {
+  try {
+    const { sessionKey, tenantId } = contexto;
+    if (!sessionKey || !tenantId) return [];
+    return await AgentSessionRepository.listarMensagensRecentesDoUsuario({
+      usuario: sessionKey,
+      tenantId,
+      limite: 12,
+    });
+  } catch (e) {
+    console.warn('[EXECUTION_AGENT] Falha ao buscar historico:', e.message);
+    return [];
+  }
 }
 
 async function prePopularSessaoAgendamento(contexto, tenantId) {
@@ -85,12 +103,40 @@ export const ExecutionAgent = {
     }
 
     if (plano.acao === 'RESPONDER_SAUDACAO') {
-      const resposta = respostaAgente(
-        'Olá! Sou a T.H.I.A.G.O. Posso ajudar com agendamentos, relatórios, seguros e análises. Como posso ajudar?'
-      );
-      contexto.resposta = resposta;
-      adicionarAuditoria(contexto, { agente: 'ExecutionAgent', acao: 'SAUDACAO' });
-      return resposta;
+      // Fallback conversacional via LLM — em vez de mensagem hardcoded,
+      // T.H.I.A.G.O. responde naturalmente e sugere acoes concretas.
+      // Reusa historico recente da conversa quando disponivel.
+      try {
+        const historico = await obterHistoricoRecente(contexto);
+        const respostaConv = await responderConversacional({
+          mensagem,
+          historico,
+          contextoUsuario,
+          logContext: {
+            requestId: contexto.requestId,
+            tenantId,
+            usuarioId,
+            usuarioNome,
+            intent: 'CONVERSACAO',
+          },
+        });
+
+        const resposta = respostaAgente(respostaConv.mensagem, {
+          meta: respostaConv.meta,
+        });
+        contexto.resposta = resposta;
+        adicionarAuditoria(contexto, { agente: 'ExecutionAgent', acao: 'CONVERSACAO_LLM' });
+        return resposta;
+      } catch (err) {
+        console.error('[EXECUTION_AGENT] Erro no fallback conversacional:', err.message);
+        // Cai pro hardcoded se LLM falhar — pior caso, comportamento atual
+        const resposta = respostaAgente(
+          'Olá! Sou a T.H.I.A.G.O. Posso ajudar com agendamentos, relatórios, seguros e análises. Como posso ajudar?'
+        );
+        contexto.resposta = resposta;
+        adicionarAuditoria(contexto, { agente: 'ExecutionAgent', acao: 'SAUDACAO_FALLBACK' });
+        return resposta;
+      }
     }
 
     for (const sessao of plano.cancelar_sessoes) {

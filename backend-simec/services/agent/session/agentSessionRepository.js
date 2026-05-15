@@ -194,4 +194,25 @@ export const AgentSessionRepository = {
       },
     });
   },
+
+  // Busca as ultimas N mensagens de QUALQUER sessao recente do usuario,
+  // ordenadas cronologicamente. Usado pelo fallback conversacional para
+  // dar continuidade ao chat.
+  async listarMensagensRecentesDoUsuario({ usuario, tenantId, limite = 12 } = {}) {
+    if (!usuario || !tenantId) return [];
+    const mensagens = await prisma.agentMessage.findMany({
+      where: {
+        tenantId,
+        session: { is: { usuario } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: limite,
+      select: { role: true, mensagem: true, createdAt: true },
+    });
+    // ordem cronologica (mais antigas primeiro)
+    return mensagens.reverse().map((m) => ({
+      role: m.role === 'agent' ? 'assistant' : m.role,
+      content: m.mensagem,
+    }));
+  },
 };
