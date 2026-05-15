@@ -92,6 +92,7 @@ function ChatMessageBubble({
             <RelatorioPreviewCard
               preview={preview}
               onDownload={handleDownloadPreview}
+              downloadAvailable={!!contextoPDF}
             />
           ) : null}
         </div>

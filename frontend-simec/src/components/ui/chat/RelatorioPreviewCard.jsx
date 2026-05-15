@@ -16,7 +16,7 @@ import {
   faCircleCheck,
 } from '@fortawesome/free-solid-svg-icons';
 
-function RelatorioPreviewCard({ preview, onDownload }) {
+function RelatorioPreviewCard({ preview, onDownload, downloadAvailable = true }) {
   const [baixando, setBaixando] = useState(false);
   const [baixouOk, setBaixouOk] = useState(false);
 
@@ -137,7 +137,7 @@ function RelatorioPreviewCard({ preview, onDownload }) {
         </div>
       ) : null}
 
-      {/* Rodapé com botão de download */}
+      {/* Rodapé com contagem (e botão se download disponível) */}
       <div
         className="flex items-center justify-between gap-3 border-t px-4 py-3"
         style={{
@@ -149,24 +149,27 @@ function RelatorioPreviewCard({ preview, onDownload }) {
           <strong style={{ color: 'var(--text-primary)' }}>
             {resumo.totalIncluido ?? linhas.length}
           </strong>{' '}
-          {resumo.totalIncluido === 1 ? 'item' : 'itens'} no PDF
+          {resumo.totalIncluido === 1 ? 'item' : 'itens'}
+          {downloadAvailable ? ' no PDF' : ''}
         </div>
-        <button
-          type="button"
-          onClick={handleClick}
-          disabled={baixando}
-          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-60"
-          style={{
-            backgroundColor: baixouOk ? 'var(--color-success)' : 'var(--brand-primary)',
-            color: 'white',
-          }}
-        >
-          <FontAwesomeIcon
-            icon={baixando ? faSpinner : baixouOk ? faCircleCheck : faFilePdf}
-            spin={baixando}
-          />
-          {baixando ? 'Gerando...' : baixouOk ? 'Baixado' : 'Baixar PDF'}
-        </button>
+        {downloadAvailable ? (
+          <button
+            type="button"
+            onClick={handleClick}
+            disabled={baixando}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition disabled:opacity-60"
+            style={{
+              backgroundColor: baixouOk ? 'var(--color-success)' : 'var(--brand-primary)',
+              color: 'white',
+            }}
+          >
+            <FontAwesomeIcon
+              icon={baixando ? faSpinner : baixouOk ? faCircleCheck : faFilePdf}
+              spin={baixando}
+            />
+            {baixando ? 'Gerando...' : baixouOk ? 'Baixado' : 'Baixar PDF'}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -183,6 +186,7 @@ RelatorioPreviewCard.propTypes = {
     totalLinhasPreview: PropTypes.string,
   }),
   onDownload: PropTypes.func,
+  downloadAvailable: PropTypes.bool,
 };
 
 export default RelatorioPreviewCard;
