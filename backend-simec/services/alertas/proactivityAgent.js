@@ -203,12 +203,34 @@ async function processarTenant(tenant) {
           : `Equipamentos: ${lista}${sufixo}`;
       }
 
-      // Link: se houver exatamente 1 equipamento, vai direto para os
-      // detalhes; caso contrario, leva para a lista geral (a UI da pagina
-      // de equipamentos permite filtrar por status/risco).
+      // Acao sugerida pela recomendacao — define se o link de cada equipamento
+      // abre o cadastro em modo "editar" (cadastro incompleto / dados a
+      // completar) ou "detalhes" (default). Heuristica simples baseada em
+      // titulo, ja que o LLM nao retorna um campo estruturado.
+      const tituloLower = (titulo || '').toLowerCase();
+      const acaoSugerida = /cadastr|preench|dados\s+(incompletos|cadastrais|faltantes)|complement/i.test(tituloLower)
+        ? 'editar'
+        : 'detalhes';
+
+      // Link primario: se houver exatamente 1 equipamento, abre direto na
+      // pagina certa (editar ou detalhes). Caso contrario leva para a lista
+      // geral — os chips individuais no card cuidam do drill-down por
+      // equipamento via metadataJson.
       const link = eqsResolvidos.length === 1
-        ? `/equipamentos/detalhes/${eqsResolvidos[0].id}`
+        ? `/equipamentos/${acaoSugerida}/${eqsResolvidos[0].id}`
         : '/equipamentos';
+
+      // Metadata para hyperlinks clicaveis no card. Salva como JSON serializado.
+      const metadataJson = eqsResolvidos.length > 0
+        ? JSON.stringify({
+            equipamentos: eqsResolvidos.map((e) => ({
+              id: e.id,
+              label: e.label,
+              acao: acaoSugerida,
+            })),
+            acaoSugerida,
+          })
+        : null;
 
       await prisma.alerta.create({
         data: {
@@ -223,6 +245,7 @@ async function processarTenant(tenant) {
           tipoEvento: TIPOEVENTO_INSIGHT,
           link,
           emailEnviado: false,
+          metadataJson,
         },
       });
 

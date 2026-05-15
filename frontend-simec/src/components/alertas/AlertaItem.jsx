@@ -12,6 +12,7 @@ import {
   faArrowUpRightFromSquare,
   faChevronDown,
   faChevronUp,
+  faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useTenantTime } from '@/hooks/time/useTenantTime';
@@ -73,6 +74,21 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
   const isAguardandoConfirmacao =
     alerta.tipoEvento === 'MANUT_CONFIRMACAO' ||
     alerta.tipoEvento === 'OS_CORRETIVA_VISITA_CONFIRMACAO';
+
+  // metadata.equipamentos: lista vinda do proactivityAgent quando o LLM
+  // citou equipamentos especificos e eles foram resolvidos para ids no
+  // banco. Permite renderizar chips clicaveis em vez do equipamento ser
+  // apenas texto no subtitulo.
+  const equipamentosClicaveis = Array.isArray(alerta?.metadata?.equipamentos)
+    ? alerta.metadata.equipamentos.filter((e) => e?.id && e?.label)
+    : [];
+  // 'editar' quando a recomendacao for de cadastro incompleto, 'detalhes'
+  // caso contrario. Backend decide e expoe via metadata.acaoSugerida.
+  const acaoEquipamento = alerta?.metadata?.acaoSugerida === 'editar' ? 'editar' : 'detalhes';
+  // "Agendar preventiva" so faz sentido quando a recomendacao for sobre
+  // manutencao/risco — em cadastro incompleto o caminho certo eh editar
+  // o equipamento direto.
+  const mostrarBotaoAgendar = acaoEquipamento !== 'editar';
 
   const dataFormatada = alerta.data ? formatarData(alerta.data) : '-';
   const subtituloRenderizado = montarSubtitulo(alerta, timezone, locale);
@@ -193,7 +209,10 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                     className="rounded-md px-2 py-1 text-[10px] font-black uppercase"
                     style={
                       alerta.status === 'NaoVisto'
-                        ? { backgroundColor: 'var(--text-primary)', color: 'var(--text-inverse)' }
+                        // Brand-primary (#2563eb) sobre texto branco contrasta
+                        // bem em light E dark. Antes usava text-primary/inverse
+                        // que no dark colidiam (ambos brancos = invisivel).
+                        ? { backgroundColor: 'var(--brand-primary)', color: '#ffffff' }
                         : { backgroundColor: 'var(--bg-surface-subtle)', color: 'var(--text-muted)' }
                     }
                   >
@@ -306,21 +325,23 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                   </button>
                 ) : null}
 
-                <Link
-                  to={buildAgendarPreventivaLink(alerta)}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold no-underline transition"
-                  style={{
-                    backgroundColor: 'var(--color-info)',
-                    color: '#ffffff',
-                    minHeight: 44,
-                  }}
-                  onClick={(event) =>
-                    handleOpenLink(event, buildAgendarPreventivaLink(alerta))
-                  }
-                >
-                  <FontAwesomeIcon icon={faWrench} />
-                  Agendar preventiva
-                </Link>
+                {mostrarBotaoAgendar ? (
+                  <Link
+                    to={buildAgendarPreventivaLink(alerta)}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-xs font-bold no-underline transition"
+                    style={{
+                      backgroundColor: 'var(--color-info)',
+                      color: '#ffffff',
+                      minHeight: 44,
+                    }}
+                    onClick={(event) =>
+                      handleOpenLink(event, buildAgendarPreventivaLink(alerta))
+                    }
+                  >
+                    <FontAwesomeIcon icon={faWrench} />
+                    Agendar preventiva
+                  </Link>
+                ) : null}
 
                 <Link
                   to={alerta.link || '#'}
@@ -333,11 +354,46 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                   }}
                   onClick={(event) => handleOpenLink(event)}
                 >
-                  <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
-                  Ver ficha técnica
+                  <FontAwesomeIcon
+                    icon={acaoEquipamento === 'editar' ? faPenToSquare : faArrowUpRightFromSquare}
+                  />
+                  {acaoEquipamento === 'editar' ? 'Completar cadastro' : 'Ver ficha técnica'}
                 </Link>
               </div>
             </div>
+
+            {equipamentosClicaveis.length > 0 ? (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span
+                  className="text-[10px] font-black uppercase tracking-wide"
+                  style={{ color: 'var(--text-muted)' }}
+                >
+                  {acaoEquipamento === 'editar' ? 'Abrir para editar' : 'Equipamentos'}
+                </span>
+                {equipamentosClicaveis.map((eq) => (
+                  <Link
+                    key={eq.id}
+                    to={`/equipamentos/${acaoEquipamento}/${eq.id}`}
+                    onClick={(event) =>
+                      handleOpenLink(event, `/equipamentos/${acaoEquipamento}/${eq.id}`)
+                    }
+                    className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold no-underline transition hover:shadow-sm"
+                    style={{
+                      borderColor: 'var(--color-info-soft)',
+                      backgroundColor: 'var(--bg-surface)',
+                      color: 'var(--color-info)',
+                    }}
+                    title={eq.label}
+                  >
+                    <FontAwesomeIcon
+                      icon={acaoEquipamento === 'editar' ? faPenToSquare : faArrowUpRightFromSquare}
+                      className="text-[10px]"
+                    />
+                    <span className="max-w-[240px] truncate">{eq.label}</span>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
 
             {showExplicacao && explicacao ? (
               <div

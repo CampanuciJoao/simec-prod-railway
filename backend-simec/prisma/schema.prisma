@@ -461,6 +461,12 @@ model Alerta {
   emailEnviado    Boolean @default(false)
   telegramEnviado Boolean @default(false)
 
+  // JSON serializado com info adicional para renderizar o alerta.
+  // Hoje: { equipamentos: [{ id, label, acao }] } para hyperlinks clicaveis
+  // nos cards de recomendacao (ex: "complete cadastro" abre direto na pagina
+  // de edicao do equipamento).
+  metadataJson    String?  @db.Text @map("metadata_json")
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
