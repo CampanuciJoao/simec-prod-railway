@@ -25,35 +25,51 @@ function normalizarTipoManutencao(lower) {
 
 function extrairPeriodo(lower) {
   const hoje = new Date();
+  const anoAtual = hoje.getFullYear();
+
+  // "ano de YYYY" / "no ano de YYYY" / "em YYYY" / "do ano YYYY"
+  // Captura ano explicito — evita falso positivo limitando ao range razoavel.
+  const matchAno = lower.match(
+    /(?:ano\s+de|no\s+ano\s+de|do\s+ano\s+de|do\s+ano|em|no\s+ano)\s+(20\d{2})\b/
+  );
+  if (matchAno) {
+    const ano = parseInt(matchAno[1], 10);
+    if (ano >= 2015 && ano <= anoAtual + 1) {
+      const inicio = new Date(ano, 0, 1);
+      // Se for o ano corrente, fim = hoje; caso contrario, 31/dez do ano
+      const fim = ano === anoAtual ? hoje : new Date(ano, 11, 31, 23, 59, 59);
+      return { periodoInicio: inicio.toISOString(), periodoFim: fim.toISOString() };
+    }
+  }
+
+  // "de YYYY até hoje" / "desde YYYY"
+  const matchDesdeAno = lower.match(/(?:desde|a\s+partir\s+de|de)\s+(20\d{2})\s*(?:at[eé]\s+hoje|at[eé]\s+agora)?/);
+  if (matchDesdeAno) {
+    const ano = parseInt(matchDesdeAno[1], 10);
+    if (ano >= 2015 && ano <= anoAtual) {
+      return {
+        periodoInicio: new Date(ano, 0, 1).toISOString(),
+        periodoFim: hoje.toISOString(),
+      };
+    }
+  }
 
   if (lower.includes('último ano') || lower.includes('ultimo ano')) {
     const inicio = new Date(hoje);
     inicio.setFullYear(inicio.getFullYear() - 1);
-
-    return {
-      periodoInicio: inicio.toISOString(),
-      periodoFim: hoje.toISOString(),
-    };
+    return { periodoInicio: inicio.toISOString(), periodoFim: hoje.toISOString() };
   }
 
   if (lower.includes('últimos 6 meses') || lower.includes('ultimos 6 meses')) {
     const inicio = new Date(hoje);
     inicio.setMonth(inicio.getMonth() - 6);
-
-    return {
-      periodoInicio: inicio.toISOString(),
-      periodoFim: hoje.toISOString(),
-    };
+    return { periodoInicio: inicio.toISOString(), periodoFim: hoje.toISOString() };
   }
 
   if (lower.includes('últimos 3 meses') || lower.includes('ultimos 3 meses')) {
     const inicio = new Date(hoje);
     inicio.setMonth(inicio.getMonth() - 3);
-
-    return {
-      periodoInicio: inicio.toISOString(),
-      periodoFim: hoje.toISOString(),
-    };
+    return { periodoInicio: inicio.toISOString(), periodoFim: hoje.toISOString() };
   }
 
   if (
@@ -64,17 +80,10 @@ function extrairPeriodo(lower) {
   ) {
     const inicio = new Date(hoje);
     inicio.setDate(inicio.getDate() - 30);
-
-    return {
-      periodoInicio: inicio.toISOString(),
-      periodoFim: hoje.toISOString(),
-    };
+    return { periodoInicio: inicio.toISOString(), periodoFim: hoje.toISOString() };
   }
 
-  return {
-    periodoInicio: null,
-    periodoFim: null,
-  };
+  return { periodoInicio: null, periodoFim: null };
 }
 
 function extrairUnidade(mensagem, lower) {
@@ -113,6 +122,16 @@ function extrairUnidade(mensagem, lower) {
 }
 
 function extrairEquipamento(mensagem) {
+  // Captura modalidade + modificador opcional (ex: "RM 3T", "RM 1.5T", "TC
+  // 64 cortes", "Mamografia 3D"). O modificador eh tipicamente um valor
+  // tecnico que ajuda a desambiguar entre equipamentos da mesma modalidade
+  // — sem ele, "rm" sozinho pode bater com varias RMs cadastradas.
+  const padraoModalidadeComMod = /\b(tc|ct|rm|rnm|rx|dr|us|uss|tomografia|raio[- ]?x|mam[oó]grafo|mamografia|ultrassom|resson[âa]ncia)\b\s*(\d+(?:[\.,]\d+)?\s*[a-zà-ú]+|\dt|\d+\s*cortes?|3d|2d)/i;
+  const matchComMod = mensagem.match(padraoModalidadeComMod);
+  if (matchComMod) {
+    return limparTexto(`${matchComMod[1]} ${matchComMod[2]}`);
+  }
+
   const matchEquipamento = mensagem.match(
     /\b(tc|ct|rm|rnm|rx|dr|us|uss|tomografia|raio[- ]?x|mam[oó]grafo|mamografia|ultrassom|resson[âa]ncia|act revolution|aquilion ct)\b/i
   );
@@ -121,6 +140,23 @@ function extrairEquipamento(mensagem) {
     return limparTexto(matchEquipamento[1]);
   }
 
+  return null;
+}
+
+// Captura 'últimas N' / 'últimos N' / 'top N' / 'os N' como limite de
+// quantidade. Default eh null (usa o limite operacional padrao do adapter).
+function extrairLimite(lower) {
+  const padroes = [
+    /(?:[uú]ltim[oa]s|top|primeiros)\s+(\d{1,3})\b/,
+    /\b(\d{1,3})\s+(?:[uú]ltim[oa]s|primeiros)\b/,
+  ];
+  for (const p of padroes) {
+    const m = lower.match(p);
+    if (m?.[1]) {
+      const n = parseInt(m[1], 10);
+      if (n > 0 && n <= 200) return n;
+    }
+  }
   return null;
 }
 
@@ -221,6 +257,7 @@ export function mesclarFiltrosRelatorio(anteriores = {}, novos = {}) {
     somenteUltima: novos.somenteUltima ?? anteriores.somenteUltima,
     periodoInicio: novos.periodoInicio ?? anteriores.periodoInicio,
     periodoFim: novos.periodoFim ?? anteriores.periodoFim,
+    limite: novos.limite ?? anteriores.limite,
   };
 }
 
@@ -234,6 +271,7 @@ export function extrairFiltrosRelatorio(mensagem) {
     somenteUltima: detectarSomenteUltima(lower),
     periodoInicio: null,
     periodoFim: null,
+    limite: extrairLimite(lower),
   };
 
   if ((lower.includes('últimas') || lower.includes('ultimas')) && !lower.includes('quando foi')) {

@@ -103,21 +103,24 @@ export const ExecutionAgent = {
     }
 
     if (plano.acao === 'RESPONDER_SAUDACAO') {
-      // Fallback conversacional via LLM — em vez de mensagem hardcoded,
-      // T.H.I.A.G.O. responde naturalmente e sugere acoes concretas.
-      // Reusa historico recente da conversa quando disponivel.
+      // Fallback conversacional via LLM. Quando intent=AMBIGUO (verbo de
+      // acao detectado mas tipo nao claro — ex: 'abrir chamado'), usa
+      // prompt especifico de desambiguacao que lista as 3 opcoes
+      // (Ocorrencia / OS Corretiva / Preventiva).
+      const intentParaConversa = plano.intent || contexto.interpretacao?.intent || 'OUTRO';
       try {
         const historico = await obterHistoricoRecente(contexto);
         const respostaConv = await responderConversacional({
           mensagem,
           historico,
           contextoUsuario,
+          intent: intentParaConversa,
           logContext: {
             requestId: contexto.requestId,
             tenantId,
             usuarioId,
             usuarioNome,
-            intent: 'CONVERSACAO',
+            intent: intentParaConversa,
           },
         });
 

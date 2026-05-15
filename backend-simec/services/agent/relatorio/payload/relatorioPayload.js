@@ -75,11 +75,12 @@ export function construirPreviewLista(resultadoBusca, contexto, filtros) {
     totalEncontrado: resultadoBusca.totalEncontrado,
     limitado: resultadoBusca.limitado,
     avisoLimite: resultadoBusca.limitado
-      ? `Encontrados ${resultadoBusca.totalEncontrado} registros — incluí os ${items.length} mais recentes. Para ver mais, peça um período menor (ex: "últimos 6 meses").`
+      ? `Encontrados ${resultadoBusca.totalEncontrado} registros — incluí os ${items.length} mais recentes. Para ver mais, peça por ano específico (ex: "preventivas em 2024").`
       : null,
-    avisoPeriodoCapado: resultadoBusca.periodoCapado
-      ? `Período pedido excedia o máximo (36 meses). Use filtros mais estreitos para um recorte específico.`
-      : null,
+    avisoPeriodoCapado: resultadoBusca.periodoMensagemOrientativa
+      || (resultadoBusca.periodoCapado
+        ? 'Período pedido excedia o máximo. Para ver dados mais antigos, peça por ano específico.'
+        : null),
   };
 
   return {

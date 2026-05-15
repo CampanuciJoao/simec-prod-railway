@@ -30,6 +30,24 @@ export const PlanningAgent = {
       return plano;
     }
 
+    // AMBIGUO — usuario quer iniciar acao mas tipo nao foi claro
+    // (ex: "abrir chamado" -> ocorrencia? OS corretiva? preventiva?).
+    // Roteia pro fallback conversacional com prompt de desambiguacao.
+    if (intent === 'AMBIGUO') {
+      const plano = {
+        acao: 'RESPONDER_SAUDACAO',
+        dominio: null,
+        sessao_alvo: null,
+        acao_contexto: null,
+        cancelar_sessoes: [],
+        intent: 'AMBIGUO',
+        raciocinio: 'Mensagem ambígua — pedindo desambiguação ao usuário',
+      };
+      contexto.plano = plano;
+      adicionarAuditoria(contexto, { agente: 'PlanningAgent', ...plano });
+      return plano;
+    }
+
     // ANALYTICS é sempre stateless — não depende de sessão ativa
     if (intent === 'ANALYTICS') {
       const plano = {

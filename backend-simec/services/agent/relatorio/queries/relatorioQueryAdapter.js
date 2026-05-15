@@ -5,8 +5,8 @@ import { buscarManutencoesRealizadas } from '../../../reportQueryService.js';
 // Definidos em [[feedback-pdf-limites]] — evitam relatorios gigantes
 // inutilizaveis e estouro de memoria no gerador.
 export const LIMITES_RELATORIO = {
-  PERIODO_DEFAULT_MESES: 12,
-  PERIODO_MAX_MESES:     36,
+  PERIODO_DEFAULT_MESES: 6,
+  PERIODO_MAX_MESES:     12,
   ITENS_MAX:             50,
 };
 
@@ -14,7 +14,7 @@ function aplicarPeriodoComLimites(dataInicio, dataFim) {
   const fim = dataFim ? new Date(dataFim) : new Date();
   const inicio = dataInicio ? new Date(dataInicio) : null;
 
-  // Sem inicio explicito -> aplica default 12 meses
+  // Sem inicio explicito -> aplica default 6 meses
   if (!inicio) {
     const padrao = new Date(fim);
     padrao.setMonth(padrao.getMonth() - LIMITES_RELATORIO.PERIODO_DEFAULT_MESES);
@@ -26,15 +26,21 @@ function aplicarPeriodoComLimites(dataInicio, dataFim) {
     };
   }
 
-  // Limite maximo: se passou de 36 meses, capa
+  // Limite maximo: se passou de 12 meses, capa e orienta
   const limite = new Date(fim);
   limite.setMonth(limite.getMonth() - LIMITES_RELATORIO.PERIODO_MAX_MESES);
   if (inicio < limite) {
+    const anoPedido = inicio.getFullYear();
     return {
       inicio: limite,
       fim,
-      periodoUsado: `últimos ${LIMITES_RELATORIO.PERIODO_MAX_MESES} meses (período pedido excedia o máximo)`,
+      periodoUsado: `últimos ${LIMITES_RELATORIO.PERIODO_MAX_MESES} meses (capado)`,
       foiCapado: true,
+      mensagemOrientativa:
+        `O período máximo por relatório é ${LIMITES_RELATORIO.PERIODO_MAX_MESES} meses. ` +
+        `Ajustei para os últimos ${LIMITES_RELATORIO.PERIODO_MAX_MESES} meses. ` +
+        `Para ver dados mais antigos (ex: ${anoPedido}), peça por ano específico — ` +
+        `'todas preventivas do equipamento X em ${anoPedido}'.`,
     };
   }
 
@@ -118,6 +124,7 @@ export async function buscarListaManutencoesRelatorio({
     limitado,
     periodoUsado: periodo.periodoUsado,
     periodoCapado: periodo.foiCapado,
+    periodoMensagemOrientativa: periodo.mensagemOrientativa || null,
     periodoInicio: periodo.inicio,
     periodoFim: periodo.fim,
   };

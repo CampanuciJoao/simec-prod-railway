@@ -106,7 +106,24 @@ Mensagem: "${sanitizarMensagem(mensagem)}"`;
   }
 }
 
-const INTENTS_VALIDOS = ['BATCH_AGENDAMENTO', 'AGENDAR_MANUTENCAO', 'RELATORIO', 'SEGURO', 'ANALYTICS', 'OUTRO'];
+const INTENTS_VALIDOS = ['BATCH_AGENDAMENTO', 'AGENDAR_MANUTENCAO', 'RELATORIO', 'SEGURO', 'ANALYTICS', 'AMBIGUO', 'OUTRO'];
+
+// Verbos de acao que indicam que o usuario QUER iniciar algo, mas pode
+// nao ter sido especifico. Casa com 'abrir chamado', 'abrir um chamado',
+// 'criar uma os', 'registrar problema', etc. Usado para promover OUTRO
+// em AMBIGUO quando ha intencao de acao mas tipo nao identificado.
+const VERBOS_ACAO_AMBIGUOS = [
+  'abrir chamado', 'abrir um chamado', 'novo chamado', 'preciso abrir',
+  'quero abrir', 'gostaria de abrir', 'criar uma os', 'criar os',
+  'registrar problema', 'registrar ocorrencia', 'registrar uma',
+  'reportar problema', 'reportar ocorrencia', 'tem um problema',
+  'preciso registrar', 'quero registrar', 'preciso criar',
+];
+
+function ehMensagemAmbigua(mensagem) {
+  const m = normalizarTexto(mensagem);
+  return VERBOS_ACAO_AMBIGUOS.some((t) => m.includes(t));
+}
 
 export const InterpretationAgent = {
   nome: 'InterpretationAgent',
@@ -145,6 +162,24 @@ export const InterpretationAgent = {
       adicionarAuditoria(contexto, { agente: 'InterpretationAgent', ...resultado });
       console.log(`[INTERPRETATION] ${resultado.intent} (LLM, confiança: ${resultado.confianca})`);
       return resultado;
+    }
+
+    // Antes de cair no fallback genérico, verifica se a mensagem tem verbo
+    // de ação claro mas tipo ambíguo (ex: "abrir chamado" — pode ser
+    // ocorrência, OS corretiva ou agendar preventiva). Marca AMBIGUO para
+    // que o ExecutionAgent peça desambiguação ao usuário.
+    if (ehMensagemAmbigua(mensagem)) {
+      const ambiguo = {
+        intent: 'AMBIGUO',
+        entidades: { equipamento: null, setor: null, unidade: null, urgencia: 'Media' },
+        confianca: 0.5,
+        raciocinio: 'Verbo de ação detectado mas tipo de operação ambíguo',
+        metodo: 'heuristica_ambiguo',
+      };
+      contexto.interpretacao = ambiguo;
+      adicionarAuditoria(contexto, { agente: 'InterpretationAgent', ...ambiguo });
+      console.log(`[INTERPRETATION] AMBIGUO (heurística — pedirá desambiguação)`);
+      return ambiguo;
     }
 
     const fallback = {

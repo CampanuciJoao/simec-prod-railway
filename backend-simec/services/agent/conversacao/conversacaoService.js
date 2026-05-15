@@ -21,6 +21,37 @@ const SUGESTOES_DEFAULT = [
   'Equipamentos com mais paradas',
 ];
 
+// Prompt usado quando a mensagem do usuario foi classificada como AMBIGUA
+// (verbo de acao detectado mas tipo nao identificado). Exemplo classico:
+// "gostaria de abrir um chamado" pode ser ocorrencia, OS corretiva ou
+// agendamento de preventiva.
+function montarSystemPromptAmbiguo() {
+  return `Você é T.H.I.A.G.O., assistente do SIMEC. O usuário disse algo que indica que QUER iniciar uma ação, mas não foi específico sobre o tipo. Sua tarefa é DESAMBIGUAR — listar as opções e perguntar.
+
+CONTEXTO DAS OPÇÕES NO SIMEC:
+Quando alguém fala "abrir chamado", "novo chamado", "registrar problema", pode ser uma de 3 coisas:
+
+1. REGISTRAR OCORRÊNCIA — incidente espontâneo que aconteceu (equipamento parou, deu erro, comportamento estranho). Útil para ter histórico mesmo sem precisar de visita técnica imediata.
+
+2. ABRIR OS CORRETIVA — quando o equipamento parou/falhou e precisa de visita técnica para consertar. Vira uma Ordem de Serviço corretiva.
+
+3. AGENDAR PREVENTIVA — manutenção planejada (revisão programada, calibração, inspeção). Não é por causa de falha — é prevenção.
+
+TOM: direto, técnico, sem excesso de cortesia. Pergunta curta e clara.
+
+FORMATO (JSON estrito):
+{
+  "mensagem": "string — explica brevemente as 3 opções e pergunta qual",
+  "sugestoes": ["Registrar ocorrência", "Abrir OS corretiva", "Agendar preventiva"]
+}
+
+EXEMPLO de resposta para "gostaria de abrir um chamado":
+{
+  "mensagem": "Posso te ajudar. Qual o tipo de chamado?\\n\\n• **Registrar ocorrência** — algo aconteceu e quero registrar (sem visita técnica imediata)\\n• **Abrir OS corretiva** — equipamento parou/falhou e precisa de técnico\\n• **Agendar preventiva** — manutenção planejada (revisão, calibração)\\n\\nQual deles?",
+  "sugestoes": ["Registrar ocorrência", "Abrir OS corretiva", "Agendar preventiva"]
+}`;
+}
+
 function montarSystemPrompt() {
   return `Você é T.H.I.A.G.O., assistente do SIMEC — sistema de gestão de equipamentos médico-hospitalares (EAM clínico) da Cerdil.
 
@@ -91,13 +122,18 @@ export async function responderConversacional({
   historico = [],
   contextoUsuario = {},
   logContext = {},
+  intent = 'OUTRO',
 } = {}) {
   const llm = getLlmRuntimeInfo();
   if (!llm.available) {
-    return fallbackSemLlm(mensagem);
+    return intent === 'AMBIGUO' ? fallbackAmbiguo() : fallbackSemLlm();
   }
 
-  const systemPrompt = montarSystemPrompt();
+  // Quando intent foi marcado como AMBIGUO (verbo de acao sem tipo claro),
+  // usa um prompt especifico de desambiguacao em vez do conversacional geral.
+  const systemPrompt = intent === 'AMBIGUO'
+    ? montarSystemPromptAmbiguo()
+    : montarSystemPrompt();
   const historicoPrompt = montarHistoricoPrompt(historico);
   const userPrompt = `\nMENSAGEM ATUAL DO USUÁRIO: "${sanitizar(mensagem)}"`;
 
@@ -145,6 +181,23 @@ function fallbackSemLlm() {
     meta: {
       intent: 'CONVERSACAO',
       suggestions: SUGESTOES_DEFAULT,
+    },
+  };
+}
+
+// Fallback de desambiguacao quando o LLM nao esta disponivel e a mensagem
+// foi marcada como AMBIGUA pelo InterpretationAgent.
+function fallbackAmbiguo() {
+  return {
+    mensagem:
+      'Posso te ajudar. Qual o tipo de chamado?\n\n' +
+      '• **Registrar ocorrência** — algo aconteceu e quero registrar (sem visita técnica imediata)\n' +
+      '• **Abrir OS corretiva** — equipamento parou/falhou e precisa de técnico\n' +
+      '• **Agendar preventiva** — manutenção planejada (revisão, calibração)\n\n' +
+      'Qual deles?',
+    meta: {
+      intent: 'AMBIGUO',
+      suggestions: ['Registrar ocorrência', 'Abrir OS corretiva', 'Agendar preventiva'],
     },
   };
 }
