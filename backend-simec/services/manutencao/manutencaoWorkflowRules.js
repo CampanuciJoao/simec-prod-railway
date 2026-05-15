@@ -289,8 +289,16 @@ export function montarWorkflowPayload({
     detalheLog = `OS ${manutencaoAtual.numeroOS} concluída. Status: ${manutencaoAtual.status} → Concluída. Manutenção realizada: ${manutencaoRealizada ? 'Sim' : 'Não'}. Equipamento: Operante.${observacao ? ` Obs: ${String(observacao).trim()}` : ''}`;
     equipamentoStatus = 'Operante';
     historicoTitulo = `OS ${manutencaoAtual.numeroOS} concluida`;
+
+    // Formato pt-BR no timezone do tenant — '14/05/2026 19:00' em vez do
+    // ISO cru '2026-05-14T22:00:00.000Z' (que confundia o leitor).
+    const fimLocal = extrairLocalDateTimeFromIso(parsedConclusao.toISOString(), timezone || 'UTC');
+    const fimFormatado = fimLocal
+      ? `${fimLocal.dateLocal.split('-').reverse().join('/')} ${fimLocal.timeLocal}`
+      : parsedConclusao.toISOString();
+
     historicoDescricao = [
-      `Fim real informado em ${dataTerminoReal}.`,
+      `Fim real informado em ${fimFormatado}.`,
       manutencaoRealizada
         ? 'A manutencao foi executada e o equipamento ficou operante.'
         : 'A manutencao nao ocorreu, mas o equipamento ficou operante.',
