@@ -1,7 +1,7 @@
 const MAPA_PERGUNTAS_ABRIR = {
   equipamentoId: 'Para qual equipamento deseja registrar a ocorrência? Informe o modelo ou TAG.',
   descricaoProblema: 'Qual é o problema observado no equipamento?',
-  statusEquipamentoAbertura: 'Qual o status atual do equipamento?\n1. **Inoperante** (parado, não funciona)\n2. **Uso Limitado** (funcionando parcialmente)\n3. **Em Manutenção** (aguardando revisão)',
+  statusEquipamentoAbertura: 'Qual o status atual do equipamento?\n1. **Inoperante** (parado, não funciona)\n2. **Uso Limitado** (funcionando parcialmente)\n3. **Em Manutenção** (aguardando revisão)\n4. **Operante** (problema intermitente, equipamento já voltou ao normal — fica em observação)',
 };
 
 const MAPA_PERGUNTAS_VISITA = {
@@ -30,5 +30,5 @@ export function formatarListaOsAbertas(osesAbertas) {
 }
 
 export function formatarStatusOpcoes() {
-  return '**1.** Inoperante\n**2.** Uso Limitado\n**3.** Em Manutenção';
+  return '**1.** Inoperante\n**2.** Uso Limitado\n**3.** Em Manutenção\n**4.** Operante (em observação)';
 }

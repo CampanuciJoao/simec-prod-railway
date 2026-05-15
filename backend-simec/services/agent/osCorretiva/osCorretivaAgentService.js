@@ -33,6 +33,9 @@ function normalizarSelecaoStatus(msg) {
   if (m === '1' || /inoper/.test(m)) return 'Inoperante';
   if (m === '2' || /limitad|parcial/.test(m)) return 'UsoLimitado';
   if (m === '3' || /manut|revis/.test(m)) return 'EmManutencao';
+  // "Operante" também é válido: ocorrência intermitente, equipamento voltou
+  // ao normal e a OS abre só para acompanhar / fechar internamente depois.
+  if (m === '4' || /\bopera/.test(m) || /\bnormal\b/.test(m) || /observ/.test(m)) return 'Operante';
   return null;
 }
 

@@ -40,6 +40,22 @@ async function reprocessarAlertas(tenantId) {
   } catch {}
 }
 
+/**
+ * Ao encerrar uma OS (concluída/cancelada/excluída ou resolvida por visita)
+ * só "libera" o equipamento para Operante se a OS realmente havia mudado o
+ * status na abertura. Quando a abertura foi com `Operante` (problema
+ * intermitente / observação), a OS nunca bloqueou o equipamento — não há o
+ * que liberar, e forçar Operante atropelaria qualquer outra alteração de
+ * status que possa ter ocorrido em paralelo (outra OS, atualização manual).
+ */
+async function liberarEquipamentoSeNecessario(tx, os) {
+  if (!os || os.statusEquipamentoAbertura === 'Operante') return;
+  await tx.equipamento.update({
+    where: { id: os.equipamentoId },
+    data: { status: 'Operante' },
+  });
+}
+
 // ─── List ─────────────────────────────────────────────────────────────────────
 
 export async function listarOsCorretivasService({ tenantId, filters }) {
@@ -363,10 +379,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
         },
       });
 
-      await tx.equipamento.update({
-        where: { id: os.equipamentoId },
-        data: { status: 'Operante' },
-      });
+      await liberarEquipamentoSeNecessario(tx, os);
     });
 
     await registrarEventoHistoricoAtivo({
@@ -462,10 +475,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
       },
     });
 
-    await tx.equipamento.update({
-      where: { id: os.equipamentoId },
-      data: { status: 'Operante' },
-    });
+    await liberarEquipamentoSeNecessario(tx, os);
   });
 
   await registrarEventoHistoricoAtivo({
@@ -491,7 +501,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     acao: 'EDIÇÃO',
     entidade: 'OsCorretiva',
     entidadeId: osId,
-    detalhes: `OS ${os.numeroOS} concluída. Equipamento retornou a Operante.`,
+    detalhes: `OS ${os.numeroOS} concluída.${os.statusEquipamentoAbertura !== 'Operante' ? ' Equipamento retornou a Operante.' : ''}`,
   });
 
   await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
@@ -528,10 +538,7 @@ export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, mo
       },
     });
 
-    await tx.equipamento.update({
-      where: { id: os.equipamentoId },
-      data: { status: 'Operante' },
-    });
+    await liberarEquipamentoSeNecessario(tx, os);
   });
 
   await registrarEventoHistoricoAtivo({
@@ -557,7 +564,7 @@ export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, mo
     acao: 'EDIÇÃO',
     entidade: 'OsCorretiva',
     entidadeId: osId,
-    detalhes: `OS ${os.numeroOS} cancelada. Motivo: ${motivoCancelamento.trim()}. Equipamento revertido para Operante.`,
+    detalhes: `OS ${os.numeroOS} cancelada. Motivo: ${motivoCancelamento.trim()}.${os.statusEquipamentoAbertura !== 'Operante' ? ' Equipamento revertido para Operante.' : ''}`,
   });
 
   await removerAlertasOsCorretivaDaOS(tenantId, os.numeroOS);
@@ -727,11 +734,8 @@ export async function excluirOsCorretivaService({ tenantId, usuarioId, osId }) {
   }
 
   await prisma.$transaction(async (tx) => {
-    // Reverte status do equipamento para Operante se a OS estava influenciando
-    await tx.equipamento.update({
-      where: { id: os.equipamentoId },
-      data: { status: 'Operante' },
-    });
+    // Reverte status do equipamento para Operante se a OS estava influenciando.
+    await liberarEquipamentoSeNecessario(tx, os);
 
     await tx.notaAndamento.deleteMany({ where: { tenantId, osCorretivaId: osId } });
     await tx.visitaTerceiro.deleteMany({ where: { tenantId, osCorretivaId: osId } });
