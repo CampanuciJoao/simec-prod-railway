@@ -1,12 +1,12 @@
 ---
-versao: 1.1.0
-vigenteDesde: 2026-05-14
+versao: 1.2.0
+vigenteDesde: 2026-05-16
 documento: politica_privacidade
 ---
 
 # Política de Privacidade do SIMEC
 
-**Versão 1.1.0 — vigente desde 14 de maio de 2026.**
+**Versão 1.2.0 — vigente desde 16 de maio de 2026.**
 
 A presente Política de Privacidade descreve como o **SIMEC** ("Sistema", "nós") trata dados pessoais dos seus usuários, em conformidade com a **Lei nº 13.709/2018 — Lei Geral de Proteção de Dados Pessoais (LGPD)**.
 
@@ -54,6 +54,8 @@ O SIMEC **não trata dados pessoais sensíveis de pacientes** (CPF, prontuário,
 | Rastreabilidade técnica de quem realizou cada serviço | Engenheiros, solicitantes (3.2) |
 | Envio de notificações operacionais (alertas de equipamento, vencimentos) | Destinatários de notificação (3.2) |
 | Análise estatística e geração de insights por inteligência artificial sobre padrões de manutenção | Dados operacionais agregados (3.2) |
+| Treinamento e operação do Knowledge Agent global (modelos de IA cross-tenant) | Conhecimento técnico despersonalizado extraído dos dados operacionais (3.2), após pipeline de scrubbing determinístico |
+| Geração de insights personalizados via Operational Agent (combinação do Knowledge global com dados do próprio tenant) | Dados operacionais (3.2) tenant-scoped |
 
 ## 5. Bases legais (Art. 7º da LGPD)
 
@@ -64,6 +66,7 @@ O SIMEC **não trata dados pessoais sensíveis de pacientes** (CPF, prontuário,
 | Gestão de manutenção (registro de engenheiros, técnicos e solicitantes) | Execução de contrato + Legítimo interesse para auditoria técnica de equipamento médico | Art. 7º, V e IX |
 | Notificações por e-mail/Telegram | Consentimento do titular ao se cadastrar como destinatário | Art. 7º, I |
 | Análise por IA para geração de insights | Legítimo interesse, com base em dados pseudonimizados quando possível | Art. 7º, IX |
+| Manutenção do Knowledge Agent global a partir de dados despersonalizados | Legítimo interesse para melhoria do produto, sobre dados que, após despersonalização determinística, não constituem dado pessoal | Art. 7º, IX + Art. 12 da LGPD |
 
 ## 6. Compartilhamento e subprocessadores
 
@@ -83,7 +86,7 @@ A Cerdil mantém contratos ou termos de uso com cada subprocessador exigindo pro
 
 Como visto na seção 6, parte do tratamento ocorre fora do Brasil. A Cerdil realiza essas transferências com base no **Art. 33, IX da LGPD** (execução de contrato de que o titular seja parte ou para cumprimento de obrigações inerentes à prestação do serviço), e exige dos subprocessadores cláusulas contratuais padrão que assegurem proteção equivalente à LGPD.
 
-Nenhum dado pessoal sensível é transferido. Quando enviamos texto operacional ao OpenAI para análise por IA, **buscamos minimizar a exposição de dados pessoais** (pseudonimização quando aplicável).
+Nenhum dado pessoal sensível é transferido. Antes de qualquer conteúdo operacional ser enviado ao OpenAI para processamento por IA, ou de ser persistido no Knowledge Agent global, o Sistema aplica **processo determinístico de despersonalização** — remoção de identificadores diretos (nomes, e-mails, telefones, IDs internos, números de série) e indiretos (combinações que permitam reidentificação) — operando sobre uma **whitelist de campos técnicos** previamente definida. O processo é auditável e seus logs são mantidos para fins de prestação de contas (Art. 6º, X da LGPD).
 
 ## 8. Retenção
 
@@ -96,6 +99,8 @@ Nenhum dado pessoal sensível é transferido. Quando enviamos texto operacional 
 | Backups | 90 dias | Recuperação operacional |
 
 Após o prazo, os dados são **anonimizados ou eliminados**. Logs estatísticos agregados (sem identificação) podem ser mantidos para fins de melhoria do produto, sem prazo definido.
+
+O **conhecimento técnico despersonalizado** consolidado no Knowledge Agent global — taxonomias de falha, padrões por modalidade e subsistema físico, correlações sintoma-solução — **não constitui dado pessoal nos termos do Art. 12 da LGPD** e é mantido pela Cerdil indefinidamente, inclusive após o encerramento do contrato do Cliente Contratante que originou os dados brutos. O dado bruto operacional segue a retenção declarada na tabela acima.
 
 ## 9. Direitos do titular (Art. 18)
 
