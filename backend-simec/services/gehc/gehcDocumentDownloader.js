@@ -146,6 +146,23 @@ async function realizarLoginNaPagina(page, login, password) {
     timeout: 60_000,
   }).catch(() => {});
   await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+
+  // Visita explicita ao Salesforce my.salesforce.com pra ESTABELECER cookies
+  // de sessao SSO no contexto desse dominio. Sem isso, qualquer GET subsequente
+  // a documentUrl Salesforce (gehealthcare-svc.my.salesforce.com/.../VersionData)
+  // bate em 401, mesmo com tokens CDX. Este passo dispara o redirect SSO
+  // (login.salesforce.com -> my.salesforce.com -> volta), populando cookies.
+  try {
+    await page.goto('https://gehealthcare-svc.my.salesforce.com/', {
+      waitUntil: 'domcontentloaded',
+      timeout: 60_000,
+    });
+    // Espera pequena pra SSO redirect terminar de setar cookies.
+    await page.waitForTimeout(3_000);
+    console.log('[GEHC_AUTH] Visita ao my.salesforce.com concluida.');
+  } catch (err) {
+    console.warn(`[GEHC_AUTH] Falha visitando Salesforce: ${err.message?.slice(0, 100)}`);
+  }
 }
 
 /**
@@ -281,14 +298,15 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
 
   if (status === 401 || status === 403) {
     // Fallback para source 101 (Salesforce): tenta navegacao real via Playwright.
-    // O context tem cookies do my.salesforce.com setados durante o SSO no login,
-    // que o context.request.get pode nao enviar cross-domain. Navegacao real
-    // do browser segue cookies + redirects automaticamente.
     if (doc.documentSource === '101') {
-      // Debug: loga cookies disponiveis pro dominio do Salesforce — ajuda
-      // diagnosticar se SSO setou cookies de sessao no contexto.
+      // Debug visível: console.log dos cookies que o contexto tem pro Salesforce.
+      // Se estiver vazio, SSO nao estabeleceu sessao no my.salesforce.com.
       try {
         const cookies = await context.cookies(doc.documentUrl);
+        console.log(
+          `[GEHC_SF] cookies para ${new URL(doc.documentUrl).host}: ` +
+          `${cookies.length} (${cookies.map((c) => c.name).slice(0, 6).join(',')})`
+        );
         t.marcar('salesforce_cookies', {
           quantidade: cookies.length,
           nomes: cookies.map((c) => c.name).slice(0, 5).join(','),
@@ -302,10 +320,16 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
             waitUntil: 'domcontentloaded',
             timeout: 60_000,
           });
+          const navStatus = navResp?.status() || null;
+          const navUrl = newPage.url();
+          console.log(
+            `[GEHC_SF] navegacao ${doc.documentId}: status=${navStatus} urlFinal=${navUrl.slice(0, 100)}`
+          );
           if (navResp && navResp.ok()) {
             const navBuffer = await navResp.body();
             if (validarPdfBuffer(navBuffer)) {
               t.marcar('salesforce_navegacao_ok', { bytes: navBuffer.length });
+              console.log(`[GEHC_SF] navegacao ${doc.documentId}: SUCESSO (${navBuffer.length} bytes)`);
               const fim = t.finalizar();
               return {
                 ok: true,
@@ -316,14 +340,18 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
                 buffer: navBuffer,
               };
             }
+            // Resposta 200 mas nao e PDF — provavel HTML de login ou JSON de erro
+            console.log(
+              `[GEHC_SF] navegacao ${doc.documentId}: 200 mas nao e PDF ` +
+              `(magic bytes: ${navBuffer.slice(0, 4).toString('hex')})`
+            );
           }
-          t.marcar('salesforce_navegacao_falhou', {
-            status: navResp?.status() || null,
-          });
+          t.marcar('salesforce_navegacao_falhou', { status: navStatus });
         } finally {
           await newPage.close().catch(() => {});
         }
       } catch (navErr) {
+        console.log(`[GEHC_SF] navegacao ${doc.documentId}: erro ${navErr.message?.slice(0, 100)}`);
         t.marcar('salesforce_navegacao_erro', { erro: navErr.message?.slice(0, 100) });
       }
     }
