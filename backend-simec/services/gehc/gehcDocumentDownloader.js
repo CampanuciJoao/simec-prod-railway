@@ -376,7 +376,7 @@ function extrairDocumentUrlDoPayload(payload, indice) {
 // Tenta baixar UM documento, registrando timeline das etapas executadas.
 // Retorna { ok, categoria, mensagem, etapas, duracaoMs, buffer? }.
 // NUNCA lanca — falhas sao categorizadas no return.
-async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
+async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tokens = null }) {
   const t = novaTimeline();
   try {
     // 1. Verifica se o botao Download eh visivel
@@ -534,12 +534,20 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
         duracaoMs: fim.duracaoMs,
       };
     }
-    // Baixa via documentUrl (Salesforce REST). A sessao Playwright tem os
-    // cookies do Salesforce — request.get com followRedirects herda eles
-    // e segue qualquer redirect interno (Salesforce -> S3 quando aplicavel).
+    // Baixa via documentUrl (Salesforce REST). Header Authorization Bearer
+    // com accessToken capturado pelo gehcAuthService — necessario porque
+    // o documentUrl aponta para outro dominio (gehealthcare-svc.my.salesforce.com)
+    // e cookies do dominio principal nao atravessam.
+    const reqHeaders = {};
+    if (tokens?.accessToken) {
+      reqHeaders.Authorization = `Bearer ${tokens.accessToken}`;
+    }
     let pdfResp;
     try {
-      pdfResp = await page.context().request.get(documentUrl, { timeout: 60_000 });
+      pdfResp = await page.context().request.get(documentUrl, {
+        timeout: 60_000,
+        headers: reqHeaders,
+      });
     } catch (err) {
       t.marcar('document_get_falhou', { erro: err.message?.slice(0, 100) });
       const fim = t.finalizar();
@@ -597,6 +605,7 @@ function sleep_ms(ms) {
 async function baixarComRetry({
   page, downloadBtn, doc, indice,
   tenantId, equipamento, ordem, trackingNumber,
+  tokens = null,
 }) {
   let ultimo = null;
   for (let tentativa = 1; tentativa <= RETRY_INLINE_MAX; tentativa++) {
@@ -606,7 +615,7 @@ async function baixarComRetry({
       await sleep_ms(espera);
     }
 
-    const r = await tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento: indice });
+    const r = await tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento: indice, tokens });
     ultimo = r;
 
     // Log estruturado dessa tentativa
@@ -835,6 +844,7 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
           const retryResult = await baixarComRetry({
             page, downloadBtn, doc, indice: i,
             tenantId, equipamento, ordem, trackingNumber,
+            tokens,
           });
 
           if (retryResult.ok) {
