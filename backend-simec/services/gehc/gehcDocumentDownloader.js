@@ -31,7 +31,7 @@ import { chromium } from 'playwright';
 import crypto from 'crypto';
 import prisma from '../prismaService.js';
 import { lerCredenciais } from './gehcAuthService.js';
-import { listarDocumentosDaOS, dispararDownload } from './gehcDocumentClient.js';
+import { listarDocumentosDaOS } from './gehcDocumentClient.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
 import { extrairUmPdf } from './gehcPdfExtractionOrchestrator.js';
@@ -238,12 +238,9 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
     };
   }
 
-  // Headers por source:
-  //   '102' (API GE):    accesstoken + idtoken nos headers (mesmo do gateway)
-  //   '101' (Salesforce): Cookie sid=<accessToken>. Confirmado em prod 2026-05-16:
-  //                        Authorization Bearer retorna 401. Salesforce historicamente
-  //                        aceita o session ID no cookie sid no dominio my.salesforce.com.
-  //                        Bearer tambem incluido como fallback secundario.
+  // Headers por source. Em '101' usamos Bearer (formato Salesforce session ID
+  // ja vem com prefixo "00D...!" no token); em '102' usamos os mesmos headers
+  // do gateway (que e um servico GE Healthcare).
   const headersBase = {
     'accept':       'application/pdf, */*',
     'User-Agent':   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -251,10 +248,9 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   };
   let headers;
   if (doc.documentSource === '101') {
-    // Salesforce — session id via Cookie + Bearer como fallback
+    // Salesforce REST aceita session id como Bearer token
     headers = {
       ...headersBase,
-      'Cookie':        `sid=${tokens.accessToken}`,
       'Authorization': `Bearer ${tokens.accessToken}`,
     };
   } else if (doc.documentSource === '102') {
@@ -265,10 +261,9 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
       'idtoken':     tokens.idToken,
     };
   } else {
-    // Source desconhecido — tenta todos os formatos
+    // Source desconhecido — tenta ambos os formatos como fallback
     headers = {
       ...headersBase,
-      'Cookie':        `sid=${tokens.accessToken}`,
       'Authorization': `Bearer ${tokens.accessToken}`,
       'accesstoken':   tokens.accessToken,
       'idtoken':       tokens.idToken,
@@ -276,57 +271,10 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   }
   t.marcar('headers_montados', { source: doc.documentSource });
 
-  // CRITICO (mapeamento ao vivo 2026-05-16): o portal real apos receber
-  // 202 do downloadDocument AGUARDA ~6.8s e entao tem a URL S3 pre-assinada
-  // no <a download>. Hipotese A (mais provavel pelo diagnostico do user):
-  // a URL S3 esta no body da resposta do downloadDocument — chamadas
-  // anteriores nao olhavam o body completo, so json.data.documentDownload.
-  //
-  // Estrategia em camadas:
-  //   1. Chama dispararDownload (que agora extrai URL S3 do body se houver)
-  //   2. Se vier s3Url -> baixa direto do S3 (sem auth, signature na query)
-  //   3. Senao -> loga rawBody pra inspecao e cai no caminho antigo (que
-  //      provavelmente vai 401 pra source 101).
-  let s3UrlPreAssinada = null;
-  try {
-    const disparo = await dispararDownload({
-      doc,
-      accessToken: tokens.accessToken,
-      idToken:     tokens.idToken,
-    });
-    t.marcar('download_disparado', { status: disparo.status, hasS3Url: !!disparo.s3Url });
-    if (disparo.s3Url) {
-      s3UrlPreAssinada = disparo.s3Url;
-      console.log(
-        `[GEHC_DOWNLOAD] ${doc.documentId}: URL S3 encontrada no response da Call 2.`
-      );
-    } else {
-      // Loga rawBody pra inspecao — vamos ver se a URL esta em outra
-      // estrutura, ou se realmente nao esta na resposta.
-      console.log(
-        `[GEHC_DOWNLOAD] ${doc.documentId}: dispararDownload body (sem URL S3 detectada): ${disparo.rawBody?.slice(0, 1500)}`
-      );
-    }
-    // O frontend real aguarda ~6.8s. Se URL S3 ja veio, podemos pular o wait.
-    if (!s3UrlPreAssinada) {
-      await new Promise((r) => setTimeout(r, 1_500));
-    }
-  } catch (err) {
-    t.marcar('download_disparo_falhou', { erro: err.message?.slice(0, 100) });
-    console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: dispararDownload falhou: ${err.message?.slice(0, 120)}`);
-  }
-
-  // Se temos a URL S3 pre-assinada, usa ela (signature na query string —
-  // sem cookies, sem auth). Senao usa documentUrl original (Salesforce).
-  const urlParaBaixar = s3UrlPreAssinada || doc.documentUrl;
-  const headersFinal = s3UrlPreAssinada
-    ? { 'accept': 'application/pdf, */*' }   // S3 pre-signed nao precisa de auth
-    : headers;
-
   let resp;
   try {
-    resp = await context.request.get(urlParaBaixar, {
-      headers: headersFinal,
+    resp = await context.request.get(doc.documentUrl, {
+      headers,
       timeout: HTTP_TIMEOUT_MS,
     });
   } catch (err) {
@@ -344,75 +292,11 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   t.marcar('http_response', { status });
 
   if (status === 401 || status === 403) {
-    // Fallback para source 101 (Salesforce): tenta navegacao real via Playwright.
-    if (doc.documentSource === '101') {
-      // Debug visível: console.log dos cookies que o contexto tem pro Salesforce.
-      // Se estiver vazio, SSO nao estabeleceu sessao no my.salesforce.com.
-      try {
-        const cookies = await context.cookies(doc.documentUrl);
-        console.log(
-          `[GEHC_SF] cookies para ${new URL(doc.documentUrl).host}: ` +
-          `${cookies.length} (${cookies.map((c) => c.name).slice(0, 6).join(',')})`
-        );
-        t.marcar('salesforce_cookies', {
-          quantidade: cookies.length,
-          nomes: cookies.map((c) => c.name).slice(0, 5).join(','),
-        });
-      } catch {}
-
-      try {
-        const newPage = await context.newPage();
-        try {
-          const navResp = await newPage.goto(doc.documentUrl, {
-            waitUntil: 'domcontentloaded',
-            timeout: 60_000,
-          });
-          const navStatus = navResp?.status() || null;
-          const navUrl = newPage.url();
-          console.log(
-            `[GEHC_SF] navegacao ${doc.documentId}: status=${navStatus} urlFinal=${navUrl.slice(0, 100)}`
-          );
-          if (navResp && navResp.ok()) {
-            const navBuffer = await navResp.body();
-            if (validarPdfBuffer(navBuffer)) {
-              t.marcar('salesforce_navegacao_ok', { bytes: navBuffer.length });
-              console.log(`[GEHC_SF] navegacao ${doc.documentId}: SUCESSO (${navBuffer.length} bytes)`);
-              const fim = t.finalizar();
-              return {
-                ok: true,
-                categoria: CATEGORIAS_LOG.SUCESSO,
-                mensagem: null,
-                etapas: fim.etapas,
-                duracaoMs: fim.duracaoMs,
-                buffer: navBuffer,
-              };
-            }
-            // Resposta 200 mas nao e PDF — provavel HTML de login ou JSON de erro
-            console.log(
-              `[GEHC_SF] navegacao ${doc.documentId}: 200 mas nao e PDF ` +
-              `(magic bytes: ${navBuffer.slice(0, 4).toString('hex')})`
-            );
-          }
-          t.marcar('salesforce_navegacao_falhou', { status: navStatus });
-        } finally {
-          await newPage.close().catch(() => {});
-        }
-      } catch (navErr) {
-        console.log(`[GEHC_SF] navegacao ${doc.documentId}: erro ${navErr.message?.slice(0, 100)}`);
-        t.marcar('salesforce_navegacao_erro', { erro: navErr.message?.slice(0, 100) });
-      }
-    }
-
     const fim = t.finalizar();
-    // Distingue: 401 em source 101 e' problema localizado do Salesforce
-    // (nosso token CDX nao destrava Salesforce direto). 401 em 102 e' o
-    // token CDX expirado (gateway tambem rejeitaria) — aborta tenant.
-    const categoria = doc.documentSource === '101' ? 'SALESFORCE_AUTH_FALHA' : 'AUTH_EXPIRADA';
-    const origem = doc.documentSource === '101' ? 'Salesforce' : 'API GE';
     return {
       ok: false,
-      categoria,
-      mensagem: `${origem} retornou HTTP ${status} (auth invalida).`,
+      categoria: 'AUTH_EXPIRADA',
+      mensagem: `${doc.documentSource === '101' ? 'Salesforce' : 'API GE'} retornou HTTP ${status} (auth invalida).`,
       etapas: fim.etapas,
       duracaoMs: fim.duracaoMs,
     };
@@ -626,17 +510,8 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
       // tem 2 docs (Service Report Salesforce + PM Form API GE), e ambos
       // agregam valor distinto pra IA. Cap defensivo de 5 por OS para casos
       // anomalos sem ficar sem rate-limit por OS.
-      //
-      // Ordena source 102 (API GE) antes de 101 (Salesforce). 102 e' o caminho
-      // simples; 101 depende de cookies Salesforce. Se um doc 101 falhar com
-      // SALESFORCE_AUTH_FALHA, ele e' marcado como permanente mas seguimos
-      // para o proximo doc 102 (que provavelmente funciona).
       const MAX_DOCS_POR_OS = 5;
-      const docsOrdenados = [...docsPendentes].sort((a, b) => {
-        const prioridade = { '102': 0, '101': 1 };
-        return (prioridade[a.documentSource] ?? 2) - (prioridade[b.documentSource] ?? 2);
-      });
-      const docsParaBaixar = docsOrdenados.slice(0, MAX_DOCS_POR_OS);
+      const docsParaBaixar = docsPendentes.slice(0, MAX_DOCS_POR_OS);
       if (docsPendentes.length > MAX_DOCS_POR_OS) {
         console.log(
           `[GEHC_PDF] SR${trackingNumber}: ${docsPendentes.length} documentos disponiveis, baixando apenas os primeiros ${MAX_DOCS_POR_OS}.`
@@ -710,9 +585,7 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
         }).catch(() => {});
 
         // Detector de FALHA_SISTEMICA: se reauth necessario OU N docs
-        // consecutivos falharam, quebra a execucao. NAO conta erros
-        // permanentes (SALESFORCE_AUTH_FALHA, NAO_E_PDF, etc.) — esses sao
-        // problemas localizados de doc, nao indicam portal fora.
+        // consecutivos falharam, quebra a execucao.
         if (retryResult.requerReauth) {
           console.error(
             `[GEHC_DOWNLOAD] ${doc.documentId}: requer reauth, abortando captura do tenant.`
@@ -725,7 +598,7 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
           return { capturados, processadas, falhaSistemica: true, erro: erros.join(' | ').slice(0, 500) };
         }
 
-        if (contadorFalhasConsecutivas && !CATEGORIAS_PERMANENTES.has(r.categoria)) {
+        if (contadorFalhasConsecutivas) {
           contadorFalhasConsecutivas.value++;
           if (contadorFalhasConsecutivas.value >= FALHAS_CONSECUTIVAS_PARA_SISTEMICO) {
             console.error(
