@@ -31,7 +31,8 @@ import { chromium } from 'playwright';
 import crypto from 'crypto';
 import prisma from '../prismaService.js';
 import { lerCredenciais } from './gehcAuthService.js';
-import { listarDocumentosDaOS } from './gehcDocumentClient.js';
+import { listarDocumentosDaOS, dispararDownload } from './gehcDocumentClient.js';
+import { GehcSubscriptionClient } from './gehcSubscriptionClient.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
 import { extrairUmPdf } from './gehcPdfExtractionOrchestrator.js';
@@ -196,177 +197,181 @@ export async function abrirSessaoAutenticada(tenantId) {
   return { browser, context, loginPage };
 }
 
-// ─── Download de um documento específico ─────────────────────────────────────
+// ─── Download de um documento específico (HTTP mutation + WS subscription + GET S3) ──
+// Baixa o PDF de um documento via fluxo WS (graphql-transport-ws).
 //
-// O portal GE retorna o `documentUrl` direto na resposta do gateway. Bastam:
-//   - GET HTTP no documentUrl
-//   - Headers de auth corretos (varia por documentSource)
-//   - Validar magic bytes %PDF no buffer recebido
+// Mapeado ao vivo em 2026-05-16 (ver [[ADR-019]]):
+//   1. Reserva proxima slot do WS (FIFO) ANTES da mutation pra evitar corrida.
+//   2. Chama mutation downloadDocument no gateway -> retorna {status:202}
+//      (sem URL — backend processa async).
+//   3. ~5.8s depois, WS push {preSignedUrl, email} chega via subscription
+//      documentDownloadSubscription -> resolve a promise reservada.
+//   4. GET na preSignedUrl S3 (sem auth — assinada na query string).
+//   5. Valida magic bytes %PDF e retorna buffer.
 //
-// Não precisa abrir popup, clicar em botão, marcar checkbox.
-
-// Baixa o PDF de um documento via documentUrl direto.
-// Dispatcher por documentSource (capturado em 2026-05-16):
-//   - '102': API GE (prod-api.gehealthcare.com) — accesstoken + idtoken no header
-//   - '101': Salesforce — Authorization Bearer accessToken (Salesforce session ID)
-//   - outros: erro permanente (DOC_SEM_URL ou desconhecido)
-//
-// Usa context.request.get que herda cookies do contexto Playwright (caso
-// algum cookie de sessao Salesforce ajude no caso 101) e permite headers
-// customizados.
-async function baixarDocumentoViaUrl({ doc, context, tokens }) {
+// IMPORTANTE: o worker NUNCA bate em gehealthcare-svc.my.salesforce.com.
+// O backend GE tem credenciais de Connected App no Salesforce e faz o
+// handoff via mutation. Tentar GET direto no documentUrl Salesforce sempre
+// retorna 401 porque o token CDX nao destrava Salesforce.
+async function baixarDocumentoViaUrl({ doc, tokens, wsClient }) {
   const t = novaTimeline();
 
   if (!doc.documentUrl) {
     const fim = t.finalizar();
     return {
-      ok: false,
-      categoria: 'DOC_SEM_URL',
+      ok: false, categoria: 'DOC_SEM_URL',
       mensagem: 'Gateway retornou documento sem documentUrl.',
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
   if (!tokens?.accessToken || !tokens?.idToken) {
     const fim = t.finalizar();
     return {
-      ok: false,
-      categoria: 'AUTH_EXPIRADA',
+      ok: false, categoria: 'AUTH_EXPIRADA',
       mensagem: 'Tokens GE indisponiveis para download.',
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
+    };
+  }
+  if (!wsClient) {
+    const fim = t.finalizar();
+    return {
+      ok: false, categoria: 'AUTH_EXPIRADA',
+      mensagem: 'WS client GEHC nao inicializado (necessario para preSignedUrl).',
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
 
-  // Headers por source. Em '101' usamos Bearer (formato Salesforce session ID
-  // ja vem com prefixo "00D...!" no token); em '102' usamos os mesmos headers
-  // do gateway (que e um servico GE Healthcare).
-  const headersBase = {
-    'accept':       'application/pdf, */*',
-    'User-Agent':   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Referer':      'https://www.gehealthcare.com.br/',
-  };
-  let headers;
-  if (doc.documentSource === '101') {
-    // Salesforce REST aceita session id como Bearer token
-    headers = {
-      ...headersBase,
-      'Authorization': `Bearer ${tokens.accessToken}`,
-    };
-  } else if (doc.documentSource === '102') {
-    // API GE direta — mesmos headers do gateway
-    headers = {
-      ...headersBase,
-      'accesstoken': tokens.accessToken,
-      'idtoken':     tokens.idToken,
-    };
-  } else {
-    // Source desconhecido — tenta ambos os formatos como fallback
-    headers = {
-      ...headersBase,
-      'Authorization': `Bearer ${tokens.accessToken}`,
-      'accesstoken':   tokens.accessToken,
-      'idtoken':       tokens.idToken,
+  // 1. Reserva slot WS ANTES de disparar a mutation (evita corrida onde o
+  //    push chega antes do resolver ser registrado).
+  const promiseUrl = wsClient.esperarProximaUrl(60_000);
+  t.marcar('ws_slot_reservado');
+
+  // 2. Dispara mutation downloadDocument no gateway.
+  let disparo;
+  try {
+    disparo = await dispararDownload({
+      doc,
+      accessToken: tokens.accessToken,
+      idToken:     tokens.idToken,
+    });
+    t.marcar('download_mutation_ok', { status: disparo.status });
+  } catch (err) {
+    // Libera o slot WS reservado (que nunca vai receber resposta).
+    promiseUrl.catch(() => {});
+    const fim = t.finalizar();
+    const isAuth = /HTTP 40[13]|auth/i.test(err.message || '');
+    return {
+      ok: false,
+      categoria: isAuth ? 'AUTH_EXPIRADA' : CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: `downloadDocument falhou: ${err.message?.slice(0, 200)}`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
-  t.marcar('headers_montados', { source: doc.documentSource });
 
+  if (disparo.status !== 202 && disparo.status !== 200) {
+    promiseUrl.catch(() => {});
+    const fim = t.finalizar();
+    return {
+      ok: false, categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: `downloadDocument status ${disparo.status}: ${disparo.message?.slice(0, 150)}`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
+    };
+  }
+
+  // 3. Aguarda push WS com preSignedUrl (timeout 60s; portal real demora ~6s).
+  let preSignedUrl;
+  try {
+    preSignedUrl = await promiseUrl;
+    t.marcar('ws_url_recebida');
+  } catch (err) {
+    const fim = t.finalizar();
+    const isTimeout = err.message === 'WS_TIMEOUT';
+    return {
+      ok: false,
+      categoria: isTimeout ? CATEGORIAS_LOG.TIMEOUT_DOWNLOAD : 'AUTH_EXPIRADA',
+      mensagem: isTimeout
+        ? 'WS nao recebeu preSignedUrl em 60s (backend GE pode estar lento).'
+        : `WS subscription falhou: ${err.message?.slice(0, 150)}`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
+    };
+  }
+
+  // 4. GET na S3 — URL assinada na query string, sem auth header.
   let resp;
   try {
-    resp = await context.request.get(doc.documentUrl, {
-      headers,
-      timeout: HTTP_TIMEOUT_MS,
+    resp = await fetch(preSignedUrl, {
+      method: 'GET',
+      headers: { 'accept': 'application/pdf, */*' },
+      signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
     });
   } catch (err) {
     const fim = t.finalizar();
     return {
       ok: false,
       categoria: categorizarErro(err.message),
-      mensagem: `Falha de rede no GET: ${err.message?.slice(0, 200)}`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      mensagem: `Falha de rede no GET S3: ${err.message?.slice(0, 200)}`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
 
-  const status = resp.status();
-  t.marcar('http_response', { status });
+  const status = resp.status;
+  t.marcar('s3_response', { status });
 
-  if (status === 401 || status === 403) {
+  if (status === 403) {
+    // S3 presigned URL expirou ou ja foi usada
     const fim = t.finalizar();
     return {
-      ok: false,
-      categoria: 'AUTH_EXPIRADA',
-      mensagem: `${doc.documentSource === '101' ? 'Salesforce' : 'API GE'} retornou HTTP ${status} (auth invalida).`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
-    };
-  }
-  if (status === 404) {
-    const fim = t.finalizar();
-    return {
-      ok: false,
-      categoria: 'BOTAO_NAO_ENCONTRADO',  // reusa categoria permanente — doc nao existe mais
-      mensagem: `Documento nao encontrado (HTTP 404): ${doc.documentUrl?.slice(0, 100)}`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      ok: false, categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: 'S3 presigned URL retornou 403 (expirada ou ja consumida).',
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
   if (status >= 500 || status === 429) {
     const fim = t.finalizar();
     return {
-      ok: false,
-      categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-      mensagem: `Backend retornou HTTP ${status} (transient).`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      ok: false, categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: `S3 retornou HTTP ${status} (transient).`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
   if (status !== 200) {
     const fim = t.finalizar();
     return {
-      ok: false,
-      categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-      mensagem: `HTTP ${status} inesperado.`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      ok: false, categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: `S3 HTTP ${status} inesperado.`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
 
   let buffer;
   try {
-    buffer = await resp.body();
+    buffer = Buffer.from(await resp.arrayBuffer());
   } catch (err) {
     const fim = t.finalizar();
     return {
       ok: false,
       categoria: categorizarErro(err.message),
-      mensagem: `Falha lendo body: ${err.message?.slice(0, 150)}`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      mensagem: `Falha lendo body S3: ${err.message?.slice(0, 150)}`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
 
   if (!validarPdfBuffer(buffer)) {
-    // Pode ser HTML de erro do Salesforce ou JSON de erro da API GE — nao retry
     const inicio = (buffer || Buffer.alloc(0)).slice(0, 60).toString('utf8').replace(/[^\x20-\x7e]/g, '·');
     const fim = t.finalizar();
     return {
-      ok: false,
-      categoria: 'NAO_E_PDF',
-      mensagem: `Response 200 mas nao e PDF. Primeiros bytes: ${inicio.slice(0, 80)}`,
-      etapas: fim.etapas,
-      duracaoMs: fim.duracaoMs,
+      ok: false, categoria: 'NAO_E_PDF',
+      mensagem: `S3 200 mas nao e PDF. Primeiros bytes: ${inicio.slice(0, 80)}`,
+      etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     };
   }
   t.marcar('buffer_lido', { bytes: buffer.length });
 
   const fim = t.finalizar();
   return {
-    ok: true,
-    categoria: CATEGORIAS_LOG.SUCESSO,
+    ok: true, categoria: CATEGORIAS_LOG.SUCESSO,
     mensagem: null,
-    etapas: fim.etapas,
-    duracaoMs: fim.duracaoMs,
+    etapas: fim.etapas, duracaoMs: fim.duracaoMs,
     buffer,
   };
 }
@@ -379,7 +384,7 @@ function sleep_ms(ms) {
 // Registra log estruturado por TENTATIVA (3 logs no caso de 3 falhas).
 // Retorna { ok, ultimoResultado, tentativasFeitas }.
 async function baixarComRetry({
-  doc, context, tokens,
+  doc, tokens, wsClient,
   tenantId, equipamento, ordem, trackingNumber,
 }) {
   let ultimo = null;
@@ -390,7 +395,7 @@ async function baixarComRetry({
       await sleep_ms(espera);
     }
 
-    const r = await baixarDocumentoViaUrl({ doc, context, tokens });
+    const r = await baixarDocumentoViaUrl({ doc, tokens, wsClient });
     ultimo = r;
 
     // Log estruturado dessa tentativa
@@ -428,11 +433,14 @@ async function baixarComRetry({
 
 // ─── Captura de todas as OSs de um equipamento (chamadas HTTP) ──────────────
 //
-// Refatorado em 2026-05-16 (ADR-019): não navega mais pela lista de OSs no
-// portal. Para cada OS pendente, chama listarDocumentosDaOS (GraphQL gateway)
-// + baixarDocumentoViaUrl (GET HTTP direto). Sem DOM, sem popup, sem click.
+// Refatorado em 2026-05-16 (ADR-019 v2): fluxo HTTP + WebSocket.
+// Para cada OS pendente:
+//   1. listarDocumentosDaOS (HTTP GraphQL)
+//   2. baixarDocumentoViaUrl (mutation downloadDocument + espera WS preSignedUrl + GET S3)
+// Sem DOM, sem popup, sem click. wsClient e' compartilhado por tenant (uma conexao
+// WS por backfill — multiplexada via FIFO queue interna).
 
-async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens, tokens, contadorFalhasConsecutivas }) {
+async function capturarPdfsDeEquipamento({ tenantId, equipamento, ordens, tokens, wsClient, contadorFalhasConsecutivas }) {
   if (!ordens.length) return { capturados: 0, processadas: 0, erro: null };
 
   let capturados = 0;
@@ -523,7 +531,7 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
         processadas++;
 
         const retryResult = await baixarComRetry({
-          doc, context, tokens,
+          doc, tokens, wsClient,
           tenantId, equipamento, ordem, trackingNumber,
         });
 
@@ -746,10 +754,25 @@ export async function executarBackfillPdfs({
     return { processadas: 0, capturados: 0, motivo: 'auth_failed' };
   }
 
+  // Abre WS client UMA vez por backfill — multiplexa via FIFO queue.
+  // Sem ele, source 101 (Salesforce) nao consegue baixar (mutation
+  // downloadDocument entrega preSignedUrl assincronamente via WS).
+  let wsClient;
+  try {
+    wsClient = new GehcSubscriptionClient({
+      accessToken: tokens.accessToken,
+      idToken:     tokens.idToken,
+    });
+  } catch (err) {
+    console.error(`[GEHC_PDF] Falha abrindo WS tenant ${tenantId}: ${err.message}`);
+    return { processadas: 0, capturados: 0, motivo: 'ws_failed' };
+  }
+
   let session;
   try {
     session = await abrirSessaoAutenticada(tenantId);
   } catch (err) {
+    await wsClient.dispose().catch(() => {});
     console.error(`[GEHC_PDF] Falha abrindo sessao Playwright tenant ${tenantId}: ${err.message}`);
     return { processadas: 0, capturados: 0, motivo: 'browser_failed' };
   }
@@ -783,11 +806,11 @@ export async function executarBackfillPdfs({
       // race condition entre backfills concorrentes (worker tem
       // concurrency: 5) e cross-tenant credential leak.
       const resultado = await capturarPdfsDeEquipamento({
-        context: session.context,
         tenantId,
         equipamento,
         ordens: ordensDoEquipamento,
         tokens,
+        wsClient,
         contadorFalhasConsecutivas,
       });
 
@@ -814,6 +837,7 @@ export async function executarBackfillPdfs({
     }
   } finally {
     await session.browser.close().catch(() => {});
+    await wsClient.dispose().catch(() => {});
   }
 
   console.log(
