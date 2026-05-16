@@ -954,6 +954,10 @@ router.post('/pipelines/:pipeline/disparar', admin, async (req, res) => {
 
   try {
     const r = await dispararPipeline(pipeline);
+    console.log(
+      `[DISPARAR] pipeline=${pipeline} usuario=${usuarioId} ok=${r.ok} ` +
+      `jobId=${r.jobId || '-'} motivo=${r.motivo || '-'}`
+    );
     if (!r.ok) {
       // 409 quando ja ha job em execucao — front trata como estado, nao erro.
       if (r.jaEmExecucao) {
@@ -971,6 +975,7 @@ router.post('/pipelines/:pipeline/disparar', admin, async (req, res) => {
 
     res.json({ ok: true, jobId: r.jobId, jobName: r.jobName });
   } catch (err) {
+    console.error(`[DISPARAR] pipeline=${pipeline} erro=${err.message}`);
     res.status(500).json({ error: err.message });
   }
 });
