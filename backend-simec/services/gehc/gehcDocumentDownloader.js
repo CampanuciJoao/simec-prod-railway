@@ -148,6 +148,18 @@ async function realizarLoginNaPagina(page, login, password) {
     timeout: 60_000,
   }).catch(() => {});
   await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
+
+  // VERIFICACAO POS-LOGIN: se networkidle deu timeout silencioso, a sessao
+  // Salesforce pode nao ter sido estabelecida. Quando isso acontece, qualquer
+  // navegacao seguinte redireciona pra logon.gehealthcare.com/loginflow/...
+  // Detectamos aqui ANTES de retornar pra que o chamador possa fazer retry.
+  const urlPosLogin = page.url();
+  if (urlPosLogin.includes('logon.gehealthcare.com') || urlPosLogin.includes('loginflow')) {
+    throw new Error(
+      `login_redirect_loop: sessao Salesforce nao estabelecida apos login ` +
+      `(URL final: ${urlPosLogin.slice(0, 100)})`
+    );
+  }
 }
 
 /**
@@ -163,22 +175,40 @@ export async function abrirSessaoAutenticada(tenantId) {
     throw new Error('Credenciais GE nao configuradas para o tenant.');
   }
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const loginPage = await context.newPage();
+  // Retry curto: networkidle do Salesforce ocasionalmente nao estabelece a
+  // sessao no 1o login (concorrencia, latencia, SPA hidratando devagar). Um
+  // 2o tentativa com browser limpo costuma resolver. Mais que 2 nao adianta
+  // (problema seria de credencial/portal, nao transitorio).
+  const MAX_TENTATIVAS = 2;
+  let ultimaErro;
+  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+    const browser = await chromium.launch({ headless: true });
+    const context = await browser.newContext();
+    const loginPage = await context.newPage();
 
-  try {
-    await realizarLoginNaPagina(loginPage, login, password);
-  } catch (err) {
-    await browser.close();
-    throw err;
+    try {
+      await realizarLoginNaPagina(loginPage, login, password);
+      // NAO fechar a loginPage — ela mantem viva a sessao SFM no contexto.
+      // Algumas implementacoes do Salesforce requerem ao menos uma aba ativa
+      // para renovar tokens silenciosamente. Reusamos no callsite quando
+      // possivel, e fechamos so apos terminar tudo.
+      if (tentativa > 1) {
+        console.log(`[GEHC_AUTH] Sessao estabelecida na ${tentativa}a tentativa.`);
+      }
+      return { browser, context, loginPage };
+    } catch (err) {
+      ultimaErro = err;
+      await browser.close().catch(() => {});
+      console.log(
+        `[GEHC_AUTH] Tentativa ${tentativa}/${MAX_TENTATIVAS} falhou: ${err.message}`
+      );
+      // Backoff curto antes da proxima tentativa
+      if (tentativa < MAX_TENTATIVAS) {
+        await sleep(5_000);
+      }
+    }
   }
-
-  // NAO fechar a loginPage — ela mantem viva a sessao SFM no contexto.
-  // Algumas implementacoes do Salesforce requerem ao menos uma aba ativa
-  // para renovar tokens silenciosamente. Reusamos no callsite quando
-  // possivel, e fechamos so apos terminar tudo.
-  return { browser, context, loginPage };
+  throw ultimaErro;
 }
 
 // ─── Download de um documento específico ─────────────────────────────────────
