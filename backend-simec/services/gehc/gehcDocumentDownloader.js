@@ -534,44 +534,46 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
         duracaoMs: fim.duracaoMs,
       };
     }
-    // Baixa via documentUrl (Salesforce REST). Header Authorization Bearer
-    // com accessToken capturado pelo gehcAuthService — necessario porque
-    // o documentUrl aponta para outro dominio (gehealthcare-svc.my.salesforce.com)
-    // e cookies do dominio principal nao atravessam.
-    const reqHeaders = {};
-    if (tokens?.accessToken) {
-      reqHeaders.Authorization = `Bearer ${tokens.accessToken}`;
-    }
-    let pdfResp;
+    // Baixa via documentUrl (Salesforce REST). O Salesforce tem auth
+    // proprio (Session ID em cookie do dominio gehealthcare-svc.my.salesforce.com).
+    // context.request.get nao tem esses cookies se a sessao foi feita
+    // no dominio principal. Solucao: fetch dentro do browser via
+    // page.evaluate — assim o Chrome envia cookies do Salesforce
+    // automaticamente (credentials: include).
+    //
+    // PDF retorna como ArrayBuffer; transfere via array de bytes (Playwright
+    // serializa retorno do evaluate via JSON, entao precisa converter).
+    let buffer;
     try {
-      pdfResp = await page.context().request.get(documentUrl, {
-        timeout: 60_000,
-        headers: reqHeaders,
-      });
+      const dataArray = await page.evaluate(async (url) => {
+        const r = await fetch(url, { credentials: 'include' });
+        if (!r.ok) {
+          throw new Error(`HTTP_${r.status}`);
+        }
+        const ab = await r.arrayBuffer();
+        return Array.from(new Uint8Array(ab));
+      }, documentUrl);
+      buffer = Buffer.from(dataArray);
     } catch (err) {
-      t.marcar('document_get_falhou', { erro: err.message?.slice(0, 100) });
+      const msg = err.message || '';
+      const httpMatch = msg.match(/HTTP_(\d+)/);
+      const status = httpMatch ? parseInt(httpMatch[1], 10) : null;
+      t.marcar('document_fetch_falhou', {
+        erro: msg.slice(0, 100),
+        status,
+      });
       const fim = t.finalizar();
       return {
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `Falha baixando documentUrl: ${err.message?.slice(0, 150)}`,
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
-    if (!pdfResp.ok()) {
-      t.marcar('document_get_status', { status: pdfResp.status() });
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `documentUrl retornou ${pdfResp.status()} ${pdfResp.statusText()}.`,
+        mensagem: status
+          ? `documentUrl retornou HTTP ${status} (fetch via browser).`
+          : `Falha no fetch do documentUrl: ${msg.slice(0, 150)}`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
     }
 
-    const buffer = await pdfResp.body();
     t.marcar('buffer_lido', { bytes: buffer.length });
 
     const fim = t.finalizar();
