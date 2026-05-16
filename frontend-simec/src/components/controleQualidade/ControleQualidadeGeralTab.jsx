@@ -300,6 +300,7 @@ function ControleQualidadeGeralTab() {
               <thead>
                 <tr style={{ color: 'var(--text-muted)' }} className="text-left text-xs uppercase">
                   <th className="px-3 py-2">Equipamento</th>
+                  <th className="px-3 py-2">Unidade</th>
                   <th className="px-3 py-2">Modalidade</th>
                   <th className="px-3 py-2">Tipo de teste</th>
                   <th className="px-3 py-2">Última execução</th>
@@ -331,6 +332,7 @@ function ControleQualidadeGeralTab() {
                           </div>
                         ) : null}
                       </td>
+                      <td className="px-3 py-2">{eq?.unidade?.nomeSistema || '—'}</td>
                       <td className="px-3 py-2">{t.tipoTeste?.modalidade || '—'}</td>
                       <td className="px-3 py-2">
                         <div className="font-medium">{categoria || t.tipoTeste?.codigo || '—'}</div>

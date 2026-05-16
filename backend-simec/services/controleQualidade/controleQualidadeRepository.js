@@ -65,7 +65,16 @@ export function atualizarTipo({ tenantId, tipoId, dados }) {
 
 const TESTE_INCLUDE = {
   tipoTeste: true,
-  equipamento: { select: { id: true, tag: true, apelido: true, modelo: true, tipo: true } },
+  equipamento: {
+    select: {
+      id: true,
+      tag: true,
+      apelido: true,
+      modelo: true,
+      tipo: true,
+      unidade: { select: { id: true, nomeSistema: true } },
+    },
+  },
   anexos: true,
   autorRegistro: { select: { id: true, nome: true } },
   deletadoPor: { select: { id: true, nome: true } },
