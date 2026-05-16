@@ -337,7 +337,9 @@ async function lerStreamComoBuffer(stream) {
 // direto via context.request.get. Funciona em headed/headless igual e e
 // independente do comportamento do browser pra PDF inline.
 const RE_GATEWAY_DOWNLOAD = /la-prd-shared-services-cdx-api-gateway/;
-const RE_S3_URL_GE = /https:\/\/[^"\s\\]+\.s3\.amazonaws\.com\/[^"\s\\]+/;
+// Aceita qualquer URL AWS — cobre bucket.s3.amazonaws.com, s3.region.amazonaws.com,
+// bucket.s3.region.amazonaws.com, e variantes regionais que apareçam.
+const RE_S3_URL_GE = /https:\/\/[a-zA-Z0-9.\-_]+\.amazonaws\.com\/[^"'\s\\<>]+/;
 
 function extrairS3UrlDoPayload(obj) {
   if (obj == null) return null;
@@ -489,6 +491,20 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
 
     if (!s3Url) {
       t.marcar('gateway_sem_s3_url', { candidatos: candidatos.length });
+
+      // Diagnostico: loga prefix dos responses pra entender estrutura do
+      // payload que o portal esta retornando. Mascara X-Amz-Signature
+      // antes de logar (URL S3 e' credencial temporaria).
+      for (let i = 0; i < candidatos.length; i++) {
+        try {
+          const txt = await candidatos[i].text();
+          const sample = (txt || '')
+            .replace(/X-Amz-Signature=[a-f0-9]+/gi, 'X-Amz-Signature=***')
+            .slice(0, 600);
+          console.log(`[GEHC_GATEWAY] body ${i+1}/${candidatos.length}: ${sample}`);
+        } catch {}
+      }
+
       const fim = t.finalizar();
       return {
         ok: false,
