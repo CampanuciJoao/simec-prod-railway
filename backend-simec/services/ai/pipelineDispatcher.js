@@ -42,9 +42,14 @@ function getQueue() {
 }
 
 /**
- * Conta jobs do pipeline em estados que indicam "ainda nao terminou":
- * waiting (na fila), active (rodando), delayed (agendado para retry).
- * Retorna { executando, waiting, active, delayed }.
+ * Conta jobs do pipeline que estao de fato ocupando o worker AGORA:
+ * waiting (proximo a sair) + active (rodando). NAO conta delayed —
+ * o BullMQ usa delayed para guardar a proxima execucao agendada do
+ * repeatable cron (ex.: gehc-capturar-pdfs sempre tem 1 instancia em
+ * delayed apontando para o proximo 04:00/16:00 UTC). Contar delayed
+ * fazia o "Rodar agora" devolver 409 permanentemente entre as
+ * janelas do cron.
+ * Retorna { executando, waiting, active, delayed: 0 }.
  */
 export async function statusDoJobDoPipeline(pipeline) {
   const jobName = PIPELINE_PARA_JOB[pipeline];
@@ -53,19 +58,17 @@ export async function statusDoJobDoPipeline(pipeline) {
   }
 
   const q = getQueue();
-  const [waiting, active, delayed] = await Promise.all([
+  const [waiting, active] = await Promise.all([
     q.getJobs(['waiting'], 0, 100),
     q.getJobs(['active'], 0, 100),
-    q.getJobs(['delayed'], 0, 100),
   ]);
   const w = waiting.filter((j) => j.name === jobName).length;
   const a = active.filter((j) => j.name === jobName).length;
-  const d = delayed.filter((j) => j.name === jobName).length;
   return {
-    executando: (w + a + d) > 0,
+    executando: (w + a) > 0,
     waiting: w,
     active: a,
-    delayed: d,
+    delayed: 0,
     jobName,
   };
 }

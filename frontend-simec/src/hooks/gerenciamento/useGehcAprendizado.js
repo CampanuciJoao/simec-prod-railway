@@ -46,6 +46,9 @@ export function useGehcAprendizado() {
   const [loading, setLoading]             = useState(true);
   const [error, setError]                 = useState(null);
   const [acaoPipeline, setAcaoPipeline]   = useState({}); // { [pipeline]: 'pausando'|'retomando'|'disparando' }
+  // Timestamp (ms) em que a acao em curso comecou. Usado pelo botao para
+  // exibir contador "Executando · 1m23s" enquanto o spinner roda.
+  const [acaoIniciadaEm, setAcaoIniciadaEm] = useState({}); // { [pipeline]: number }
   // Feedback inline pos-acao: { [pipeline]: { tipo: 'success'|'error', mensagem, expira } }
   // Auto-clear via setTimeout. Componente renderiza abaixo do nome do pipeline.
   const [feedbackPipeline, setFeedbackPipeline] = useState({});
@@ -189,6 +192,11 @@ export function useGehcAprendizado() {
       delete novo[pipeline];
       return novo;
     });
+    setAcaoIniciadaEm((s) => {
+      const novo = { ...s };
+      delete novo[pipeline];
+      return novo;
+    });
   }, []);
 
   // Polling do estado do job ate ele terminar (executando=false) ou ate
@@ -220,6 +228,7 @@ export function useGehcAprendizado() {
 
   const disparar = useCallback(async (pipeline) => {
     setAcaoPipeline((s) => ({ ...s, [pipeline]: 'disparando' }));
+    setAcaoIniciadaEm((s) => ({ ...s, [pipeline]: Date.now() }));
     let enqueueOk = false;
     try {
       const r = await postDispararPipeline(pipeline);
@@ -316,6 +325,7 @@ export function useGehcAprendizado() {
     status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
     acaoPipeline,
+    acaoIniciadaEm,
     feedbackPipeline,
     pausar, retomar, disparar,
     darFeedbackInsight, resolverInsight, descartarInsight,

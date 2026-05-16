@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBrain,
@@ -8,6 +8,7 @@ import {
   faCircleExclamation,
   faFilePdf,
   faSpinner,
+  faCircleNotch,
   faTriangleExclamation,
   faClockRotateLeft,
   faChartPie,
@@ -153,7 +154,41 @@ function StatusGeral({ status, pipelines }) {
   );
 }
 
-function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, onRetomar, onDisparar }) {
+// Formata duracao em ms para "Xs" / "Xm Ys" (compacto, sem zeros a esquerda).
+function formatarDecorrido(ms) {
+  if (!ms || ms < 0) return '0s';
+  const s = Math.floor(ms / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return r === 0 ? `${m}m` : `${m}m ${r}s`;
+}
+
+// Re-renderiza a cada segundo enquanto houver pelo menos uma acao em curso.
+// Sem isso o contador "Executando · 1m23s" ficaria parado ate o front
+// receber um refresh externo. Para quando nada mais esta rodando.
+function useTickEnquantoAtivo(ativo, intervaloMs = 1000) {
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (!ativo) return undefined;
+    const id = setInterval(() => forceTick((n) => n + 1), intervaloMs);
+    return () => clearInterval(id);
+  }, [ativo, intervaloMs]);
+}
+
+function ListaPipelines({
+  pipelines,
+  acaoPipeline,
+  acaoIniciadaEm,
+  feedbackPipeline,
+  onPausar,
+  onRetomar,
+  onDisparar,
+}) {
+  // Mantem o contador vivo enquanto qualquer pipeline esta disparando.
+  const algumDisparando = Object.values(acaoPipeline || {}).some((a) => a === 'disparando');
+  useTickEnquantoAtivo(algumDisparando);
+
   if (!pipelines?.length) return null;
 
   return (
@@ -217,24 +252,42 @@ function ListaPipelines({ pipelines, acaoPipeline, feedbackPipeline, onPausar, o
               {/* Botoes: full-width em mobile (ficam mais legiveis e nao cortam),
                   inline em sm+ */}
               <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center">
-                {podeDisparar && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => onDisparar(p.pipeline)}
-                    disabled={!!acao}
-                    title="Forçar execução agora (sem esperar o cron)"
-                    className="w-full justify-center sm:w-auto"
-                  >
-                    <FontAwesomeIcon
-                      icon={acao === 'disparando' ? faSpinner : faBolt}
-                      spin={acao === 'disparando'}
-                    />
-                    <span className="ml-1 text-xs">
-                      {acao === 'disparando' ? 'Executando…' : 'Rodar agora'}
-                    </span>
-                  </Button>
-                )}
+                {podeDisparar && (() => {
+                  const disparando = acao === 'disparando';
+                  const inicio = acaoIniciadaEm?.[p.pipeline];
+                  const decorridoMs = disparando && inicio ? Date.now() - inicio : 0;
+                  return (
+                    <Button
+                      type="button"
+                      variant={disparando ? 'primary' : 'ghost'}
+                      onClick={() => onDisparar(p.pipeline)}
+                      disabled={!!acao}
+                      title={
+                        disparando
+                          ? 'Job em execução — aguarde concluir'
+                          : 'Forçar execução agora (sem esperar o cron)'
+                      }
+                      className={`w-full justify-center sm:w-auto ${
+                        disparando ? 'animate-pulse ring-2 ring-offset-1' : ''
+                      }`}
+                      style={
+                        disparando
+                          ? { '--tw-ring-color': 'var(--brand-primary)' }
+                          : undefined
+                      }
+                    >
+                      <FontAwesomeIcon
+                        icon={disparando ? faCircleNotch : faBolt}
+                        spin={disparando}
+                      />
+                      <span className="ml-1.5 text-xs tabular-nums">
+                        {disparando
+                          ? `Executando · ${formatarDecorrido(decorridoMs)}`
+                          : 'Rodar agora'}
+                      </span>
+                    </Button>
+                  );
+                })()}
                 {podePausar ? (
                   <Button
                     type="button"
@@ -706,7 +759,7 @@ function GehcAprendizadoTab() {
   const {
     status, pipelines, equipamentos, atividade, causas, insights,
     loading, error,
-    acaoPipeline, feedbackPipeline,
+    acaoPipeline, acaoIniciadaEm, feedbackPipeline,
     pausar, retomar, disparar,
     darFeedbackInsight, resolverInsight, descartarInsight,
     limparTodosInsights, descartarTodosInsights,
@@ -846,6 +899,7 @@ function GehcAprendizadoTab() {
         <ListaPipelines
           pipelines={pipelines}
           acaoPipeline={acaoPipeline}
+          acaoIniciadaEm={acaoIniciadaEm}
           feedbackPipeline={feedbackPipeline}
           onPausar={(pipeline, label) => setDialogo({ pipeline, label })}
           onRetomar={(pipeline) => retomar(pipeline)}
