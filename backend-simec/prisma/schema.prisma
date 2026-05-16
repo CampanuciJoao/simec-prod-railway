@@ -926,6 +926,12 @@ model GehcPdfExtraido {
 
   // Camada 2: LLM
   rootCauseCategory String?  @map("root_cause_category")
+  // Categoria da intervencao aplicada (whitelist do Knowledge Agent V1 —
+  // troca_peca | recalibracao | limpeza_manutencao | firmware | reset_reboot
+  // | cabo_conexao | reposicao_consumivel | escalacao_fabricante
+  // | substituicao_total | treinamento_operador | sem_acao | desconhecido).
+  // Insumo direto da camada cross-tenant (ADR-018).
+  solucaoAplicada   String?  @map("solucao_aplicada")
   llmConfianca      Float?   @map("llm_confianca")
   llmRaciocinio     String?  @db.Text @map("llm_raciocinio")
   measurementsJson  Json?    @map("measurements_json")
@@ -949,6 +955,7 @@ model GehcPdfExtraido {
   pdfDocumento GehcPdfDocumento @relation(fields: [pdfDocumentoId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, rootCauseCategory])
+  @@index([tenantId, solucaoAplicada])
   @@index([tenantId, extraidoEm])
   @@index([extractorVersion, extraidoEm])
   @@map("gehc_pdf_extraidos")
