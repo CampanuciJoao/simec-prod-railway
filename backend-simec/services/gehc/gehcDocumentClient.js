@@ -285,7 +285,15 @@ export async function dispararDownload({ doc, accessToken, idToken }) {
       throw new Error(`dispararDownload HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
 
-    const json = await res.json().catch(() => ({}));
+    // Captura body COMPLETO (não json.parse direto) pra poder extrair
+    // URL S3 ou outro indicio do mecanismo de download. Mapeamento do
+    // portal real em 2026-05-16 mostrou que a URL S3 aparece ~6.8s
+    // apos o 202 — possivelmente no body desta resposta (truncado em
+    // capturas anteriores) ou em outro mecanismo.
+    const rawText = await res.text().catch(() => '');
+    let json;
+    try { json = JSON.parse(rawText); } catch { json = {}; }
+
     if (json.errors?.length) {
       const msg = json.errors[0]?.message || 'erro desconhecido';
       if (/timeout/i.test(msg)) {
@@ -295,11 +303,18 @@ export async function dispararDownload({ doc, accessToken, idToken }) {
       throw new Error(`dispararDownload GraphQL: ${msg}`);
     }
 
+    // Procura URL S3 pre-assinada no corpo da resposta (hipotese A).
+    // Regex permissiva — qualquer URL amazonaws.com com X-Amz-Signature.
+    const matchS3 = rawText.match(/https:\/\/[^"\s\\<>]+\.amazonaws\.com\/[^"\s\\<>]+X-Amz-Signature=[a-fA-F0-9]+/);
+    const s3Url = matchS3 ? matchS3[0] : null;
+
     const data = json?.data?.documentDownload;
     return {
-      ok:      data?.status === 202 || data?.status === 200,
-      status:  data?.status,
-      message: data?.message,
+      ok:       data?.status === 202 || data?.status === 200,
+      status:   data?.status,
+      message:  data?.message,
+      s3Url,
+      rawBody:  rawText.slice(0, 5000),  // pra inspecao no caller
     };
   }
 

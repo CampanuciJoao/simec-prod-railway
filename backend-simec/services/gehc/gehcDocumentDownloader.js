@@ -276,34 +276,57 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   }
   t.marcar('headers_montados', { source: doc.documentSource });
 
-  // CRITICO (descoberto em 2026-05-16): pra source 101 (Salesforce) o
-  // user nao tem sessao SF nativa — gehealthcare-svc.my.salesforce.com
-  // redireciona pra IdP SAML (efs.sso.gehealthcare.com) quando acessado
-  // direto. O downloadDocument mutation no gateway faz o HANDOFF backend:
-  // libera o documentUrl pra ser servido sem auth direto. Sem chamar
-  // dispararDownload antes, qualquer GET no documentUrl retorna 401.
-  // Para source 102 (API GE direta) tambem chamamos por seguranca — pode
-  // nao ser necessario mas tambem nao prejudica (gateway aceita ambos).
+  // CRITICO (mapeamento ao vivo 2026-05-16): o portal real apos receber
+  // 202 do downloadDocument AGUARDA ~6.8s e entao tem a URL S3 pre-assinada
+  // no <a download>. Hipotese A (mais provavel pelo diagnostico do user):
+  // a URL S3 esta no body da resposta do downloadDocument — chamadas
+  // anteriores nao olhavam o body completo, so json.data.documentDownload.
+  //
+  // Estrategia em camadas:
+  //   1. Chama dispararDownload (que agora extrai URL S3 do body se houver)
+  //   2. Se vier s3Url -> baixa direto do S3 (sem auth, signature na query)
+  //   3. Senao -> loga rawBody pra inspecao e cai no caminho antigo (que
+  //      provavelmente vai 401 pra source 101).
+  let s3UrlPreAssinada = null;
   try {
     const disparo = await dispararDownload({
       doc,
       accessToken: tokens.accessToken,
       idToken:     tokens.idToken,
     });
-    t.marcar('download_disparado', { status: disparo.status });
-    // Backend leva alguns segundos pra preparar a URL — espera leve.
-    await new Promise((r) => setTimeout(r, 1_500));
+    t.marcar('download_disparado', { status: disparo.status, hasS3Url: !!disparo.s3Url });
+    if (disparo.s3Url) {
+      s3UrlPreAssinada = disparo.s3Url;
+      console.log(
+        `[GEHC_DOWNLOAD] ${doc.documentId}: URL S3 encontrada no response da Call 2.`
+      );
+    } else {
+      // Loga rawBody pra inspecao — vamos ver se a URL esta em outra
+      // estrutura, ou se realmente nao esta na resposta.
+      console.log(
+        `[GEHC_DOWNLOAD] ${doc.documentId}: dispararDownload body (sem URL S3 detectada): ${disparo.rawBody?.slice(0, 1500)}`
+      );
+    }
+    // O frontend real aguarda ~6.8s. Se URL S3 ja veio, podemos pular o wait.
+    if (!s3UrlPreAssinada) {
+      await new Promise((r) => setTimeout(r, 1_500));
+    }
   } catch (err) {
-    // Falha do disparo nao impede a tentativa de GET — pode ser que a
-    // mutation nao seja obrigatoria pra alguns sources. Loga e segue.
     t.marcar('download_disparo_falhou', { erro: err.message?.slice(0, 100) });
     console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: dispararDownload falhou: ${err.message?.slice(0, 120)}`);
   }
 
+  // Se temos a URL S3 pre-assinada, usa ela (signature na query string —
+  // sem cookies, sem auth). Senao usa documentUrl original (Salesforce).
+  const urlParaBaixar = s3UrlPreAssinada || doc.documentUrl;
+  const headersFinal = s3UrlPreAssinada
+    ? { 'accept': 'application/pdf, */*' }   // S3 pre-signed nao precisa de auth
+    : headers;
+
   let resp;
   try {
-    resp = await context.request.get(doc.documentUrl, {
-      headers,
+    resp = await context.request.get(urlParaBaixar, {
+      headers: headersFinal,
       timeout: HTTP_TIMEOUT_MS,
     });
   } catch (err) {
