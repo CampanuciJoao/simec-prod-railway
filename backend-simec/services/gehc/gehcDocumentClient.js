@@ -207,4 +207,103 @@ export async function listarDocumentosDaOS({
   throw ultimoErro || new Error('documentSearch falhou apos retries');
 }
 
+// Query GraphQL pra disparar o downloadDocument no gateway. Captura ao vivo
+// em 2026-05-16 mostrou que essa mutation retorna sempre 202 Accepted
+// ("Request has been accepted for processing") — NAO retorna URL nem
+// binario, mas e' OBRIGATORIA pro backend liberar o documentUrl pra ser
+// servido. Sem essa chamada, GET no documentUrl Salesforce retorna 401
+// (o user nao tem sessao SF nativa — backend faz o handoff via downloadDocument).
+const QUERY_DOWNLOAD_DOCUMENT = `
+  query downloadDocument($queryContext: DocumentDownloadQuery!) {
+    documentDownload(queryContext: $queryContext) {
+      status
+      message
+      __typename
+    }
+  }
+`;
+
+/**
+ * Dispara a mutation downloadDocument no gateway pra preparar o backend
+ * a servir o documentUrl. Retorna { ok, status, message } — em caso de
+ * sucesso (status=202), o documentUrl fica liberado por alguns segundos.
+ *
+ * @param {object} args
+ * @param {object} args.doc - documento retornado por listarDocumentosDaOS,
+ *                            com {documentId, fileName, documentType,
+ *                            documentSource, documentUrl, source}
+ * @param {string} args.accessToken
+ * @param {string} args.idToken
+ */
+export async function dispararDownload({ doc, accessToken, idToken }) {
+  if (!doc?.documentUrl || !accessToken || !idToken) {
+    throw new Error('dispararDownload: doc com documentUrl + tokens obrigatorios');
+  }
+
+  const payload = {
+    operationName: 'downloadDocument',
+    query:         QUERY_DOWNLOAD_DOCUMENT,
+    variables: {
+      queryContext: {
+        documents: [
+          {
+            documentId:     doc.documentId,
+            documentName:   doc.fileName,
+            documentSource: doc.documentSource,
+            documentType:   doc.documentType,
+            documentUrl:    doc.documentUrl,
+            source:         doc.source || 'SERVICEMAX',
+          },
+        ],
+      },
+    },
+  };
+
+  let ultimoErro;
+  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
+    if (tentativa > 1) {
+      await sleep(RETRY_BACKOFF_MS[tentativa - 1]);
+    }
+
+    let res;
+    try {
+      res = await tentarFetch(payload, accessToken, idToken);
+    } catch (err) {
+      ultimoErro = new Error(`dispararDownload inacessivel: ${err.message}`);
+      continue;
+    }
+
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(`dispararDownload HTTP ${res.status} (auth): ${body.slice(0, 200)}`);
+      }
+      if (res.status >= 500 || res.status === 429) {
+        ultimoErro = new Error(`dispararDownload HTTP ${res.status}: ${body.slice(0, 200)}`);
+        continue;
+      }
+      throw new Error(`dispararDownload HTTP ${res.status}: ${body.slice(0, 200)}`);
+    }
+
+    const json = await res.json().catch(() => ({}));
+    if (json.errors?.length) {
+      const msg = json.errors[0]?.message || 'erro desconhecido';
+      if (/timeout/i.test(msg)) {
+        ultimoErro = new Error(`dispararDownload GraphQL: ${msg}`);
+        continue;
+      }
+      throw new Error(`dispararDownload GraphQL: ${msg}`);
+    }
+
+    const data = json?.data?.documentDownload;
+    return {
+      ok:      data?.status === 202 || data?.status === 200,
+      status:  data?.status,
+      message: data?.message,
+    };
+  }
+
+  throw ultimoErro || new Error('dispararDownload falhou apos retries');
+}
+
 export const DOCUMENT_TYPES_PADRAO_EXPORT = DOCUMENT_TYPES_PADRAO;
