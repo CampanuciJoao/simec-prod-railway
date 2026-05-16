@@ -105,6 +105,7 @@ async function produzirEventosPdfGE({ tenantId }) {
           equipmentStatus:  ex.equipmentStatus,
           engineerFullName: ex.engineerFullName,
           totalMinutes:     ex.totalMinutes,
+          solucaoAplicada:  ex.solucaoAplicada,
           measurements:     ex.measurementsJson,
           partsReplaced:    ex.partsReplacedJson,
           actionsTakenSummary: trunc(ex.actionsTaken, 500),

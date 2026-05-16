@@ -16,7 +16,10 @@ import { generateJsonWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
 import { logLlmUsage } from '../ai/llmUsageLogger.js';
 import { AI_CONFIG } from '../ai/config.js';
 
-const LLM_EXTRACTOR_VERSION = 1;
+// Bumpamos para 2 ao adicionar solucaoAplicada — o orquestrador reprocessa
+// automaticamente extracoes com extractorVersion menor (ver
+// gehcPdfExtractionOrchestrator.js). Backlog antigo ganha o campo novo.
+const LLM_EXTRACTOR_VERSION = 2;
 
 const TAXONOMIA_CAUSAS = [
   'infra_chiller_cliente',  // chiller predial do hospital (problema do cliente, nao do magneto)
@@ -32,6 +35,23 @@ const TAXONOMIA_CAUSAS = [
   'desconhecido',            // LLM nao conseguiu categorizar com confianca
 ];
 
+// Catalogo de solucoes aplicadas — base de aprendizado cross-tenant.
+// Conjunto fechado, evolui via versionamento. Whitelist do ADR-018.
+const TAXONOMIA_SOLUCOES = [
+  'troca_peca',              // troca/substituicao de peca (peca especifica em partsReplaced)
+  'recalibracao',            // recalibracao, shimming, ajuste de parametros
+  'limpeza_manutencao',      // limpeza, manutencao mecanica, lubrificacao
+  'firmware',                // atualizacao de firmware/software, patch
+  'reset_reboot',            // reset, reinicializacao, power cycle
+  'cabo_conexao',            // reparo de cabo, conector, solda
+  'reposicao_consumivel',    // reabastecimento (helio, oleo, contraste, agua)
+  'escalacao_fabricante',    // acionamento do fabricante / contrato GE
+  'substituicao_total',      // substituicao integral do subsistema/equipamento
+  'treinamento_operador',    // nao era falha de equipamento — orientacao
+  'sem_acao',                // observacao apenas, sem intervencao
+  'desconhecido',            // LLM nao conseguiu classificar a solucao
+];
+
 function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed }) {
   return `Voce e um especialista em manutencao de equipamentos de Ressonancia Magnetica GE Healthcare.
 Analise o relato de uma OS abaixo e responda APENAS com um JSON valido na estrutura especificada.
@@ -45,8 +65,9 @@ Texto da OS:
 Responda apenas com este JSON, sem markdown, sem comentarios:
 {
   "rootCauseCategory": "uma das: ${TAXONOMIA_CAUSAS.join(' | ')}",
+  "solucaoAplicada": "uma das: ${TAXONOMIA_SOLUCOES.join(' | ')}",
   "confianca": 0.0,
-  "raciocinio": "uma frase curta explicando a categorizacao",
+  "raciocinio": "uma frase curta explicando a categorizacao e a solucao",
   "measurements": {
     "heliumPct":     null,
     "heliumPressurePsi": null,
@@ -59,9 +80,10 @@ Responda apenas com este JSON, sem markdown, sem comentarios:
 
 Regras:
 - rootCauseCategory: escolha SEMPRE um da lista. Use 'desconhecido' se confianca < 0.5.
+- solucaoAplicada: classifique a INTERVENCAO descrita em actionsTaken. Use 'desconhecido' se nao houver indicacao clara, 'sem_acao' se foi so observacao/inspecao sem intervencao.
 - confianca: 0 a 1, baseada em quao explicito esta o sintoma no texto.
 - measurements: extraia APENAS valores numericos explicitos no texto. Use null para os nao mencionados. "outras" = chave-valor para metricas adicionais que aparecerem (ex: "fluxo_gpm", "tensao_v").
-- partsReplaced: liste pecas trocadas ou aplicadas, em portugues (ex: ["bateria MRU", "bobina cabeca"]). Vazio se nada foi trocado.
+- partsReplaced: liste pecas trocadas ou aplicadas, em portugues (ex: ["bateria MRU", "bobina cabeca"]). Vazio se nada foi trocado. ATENCAO: NUNCA inclua numero de serie, modelo proprietario unico nem nome de pessoas — apenas categoria generica da peca.
 
 Heuristicas para a categoria:
 - "chiller" ou "chiller externo" ou "chiller predial" + cliente: infra_chiller_cliente
@@ -71,7 +93,19 @@ Heuristicas para a categoria:
 - "bobina" (cabeca, corpo, joelho): bobina
 - "gradiente", "GP/AGI", "amplificador de gradiente": gradiente
 - "rede", "DICOM", "fluxo de imagens": rede_dados
-- "software", "host", "MRU", "OS GE", "boot": software`;
+- "software", "host", "MRU", "OS GE", "boot": software
+
+Heuristicas para a solucao:
+- "trocada", "substituida", "replaced" + peca: troca_peca
+- "ajustado", "calibrado", "shimming", "tuning": recalibracao
+- "limpeza", "manutencao preventiva", "lubrificacao": limpeza_manutencao
+- "firmware", "patch", "atualizacao de software": firmware
+- "reset", "reboot", "power cycle", "reiniciado": reset_reboot
+- "cabo", "conector reparado", "solda": cabo_conexao
+- "recarga de helio", "reposicao", "abastecimento": reposicao_consumivel
+- "acionado fabricante", "ticket GE", "escalado": escalacao_fabricante
+- "operador orientado", "treinamento", "uso indevido": treinamento_operador
+- so inspecao/observacao/nao houve falha: sem_acao`;
 }
 
 export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
@@ -96,6 +130,12 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
     resultado.rootCauseCategory = 'desconhecido';
   }
 
+  // Valida solucao aplicada
+  const sol = resultado?.solucaoAplicada;
+  if (!sol || !TAXONOMIA_SOLUCOES.includes(sol)) {
+    resultado.solucaoAplicada = 'desconhecido';
+  }
+
   // Telemetria de uso (nao bloqueia)
   await logLlmUsage({
     tenantId,
@@ -112,6 +152,7 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
     extractorVersion: LLM_EXTRACTOR_VERSION,
     dados: {
       rootCauseCategory: resultado.rootCauseCategory,
+      solucaoAplicada:   resultado.solucaoAplicada,
       confianca:         resultado.confianca ?? null,
       raciocinio:        resultado.raciocinio ?? null,
       measurements:      resultado.measurements || {},
@@ -122,3 +163,4 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
 
 export const LLM_EXTRACTOR_VERSION_EXPORT = LLM_EXTRACTOR_VERSION;
 export const TAXONOMIA_CAUSAS_EXPORT = TAXONOMIA_CAUSAS;
+export const TAXONOMIA_SOLUCOES_EXPORT = TAXONOMIA_SOLUCOES;
