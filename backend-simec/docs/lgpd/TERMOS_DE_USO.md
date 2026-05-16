@@ -1,12 +1,12 @@
 ---
-versao: 1.0.0
-vigenteDesde: 2026-05-14
+versao: 1.1.0
+vigenteDesde: 2026-05-16
 documento: termos_uso
 ---
 
 # Termos de Uso do SIMEC
 
-**Versão 1.0.0 — vigente desde 14 de maio de 2026.**
+**Versão 1.1.0 — vigente desde 16 de maio de 2026.**
 
 Os presentes Termos de Uso ("Termos") regulam o acesso e uso do **SIMEC**, software de gestão de manutenção de equipamentos médico-hospitalares operado pela **Cerdil** (`{{RAZAO_SOCIAL}}`, CNPJ `{{CNPJ}}`).
 
@@ -57,7 +57,15 @@ Ao acessar o Sistema, o usuário concorda com estes Termos. Se não concordar, n
 
 5.2. O Conteúdo inserido pelo Cliente Contratante permanece de sua propriedade. A Cerdil recebe apenas licença não-exclusiva para processá-lo no escopo do contrato.
 
-5.3. Estatísticas agregadas e anonimizadas decorrentes do uso do Sistema podem ser utilizadas pela Cerdil para fins de melhoria do produto e benchmarking de mercado, sem identificar Cliente Contratante específico.
+5.3. **Estatísticas agregadas e anonimizadas** decorrentes do uso do Sistema podem ser utilizadas pela Cerdil para fins de melhoria do produto e benchmarking de mercado, sem identificar Cliente Contratante específico.
+
+5.4. **Conhecimento técnico agregado e despersonalizado** extraído da operação do Sistema — incluindo padrões de falha de equipamentos médicos por modalidade e subsistema físico, taxonomias de causa-raiz, correlações entre sintomas e soluções aplicadas — **não constitui Conteúdo do Cliente Contratante** e poderá ser utilizado pela Cerdil para:
+
+(i) treinamento e aprimoramento dos modelos de inteligência artificial integrados ao Sistema;
+(ii) geração de recomendações e insights para o conjunto de Clientes Contratantes da plataforma;
+(iii) estudos técnicos e benchmarking de mercado.
+
+Em nenhuma hipótese serão expostos ou utilizados, fora do tenant do Cliente Contratante, dados que permitam identificação direta ou indireta do Cliente, de seus equipamentos individuais (número de série, localização, contrato), de pessoas naturais (técnicos, solicitantes, operadores) ou de informações comerciais (valores, fornecedores). O processo de despersonalização é técnico, determinístico, auditável e parte integrante do pipeline de IA do Sistema, conforme detalhado na Política de Privacidade.
 
 ## 6. Disponibilidade e manutenção
 
