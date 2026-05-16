@@ -31,7 +31,7 @@ import { chromium } from 'playwright';
 import crypto from 'crypto';
 import prisma from '../prismaService.js';
 import { lerCredenciais } from './gehcAuthService.js';
-import { listarDocumentosDaOS } from './gehcDocumentClient.js';
+import { listarDocumentosDaOS, dispararDownload } from './gehcDocumentClient.js';
 import { obterTokensGehc } from './gehcAuthService.js';
 import { estaAtivo, PIPELINE_NAMES } from '../ai/aiPipelineState.js';
 import { extrairUmPdf } from './gehcPdfExtractionOrchestrator.js';
@@ -275,6 +275,30 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
     };
   }
   t.marcar('headers_montados', { source: doc.documentSource });
+
+  // CRITICO (descoberto em 2026-05-16): pra source 101 (Salesforce) o
+  // user nao tem sessao SF nativa — gehealthcare-svc.my.salesforce.com
+  // redireciona pra IdP SAML (efs.sso.gehealthcare.com) quando acessado
+  // direto. O downloadDocument mutation no gateway faz o HANDOFF backend:
+  // libera o documentUrl pra ser servido sem auth direto. Sem chamar
+  // dispararDownload antes, qualquer GET no documentUrl retorna 401.
+  // Para source 102 (API GE direta) tambem chamamos por seguranca — pode
+  // nao ser necessario mas tambem nao prejudica (gateway aceita ambos).
+  try {
+    const disparo = await dispararDownload({
+      doc,
+      accessToken: tokens.accessToken,
+      idToken:     tokens.idToken,
+    });
+    t.marcar('download_disparado', { status: disparo.status });
+    // Backend leva alguns segundos pra preparar a URL — espera leve.
+    await new Promise((r) => setTimeout(r, 1_500));
+  } catch (err) {
+    // Falha do disparo nao impede a tentativa de GET — pode ser que a
+    // mutation nao seja obrigatoria pra alguns sources. Loga e segue.
+    t.marcar('download_disparo_falhou', { erro: err.message?.slice(0, 100) });
+    console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: dispararDownload falhou: ${err.message?.slice(0, 120)}`);
+  }
 
   let resp;
   try {
