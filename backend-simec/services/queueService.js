@@ -263,12 +263,12 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-discovery-diario) agendado diariamente às 02:30 UTC.');
 
-    // Captura de PDFs de OS GE para alimentar a IA preditiva — diário às 04:00 UTC.
+    // Captura de PDFs de OS GE para alimentar a IA preditiva — a cada 3h.
     // Roda DEPOIS do gehc-sync-dados (02:00) para que as OSs novas já estejam
     // persistidas; baixa os PDFs delas via Playwright e armazena no R2.
     // Resumível: cada execução pega até 50 OSs sem PDF por tenant. Backfill
-    // histórico de uma base nova de equipamentos leva algumas noites para
-    // se completar.
+    // histórico de uma base nova de equipamentos completa em poucos dias
+    // com a cadencia de 8 ciclos/dia.
     const repeatables6 = await queue.getRepeatableJobs();
     for (const job of repeatables6) {
       if (job.name === 'gehc-capturar-pdfs') {
@@ -280,16 +280,16 @@ export async function iniciarJobsDeAlertas() {
       'gehc-capturar-pdfs',
       {},
       {
-        // 2x ao dia: 04:00 UTC (madrugada BRT) e 16:00 UTC (final tarde BRT).
-        // Backfill historico completa em metade do tempo, e OSs novas do dia
-        // sao baixadas no mesmo dia em vez de so no dia seguinte.
-        repeat: { cron: '0 4,16 * * *' },
+        // A cada 3h (00, 03, 06, 09, 12, 15, 18, 21 UTC). 8 ciclos/dia ×
+        // até 50 PDFs/ciclo = teto de 400 PDFs/dia. Backfill historico
+        // completa em ~1/4 do tempo do agendamento antigo (2x/dia).
+        repeat: { cron: '0 */3 * * *' },
         removeOnComplete: 10,
         removeOnFail: 10,
       }
     );
 
-    console.log('[QUEUE] Job GEHC (gehc-capturar-pdfs) agendado 2x/dia (04:00 e 16:00 UTC).');
+    console.log('[QUEUE] Job GEHC (gehc-capturar-pdfs) agendado a cada 3h (00, 03, 06, 09, 12, 15, 18, 21 UTC).');
 
     // Extracao de causa-raiz / medicoes a partir dos PDFs ja baixados.
     // Roda diariamente as 05:00 UTC, 1h depois da captura, para que os PDFs
