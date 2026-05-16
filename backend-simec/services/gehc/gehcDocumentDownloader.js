@@ -317,7 +317,6 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
     }
 
     // 2. Clica e tenta capturar download direto OU detectar popup
-    const popupAntes = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
     const promiseDownload = page.waitForEvent('download', { timeout: 5_000 }).catch(() => null);
     await downloadBtn.click().catch(() => {});
     t.marcar('botao_clicado');
@@ -339,10 +338,13 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
       };
     }
 
-    // 3. Espera popup
-    await page.waitForTimeout(1_500);
-    const popupDepois = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
-    const popupAbriu = popupDepois > popupAntes;
+    // 3. Espera popup com timeout maior (SPA pesada, varia 0.5-8s)
+    // POPUP_TIMEOUT_MS=30s e retorna assim que o popup aparece (nao espera 30s)
+    const popupLocator = page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).first();
+    const popupAbriu = await popupLocator
+      .waitFor({ state: 'visible', timeout: POPUP_TIMEOUT_MS })
+      .then(() => true)
+      .catch(() => false);
     t.marcar('popup_detectado', { ok: popupAbriu });
 
     if (!popupAbriu) {
