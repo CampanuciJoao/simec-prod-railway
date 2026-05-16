@@ -75,12 +75,15 @@ const CATEGORIAS_PERMANENTES = new Set([
   'BOTAO_NAO_ENCONTRADO',  // legado, nao usado mais; mantido p/ compat de logs
   'NAO_E_PDF',             // response veio mas nao e PDF (HTML de erro)
   'DOC_SEM_URL',           // gateway retornou doc sem documentUrl
+  'SALESFORCE_AUTH_FALHA', // 401 em source 101 — token CDX nao destrava Salesforce
+                           // direto. Pula o doc, NAO aborta tenant (outros docs
+                           // podem ser source 102 que funciona).
 ]);
 
 // Categorias que se beneficiam de re-login inline (nao adianta retry sem auth).
 const CATEGORIAS_REAUTH = new Set([
   'SESSAO_PERDIDA',
-  'AUTH_EXPIRADA',
+  'AUTH_EXPIRADA',         // 401 em source 102 (gateway/API GE) — token de fato expirou
 ]);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -218,9 +221,12 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
     };
   }
 
-  // Headers por source. Em '101' usamos Bearer (formato Salesforce session ID
-  // ja vem com prefixo "00D...!" no token); em '102' usamos os mesmos headers
-  // do gateway (que e um servico GE Healthcare).
+  // Headers por source:
+  //   '102' (API GE):    accesstoken + idtoken nos headers (mesmo do gateway)
+  //   '101' (Salesforce): Cookie sid=<accessToken>. Confirmado em prod 2026-05-16:
+  //                        Authorization Bearer retorna 401. Salesforce historicamente
+  //                        aceita o session ID no cookie sid no dominio my.salesforce.com.
+  //                        Bearer tambem incluido como fallback secundario.
   const headersBase = {
     'accept':       'application/pdf, */*',
     'User-Agent':   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -228,9 +234,10 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   };
   let headers;
   if (doc.documentSource === '101') {
-    // Salesforce REST aceita session id como Bearer token
+    // Salesforce — session id via Cookie + Bearer como fallback
     headers = {
       ...headersBase,
+      'Cookie':        `sid=${tokens.accessToken}`,
       'Authorization': `Bearer ${tokens.accessToken}`,
     };
   } else if (doc.documentSource === '102') {
@@ -241,9 +248,10 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
       'idtoken':     tokens.idToken,
     };
   } else {
-    // Source desconhecido — tenta ambos os formatos como fallback
+    // Source desconhecido — tenta todos os formatos
     headers = {
       ...headersBase,
+      'Cookie':        `sid=${tokens.accessToken}`,
       'Authorization': `Bearer ${tokens.accessToken}`,
       'accesstoken':   tokens.accessToken,
       'idtoken':       tokens.idToken,
@@ -273,10 +281,15 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
 
   if (status === 401 || status === 403) {
     const fim = t.finalizar();
+    // Distingue: 401 em source 101 e' problema localizado do Salesforce
+    // (nosso token CDX nao destrava Salesforce direto). 401 em 102 e' o
+    // token CDX expirado (gateway tambem rejeitaria) — aborta tenant.
+    const categoria = doc.documentSource === '101' ? 'SALESFORCE_AUTH_FALHA' : 'AUTH_EXPIRADA';
+    const origem = doc.documentSource === '101' ? 'Salesforce' : 'API GE';
     return {
       ok: false,
-      categoria: 'AUTH_EXPIRADA',
-      mensagem: `${doc.documentSource === '101' ? 'Salesforce' : 'API GE'} retornou HTTP ${status} (auth invalida).`,
+      categoria,
+      mensagem: `${origem} retornou HTTP ${status} (auth invalida).`,
       etapas: fim.etapas,
       duracaoMs: fim.duracaoMs,
     };
@@ -490,8 +503,17 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
       // tem 2 docs (Service Report Salesforce + PM Form API GE), e ambos
       // agregam valor distinto pra IA. Cap defensivo de 5 por OS para casos
       // anomalos sem ficar sem rate-limit por OS.
+      //
+      // Ordena source 102 (API GE) antes de 101 (Salesforce). 102 e' o caminho
+      // simples; 101 depende de cookies Salesforce. Se um doc 101 falhar com
+      // SALESFORCE_AUTH_FALHA, ele e' marcado como permanente mas seguimos
+      // para o proximo doc 102 (que provavelmente funciona).
       const MAX_DOCS_POR_OS = 5;
-      const docsParaBaixar = docsPendentes.slice(0, MAX_DOCS_POR_OS);
+      const docsOrdenados = [...docsPendentes].sort((a, b) => {
+        const prioridade = { '102': 0, '101': 1 };
+        return (prioridade[a.documentSource] ?? 2) - (prioridade[b.documentSource] ?? 2);
+      });
+      const docsParaBaixar = docsOrdenados.slice(0, MAX_DOCS_POR_OS);
       if (docsPendentes.length > MAX_DOCS_POR_OS) {
         console.log(
           `[GEHC_PDF] SR${trackingNumber}: ${docsPendentes.length} documentos disponiveis, baixando apenas os primeiros ${MAX_DOCS_POR_OS}.`
