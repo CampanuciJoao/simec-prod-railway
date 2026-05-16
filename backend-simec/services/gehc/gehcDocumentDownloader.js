@@ -534,33 +534,29 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
         duracaoMs: fim.duracaoMs,
       };
     }
-    // Baixa via documentUrl (Salesforce REST) dentro do browser pra herdar
-    // cookies da sessao Salesforce (Session ID). NAO usar window.fetch — o
-    // portal GE substitui o fetch global por wrapper proprio que retorna
-    // undefined em alguns casos (TypeError: Cannot read properties of
-    // undefined). XMLHttpRequest e' primitivo, dificil de ser interceptado.
+    // Baixa via documentUrl (Salesforce REST) simulando NAVEGACAO em vez de
+    // XHR/fetch. Salesforce nao tem CORS aberto para outros dominios — XHR
+    // cross-origin (de gehealthcare.com.br pra gehealthcare-svc.my.salesforce.com)
+    // bate em NETWORK_ERROR. Navegacao nao tem CORS — o browser segue links
+    // normalmente, incluindo cookies do dominio destino.
+    //
+    // Estrategia: nova page no mesmo BrowserContext (compartilha cookie jar),
+    // page.goto retorna o response do servidor. body() expoe os bytes brutos.
     let buffer;
+    let newPage = null;
     try {
-      const dataArray = await page.evaluate(async (url) => {
-        return new Promise((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('GET', url, true);
-          xhr.responseType = 'arraybuffer';
-          xhr.withCredentials = true;
-          xhr.timeout = 50_000;
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(Array.from(new Uint8Array(xhr.response)));
-            } else {
-              reject(new Error(`HTTP_${xhr.status}`));
-            }
-          };
-          xhr.onerror = () => reject(new Error('NETWORK_ERROR'));
-          xhr.ontimeout = () => reject(new Error('XHR_TIMEOUT'));
-          xhr.send();
-        });
-      }, documentUrl);
-      buffer = Buffer.from(dataArray);
+      newPage = await page.context().newPage();
+      const response = await newPage.goto(documentUrl, {
+        waitUntil: 'domcontentloaded',
+        timeout: 60_000,
+      });
+      if (!response) {
+        throw new Error('NO_RESPONSE');
+      }
+      if (!response.ok()) {
+        throw new Error(`HTTP_${response.status()}`);
+      }
+      buffer = await response.body();
     } catch (err) {
       const msg = err.message || '';
       const httpMatch = msg.match(/HTTP_(\d+)/);
@@ -574,11 +570,15 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
         mensagem: status
-          ? `documentUrl retornou HTTP ${status} (fetch via browser).`
-          : `Falha no fetch do documentUrl: ${msg.slice(0, 150)}`,
+          ? `documentUrl retornou HTTP ${status} (navegacao via newPage).`
+          : `Falha na navegacao para documentUrl: ${msg.slice(0, 150)}`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
+    } finally {
+      if (newPage) {
+        await newPage.close().catch(() => {});
+      }
     }
 
     t.marcar('buffer_lido', { bytes: buffer.length });
