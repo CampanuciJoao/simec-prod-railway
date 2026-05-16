@@ -205,11 +205,12 @@ const alertasWorker = new Worker(
     }
 
     if (job?.name === 'gehc-capturar-pdfs') {
-      // Captura noturna de PDFs de OS GE para alimentar a IA preditiva.
+      // Captura de PDFs de OS GE para alimentar a IA preditiva.
       // O downloader internamente respeita o estado de pausa do pipeline
       // (PIPELINE_NAMES.GEHC_CAPTURA_PDF) — se desativado, devolve cedo.
-      // limite 50 + maxPorEquipamento 5 = backfill horizontal (cobre mais
-      // equipamentos por execucao em vez de concentrar em poucos).
+      // limite 50 + maxPorEquipamento 10 = teto generoso por eq para
+      // aproveitar quando poucos eqs concentram muitas OSs pendentes,
+      // sem sair do envelope de tempo do ciclo (~10-15min).
       return comTelemetria(job, PIPELINE_NAMES.GEHC_CAPTURA_PDF, async () => {
         try {
           // Janela de 365d (1 ano) — cobre manutencoes antigas relevantes
@@ -218,11 +219,11 @@ const alertasWorker = new Worker(
           // (orderBy requestedAt desc dentro do equipamento). Conforme as
           // recentes vao sendo marcadas como baixadas, os ciclos seguintes
           // descem naturalmente para as mais antigas. Cobertura plena dos
-          // 365d acontece em alguns ciclos do cron 2x/dia.
+          // 365d acontece em alguns dias com o cron a cada 3h.
           const r = await executarBackfillTodosTenants({
             diasAtras: 365,
             limite: 50,
-            maxPorEquipamento: 5,
+            maxPorEquipamento: 10,
           });
           return { ok: true, ...r };
         } catch (err) {
