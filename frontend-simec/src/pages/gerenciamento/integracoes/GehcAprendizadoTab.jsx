@@ -291,13 +291,18 @@ function ListaPipelines({
                 {podePausar ? (
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant={acao === 'disparando' ? 'danger' : 'secondary'}
                     onClick={() => onPausar(p.pipeline, p.label)}
-                    disabled={!!acao}
+                    disabled={acao === 'pausando'}
+                    title={
+                      acao === 'disparando'
+                        ? 'Pausa imediata — interrompe a execução em curso no próximo equipamento'
+                        : 'Pausar este pipeline'
+                    }
                     className="w-full justify-center sm:w-auto"
                   >
                     <FontAwesomeIcon icon={acao === 'pausando' ? faSpinner : faCirclePause} spin={acao === 'pausando'} />
-                    Pausar
+                    {acao === 'disparando' ? 'Parar agora' : 'Pausar'}
                   </Button>
                 ) : (
                   <Button
