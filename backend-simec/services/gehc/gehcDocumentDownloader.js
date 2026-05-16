@@ -534,24 +534,31 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
         duracaoMs: fim.duracaoMs,
       };
     }
-    // Baixa via documentUrl (Salesforce REST). O Salesforce tem auth
-    // proprio (Session ID em cookie do dominio gehealthcare-svc.my.salesforce.com).
-    // context.request.get nao tem esses cookies se a sessao foi feita
-    // no dominio principal. Solucao: fetch dentro do browser via
-    // page.evaluate — assim o Chrome envia cookies do Salesforce
-    // automaticamente (credentials: include).
-    //
-    // PDF retorna como ArrayBuffer; transfere via array de bytes (Playwright
-    // serializa retorno do evaluate via JSON, entao precisa converter).
+    // Baixa via documentUrl (Salesforce REST) dentro do browser pra herdar
+    // cookies da sessao Salesforce (Session ID). NAO usar window.fetch — o
+    // portal GE substitui o fetch global por wrapper proprio que retorna
+    // undefined em alguns casos (TypeError: Cannot read properties of
+    // undefined). XMLHttpRequest e' primitivo, dificil de ser interceptado.
     let buffer;
     try {
       const dataArray = await page.evaluate(async (url) => {
-        const r = await fetch(url, { credentials: 'include' });
-        if (!r.ok) {
-          throw new Error(`HTTP_${r.status}`);
-        }
-        const ab = await r.arrayBuffer();
-        return Array.from(new Uint8Array(ab));
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('GET', url, true);
+          xhr.responseType = 'arraybuffer';
+          xhr.withCredentials = true;
+          xhr.timeout = 50_000;
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(Array.from(new Uint8Array(xhr.response)));
+            } else {
+              reject(new Error(`HTTP_${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error('NETWORK_ERROR'));
+          xhr.ontimeout = () => reject(new Error('XHR_TIMEOUT'));
+          xhr.send();
+        });
       }, documentUrl);
       buffer = Buffer.from(dataArray);
     } catch (err) {
