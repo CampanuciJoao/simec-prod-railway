@@ -337,22 +337,40 @@ async function lerStreamComoBuffer(stream) {
 // direto via context.request.get. Funciona em headed/headless igual e e
 // independente do comportamento do browser pra PDF inline.
 const RE_GATEWAY_DOWNLOAD = /la-prd-shared-services-cdx-api-gateway/;
-// Aceita qualquer URL AWS — cobre bucket.s3.amazonaws.com, s3.region.amazonaws.com,
-// bucket.s3.region.amazonaws.com, e variantes regionais que apareçam.
-const RE_S3_URL_GE = /https:\/\/[a-zA-Z0-9.\-_]+\.amazonaws\.com\/[^"'\s\\<>]+/;
 
-function extrairS3UrlDoPayload(obj) {
-  if (obj == null) return null;
-  if (typeof obj === 'string') {
-    const m = obj.match(RE_S3_URL_GE);
-    return m ? m[0] : null;
+// Operacao GraphQL que retorna a lista de documentos com URLs. Confirmado
+// via captura ao vivo em 2026-05-16: response tem `data.documentSearch.results.documents[].documentUrl`,
+// que aponta para Salesforce (gehealthcare-svc.my.salesforce.com/.../VersionData).
+// NAO ha URL S3 no payload — o browser segue redirect Salesforce -> S3 quando
+// renderiza, mas via context.request.get(documentUrl) com cookies da sessao
+// Playwright o download funciona direto.
+//
+// Os documentos no array vem na MESMA ordem dos checkboxes do popup, entao
+// usamos `indiceDocumento` (escolhido pelo nosso scraper) para pegar o
+// documentUrl correto. NAO podemos matchar por id porque os ids do Salesforce
+// rotacionam a cada chamada (memoria do projeto).
+function extrairDocumentUrlDoPayload(payload, indice) {
+  // Caminho preferencial: formato conhecido do documentSearch
+  const docs = payload?.data?.documentSearch?.results?.documents;
+  if (Array.isArray(docs) && docs.length > 0) {
+    const idx = Math.min(indice ?? 0, docs.length - 1);
+    if (typeof docs[idx]?.documentUrl === 'string' && docs[idx].documentUrl.startsWith('http')) {
+      return docs[idx].documentUrl;
+    }
   }
-  if (typeof obj !== 'object') return null;
-  for (const v of Object.values(obj)) {
-    const found = extrairS3UrlDoPayload(v);
-    if (found) return found;
+  // Fallback: busca recursiva por qualquer campo `documentUrl` no objeto
+  function busca(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    if (typeof obj.documentUrl === 'string' && obj.documentUrl.startsWith('http')) {
+      return obj.documentUrl;
+    }
+    for (const v of Object.values(obj)) {
+      const found = busca(v);
+      if (found) return found;
+    }
+    return null;
   }
-  return null;
+  return busca(payload);
 }
 
 // Tenta baixar UM documento, registrando timeline das etapas executadas.
@@ -459,48 +477,48 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
     };
     page.on('response', responseListener);
 
-    let s3Url = null;
+    let documentUrl = null;
     const lidos = new WeakSet();
     try {
       await botaoPopup.click().catch(() => {});
       t.marcar('botao_popup_clicado');
 
       const deadline = Date.now() + DOWNLOAD_TIMEOUT_MS;
-      while (Date.now() < deadline && !s3Url) {
+      while (Date.now() < deadline && !documentUrl) {
         for (const resp of candidatos) {
           if (lidos.has(resp)) continue;
           lidos.add(resp);
           try {
             const txt = await resp.text();
-            const m = txt.match(RE_S3_URL_GE);
-            if (m) {
-              s3Url = m[0];
-              t.marcar('s3_url_extraida', { hasUrl: true });
+            if (!txt.includes('documentUrl')) continue;
+            let payload;
+            try { payload = JSON.parse(txt); } catch { continue; }
+            const url = extrairDocumentUrlDoPayload(payload, indiceDocumento);
+            if (url) {
+              documentUrl = url;
+              t.marcar('document_url_extraida', { hasUrl: true });
               break;
             }
           } catch {
             // body ja consumido ou erro de leitura — ignora
           }
         }
-        if (s3Url) break;
+        if (documentUrl) break;
         await sleep_ms(500);
       }
     } finally {
       page.off('response', responseListener);
     }
 
-    if (!s3Url) {
-      t.marcar('gateway_sem_s3_url', { candidatos: candidatos.length });
+    if (!documentUrl) {
+      t.marcar('gateway_sem_document_url', { candidatos: candidatos.length });
 
       // Diagnostico: loga prefix dos responses pra entender estrutura do
-      // payload que o portal esta retornando. Mascara X-Amz-Signature
-      // antes de logar (URL S3 e' credencial temporaria).
+      // payload que o portal esta retornando.
       for (let i = 0; i < candidatos.length; i++) {
         try {
           const txt = await candidatos[i].text();
-          const sample = (txt || '')
-            .replace(/X-Amz-Signature=[a-f0-9]+/gi, 'X-Amz-Signature=***')
-            .slice(0, 600);
+          const sample = (txt || '').slice(0, 800);
           console.log(`[GEHC_GATEWAY] body ${i+1}/${candidatos.length}: ${sample}`);
         } catch {}
       }
@@ -511,36 +529,35 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
         mensagem: candidatos.length === 0
           ? `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s sem responses do gateway (click pode nao ter disparado o POST).`
-          : `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s — ${candidatos.length} response(s) do gateway vistos, nenhum com URL S3.`,
+          : `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s — ${candidatos.length} response(s) do gateway vistos, nenhum com documentUrl.`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
     }
-    t.marcar('s3_url_extraida', { hasUrl: true });
-
-    // Baixa direto do S3 — servidor-pra-servidor, sem cookies, sem CORS.
-    // URL e' pre-assinada com X-Amz-Signature; vale 7 dias.
+    // Baixa via documentUrl (Salesforce REST). A sessao Playwright tem os
+    // cookies do Salesforce — request.get com followRedirects herda eles
+    // e segue qualquer redirect interno (Salesforce -> S3 quando aplicavel).
     let pdfResp;
     try {
-      pdfResp = await page.context().request.get(s3Url, { timeout: 60_000 });
+      pdfResp = await page.context().request.get(documentUrl, { timeout: 60_000 });
     } catch (err) {
-      t.marcar('s3_get_falhou', { erro: err.message?.slice(0, 100) });
+      t.marcar('document_get_falhou', { erro: err.message?.slice(0, 100) });
       const fim = t.finalizar();
       return {
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `Falha baixando S3: ${err.message?.slice(0, 150)}`,
+        mensagem: `Falha baixando documentUrl: ${err.message?.slice(0, 150)}`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
     }
     if (!pdfResp.ok()) {
-      t.marcar('s3_get_status', { status: pdfResp.status() });
+      t.marcar('document_get_status', { status: pdfResp.status() });
       const fim = t.finalizar();
       return {
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `S3 retornou ${pdfResp.status()} ${pdfResp.statusText()}.`,
+        mensagem: `documentUrl retornou ${pdfResp.status()} ${pdfResp.statusText()}.`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
