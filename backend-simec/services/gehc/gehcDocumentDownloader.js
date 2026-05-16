@@ -148,18 +148,6 @@ async function realizarLoginNaPagina(page, login, password) {
     timeout: 60_000,
   }).catch(() => {});
   await page.waitForLoadState('networkidle', { timeout: 20_000 }).catch(() => {});
-
-  // VERIFICACAO POS-LOGIN: se networkidle deu timeout silencioso, a sessao
-  // Salesforce pode nao ter sido estabelecida. Quando isso acontece, qualquer
-  // navegacao seguinte redireciona pra logon.gehealthcare.com/loginflow/...
-  // Detectamos aqui ANTES de retornar pra que o chamador possa fazer retry.
-  const urlPosLogin = page.url();
-  if (urlPosLogin.includes('logon.gehealthcare.com') || urlPosLogin.includes('loginflow')) {
-    throw new Error(
-      `login_redirect_loop: sessao Salesforce nao estabelecida apos login ` +
-      `(URL final: ${urlPosLogin.slice(0, 100)})`
-    );
-  }
 }
 
 /**
@@ -175,40 +163,22 @@ export async function abrirSessaoAutenticada(tenantId) {
     throw new Error('Credenciais GE nao configuradas para o tenant.');
   }
 
-  // Retry curto: networkidle do Salesforce ocasionalmente nao estabelece a
-  // sessao no 1o login (concorrencia, latencia, SPA hidratando devagar). Um
-  // 2o tentativa com browser limpo costuma resolver. Mais que 2 nao adianta
-  // (problema seria de credencial/portal, nao transitorio).
-  const MAX_TENTATIVAS = 2;
-  let ultimaErro;
-  for (let tentativa = 1; tentativa <= MAX_TENTATIVAS; tentativa++) {
-    const browser = await chromium.launch({ headless: true });
-    const context = await browser.newContext();
-    const loginPage = await context.newPage();
+  const browser = await chromium.launch({ headless: true });
+  const context = await browser.newContext();
+  const loginPage = await context.newPage();
 
-    try {
-      await realizarLoginNaPagina(loginPage, login, password);
-      // NAO fechar a loginPage — ela mantem viva a sessao SFM no contexto.
-      // Algumas implementacoes do Salesforce requerem ao menos uma aba ativa
-      // para renovar tokens silenciosamente. Reusamos no callsite quando
-      // possivel, e fechamos so apos terminar tudo.
-      if (tentativa > 1) {
-        console.log(`[GEHC_AUTH] Sessao estabelecida na ${tentativa}a tentativa.`);
-      }
-      return { browser, context, loginPage };
-    } catch (err) {
-      ultimaErro = err;
-      await browser.close().catch(() => {});
-      console.log(
-        `[GEHC_AUTH] Tentativa ${tentativa}/${MAX_TENTATIVAS} falhou: ${err.message}`
-      );
-      // Backoff curto antes da proxima tentativa
-      if (tentativa < MAX_TENTATIVAS) {
-        await sleep(5_000);
-      }
-    }
+  try {
+    await realizarLoginNaPagina(loginPage, login, password);
+  } catch (err) {
+    await browser.close();
+    throw err;
   }
-  throw ultimaErro;
+
+  // NAO fechar a loginPage — ela mantem viva a sessao SFM no contexto.
+  // Algumas implementacoes do Salesforce requerem ao menos uma aba ativa
+  // para renovar tokens silenciosamente. Reusamos no callsite quando
+  // possivel, e fechamos so apos terminar tudo.
+  return { browser, context, loginPage };
 }
 
 // ─── Download de um documento específico ─────────────────────────────────────
@@ -326,57 +296,10 @@ async function lerStreamComoBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
-// O portal GE Healthcare nao serve PDF via download event — ele chama o
-// gateway GraphQL (la-prd-shared-services-cdx-api-gateway), recebe uma URL
-// S3 pre-assinada (X-Amz-Expires=604800), e abre via <a> que o Chrome
-// renderiza inline. Por isso `page.waitForEvent('download')` nunca dispara
-// no Playwright. Diagnostico completo: captura ao vivo de fetch/XHR
-// confirmou padrao em 2026-05-16 (OSs MRR9826A e MRR11625).
-//
-// Estrategia: filtrar pelo response do gateway que contiver URL S3 e baixar
-// direto via context.request.get. Funciona em headed/headless igual e e
-// independente do comportamento do browser pra PDF inline.
-const RE_GATEWAY_DOWNLOAD = /la-prd-shared-services-cdx-api-gateway/;
-
-// Operacao GraphQL que retorna a lista de documentos com URLs. Confirmado
-// via captura ao vivo em 2026-05-16: response tem `data.documentSearch.results.documents[].documentUrl`,
-// que aponta para Salesforce (gehealthcare-svc.my.salesforce.com/.../VersionData).
-// NAO ha URL S3 no payload — o browser segue redirect Salesforce -> S3 quando
-// renderiza, mas via context.request.get(documentUrl) com cookies da sessao
-// Playwright o download funciona direto.
-//
-// Os documentos no array vem na MESMA ordem dos checkboxes do popup, entao
-// usamos `indiceDocumento` (escolhido pelo nosso scraper) para pegar o
-// documentUrl correto. NAO podemos matchar por id porque os ids do Salesforce
-// rotacionam a cada chamada (memoria do projeto).
-function extrairDocumentUrlDoPayload(payload, indice) {
-  // Caminho preferencial: formato conhecido do documentSearch
-  const docs = payload?.data?.documentSearch?.results?.documents;
-  if (Array.isArray(docs) && docs.length > 0) {
-    const idx = Math.min(indice ?? 0, docs.length - 1);
-    if (typeof docs[idx]?.documentUrl === 'string' && docs[idx].documentUrl.startsWith('http')) {
-      return docs[idx].documentUrl;
-    }
-  }
-  // Fallback: busca recursiva por qualquer campo `documentUrl` no objeto
-  function busca(obj) {
-    if (!obj || typeof obj !== 'object') return null;
-    if (typeof obj.documentUrl === 'string' && obj.documentUrl.startsWith('http')) {
-      return obj.documentUrl;
-    }
-    for (const v of Object.values(obj)) {
-      const found = busca(v);
-      if (found) return found;
-    }
-    return null;
-  }
-  return busca(payload);
-}
-
 // Tenta baixar UM documento, registrando timeline das etapas executadas.
 // Retorna { ok, categoria, mensagem, etapas, duracaoMs, buffer? }.
 // NUNCA lanca — falhas sao categorizadas no return.
-async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tokens = null }) {
+async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
   const t = novaTimeline();
   try {
     // 1. Verifica se o botao Download eh visivel
@@ -394,6 +317,7 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
     }
 
     // 2. Clica e tenta capturar download direto OU detectar popup
+    const popupAntes = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
     const promiseDownload = page.waitForEvent('download', { timeout: 5_000 }).catch(() => null);
     await downloadBtn.click().catch(() => {});
     t.marcar('botao_clicado');
@@ -415,13 +339,10 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
       };
     }
 
-    // 3. Espera popup com timeout maior (SPA pesada, varia 0.5-8s)
-    // POPUP_TIMEOUT_MS=30s e retorna assim que o popup aparece (nao espera 30s)
-    const popupLocator = page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).first();
-    const popupAbriu = await popupLocator
-      .waitFor({ state: 'visible', timeout: POPUP_TIMEOUT_MS })
-      .then(() => true)
-      .catch(() => false);
+    // 3. Espera popup
+    await page.waitForTimeout(1_500);
+    const popupDepois = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
+    const popupAbriu = popupDepois > popupAntes;
     t.marcar('popup_detectado', { ok: popupAbriu });
 
     if (!popupAbriu) {
@@ -456,131 +377,28 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
     await checkboxes.nth(indiceDocumento).check().catch(() => {});
     t.marcar('checkbox_marcado', { indice: indiceDocumento });
 
-    // 5. Clica DOWNLOAD do popup e intercepta o response do gateway que
-    // contem a URL S3 pre-assinada. O portal NAO dispara download event —
-    // ele abre o PDF via <a> (target=_blank), por isso waitForEvent('download')
-    // nunca dispara. Veja comentario do extrairS3UrlDoPayload.
-    //
-    // Implementacao: page.on('response') coleta TODOS os responses do gateway
-    // (sem ler body no listener — filter async do waitForResponse pode dar
-    // problema consumindo bodies de responses irrelevantes). Polling de 500ms
-    // le o body de cada candidato novo procurando URL S3.
+    // 5. Clica DOWNLOAD do popup e espera o evento
     const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
-
-    const candidatos = [];
-    const responseListener = (resp) => {
-      if (resp.request().method() === 'POST'
-          && RE_GATEWAY_DOWNLOAD.test(resp.url())
-          && resp.status() === 200) {
-        candidatos.push(resp);
-      }
-    };
-    page.on('response', responseListener);
-
-    let documentUrl = null;
-    const lidos = new WeakSet();
+    let download;
     try {
-      await botaoPopup.click().catch(() => {});
-      t.marcar('botao_popup_clicado');
-
-      const deadline = Date.now() + DOWNLOAD_TIMEOUT_MS;
-      while (Date.now() < deadline && !documentUrl) {
-        for (const resp of candidatos) {
-          if (lidos.has(resp)) continue;
-          lidos.add(resp);
-          try {
-            const txt = await resp.text();
-            if (!txt.includes('documentUrl')) continue;
-            let payload;
-            try { payload = JSON.parse(txt); } catch { continue; }
-            const url = extrairDocumentUrlDoPayload(payload, indiceDocumento);
-            if (url) {
-              documentUrl = url;
-              t.marcar('document_url_extraida', { hasUrl: true });
-              break;
-            }
-          } catch {
-            // body ja consumido ou erro de leitura — ignora
-          }
-        }
-        if (documentUrl) break;
-        await sleep_ms(500);
-      }
-    } finally {
-      page.off('response', responseListener);
-    }
-
-    if (!documentUrl) {
-      t.marcar('gateway_sem_document_url', { candidatos: candidatos.length });
-
-      // Diagnostico: loga prefix dos responses pra entender estrutura do
-      // payload que o portal esta retornando.
-      for (let i = 0; i < candidatos.length; i++) {
-        try {
-          const txt = await candidatos[i].text();
-          const sample = (txt || '').slice(0, 800);
-          console.log(`[GEHC_GATEWAY] body ${i+1}/${candidatos.length}: ${sample}`);
-        } catch {}
-      }
-
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: candidatos.length === 0
-          ? `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s sem responses do gateway (click pode nao ter disparado o POST).`
-          : `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s — ${candidatos.length} response(s) do gateway vistos, nenhum com documentUrl.`,
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
-    // Baixa via documentUrl (Salesforce REST) simulando NAVEGACAO em vez de
-    // XHR/fetch. Salesforce nao tem CORS aberto para outros dominios — XHR
-    // cross-origin (de gehealthcare.com.br pra gehealthcare-svc.my.salesforce.com)
-    // bate em NETWORK_ERROR. Navegacao nao tem CORS — o browser segue links
-    // normalmente, incluindo cookies do dominio destino.
-    //
-    // Estrategia: nova page no mesmo BrowserContext (compartilha cookie jar),
-    // page.goto retorna o response do servidor. body() expoe os bytes brutos.
-    let buffer;
-    let newPage = null;
-    try {
-      newPage = await page.context().newPage();
-      const response = await newPage.goto(documentUrl, {
-        waitUntil: 'domcontentloaded',
-        timeout: 60_000,
-      });
-      if (!response) {
-        throw new Error('NO_RESPONSE');
-      }
-      if (!response.ok()) {
-        throw new Error(`HTTP_${response.status()}`);
-      }
-      buffer = await response.body();
+      [download] = await Promise.all([
+        page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
+        botaoPopup.click(),
+      ]);
     } catch (err) {
-      const msg = err.message || '';
-      const httpMatch = msg.match(/HTTP_(\d+)/);
-      const status = httpMatch ? parseInt(httpMatch[1], 10) : null;
-      t.marcar('document_fetch_falhou', {
-        erro: msg.slice(0, 100),
-        status,
-      });
+      t.marcar('download_event_timeout', { ok: false, erro: err.message?.slice(0, 100) });
       const fim = t.finalizar();
       return {
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: status
-          ? `documentUrl retornou HTTP ${status} (navegacao via newPage).`
-          : `Falha na navegacao para documentUrl: ${msg.slice(0, 150)}`,
+        mensagem: `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s esperando evento download após click no popup.`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
-    } finally {
-      if (newPage) {
-        await newPage.close().catch(() => {});
-      }
     }
+    t.marcar('download_event', { ok: true });
 
+    const buffer = await lerStreamComoBuffer(await download.createReadStream());
     t.marcar('buffer_lido', { bytes: buffer.length });
 
     const fim = t.finalizar();
@@ -591,6 +409,7 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento, tok
       etapas: fim.etapas,
       duracaoMs: fim.duracaoMs,
       buffer,
+      download,
     };
   } catch (err) {
     const fim = t.finalizar();
@@ -614,7 +433,6 @@ function sleep_ms(ms) {
 async function baixarComRetry({
   page, downloadBtn, doc, indice,
   tenantId, equipamento, ordem, trackingNumber,
-  tokens = null,
 }) {
   let ultimo = null;
   for (let tentativa = 1; tentativa <= RETRY_INLINE_MAX; tentativa++) {
@@ -624,7 +442,7 @@ async function baixarComRetry({
       await sleep_ms(espera);
     }
 
-    const r = await tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento: indice, tokens });
+    const r = await tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento: indice });
     ultimo = r;
 
     // Log estruturado dessa tentativa
@@ -853,7 +671,6 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
           const retryResult = await baixarComRetry({
             page, downloadBtn, doc, indice: i,
             tenantId, equipamento, ordem, trackingNumber,
-            tokens,
           });
 
           if (retryResult.ok) {
