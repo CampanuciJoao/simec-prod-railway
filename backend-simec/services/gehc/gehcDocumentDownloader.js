@@ -326,6 +326,33 @@ async function lerStreamComoBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
+// O portal GE Healthcare nao serve PDF via download event — ele chama o
+// gateway GraphQL (la-prd-shared-services-cdx-api-gateway), recebe uma URL
+// S3 pre-assinada (X-Amz-Expires=604800), e abre via <a> que o Chrome
+// renderiza inline. Por isso `page.waitForEvent('download')` nunca dispara
+// no Playwright. Diagnostico completo: captura ao vivo de fetch/XHR
+// confirmou padrao em 2026-05-16 (OSs MRR9826A e MRR11625).
+//
+// Estrategia: filtrar pelo response do gateway que contiver URL S3 e baixar
+// direto via context.request.get. Funciona em headed/headless igual e e
+// independente do comportamento do browser pra PDF inline.
+const RE_GATEWAY_DOWNLOAD = /la-prd-shared-services-cdx-api-gateway/;
+const RE_S3_URL_GE = /https:\/\/[^"\s\\]+\.s3\.amazonaws\.com\/[^"\s\\]+/;
+
+function extrairS3UrlDoPayload(obj) {
+  if (obj == null) return null;
+  if (typeof obj === 'string') {
+    const m = obj.match(RE_S3_URL_GE);
+    return m ? m[0] : null;
+  }
+  if (typeof obj !== 'object') return null;
+  for (const v of Object.values(obj)) {
+    const found = extrairS3UrlDoPayload(v);
+    if (found) return found;
+  }
+  return null;
+}
+
 // Tenta baixar UM documento, registrando timeline das etapas executadas.
 // Retorna { ok, categoria, mensagem, etapas, duracaoMs, buffer? }.
 // NUNCA lanca — falhas sao categorizadas no return.
@@ -409,28 +436,100 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
     await checkboxes.nth(indiceDocumento).check().catch(() => {});
     t.marcar('checkbox_marcado', { indice: indiceDocumento });
 
-    // 5. Clica DOWNLOAD do popup e espera o evento
+    // 5. Clica DOWNLOAD do popup e intercepta o response do gateway que
+    // contem a URL S3 pre-assinada. O portal NAO dispara download event —
+    // ele abre o PDF via <a> (target=_blank), por isso waitForEvent('download')
+    // nunca dispara. Veja comentario do extrairS3UrlDoPayload.
     const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
-    let download;
-    try {
-      [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
-        botaoPopup.click(),
-      ]);
-    } catch (err) {
-      t.marcar('download_event_timeout', { ok: false, erro: err.message?.slice(0, 100) });
+
+    // Prepara a escuta ANTES de clicar — race condition seria perda de evento.
+    // Filtra pelo response que (a) e do gateway, (b) status 200 e (c) corpo
+    // contem URL S3 (descarta o 1o POST que lista PDFs sem URL).
+    const gatewayResponsePromise = page.waitForResponse(
+      async (r) => {
+        if (r.request().method() !== 'POST') return false;
+        if (!RE_GATEWAY_DOWNLOAD.test(r.url())) return false;
+        if (r.status() !== 200) return false;
+        try {
+          const txt = await r.text();
+          return RE_S3_URL_GE.test(txt);
+        } catch {
+          return false;
+        }
+      },
+      { timeout: DOWNLOAD_TIMEOUT_MS },
+    ).catch(() => null);
+
+    await botaoPopup.click().catch(() => {});
+    t.marcar('botao_popup_clicado');
+
+    const gatewayResponse = await gatewayResponsePromise;
+    if (!gatewayResponse) {
       const fim = t.finalizar();
       return {
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s esperando evento download após click no popup.`,
+        mensagem: `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s esperando response do gateway com URL S3.`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
     }
-    t.marcar('download_event', { ok: true });
+    t.marcar('gateway_response_recebido', { status: gatewayResponse.status() });
 
-    const buffer = await lerStreamComoBuffer(await download.createReadStream());
+    // Extrai a URL S3 do payload — busca recursiva (campo pode variar).
+    let s3Url;
+    try {
+      const payload = await gatewayResponse.json();
+      s3Url = extrairS3UrlDoPayload(payload);
+    } catch {
+      // Fallback: regex no texto bruto
+      const txt = await gatewayResponse.text().catch(() => '');
+      const m = txt.match(RE_S3_URL_GE);
+      s3Url = m ? m[0] : null;
+    }
+
+    if (!s3Url) {
+      t.marcar('s3_url_nao_encontrada', { ok: false });
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+        mensagem: 'Response do gateway sem URL S3 reconhecida.',
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+    t.marcar('s3_url_extraida', { hasUrl: true });
+
+    // Baixa direto do S3 — servidor-pra-servidor, sem cookies, sem CORS.
+    // URL e' pre-assinada com X-Amz-Signature; vale 7 dias.
+    let pdfResp;
+    try {
+      pdfResp = await page.context().request.get(s3Url, { timeout: 60_000 });
+    } catch (err) {
+      t.marcar('s3_get_falhou', { erro: err.message?.slice(0, 100) });
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+        mensagem: `Falha baixando S3: ${err.message?.slice(0, 150)}`,
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+    if (!pdfResp.ok()) {
+      t.marcar('s3_get_status', { status: pdfResp.status() });
+      const fim = t.finalizar();
+      return {
+        ok: false,
+        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+        mensagem: `S3 retornou ${pdfResp.status()} ${pdfResp.statusText()}.`,
+        etapas: fim.etapas,
+        duracaoMs: fim.duracaoMs,
+      };
+    }
+
+    const buffer = await pdfResp.body();
     t.marcar('buffer_lido', { bytes: buffer.length });
 
     const fim = t.finalizar();
@@ -441,7 +540,6 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
       etapas: fim.etapas,
       duracaoMs: fim.duracaoMs,
       buffer,
-      download,
     };
   } catch (err) {
     const fim = t.finalizar();
