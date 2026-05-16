@@ -1,23 +1,31 @@
-// Captura PDFs de OS GE via Playwright headless e extrai conteudo na hora.
+// Captura PDFs de OS GE via chamada direta ao gateway GraphQL CDX + GET HTTP.
 //
-// Por que Playwright e não fetch puro?
-// O fluxo de download do portal GE é:
-//   1. documentSearch (GraphQL) → lista PDFs disponíveis para a OS
-//   2. downloadDocument (mutation) → retorna 202 (request aceito, async)
-//   3. Popup com link para URL S3 pré-assinada (válida 7 dias) → download real
+// Arquitetura (refatoracao 2026-05-16, ver [[ADR-019]]):
+//   1. listarDocumentosDaOS (gehcDocumentClient.js) chama getDocumentSearch
+//      no gateway — retorna documents[] com documentUrl + documentSource.
+//   2. Para cada documento, baixarDocumentoViaUrl faz GET HTTP direto:
+//        - documentSource '102' (API GE / Preventive Maintenance Form)
+//          -> https://prod-api.gehealthcare.com/health/smaxCdrSIMS/...
+//          -> headers: accesstoken + idtoken (mesmo do gateway)
+//        - documentSource '101' (Salesforce / Service Report)
+//          -> https://gehealthcare-svc.my.salesforce.com/services/data/.../VersionData
+//          -> headers: Authorization Bearer accessToken (Salesforce session ID)
+//   3. Buffer recebido roda inline em extrairUmPdf() (Camada 1 regex + Camada 2 LLM).
 //
-// Cada OS tem 1+ documentos. Marcar 2+ documentos no popup gera um ZIP no S3
-// — para evitar lidar com unzip, marcamos APENAS UM por vez (o documento mais
-// relevante: Service Report). Se a OS tem múltiplos, o popup é reaberto.
+// Por que Playwright continua? Apenas para AUTH inicial — gehcAuthService usa
+// Playwright pra capturar accesstoken+idtoken via intercept de queries CDX no
+// login. Apos isso os tokens ficam no banco e o downloader nao precisa abrir
+// browser. abrirSessaoAutenticada eh mantida como helper opcional para casos
+// onde queremos cookies Salesforce (fallback se Bearer falhar).
 //
-// O nome do arquivo segue o padrão MRR11625_CR_CSR_ServReq_17159687_20260325_069Ur00000YSvPeIAL.pdf,
-// onde o ID do documento (069Ur...IAL) sempre fecha a string. Usamos isso para
-// extrair o documentId canônico e garantir idempotência.
+// Armazenamento: o binario do PDF NAO eh persistido em R2 (decisao anterior).
+// O buffer roda inline pela extracao Camada 1 + Camada 2 e e' descartado.
+// gehcPdfDocumento eh gravado com baixadoEm para dedup, mas r2Key=null.
 //
-// Armazenamento: o PDF NAO eh persistido (R2 ficou para tras). Logo apos o
-// download em memoria chamamos extrairUmPdf() com o buffer; o conteudo
-// extraido vai para gehcPdfExtraido e o buffer eh descartado. gehcPdfDocumento
-// continua sendo gravado para dedup e auditoria, mas com r2Key=null.
+// LGPD: Camada 1 (regex) extrai campos identificaveis (engineerFullName,
+// serialNumber) que ficam tenant-scoped. Apenas Camada 2 (LLM, despersonalizada
+// por design do prompt) pode subir pro Knowledge Agent global. Ver
+// [[ADR-018 - Knowledge Agent global cross-tenant e Operational Agents tenant-scoped]].
 
 import { chromium } from 'playwright';
 import crypto from 'crypto';
@@ -40,62 +48,49 @@ import {
 } from './gehcDownloaderAlerter.js';
 
 const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com.br/account';
-// Lista de OS do equipamento na aba 'Servico'. Mais eficiente que abrir 1
-// pagina por OS — todas com 'Documentos disponiveis' aparecem juntas.
-const PORTAL_LISTA_OS_URL = (assetId) =>
-  `https://www.gehealthcare.com.br/account/myequipment-360?assetId=${assetId}#service-tab`;
 
-const RATE_LIMIT_OS_MS     = 3_000;   // espera entre OSs no mesmo tenant
-const RATE_LIMIT_TENANT_MS = 15_000;  // espera entre tenants
-const DOWNLOAD_TIMEOUT_MS  = 120_000; // tempo máx aguardando o `download` event
-                                      // (portal GE intermitente; 60s era curto)
-const POPUP_TIMEOUT_MS     = 30_000;  // tempo máx aguardando popup abrir (SPA pode demorar)
-const TRIGGER_TIMEOUT_MS   = 20_000;  // tempo máx procurando botao Download
+const RATE_LIMIT_OS_MS     = 1_000;   // espera entre OSs no mesmo tenant (HTTP é rápido)
+const RATE_LIMIT_TENANT_MS = 10_000;  // espera entre tenants
+const HTTP_TIMEOUT_MS      = 60_000;  // timeout do GET HTTP por PDF
 
 // Circuit breaker — apos N tentativas consecutivas falhando, "quarentena"
-// o documento por X dias. Evita gastar Playwright todo ciclo tentando
-// docs que provavelmente estao com problema permanente no portal GE
+// o documento por X dias. Evita gastar requests todo ciclo tentando docs
+// que provavelmente estao com problema permanente no portal GE
 // (S3 expirado, OS marcada como restrita, PDF corrompido, etc).
 const CIRCUIT_BREAKER_TENTATIVAS = 10;       // mais permissivo (3 inline x ~3 ciclos)
 const CIRCUIT_BREAKER_DIAS_QUARENTENA = 7;
 
-// Retry inline por documento dentro de uma execucao. Escalonado: a 1a
-// tentativa eh imediata, depois espera RETRY_BACKOFF_MS[i] entre tentativas.
+// Retry inline por documento dentro de uma execucao. Backoff curto agora
+// que e' HTTP (nao Playwright) — falha rapido.
 const RETRY_INLINE_MAX = 3;
-const RETRY_BACKOFF_MS = [0, 30_000, 60_000]; // antes da 1a, 2a, 3a tentativa
+const RETRY_BACKOFF_MS = [0, 2_000, 5_000];
 
 // Detector inline de falha sistemica: se N docs CONSECUTIVOS esgotam
-// suas 3 tentativas, eh provavel problema maior (sessao, layout, portal
+// suas 3 tentativas, eh provavel problema maior (auth expirada, portal
 // fora). Quebra a execucao e gera alerta interno (sem Telegram).
 const FALHAS_CONSECUTIVAS_PARA_SISTEMICO = 3;
 
 // Categorias de erro PERMANENTE — nao adianta fazer retry inline.
-// SESSAO_PERDIDA tenta re-login no proximo ciclo; layout exige fix.
 const CATEGORIAS_PERMANENTES = new Set([
-  'BOTAO_NAO_ENCONTRADO',
+  'BOTAO_NAO_ENCONTRADO',  // legado, nao usado mais; mantido p/ compat de logs
+  'NAO_E_PDF',             // response veio mas nao e PDF (HTML de erro)
+  'DOC_SEM_URL',           // gateway retornou doc sem documentUrl
 ]);
 
 // Categorias que se beneficiam de re-login inline (nao adianta retry sem auth).
 const CATEGORIAS_REAUTH = new Set([
   'SESSAO_PERDIDA',
+  'AUTH_EXPIRADA',
 ]);
 
-// R2_PREFIX e r2KeyParaPdf permanecem para compatibilidade com PDFs legados
-// que ainda existirem no bucket (limpeza explicita via endpoint dedicado).
-const R2_PREFIX = 'gehc-pdfs';
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
-// ─── Helpers de identidade ───────────────────────────────────────────────────
-
-function extrairDocumentIdDoNome(fileName) {
-  // Padrão observado: PREFIXO..._<documentId>.pdf
-  // Ex: MRR11625_CR_CSR_ServReq_17159687_20260325_069Ur00000YSvPeIAL.pdf
-  const sem = fileName.replace(/\.pdf$/i, '');
-  const parts = sem.split('_');
-  return parts[parts.length - 1] || null;
-}
-
-function r2KeyParaPdf({ tenantId, gehcServiceId, documentId }) {
-  return `${R2_PREFIX}/${tenantId}/${gehcServiceId}/${documentId}.pdf`;
+// Valida que o buffer começa com %PDF (magic bytes). Salesforce pode retornar
+// HTML de erro com status 200 se a sessao caiu, ou JSON de erro do API GE.
+function validarPdfBuffer(buffer) {
+  if (!buffer || buffer.length < 4) return false;
+  // Magic bytes "%PDF" = [0x25, 0x50, 0x44, 0x46]
+  return buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
 }
 
 function sleep(ms) {
@@ -182,245 +177,178 @@ export async function abrirSessaoAutenticada(tenantId) {
 }
 
 // ─── Download de um documento específico ─────────────────────────────────────
+//
+// O portal GE retorna o `documentUrl` direto na resposta do gateway. Bastam:
+//   - GET HTTP no documentUrl
+//   - Headers de auth corretos (varia por documentSource)
+//   - Validar magic bytes %PDF no buffer recebido
+//
+// Não precisa abrir popup, clicar em botão, marcar checkbox.
 
-// Selectors do portal MyEquipment 360.
-// ATENCAO: o texto "Documentos disponíveis" na lista de OSs e apenas LABEL
-// informativa (em verde), NAO um botao clicavel. O elemento clicavel real
-// e o botao "Download" ao lado direito da linha. Ao clicar nele, abre o
-// popup "Fazer o download dos documentos" com checkboxes.
-const RE_TITULO_POPUP   = /fazer\s+o\s+download\s+dos\s+documentos/i;
-const RE_BOTAO_DOWNLOAD = /^(download|baixar)$/i;
-
-async function clicarBotaoDownloadDaOs({ page }) {
-  // Pequena pausa para o framework SPA terminar de hidratar a tela depois
-  // do navigate. NAO usar 'networkidle' — em SPAs com analytics/websockets
-  // o estado idle nunca chega e o timeout estoura.
-  await page.waitForTimeout(2_000);
-
-  // Detecta redirect para tela de login — sessao Salesforce nao foi
-  // estabelecida ou expirou. Curto-circuita com erro claro em vez de
-  // ficar buscando seletores num formulario de login.
-  const urlAtual = page.url();
-  if (urlAtual.includes('logon.gehealthcare.com') || urlAtual.includes('loginflow')) {
-    throw new Error(`sessao_perdida: navegacao caiu em ${urlAtual.slice(0, 80)}...`);
-  }
-
-  // Se o popup ja esta aberto (caso raro), nao precisa clicar.
-  const popupJaAberto = await page.getByText(RE_TITULO_POPUP).count() > 0;
-  if (popupJaAberto) return true;
-
-  // Procura o botao "Download" da OS (clicavel, em a/button) — varias
-  // estrategias de selector em ordem de preferencia. O texto "Documentos
-  // disponíveis" e ignorado intencionalmente (e label, nao botao).
-  const tentativas = [
-    page.getByRole('button', { name: RE_BOTAO_DOWNLOAD }).first(),
-    page.getByRole('link',   { name: RE_BOTAO_DOWNLOAD }).first(),
-    page.locator('button').filter({ hasText: RE_BOTAO_DOWNLOAD }).first(),
-    page.locator('a').filter({ hasText: RE_BOTAO_DOWNLOAD }).first(),
-  ];
-
-  for (const trigger of tentativas) {
-    try {
-      await trigger.waitFor({ state: 'visible', timeout: TRIGGER_TIMEOUT_MS });
-      await trigger.click({ timeout: TRIGGER_TIMEOUT_MS });
-      // Aguarda popup abrir; se nao abrir em 5s, talvez tenha baixado direto
-      await page.getByText(RE_TITULO_POPUP).waitFor({ timeout: 5_000 }).catch(() => {});
-      return true;
-    } catch { /* tenta proximo selector */ }
-  }
-
-  // Ultimo recurso: dump de debug para diagnostico (so URL e contagem de
-  // botoes, nao o HTML completo para nao explodir log).
-  try {
-    const url = page.url();
-    const totalBotoes = await page.locator('button, a').count();
-    const textosVisiveis = await page.locator('button, a').allInnerTexts();
-    const previewTextos = textosVisiveis.slice(0, 20).filter(Boolean).map((t) => t.trim()).join(' | ');
-    console.warn(`[GEHC_PDF_DEBUG] popup_indisponivel em ${url} — ${totalBotoes} botoes/links visiveis. Preview: ${previewTextos}`);
-  } catch { /* ignora erros do debug */ }
-
-  return false;
-}
-
-async function baixarUmDocumentoPorPopup({ page, indiceDocumento }) {
-  const ok = await clicarBotaoDownloadDaOs({ page });
-  if (!ok) {
-    // Provavelmente OS sem documentos publicados ainda no portal, ou layout
-    // diferente do esperado — caso nao-bloqueante, retorna null.
-    return null;
-  }
-
-  // Caso especial: clicar no Download da lista pode baixar 1 arquivo direto
-  // (sem popup) quando a OS tem apenas 1 documento. Detectamos via timeout
-  // curto antes de tentar interagir com checkboxes.
-  const popupVisivel = (await page.getByText(RE_TITULO_POPUP).count()) > 0;
-  if (!popupVisivel) {
-    // Nao apareceu popup — espera download direto disparado pelo botao.
-    try {
-      const download = await page.waitForEvent('download', { timeout: 8_000 });
-      return download;
-    } catch {
-      // Nao baixou nem abriu popup — falha real.
-      return null;
-    }
-  }
-
-  // Caso comum: popup aberto, marcar 1 checkbox e clicar DOWNLOAD do popup.
-  const checkboxes = page.locator('input[type="checkbox"]');
-  const total = await checkboxes.count();
-  if (total === 0) {
-    return null;
-  }
-  for (let i = 0; i < total; i++) {
-    const cb = checkboxes.nth(i);
-    if (await cb.isChecked()) await cb.uncheck();
-  }
-  if (indiceDocumento >= total) {
-    throw new Error(`Indice ${indiceDocumento} fora do range (popup tem ${total} checkbox(es))`);
-  }
-  await checkboxes.nth(indiceDocumento).check();
-
-  const botaoDownloadPopup = page.locator('button').filter({ hasText: RE_BOTAO_DOWNLOAD }).last();
-
-  const [download] = await Promise.all([
-    page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
-    botaoDownloadPopup.click(),
-  ]);
-
-  return download;
-}
-
-async function lerStreamComoBuffer(stream) {
-  const chunks = [];
-  for await (const chunk of stream) chunks.push(chunk);
-  return Buffer.concat(chunks);
-}
-
-// Tenta baixar UM documento, registrando timeline das etapas executadas.
-// Retorna { ok, categoria, mensagem, etapas, duracaoMs, buffer? }.
-// NUNCA lanca — falhas sao categorizadas no return.
-async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
+// Baixa o PDF de um documento via documentUrl direto.
+// Dispatcher por documentSource (capturado em 2026-05-16):
+//   - '102': API GE (prod-api.gehealthcare.com) — accesstoken + idtoken no header
+//   - '101': Salesforce — Authorization Bearer accessToken (Salesforce session ID)
+//   - outros: erro permanente (DOC_SEM_URL ou desconhecido)
+//
+// Usa context.request.get que herda cookies do contexto Playwright (caso
+// algum cookie de sessao Salesforce ajude no caso 101) e permite headers
+// customizados.
+async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   const t = novaTimeline();
-  try {
-    // 1. Verifica se o botao Download eh visivel
-    const visivel = await downloadBtn.isVisible({ timeout: 3_000 }).catch(() => false);
-    t.marcar('botao_visivel', { ok: visivel });
-    if (!visivel) {
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.BOTAO_NAO_ENCONTRADO,
-        mensagem: 'Botão Download não está visível no card.',
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
 
-    // 2. Clica e tenta capturar download direto OU detectar popup
-    const popupAntes = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
-    const promiseDownload = page.waitForEvent('download', { timeout: 5_000 }).catch(() => null);
-    await downloadBtn.click().catch(() => {});
-    t.marcar('botao_clicado');
-
-    const downloadDireto = await promiseDownload;
-    if (downloadDireto) {
-      t.marcar('download_direto', { ok: true });
-      const buffer = await lerStreamComoBuffer(await downloadDireto.createReadStream());
-      t.marcar('buffer_lido', { bytes: buffer.length });
-      const fim = t.finalizar();
-      return {
-        ok: true,
-        categoria: CATEGORIAS_LOG.SUCESSO,
-        mensagem: null,
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-        buffer,
-        download: downloadDireto,
-      };
-    }
-
-    // 3. Espera popup
-    await page.waitForTimeout(1_500);
-    const popupDepois = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
-    const popupAbriu = popupDepois > popupAntes;
-    t.marcar('popup_detectado', { ok: popupAbriu });
-
-    if (!popupAbriu) {
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.POPUP_NAO_ABRIU,
-        mensagem: 'Popup de download não abriu após click no botão.',
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
-
-    // 4. Marca o checkbox correto
-    const checkboxes = page.locator('input[type="checkbox"]');
-    const total = await checkboxes.count();
-    t.marcar('checkboxes_listados', { total });
-    if (total === 0 || indiceDocumento >= total) {
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.POPUP_NAO_ABRIU,
-        mensagem: `Popup sem checkboxes válidos (total=${total}, indice=${indiceDocumento}).`,
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
-    for (let i = 0; i < total; i++) {
-      const cb = checkboxes.nth(i);
-      if (await cb.isChecked()) await cb.uncheck().catch(() => {});
-    }
-    await checkboxes.nth(indiceDocumento).check().catch(() => {});
-    t.marcar('checkbox_marcado', { indice: indiceDocumento });
-
-    // 5. Clica DOWNLOAD do popup e espera o evento
-    const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
-    let download;
-    try {
-      [download] = await Promise.all([
-        page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
-        botaoPopup.click(),
-      ]);
-    } catch (err) {
-      t.marcar('download_event_timeout', { ok: false, erro: err.message?.slice(0, 100) });
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s esperando evento download após click no popup.`,
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
-    t.marcar('download_event', { ok: true });
-
-    const buffer = await lerStreamComoBuffer(await download.createReadStream());
-    t.marcar('buffer_lido', { bytes: buffer.length });
-
+  if (!doc.documentUrl) {
     const fim = t.finalizar();
     return {
-      ok: true,
-      categoria: CATEGORIAS_LOG.SUCESSO,
-      mensagem: null,
+      ok: false,
+      categoria: 'DOC_SEM_URL',
+      mensagem: 'Gateway retornou documento sem documentUrl.',
       etapas: fim.etapas,
       duracaoMs: fim.duracaoMs,
-      buffer,
-      download,
     };
+  }
+  if (!tokens?.accessToken || !tokens?.idToken) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: 'AUTH_EXPIRADA',
+      mensagem: 'Tokens GE indisponiveis para download.',
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+
+  // Headers por source. Em '101' usamos Bearer (formato Salesforce session ID
+  // ja vem com prefixo "00D...!" no token); em '102' usamos os mesmos headers
+  // do gateway (que e um servico GE Healthcare).
+  const headersBase = {
+    'accept':       'application/pdf, */*',
+    'User-Agent':   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Referer':      'https://www.gehealthcare.com.br/',
+  };
+  let headers;
+  if (doc.documentSource === '101') {
+    // Salesforce REST aceita session id como Bearer token
+    headers = {
+      ...headersBase,
+      'Authorization': `Bearer ${tokens.accessToken}`,
+    };
+  } else if (doc.documentSource === '102') {
+    // API GE direta — mesmos headers do gateway
+    headers = {
+      ...headersBase,
+      'accesstoken': tokens.accessToken,
+      'idtoken':     tokens.idToken,
+    };
+  } else {
+    // Source desconhecido — tenta ambos os formatos como fallback
+    headers = {
+      ...headersBase,
+      'Authorization': `Bearer ${tokens.accessToken}`,
+      'accesstoken':   tokens.accessToken,
+      'idtoken':       tokens.idToken,
+    };
+  }
+  t.marcar('headers_montados', { source: doc.documentSource });
+
+  let resp;
+  try {
+    resp = await context.request.get(doc.documentUrl, {
+      headers,
+      timeout: HTTP_TIMEOUT_MS,
+    });
   } catch (err) {
     const fim = t.finalizar();
     return {
       ok: false,
       categoria: categorizarErro(err.message),
-      mensagem: err.message?.slice(0, 200) || 'Erro inesperado',
+      mensagem: `Falha de rede no GET: ${err.message?.slice(0, 200)}`,
       etapas: fim.etapas,
       duracaoMs: fim.duracaoMs,
     };
   }
+
+  const status = resp.status();
+  t.marcar('http_response', { status });
+
+  if (status === 401 || status === 403) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: 'AUTH_EXPIRADA',
+      mensagem: `${doc.documentSource === '101' ? 'Salesforce' : 'API GE'} retornou HTTP ${status} (auth invalida).`,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+  if (status === 404) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: 'BOTAO_NAO_ENCONTRADO',  // reusa categoria permanente — doc nao existe mais
+      mensagem: `Documento nao encontrado (HTTP 404): ${doc.documentUrl?.slice(0, 100)}`,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+  if (status >= 500 || status === 429) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: `Backend retornou HTTP ${status} (transient).`,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+  if (status !== 200) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
+      mensagem: `HTTP ${status} inesperado.`,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+
+  let buffer;
+  try {
+    buffer = await resp.body();
+  } catch (err) {
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: categorizarErro(err.message),
+      mensagem: `Falha lendo body: ${err.message?.slice(0, 150)}`,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+
+  if (!validarPdfBuffer(buffer)) {
+    // Pode ser HTML de erro do Salesforce ou JSON de erro da API GE — nao retry
+    const inicio = (buffer || Buffer.alloc(0)).slice(0, 60).toString('utf8').replace(/[^\x20-\x7e]/g, '·');
+    const fim = t.finalizar();
+    return {
+      ok: false,
+      categoria: 'NAO_E_PDF',
+      mensagem: `Response 200 mas nao e PDF. Primeiros bytes: ${inicio.slice(0, 80)}`,
+      etapas: fim.etapas,
+      duracaoMs: fim.duracaoMs,
+    };
+  }
+  t.marcar('buffer_lido', { bytes: buffer.length });
+
+  const fim = t.finalizar();
+  return {
+    ok: true,
+    categoria: CATEGORIAS_LOG.SUCESSO,
+    mensagem: null,
+    etapas: fim.etapas,
+    duracaoMs: fim.duracaoMs,
+    buffer,
+  };
 }
 
 function sleep_ms(ms) {
@@ -431,18 +359,18 @@ function sleep_ms(ms) {
 // Registra log estruturado por TENTATIVA (3 logs no caso de 3 falhas).
 // Retorna { ok, ultimoResultado, tentativasFeitas }.
 async function baixarComRetry({
-  page, downloadBtn, doc, indice,
+  doc, context, tokens,
   tenantId, equipamento, ordem, trackingNumber,
 }) {
   let ultimo = null;
   for (let tentativa = 1; tentativa <= RETRY_INLINE_MAX; tentativa++) {
     if (tentativa > 1) {
-      const espera = RETRY_BACKOFF_MS[tentativa - 1] || 60_000;
+      const espera = RETRY_BACKOFF_MS[tentativa - 1] || 5_000;
       console.log(`[GEHC_DOWNLOAD] ${doc.documentId} tentativa ${tentativa}/${RETRY_INLINE_MAX} apos ${espera / 1000}s...`);
       await sleep_ms(espera);
     }
 
-    const r = await tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento: indice });
+    const r = await baixarDocumentoViaUrl({ doc, context, tokens });
     ultimo = r;
 
     // Log estruturado dessa tentativa
@@ -478,345 +406,200 @@ async function baixarComRetry({
   return { ok: false, ultimoResultado: ultimo, tentativasFeitas: RETRY_INLINE_MAX };
 }
 
-// ─── Captura de TODAS as OSs de um equipamento (1 navegacao) ────────────────
+// ─── Captura de todas as OSs de um equipamento (chamadas HTTP) ──────────────
 //
-// Estrategia objetiva: navegar UMA vez para a lista de OSs do equipamento
-// e baixar todos os PDFs visiveis com 'Documentos disponiveis'. Em vez de
-// abrir 1 pagina por OS (Playwright + SPA + analytics = ~30s cada), aqui
-// e 1 pagina por equipamento + N cliques rapidos no mesmo DOM.
-//
-// Como 'Documentos disponiveis' so aparece para OS com PDFs ja publicados
-// pelo GE, o filtro fica natural — nao gastamos tempo com OSs vazias.
+// Refatorado em 2026-05-16 (ADR-019): não navega mais pela lista de OSs no
+// portal. Para cada OS pendente, chama listarDocumentosDaOS (GraphQL gateway)
+// + baixarDocumentoViaUrl (GET HTTP direto). Sem DOM, sem popup, sem click.
 
 async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, ordens, tokens, contadorFalhasConsecutivas }) {
-  const assetId = equipamento.gehcAssetId;
-  if (!assetId) return { capturados: 0, processadas: 0, erro: 'sem_asset_id' };
   if (!ordens.length) return { capturados: 0, processadas: 0, erro: null };
 
-  // Mapa trackingNumber -> ordem (para encontrar a ordem ao processar a row)
-  const ordensPorTracking = new Map();
-  for (const o of ordens) {
-    if (o.trackingNumber) ordensPorTracking.set(String(o.trackingNumber), o);
-  }
-  if (ordensPorTracking.size === 0) {
-    return { capturados: 0, processadas: 0, erro: 'nenhuma_os_com_tracking_number' };
-  }
-
-  const page = await context.newPage();
   let capturados = 0;
   let processadas = 0;
   const erros = [];
 
-  try {
-    await page.goto(PORTAL_LISTA_OS_URL(assetId), {
-      waitUntil: 'domcontentloaded',
-      timeout: 30_000,
-    });
+  // Ordens já vem com trackingNumber preenchido — filtra inválidas.
+  const ordensComTracking = ordens.filter((o) => o.trackingNumber);
+  if (ordensComTracking.length === 0) {
+    return { capturados: 0, processadas: 0, erro: 'nenhuma_os_com_tracking_number' };
+  }
 
-    // SPA do Salesforce hidratar — pequena pausa fixa em vez de networkidle
-    // (que nunca chega em SPAs com analytics/websockets).
-    await page.waitForTimeout(3_000);
+  const tag = equipamento.tag || equipamento.id;
+  console.log(`[GEHC_PDF] ${tag}: processando ${ordensComTracking.length} OS(s) via gateway.`);
 
-    // Detecta redirect para tela de login
-    const urlAtual = page.url();
-    if (urlAtual.includes('logon.gehealthcare.com') || urlAtual.includes('loginflow')) {
-      return { capturados: 0, processadas: 0, erro: `sessao_perdida: ${urlAtual.slice(0, 80)}` };
-    }
+  for (const ordem of ordensComTracking) {
+    try {
+      const trackingNumber = String(ordem.trackingNumber);
 
-    // Selector ESTAVEL descoberto via inspecao do DOM real do portal:
-    //   <div class="ge-equipment-service-history__item">       <- card completo
-    //     <div class="...__wrapper">  numero SR + 'Documentos disponiveis'
-    //     <div class="...__holder">   <button>Detalhes</button> <button>Download</button>
-    //   </div>
-    // Aguarda pelo menos 1 card aparecer COM CONTEUDO HIDRATADO (numero SR
-    // visivel) — sem isso, snapshotar items pode pegar skeletons placeholders
-    // de SPA ainda em hidratacao.
-    const itemSelector = '.ge-equipment-service-history__item';
-    const numeroSelector = '.ge-equipment-service-history__number';
-    const temItem = await page.locator(itemSelector).first()
-      .waitFor({ state: 'visible', timeout: 20_000 })
-      .then(() => true).catch(() => false);
+      // Guard de idempotencia por OS: documentIds rotacionam entre chamadas
+      // do gateway (memoria do projeto). Pula a OS inteira se ja tem
+      // qualquer documento baixado — economiza gateway + HTTP + LLM.
+      const jaTemBaixadoNaOs = await prisma.gehcPdfDocumento.count({
+        where: { ordemServicoId: ordem.id, baixadoEm: { not: null } },
+      });
+      if (jaTemBaixadoNaOs > 0) continue;
 
-    if (!temItem) {
-      return { capturados: 0, processadas: 0, erro: 'lista_sem_items_de_servico' };
-    }
-
-    // Aguarda hidratacao real: pelo menos 1 numero SR com texto nao-vazio
-    // dentro de algum card. Fallback de 5s — se nao hidratar, ja era.
-    await page.waitForFunction(
-      (sel) => {
-        const els = document.querySelectorAll(sel);
-        return [...els].some(el => /\d{5,}/.test(el.textContent || ''));
-      },
-      numeroSelector,
-      { timeout: 5_000 },
-    ).catch(() => {});
-
-    // Pega TODOS os cards de OS visiveis e processa um a um.
-    const items = await page.locator(itemSelector).all();
-    console.log(`[GEHC_PDF] ${equipamento.tag || equipamento.id}: ${items.length} card(s) de OS visiveis na lista.`);
-
-    for (const item of items) {
+      // Lista documentos da OS via gateway GraphQL (com retry interno).
+      let docsBrutos;
       try {
-        // Numero da OS sai do .ge-equipment-service-history__number — formato:
-        // <div><span>Nº SR</span>17386673</div>
-        const textoNumero = await item.locator('.ge-equipment-service-history__number')
-          .textContent({ timeout: 3_000 }).catch(() => '');
-        const matchSR = textoNumero?.match(/(\d{5,})/);
-        if (!matchSR) {
-          // Card sem numero visivel — pula (provavelmente loading skeleton)
-          continue;
-        }
-        const trackingNumber = matchSR[1];
-        const ordem = ordensPorTracking.get(trackingNumber);
-        if (!ordem) {
-          // OS na lista mas nao no nosso conjunto (ja baixada ou fora da janela)
-          continue;
-        }
-
-        // So tem botao Download se 'Documentos disponiveis' estiver presente
-        // no card (filtro natural — OS sem PDF nem chega aqui).
-        const temDocsDisponiveis = await item
-          .locator('.ge-equipment-service-history-activity-info__title')
-          .filter({ hasText: /documentos?\s+dispon[ií]ve/i })
-          .count() > 0;
-        if (!temDocsDisponiveis) continue;
-
-        // Guard de idempotencia por OS: o portal GE retorna documentIds NOVOS
-        // a cada chamada do documentSearch (mesmo PDF logico, ID novo). A
-        // idempotencia interna abaixo eh por documentId, entao nao protege
-        // contra execucoes concorrentes. Aqui pulamos a OS inteira se ela ja
-        // tem QUALQUER doc baixado — economiza GraphQL + Playwright + LLM.
-        const jaTemBaixadoNaOs = await prisma.gehcPdfDocumento.count({
-          where: { ordemServicoId: ordem.id, baixadoEm: { not: null } },
+        docsBrutos = await listarDocumentosDaOS({
+          serviceRequestNumber: trackingNumber,
+          accessToken: tokens?.accessToken,
+          idToken: tokens?.idToken,
         });
-        if (jaTemBaixadoNaOs > 0) {
-          continue;
+      } catch (err) {
+        erros.push(`SR${trackingNumber}: documentSearch ${err.message}`);
+        continue;
+      }
+      if (!docsBrutos.length) continue;
+
+      // Circuit breaker: pula docs com >=10 tentativas falhas nos ultimos 7d.
+      // Apos 7d volta a tentar — pode ter resolvido no lado do GE.
+      const idsRecorrentes = docsBrutos.map((d) => d.documentId);
+      const registros = await prisma.gehcPdfDocumento.findMany({
+        where: { documentId: { in: idsRecorrentes } },
+        select: {
+          documentId: true, baixadoEm: true,
+          tentativas: true, ultimaTentativaEm: true,
+        },
+      });
+      const limiteQuarentena = new Date();
+      limiteQuarentena.setDate(limiteQuarentena.getDate() - CIRCUIT_BREAKER_DIAS_QUARENTENA);
+      const skipSet = new Set();
+      const quarentena = [];
+      for (const r of registros) {
+        if (r.baixadoEm) { skipSet.add(r.documentId); continue; }
+        if (
+          (r.tentativas ?? 0) >= CIRCUIT_BREAKER_TENTATIVAS &&
+          r.ultimaTentativaEm && r.ultimaTentativaEm > limiteQuarentena
+        ) {
+          skipSet.add(r.documentId);
+          quarentena.push(r.documentId);
         }
+      }
+      if (quarentena.length > 0) {
+        console.log(
+          `[GEHC_PDF] SR${trackingNumber}: ${quarentena.length} doc(s) em quarentena (>=${CIRCUIT_BREAKER_TENTATIVAS} tentativas, voltam apos ${CIRCUIT_BREAKER_DIAS_QUARENTENA}d): ${quarentena.join(', ')}`
+        );
+      }
+      const docsPendentes = docsBrutos.filter((d) => !skipSet.has(d.documentId));
+      if (!docsPendentes.length) continue;
 
-        // Resolve documentos do GraphQL (idempotencia + filename real).
-        let docsPendentes = [];
-        try {
-          const docs = await listarDocumentosDaOS({
-            serviceRequestNumber: trackingNumber,
-            accessToken: tokens?.accessToken,
-            idToken: tokens?.idToken,
-          });
-          if (docs.length) {
-            // 1. Pula docs ja baixados (sucesso final)
-            // 2. Circuit breaker: pula docs com >=5 tentativas falhando se a
-            //    ultima tentativa foi ha menos de 7 dias. Apos 7 dias volta
-            //    a tentar — pode ter se resolvido o problema do lado do GE.
-            const idsRecorrentes = docs.map((d) => d.documentId);
-            const registros = await prisma.gehcPdfDocumento.findMany({
-              where: { documentId: { in: idsRecorrentes } },
-              select: {
-                documentId: true,
-                baixadoEm: true,
-                tentativas: true,
-                ultimaTentativaEm: true,
-              },
-            });
-            const limiteQuarentena = new Date();
-            limiteQuarentena.setDate(limiteQuarentena.getDate() - CIRCUIT_BREAKER_DIAS_QUARENTENA);
-            const skipSet = new Set();
-            const quarentena = [];
-            for (const r of registros) {
-              if (r.baixadoEm) { skipSet.add(r.documentId); continue; }
-              if (
-                (r.tentativas ?? 0) >= CIRCUIT_BREAKER_TENTATIVAS &&
-                r.ultimaTentativaEm && r.ultimaTentativaEm > limiteQuarentena
-              ) {
-                skipSet.add(r.documentId);
-                quarentena.push(r.documentId);
-              }
-            }
-            if (quarentena.length > 0) {
-              console.log(
-                `[GEHC_PDF] SR${trackingNumber}: ${quarentena.length} doc(s) em quarentena (>=${CIRCUIT_BREAKER_TENTATIVAS} tentativas, voltam a tentar apos ${CIRCUIT_BREAKER_DIAS_QUARENTENA}d): ${quarentena.join(', ')}`
-              );
-            }
-            docsPendentes = docs.filter((d) => !skipSet.has(d.documentId));
-          }
-        } catch (err) {
-          erros.push(`SR${trackingNumber}: documentSearch ${err.message}`);
-          continue;
-        }
+      // Baixa TODOS os documentos da OS — Manutencoes Planejadas tipicamente
+      // tem 2 docs (Service Report Salesforce + PM Form API GE), e ambos
+      // agregam valor distinto pra IA. Cap defensivo de 5 por OS para casos
+      // anomalos sem ficar sem rate-limit por OS.
+      const MAX_DOCS_POR_OS = 5;
+      const docsParaBaixar = docsPendentes.slice(0, MAX_DOCS_POR_OS);
+      if (docsPendentes.length > MAX_DOCS_POR_OS) {
+        console.log(
+          `[GEHC_PDF] SR${trackingNumber}: ${docsPendentes.length} documentos disponiveis, baixando apenas os primeiros ${MAX_DOCS_POR_OS}.`
+        );
+      }
 
-        if (!docsPendentes.length) continue; // nada a fazer
+      // Loop pelos documentos pendentes — usa wrapper com retry inline + log estruturado.
+      for (const doc of docsParaBaixar) {
+        processadas++;
 
-        // Cada OS GE pode ter varios documentos (Service Report, Activity
-        // Sheet, etc), todos com conteudo praticamente identico. Para a IA
-        // 1 PDF por OS basta — economiza download, R2 nao usado mas storage
-        // do banco fica menor, evita duplicacao no drill-down.
-        // listarDocumentosDaOS retorna em ordem de relevancia do portal,
-        // entao o primeiro eh o mais informativo (Service Report).
-        if (docsPendentes.length > 1) {
-          console.log(
-            `[GEHC_PDF] SR${trackingNumber}: ${docsPendentes.length} documentos disponiveis, baixando so o primeiro (${docsPendentes[0].documentId}).`
-          );
-          docsPendentes = docsPendentes.slice(0, 1);
-        }
+        const retryResult = await baixarComRetry({
+          doc, context, tokens,
+          tenantId, equipamento, ordem, trackingNumber,
+        });
 
-        // Botao Download esta no .ge-equipment-service-history__holder do card.
-        const downloadBtn = item.locator('.ge-equipment-service-history__holder button')
-          .filter({ hasText: /^(download|baixar)$/i }).first();
-
-        // Para cada documento pendente da OS — usa wrapper com retry inline
-        // 3x + log estruturado por tentativa + transient/permanent.
-        for (let i = 0; i < docsPendentes.length; i++) {
-          const doc = docsPendentes[i];
-          processadas++;
-
-          const retryResult = await baixarComRetry({
-            page, downloadBtn, doc, indice: i,
-            tenantId, equipamento, ordem, trackingNumber,
-          });
-
-          if (retryResult.ok) {
-            // SUCESSO — persiste documento, dispara extracao inline,
-            // marca logs anteriores desse documentId como resolvidos
-            const r = retryResult.ultimoResultado;
-            const fileName = doc.fileName || (r.download ? r.download.suggestedFilename() : 'sem_nome.pdf');
-            const fileHash = crypto.createHash('sha256').update(r.buffer).digest('hex');
-
-            const pdfDocumento = await prisma.gehcPdfDocumento.upsert({
-              where: { documentId: doc.documentId },
-              create: {
-                tenantId, equipamentoId: equipamento.id, ordemServicoId: ordem.id,
-                documentId: doc.documentId, fileName, fileHash,
-                fileSizeBytes: r.buffer.length, r2Key: null,
-                baixadoEm: new Date(),
-                tentativas: retryResult.tentativasFeitas,
-                ultimaTentativaEm: new Date(), ultimoErro: null,
-              },
-              update: {
-                fileName, fileHash, fileSizeBytes: r.buffer.length, r2Key: null,
-                baixadoEm: new Date(),
-                tentativas: { increment: retryResult.tentativasFeitas },
-                ultimaTentativaEm: new Date(), ultimoErro: null,
-              },
-            });
-
-            try {
-              const ext = await extrairUmPdf({ pdfDocumento, buffer: r.buffer });
-              if (!ext.ok) console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: extracao inline falhou — ${ext.erro}`);
-            } catch (extErr) {
-              console.error(`[GEHC_DOWNLOAD] ${doc.documentId}: erro extracao:`, extErr.message);
-            }
-
-            await marcarComoResolvido({ tenantId, documentId: doc.documentId });
-            capturados++;
-            // Reset do contador de falhas consecutivas — voltou a funcionar
-            if (contadorFalhasConsecutivas) contadorFalhasConsecutivas.value = 0;
-            continue;
-          }
-
-          // FALHA apos retry — atualiza pdfDocumento + incrementa contador
+        if (retryResult.ok) {
           const r = retryResult.ultimoResultado;
-          const erroAmigavel = r.mensagem || 'Falha desconhecida.';
-          erros.push(`${doc.documentId}: ${r.categoria} — ${erroAmigavel}`);
+          const fileName = doc.fileName || 'sem_nome.pdf';
+          const fileHash = crypto.createHash('sha256').update(r.buffer).digest('hex');
 
-          await prisma.gehcPdfDocumento.upsert({
+          const pdfDocumento = await prisma.gehcPdfDocumento.upsert({
             where: { documentId: doc.documentId },
             create: {
               tenantId, equipamentoId: equipamento.id, ordemServicoId: ordem.id,
-              documentId: doc.documentId, fileName: doc.fileName,
+              documentId: doc.documentId, fileName, fileHash,
+              fileSizeBytes: r.buffer.length, r2Key: null,
+              baixadoEm: new Date(),
               tentativas: retryResult.tentativasFeitas,
-              ultimaTentativaEm: new Date(),
-              ultimoErro: `[${r.categoria}] ${erroAmigavel}`.slice(0, 500),
+              ultimaTentativaEm: new Date(), ultimoErro: null,
             },
             update: {
+              fileName, fileHash, fileSizeBytes: r.buffer.length, r2Key: null,
+              baixadoEm: new Date(),
               tentativas: { increment: retryResult.tentativasFeitas },
-              ultimaTentativaEm: new Date(),
-              ultimoErro: `[${r.categoria}] ${erroAmigavel}`.slice(0, 500),
+              ultimaTentativaEm: new Date(), ultimoErro: null,
             },
-          }).catch(() => {});
+          });
 
-          // Detector de FALHA_SISTEMICA: incrementa contador de falhas
-          // consecutivas. Se atingir limite, sinaliza pra cima quebrar
-          // a execucao (evita gastar Playwright em problema sistemico).
-          if (contadorFalhasConsecutivas) {
-            contadorFalhasConsecutivas.value++;
-            if (contadorFalhasConsecutivas.value >= FALHAS_CONSECUTIVAS_PARA_SISTEMICO) {
-              console.error(
-                `[GEHC_DOWNLOAD] FALHA_SISTEMICA detectada — ${contadorFalhasConsecutivas.value} docs consecutivos falharam todas as ${RETRY_INLINE_MAX} tentativas. Quebrando execucao.`
-              );
-              await registrarLog({
-                tenantId,
-                categoria: CATEGORIAS_LOG.FALHA_SISTEMICA,
-                mensagem: `${contadorFalhasConsecutivas.value} docs consecutivos falharam todas as ${RETRY_INLINE_MAX} tentativas. Provavel sessao perdida, layout do portal mudou ou portal fora do ar.`,
-              });
-              return { capturados, processadas, falhaSistemica: true, erro: erros.join(' | ').slice(0, 500) };
-            }
+          try {
+            const ext = await extrairUmPdf({ pdfDocumento, buffer: r.buffer });
+            if (!ext.ok) console.warn(`[GEHC_DOWNLOAD] ${doc.documentId}: extracao inline falhou — ${ext.erro}`);
+          } catch (extErr) {
+            console.error(`[GEHC_DOWNLOAD] ${doc.documentId}: erro extracao:`, extErr.message);
+          }
+
+          await marcarComoResolvido({ tenantId, documentId: doc.documentId });
+          capturados++;
+          if (contadorFalhasConsecutivas) contadorFalhasConsecutivas.value = 0;
+          continue;
+        }
+
+        // FALHA apos retry — atualiza tentativas + ultimoErro
+        const r = retryResult.ultimoResultado || {};
+        const erroAmigavel = r.mensagem || 'Falha desconhecida.';
+        erros.push(`${doc.documentId}: ${r.categoria || 'ERRO'} — ${erroAmigavel}`);
+
+        await prisma.gehcPdfDocumento.upsert({
+          where: { documentId: doc.documentId },
+          create: {
+            tenantId, equipamentoId: equipamento.id, ordemServicoId: ordem.id,
+            documentId: doc.documentId, fileName: doc.fileName,
+            tentativas: retryResult.tentativasFeitas,
+            ultimaTentativaEm: new Date(),
+            ultimoErro: `[${r.categoria}] ${erroAmigavel}`.slice(0, 500),
+          },
+          update: {
+            tentativas: { increment: retryResult.tentativasFeitas },
+            ultimaTentativaEm: new Date(),
+            ultimoErro: `[${r.categoria}] ${erroAmigavel}`.slice(0, 500),
+          },
+        }).catch(() => {});
+
+        // Detector de FALHA_SISTEMICA: se reauth necessario OU N docs
+        // consecutivos falharam, quebra a execucao.
+        if (retryResult.requerReauth) {
+          console.error(
+            `[GEHC_DOWNLOAD] ${doc.documentId}: requer reauth, abortando captura do tenant.`
+          );
+          await registrarLog({
+            tenantId,
+            categoria: CATEGORIAS_LOG.FALHA_SISTEMICA,
+            mensagem: 'Auth GE expirada — necessario re-autenticar antes de continuar.',
+          });
+          return { capturados, processadas, falhaSistemica: true, erro: erros.join(' | ').slice(0, 500) };
+        }
+
+        if (contadorFalhasConsecutivas) {
+          contadorFalhasConsecutivas.value++;
+          if (contadorFalhasConsecutivas.value >= FALHAS_CONSECUTIVAS_PARA_SISTEMICO) {
+            console.error(
+              `[GEHC_DOWNLOAD] FALHA_SISTEMICA detectada — ${contadorFalhasConsecutivas.value} docs consecutivos falharam todas as ${RETRY_INLINE_MAX} tentativas.`
+            );
+            await registrarLog({
+              tenantId,
+              categoria: CATEGORIAS_LOG.FALHA_SISTEMICA,
+              mensagem: `${contadorFalhasConsecutivas.value} docs consecutivos falharam todas as ${RETRY_INLINE_MAX} tentativas. Provavel auth expirada ou gateway fora do ar.`,
+            });
+            return { capturados, processadas, falhaSistemica: true, erro: erros.join(' | ').slice(0, 500) };
           }
         }
-      } catch (err) {
-        erros.push(`row: ${err.message?.slice(0, 100)}`);
       }
+    } catch (err) {
+      erros.push(`OS ${ordem.trackingNumber || ordem.id}: ${err.message?.slice(0, 100)}`);
     }
-  } finally {
-    await page.close().catch(() => {});
   }
 
   return { capturados, processadas, erro: erros.length ? erros.join(' | ').slice(0, 500) : null };
 }
-
-// Helper que aciona o botao Download e captura o download — cobre 2 cenarios:
-// (a) baixa direto (1 PDF), (b) abre popup com checkboxes (multiplos PDFs).
-async function disparaDownloadDoBotao({ page, downloadBtn, indiceDocumento }) {
-  // Tenta capturar download imediato OU detectar popup
-  const popupAntes = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
-
-  // Clica e espera ate 5s pelo download direto
-  const promiseDownload = page.waitForEvent('download', { timeout: 5_000 }).catch(() => null);
-  await downloadBtn.click().catch(() => {});
-
-  const downloadDireto = await promiseDownload;
-  if (downloadDireto) return downloadDireto;
-
-  // Nao baixou direto — verificar se popup abriu
-  await page.waitForTimeout(1_500);
-  const popupDepois = await page.getByText(/fazer\s+o\s+download\s+dos\s+documentos/i).count();
-
-  if (popupDepois > popupAntes) {
-    // Popup aberto — marcar checkbox correto e clicar DOWNLOAD do popup
-    const checkboxes = page.locator('input[type="checkbox"]');
-    const total = await checkboxes.count();
-    if (total === 0 || indiceDocumento >= total) return null;
-
-    for (let i = 0; i < total; i++) {
-      const cb = checkboxes.nth(i);
-      if (await cb.isChecked()) await cb.uncheck().catch(() => {});
-    }
-    await checkboxes.nth(indiceDocumento).check().catch(() => {});
-
-    const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
-    const [download] = await Promise.all([
-      page.waitForEvent('download', { timeout: DOWNLOAD_TIMEOUT_MS }),
-      botaoPopup.click(),
-    ]);
-    return download;
-  }
-
-  return null;
-}
-
-// ─── Backfill orquestrado ────────────────────────────────────────────────────
-
-/**
- * Roda backfill de PDFs para um tenant.
- * Distribui as OSs ENTRE equipamentos (top N por equipamento) em vez de
- * concentrar tudo em poucos — assim a IA ganha contexto horizontal mais
- * rapidamente. Resumível: pula OSs cujo PDF já está baixado.
- *
- * @param {string} tenantId
- * @param {object} opts
- * @param {string[]} [opts.modalidades] - ex: ['MR'] (default: tudo)
- * @param {number} [opts.diasAtras=365]
- * @param {number} [opts.limite=50] - número máximo TOTAL de OSs por execução
- * @param {number} [opts.maxPorEquipamento=5] - cap de OSs por equipamento por execução
- */
 export async function executarBackfillPdfs({
   tenantId,
   modalidades,
