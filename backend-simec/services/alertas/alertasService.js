@@ -23,12 +23,37 @@ export async function listarAlertasService({ tenantId, userId, page = 1, pageSiz
     contarMetricasAlertas({ tenantId, userId, baseline }),
   ]);
 
+  // Enriquece com o feedback do próprio usuário (útil/não-útil + comentário)
+  // quando existe. Front usa para indicar qual botão está ativo no card.
+  const idsRecomendacoes = paginado.data
+    .filter((a) => a.tipo === 'Recomendação')
+    .map((a) => a.id);
+  let feedbackPorAlertaId = {};
+  if (idsRecomendacoes.length > 0) {
+    const feedbacks = await prisma.alertaFeedback.findMany({
+      where: {
+        tenantId,
+        usuarioId: userId,
+        alertaId: { in: idsRecomendacoes },
+      },
+      select: { alertaId: true, util: true, comentario: true, createdAt: true },
+    });
+    for (const f of feedbacks) {
+      feedbackPorAlertaId[f.alertaId] = f;
+    }
+  }
+
+  const dataAdaptada = adaptarListaAlertas(paginado.data).map((alerta) => ({
+    ...alerta,
+    feedbackUsuario: feedbackPorAlertaId[alerta.id] || null,
+  }));
+
   const totalPages = Math.ceil(paginado.total / pageSize) || 1;
 
   return {
     ok: true,
     data: {
-      data: adaptarListaAlertas(paginado.data),
+      data: dataAdaptada,
       total: paginado.total,
       page,
       pageSize,

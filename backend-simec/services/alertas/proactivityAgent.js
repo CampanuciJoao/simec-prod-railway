@@ -203,30 +203,41 @@ async function processarTenant(tenant) {
           : `Equipamentos: ${lista}${sufixo}`;
       }
 
-      // Acao sugerida pela recomendacao — define se o link de cada equipamento
-      // abre o cadastro em modo "editar" (cadastro incompleto / dados a
-      // completar) ou "detalhes" (default). Heuristica simples baseada em
-      // titulo, ja que o LLM nao retorna um campo estruturado.
+      // Ação sugerida pela recomendacao — define o CTA contextual do card no
+      // front. Valores reconhecidos:
+      //   - 'editar'             → abre cadastro do equipamento (dados incompletos)
+      //   - 'agendar_preventiva' → CTA "Agendar preventiva" (whitelist)
+      //   - 'detalhes' (default) → CTA "Ver ficha técnica" apenas
+      // O LLM não emite isso estruturado; classificamos por título.
       const tituloLower = (titulo || '').toLowerCase();
-      const acaoSugerida = /cadastr|preench|dados\s+(incompletos|cadastrais|faltantes)|complement/i.test(tituloLower)
-        ? 'editar'
-        : 'detalhes';
+      let acaoSugerida;
+      if (/cadastr|preench|dados\s+(incompletos|cadastrais|faltantes)|complement/i.test(tituloLower)) {
+        acaoSugerida = 'editar';
+      } else if (/preventiva|programar|agend|cronograma|periodicidade|vencendo|atrasad/i.test(tituloLower)) {
+        acaoSugerida = 'agendar_preventiva';
+      } else {
+        acaoSugerida = 'detalhes';
+      }
 
-      // Link primario: se houver exatamente 1 equipamento, abre direto na
-      // pagina certa (editar ou detalhes). Caso contrario leva para a lista
-      // geral — os chips individuais no card cuidam do drill-down por
-      // equipamento via metadataJson.
+      // Link primário do card. Para 'editar' e 'detalhes' aponta para o
+      // equipamento; para 'agendar_preventiva' a navegação acontece via botão
+      // dedicado no front (com state preenchido), então caímos em 'detalhes'
+      // para o link principal.
+      const acaoParaLink = acaoSugerida === 'agendar_preventiva' ? 'detalhes' : acaoSugerida;
       const link = eqsResolvidos.length === 1
-        ? `/equipamentos/${acaoSugerida}/${eqsResolvidos[0].id}`
+        ? `/equipamentos/${acaoParaLink}/${eqsResolvidos[0].id}`
         : '/equipamentos';
 
       // Metadata para hyperlinks clicaveis no card. Salva como JSON serializado.
+      // equipamentos[].acao é o prefixo de rota usado pelos chips (não pode ser
+      // 'agendar_preventiva' que não é rota de equipamento). acaoSugerida no
+      // nível do alerta carrega a intenção para o CTA contextual no front.
       const metadataJson = eqsResolvidos.length > 0
         ? JSON.stringify({
             equipamentos: eqsResolvidos.map((e) => ({
               id: e.id,
               label: e.label,
-              acao: acaoSugerida,
+              acao: acaoParaLink,
             })),
             acaoSugerida,
           })

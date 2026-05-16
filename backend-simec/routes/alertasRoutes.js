@@ -189,6 +189,50 @@ router.post('/marcar-todos-vistos', async (req, res) => {
   }
 });
 
+// Feedback do usuário sobre uma recomendação inteligente.
+// POST /:id/feedback { util: boolean, comentario?: string }
+// Upsert: clicar de novo atualiza o registro do mesmo usuário no mesmo alerta.
+router.post('/:id/feedback', async (req, res) => {
+  try {
+    const util = req.body?.util;
+    const comentarioRaw = req.body?.comentario;
+    if (typeof util !== 'boolean') {
+      return res.status(400).json({ message: '"util" precisa ser boolean.' });
+    }
+    const comentario =
+      typeof comentarioRaw === 'string' && comentarioRaw.trim().length > 0
+        ? comentarioRaw.trim().slice(0, 2000)
+        : null;
+
+    const tenantId = req.usuario.tenantId;
+    const usuarioId = req.usuario.id;
+    const alertaId = req.params.id;
+
+    // Garante que o alerta existe no tenant (FK não bloqueia falar de tenant
+    // alheio mas a checagem aqui devolve 404 amigável em vez de 500).
+    const alerta = await prisma.alerta.findFirst({
+      where: { tenantId, id: alertaId },
+      select: { id: true },
+    });
+    if (!alerta) {
+      return res.status(404).json({ message: 'Alerta não encontrado.' });
+    }
+
+    const feedback = await prisma.alertaFeedback.upsert({
+      where: {
+        tenantId_alertaId_usuarioId: { tenantId, alertaId, usuarioId },
+      },
+      update: { util, comentario },
+      create: { tenantId, alertaId, usuarioId, util, comentario },
+    });
+
+    return res.json({ ok: true, feedback });
+  } catch (error) {
+    console.error('[ALERTA_FEEDBACK_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao registrar feedback.' });
+  }
+});
+
 router.put('/:id/status', async (req, res) => {
   try {
     const resultado = await atualizarStatusAlertaService({

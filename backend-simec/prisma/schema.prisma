@@ -64,6 +64,7 @@ model Tenant {
   aiPipelineEstados        AiPipelineEstado[]
   tiposTesteQualidade      TipoTesteQualidade[]
   testesQualidade          TesteQualidade[]
+  alertaFeedbacks          AlertaFeedback[]
 
   @@map("tenants")
 }
@@ -144,6 +145,7 @@ model Usuario {
   aceitesTermos           AceiteTermo[]
   testesQualidadeAutor    TesteQualidade[]   @relation("TesteQualidadeAutor")
   testesQualidadeDeletados TesteQualidade[]  @relation("TesteQualidadeDeletadoPor")
+  alertaFeedbacks         AlertaFeedback[]
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -472,6 +474,7 @@ model Alerta {
 
   tenant          Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   lidoPorUsuarios AlertaLidoPorUsuario[]
+  feedbacks       AlertaFeedback[]
 
   @@unique([tenantId, id])
   @@index([tenantId, data])
@@ -483,6 +486,30 @@ model Alerta {
   @@index([tenantId, tipoEvento])
   @@index([tenantId, tipoCategoria])
   @@map("alertas")
+}
+
+// Feedback do usuário sobre uma recomendação inteligente (👍 útil / 👎 não-útil
+// + comentário opcional). Usado para refinar a IA e medir qualidade das
+// recomendações ao longo do tempo. 1 feedback por usuário por alerta — clicar
+// de novo atualiza o registro.
+model AlertaFeedback {
+  id         String   @id @default(uuid())
+  tenantId   String
+  alertaId   String
+  usuarioId  String
+  util       Boolean
+  comentario String?  @db.Text
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alerta  Alerta  @relation(fields: [tenantId, alertaId], references: [tenantId, id], onDelete: Cascade)
+  usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, alertaId, usuarioId])
+  @@index([tenantId, util])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("alerta_feedback")
 }
 
 model AlertaLidoPorUsuario {

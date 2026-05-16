@@ -17,3 +17,10 @@ export const marcarTodosAlertasComoVistos = () =>
 
 export const getHistoricoAlertas = (params = {}) =>
   api.get('/alertas/historico', { params }).then((res) => res.data);
+
+// Feedback do usuário sobre uma recomendação inteligente.
+// util: true (👍) | false (👎); comentario opcional (default null).
+export const enviarFeedbackAlerta = (alertaId, { util, comentario = null }) =>
+  api
+    .post(`/alertas/${alertaId}/feedback`, { util, comentario })
+    .then((res) => res.data);

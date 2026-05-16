@@ -13,6 +13,8 @@ import {
   faChevronDown,
   faChevronUp,
   faPenToSquare,
+  faThumbsUp,
+  faThumbsDown,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { useTenantTime } from '@/hooks/time/useTenantTime';
@@ -22,6 +24,8 @@ import {
   getAlertaIcon,
   buildAgendarPreventivaLink,
 } from '@/utils/alertas/alertaUtils';
+import { enviarFeedbackAlerta } from '@/services/api/alertasApi';
+import { useToast } from '@/contexts/ToastContext';
 
 function montarSubtitulo(alerta, timezone, locale) {
   const partes = [];
@@ -66,8 +70,15 @@ function extrairExplicacao(alerta) {
 
 function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const { timezone, locale } = useTenantTime();
   const [showExplicacao, setShowExplicacao] = useState(false);
+
+  // Estado de feedback (👍/👎). Inicializa do que o backend devolveu.
+  const [feedback, setFeedback] = useState(alerta?.feedbackUsuario || null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackComentario, setFeedbackComentario] = useState('');
+  const [feedbackEnviando, setFeedbackEnviando] = useState(false);
 
   const style = getAlertaVisual(alerta);
   const isRecomendacao = alerta.tipo === 'Recomendação';
@@ -75,20 +86,67 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
     alerta.tipoEvento === 'MANUT_CONFIRMACAO' ||
     alerta.tipoEvento === 'OS_CORRETIVA_VISITA_CONFIRMACAO';
 
-  // metadata.equipamentos: lista vinda do proactivityAgent quando o LLM
-  // citou equipamentos especificos e eles foram resolvidos para ids no
-  // banco. Permite renderizar chips clicaveis em vez do equipamento ser
-  // apenas texto no subtitulo.
   const equipamentosClicaveis = Array.isArray(alerta?.metadata?.equipamentos)
     ? alerta.metadata.equipamentos.filter((e) => e?.id && e?.label)
     : [];
-  // 'editar' quando a recomendacao for de cadastro incompleto, 'detalhes'
-  // caso contrario. Backend decide e expoe via metadata.acaoSugerida.
-  const acaoEquipamento = alerta?.metadata?.acaoSugerida === 'editar' ? 'editar' : 'detalhes';
-  // "Agendar preventiva" so faz sentido quando a recomendacao for sobre
-  // manutencao/risco — em cadastro incompleto o caminho certo eh editar
-  // o equipamento direto.
-  const mostrarBotaoAgendar = acaoEquipamento !== 'editar';
+  // CTA contextual baseado em metadata.acaoSugerida:
+  //   'editar'             → cadastro incompleto, abre ficha em modo edição
+  //   'agendar_preventiva' → recomenda agendar preventiva
+  //   'detalhes' (default) → só "Ver ficha técnica", sem CTA de agendar
+  const acaoSugeridaRaw = alerta?.metadata?.acaoSugerida;
+  const acaoEquipamento = acaoSugeridaRaw === 'editar' ? 'editar' : 'detalhes';
+  const mostrarBotaoAgendar = acaoSugeridaRaw === 'agendar_preventiva';
+
+  const handleFeedback = useCallback(
+    async (util) => {
+      if (feedbackEnviando) return;
+      // Clique no botão já ativo abre/fecha textarea (não reenvia)
+      if (feedback?.util === util) {
+        setFeedbackOpen((open) => !open);
+        return;
+      }
+      setFeedbackEnviando(true);
+      try {
+        const resp = await enviarFeedbackAlerta(alerta.id, {
+          util,
+          comentario: null,
+        });
+        setFeedback(resp?.feedback || { util, comentario: null });
+        addToast(util ? 'Obrigado pelo feedback!' : 'Feedback registrado.', 'success');
+        // Quando é não-útil, abre textarea pra capturar o motivo opcional
+        if (!util) setFeedbackOpen(true);
+      } catch (err) {
+        addToast(
+          err?.response?.data?.message || 'Falha ao enviar feedback.',
+          'error'
+        );
+      } finally {
+        setFeedbackEnviando(false);
+      }
+    },
+    [alerta.id, feedback, feedbackEnviando, addToast]
+  );
+
+  const handleEnviarComentario = useCallback(async () => {
+    if (feedbackEnviando || !feedback) return;
+    setFeedbackEnviando(true);
+    try {
+      const resp = await enviarFeedbackAlerta(alerta.id, {
+        util: feedback.util,
+        comentario: feedbackComentario || null,
+      });
+      setFeedback(resp?.feedback || { ...feedback, comentario: feedbackComentario });
+      setFeedbackOpen(false);
+      addToast('Comentário salvo.', 'success');
+    } catch (err) {
+      addToast(
+        err?.response?.data?.message || 'Falha ao salvar comentário.',
+        'error'
+      );
+    } finally {
+      setFeedbackEnviando(false);
+    }
+  }, [alerta.id, feedback, feedbackComentario, feedbackEnviando, addToast]);
 
   const dataFormatada = alerta.data ? formatarData(alerta.data) : '-';
   const subtituloRenderizado = montarSubtitulo(alerta, timezone, locale);
@@ -417,6 +475,117 @@ function AlertaItem({ alerta, onUpdateStatus, onDismiss }) {
                 >
                   {explicacao}
                 </p>
+              </div>
+            ) : null}
+
+            {/* Feedback do usuário sobre a qualidade da recomendação. */}
+            <div
+              className="mt-4 flex flex-wrap items-center gap-2 border-t pt-3"
+              style={{ borderColor: 'var(--color-info-soft)' }}
+            >
+              <span
+                className="text-[10px] font-bold uppercase tracking-[0.16em]"
+                style={{ color: 'var(--text-muted)' }}
+              >
+                Essa recomendação foi útil?
+              </span>
+              <button
+                type="button"
+                onClick={() => handleFeedback(true)}
+                disabled={feedbackEnviando}
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition hover:shadow-sm"
+                style={{
+                  borderColor:
+                    feedback?.util === true ? 'var(--color-success)' : 'var(--color-info-soft)',
+                  backgroundColor:
+                    feedback?.util === true
+                      ? 'var(--color-success-soft)'
+                      : 'var(--bg-surface)',
+                  color:
+                    feedback?.util === true
+                      ? 'var(--color-success)'
+                      : 'var(--text-muted)',
+                }}
+                aria-label="Útil"
+                title="Útil"
+              >
+                <FontAwesomeIcon icon={faThumbsUp} />
+                Útil
+              </button>
+              <button
+                type="button"
+                onClick={() => handleFeedback(false)}
+                disabled={feedbackEnviando}
+                className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold transition hover:shadow-sm"
+                style={{
+                  borderColor:
+                    feedback?.util === false ? 'var(--color-danger)' : 'var(--color-info-soft)',
+                  backgroundColor:
+                    feedback?.util === false
+                      ? 'var(--color-danger-soft)'
+                      : 'var(--bg-surface)',
+                  color:
+                    feedback?.util === false
+                      ? 'var(--color-danger)'
+                      : 'var(--text-muted)',
+                }}
+                aria-label="Não útil"
+                title="Não útil"
+              >
+                <FontAwesomeIcon icon={faThumbsDown} />
+                Não útil
+              </button>
+              {feedback && !feedbackOpen ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFeedbackComentario(feedback.comentario || '');
+                    setFeedbackOpen(true);
+                  }}
+                  className="text-[11px] font-semibold underline-offset-2 hover:underline"
+                  style={{ color: 'var(--color-info)' }}
+                >
+                  {feedback.comentario ? 'Editar comentário' : 'Adicionar comentário'}
+                </button>
+              ) : null}
+            </div>
+
+            {feedbackOpen ? (
+              <div className="mt-2 flex flex-col gap-2">
+                <textarea
+                  rows={2}
+                  value={feedbackComentario}
+                  onChange={(e) => setFeedbackComentario(e.target.value)}
+                  placeholder="Por que essa recomendação foi útil ou não? (opcional)"
+                  className="w-full rounded-lg border px-3 py-2 text-sm"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: 'var(--bg-surface)',
+                    color: 'var(--text-primary)',
+                  }}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFeedbackOpen(false)}
+                    className="rounded-lg px-3 py-1 text-xs font-semibold"
+                    style={{ color: 'var(--text-muted)' }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleEnviarComentario}
+                    disabled={feedbackEnviando}
+                    className="rounded-lg px-3 py-1 text-xs font-bold"
+                    style={{
+                      backgroundColor: 'var(--color-info)',
+                      color: '#fff',
+                    }}
+                  >
+                    {feedbackEnviando ? 'Salvando...' : 'Salvar comentário'}
+                  </button>
+                </div>
               </div>
             ) : null}
           </div>
