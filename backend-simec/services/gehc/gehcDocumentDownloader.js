@@ -440,61 +440,62 @@ async function tentarBaixarUmDocumento({ page, downloadBtn, indiceDocumento }) {
     // contem a URL S3 pre-assinada. O portal NAO dispara download event —
     // ele abre o PDF via <a> (target=_blank), por isso waitForEvent('download')
     // nunca dispara. Veja comentario do extrairS3UrlDoPayload.
+    //
+    // Implementacao: page.on('response') coleta TODOS os responses do gateway
+    // (sem ler body no listener — filter async do waitForResponse pode dar
+    // problema consumindo bodies de responses irrelevantes). Polling de 500ms
+    // le o body de cada candidato novo procurando URL S3.
     const botaoPopup = page.locator('button').filter({ hasText: /^(download|baixar)$/i }).last();
 
-    // Prepara a escuta ANTES de clicar — race condition seria perda de evento.
-    // Filtra pelo response que (a) e do gateway, (b) status 200 e (c) corpo
-    // contem URL S3 (descarta o 1o POST que lista PDFs sem URL).
-    const gatewayResponsePromise = page.waitForResponse(
-      async (r) => {
-        if (r.request().method() !== 'POST') return false;
-        if (!RE_GATEWAY_DOWNLOAD.test(r.url())) return false;
-        if (r.status() !== 200) return false;
-        try {
-          const txt = await r.text();
-          return RE_S3_URL_GE.test(txt);
-        } catch {
-          return false;
-        }
-      },
-      { timeout: DOWNLOAD_TIMEOUT_MS },
-    ).catch(() => null);
+    const candidatos = [];
+    const responseListener = (resp) => {
+      if (resp.request().method() === 'POST'
+          && RE_GATEWAY_DOWNLOAD.test(resp.url())
+          && resp.status() === 200) {
+        candidatos.push(resp);
+      }
+    };
+    page.on('response', responseListener);
 
-    await botaoPopup.click().catch(() => {});
-    t.marcar('botao_popup_clicado');
-
-    const gatewayResponse = await gatewayResponsePromise;
-    if (!gatewayResponse) {
-      const fim = t.finalizar();
-      return {
-        ok: false,
-        categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s esperando response do gateway com URL S3.`,
-        etapas: fim.etapas,
-        duracaoMs: fim.duracaoMs,
-      };
-    }
-    t.marcar('gateway_response_recebido', { status: gatewayResponse.status() });
-
-    // Extrai a URL S3 do payload — busca recursiva (campo pode variar).
-    let s3Url;
+    let s3Url = null;
+    const lidos = new WeakSet();
     try {
-      const payload = await gatewayResponse.json();
-      s3Url = extrairS3UrlDoPayload(payload);
-    } catch {
-      // Fallback: regex no texto bruto
-      const txt = await gatewayResponse.text().catch(() => '');
-      const m = txt.match(RE_S3_URL_GE);
-      s3Url = m ? m[0] : null;
+      await botaoPopup.click().catch(() => {});
+      t.marcar('botao_popup_clicado');
+
+      const deadline = Date.now() + DOWNLOAD_TIMEOUT_MS;
+      while (Date.now() < deadline && !s3Url) {
+        for (const resp of candidatos) {
+          if (lidos.has(resp)) continue;
+          lidos.add(resp);
+          try {
+            const txt = await resp.text();
+            const m = txt.match(RE_S3_URL_GE);
+            if (m) {
+              s3Url = m[0];
+              t.marcar('s3_url_extraida', { hasUrl: true });
+              break;
+            }
+          } catch {
+            // body ja consumido ou erro de leitura — ignora
+          }
+        }
+        if (s3Url) break;
+        await sleep_ms(500);
+      }
+    } finally {
+      page.off('response', responseListener);
     }
 
     if (!s3Url) {
-      t.marcar('s3_url_nao_encontrada', { ok: false });
+      t.marcar('gateway_sem_s3_url', { candidatos: candidatos.length });
       const fim = t.finalizar();
       return {
         ok: false,
         categoria: CATEGORIAS_LOG.TIMEOUT_DOWNLOAD,
-        mensagem: 'Response do gateway sem URL S3 reconhecida.',
+        mensagem: candidatos.length === 0
+          ? `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s sem responses do gateway (click pode nao ter disparado o POST).`
+          : `Timeout ${DOWNLOAD_TIMEOUT_MS / 1000}s — ${candidatos.length} response(s) do gateway vistos, nenhum com URL S3.`,
         etapas: fim.etapas,
         duracaoMs: fim.duracaoMs,
       };
