@@ -28,10 +28,13 @@ const REFRESH_INTERVAL_MS = 60_000;
 // suficiente para liberar o botao logo apos jobs curtos (5-30s), e nao
 // agressivo o suficiente para sobrecarregar a API em jobs longos (5min).
 const JOB_POLL_INTERVAL_MS = 4_000;
+// gehc-capturar-pdfs leva ~20 min num ciclo cheio (limite=50, 5 PDFs por
+// equipamento, Playwright + R2). Margem extra para evitar dar "timeout" no
+// front enquanto o job ainda está rodando no worker.
 // Limite duro: para o polling apos 15 min para nao deixar request aberto
 // indefinidamente. O proximo refresh global (60s) vai capturar o resultado
 // final via /pipelines mesmo se o polling acabar antes do job.
-const JOB_POLL_TIMEOUT_MS = 15 * 60_000;
+const JOB_POLL_TIMEOUT_MS = 30 * 60_000;
 
 export function useGehcAprendizado() {
   const [status, setStatus]               = useState(null);
@@ -255,18 +258,41 @@ export function useGehcAprendizado() {
     // Espera o job sair da fila/active. Enquanto isso o botao fica disabled
     // com spinner.
     const fim = await aguardarJobTerminar(pipeline);
+    // Pega a telemetria mais fresca direto da API para já refletir o ciclo
+    // que acabou de terminar (carregar() seta state, mas o feedback abaixo
+    // precisa do valor agora).
+    let snapshot = null;
+    try {
+      const ps = await getAprendizadoPipelines();
+      snapshot = (ps?.pipelines || []).find((p) => p.pipeline === pipeline) || null;
+    } catch {
+      // erros de rede não bloqueiam o feedback
+    }
+    // Atualiza o estado global em paralelo (sem await — o feedback usa o
+    // snapshot local).
+    carregar().catch(() => {});
     if (fim.ok) {
       const horario = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      setFeedback(pipeline, 'success', `Execução concluída às ${horario}. Pronto para rodar de novo se precisar.`, 60_000);
-    } else {
+      const detalhe = snapshot?.ultimaExecucaoMensagem
+        ? ` — ${snapshot.ultimaExecucaoMensagem}`
+        : '';
+      const tone = snapshot?.ultimaExecucaoOk === false ? 'error' : 'success';
       setFeedback(
         pipeline,
-        'error',
-        'A execução demorou mais que o esperado — botão liberado. Verifique os KPIs e o feed para ver o resultado.',
+        tone,
+        `Execução concluída às ${horario}${detalhe}.`,
+        60_000,
+      );
+    } else {
+      // Polling estourou timeout. O job pode ainda estar rodando — não
+      // assumimos falha. Indicamos que o usuário acompanhe pelos KPIs.
+      setFeedback(
+        pipeline,
+        'info',
+        'O job ainda está em execução. O spinner foi liberado, mas o ciclo continua no servidor. Acompanhe os KPIs e a Última execução acima.',
         60_000,
       );
     }
-    await carregar().catch(() => {});
     liberarAcao(pipeline);
   }, [carregar, liberarAcao, aguardarJobTerminar]);
 
