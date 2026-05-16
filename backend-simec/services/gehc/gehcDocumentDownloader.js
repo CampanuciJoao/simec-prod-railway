@@ -280,6 +280,54 @@ async function baixarDocumentoViaUrl({ doc, context, tokens }) {
   t.marcar('http_response', { status });
 
   if (status === 401 || status === 403) {
+    // Fallback para source 101 (Salesforce): tenta navegacao real via Playwright.
+    // O context tem cookies do my.salesforce.com setados durante o SSO no login,
+    // que o context.request.get pode nao enviar cross-domain. Navegacao real
+    // do browser segue cookies + redirects automaticamente.
+    if (doc.documentSource === '101') {
+      // Debug: loga cookies disponiveis pro dominio do Salesforce — ajuda
+      // diagnosticar se SSO setou cookies de sessao no contexto.
+      try {
+        const cookies = await context.cookies(doc.documentUrl);
+        t.marcar('salesforce_cookies', {
+          quantidade: cookies.length,
+          nomes: cookies.map((c) => c.name).slice(0, 5).join(','),
+        });
+      } catch {}
+
+      try {
+        const newPage = await context.newPage();
+        try {
+          const navResp = await newPage.goto(doc.documentUrl, {
+            waitUntil: 'domcontentloaded',
+            timeout: 60_000,
+          });
+          if (navResp && navResp.ok()) {
+            const navBuffer = await navResp.body();
+            if (validarPdfBuffer(navBuffer)) {
+              t.marcar('salesforce_navegacao_ok', { bytes: navBuffer.length });
+              const fim = t.finalizar();
+              return {
+                ok: true,
+                categoria: CATEGORIAS_LOG.SUCESSO,
+                mensagem: null,
+                etapas: fim.etapas,
+                duracaoMs: fim.duracaoMs,
+                buffer: navBuffer,
+              };
+            }
+          }
+          t.marcar('salesforce_navegacao_falhou', {
+            status: navResp?.status() || null,
+          });
+        } finally {
+          await newPage.close().catch(() => {});
+        }
+      } catch (navErr) {
+        t.marcar('salesforce_navegacao_erro', { erro: navErr.message?.slice(0, 100) });
+      }
+    }
+
     const fim = t.finalizar();
     // Distingue: 401 em source 101 e' problema localizado do Salesforce
     // (nosso token CDX nao destrava Salesforce direto). 401 em 102 e' o
@@ -587,7 +635,9 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
         }).catch(() => {});
 
         // Detector de FALHA_SISTEMICA: se reauth necessario OU N docs
-        // consecutivos falharam, quebra a execucao.
+        // consecutivos falharam, quebra a execucao. NAO conta erros
+        // permanentes (SALESFORCE_AUTH_FALHA, NAO_E_PDF, etc.) — esses sao
+        // problemas localizados de doc, nao indicam portal fora.
         if (retryResult.requerReauth) {
           console.error(
             `[GEHC_DOWNLOAD] ${doc.documentId}: requer reauth, abortando captura do tenant.`
@@ -600,7 +650,7 @@ async function capturarPdfsDeEquipamento({ context, tenantId, equipamento, orden
           return { capturados, processadas, falhaSistemica: true, erro: erros.join(' | ').slice(0, 500) };
         }
 
-        if (contadorFalhasConsecutivas) {
+        if (contadorFalhasConsecutivas && !CATEGORIAS_PERMANENTES.has(r.categoria)) {
           contadorFalhasConsecutivas.value++;
           if (contadorFalhasConsecutivas.value >= FALHAS_CONSECUTIVAS_PARA_SISTEMICO) {
             console.error(
