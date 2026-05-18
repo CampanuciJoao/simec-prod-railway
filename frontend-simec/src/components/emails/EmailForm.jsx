@@ -25,33 +25,56 @@ const ESTADO_INICIAL = {
 function FormField({ label, required = false, children, hint = '' }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-700">
+      <label
+        className="text-sm font-medium"
+        style={{ color: 'var(--text-secondary)' }}
+      >
         {label}
         {required ? ' *' : ''}
       </label>
       {children}
-      {hint ? <p className="text-xs text-slate-500">{hint}</p> : null}
+      {hint ? (
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {hint}
+        </p>
+      ) : null}
     </div>
   );
 }
 
 function ToggleField({ checked, onChange, label, description }) {
   return (
-    <label className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border border-slate-200 bg-white p-4 transition hover:border-slate-300">
+    <label
+      className="flex cursor-pointer items-start justify-between gap-4 rounded-xl border p-4 transition"
+      style={{
+        borderColor: 'var(--border-soft)',
+        backgroundColor: 'var(--bg-surface-soft)',
+      }}
+    >
       <div className="min-w-0">
-        <div className="text-sm font-medium text-slate-800">{label}</div>
+        <div
+          className="text-sm font-medium"
+          style={{ color: 'var(--text-primary)' }}
+        >
+          {label}
+        </div>
         {description ? (
-          <div className="mt-1 text-xs leading-5 text-slate-500">
+          <div
+            className="mt-1 text-xs leading-5"
+            style={{ color: 'var(--text-muted)' }}
+          >
             {description}
           </div>
         ) : null}
       </div>
 
       <span
-        className={[
-          'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition',
-          checked ? 'bg-blue-600' : 'bg-slate-300',
-        ].join(' ')}
+        className="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition"
+        style={{
+          backgroundColor: checked
+            ? 'var(--brand-primary)'
+            : 'var(--border-strong)',
+        }}
       >
         <input
           type="checkbox"
@@ -61,9 +84,10 @@ function ToggleField({ checked, onChange, label, description }) {
         />
         <span
           className={[
-            'inline-block h-5 w-5 transform rounded-full bg-white shadow transition',
+            'inline-block h-5 w-5 transform rounded-full shadow transition',
             checked ? 'translate-x-5' : 'translate-x-1',
           ].join(' ')}
+          style={{ backgroundColor: '#fff' }}
         />
       </span>
     </label>
@@ -176,7 +200,14 @@ function EmailForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error ? (
-        <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          className="rounded-2xl border px-4 py-3 text-sm"
+          style={{
+            borderColor: 'var(--color-danger)',
+            backgroundColor: 'var(--color-danger-soft)',
+            color: 'var(--color-danger)',
+          }}
+        >
           {error}
         </div>
       ) : null}
@@ -185,7 +216,10 @@ function EmailForm({
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <FormField label="Nome">
             <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <span
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 <FontAwesomeIcon icon={faUser} />
               </span>
               <Input
@@ -200,7 +234,10 @@ function EmailForm({
 
           <FormField label="E-mail" required>
             <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <span
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 <FontAwesomeIcon icon={faEnvelope} />
               </span>
               <Input
@@ -219,7 +256,10 @@ function EmailForm({
             hint="Número de dias antes do vencimento para enviar alertas."
           >
             <div className="relative">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
+              <span
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2"
+                style={{ color: 'var(--text-muted)' }}
+              >
                 <FontAwesomeIcon icon={faClock} />
               </span>
               <Input
@@ -251,14 +291,23 @@ function EmailForm({
 
       <Card>
         <div className="mb-4 flex items-center gap-2">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-100 text-blue-600">
+          <span
+            className="inline-flex h-10 w-10 items-center justify-center rounded-2xl"
+            style={{
+              backgroundColor: 'var(--brand-primary-soft)',
+              color: 'var(--brand-primary)',
+            }}
+          >
             <FontAwesomeIcon icon={faBell} />
           </span>
           <div>
-            <h3 className="text-base font-semibold text-slate-900">
+            <h3
+              className="text-base font-semibold"
+              style={{ color: 'var(--text-primary)' }}
+            >
               Tipos de alerta
             </h3>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
               Selecione quais notificações esse e-mail deve receber.
             </p>
           </div>
