@@ -87,7 +87,7 @@ function ManutencoesPage() {
           className="w-full sm:w-auto justify-center"
         >
           <FontAwesomeIcon icon={faPlus} />
-          Agendar nova
+          Agendar Preventiva
         </Button>
       </div>
     );

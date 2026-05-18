@@ -1,7 +1,7 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowLeft, faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft } from '@fortawesome/free-solid-svg-icons';
+import { faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
@@ -11,7 +11,7 @@ import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/Confirmaca
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
 import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
 import MoverOsEquipamentoModal from '@/components/osCorretiva/MoverOsEquipamentoModal';
-import { PageLayout, PageState, Button } from '@/components/ui';
+import { PageLayout, PageState, Button, BackButton } from '@/components/ui';
 
 const STATUS_COLORS = {
   Aberta: '#2563eb',
@@ -91,11 +91,7 @@ function DetalhesOsCorretivaPage() {
         {/* Cabeçalho */}
         <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <Link to="/manutencoes">
-              <Button type="button" variant="secondary">
-                <FontAwesomeIcon icon={faArrowLeft} />
-              </Button>
-            </Link>
+            <BackButton fallbackTo="/manutencoes" />
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>

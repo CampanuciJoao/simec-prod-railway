@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import debounce from 'lodash/debounce';
 import { getOsCorretivas, excluirOsCorretiva } from '../../services/api/osCorretivaApi';
 import { useToast } from '../../contexts/ToastContext';
+import { useSessionState } from '../shared/useSessionState';
 
 const PAGE_SIZE = 12;
 
@@ -34,8 +35,18 @@ export function useOsCorretiva({ tipoFixo = null } = {}) {
     hasNextPage: false,
   });
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filtros, setFiltros] = useState({ tipo: '', status: '' });
+  // Persistência por namespace do tipoFixo — Manutenções (Corretiva) e
+  // Ocorrências (Ocorrencia) têm filtros independentes. Sem tipoFixo, usa um
+  // bucket "all". Sobrevive a back/reload no mesmo tab.
+  const sessionScope = tipoFixo || 'all';
+  const [searchTerm, setSearchTerm] = useSessionState(
+    `osCorretiva:${sessionScope}:searchTerm`,
+    ''
+  );
+  const [filtros, setFiltros] = useSessionState(
+    `osCorretiva:${sessionScope}:filtros`,
+    { tipo: '', status: '' }
+  );
 
   const fetchOsCorretivas = useCallback(
     async ({ page = 1, append = false } = {}) => {

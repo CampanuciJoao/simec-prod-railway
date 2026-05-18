@@ -7,6 +7,7 @@ import {
   getUnidades,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
+import { useSessionState } from '../shared/useSessionState';
 
 const PAGE_SIZE = 12;
 
@@ -52,17 +53,22 @@ export function useManutencoes() {
     hasNextPage: false,
   });
 
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filtros, setFiltros] = useState({
+  // Filtros/busca/ordenação persistidos em sessionStorage — sobrevive a back
+  // do navegador e reload no mesmo tab. Limpa ao fechar a aba.
+  const [searchTerm, setSearchTerm] = useSessionState(
+    'manutencoes:searchTerm',
+    ''
+  );
+  const [filtros, setFiltros] = useSessionState('manutencoes:filtros', {
     status: '',
     tipo: '',
     unidadeId: '',
   });
 
-  const [sortConfig, setSortConfig] = useState({
-    key: 'createdAt',
-    direction: 'descending',
-  });
+  const [sortConfig, setSortConfig] = useSessionState(
+    'manutencoes:sortConfig',
+    { key: 'createdAt', direction: 'descending' }
+  );
 
   const fetchUnidades = useCallback(async () => {
     try {
