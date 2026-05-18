@@ -214,8 +214,17 @@ function TabHistoricoSaude({ equipamentoId }) {
     else setFim(e.target.value);
   };
 
-  const handleExportar = () => {
-    void exportarSaudeEquipamentoPDF(equipamentoId, { inicio, fim }).catch(() => {});
+  const [exportandoModo, setExportandoModo] = useState(null);
+
+  const handleExportar = async (modo) => {
+    setExportandoModo(modo);
+    try {
+      await exportarSaudeEquipamentoPDF(equipamentoId, { inicio, fim, modo });
+    } catch {
+      // erro tratado pelo helper baixarPdf
+    } finally {
+      setExportandoModo(null);
+    }
   };
 
   return (
@@ -247,9 +256,25 @@ function TabHistoricoSaude({ equipamentoId }) {
           <div className="flex items-end gap-2 ml-auto flex-wrap">
             <DateInput label="De"  value={inicio} onChange={(e) => handleCustom('inicio', e)} />
             <DateInput label="Ate" value={fim}    onChange={(e) => handleCustom('fim', e)} />
-            <Button variant="danger" size="sm" onClick={handleExportar}>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => handleExportar('resumido')}
+              disabled={!!exportandoModo}
+              title="Relatorio executivo com KPIs, eventos criticos e graficos (~2-3 paginas)"
+            >
               <FontAwesomeIcon icon={faFilePdf} className="mr-2" />
-              Exportar PDF
+              {exportandoModo === 'resumido' ? 'Gerando...' : 'PDF Resumido'}
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={() => handleExportar('completo')}
+              disabled={!!exportandoModo}
+              title="Relatorio tecnico com resumo diario, todos os eventos e graficos"
+            >
+              <FontAwesomeIcon icon={faFilePdf} className="mr-2" />
+              {exportandoModo === 'completo' ? 'Gerando...' : 'PDF Completo'}
             </Button>
           </div>
         </div>
