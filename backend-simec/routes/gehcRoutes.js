@@ -11,7 +11,11 @@ import {
   removerCredenciais,
   temCredenciaisConfiguradas,
 } from '../services/gehc/gehcAuthService.js';
-import { gerarPdfSaudeEquipamentoBuffer } from '../services/pdf/pdfDocumentService.js';
+import {
+  gerarPdfSaudeEquipamentoBuffer,
+  gerarPdfSaudeResumidoBuffer,
+  gerarPdfSaudeCompletoBuffer,
+} from '../services/pdf/pdfDocumentService.js';
 import { RM_FILTER } from '../services/equipamento/equipamentoModalidade.js';
 
 const router = express.Router();
@@ -619,7 +623,11 @@ router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
 router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) => {
   const tenantId = req.usuario.tenantId;
   const { equipamentoId } = req.params;
-  const { inicio, fim } = req.query;
+  const { inicio, fim, modo } = req.query;
+
+  // modo: 'resumido' (executivo, ~2-3 paginas) ou 'completo' (tecnico com
+  // resumo diario + eventos cronologicos). Default: completo (backwards-compat).
+  const modoNormalizado = modo === 'resumido' ? 'resumido' : 'completo';
 
   const where = {
     tenantId,
@@ -651,7 +659,7 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
       }),
     ]);
 
-    const pdfBuffer = await gerarPdfSaudeEquipamentoBuffer({
+    const payload = {
       equipamento: {
         modelo:   equipamento?.modelo,
         tag:      equipamento?.tag,
@@ -661,10 +669,15 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
       inicio: inicio || null,
       fim:    fim    || null,
       snapshots,
-    }, { locale: 'pt-BR', timeZone: 'America/Sao_Paulo' });
+    };
+    const opts = { locale: 'pt-BR', timeZone: 'America/Sao_Paulo' };
+
+    const pdfBuffer = modoNormalizado === 'resumido'
+      ? await gerarPdfSaudeResumidoBuffer(payload, opts)
+      : await gerarPdfSaudeCompletoBuffer(payload, opts);
 
     const tag      = equipamento?.tag || equipamentoId;
-    const filename = `saude_ativo_${tag}_${new Date().toISOString().split('T')[0]}.pdf`;
+    const filename = `saude_ativo_${tag}_${modoNormalizado}_${new Date().toISOString().split('T')[0]}.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(pdfBuffer);

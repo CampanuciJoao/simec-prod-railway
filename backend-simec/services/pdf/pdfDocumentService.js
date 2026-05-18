@@ -1135,11 +1135,51 @@ export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
   return finalizeDocument(doc);
 }
 
-export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
-  const title = 'RELATORIO DE SAUDE DO ATIVO';
-  const doc = createDocument(title, options);
-  const { locale, timeZone } = options;
+// ─── Helpers compartilhados entre Resumido e Completo ───────────────────────
 
+function _saudeFmtTendencia(t) {
+  if (t === 'alta') return 'em alta';
+  if (t === 'baixa') return 'em baixa';
+  return 'estavel';
+}
+
+function _saudeKpiItems(estatisticas) {
+  const items = [];
+  const { helio, pressao, temperatura, uptime, total } = estatisticas;
+
+  items.push({
+    label: 'Total de leituras',
+    value: String(total ?? 0),
+  });
+
+  if (helio) {
+    items.push({
+      label: 'Helio (%)',
+      value: `${helio.media}% (min ${helio.min} / max ${helio.max}) — ${_saudeFmtTendencia(helio.tendencia)}`,
+    });
+  }
+  if (pressao) {
+    items.push({
+      label: 'Pressao (PSI)',
+      value: `${pressao.media} PSI (min ${pressao.min} / max ${pressao.max}) — ${_saudeFmtTendencia(pressao.tendencia)}`,
+    });
+  }
+  if (temperatura) {
+    items.push({
+      label: 'Temperatura (C)',
+      value: `${temperatura.media} °C (min ${temperatura.min} / max ${temperatura.max}) — ${_saudeFmtTendencia(temperatura.tendencia)}`,
+    });
+  }
+  if (uptime) {
+    items.push({
+      label: 'Uptime',
+      value: `${uptime.pct}% (${uptime.onlines} online / ${uptime.offlines} offline em ${uptime.leituras} leituras)`,
+    });
+  }
+  return items;
+}
+
+function _saudeContextoEMetricas(doc, payload, estatisticas) {
   drawSectionTitle(doc, 'Contexto do equipamento');
   infoRow(doc, 'Equipamento', payload?.equipamento?.modelo);
   infoRow(doc, 'TAG / N° Serie', payload?.equipamento?.tag);
@@ -1151,112 +1191,169 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
       : 'Historico completo',
   );
 
-  const snapshots = payload?.snapshots || [];
+  drawSectionTitle(doc, 'Indicadores do periodo');
+  drawInfoGrid(doc, _saudeKpiItems(estatisticas), 2);
+}
 
-  if (snapshots.length >= 2) {
-    const usarHora = snapshots.length <= 48;
-    const fmtLabel = (capturedAt) =>
-      new Intl.DateTimeFormat(locale || 'pt-BR', {
-        timeZone: timeZone || 'UTC',
-        day: '2-digit',
-        month: '2-digit',
-        ...(usarHora ? { hour: '2-digit' } : {}),
-      }).format(new Date(capturedAt));
+function _saudeGraficos(doc, snapshots, locale, timeZone) {
+  if (snapshots.length < 2) return;
 
-    const labels = snapshots.map((s) => fmtLabel(s.capturedAt));
+  const usarHora = snapshots.length <= 48;
+  const fmtLabel = (capturedAt) =>
+    new Intl.DateTimeFormat(locale || 'pt-BR', {
+      timeZone: timeZone || 'UTC',
+      day: '2-digit',
+      month: '2-digit',
+      ...(usarHora ? { hour: '2-digit' } : {}),
+    }).format(new Date(capturedAt));
 
-    // ── Gráfico 1: Nível de Hélio ──────────────────────────────────────────
-    const helioValues = snapshots.map((s) => s.heliumLevelPct);
-    if (helioValues.some((v) => v != null)) {
-      drawSectionTitle(doc, 'Nível de Hélio no período');
-      drawSingleMetricChart(doc, {
-        title: 'Nível de Hélio (%)',
-        unit: '%',
-        labels,
-        values: helioValues,
-        color: '#3b82f6',
-      });
-      drawTable(doc, {
-        headers: ['Data / Hora', 'Hélio (%)'],
-        columnWidths: [280, 215],
-        rows: snapshots
-          .filter((s) => s.heliumLevelPct != null)
-          .map((s) => [
-            formatDateTime(s.capturedAt, locale, timeZone),
-            `${s.heliumLevelPct}%`,
-          ]),
-        emptyMessage: 'Sem leituras de hélio no período.',
-      });
-    }
+  const labels = snapshots.map((s) => fmtLabel(s.capturedAt));
 
-    // ── Gráfico 2: Pressão do Hélio ────────────────────────────────────────
-    const pressaoValues = snapshots.map((s) => s.heliumPressurePsi);
-    if (pressaoValues.some((v) => v != null)) {
-      drawSectionTitle(doc, 'Pressão do Hélio no período');
-      drawSingleMetricChart(doc, {
-        title: 'Pressão (PSI)',
-        unit: 'PSI',
-        labels,
-        values: pressaoValues,
-        color: '#8b5cf6',
-      });
-      drawTable(doc, {
-        headers: ['Data / Hora', 'Pressão (PSI)'],
-        columnWidths: [280, 215],
-        rows: snapshots
-          .filter((s) => s.heliumPressurePsi != null)
-          .map((s) => [
-            formatDateTime(s.capturedAt, locale, timeZone),
-            `${s.heliumPressurePsi} PSI`,
-          ]),
-        emptyMessage: 'Sem leituras de pressão no período.',
-      });
-    }
-
-    // ── Gráfico 3: Temperatura do Coolant ──────────────────────────────────
-    const tempValues = snapshots.map((s) => s.coolantTempC);
-    if (tempValues.some((v) => v != null)) {
-      drawSectionTitle(doc, 'Temperatura do sistema de resfriamento no período');
-      drawSingleMetricChart(doc, {
-        title: 'Temperatura (°C)',
-        unit: '°C',
-        labels,
-        values: tempValues,
-        color: '#dc2626',
-      });
-      drawTable(doc, {
-        headers: ['Data / Hora', 'Temperatura (°C)'],
-        columnWidths: [280, 215],
-        rows: snapshots
-          .filter((s) => s.coolantTempC != null)
-          .map((s) => [
-            formatDateTime(s.capturedAt, locale, timeZone),
-            `${s.coolantTempC} °C`,
-          ]),
-        emptyMessage: 'Sem leituras de temperatura no período.',
-      });
-    }
+  const helioValues = snapshots.map((s) => s.heliumLevelPct);
+  if (helioValues.some((v) => v != null)) {
+    drawSectionTitle(doc, 'Nivel de Helio no periodo');
+    drawSingleMetricChart(doc, {
+      title: 'Nivel de Helio (%)', unit: '%', labels, values: helioValues, color: '#3b82f6',
+    });
   }
 
-  drawSectionTitle(doc, 'Registros completos de saude');
-  const rows = snapshots.map(s => [
-    formatDateTime(s.capturedAt, locale, timeZone),
-    s.heliumLevelPct    != null ? `${s.heliumLevelPct}%`   : '—',
-    s.heliumPressurePsi != null ? `${s.heliumPressurePsi}` : '—',
-    s.coolantTempC      != null ? `${s.coolantTempC}°C`    : '—',
-    s.coolantFlowGpm    != null ? `${s.coolantFlowGpm}`    : '—',
-    s.compressorStatus  || '—',
-    s.equipmentOnline === true ? 'Online' : s.equipmentOnline === false ? 'Offline' : '—',
-  ]);
+  const pressaoValues = snapshots.map((s) => s.heliumPressurePsi);
+  if (pressaoValues.some((v) => v != null)) {
+    drawSectionTitle(doc, 'Pressao do Helio no periodo');
+    drawSingleMetricChart(doc, {
+      title: 'Pressao (PSI)', unit: 'PSI', labels, values: pressaoValues, color: '#8b5cf6',
+    });
+  }
+
+  const tempValues = snapshots.map((s) => s.coolantTempC);
+  if (tempValues.some((v) => v != null)) {
+    drawSectionTitle(doc, 'Temperatura do sistema de resfriamento');
+    drawSingleMetricChart(doc, {
+      title: 'Temperatura (°C)', unit: '°C', labels, values: tempValues, color: '#dc2626',
+    });
+  }
+}
+
+function _saudeTabelaEventos(doc, eventos, locale, timeZone, { somenteCriticos = false } = {}) {
+  const lista = somenteCriticos ? eventos.filter((e) => e.severidade === 'critico') : eventos;
+  if (!lista.length) {
+    drawParagraph(doc, somenteCriticos
+      ? 'Nenhum evento critico identificado no periodo.'
+      : 'Nenhum evento fora do padrao identificado no periodo.');
+    return;
+  }
 
   drawTable(doc, {
-    headers: ['Data/Hora', 'Helio %', 'Pressao (PSI)', 'Temp (C)', 'Fluxo (GPM)', 'Compressor', 'Online'],
-    columnWidths: [110, 55, 70, 55, 65, 70, 60],
-    rows,
-    emptyMessage: 'Nenhum registro encontrado para o periodo selecionado.',
+    headers: ['Data / Hora', 'Metrica', 'Valor', 'Faixa tipica', 'Severidade'],
+    columnWidths: [110, 90, 70, 145, 80],
+    rows: lista.map((ev) => [
+      formatDateTime(ev.capturedAt, locale, timeZone),
+      ev.metrica,
+      `${ev.valor}${ev.unit || ''}`,
+      ev.limite || '—',
+      ev.severidade === 'critico' ? 'Critico' : 'Atencao',
+    ]),
+    emptyMessage: 'Nenhum evento registrado.',
   });
+}
+
+/**
+ * Relatorio RESUMIDO — visao executiva de poucas paginas com KPIs, eventos
+ * criticos e graficos de variacao. Para periodos longos (3-6 meses), entrega
+ * o essencial sem inflar o documento.
+ */
+export async function gerarPdfSaudeResumidoBuffer(payload, options = {}) {
+  const { locale, timeZone } = options;
+  const snapshots = payload?.snapshots || [];
+
+  // Lazy import pra evitar import circular se houver mudancas futuras
+  const { analisarSaude } = await import('../gehc/saudeAnalytics.js');
+  const analise = snapshots.length
+    ? analisarSaude(snapshots)
+    : { estatisticas: { total: 0 }, eventos: [], diarios: [], veredito: 'Sem leituras no periodo selecionado.' };
+
+  const doc = createDocument('RELATORIO DE SAUDE DO ATIVO - RESUMIDO', options);
+
+  _saudeContextoEMetricas(doc, payload, analise.estatisticas);
+
+  drawSectionTitle(doc, 'Avaliacao do periodo');
+  drawParagraph(doc, analise.veredito);
+
+  drawSectionTitle(doc, 'Eventos criticos identificados');
+  _saudeTabelaEventos(doc, analise.eventos, locale, timeZone, { somenteCriticos: true });
+
+  const totalAtencao = analise.eventos.filter((e) => e.severidade === 'atencao').length;
+  if (totalAtencao > 0) {
+    drawSectionTitle(doc, 'Eventos de atencao');
+    drawParagraph(
+      doc,
+      `${totalAtencao} evento(s) de atencao foram identificados (desvios entre 2 e 3 sigma da media, ou periodos offline). Consulte o relatorio completo para o detalhamento.`,
+    );
+  }
+
+  _saudeGraficos(doc, snapshots, locale, timeZone);
 
   return finalizeDocument(doc);
+}
+
+/**
+ * Relatorio COMPLETO — tecnico, com resumo diario, todos os eventos e graficos.
+ * Substitui a tabela bruta antiga (snapshot-a-snapshot) por agregacao diaria.
+ */
+export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
+  const { locale, timeZone } = options;
+  const snapshots = payload?.snapshots || [];
+
+  const { analisarSaude } = await import('../gehc/saudeAnalytics.js');
+  const analise = snapshots.length
+    ? analisarSaude(snapshots)
+    : { estatisticas: { total: 0 }, eventos: [], diarios: [], veredito: 'Sem leituras no periodo selecionado.' };
+
+  const doc = createDocument('RELATORIO DE SAUDE DO ATIVO - COMPLETO', options);
+
+  _saudeContextoEMetricas(doc, payload, analise.estatisticas);
+
+  drawSectionTitle(doc, 'Avaliacao do periodo');
+  drawParagraph(doc, analise.veredito);
+
+  _saudeGraficos(doc, snapshots, locale, timeZone);
+
+  // Resumo diario — 1 linha por dia
+  drawSectionTitle(doc, 'Resumo diario');
+  const fmtDia = (iso) => {
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y.slice(2)}`;
+  };
+  const fmtMetrica = (m) => (m == null ? '—' : `${m.media} (${m.min}/${m.max})`);
+  drawTable(doc, {
+    headers: ['Data', 'Helio % (med/min/max)', 'Pressao PSI (med/min/max)', 'Temp °C (med/min/max)', 'Uptime %', 'Eventos'],
+    columnWidths: [55, 110, 110, 100, 55, 60],
+    rows: analise.diarios.map((d) => [
+      fmtDia(d.data),
+      fmtMetrica(d.helio),
+      fmtMetrica(d.pressao),
+      fmtMetrica(d.temperatura),
+      d.uptimePct != null ? `${d.uptimePct}%` : '—',
+      d.eventos > 0 ? String(d.eventos) : '—',
+    ]),
+    emptyMessage: 'Sem leituras agregaveis no periodo.',
+  });
+
+  drawSectionTitle(doc, 'Eventos fora do padrao (cronologico)');
+  _saudeTabelaEventos(doc, analise.eventos, locale, timeZone);
+
+  return finalizeDocument(doc);
+}
+
+/**
+ * Wrapper backwards-compatible — chamadores antigos que nao passam `modo`
+ * recebem o relatorio Completo (com a nova arquitetura agregada, nao a
+ * tabela bruta antiga).
+ */
+export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
+  const modo = payload?.modo;
+  if (modo === 'resumido') return gerarPdfSaudeResumidoBuffer(payload, options);
+  return gerarPdfSaudeCompletoBuffer(payload, options);
 }
 
 export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
