@@ -80,6 +80,11 @@ function TimelineItem({ evento, timezone }) {
             Registrado no sistema em {fmt(evento.meta.dataHoraRegistro)}.
           </p>
         )}
+        {evento.meta?.registradoPor && (
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            Registrado por: <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{evento.meta.registradoPor}</span>
+          </p>
+        )}
         {resumoOs && (
           <p className="mt-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
             {resumoOs}

@@ -95,6 +95,7 @@ function buildTimeline(os) {
     descricao: `Solicitante: ${os.solicitante}. Problema: ${os.descricaoProblema}`,
     meta: {
       solicitante: os.solicitante,
+      registradoPor: os.autor?.nome || null,
       ...(isRetroativo ? {
         registroRetroativo: true,
         dataHoraRegistro: os.dataHoraAbertura,
@@ -108,7 +109,10 @@ function buildTimeline(os) {
       dataHora: nota.data,
       titulo: `Nota de andamento — ${nota.tecnicoNome || nota.autor?.nome || 'Técnico'}`,
       descricao: nota.nota,
-      meta: { tecnicoNome: nota.tecnicoNome || nota.autor?.nome },
+      meta: {
+        tecnicoNome: nota.tecnicoNome || nota.autor?.nome,
+        registradoPor: nota.autor?.nome || null,
+      },
     });
   }
 
