@@ -75,6 +75,7 @@ export {
 // NAVIGATION
 // =========================
 export {
+  BackButton,
   Breadcrumb,
   Sidebar,
 } from './navigation';
