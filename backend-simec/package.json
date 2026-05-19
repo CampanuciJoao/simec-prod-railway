@@ -52,6 +52,7 @@
     "multer": "^2.0.1",
     "nodemailer": "^7.0.3",
     "pdf-parse": "^1.1.4",
+    "pdfjs-dist": "^4.10.38",
     "pdfkit": "^0.18.0",
     "playwright": "^1.59.1",
     "socket.io": "^4.8.3",

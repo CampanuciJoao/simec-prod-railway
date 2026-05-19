@@ -2,6 +2,7 @@
 // VersÃ£o: Multi-tenant hardened + upload centralizado
 
 import express from 'express';
+import multer from 'multer';
 import prisma from '../services/prismaService.js';
 import { registrarLog } from '../services/logService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
@@ -17,8 +18,24 @@ import {
   deleteStoredFile,
   getFromR2,
 } from '../services/uploads/fileStorageService.js';
+import {
+  extrairApolice,
+  ApoliceExtractorError,
+} from '../services/seguros/apoliceExtractor.js';
+import { casarTudo } from '../services/seguros/apoliceMatcher.js';
 
 const router = express.Router();
+
+// Upload em memória apenas para extração (PDF não é persistido aqui — fica no
+// frontend e sobe via fluxo normal de anexos quando o seguro é salvo).
+const uploadEmMemoria = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB — apólices reais ficam em 1-3 MB
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') return cb(null, true);
+    cb(new Error('Apenas PDFs são aceitos.'));
+  },
+});
 
 router.use(proteger);
 
@@ -829,6 +846,121 @@ router.get('/:id/historico', async (req, res) => {
   } catch (error) {
     console.error('[SEGURO_HISTORICO_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar histÃ³rico do seguro.' });
+  }
+});
+
+// ==============================
+// POST EXTRAIR PDF (drag-and-drop)
+// Lê apólice em PDF via LLM, retorna campos pré-preenchidos e sugestões de
+// vínculo com Unidade/Equipamento. NÃO persiste o PDF nem cria seguro.
+// ==============================
+router.post('/extrair-pdf', uploadEmMemoria.single('file'), async (req, res) => {
+  try {
+    const tenantId = req.usuario.tenantId;
+
+    if (!req.file) {
+      return res.status(400).json({
+        code: 'ERR_NO_FILE',
+        message: 'Envie o PDF da apólice no campo "file".',
+      });
+    }
+
+    const password = req.body?.password || null;
+
+    // ─── Extração via LLM ────────────────────────────────────────────────
+    let extracao;
+    try {
+      extracao = await extrairApolice(req.file.buffer, { password, tenantId });
+    } catch (err) {
+      if (err instanceof ApoliceExtractorError) {
+        const status = err.code === 'ERR_PDF_PROTECTED' ? 422 : 422;
+        return res.status(status).json({ code: err.code, message: err.message });
+      }
+      throw err;
+    }
+
+    // ─── Match com entidades do tenant ───────────────────────────────────
+    const matches = await casarTudo(tenantId, extracao);
+
+    // ─── Monta payload pronto para o formulário ──────────────────────────
+    const campos = {
+      tipoSeguro: extracao.tipoSeguro || 'OUTRO',
+      apoliceNumero: extracao.apoliceNumero || '',
+      seguradora: extracao.seguradora || '',
+      premioTotal: extracao.premioTotal || 0,
+      dataInicio: extracao.dataInicio || '',
+      dataFim: extracao.dataFim || '',
+      status: 'Ativo',
+      unidadeId: matches.unidade.unidadeId || '',
+      equipamentoId: matches.equipamento.equipamentoId || '',
+      veiculoId: '', // SIMEC não tem cadastro de veículos — sempre null
+      ...extracao.coberturas,
+    };
+
+    // ─── Avisos para o usuário ───────────────────────────────────────────
+    const avisos = [];
+
+    if (matches.unidade.confianca === 'ambigua') {
+      avisos.push({
+        tipo: 'unidade-ambigua',
+        mensagem: `Encontradas ${matches.unidade.candidatos.length} unidades possíveis pelo endereço. Confirme manualmente.`,
+      });
+    } else if (!matches.unidade.unidadeId && extracao.localRisco) {
+      avisos.push({
+        tipo: 'unidade-nao-encontrada',
+        mensagem: 'Nenhuma unidade cadastrada bate com o endereço da apólice. Selecione manualmente.',
+      });
+    }
+
+    if (extracao.tipoSeguro === 'EQUIPAMENTO' && extracao.bens.length > 0 && !matches.equipamento.equipamentoId) {
+      const seriesPdf = extracao.bens.map((b) => b.numeroSerie || b.chassi).filter(Boolean);
+      if (seriesPdf.length > 0) {
+        avisos.push({
+          tipo: 'equipamento-nao-encontrado',
+          mensagem: `Equipamento da apólice (série ${seriesPdf.join(', ')}) não está cadastrado. Selecione manualmente ou cadastre o equipamento antes.`,
+        });
+      }
+    }
+
+    if (extracao.tipoSeguro === 'AUTO' && extracao.bens.length > 0) {
+      const dadosVeiculo = extracao.bens
+        .map((b) => {
+          const partes = [b.fabricante, b.modelo, b.placa && `Placa ${b.placa}`, b.chassi && `Chassi ${b.chassi}`]
+            .filter(Boolean)
+            .join(' — ');
+          return partes;
+        })
+        .filter(Boolean);
+
+      if (dadosVeiculo.length > 0) {
+        avisos.push({
+          tipo: 'dados-veiculo',
+          mensagem: `Veículo da apólice: ${dadosVeiculo.join(' / ')}. O SIMEC não cadastra veículos — esses dados ficam apenas informativos.`,
+        });
+      }
+    }
+
+    return res.json({
+      campos,
+      sugestoes: {
+        unidadeCandidatos: matches.unidade.candidatos,
+        unidadeConfianca: matches.unidade.confianca,
+        equipamentoCandidatos: matches.equipamento.candidatos,
+      },
+      avisos,
+      extracaoBruta: extracao, // disponível pra debug, frontend pode ignorar
+    });
+  } catch (error) {
+    console.error('[SEGURO_EXTRAIR_PDF_ERROR]', error);
+
+    if (error.message?.includes('Apenas PDFs')) {
+      return res.status(400).json({ code: 'ERR_INVALID_FILE_TYPE', message: error.message });
+    }
+
+    return res.status(500).json({
+      code: 'ERR_INTERNAL',
+      message: 'Erro ao processar a apólice. Tente novamente ou preencha manualmente.',
+    });
   }
 });
 
