@@ -31,3 +31,16 @@ export const cancelarSeguro = (id, motivo) =>
 
 export const getSeguroHistorico = (id) =>
   api.get(`/seguros/${id}/historico`).then((res) => res.data);
+
+export const extrairApolicePdf = (file, password = null) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (password) formData.append('password', password);
+
+  return api
+    .post('/seguros/extrair-pdf', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 60000, // LLM pode levar até 30-40s
+    })
+    .then((res) => res.data);
+};
