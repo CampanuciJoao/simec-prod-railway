@@ -1,7 +1,11 @@
 import React from 'react';
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faBookOpen, faBuildingShield } from '@fortawesome/free-solid-svg-icons';
+import {
+  faBookOpen,
+  faBuildingShield,
+  faHeartPulse,
+} from '@fortawesome/free-solid-svg-icons';
 
 import { PageHeader, PageLayout, ResponsiveTabs } from '@/components/ui';
 
@@ -21,6 +25,12 @@ function SuperAdminPage() {
       label: 'Base de ajuda',
       icon: <FontAwesomeIcon icon={faBookOpen} />,
       path: '/superadmin/ajuda',
+    },
+    {
+      id: 'saude',
+      label: 'Saúde do sistema',
+      icon: <FontAwesomeIcon icon={faHeartPulse} />,
+      path: '/superadmin/saude',
     },
   ];
 

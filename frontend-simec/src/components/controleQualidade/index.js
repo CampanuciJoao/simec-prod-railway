@@ -4,3 +4,5 @@ export { default as RegistrarTesteForm } from './RegistrarTesteForm';
 export { default as ControleQualidadeEquipamentoTab } from './ControleQualidadeEquipamentoTab';
 export { default as ProgramaCard } from './ProgramaCard';
 export { default as ImportarLoteCqPanel } from './ImportarLoteCqPanel';
+export { default as CatalogoTab } from './CatalogoTab';
+export { default as ExcluidosTab } from './ExcluidosTab';

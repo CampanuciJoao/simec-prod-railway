@@ -1,5 +1,8 @@
 import { normalizarTexto } from '../../shared/textUtils.js';
 
+// Re-exportado para testes que importam direto deste módulo.
+export { normalizarTexto };
+
 export function tokenizar(texto = '') {
   return normalizarTexto(texto)
     .split(/[\s/-]+/)

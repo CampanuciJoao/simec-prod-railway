@@ -1,6 +1,7 @@
 import { chromium } from 'playwright';
 import prisma from '../prismaService.js';
 import { encryptToken, decryptToken } from './gehcCrypto.js';
+import { observeGehcAuth } from '../metrics/metricsService.js';
 
 const GEHC_PORTAL_URL = 'https://www.gehealthcare.com.br/account';
 const REFRESH_URL     = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
@@ -63,6 +64,8 @@ async function salvarTokens(tenantId, { accessToken, idToken, refreshToken, expi
     create: { id: crypto.randomUUID(), tenantId, ...enc, expiresAt: expiresAt ?? null },
     update: { ...enc, expiresAt: expiresAt ?? null, updatedAt: new Date() },
   });
+  // Token salvo com sucesso = auth válida pra esse tenant
+  observeGehcAuth(tenantId, true);
 }
 
 async function lerTokens(tenantId) {

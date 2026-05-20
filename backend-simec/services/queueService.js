@@ -73,6 +73,26 @@ function getAlertasQueue() {
   return alertasQueue;
 }
 
+// Exporta os counts da fila pra o snapshot de saúde (sem efeito colateral).
+// Retorna { waiting, active, completed, failed, delayed, paused } ou null
+// se a fila não estiver pronta.
+export async function coletarQueueCounts() {
+  try {
+    const queue = getAlertasQueue();
+    if (!queue) return null;
+    return await queue.getJobCounts(
+      'waiting',
+      'active',
+      'completed',
+      'failed',
+      'delayed',
+      'paused'
+    );
+  } catch {
+    return null;
+  }
+}
+
 async function logQueueState(prefix = 'QUEUE_STATE') {
   try {
     const queue = getAlertasQueue();
