@@ -1,40 +1,31 @@
-FROM node:20-bookworm-slim
-
-# System libs required by Chromium (Playwright)
-RUN apt-get update && apt-get install -y \
-    libglib2.0-0 \
-    libnss3 \
-    libnspr4 \
-    libatk1.0-0 \
-    libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
-    libx11-6 \
-    libxcb1 \
-    libxext6 \
-    fonts-liberation \
-    ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+# Imagem oficial do Playwright (mantida pela Microsoft) com:
+#  - Ubuntu 22.04 (jammy)
+#  - Node.js 20 LTS
+#  - Chromium/Firefox/Webkit já instalados em /ms-playwright
+#  - Todas as libs do sistema que o Chromium precisa
+#
+# Versão fixada para casar com playwright@1.59.1 do package.json.
+# Trocamos a base node:20-bookworm-slim + apt-get install manual de 17 libs
+# porque o Debian bookworm passou a falhar com "invalid signature" no apt
+# update (2026-05-20). Usar imagem oficial elimina o apt-get inteiro.
+FROM mcr.microsoft.com/playwright:v1.59.1-jammy
 
 WORKDIR /app
 
+# Postinstall do package.json roda `npx playwright install --with-deps`
+# quando GEHC_SCRAPER_ENABLED=true. Aqui na build forçamos false porque o
+# Chromium JÁ ESTÁ embutido na imagem — não precisa baixar de novo nem
+# rodar apt-get install (que tenta deps do sistema). Em runtime, o Railway
+# sobrescreve com GEHC_SCRAPER_ENABLED=true e o scraper funciona normal.
+ENV GEHC_SCRAPER_ENABLED=false
+
+# Diretório onde os browsers já estão instalados na imagem oficial.
+# Garante que o runtime do Playwright procura eles aqui em vez de tentar
+# baixar pra ~/.cache/ms-playwright (que não existe num container fresh).
+ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+
 COPY package*.json ./
 RUN npm ci
-
-# Instalação do Chromium em camada explícita, separada do `npm ci`.
-# O postinstall condicional em package.json depende de GEHC_SCRAPER_ENABLED no
-# ambiente, mas a layer `npm ci` é cacheada agressivamente pelo Docker e não
-# invalida quando a env var muda. Resultado: tokens GE nunca eram capturados
-# em produção (incidente 2026-05-11). A linha abaixo garante o binário sempre
-# presente, ao custo de ~150MB no build do backend.
-RUN npx playwright install --with-deps chromium
 
 COPY . .
 
