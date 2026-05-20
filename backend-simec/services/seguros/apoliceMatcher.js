@@ -4,15 +4,15 @@
 
 import prisma from '../prismaService.js';
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-function normalizarCep(cep) {
+// ─── Helpers (exportados para testes) ───────────────────────────────────────
+export function normalizarCep(cep) {
   if (!cep) return null;
   const digitos = String(cep).replace(/\D/g, '');
   if (digitos.length !== 8) return null;
   return `${digitos.slice(0, 5)}-${digitos.slice(5)}`;
 }
 
-function normalizarTexto(texto) {
+export function normalizarTexto(texto) {
   if (!texto) return '';
   return String(texto)
     .normalize('NFD')

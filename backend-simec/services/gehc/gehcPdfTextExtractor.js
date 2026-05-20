@@ -38,7 +38,7 @@ function trimMulti(s) {
   return typeof s === 'string' ? s.replace(/[ \t]+/g, ' ').replace(/\n{3,}/g, '\n\n').trim() : null;
 }
 
-function parseDateBR(s) {
+export function parseDateBR(s) {
   if (!s) return null;
   // Aceita "25/03/2026 08:13" ou "25/03/2026 08:13 a.m." ou so "25/03/2026"
   const m = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?(?:\s*(a\.m\.|p\.m\.))?/i);

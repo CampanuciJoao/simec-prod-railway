@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus,
-  faClipboardList,
   faExternalLinkAlt,
   faTrash,
   faFilePdf,
@@ -20,17 +19,8 @@ import {
   Textarea,
   GlobalFilterBar,
 } from '@/components/ui';
-import { useToast } from '@/contexts/ToastContext';
 
-import {
-  getDashboardCq,
-  listarTestesCq,
-  excluirTesteCq,
-} from '@/services/api';
-import { getEquipamentos } from '@/services/api/equipamentosApi';
-import { getUnidades } from '@/services/api/unidadesApi';
-import { exportarConformidadeCqPDF } from '@/services/api/pdfApi';
-
+import { useControleQualidadeGeral, diasParaVencimento } from '@/hooks/controleQualidade';
 import ControleQualidadeKpiGrid from './ControleQualidadeKpiGrid';
 import RegistrarTesteForm from './RegistrarTesteForm';
 
@@ -41,7 +31,7 @@ const RESULTADO_BADGES = {
 };
 
 // Prefixos do código do TipoTesteQualidade → categoria humanizada.
-// Codigos seguem o padrão CQ_* (Controle de Qualidade) e LR_* (Levantamento
+// Códigos seguem o padrão CQ_* (Controle de Qualidade) e LR_* (Levantamento
 // Radiométrico) conforme catálogo simplificado em
 // prisma/migrations/20260514000004_simplificar_catalogo_cq.
 const CATEGORIA_LABELS = {
@@ -54,7 +44,6 @@ function categoriaDoTipoTeste(tipoTeste) {
   const codigo = tipoTeste.codigo || '';
   const prefixo = codigo.split('_')[0];
   if (CATEGORIA_LABELS[prefixo]) return CATEGORIA_LABELS[prefixo];
-  // Fallback: usa a parte antes do "—" do nome ("Controle de Qualidade — TC").
   const nome = tipoTeste.nome || '';
   const antesDoTraco = nome.split('—')[0].trim();
   return antesDoTraco || null;
@@ -65,159 +54,31 @@ function fmt(d) {
   return new Date(d).toLocaleDateString('pt-BR');
 }
 
-function diasParaVencimento(data) {
-  if (!data) return null;
-  const ms = new Date(data).getTime() - Date.now();
-  return Math.ceil(ms / 86_400_000);
-}
-
-function statusVencimento(testes) {
-  // testes[0] eh o mais recente — usado para coluna 'status'
-  return null;
-}
-
 function ControleQualidadeGeralTab() {
-  const navigate = useNavigate();
-  const { addToast } = useToast();
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [metricas, setMetricas] = useState({});
-  const [testes, setTestes] = useState([]);
-  const [equipamentos, setEquipamentos] = useState([]);
-  const [filtros, setFiltros] = useState({
-    modalidade: '',
-    resultado: '',
-    statusVencimento: '',
-    search: '',
-  });
-
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [drawerEquipamentoId, setDrawerEquipamentoId] = useState(null);
-
-  const [excluirModal, setExcluirModal] = useState({ open: false, teste: null, motivo: '' });
-
-  const [unidades, setUnidades] = useState([]);
-  const [pdfModal, setPdfModal] = useState({ open: false, unidadeId: '', responsavel: '', exportando: false });
-
-  const carregar = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [dashRes, testesRes, eqRes, unidadesRes] = await Promise.all([
-        getDashboardCq(),
-        listarTestesCq({ pageSize: 100 }),
-        getEquipamentos({ pageSize: 500 }),
-        getUnidades().catch(() => []),
-      ]);
-      setMetricas(dashRes || {});
-      setTestes(testesRes?.items || []);
-      setEquipamentos(eqRes?.items || []);
-      setUnidades(Array.isArray(unidadesRes) ? unidadesRes : (unidadesRes?.items || []));
-    } catch (e) {
-      setError(e?.response?.data?.message || 'Erro ao carregar Controle de Qualidade.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { carregar(); }, [carregar]);
-
-  const modalidades = useMemo(
-    () => [...new Set(equipamentos.map((e) => e.tipo).filter(Boolean))].sort(),
-    [equipamentos]
-  );
-
-  // KPI ativo = derivado dos filtros aplicados. Só destacam-se os 4 cards
-  // com filtro equivalente; "Sem programa" não é filtrável aqui (são
-  // equipamentos regulados sem nenhum teste registrado).
-  const activeKpi = useMemo(() => {
-    if (filtros.resultado === 'Aprovado') return 'aprovados';
-    if (filtros.resultado === 'Reprovado') return 'reprovados';
-    if (filtros.statusVencimento === 'vencendo') return 'vencendo';
-    if (filtros.statusVencimento === 'vencido') return 'vencidos';
-    return null;
-  }, [filtros.resultado, filtros.statusVencimento]);
-
-  // Cada KPI clicável aplica seu filtro e zera os filtros conflitantes
-  // (resultado/statusVencimento), preservando modalidade e busca.
-  // "Sem programa" é diferente: navega para a aba de Equipamentos cadastrados
-  // com filtro de IDs (são equipamentos sem testes registrados — não filtra
-  // a tabela de "Testes registrados" aqui).
-  const handleSelectKpi = useCallback((key) => {
-    if (key === 'semPrograma') {
-      const lista = Array.isArray(metricas?.equipamentosSemPrograma)
-        ? metricas.equipamentosSemPrograma
-        : null;
-
-      if (lista === null) {
-        addToast(
-          'A lista de equipamentos sem programa não veio do servidor. Atualize a página e tente novamente.',
-          'warning'
-        );
-        return;
-      }
-
-      const ids = lista.map((eq) => eq?.id).filter(Boolean);
-
-      if (ids.length === 0) {
-        addToast('Nenhum equipamento regulado está sem programa CQ no momento.', 'info');
-        return;
-      }
-
-      navigate('/equipamentos', {
-        state: {
-          equipamentoIds: ids,
-          equipamentoIdsLabel: 'Sem programa CQ',
-        },
-      });
-      return;
-    }
-    setFiltros((f) => {
-      const base = { ...f, resultado: '', statusVencimento: '' };
-      if (key === 'aprovados') base.resultado = 'Aprovado';
-      else if (key === 'reprovados') base.resultado = 'Reprovado';
-      else if (key === 'vencendo') base.statusVencimento = 'vencendo';
-      else if (key === 'vencidos') base.statusVencimento = 'vencido';
-      return base;
-    });
-  }, [metricas, navigate, addToast]);
-
-  const testesFiltrados = useMemo(() => {
-    return testes.filter((t) => {
-      if (filtros.modalidade && t.tipoTeste?.modalidade !== filtros.modalidade) return false;
-      if (filtros.resultado && t.resultado !== filtros.resultado) return false;
-      if (filtros.statusVencimento) {
-        const dias = diasParaVencimento(t.proximoVencimento);
-        if (filtros.statusVencimento === 'vencido' && (dias === null || dias >= 0)) return false;
-        if (filtros.statusVencimento === 'vencendo' && (dias === null || dias < 0 || dias > 30)) return false;
-        if (filtros.statusVencimento === 'em_dia' && (dias === null || dias <= 30)) return false;
-      }
-      if (filtros.search) {
-        const q = filtros.search.toLowerCase();
-        const eq = t.equipamento;
-        const haystack = [
-          eq?.modelo, eq?.tag, eq?.apelido,
-          t.tipoTeste?.codigo, t.tipoTeste?.nome,
-          t.numeroLaudo, t.empresaExecutora, t.responsavelNome,
-        ].join(' ').toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [testes, filtros]);
-
-  const handleExcluir = async () => {
-    const teste = excluirModal.teste;
-    const motivo = excluirModal.motivo.trim();
-    if (!teste || motivo.length < 10) return;
-    try {
-      await excluirTesteCq(teste.id, motivo);
-      setExcluirModal({ open: false, teste: null, motivo: '' });
-      carregar();
-    } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao excluir teste.');
-    }
-  };
+  const {
+    loading,
+    error,
+    metricas,
+    equipamentos,
+    unidades,
+    filtros,
+    setFiltro,
+    modalidades,
+    activeKpi,
+    testesFiltrados,
+    handleSelectKpi,
+    drawerOpen,
+    drawerEquipamentoId,
+    abrirDrawer,
+    fecharDrawer,
+    excluirModal,
+    setExcluirModal,
+    handleExcluir,
+    pdfModal,
+    setPdfModal,
+    handleExportarPdf,
+    recarregar,
+  } = useControleQualidadeGeral();
 
   if (loading) {
     return <PageSection><PageState loading /></PageSection>;
@@ -245,7 +106,7 @@ function ControleQualidadeGeralTab() {
           <FontAwesomeIcon icon={faFilePdf} />
           <span className="ml-2">Exportar PDF</span>
         </Button>
-        <Button onClick={() => { setDrawerEquipamentoId(null); setDrawerOpen(true); }}>
+        <Button onClick={() => abrirDrawer(null)}>
           <FontAwesomeIcon icon={faPlus} />
           <span className="ml-2">Registrar CQ</span>
         </Button>
@@ -253,21 +114,21 @@ function ControleQualidadeGeralTab() {
 
       <GlobalFilterBar
         searchTerm={filtros.search}
-        onSearchChange={(e) => setFiltros((f) => ({ ...f, search: e.target.value }))}
+        onSearchChange={(e) => setFiltro('search', e.target.value)}
         searchPlaceholder="Modelo, tag, laudo, responsável..."
         selectFilters={[
           {
             id: 'modalidade',
             label: 'Modalidade',
             value: filtros.modalidade,
-            onChange: (v) => setFiltros((f) => ({ ...f, modalidade: v })),
+            onChange: (v) => setFiltro('modalidade', v),
             options: modalidades.map((m) => ({ value: m, label: m })),
           },
           {
             id: 'resultado',
             label: 'Resultado',
             value: filtros.resultado,
-            onChange: (v) => setFiltros((f) => ({ ...f, resultado: v })),
+            onChange: (v) => setFiltro('resultado', v),
             options: [
               { value: 'Aprovado', label: 'Aprovado' },
               { value: 'AprovadoComRestricoes', label: 'Aprov. c/ restrições' },
@@ -278,7 +139,7 @@ function ControleQualidadeGeralTab() {
             id: 'statusVencimento',
             label: 'Vencimento',
             value: filtros.statusVencimento,
-            onChange: (v) => setFiltros((f) => ({ ...f, statusVencimento: v })),
+            onChange: (v) => setFiltro('statusVencimento', v),
             options: [
               { value: 'vencido', label: 'Vencido' },
               { value: 'vencendo', label: 'Vencendo (≤30d)' },
@@ -398,29 +259,16 @@ function ControleQualidadeGeralTab() {
 
       <RegistrarTesteForm
         open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
+        onClose={fecharDrawer}
         equipamentos={equipamentos}
         equipamentoIdInicial={drawerEquipamentoId}
-        onCreated={() => carregar()}
+        onCreated={recarregar}
       />
 
       <ModalConfirmacao
         isOpen={pdfModal.open}
         onClose={() => setPdfModal({ open: false, unidadeId: '', responsavel: '', exportando: false })}
-        onConfirm={async () => {
-          if (!pdfModal.unidadeId) return;
-          setPdfModal((s) => ({ ...s, exportando: true }));
-          try {
-            await exportarConformidadeCqPDF({
-              unidadeId: pdfModal.unidadeId,
-              responsavelTecnico: pdfModal.responsavel?.trim() || null,
-            });
-            setPdfModal({ open: false, unidadeId: '', responsavel: '', exportando: false });
-          } catch (e) {
-            alert(e?.response?.data?.message || 'Erro ao gerar PDF.');
-            setPdfModal((s) => ({ ...s, exportando: false }));
-          }
-        }}
+        onConfirm={handleExportarPdf}
         title="Exportar PDF de Conformidade ANVISA"
         message="O PDF consolida todos os equipamentos regulados da unidade selecionada (Mamografia, TC, RX, Densitometria, RM, US) com status de conformidade RDC 611/2022 e pendências abertas."
         confirmText={pdfModal.exportando ? 'Gerando...' : 'Gerar PDF'}

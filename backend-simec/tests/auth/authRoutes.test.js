@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 
 import { buildAuthRouter } from '../../routes/authRoutes.js';
 
 async function withServer(router, run) {
   const app = express();
   app.use(express.json());
+  app.use(cookieParser());
   app.use('/api/auth', router);
 
   const server = await new Promise((resolve) => {

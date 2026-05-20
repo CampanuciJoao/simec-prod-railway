@@ -36,8 +36,12 @@ import telegramRoutes from './routes/telegramRoutes.js';
 import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
 import lgpdRoutes from './routes/lgpdRoutes.js';
 import controleQualidadeRoutes from './routes/controleQualidadeRoutes.js';
+import metricsRoutes from './routes/metricsRoutes.js';
+import saudeRoutes from './routes/saudeRoutes.js';
 
 import cookieParser from 'cookie-parser';
+import { metricsMiddleware } from './middleware/metricsMiddleware.js';
+import { aplicarRedisAdapter } from './services/realtime/socketRedisAdapter.js';
 
 import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
@@ -72,6 +76,13 @@ const io = new Server(httpServer, {
 });
 
 global.io = io;
+
+// Plugga o Redis adapter pra permitir múltiplas instâncias do backend
+// compartilharem eventos em tempo real. Não bloqueia o boot — se Redis
+// estiver indisponível, cai pro adapter in-memory.
+aplicarRedisAdapter(io).catch((err) => {
+  console.warn('[SOCKET_ADAPTER] Falha inesperada ao aplicar adapter:', err?.message || err);
+});
 
 io.on('connection', (socket) => {
   console.log(`[SOCKET] Navegador conectado ao SIMEC: ${socket.id}`);
@@ -120,6 +131,11 @@ app.use((req, res, next) => {
 app.use(cookieParser());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+app.use(metricsMiddleware);
+
+// Prometheus scrape endpoint — sem auth. Restrinja via proxy/firewall
+// se for exposto publicamente em produção.
+app.use('/metrics', metricsRoutes);
 
 app.get('/', (req, res) => {
   res.send('API do SIMEC ativa e operante em tempo real!');
@@ -181,6 +197,7 @@ app.use('/api/pdf-data', pdfDataRoutes);
 app.use('/api/pdfs', pdfRoutes);
 app.use('/api/superadmin', superadminTenantsRoutes);
 app.use('/api/superadmin/help', superadminHelpRoutes);
+app.use('/api/superadmin/saude', saudeRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);
