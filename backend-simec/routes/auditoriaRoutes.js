@@ -27,7 +27,7 @@ router.get('/', async (req, res) => {
     limit = 50,
   } = req.query;
 
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   const pageNum = Number.parseInt(page, 10);
   const limitNum = Number.parseInt(limit, 10);
@@ -128,7 +128,7 @@ router.get('/', async (req, res) => {
  * @access  Admin
  */
 router.get('/filtros', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const [usuarios, acoesDistintas, entidadesDistintas] = await Promise.all([

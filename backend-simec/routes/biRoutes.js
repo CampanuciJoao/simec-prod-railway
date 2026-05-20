@@ -62,7 +62,7 @@ function calcularHorasParadoOsCorretiva(os) {
 
 router.get('/indicadores', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const agora = new Date();
     const inicioAno = startOfYear(agora);
     const fimAno = endOfYear(agora);

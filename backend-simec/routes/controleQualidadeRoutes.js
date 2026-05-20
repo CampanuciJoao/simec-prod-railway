@@ -46,7 +46,7 @@ router.use(proteger);
 router.get('/tipos', async (req, res) => {
   try {
     const r = await listarTiposService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       modalidade: req.query.modalidade || null,
       somenteAtivos: req.query.somenteAtivos !== 'false',
     });
@@ -60,7 +60,7 @@ router.get('/tipos', async (req, res) => {
 router.post('/tipos', admin, async (req, res) => {
   try {
     const r = await criarTipoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       dados: req.body,
     });
@@ -80,7 +80,7 @@ router.post('/tipos', admin, async (req, res) => {
 router.put('/tipos/:id', admin, async (req, res) => {
   try {
     const r = await atualizarTipoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       tipoId: req.params.id,
       dados: req.body,
@@ -102,7 +102,7 @@ router.put('/tipos/:id', admin, async (req, res) => {
 
 router.get('/dashboard', async (req, res) => {
   try {
-    const r = await dashboardService({ tenantId: req.usuario.tenantId });
+    const r = await dashboardService({ tenantId: req.tenantContext });
     return res.json(r.data);
   } catch (e) {
     console.error('[CQ_DASHBOARD_ERROR]', e);
@@ -115,7 +115,7 @@ router.get('/dashboard', async (req, res) => {
 router.post('/equipamento/:equipamentoId/programa', async (req, res) => {
   try {
     const r = await ativarProgramaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       equipamentoId: req.params.equipamentoId,
       codigos: Array.isArray(req.body?.codigos) ? req.body.codigos : null,
@@ -133,7 +133,7 @@ router.post('/equipamento/:equipamentoId/programa', async (req, res) => {
 router.get('/testes', async (req, res) => {
   try {
     const data = await listarTestesService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       filtros: req.query,
     });
     return res.json(data);
@@ -146,7 +146,7 @@ router.get('/testes', async (req, res) => {
 router.get('/testes/equipamento/:equipamentoId', async (req, res) => {
   try {
     const r = await listarTestesDoEquipamentoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       equipamentoId: req.params.equipamentoId,
     });
     return res.json(r.data);
@@ -159,7 +159,7 @@ router.get('/testes/equipamento/:equipamentoId', async (req, res) => {
 router.get('/testes/:id', async (req, res) => {
   try {
     const r = await obterTesteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       testeId: req.params.id,
     });
     if (!r.ok) return res.status(r.status).json({ message: r.message });
@@ -173,7 +173,7 @@ router.get('/testes/:id', async (req, res) => {
 router.post('/testes', async (req, res) => {
   try {
     const r = await criarTesteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       dados: req.body,
     });
@@ -193,7 +193,7 @@ router.post('/testes', async (req, res) => {
 router.put('/testes/:id', async (req, res) => {
   try {
     const r = await atualizarTesteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       testeId: req.params.id,
       dados: req.body,
@@ -215,7 +215,7 @@ router.put('/testes/:id', async (req, res) => {
 router.delete('/testes/:id', async (req, res) => {
   try {
     const r = await excluirTesteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       testeId: req.params.id,
       dados: req.body,
@@ -237,7 +237,7 @@ router.delete('/testes/:id', async (req, res) => {
 router.post('/testes/:id/restaurar', admin, async (req, res) => {
   try {
     const r = await restaurarTesteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       testeId: req.params.id,
     });
@@ -254,7 +254,7 @@ router.post('/testes/:id/restaurar', admin, async (req, res) => {
 router.patch('/testes/:id/pendencias/:idx', async (req, res) => {
   try {
     const r = await atualizarPendenciaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       testeId: req.params.id,
       indice: req.params.idx,
@@ -271,7 +271,7 @@ router.patch('/testes/:id/pendencias/:idx', async (req, res) => {
 router.post('/testes/:id/pendencias', async (req, res) => {
   try {
     const r = await adicionarPendenciaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       testeId: req.params.id,
       dados: { descricao: String(req.body?.descricao || '').trim() },
@@ -291,7 +291,7 @@ router.post('/testes/:id/pendencias', async (req, res) => {
 // upload normal via /testes/:id/anexos depois de salvar o teste.
 router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const file = (req.files || [])[0];
     if (!file) {
       return res.status(400).json({ message: 'Nenhum arquivo enviado.' });
@@ -355,7 +355,7 @@ router.post('/extrair-laudo', uploadFor('controleQualidade'), async (req, res) =
 router.post('/importacao/extrair-lote', admin, uploadFor('controleQualidadeImport'), async (req, res) => {
   try {
     const r = await extrairLoteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       files: req.files || [],
     });
     if (!r.ok) return res.status(400).json({ message: r.erro });
@@ -371,7 +371,7 @@ router.post('/importacao/criar-lote', admin, async (req, res) => {
   try {
     const items = Array.isArray(req.body?.items) ? req.body.items : [];
     const r = await criarLoteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       items,
     });
@@ -398,7 +398,7 @@ router.post('/importacao/descartar-lote', admin, async (req, res) => {
 
 router.post('/testes/:id/anexos', uploadFor('controleQualidade'), async (req, res, next) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const testeId = req.params.id;
 
@@ -433,7 +433,7 @@ router.post('/testes/:id/anexos', uploadFor('controleQualidade'), async (req, re
 
 router.delete('/testes/:id/anexos/:anexoId', async (req, res, next) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const testeId = req.params.id;
     const anexoId = req.params.anexoId;

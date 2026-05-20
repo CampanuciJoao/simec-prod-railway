@@ -8,7 +8,7 @@ import React, {
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 
 import ChatBot from '@/components/ui/chat/ChatBot';
-import { Sidebar } from '@/components/ui';
+import { Sidebar, ImpersonacaoBanner } from '@/components/ui';
 import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
 import AppTopbar from '@/components/layouts/AppTopbar';
 import GuardiaoAceiteTermos from '@/components/lgpd/GuardiaoAceiteTermos';
@@ -167,6 +167,8 @@ function AppLayout() {
         />
 
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
+          <ImpersonacaoBanner />
+
           <AppTopbar
             nomeUsuario={nomeUsuario}
             alertsOpen={alertsOpen}

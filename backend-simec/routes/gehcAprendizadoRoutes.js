@@ -44,7 +44,7 @@ async function logAuditoria({ tenantId, autorId, acao, entidadeId, detalhes }) {
 // ─── GET /api/gehc/aprendizado/status ─────────────────────────────────────────
 // KPIs principais para o cabeçalho da aba "Aprendizado da IA".
 router.get('/status', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const [
       totalOs,
@@ -111,7 +111,7 @@ router.get('/status', async (req, res) => {
 // Lista insights ativos da IA (sem resolvedoEm). Ordenado por severidade
 // (critical > high > medium > low) e geradoEm desc.
 router.get('/insights', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const insights = await prisma.iaInsight.findMany({
       where: { tenantId, resolvidoEm: null },
@@ -135,7 +135,7 @@ router.get('/insights', async (req, res) => {
 // Engenheiro marca util / inutil / falso positivo. Vira ground truth para
 // retreinamento futuro.
 router.patch('/insights/:id/feedback', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { id } = req.params;
   const { util } = req.body || {};
 
@@ -161,7 +161,7 @@ router.patch('/insights/:id/feedback', async (req, res) => {
 // Lista logs estruturados do gehcDocumentDownloader (1 entry por tentativa
 // inline). Filtros opcionais: categoria, resolvido, desdeDias, limite.
 router.get('/logs-downloader', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const categoria = req.query?.categoria || null;
   const resolvido = req.query?.resolvido != null
     ? String(req.query.resolvido) === 'true'
@@ -214,7 +214,7 @@ router.get('/logs-downloader', async (req, res) => {
 // Snapshot do estado da pipeline de PDFs para o tenant. Util quando os KPIs
 // nao batem (ex: PDFs baixados mas 0 analisados) e nao se tem acesso ao log.
 router.get('/extracoes/diagnostico', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const [
@@ -315,7 +315,7 @@ router.get('/extracoes/diagnostico', async (req, res) => {
 // feedbackUtil=false — sinaliza para a IA que esse insight nao deveria
 // ter sido gerado.
 router.patch('/insights/:id/descartar', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { id } = req.params;
   try {
     const insight = await prisma.iaInsight.findFirst({ where: { id, tenantId } });
@@ -339,7 +339,7 @@ router.patch('/insights/:id/descartar', async (req, res) => {
 // Descarta todos insights ativos como falsos positivos. Util para limpar
 // uma onda de erros sem dar feedback positivo a IA.
 router.post('/insights/descartar-todos', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const usuarioId = req.usuario.id;
   try {
     const agora = new Date();
@@ -365,7 +365,7 @@ router.post('/insights/descartar-todos', admin, async (req, res) => {
 // ia-gerar-insights re-cria APENAS os que ainda forem validos pelos novos
 // criterios.
 router.post('/insights/limpar-todos', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const usuarioId = req.usuario.id;
   try {
     const r = await prisma.iaInsight.updateMany({
@@ -396,7 +396,7 @@ router.post('/insights/limpar-todos', admin, async (req, res) => {
 // reprocessar, eh necessario rodar "Captura de PDFs GE" para baixar tudo
 // de novo.
 router.post('/extracoes/resetar', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const usuarioId = req.usuario.id;
 
   try {
@@ -478,7 +478,7 @@ router.post('/extracoes/resetar', admin, async (req, res) => {
 // Marca insight como resolvido manualmente (engenheiro tomou acao).
 // Proximo run do insightsGenerator pode regerar se a condicao persistir.
 router.patch('/insights/:id/resolver', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { id } = req.params;
   try {
     const insight = await prisma.iaInsight.findFirst({ where: { id, tenantId } });
@@ -498,7 +498,7 @@ router.patch('/insights/:id/resolver', admin, async (req, res) => {
 // Pergunta livre + RAG sobre o Knowledge Layer.
 // Body: { pergunta, equipamentoId? }
 router.post('/ia/ask', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { pergunta, equipamentoId } = req.body || {};
 
   if (!pergunta || typeof pergunta !== 'string') {
@@ -519,7 +519,7 @@ router.post('/ia/ask', async (req, res) => {
 // Timeline unificada do Knowledge Layer para um equipamento. Read-only — usada
 // para inspecao (admin/debug) e como base para o RAG do chatbot (PR4).
 router.get('/timeline/:equipamentoId', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { equipamentoId } = req.params;
   const limite = Math.min(Number(req.query.limite) || 100, 500);
   try {
@@ -550,7 +550,7 @@ router.get('/timeline/:equipamentoId', async (req, res) => {
 // Agregacao de causa-raiz por categoria normalizada (taxonomia LLM).
 // Resposta: top categorias com contagem total + por equipamento.
 router.get('/causas', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const agregadosBrutos = await prisma.gehcPdfExtraido.groupBy({
       by: ['rootCauseCategory'],
@@ -576,7 +576,7 @@ router.get('/causas', async (req, res) => {
 // evidencia (raciocinio do LLM, trecho do problema, acoes tomadas) para
 // rastreabilidade.
 router.get('/causas/:categoria', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { categoria } = req.params;
   try {
     const extracoes = await prisma.gehcPdfExtraido.findMany({
@@ -687,7 +687,7 @@ router.get('/causas/:categoria', async (req, res) => {
 // Lista equipamentos com cobertura de PDF (ordenado por menor cobertura primeiro
 // — quem precisa de mais atenção fica no topo).
 router.get('/equipamentos', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const equipamentos = await prisma.equipamento.findMany({
       where: { tenantId, gehcAssetId: { not: null } },
@@ -758,7 +758,7 @@ router.get('/equipamentos', async (req, res) => {
 // ─── GET /api/gehc/aprendizado/equipamentos/:id ───────────────────────────────
 // Drill-down: lista OSs do equipamento com flag indicando se tem PDF baixado.
 router.get('/equipamentos/:id', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { id } = req.params;
   try {
     const equipamento = await prisma.equipamento.findFirst({
@@ -826,7 +826,7 @@ router.get('/equipamentos/:id', async (req, res) => {
 // ─── GET /api/gehc/aprendizado/pdf/:documentId ────────────────────────────────
 // Stream do PDF original armazenado no R2. Acesso restrito ao tenant dono.
 router.get('/pdf/:documentId', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { documentId } = req.params;
   try {
     const doc = await prisma.gehcPdfDocumento.findUnique({
@@ -853,7 +853,7 @@ router.get('/pdf/:documentId', async (req, res) => {
 // Feed cronológico das últimas captações (sucessos e falhas) — usada na seção
 // "Atividade recente da IA" da UI.
 router.get('/atividade', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const documentos = await prisma.gehcPdfDocumento.findMany({
       where: { tenantId },
@@ -893,7 +893,7 @@ router.get('/atividade', async (req, res) => {
 // ─── GET /api/gehc/aprendizado/pipelines ──────────────────────────────────────
 // Estado de cada pipeline da IA (kill switch global + pipelines individuais).
 router.get('/pipelines', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const pipelines = await listarEstados({ tenantId });
     res.json({ pipelines });
@@ -907,7 +907,7 @@ router.get('/pipelines', async (req, res) => {
 // Pausa um pipeline. Body opcional: { escopo: 'tenant'|'global', motivo }.
 // "global" só pausa o tenant atual a menos que o usuário seja superadmin.
 router.post('/pipelines/:pipeline/pausar', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const usuarioId = req.usuario.id;
   const { pipeline } = req.params;
   const { motivo, escopo = 'tenant' } = req.body || {};
@@ -941,7 +941,7 @@ router.post('/pipelines/:pipeline/pausar', admin, async (req, res) => {
 // validacao, manutencao e debug. O cron continua agendado normalmente —
 // isso adiciona UMA execucao avulsa em paralelo.
 router.post('/pipelines/:pipeline/disparar', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const usuarioId = req.usuario.id;
   const { pipeline } = req.params;
 
@@ -998,7 +998,7 @@ router.get('/pipelines/:pipeline/job-status', async (req, res) => {
 
 // ─── POST /api/gehc/aprendizado/pipelines/:pipeline/retomar ───────────────────
 router.post('/pipelines/:pipeline/retomar', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const usuarioId = req.usuario.id;
   const { pipeline } = req.params;
   const { escopo = 'tenant' } = req.body || {};

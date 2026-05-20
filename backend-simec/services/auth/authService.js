@@ -6,6 +6,7 @@ import {
   atualizarSenhaUsuario,
   buscarPasswordResetTokenPorHash,
   buscarSessaoPorRefreshHash,
+  buscarSuperadminSystem,
   buscarTenantPorSlug,
   buscarUsuarioPorEmailOuUsername,
   buscarUsuariosPorUsername,
@@ -28,6 +29,7 @@ const defaultAuthServiceDeps = {
   atualizarSenhaUsuario,
   buscarPasswordResetTokenPorHash,
   buscarSessaoPorRefreshHash,
+  buscarSuperadminSystem,
   buscarTenantPorSlug,
   buscarUsuarioPorEmailOuUsername,
   buscarUsuariosPorUsername,
@@ -73,6 +75,31 @@ function buildAuthPayload(usuario) {
     role: usuario.role,
     tenantId: usuario.tenantId,
   };
+}
+
+// Token novo para uma sessão de superadmin atuando como tenant alvo.
+// Reusa a identidade do superadmin; adiciona impersonacaoId + actAsTenantId
+// para que o middleware aplique o contexto correto. TTL menor que o do
+// access token normal (segurança extra para sessões privilegiadas).
+export function signImpersonationToken({ usuario, impersonacaoId, actAsTenantId, expiresIn = '4h' }) {
+  if (!usuario || !impersonacaoId || !actAsTenantId) {
+    throw new Error('signImpersonationToken: parâmetros incompletos.');
+  }
+  return jwt.sign(
+    {
+      ...buildAuthPayload(usuario),
+      impersonacaoId,
+      actAsTenantId,
+    },
+    getJwtSecret(),
+    { expiresIn }
+  );
+}
+
+// Token "limpo" (sem claims de impersonação) — usado quando o superadmin
+// encerra a sessão de impersonação. Reemite com o payload original.
+export function signCleanToken({ usuario, expiresIn = ACCESS_TOKEN_TTL }) {
+  return jwt.sign(buildAuthPayload(usuario), getJwtSecret(), { expiresIn });
 }
 
 function buildAuthResponse(usuario, accessToken) {
@@ -168,11 +195,11 @@ export async function autenticarUsuarioService({
   ipAddress,
   userAgent,
 }) {
-  if (!username || !senha || !tenant) {
+  if (!username || !senha) {
     return {
       ok: false,
       status: 400,
-      message: 'Empresa, nome de usuario e senha sao obrigatorios.',
+      message: 'Nome de usuario e senha sao obrigatorios.',
     };
   }
 
@@ -188,11 +215,23 @@ export async function autenticarUsuarioService({
   }
 
   const usernameNormalizado = String(username).toLowerCase().trim();
-  const tenantNormalizado = String(tenant).toLowerCase().trim();
-  const usuariosEncontrados = await authServiceDeps.buscarUsuariosPorUsername(
-    usernameNormalizado,
-    tenantNormalizado
-  );
+
+  // Caminho 1: tenant slug informado — fluxo de cliente.
+  // Caminho 2: tenant ausente — busca SÓ no Tenant System (plano de controle).
+  // O front pode tentar primeiro sem slug; se não achar, pede slug e tenta de novo.
+  let usuariosEncontrados;
+  if (tenant) {
+    const tenantNormalizado = String(tenant).toLowerCase().trim();
+    usuariosEncontrados = await authServiceDeps.buscarUsuariosPorUsername(
+      usernameNormalizado,
+      tenantNormalizado
+    );
+  } else {
+    usuariosEncontrados = await authServiceDeps.buscarSuperadminSystem({
+      username: usernameNormalizado,
+      email: usernameNormalizado.includes('@') ? usernameNormalizado : null,
+    });
+  }
 
   if (!usuariosEncontrados.length) {
     return {

@@ -34,7 +34,7 @@ router.use(proteger);
 router.get('/', async (req, res) => {
   try {
     const resultado = await listarOsCorretivasService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       filters: req.query,
     });
     const items = adaptarListaOsCorretivasResponse(resultado.items);
@@ -48,7 +48,7 @@ router.get('/', async (req, res) => {
 router.get('/:id/historico', async (req, res) => {
   try {
     const resultado = await buscarEventosHistorico({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       referenciaId: req.params.id,
       referenciaTipo: 'os_corretiva',
       modelName: 'osCorretiva',
@@ -65,7 +65,7 @@ router.get('/:id/historico', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const resultado = await obterOsCorretivaDetalhadaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       osId: req.params.id,
     });
     if (!resultado.ok) return res.status(resultado.status).json({ message: resultado.message });
@@ -79,7 +79,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', validate(abrirOsSchema), async (req, res) => {
   try {
     const resultado = await abrirOsCorretivaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       dados: req.validatedData,
     });
@@ -100,7 +100,7 @@ router.post('/', validate(abrirOsSchema), async (req, res) => {
 router.post('/:id/notas', validate(notaAndamentoSchema), async (req, res) => {
   try {
     const resultado = await adicionarNotaOsCorretivaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       dados: req.validatedData,
@@ -121,7 +121,7 @@ router.post('/:id/notas', validate(notaAndamentoSchema), async (req, res) => {
 router.post('/:id/visitas', validate(agendarVisitaSchema), async (req, res) => {
   try {
     const resultado = await agendarVisitaTerceiroService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       dados: req.validatedData,
@@ -142,7 +142,7 @@ router.post('/:id/visitas', validate(agendarVisitaSchema), async (req, res) => {
 router.post('/:id/visitas/:visitaId/iniciar', async (req, res) => {
   try {
     const resultado = await iniciarVisitaTerceiroService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       visitaId: req.params.visitaId,
@@ -158,7 +158,7 @@ router.post('/:id/visitas/:visitaId/iniciar', async (req, res) => {
 router.post('/:id/visitas/:visitaId/resultado', validate(registrarResultadoSchema), async (req, res) => {
   try {
     const resultado = await registrarResultadoVisitaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       visitaId: req.params.visitaId,
@@ -180,7 +180,7 @@ router.post('/:id/visitas/:visitaId/resultado', validate(registrarResultadoSchem
 router.post('/:id/concluir', validate(concluirOsSchema), async (req, res) => {
   try {
     const resultado = await concluirOsCorretivaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       dados: req.validatedData,
@@ -196,7 +196,7 @@ router.post('/:id/concluir', validate(concluirOsSchema), async (req, res) => {
 router.patch('/:id/equipamento', validate(moverOsEquipamentoSchema), async (req, res) => {
   try {
     const resultado = await moverOsEquipamentoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       dados: req.validatedData,
@@ -217,7 +217,7 @@ router.patch('/:id/equipamento', validate(moverOsEquipamentoSchema), async (req,
 router.post('/:id/cancelar', async (req, res) => {
   try {
     const resultado = await cancelarOsCorretivaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
       motivoCancelamento: req.body?.motivoCancelamento,
@@ -233,7 +233,7 @@ router.post('/:id/cancelar', async (req, res) => {
 router.delete('/:id', admin, async (req, res) => {
   try {
     const resultado = await excluirOsCorretivaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       osId: req.params.id,
     });

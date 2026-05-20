@@ -96,3 +96,8 @@ export {
   getStatusVariant,
   getStatusTone,
 } from './uistyles';
+
+// =========================
+// PLANO DE CONTROLE
+// =========================
+export { default as ImpersonacaoBanner } from './ImpersonacaoBanner';

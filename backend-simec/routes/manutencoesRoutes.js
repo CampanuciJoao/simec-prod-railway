@@ -53,7 +53,7 @@ router.post(
   async (req, res) => {
     try {
       const result = await extrairImportacaoLoteService({
-        tenantId: req.usuario.tenantId,
+        tenantId: req.tenantContext,
         files: req.files || [],
       });
       if (!result.ok) {
@@ -73,7 +73,7 @@ router.post(
 router.post('/importacao/criar-lote', async (req, res) => {
   try {
     const result = await criarImportacaoLoteService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       items: req.body?.items || [],
     });
@@ -90,7 +90,7 @@ router.post('/importacao/criar-lote', async (req, res) => {
 router.get('/', async (req, res) => {
   try {
     const data = await listarManutencoesService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       filters: req.query,
     });
 
@@ -104,7 +104,7 @@ router.get('/', async (req, res) => {
 router.get('/:id/historico', async (req, res) => {
   try {
     const resultado = await buscarEventosHistorico({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       referenciaId: req.params.id,
       referenciaTipo: 'manutencao',
       modelName: 'manutencao',
@@ -121,7 +121,7 @@ router.get('/:id/historico', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const resultado = await obterManutencaoDetalhadaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       manutencaoId: req.params.id,
     });
 
@@ -141,7 +141,7 @@ router.get('/:id', async (req, res) => {
 router.post('/', validate(manutencaoSchema), async (req, res) => {
   try {
     const resultado = await criarManutencaoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       dados: req.validatedData,
       statusEquipamento: req.body?.statusEquipamento || null,
@@ -166,7 +166,7 @@ router.post('/', validate(manutencaoSchema), async (req, res) => {
 router.put('/:id', validate(manutencaoSchema), async (req, res) => {
   try {
     const resultado = await atualizarManutencaoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       manutencaoId: req.params.id,
       dados: req.validatedData,
@@ -191,7 +191,7 @@ router.put('/:id', validate(manutencaoSchema), async (req, res) => {
 router.post('/:id/notas', async (req, res) => {
   try {
     const resultado = await adicionarNotaManutencaoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       manutencaoId: req.params.id,
       nota: req.body?.nota,
@@ -213,7 +213,7 @@ router.post('/:id/notas', async (req, res) => {
 router.post('/:id/concluir', async (req, res) => {
   try {
     const resultado = await concluirManutencaoComAcaoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       manutencaoId: req.params.id,
       acao: req.body?.acao,
@@ -248,7 +248,7 @@ router.post('/:id/concluir', async (req, res) => {
 
 router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const manutencaoId = req.params.id;
 
@@ -283,7 +283,7 @@ router.post('/:id/anexos', uploadFor('manutencoes'), async (req, res, next) => {
 
 router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const manutencaoId = req.params.id;
     const anexoId = req.params.anexoId;
@@ -326,7 +326,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
 router.delete('/:id', admin, async (req, res) => {
   try {
     const resultado = await excluirManutencaoService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       manutencaoId: req.params.id,
     });
@@ -351,12 +351,12 @@ router.delete('/:id', admin, async (req, res) => {
     }
 
     await deletarManutencao({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       manutencaoId: req.params.id,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃƒO',
       entidade: 'ManutenÃ§Ã£o',

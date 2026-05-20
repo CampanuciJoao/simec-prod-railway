@@ -4,6 +4,7 @@ const tenantSelect = {
   id: true,
   nome: true,
   slug: true,
+  kind: true,
   timezone: true,
   locale: true,
   ativo: true,
@@ -36,6 +37,26 @@ export function buscarUsuariosPorUsername(username, tenantSlug = null) {
             },
           }
         : {}),
+    },
+    select: usuarioSelect,
+    take: 2,
+  });
+}
+
+// Busca exclusiva no Tenant System por username OU email. Usada no login
+// de plano de controle (sem precisar de slug). Retorna até 2 para
+// permitir detectar conflito (não deve acontecer em circunstâncias normais).
+export function buscarSuperadminSystem({ username, email }) {
+  const or = [];
+  if (username) or.push({ username: String(username).toLowerCase().trim() });
+  if (email) or.push({ email: String(email).toLowerCase().trim() });
+  if (or.length === 0) return Promise.resolve([]);
+
+  return prisma.usuario.findMany({
+    where: {
+      role: 'superadmin',
+      tenant: { kind: 'SYSTEM' },
+      OR: or,
     },
     select: usuarioSelect,
     take: 2,

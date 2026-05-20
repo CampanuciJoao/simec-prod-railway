@@ -8,63 +8,66 @@ datasource db {
 }
 
 model Tenant {
-  id        String   @id @default(uuid())
-  nome      String
-  slug      String   @unique
-  timezone  String   @default("UTC")
-  locale    String   @default("pt-BR")
-  ativo     Boolean  @default(true)
-  contatoNome String?
-  contatoEmail String?
+  id              String     @id @default(uuid())
+  nome            String
+  slug            String     @unique
+  kind            TenantKind @default(CUSTOMER)
+  timezone        String     @default("UTC")
+  locale          String     @default("pt-BR")
+  ativo           Boolean    @default(true)
+  contatoNome     String?
+  contatoEmail    String?
   contatoTelefone String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
-  usuarios             Usuario[]
-  unidades             Unidade[]
-  equipamentos         Equipamento[]
-  veiculos             Veiculo[]
-  acessorios           Acessorio[]
-  contratos            Contrato[]
-  manutencoes          Manutencao[]
-  seguros              Seguro[]
-  alertas              Alerta[]
-  alertasLidos         AlertaLidoPorUsuario[]
-  alertasHistorico     AlertaHistorico[]
-  logsAuditoria        LogAuditoria[]
-  anexos               Anexo[]
-  notasAndamento       NotaAndamento[]
-  emailsNotificacao    EmailNotificacao[]
-  notificacoesEnviadas NotificacaoEnviada[]
-  agentSessions        AgentSession[]
-  agentMessages        AgentMessage[]
-  userAgentMemories    UserAgentMemory[]
-  manutencaoEventos    ManutencaoEvento[]
-  historicoAtivoEventos HistoricoAtivoEvento[]
-  authSessions         AuthSession[]
-  passwordResetTokens  PasswordResetToken[]
-  orcamentos           Orcamento[]
-  osCorretivas         OsCorretiva[]
-  visitasTerceiro      VisitaTerceiro[]
-  gehcSaudeSnapshots   GehcSaudeSnapshot[]
-  gehcToken            GehcToken?
-  gehcContratos        GehcContrato[]
-  gehcOrdensServico    GehcOrdemServico[]
-  gehcUtilizacao       GehcUtilizacaoMensal[]
-  gehcAlertaSuspensoes     GehcAlertaSuspensao[]
-  gehcPdfDocumentos        GehcPdfDocumento[]
-  gehcPdfExtraidos         GehcPdfExtraido[]
-  gehcDownloadLogs         GehcDownloadLog[]
-  eventosEquipamento       EventoEquipamento[]
-  eventoEmbeddings         EventoEquipamentoEmbedding[]
-  iaInsights               IaInsight[]
-  telegramNotificacoes     TelegramNotificacao[]
-  telegramVinculacaoTokens TelegramVinculacaoToken[]
-  alertConfigs             AlertConfig[]
-  aiPipelineEstados        AiPipelineEstado[]
-  tiposTesteQualidade      TipoTesteQualidade[]
-  testesQualidade          TesteQualidade[]
-  alertaFeedbacks          AlertaFeedback[]
+  usuarios                  Usuario[]
+  unidades                  Unidade[]
+  equipamentos              Equipamento[]
+  veiculos                  Veiculo[]
+  acessorios                Acessorio[]
+  contratos                 Contrato[]
+  manutencoes               Manutencao[]
+  seguros                   Seguro[]
+  alertas                   Alerta[]
+  alertasLidos              AlertaLidoPorUsuario[]
+  alertasHistorico          AlertaHistorico[]
+  logsAuditoria             LogAuditoria[]
+  anexos                    Anexo[]
+  notasAndamento            NotaAndamento[]
+  emailsNotificacao         EmailNotificacao[]
+  notificacoesEnviadas      NotificacaoEnviada[]
+  agentSessions             AgentSession[]
+  agentMessages             AgentMessage[]
+  userAgentMemories         UserAgentMemory[]
+  manutencaoEventos         ManutencaoEvento[]
+  historicoAtivoEventos     HistoricoAtivoEvento[]
+  authSessions              AuthSession[]
+  passwordResetTokens       PasswordResetToken[]
+  orcamentos                Orcamento[]
+  osCorretivas              OsCorretiva[]
+  visitasTerceiro           VisitaTerceiro[]
+  gehcSaudeSnapshots        GehcSaudeSnapshot[]
+  gehcToken                 GehcToken?
+  gehcContratos             GehcContrato[]
+  gehcOrdensServico         GehcOrdemServico[]
+  gehcUtilizacao            GehcUtilizacaoMensal[]
+  gehcAlertaSuspensoes      GehcAlertaSuspensao[]
+  gehcPdfDocumentos         GehcPdfDocumento[]
+  gehcPdfExtraidos          GehcPdfExtraido[]
+  gehcDownloadLogs          GehcDownloadLog[]
+  eventosEquipamento        EventoEquipamento[]
+  eventoEmbeddings          EventoEquipamentoEmbedding[]
+  iaInsights                IaInsight[]
+  telegramNotificacoes      TelegramNotificacao[]
+  telegramVinculacaoTokens  TelegramVinculacaoToken[]
+  alertConfigs              AlertConfig[]
+  aiPipelineEstados         AiPipelineEstado[]
+  tiposTesteQualidade       TipoTesteQualidade[]
+  testesQualidade           TesteQualidade[]
+  alertaFeedbacks           AlertaFeedback[]
+  impersonacoes             Impersonacao[]               @relation("ImpersonacaoTenantAlvo")
+  logsAuditoriaImpersonadas LogAuditoria[]               @relation("LogAuditoriaActedAs")
 
   @@map("tenants")
 }
@@ -118,34 +121,36 @@ model Unidade {
 }
 
 model Usuario {
-  id        String   @id @default(uuid())
-  tenantId  String
-  username  String
-  email     String
-  nome      String
-  senha     String
-  role      Role     @default(user)
-  timezone  String?
+  id                     String   @id @default(uuid())
+  tenantId               String
+  username               String
+  email                  String
+  nome                   String
+  senha                  String
+  role                   Role     @default(user)
+  timezone               String?
   notificacoesBaselineEm DateTime @default(now()) @map("notificacoes_baseline_em")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
-  tenant               Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  alertasLidos         AlertaLidoPorUsuario[]
-  logsDeAuditoria      LogAuditoria[]
-  notasDeAndamento     NotaAndamento[]
-  osCorretivas         OsCorretiva[]
-  manutencaoEventos    ManutencaoEvento[]
-  authSessions         AuthSession[]
-  passwordResetTokens  PasswordResetToken[]
-  orcamentosComoCriador   Orcamento[] @relation("OrcamentoCriador")
-  orcamentosComoAprovador Orcamento[] @relation("OrcamentoAprovador")
-  aiPipelinesPausados     AiPipelineEstado[] @relation("AiPipelinePausadoPor")
-  aiPipelinesRetomados    AiPipelineEstado[] @relation("AiPipelineRetomadoPor")
-  aceitesTermos           AceiteTermo[]
-  testesQualidadeAutor    TesteQualidade[]   @relation("TesteQualidadeAutor")
-  testesQualidadeDeletados TesteQualidade[]  @relation("TesteQualidadeDeletadoPor")
-  alertaFeedbacks         AlertaFeedback[]
+  tenant                   Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  alertasLidos             AlertaLidoPorUsuario[]
+  logsDeAuditoria          LogAuditoria[]
+  notasDeAndamento         NotaAndamento[]
+  osCorretivas             OsCorretiva[]
+  manutencaoEventos        ManutencaoEvento[]
+  authSessions             AuthSession[]
+  passwordResetTokens      PasswordResetToken[]
+  orcamentosComoCriador    Orcamento[]            @relation("OrcamentoCriador")
+  orcamentosComoAprovador  Orcamento[]            @relation("OrcamentoAprovador")
+  aiPipelinesPausados      AiPipelineEstado[]     @relation("AiPipelinePausadoPor")
+  aiPipelinesRetomados     AiPipelineEstado[]     @relation("AiPipelineRetomadoPor")
+  aceitesTermos            AceiteTermo[]
+  testesQualidadeAutor     TesteQualidade[]       @relation("TesteQualidadeAutor")
+  testesQualidadeDeletados TesteQualidade[]       @relation("TesteQualidadeDeletadoPor")
+  alertaFeedbacks          AlertaFeedback[]
+  logsAdminCriados         LogAdmin[]
+  impersonacoesIniciadas   Impersonacao[]
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -175,22 +180,22 @@ model Equipamento {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
-  tenant            Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  unidade           Unidade      @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+  tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade           Unidade                @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
   acessorios        Acessorio[]
   anexos            Anexo[]
   manutencoes       Manutencao[]
   osCorretivas      OsCorretiva[]
   seguros           Seguro[]
-  contratosCobertos Contrato[]   @relation("ContratosEquipamentosCobertos")
+  contratosCobertos Contrato[]             @relation("ContratosEquipamentosCobertos")
   historicoEventos  HistoricoAtivoEvento[]
 
   riskScore     Int?
   riskLevel     String?
   riskUpdatedAt DateTime?
 
-  gehcAssetId        String?  @map("gehc_asset_id")
-  gehcSystemId       String?  @map("gehc_system_id")
+  gehcAssetId        String?                @map("gehc_asset_id")
+  gehcSystemId       String?                @map("gehc_system_id")
   gehcSaudeSnapshots GehcSaudeSnapshot[]
   gehcContrato       GehcContrato?
   gehcOrdensServico  GehcOrdemServico[]
@@ -346,11 +351,11 @@ model HistoricoAtivoEvento {
   impactaAnalise Boolean  @default(false) @map("impacta_analise")
   referenciaId   String?  @map("referencia_id")
   referenciaTipo String?  @map("referencia_tipo")
-  metadataJson   String?  @db.Text @map("metadata_json")
+  metadataJson   String?  @map("metadata_json") @db.Text
   dataEvento     DateTime @default(now()) @map("data_evento")
   createdAt      DateTime @default(now())
 
-  tenant     Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento Equipamento @relation(fields: [equipamentoId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, equipamentoId, dataEvento(sort: Desc)])
@@ -467,7 +472,7 @@ model Alerta {
   // Hoje: { equipamentos: [{ id, label, acao }] } para hyperlinks clicaveis
   // nos cards de recomendacao (ex: "complete cadastro" abre direto na pagina
   // de edicao do equipamento).
-  metadataJson    String?  @db.Text @map("metadata_json")
+  metadataJson String? @map("metadata_json") @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -545,7 +550,7 @@ model AlertaHistorico {
   dataAlerta    DateTime @map("data_alerta")
   dataArquivado DateTime @default(now()) @map("data_arquivado")
   motivoArquivo String   @default("retencao_automatica") @map("motivo_arquivo")
-  metadataJson  String?  @db.Text @map("metadata_json")
+  metadataJson  String?  @map("metadata_json") @db.Text
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -558,20 +563,26 @@ model AlertaHistorico {
 }
 
 model LogAuditoria {
-  id         String   @id @default(uuid())
-  tenantId   String
-  acao       String
-  entidade   String
-  entidadeId String   @map("entidade_id")
-  detalhes   String
-  timestamp  DateTime @default(now())
-  autorId    String   @map("autor_id")
+  id              String   @id @default(uuid())
+  tenantId        String
+  acao            String
+  entidade        String
+  entidadeId      String   @map("entidade_id")
+  detalhes        String
+  timestamp       DateTime @default(now())
+  autorId         String   @map("autor_id")
+  // Quando a ação foi feita por superadmin em impersonação, este é o tenant
+  // onde a ação aconteceu. tenantId = mesmo tenant (escrita pertence a ele).
+  // Não-impersonadas têm actedAsTenantId = NULL.
+  actedAsTenantId String?  @map("acted_as_tenant_id")
 
-  tenant Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  autor  Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  tenant        Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  autor         Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
+  actedAsTenant Tenant? @relation("LogAuditoriaActedAs", fields: [actedAsTenantId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, entidade, entidadeId, timestamp])
   @@index([tenantId, autorId, timestamp])
+  @@index([actedAsTenantId, timestamp])
   @@map("log_auditoria")
 }
 
@@ -750,16 +761,16 @@ model GehcSaudeSnapshot {
   equipamentoId String   @map("equipamento_id")
   capturedAt    DateTime @default(now()) @map("captured_at")
 
-  heliumLevelPct     Float?  @map("helium_level_pct")
-  heliumPressurePsi  Float?  @map("helium_pressure_psi")
-  compressorStatus   String? @map("compressor_status")
-  coolantFlowGpm     Float?  @map("coolant_flow_gpm")
-  coolantTempC       Float?  @map("coolant_temp_c")
-  cryocoolerStatus   String? @map("cryocooler_status")
-  magnetOnline       Boolean? @map("magnet_online")
-  equipmentOnline    Boolean? @map("equipment_online")
+  heliumLevelPct    Float?   @map("helium_level_pct")
+  heliumPressurePsi Float?   @map("helium_pressure_psi")
+  compressorStatus  String?  @map("compressor_status")
+  coolantFlowGpm    Float?   @map("coolant_flow_gpm")
+  coolantTempC      Float?   @map("coolant_temp_c")
+  cryocoolerStatus  String?  @map("cryocooler_status")
+  magnetOnline      Boolean? @map("magnet_online")
+  equipmentOnline   Boolean? @map("equipment_online")
 
-  rawJson String? @db.Text @map("raw_json")
+  rawJson String? @map("raw_json") @db.Text
 
   tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
@@ -773,12 +784,12 @@ model GehcSaudeSnapshot {
 model GehcToken {
   id           String    @id @default(uuid())
   tenantId     String    @unique
-  accessToken  String?   @db.Text @map("access_token")
-  idToken      String?   @db.Text @map("id_token")
-  refreshToken String?   @db.Text @map("refresh_token")
+  accessToken  String?   @map("access_token") @db.Text
+  idToken      String?   @map("id_token") @db.Text
+  refreshToken String?   @map("refresh_token") @db.Text
   expiresAt    DateTime? @map("expires_at")
-  gehcLogin    String?   @db.Text @map("gehc_login")
-  gehcPassword String?   @db.Text @map("gehc_password")
+  gehcLogin    String?   @map("gehc_login") @db.Text
+  gehcPassword String?   @map("gehc_password") @db.Text
   capturedAt   DateTime  @default(now()) @map("captured_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 
@@ -800,7 +811,7 @@ model GehcContrato {
   warrantyExpiration DateTime? @map("warranty_expiration")
   entitlements       String?   @db.Text
   assetCoverageType  String?   @map("asset_coverage_type")
-  rawJson            String?   @db.Text @map("raw_json")
+  rawJson            String?   @map("raw_json") @db.Text
   sincronizadoEm     DateTime  @default(now()) @map("sincronizado_em")
   updatedAt          DateTime  @updatedAt @map("updated_at")
 
@@ -818,19 +829,19 @@ model GehcOrdemServico {
   tenantId           String
   equipamentoId      String    @map("equipamento_id")
   gehcServiceId      String    @map("gehc_service_id")
-  problemDescription String?   @db.Text @map("problem_description")
+  problemDescription String?   @map("problem_description") @db.Text
   trackingNumber     String?   @map("tracking_number")
   serviceTypeCode    String?   @map("service_type_code")
   serviceStateCode   String?   @map("service_state_code")
   requestedAt        DateTime? @map("requested_at")
   scheduledDate      DateTime? @map("scheduled_date")
   engineerName       String?   @map("engineer_name")
-  correctiveAction   String?   @db.Text @map("corrective_action")
-  rawJson            String?   @db.Text @map("raw_json")
+  correctiveAction   String?   @map("corrective_action") @db.Text
+  rawJson            String?   @map("raw_json") @db.Text
   sincronizadoEm     DateTime  @default(now()) @map("sincronizado_em")
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  tenant        Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento   Equipamento        @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
   pdfDocumentos GehcPdfDocumento[]
 
   @@unique([gehcServiceId])
@@ -851,27 +862,27 @@ model GehcOrdemServico {
 // para permitir reprocessamento quando o extrator melhorar.
 
 model GehcPdfDocumento {
-  id              String   @id @default(uuid())
-  tenantId        String
-  equipamentoId   String   @map("equipamento_id")
-  ordemServicoId  String   @map("ordem_servico_id")
+  id             String @id @default(uuid())
+  tenantId       String
+  equipamentoId  String @map("equipamento_id")
+  ordemServicoId String @map("ordem_servico_id")
 
   // Identidade do documento no portal GE (ex: "069Ur00000YSvPeIAL").
-  documentId      String   @unique @map("document_id")
-  fileName        String   @map("file_name")
-  fileHash        String?  @map("file_hash")
-  fileSizeBytes   Int?     @map("file_size_bytes")
+  documentId    String  @unique @map("document_id")
+  fileName      String  @map("file_name")
+  fileHash      String? @map("file_hash")
+  fileSizeBytes Int?    @map("file_size_bytes")
 
   // Chave do objeto no Cloudflare R2 (gehc-pdfs/{tenant}/{os}/{docId}.pdf).
-  r2Key           String?  @map("r2_key")
+  r2Key String? @map("r2_key")
 
-  baixadoEm       DateTime? @map("baixado_em")
-  tentativas      Int       @default(0)
-  ultimoErro      String?   @db.Text @map("ultimo_erro")
+  baixadoEm         DateTime? @map("baixado_em")
+  tentativas        Int       @default(0)
+  ultimoErro        String?   @map("ultimo_erro") @db.Text
   ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento  Equipamento      @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
@@ -904,48 +915,48 @@ model GehcPdfDocumento {
 //   - desconhecido             - LLM nao conseguiu categorizar com confianca
 
 model GehcPdfExtraido {
-  id              String  @id @default(uuid())
-  tenantId        String
-  pdfDocumentoId  String  @unique @map("pdf_documento_id")
+  id             String @id @default(uuid())
+  tenantId       String
+  pdfDocumentoId String @unique @map("pdf_documento_id")
 
   // Camada 1: regex
-  caseNumber       String?  @map("case_number")
-  woNumber         String?  @map("wo_number")
-  serviceType      String?  @map("service_type")
-  equipmentStatus  String?  @map("equipment_status")
-  systemId         String?  @map("system_id")
-  serialNumber     String?  @map("serial_number")
-  engineerFullName String?  @map("engineer_full_name")
-  problemReported  String?  @db.Text @map("problem_reported")
-  problemAnalyzed  String?  @db.Text @map("problem_analyzed")
-  actionsTaken     String?  @db.Text @map("actions_taken")
-  rootCauseRaw     String?  @db.Text @map("root_cause_raw")
-  testsPerformed   String?  @db.Text @map("tests_performed")
-  totalMinutes     Int?     @map("total_minutes")
+  caseNumber       String?   @map("case_number")
+  woNumber         String?   @map("wo_number")
+  serviceType      String?   @map("service_type")
+  equipmentStatus  String?   @map("equipment_status")
+  systemId         String?   @map("system_id")
+  serialNumber     String?   @map("serial_number")
+  engineerFullName String?   @map("engineer_full_name")
+  problemReported  String?   @map("problem_reported") @db.Text
+  problemAnalyzed  String?   @map("problem_analyzed") @db.Text
+  actionsTaken     String?   @map("actions_taken") @db.Text
+  rootCauseRaw     String?   @map("root_cause_raw") @db.Text
+  testsPerformed   String?   @map("tests_performed") @db.Text
+  totalMinutes     Int?      @map("total_minutes")
   openedAt         DateTime? @map("opened_at")
 
   // Camada 2: LLM
-  rootCauseCategory String?  @map("root_cause_category")
+  rootCauseCategory String?   @map("root_cause_category")
   // Categoria da intervencao aplicada (whitelist do Knowledge Agent V1 —
   // troca_peca | recalibracao | limpeza_manutencao | firmware | reset_reboot
   // | cabo_conexao | reposicao_consumivel | escalacao_fabricante
   // | substituicao_total | treinamento_operador | sem_acao | desconhecido).
   // Insumo direto da camada cross-tenant (ADR-018).
-  solucaoAplicada   String?  @map("solucao_aplicada")
-  llmConfianca      Float?   @map("llm_confianca")
-  llmRaciocinio     String?  @db.Text @map("llm_raciocinio")
-  measurementsJson  Json?    @map("measurements_json")
-  partsReplacedJson Json?    @map("parts_replaced_json")
+  solucaoAplicada   String?   @map("solucao_aplicada")
+  llmConfianca      Float?    @map("llm_confianca")
+  llmRaciocinio     String?   @map("llm_raciocinio") @db.Text
+  measurementsJson  Json?     @map("measurements_json")
+  partsReplacedJson Json?     @map("parts_replaced_json")
   llmExtractedAt    DateTime? @map("llm_extracted_at")
-  llmModel          String?  @map("llm_model")
-  llmError          String?  @db.Text @map("llm_error")
+  llmModel          String?   @map("llm_model")
+  llmError          String?   @map("llm_error") @db.Text
 
   // Versionamento
-  extractorVersion  Int      @default(1) @map("extractor_version")
-  rawTextHash       String?  @map("raw_text_hash")
-  extractionError   String?  @db.Text @map("extraction_error")
+  extractorVersion  Int       @default(1) @map("extractor_version")
+  rawTextHash       String?   @map("raw_text_hash")
+  extractionError   String?   @map("extraction_error") @db.Text
   extraidoEm        DateTime? @map("extraido_em")
-  tentativas        Int      @default(0)
+  tentativas        Int       @default(0)
   ultimaTentativaEm DateTime? @map("ultima_tentativa_em")
 
   createdAt DateTime @default(now())
@@ -982,28 +993,28 @@ model GehcPdfExtraido {
 //   OUTRO                   — erro nao categorizado
 
 model GehcDownloadLog {
-  id              String   @id @default(uuid())
-  tenantId        String
-  documentId      String?
-  fileName        String?
-  equipamentoId   String?
-  ordemServicoId  String?
-  trackingNumber  String?
+  id             String  @id @default(uuid())
+  tenantId       String
+  documentId     String?
+  fileName       String?
+  equipamentoId  String?
+  ordemServicoId String?
+  trackingNumber String?
 
-  categoria       String
-  mensagem        String?  @db.Text
-  etapasJson      String?  @db.Text
-  duracaoMs       Int?
-  tentativaN      Int      @default(1)
+  categoria  String
+  mensagem   String? @db.Text
+  etapasJson String? @db.Text
+  duracaoMs  Int?
+  tentativaN Int     @default(1)
 
   // Marcado como true quando o mesmo documentId baixar com sucesso depois.
   // Usado pra estatistica de % de sucesso eventual.
-  resolvido       Boolean  @default(false)
-  resolvidoEm     DateTime?
+  resolvido   Boolean   @default(false)
+  resolvidoEm DateTime?
 
-  createdAt       DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  tenant          Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@index([tenantId, categoria])
@@ -1045,9 +1056,9 @@ model GehcDownloadLog {
 // originais.
 
 model EventoEquipamento {
-  id             String   @id @default(uuid())
-  tenantId       String
-  equipamentoId  String   @map("equipamento_id")
+  id            String @id @default(uuid())
+  tenantId      String
+  equipamentoId String @map("equipamento_id")
 
   ocorridoEm     DateTime @map("ocorrido_em")
   fonte          String
@@ -1057,13 +1068,13 @@ model EventoEquipamento {
   resumo         String
   detalhesJson   Json?    @map("detalhes_json")
 
-  refFonteTipo   String   @map("ref_fonte_tipo")
-  refFonteId     String   @map("ref_fonte_id")
+  refFonteTipo String @map("ref_fonte_tipo")
+  refFonteId   String @map("ref_fonte_id")
 
-  createdAt      DateTime @default(now())
+  createdAt DateTime @default(now())
 
-  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  tenant      Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento                 @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
   embedding   EventoEquipamentoEmbedding?
 
   @@unique([refFonteTipo, refFonteId, tipoEvento], name: "evento_equipamento_origem_tipo")
@@ -1082,20 +1093,20 @@ model EventoEquipamento {
 // equipamentos crescer.
 
 model EventoEquipamentoEmbedding {
-  id                  String   @id @default(uuid())
+  id                  String @id @default(uuid())
   tenantId            String
-  eventoEquipamentoId String   @unique @map("evento_equipamento_id")
+  eventoEquipamentoId String @unique @map("evento_equipamento_id")
 
-  embedding           Json     // array de N floats (N = dim)
-  model               String
-  dim                 Int
-  inputText           String   @db.Text @map("input_text")
+  embedding Json // array de N floats (N = dim)
+  model     String
+  dim       Int
+  inputText String @map("input_text") @db.Text
 
-  geradoEm            DateTime @default(now()) @map("gerado_em")
-  createdAt           DateTime @default(now())
+  geradoEm  DateTime @default(now()) @map("gerado_em")
+  createdAt DateTime @default(now())
 
-  tenant              Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  evento              EventoEquipamento @relation(fields: [eventoEquipamentoId], references: [id], onDelete: Cascade)
+  tenant Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  evento EventoEquipamento @relation(fields: [eventoEquipamentoId], references: [id], onDelete: Cascade)
 
   @@index([tenantId])
   @@map("evento_equipamento_embedding")
@@ -1111,28 +1122,28 @@ model EventoEquipamentoEmbedding {
 // para retreinamento futuro.
 
 model IaInsight {
-  id            String    @id @default(uuid())
+  id            String @id @default(uuid())
   tenantId      String
-  equipamentoId String    @map("equipamento_id")
+  equipamentoId String @map("equipamento_id")
 
-  tipo          String    // 'reincidencia_causa' | 'anomalia_helio' | 'risco_alto' | etc
-  severidade    String    @default("medium")
+  tipo          String // 'reincidencia_causa' | 'anomalia_helio' | 'risco_alto' | etc
+  severidade    String  @default("medium")
   titulo        String
-  descricao     String    @db.Text
-  recomendacao  String?   @db.Text
-  evidenciaJson Json?     @map("evidencia_json")
+  descricao     String  @db.Text
+  recomendacao  String? @db.Text
+  evidenciaJson Json?   @map("evidencia_json")
 
-  geradoEm      DateTime  @default(now()) @map("gerado_em")
-  validoAte     DateTime? @map("valido_ate")
-  resolvidoEm   DateTime? @map("resolvido_em")
-  feedbackUtil  Boolean?  @map("feedback_util")
-  feedbackEm    DateTime? @map("feedback_em")
+  geradoEm     DateTime  @default(now()) @map("gerado_em")
+  validoAte    DateTime? @map("valido_ate")
+  resolvidoEm  DateTime? @map("resolvido_em")
+  feedbackUtil Boolean?  @map("feedback_util")
+  feedbackEm   DateTime? @map("feedback_em")
 
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  tenant        Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento   Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  tenant      Tenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento Equipamento @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
 
   @@index([tenantId, severidade, geradoEm(sort: Desc)])
   @@index([tenantId, resolvidoEm])
@@ -1140,28 +1151,28 @@ model IaInsight {
 }
 
 model AiPipelineEstado {
-  id            String    @id @default(uuid())
-  tenantId      String?
-  pipeline      String
-  ativo         Boolean   @default(true)
-  pausadoEm     DateTime? @map("pausado_em")
-  pausadoPorId  String?   @map("pausado_por_id")
-  motivoPausa   String?   @db.Text @map("motivo_pausa")
-  retomadoEm    DateTime? @map("retomado_em")
-  retomadoPorId String?   @map("retomado_por_id")
+  id                      String    @id @default(uuid())
+  tenantId                String?
+  pipeline                String
+  ativo                   Boolean   @default(true)
+  pausadoEm               DateTime? @map("pausado_em")
+  pausadoPorId            String?   @map("pausado_por_id")
+  motivoPausa             String?   @map("motivo_pausa") @db.Text
+  retomadoEm              DateTime? @map("retomado_em")
+  retomadoPorId           String?   @map("retomado_por_id")
   // Telemetria da ultima execucao (atualizado por registrarExecucao()
   // a cada fim de job — sucesso ou falha). Visivel no painel pra admin
   // saber se o pipeline esta funcionando sem precisar de logs.
   ultimaExecucaoEm        DateTime? @map("ultima_execucao_em")
   ultimaExecucaoOk        Boolean?  @map("ultima_execucao_ok")
-  ultimaExecucaoMensagem  String?   @db.Text @map("ultima_execucao_mensagem")
+  ultimaExecucaoMensagem  String?   @map("ultima_execucao_mensagem") @db.Text
   ultimaExecucaoMetrics   Json?     @map("ultima_execucao_metrics")
   ultimaExecucaoDuracaoMs Int?      @map("ultima_execucao_duracao_ms")
-  updatedAt     DateTime  @updatedAt
+  updatedAt               DateTime  @updatedAt
 
-  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  pausadoPor   Usuario? @relation("AiPipelinePausadoPor", fields: [pausadoPorId], references: [id], onDelete: SetNull)
-  retomadoPor  Usuario? @relation("AiPipelineRetomadoPor", fields: [retomadoPorId], references: [id], onDelete: SetNull)
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pausadoPor  Usuario? @relation("AiPipelinePausadoPor", fields: [pausadoPorId], references: [id], onDelete: SetNull)
+  retomadoPor Usuario? @relation("AiPipelineRetomadoPor", fields: [retomadoPorId], references: [id], onDelete: SetNull)
 
   @@map("ai_pipeline_estados")
 }
@@ -1189,14 +1200,14 @@ model GehcUtilizacaoMensal {
 
 // ─── GE Health Cloud — Suspensão temporária de alertas ───────────────────────
 model GehcAlertaSuspensao {
-  id            String    @id @default(uuid())
+  id            String   @id @default(uuid())
   tenantId      String
-  equipamentoId String?   @map("equipamento_id")
-  tipoEvento    String?   @map("tipo_evento")
+  equipamentoId String?  @map("equipamento_id")
+  tipoEvento    String?  @map("tipo_evento")
   motivo        String?
-  suspensoAte   DateTime  @map("suspenso_ate")
-  criadoPor     String    @map("criado_por")
-  criadoEm      DateTime  @default(now()) @map("criado_em")
+  suspensoAte   DateTime @map("suspenso_ate")
+  criadoPor     String   @map("criado_por")
+  criadoEm      DateTime @default(now()) @map("criado_em")
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -1270,7 +1281,7 @@ model UserAgentMemory {
 }
 
 model AuthSession {
-  id               String   @id @default(uuid())
+  id               String    @id @default(uuid())
   tenantId         String
   usuarioId        String
   refreshTokenHash String
@@ -1278,8 +1289,8 @@ model AuthSession {
   userAgent        String?
   expiresAt        DateTime
   revokedAt        DateTime?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
@@ -1292,13 +1303,13 @@ model AuthSession {
 }
 
 model PasswordResetToken {
-  id         String   @id @default(uuid())
-  tenantId   String
-  usuarioId  String
-  tokenHash  String   @unique
-  expiresAt  DateTime
-  usedAt     DateTime?
-  createdAt  DateTime @default(now())
+  id        String    @id @default(uuid())
+  tenantId  String
+  usuarioId String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
 
   tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   usuario Usuario @relation(fields: [tenantId, usuarioId], references: [tenantId, id], onDelete: Cascade)
@@ -1332,11 +1343,63 @@ enum Role {
   user
 }
 
+// Tenant System (kind=SYSTEM) hospeda usuários do plano de controle.
+// Tenants reais de cliente são kind=CUSTOMER. Não há mistura.
+enum TenantKind {
+  SYSTEM
+  CUSTOMER
+}
+
+// Log de ações executadas no plano de controle (criar/suspender tenant,
+// reset de senha cross-tenant, mudança em catálogo, etc). Separado do
+// LogAuditoria operacional pra deixar a trilha de admin auditável sem
+// poluir o log de cada tenant.
+model LogAdmin {
+  id        String   @id @default(uuid())
+  autorId   String   @map("autor_id")
+  acao      String
+  // Tipo do alvo: 'tenant', 'usuario', 'plano', 'feature_flag', 'template'...
+  alvoTipo  String   @map("alvo_tipo")
+  alvoId    String?  @map("alvo_id")
+  motivo    String?
+  // Detalhes estruturados (request body sanitizado, diff de campos, etc).
+  contexto  Json?
+  timestamp DateTime @default(now())
+
+  autor Usuario @relation(fields: [autorId], references: [id], onDelete: Cascade)
+
+  @@index([autorId, timestamp])
+  @@index([alvoTipo, alvoId, timestamp])
+  @@map("log_admin")
+}
+
+// Sessão de impersonação. Aberta quando superadmin entra num tenant
+// alvo; fechada explicitamente (logout/sair) ou por expiração.
+// JWT carrega referência (impersonacaoId) que é validada no middleware.
+model Impersonacao {
+  id              String    @id @default(uuid())
+  superadminId    String    @map("superadmin_id")
+  actedAsTenantId String    @map("acted_as_tenant_id")
+  motivo          String
+  iniciadaEm      DateTime  @default(now()) @map("iniciada_em")
+  encerradaEm     DateTime? @map("encerrada_em")
+  // 'ativa' | 'encerrada_usuario' | 'expirada' | 'revogada'
+  status          String    @default("ativa")
+
+  superadmin    Usuario @relation(fields: [superadminId], references: [id], onDelete: Cascade)
+  actedAsTenant Tenant  @relation("ImpersonacaoTenantAlvo", fields: [actedAsTenantId], references: [id], onDelete: Cascade)
+
+  @@index([superadminId, iniciadaEm])
+  @@index([actedAsTenantId, iniciadaEm])
+  @@index([status, iniciadaEm])
+  @@map("impersonacao")
+}
+
 model Orcamento {
   id                   String    @id @default(uuid())
   tenantId             String
   titulo               String
-  tipo                 String    // PRODUTO | SERVICO | MISTO
+  tipo                 String // PRODUTO | SERVICO | MISTO
   status               String    @default("RASCUNHO") // RASCUNHO | PENDENTE | APROVADO | REJEITADO
   observacao           String?
   unidadeId            String?
@@ -1348,10 +1411,10 @@ model Orcamento {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  tenant      Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  criadoPor   Usuario   @relation("OrcamentoCriador", fields: [criadoPorId], references: [id])
-  aprovadoPor Usuario?  @relation("OrcamentoAprovador", fields: [aprovadoPorId], references: [id])
-  unidade     Unidade?  @relation(fields: [unidadeId], references: [id], onDelete: SetNull)
+  tenant       Tenant                @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  criadoPor    Usuario               @relation("OrcamentoCriador", fields: [criadoPorId], references: [id])
+  aprovadoPor  Usuario?              @relation("OrcamentoAprovador", fields: [aprovadoPorId], references: [id])
+  unidade      Unidade?              @relation(fields: [unidadeId], references: [id], onDelete: SetNull)
   fornecedores OrcamentoFornecedor[]
   itens        OrcamentoItem[]
 
@@ -1369,7 +1432,7 @@ model OrcamentoFornecedor {
   formaPagamento String?
   ordem          Int
 
-  orcamento Orcamento          @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  orcamento Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   precos    OrcamentoItemPreco[]
 
   @@index([orcamentoId])
@@ -1384,7 +1447,7 @@ model OrcamentoItem {
   ordem       Int
   isDestaque  Boolean   @default(false)
 
-  orcamento Orcamento          @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
+  orcamento Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)
   precos    OrcamentoItemPreco[]
 
   @@index([orcamentoId])
@@ -1547,13 +1610,13 @@ enum DocumentoLegal {
 }
 
 model AceiteTermo {
-  id         String         @id @default(uuid())
-  usuarioId  String         @map("usuario_id")
-  documento  DocumentoLegal
-  versao     String
-  aceitoEm   DateTime       @default(now()) @map("aceito_em")
-  ip         String?
-  userAgent  String?        @map("user_agent") @db.Text
+  id        String         @id @default(uuid())
+  usuarioId String         @map("usuario_id")
+  documento DocumentoLegal
+  versao    String
+  aceitoEm  DateTime       @default(now()) @map("aceito_em")
+  ip        String?
+  userAgent String?        @map("user_agent") @db.Text
 
   usuario Usuario @relation(fields: [usuarioId], references: [id], onDelete: Cascade)
 
@@ -1583,17 +1646,17 @@ enum ResultadoTesteQualidade {
 }
 
 model TipoTesteQualidade {
-  id                String   @id @default(uuid())
+  id                String  @id @default(uuid())
   tenantId          String
-  codigo            String   // ex: "MAMO_LR_QUADRIENAL"
-  nome              String   // ex: "Levantamento Radiometrico Ambiental"
-  modalidade        String   // ex: "Mamografia" - bate com Equipamento.tipo
-  frequenciaDias    Int      @map("frequencia_dias") // 30, 180, 365, 1460...
-  obrigatorio       Boolean  @default(false) // exigido por norma
-  normaReferencia   String?  @map("norma_referencia") // ex: "RDC 611/2022"
-  responsavelTipico String?  @map("responsavel_tipico") // ex: "Fisico medico"
-  descricao         String?  @db.Text
-  ativo             Boolean  @default(true)
+  codigo            String // ex: "MAMO_LR_QUADRIENAL"
+  nome              String // ex: "Levantamento Radiometrico Ambiental"
+  modalidade        String // ex: "Mamografia" - bate com Equipamento.tipo
+  frequenciaDias    Int     @map("frequencia_dias") // 30, 180, 365, 1460...
+  obrigatorio       Boolean @default(false) // exigido por norma
+  normaReferencia   String? @map("norma_referencia") // ex: "RDC 611/2022"
+  responsavelTipico String? @map("responsavel_tipico") // ex: "Fisico medico"
+  descricao         String? @db.Text
+  ativo             Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1607,32 +1670,32 @@ model TipoTesteQualidade {
 }
 
 model TesteQualidade {
-  id                  String                  @id @default(uuid())
+  id                  String                   @id @default(uuid())
   tenantId            String
-  equipamentoId       String                  @map("equipamento_id")
-  tipoTesteId         String                  @map("tipo_teste_id")
+  equipamentoId       String                   @map("equipamento_id")
+  tipoTesteId         String                   @map("tipo_teste_id")
   // Campos de execucao (nullable enquanto for "fantasma" do programa
   // recem-ativado e ainda nao houve primeira execucao real).
-  dataExecucao        DateTime?               @db.Date @map("data_execucao")
-  proximoVencimento   DateTime?               @db.Date @map("proximo_vencimento")
+  dataExecucao        DateTime?                @map("data_execucao") @db.Date
+  proximoVencimento   DateTime?                @map("proximo_vencimento") @db.Date
   resultado           ResultadoTesteQualidade?
   // Identificacao do laudo emitido pelo fisico/empresa
-  numeroLaudo         String?                 @map("numero_laudo")
-  empresaExecutora    String?                 @map("empresa_executora")
-  responsavelNome     String?                 @map("responsavel_nome")
-  responsavelRegistro String?                 @map("responsavel_registro") // ABFM, CRM, CRF
+  numeroLaudo         String?                  @map("numero_laudo")
+  empresaExecutora    String?                  @map("empresa_executora")
+  responsavelNome     String?                  @map("responsavel_nome")
+  responsavelRegistro String?                  @map("responsavel_registro") // ABFM, CRM, CRF
   // Validade pode ser menor que frequencia padrao se fisico determinar
-  validadeMeses       Int?                    @map("validade_meses")
-  observacoes         String?                 @db.Text
+  validadeMeses       Int?                     @map("validade_meses")
+  observacoes         String?                  @db.Text
   // Pendencias da secao "Recomendacoes - Providenciar X" do laudo.
   // Cada item: { descricao, resolvido, criadoEm, dataResolucao?, observacao?, resolvidoPor? }
-  pendenciasAcao      Json?                   @map("pendencias_acao")
-  autorRegistroId     String?                 @map("autor_registro_id")
+  pendenciasAcao      Json?                    @map("pendencias_acao")
+  autorRegistroId     String?                  @map("autor_registro_id")
   // Soft delete com justificativa obrigatoria. Anexos PDF preservados ate
   // hard delete via cron de retencao (5 anos apos dataExecucao).
-  deletadoEm          DateTime?               @map("deletado_em")
-  deletadoPorId       String?                 @map("deletado_por_id")
-  motivoExclusao      String?                 @db.Text @map("motivo_exclusao")
+  deletadoEm          DateTime?                @map("deletado_em")
+  deletadoPorId       String?                  @map("deletado_por_id")
+  motivoExclusao      String?                  @map("motivo_exclusao") @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

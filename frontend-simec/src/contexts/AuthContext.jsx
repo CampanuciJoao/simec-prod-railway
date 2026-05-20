@@ -10,6 +10,10 @@ import React, {
 import { useNavigate } from 'react-router-dom';
 
 import { loginUsuario, logoutUsuario, refreshSessao } from '@/services/api';
+import {
+  iniciarImpersonacao as apiIniciarImpersonacao,
+  encerrarImpersonacao as apiEncerrarImpersonacao,
+} from '@/services/api/impersonacaoApi';
 import { setDefaultTimezone } from '@/utils/timeUtils';
 
 export const AuthContext = createContext(null);
@@ -28,6 +32,7 @@ function parseJwtPayload(token) {
 
 function hydrateStoredData(parsed) {
   const tenant = parsed?.tenant || null;
+  const impersonacao = parsed?.impersonacao || null;
   const usuario = parsed?.usuario
     ? {
         ...parsed.usuario,
@@ -39,6 +44,7 @@ function hydrateStoredData(parsed) {
     ...parsed,
     tenant,
     usuario,
+    impersonacao,
   };
 }
 
@@ -83,6 +89,7 @@ function isTokenExpired(token) {
 export function AuthProvider({ children }) {
   const [usuario, setUsuario] = useState(null);
   const [tenant, setTenant] = useState(null);
+  const [impersonacao, setImpersonacao] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const navigate = useNavigate();
@@ -92,6 +99,7 @@ export function AuthProvider({ children }) {
     setStorage(hydrated);
     setUsuario(hydrated.usuario);
     setTenant(hydrated.tenant || null);
+    setImpersonacao(hydrated.impersonacao || null);
     // Hierarquia: usuario -> tenant -> UTC
     setDefaultTimezone(hydrated.usuario?.timezone || hydrated.tenant?.timezone);
     return hydrated;
@@ -112,6 +120,7 @@ export function AuthProvider({ children }) {
         if (active) {
           setUsuario(storedData.usuario);
           setTenant(storedData.tenant || null);
+          setImpersonacao(storedData.impersonacao || null);
           // Hierarquia: usuario -> tenant -> UTC
           setDefaultTimezone(storedData.usuario?.timezone || storedData.tenant?.timezone);
           setLoading(false);
@@ -127,6 +136,7 @@ export function AuthProvider({ children }) {
           setStorage(hydrated);
           setUsuario(hydrated.usuario);
           setTenant(hydrated.tenant || null);
+          setImpersonacao(hydrated.impersonacao || null);
           // Hierarquia: usuario -> tenant -> UTC
           setDefaultTimezone(hydrated.usuario?.timezone || hydrated.tenant?.timezone);
         }
@@ -136,6 +146,7 @@ export function AuthProvider({ children }) {
         if (active) {
           setUsuario(null);
           setTenant(null);
+          setImpersonacao(null);
         }
       } finally {
         if (active) setLoading(false);
@@ -150,16 +161,22 @@ export function AuthProvider({ children }) {
   }, []);
 
   const login = useCallback(
-    async (username, senha, tenantSlug, redirectPath = '/dashboard') => {
+    async (username, senha, tenantSlug, redirectPath = null) => {
       try {
+        // tenantSlug é opcional. Sem slug, backend tenta autenticar como
+        // superadmin do Tenant System. Com slug, fluxo de cliente normal.
         const responseData = await loginUsuario({
           username,
           senha,
-          tenant: tenantSlug,
+          tenant: tenantSlug || undefined,
         });
 
-        syncAuthState(responseData);
-        navigate(redirectPath, { replace: true });
+        const hydrated = syncAuthState(responseData);
+        // Superadmin do Tenant System vai pro plano de controle por default.
+        const destino =
+          redirectPath ||
+          (hydrated.tenant?.kind === 'SYSTEM' ? '/superadmin' : '/dashboard');
+        navigate(destino, { replace: true });
       } catch (error) {
         console.error('[AUTH_CONTEXT_LOGIN_ERROR]', error);
         throw error;
@@ -167,6 +184,46 @@ export function AuthProvider({ children }) {
     },
     [navigate, syncAuthState]
   );
+
+  // Abre sessão de impersonação. Backend devolve token novo (com claims) e
+  // dados do tenant alvo. Persistimos em userInfo e atualizamos contexto.
+  const iniciarImpersonacao = useCallback(
+    async ({ tenantId, motivo }) => {
+      const stored = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const data = await apiIniciarImpersonacao({ tenantId, motivo });
+      if (!data?.token || !data?.impersonacao) {
+        throw new Error('Resposta inválida do servidor para impersonação.');
+      }
+      const next = {
+        ...stored,
+        token: data.token,
+        impersonacao: data.impersonacao,
+      };
+      syncAuthState(next);
+      // Após impersonar, leva pro dashboard normal do tenant alvo.
+      navigate('/dashboard', { replace: true });
+      return data.impersonacao;
+    },
+    [navigate, syncAuthState]
+  );
+
+  // Encerra a sessão de impersonação. Backend devolve token limpo (sem claims).
+  const encerrarImpersonacao = useCallback(async () => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('userInfo') || '{}');
+      const data = await apiEncerrarImpersonacao();
+      const next = {
+        ...stored,
+        token: data?.token || stored.token,
+        impersonacao: null,
+      };
+      syncAuthState(next);
+      navigate('/superadmin', { replace: true });
+    } catch (error) {
+      console.error('[AUTH_CONTEXT_ENCERRAR_IMPERSONACAO_ERROR]', error);
+      throw error;
+    }
+  }, [navigate, syncAuthState]);
 
   const logout = useCallback(async () => {
     try {
@@ -177,6 +234,7 @@ export function AuthProvider({ children }) {
       clearStorage();
       setUsuario(null);
       setTenant(null);
+      setImpersonacao(null);
       navigate('/login', { replace: true });
     }
   }, [navigate]);
@@ -192,19 +250,40 @@ export function AuthProvider({ children }) {
     }
   }, [usuario]);
 
+  const isSuperAdminSystem = useMemo(
+    () => usuario?.role === 'superadmin' && tenant?.kind === 'SYSTEM',
+    [usuario, tenant]
+  );
+
   const value = useMemo(
     () => ({
       usuario,
       user: usuario,
       tenant,
+      impersonacao,
       isAuthenticated: !!usuario,
       isAdmin,
+      isSuperAdminSystem,
       loading,
       login,
       logout,
+      iniciarImpersonacao,
+      encerrarImpersonacao,
       syncAuthState,
     }),
-    [usuario, tenant, isAdmin, loading, login, logout, syncAuthState]
+    [
+      usuario,
+      tenant,
+      impersonacao,
+      isAdmin,
+      isSuperAdminSystem,
+      loading,
+      login,
+      logout,
+      iniciarImpersonacao,
+      encerrarImpersonacao,
+      syncAuthState,
+    ]
   );
 
   return (

@@ -33,11 +33,10 @@ function LoginForm({
         label="Empresa"
         value={tenant}
         onChange={(event) => onChangeTenant(event.target.value)}
-        placeholder="Informe sua empresa"
-        hint="Use o acesso liberado para a empresa da sua equipe."
+        placeholder="Informe sua empresa (deixe vazio para acesso de plataforma)"
+        hint="Use o acesso liberado para a empresa da sua equipe. Superadmins de plataforma podem deixar este campo vazio."
         leadingIcon={<FontAwesomeIcon icon={faBuilding} />}
         disabled={loading}
-        required
       />
 
       <Input

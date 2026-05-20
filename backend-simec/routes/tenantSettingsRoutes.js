@@ -13,7 +13,7 @@ router.use(admin);
 
 router.get('/settings', async (req, res) => {
   try {
-    const resultado = await obterTenantSettingsService(req.usuario.tenantId);
+    const resultado = await obterTenantSettingsService(req.tenantContext);
     return res.status(resultado.status).json(
       resultado.ok ? resultado.data : { message: resultado.message }
     );
@@ -26,7 +26,7 @@ router.get('/settings', async (req, res) => {
 router.put('/settings', async (req, res) => {
   try {
     const resultado = await atualizarTenantSettingsService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       payload: req.body,
       autor: req.usuario,
     });

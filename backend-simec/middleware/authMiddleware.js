@@ -87,6 +87,7 @@ export const proteger = async (req, res, next) => {
               id: true,
               nome: true,
               slug: true,
+              kind: true,
               timezone: true,
               locale: true,
               ativo: true,
@@ -99,6 +100,42 @@ export const proteger = async (req, res, next) => {
       });
 
       if (usuarioAtual) await setCachedUser(decoded.id, usuarioAtual);
+    }
+
+    // Sessão de impersonação (opcional). Se o JWT carrega impersonacaoId,
+    // validamos contra o DB antes de aceitar o actAsTenantId. Sessão
+    // encerrada/expirada/revogada -> ignora claim silenciosamente e segue
+    // como superadmin sem contexto de tenant.
+    let impersonacao = null;
+    if (decoded.impersonacaoId && decoded.actAsTenantId) {
+      try {
+        const registro = await prisma.impersonacao.findUnique({
+          where: { id: decoded.impersonacaoId },
+          include: {
+            actedAsTenant: {
+              select: { id: true, nome: true, slug: true, kind: true, ativo: true },
+            },
+          },
+        });
+        if (
+          registro &&
+          registro.status === 'ativa' &&
+          registro.superadminId === usuarioAtual.id &&
+          registro.actedAsTenantId === decoded.actAsTenantId &&
+          registro.actedAsTenant?.ativo
+        ) {
+          impersonacao = {
+            id: registro.id,
+            actAsTenantId: registro.actedAsTenantId,
+            actAsTenant: registro.actedAsTenant,
+            motivo: registro.motivo,
+            iniciadaEm: registro.iniciadaEm,
+          };
+        }
+      } catch (err) {
+        // Falha silenciosa: a request segue como se não houvesse impersonação.
+        console.warn('[AUTH_MIDDLEWARE_IMPERSONACAO]', err.message);
+      }
     }
 
     if (!usuarioAtual) {
@@ -127,7 +164,14 @@ export const proteger = async (req, res, next) => {
       tenantId: usuarioAtual.tenantId,
       timezone: usuarioAtual.timezone || null,
       tenant: usuarioAtual.tenant,
+      impersonacao,
     };
+
+    // tenantContext é o tenant em cujo ESCOPO a requisição deve operar.
+    // Default = tenant do usuário. Sob impersonação ativa, = tenant alvo.
+    // TODOS os handlers de domínio devem usar req.tenantContext em vez de
+    // req.usuario.tenantId (ver requireTenantContext abaixo para a guarda).
+    req.tenantContext = impersonacao?.actAsTenantId || usuarioAtual.tenantId;
 
     return next();
   } catch (error) {
@@ -157,4 +201,42 @@ export const superadmin = (req, res, next) => {
   return res.status(403).json({
     message: 'Acesso negado. Requer privilegios de superadmin.',
   });
+};
+
+// Plano de controle: superadmin DO Tenant System. Bloqueia mesmo
+// superadmins legados que ainda estejam em CUSTOMER (não deveriam existir
+// após Fase 0, mas garantia defensiva).
+export const requireSystemTenant = (req, res, next) => {
+  const u = req.usuario;
+  if (u && u.role === 'superadmin' && u.tenant?.kind === 'SYSTEM') {
+    return next();
+  }
+  return res.status(403).json({
+    message: 'Acesso restrito ao plano de controle (Tenant System).',
+  });
+};
+
+// Guard para endpoints de domínio (escopo de cliente). Bloqueia superadmin
+// do Tenant System que esteja SEM impersonação ativa — esse tipo de
+// usuário não pode operar dados de cliente sem antes "atuar como".
+// Usuários CUSTOMER comuns passam direto.
+export const requireTenantContext = (req, res, next) => {
+  const u = req.usuario;
+
+  // Sem usuário (não deveria chegar aqui se proteger rodou antes).
+  if (!u) {
+    return res.status(401).json({ message: 'Nao autorizado.' });
+  }
+
+  // Superadmin do Tenant System sem impersonação não tem contexto válido
+  // de tenant operacional. Frontend deve obrigar selecionar tenant antes
+  // de acessar rotas de domínio.
+  if (u.tenant?.kind === 'SYSTEM' && !u.impersonacao) {
+    return res.status(412).json({
+      message: 'Selecione um tenant para atuar antes de acessar dados operacionais.',
+      code: 'TENANT_CONTEXT_REQUIRED',
+    });
+  }
+
+  return next();
 };

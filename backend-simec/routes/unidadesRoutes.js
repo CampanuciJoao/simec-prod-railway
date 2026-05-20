@@ -39,7 +39,7 @@ async function buscarUnidadeCompleta(tenantId, id) {
 // ==============================
 router.get('/', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const unidades = await prisma.unidade.findMany({
       where: { tenantId },
@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
 // ==============================
 router.get('/:id', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const unidade = await buscarUnidadeCompleta(tenantId, req.params.id);
 
@@ -80,7 +80,7 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
   const dados = req.validatedData;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const novaUnidade = await prisma.unidade.create({
       data: {
@@ -121,7 +121,7 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
 // ==============================
 router.put('/:id', validate(unidadeSchema), async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const dados = req.validatedData;
 
   try {
@@ -182,7 +182,7 @@ router.put('/:id', validate(unidadeSchema), async (req, res) => {
 // ==============================
 router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const unidade = await prisma.unidade.findFirst({
@@ -248,7 +248,7 @@ router.delete('/:id', admin, async (req, res) => {
 // ==============================
 router.post('/:id/anexos', uploadFor('unidades'), async (req, res, next) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const unidadeId = req.params.id;
 
@@ -276,7 +276,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
     await removerAnexo({
       resource: 'unidades',
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       entityId: req.params.id,
       anexoId: req.params.anexoId,

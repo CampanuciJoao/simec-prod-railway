@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
   try {
     const { status, tipo } = req.query;
     const orcamentos = await listarOrcamentos({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       status,
       tipo,
     });
@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
 
 router.get('/metricas', async (req, res) => {
   try {
-    const metricas = await obterMetricasOrcamentos({ tenantId: req.usuario.tenantId });
+    const metricas = await obterMetricasOrcamentos({ tenantId: req.tenantContext });
     return res.json(metricas);
   } catch (error) {
     console.error('[ORCAMENTO_METRICAS_ERROR]', error);
@@ -45,7 +45,7 @@ router.get('/metricas', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const orcamento = await buscarOrcamentoPorId({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       id: req.params.id,
     });
     return res.json(orcamento);
@@ -60,13 +60,13 @@ router.post('/', validate(orcamentoSchema), async (req, res) => {
   try {
     const dados = req.validatedData;
     const orcamento = await criarOrcamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       criadoPorId: req.usuario.id,
       dados,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'CRIAÃ‡ÃƒO',
       entidade: 'Orcamento',
@@ -86,13 +86,13 @@ router.put('/:id', validate(orcamentoSchema), async (req, res) => {
   try {
     const dados = req.validatedData;
     const orcamento = await atualizarOrcamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       id: req.params.id,
       dados,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
@@ -111,12 +111,12 @@ router.put('/:id', validate(orcamentoSchema), async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     await excluirOrcamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       id: req.params.id,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'EXCLUSÃƒO',
       entidade: 'Orcamento',
@@ -135,12 +135,12 @@ router.delete('/:id', async (req, res) => {
 router.post('/:id/enviar-aprovacao', async (req, res) => {
   try {
     const orcamento = await enviarParaAprovacao({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       id: req.params.id,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
@@ -160,14 +160,14 @@ router.post('/:id/aprovar', admin, async (req, res) => {
   try {
     const { fornecedorAprovadoId } = req.body || {};
     const orcamento = await aprovarOrcamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       id: req.params.id,
       aprovadoPorId: req.usuario.id,
       fornecedorAprovadoId: fornecedorAprovadoId || null,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',
@@ -187,14 +187,14 @@ router.post('/:id/rejeitar', admin, validate(rejeitarSchema), async (req, res) =
   try {
     const { motivoRejeicao } = req.validatedData;
     const orcamento = await rejeitarOrcamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       id: req.params.id,
       aprovadoPorId: req.usuario.id,
       motivoRejeicao,
     });
 
     await registrarLog({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       acao: 'EDIÃ‡ÃƒO',
       entidade: 'Orcamento',

@@ -82,7 +82,7 @@ router.get('/', async (req, res) => {
     };
 
     const resultado = await listarAlertasService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       userId:   req.usuario.id,
       page,
       pageSize,
@@ -99,7 +99,7 @@ router.get('/', async (req, res) => {
 router.get('/resumo', async (req, res) => {
   try {
     const resultado = await resumirAlertasService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       userId:   req.usuario.id,
     });
     return res.json(resultado.data);
@@ -112,7 +112,7 @@ router.get('/resumo', async (req, res) => {
 // GET /historico — log de auditoria completo
 router.get('/historico', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const page     = Math.max(1, parsePositiveInt(req.query.page, 1));
     const pageSize = Math.min(100, Math.max(1, parsePositiveInt(req.query.pageSize, 25)));
 
@@ -176,7 +176,7 @@ router.get('/historico', async (req, res) => {
 router.post('/marcar-todos-vistos', async (req, res) => {
   try {
     const resultado = await marcarTodosAlertasComoVistosService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       userId:   req.usuario.id,
     });
     if (!resultado.ok) {
@@ -204,7 +204,7 @@ router.post('/:id/feedback', async (req, res) => {
         ? comentarioRaw.trim().slice(0, 2000)
         : null;
 
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const alertaId = req.params.id;
 
@@ -236,7 +236,7 @@ router.post('/:id/feedback', async (req, res) => {
 router.put('/:id/status', async (req, res) => {
   try {
     const resultado = await atualizarStatusAlertaService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       userId:   req.usuario.id,
       alertaId: req.params.id,
       status:   req.body?.status,

@@ -36,7 +36,7 @@ router.post('/chat', proteger, async (req, res) => {
 
   try {
     const usuarioId = req.usuario?.id;
-    const tenantId = req.usuario?.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioNome = req.usuario?.nome || 'Usuário';
     const mensagemNormalizada = mensagem.trim();
     const logContext = {
@@ -127,7 +127,7 @@ router.post('/chat', proteger, async (req, res) => {
       error,
       {
         requestId,
-        tenantId: req.usuario?.tenantId || null,
+        tenantId: req.tenantContext || null,
         usuarioId: req.usuario?.id || null,
         usuarioNome: req.usuario?.nome || 'desconhecido',
       },
@@ -150,7 +150,7 @@ router.post('/chat', proteger, async (req, res) => {
 router.post('/reset', proteger, async (req, res) => {
   try {
     const usuarioId = req.usuario?.id;
-    const tenantId = req.usuario?.tenantId;
+    const tenantId = req.tenantContext;
 
     if (!usuarioId || !tenantId) {
       return res.status(401).json({
@@ -199,7 +199,7 @@ router.post('/reset', proteger, async (req, res) => {
       'AGENT_RESET_ERROR',
       error,
       {
-        tenantId: req.usuario?.tenantId || null,
+        tenantId: req.tenantContext || null,
         usuarioId: req.usuario?.id || null,
         usuarioNome: req.usuario?.nome || 'desconhecido',
       }

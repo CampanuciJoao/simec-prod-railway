@@ -18,7 +18,7 @@ router.get('/', async (req, res) => {
   try {
     const emails = await prisma.emailNotificacao.findMany({
       where: {
-        tenantId: req.usuario.tenantId,
+        tenantId: req.tenantContext,
       },
       orderBy: {
         email: 'asc',
@@ -54,7 +54,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const emailNormalizado = email.trim().toLowerCase();
 
@@ -125,7 +125,7 @@ router.put('/:id', async (req, res) => {
     recebeAlertasSeguro,
   } = req.body;
 
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const emailExistente = await prisma.emailNotificacao.findFirst({
@@ -181,7 +181,7 @@ router.put('/:id', async (req, res) => {
 // ==============================
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const emailExistente = await prisma.emailNotificacao.findFirst({

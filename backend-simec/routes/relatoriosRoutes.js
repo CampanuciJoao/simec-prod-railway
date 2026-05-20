@@ -28,7 +28,7 @@ router.post('/gerar', async (req, res) => {
     tipo,
   } = req.body;
 
-  const tenantId = req.usuario?.tenantId;
+  const tenantId = req.tenantContext;
 
   if (!tenantId) {
     return res.status(401).json({

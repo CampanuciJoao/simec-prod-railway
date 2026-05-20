@@ -242,7 +242,7 @@ const SEGURO_INCLUDE = {
 // ==============================
 router.get('/', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 15));
@@ -281,7 +281,7 @@ router.get('/', async (req, res) => {
 // ==============================
 router.get('/:id', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const seguro = await buscarSeguroCompleto(tenantId, req.params.id);
 
@@ -306,7 +306,7 @@ router.post('/', validate(seguroSchema), async (req, res) => {
   const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
@@ -397,7 +397,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
   const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const seguro = await prisma.seguro.findFirst({
       where: { id, tenantId },
@@ -483,7 +483,7 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
 // ==============================
 router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const seguro = await prisma.seguro.findFirst({
@@ -541,7 +541,7 @@ router.delete('/:id', admin, async (req, res) => {
 // ==============================
 router.get('/:id/apolice', async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const seguro = await prisma.seguro.findFirst({
@@ -583,7 +583,7 @@ router.get('/:id/apolice', async (req, res) => {
 // ==============================
 router.post('/:id/anexos', uploadFor('seguros'), async (req, res, next) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
     const seguroId = req.params.id;
 
@@ -611,7 +611,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
     await removerAnexo({
       resource: 'seguros',
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       entityId: req.params.id,
       anexoId: req.params.anexoId,
@@ -639,7 +639,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
 router.post('/:id/cancelar', async (req, res) => {
   const { id } = req.params;
   const { motivo } = req.body;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const seguro = await prisma.seguro.findFirst({
@@ -708,7 +708,7 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
   const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const seguroAntigo = await prisma.seguro.findFirst({
       where: { id, tenantId },
@@ -810,7 +810,7 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
 // ==============================
 router.get('/:id/historico', async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const cadeia = [];
@@ -856,7 +856,7 @@ router.get('/:id/historico', async (req, res) => {
 // ==============================
 router.post('/extrair-pdf', uploadEmMemoria.single('file'), async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     if (!req.file) {
       return res.status(400).json({
