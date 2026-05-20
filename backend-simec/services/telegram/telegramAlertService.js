@@ -20,11 +20,26 @@ export async function dispararNotificacoesTelegram(tenantIds = []) {
   await Promise.allSettled(tenantIds.map(processarTenant));
 }
 
+// Aviso "uma vez por boot" sobre token ausente. Sem essa flag, o cron de
+// 1min faria spam de console.warn — com ela, o operador vê o problema no
+// primeiro boot e fica em silêncio depois (até o próximo restart).
+let avisouTokenAusente = false;
+
 // Drenagem global: varre TODOS tenants com alertas pendentes e tenta enviar.
 // Roda em cron dedicado (a cada 1min) para garantir que pendencias nunca
 // fiquem represadas, mesmo quando a regra de alertas nao gerou novidade.
 export async function dispararPendenciasTelegramTodos() {
-  if (!telegramConfigurado()) return { tenantsProcessados: 0, motivo: 'telegram_nao_configurado' };
+  if (!telegramConfigurado()) {
+    if (!avisouTokenAusente) {
+      console.warn(
+        '[TELEGRAM_CONFIG] TELEGRAM_BOT_TOKEN ausente nas env vars. ' +
+        'Alertas com telegramEnviado=false vão se acumular indefinidamente. ' +
+        'Configure a variável no Railway > Variables e redeploy.'
+      );
+      avisouTokenAusente = true;
+    }
+    return { tenantsProcessados: 0, motivo: 'telegram_nao_configurado' };
+  }
 
   const tenantsPendentes = await prisma.alerta.findMany({
     where: { telegramEnviado: false },
