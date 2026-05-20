@@ -37,7 +37,7 @@ router.post('/configurar-webhook', proteger, admin, async (req, res) => {
 // Listar destinatários do tenant
 router.get('/destinatarios', proteger, admin, async (req, res) => {
   const destinatarios = await prisma.telegramNotificacao.findMany({
-    where: { tenantId: req.usuario.tenantId },
+    where: { tenantId: req.tenantContext },
     orderBy: { createdAt: 'desc' },
   });
   res.json(destinatarios);
@@ -49,7 +49,7 @@ router.post('/destinatarios', proteger, admin, async (req, res) => {
   if (!chatId) return res.status(400).json({ erro: 'chatId obrigatório.' });
   try {
     const dest = await prisma.telegramNotificacao.create({
-      data: { tenantId: req.usuario.tenantId, chatId: String(chatId), nome: nome || null, ...prefs },
+      data: { tenantId: req.tenantContext, chatId: String(chatId), nome: nome || null, ...prefs },
     });
     res.status(201).json(dest);
   } catch (err) {
@@ -61,7 +61,7 @@ router.post('/destinatarios', proteger, admin, async (req, res) => {
 // Atualizar preferências de um destinatário
 router.put('/destinatarios/:id', proteger, admin, async (req, res) => {
   const dest = await prisma.telegramNotificacao.findFirst({
-    where: { id: req.params.id, tenantId: req.usuario.tenantId },
+    where: { id: req.params.id, tenantId: req.tenantContext },
   });
   if (!dest) return res.status(404).json({ erro: 'Destinatário não encontrado.' });
 
@@ -76,7 +76,7 @@ router.put('/destinatarios/:id', proteger, admin, async (req, res) => {
 // Remover destinatário
 router.delete('/destinatarios/:id', proteger, admin, async (req, res) => {
   const dest = await prisma.telegramNotificacao.findFirst({
-    where: { id: req.params.id, tenantId: req.usuario.tenantId },
+    where: { id: req.params.id, tenantId: req.tenantContext },
   });
   if (!dest) return res.status(404).json({ erro: 'Destinatário não encontrado.' });
   await prisma.telegramNotificacao.delete({ where: { id: req.params.id } });
@@ -85,7 +85,7 @@ router.delete('/destinatarios/:id', proteger, admin, async (req, res) => {
 
 // Gerar token de vinculação (válido por 10 min)
 router.post('/gerar-token', proteger, admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   await prisma.telegramVinculacaoToken.updateMany({
     where: { tenantId, usado: false },

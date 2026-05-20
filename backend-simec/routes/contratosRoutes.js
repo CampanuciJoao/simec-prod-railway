@@ -185,7 +185,7 @@ const CONTRATO_INCLUDE = {
 // ==============================
 router.get('/', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(req.query.pageSize) || 10));
@@ -225,7 +225,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const contrato = await buscarContratoCompleto(
-      req.usuario.tenantId,
+      req.tenantContext,
       req.params.id
     );
 
@@ -258,7 +258,7 @@ router.post('/', validate(contratoSchema), async (req, res) => {
   } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     await validarUnidadesDoTenant(tenantId, unidadesCobertasIds);
     await validarEquipamentosDoTenant(tenantId, equipamentosCobertosIds);
@@ -339,7 +339,7 @@ router.put('/:id', validate(contratoSchema), async (req, res) => {
   const { unidadesCobertasIds, equipamentosCobertosIds, ...restante } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const contrato = await prisma.contrato.findFirst({
       where: {
@@ -435,7 +435,7 @@ router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const contrato = await prisma.contrato.findFirst({
       where: {
@@ -496,7 +496,7 @@ router.post(
   uploadFor('contratos'),
   async (req, res, next) => {
     try {
-      const tenantId = req.usuario.tenantId;
+      const tenantId = req.tenantContext;
       const usuarioId = req.usuario.id;
       const contratoId = req.params.id;
 
@@ -525,7 +525,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
     await removerAnexo({
       resource: 'contratos',
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       entityId: req.params.id,
       anexoId: req.params.anexoId,

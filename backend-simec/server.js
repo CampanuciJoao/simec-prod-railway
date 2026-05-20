@@ -38,6 +38,7 @@ import lgpdRoutes from './routes/lgpdRoutes.js';
 import controleQualidadeRoutes from './routes/controleQualidadeRoutes.js';
 import metricsRoutes from './routes/metricsRoutes.js';
 import saudeRoutes from './routes/saudeRoutes.js';
+import superadminImpersonacaoRoutes from './routes/superadminImpersonacaoRoutes.js';
 
 import cookieParser from 'cookie-parser';
 import { metricsMiddleware } from './middleware/metricsMiddleware.js';
@@ -198,6 +199,7 @@ app.use('/api/pdfs', pdfRoutes);
 app.use('/api/superadmin', superadminTenantsRoutes);
 app.use('/api/superadmin/help', superadminHelpRoutes);
 app.use('/api/superadmin/saude', saudeRoutes);
+app.use('/api/superadmin/impersonar', superadminImpersonacaoRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);

@@ -10,7 +10,7 @@ router.use(proteger);
 router.get('/', async (req, res) => {
   try {
     const resultado = await obterDashboardService({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       userId: req.usuario.id,
     });
 

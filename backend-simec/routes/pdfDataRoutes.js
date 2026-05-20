@@ -16,7 +16,7 @@ router.use(proteger);
 router.get('/manutencao/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     if (!id || typeof id !== 'string') {
       return res.status(400).json({
@@ -84,7 +84,7 @@ router.get('/manutencao/:id', async (req, res) => {
 router.post('/relatorio', async (req, res) => {
   try {
     const { ids } = req.body;
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     if (!Array.isArray(ids) || ids.length === 0) {
       return res.status(400).json({

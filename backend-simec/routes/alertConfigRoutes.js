@@ -32,7 +32,7 @@ router.get('/modules', proteger, (req, res) => {
 router.get('/:module', proteger, async (req, res) => {
   const { module } = req.params;
   try {
-    const config = await getConfig(req.usuario.tenantId, module);
+    const config = await getConfig(req.tenantContext, module);
     const defaults = getDefaults(module);
     if (!defaults) return res.status(404).json({ message: `Módulo "${module}" não suportado.` });
     const meta = config.__meta || null;
@@ -62,7 +62,7 @@ router.put('/:module', proteger, admin, async (req, res) => {
     return res.status(400).json({ message: 'Body inválido: esperava { config: { ... } }.' });
   }
 
-  const result = await setConfig(req.usuario.tenantId, module, partial, req.usuario.id);
+  const result = await setConfig(req.tenantContext, module, partial, req.usuario.id);
   if (!result.ok) {
     return res.status(400).json({ message: 'Validação falhou.', errors: result.errors });
   }
@@ -78,7 +78,7 @@ router.put('/:module', proteger, admin, async (req, res) => {
  */
 router.post('/:module/reset', proteger, admin, async (req, res) => {
   const { module } = req.params;
-  const result = await resetConfig(req.usuario.tenantId, module, req.usuario.id);
+  const result = await resetConfig(req.tenantContext, module, req.usuario.id);
   if (!result.ok) {
     return res.status(400).json({ message: 'Falha ao restaurar padrões.', errors: result.errors });
   }

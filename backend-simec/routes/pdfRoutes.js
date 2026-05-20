@@ -73,7 +73,7 @@ function mapErrorToResponse(res, error, fallbackMessage) {
 router.get('/bi', async (req, res) => {
   try {
     const dados = await obterDadosPdfBI({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
     });
     const buffer = await gerarPdfBIBuffer(dados, getPdfOptions(req));
     const fileName = `BI_ESTRATEGICO_SIMEC_${dados.ano || 'ANO'}.pdf`;
@@ -88,7 +88,7 @@ router.get('/bi', async (req, res) => {
 router.get('/manutencao/:id', async (req, res) => {
   try {
     const manutencao = await obterDadosPdfManutencao({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       manutencaoId: req.params.id,
     });
     const buffer = await gerarPdfOSManutencaoBuffer(
@@ -107,7 +107,7 @@ router.get('/manutencao/:id', async (req, res) => {
 router.post('/relatorio', async (req, res) => {
   try {
     const resultado = await obterDadosPdfRelatorio({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       filtros: req.body || {},
     });
     const buffer = await gerarPdfRelatorioBuffer(resultado, getPdfOptions(req));
@@ -126,7 +126,7 @@ router.post('/relatorio', async (req, res) => {
 router.post('/relatorio/manutencoes-ids', async (req, res) => {
   try {
     const resultado = await obterDadosPdfRelatorioPorIds({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       ids: req.body?.ids || [],
     });
     const buffer = await gerarPdfRelatorioBuffer(resultado, getPdfOptions(req));
@@ -140,7 +140,7 @@ router.post('/relatorio/manutencoes-ids', async (req, res) => {
 router.get('/ocorrencia/:id', async (req, res) => {
   try {
     const ocorrencia = await obterDadosPdfOcorrencia({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       ocorrenciaId: req.params.id,
     });
     const buffer = await gerarPdfOcorrenciaBuffer(
@@ -159,7 +159,7 @@ router.get('/ocorrencia/:id', async (req, res) => {
 router.get('/equipamentos/:id/historico', async (req, res) => {
   try {
     const payload = await obterDadosPdfHistoricoEquipamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       equipamentoId: req.params.id,
       categoria: req.query?.categoria || null,
       subcategoria: req.query?.subcategoria || null,
@@ -182,7 +182,7 @@ router.get('/equipamentos/:id/historico', async (req, res) => {
 router.get('/orcamento/:id', async (req, res) => {
   try {
     const orcamento = await obterDadosPdfOrcamento({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       orcamentoId: req.params.id,
     });
     const buffer = await gerarPdfOrcamentoBuffer(orcamento, getPdfOptions(req));
@@ -197,7 +197,7 @@ router.get('/orcamento/:id', async (req, res) => {
 router.get('/os-corretiva/:id', async (req, res) => {
   try {
     const os = await obterDadosPdfOsCorretiva({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       osId: req.params.id,
     });
     const buffer = await gerarPdfOsCorretivaBuffer(
@@ -217,7 +217,7 @@ router.get('/os-corretiva/:id', async (req, res) => {
 router.get('/contrato/:id', async (req, res) => {
   try {
     const contrato = await obterDadosPdfContrato({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       contratoId: req.params.id,
     });
     const buffer = await gerarPdfContratoBuffer(contrato, getPdfOptions(req));
@@ -238,7 +238,7 @@ router.get('/contrato/:id', async (req, res) => {
 // ─── GET /pdfs/gehc-utilizacao ───────────────────────────────────────────────
 router.get('/gehc-utilizacao', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const meses = Math.min(Number(req.query.meses) || 12, 36);
 
     const inicio = new Date();
@@ -338,7 +338,7 @@ router.post('/conformidade-cq', async (req, res) => {
     const { unidadeId, responsavelTecnico } = req.body || {};
 
     const dados = await obterDadosPdfConformidadeCq({
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       unidadeId,
     });
 

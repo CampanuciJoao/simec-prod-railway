@@ -12,7 +12,7 @@ router.use(admin);
 
 router.get('/', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const usuarios = await prisma.usuario.findMany({
       where: { tenantId },
@@ -55,7 +55,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usernameNormalizado = String(username).toLowerCase().trim();
     const emailNormalizado = String(email).toLowerCase().trim();
 
@@ -129,7 +129,7 @@ router.put('/:id', async (req, res) => {
   }
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const usuario = await prisma.usuario.findFirst({
       where: {
@@ -208,7 +208,7 @@ router.put('/:id', async (req, res) => {
 
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   if (req.usuario.id === id) {
     return res.status(403).json({

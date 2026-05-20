@@ -284,7 +284,7 @@ async function validarPatrimonioUnico({
 // ==============================
 router.get('/', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const page = parsePositiveInt(req.query?.page, 1);
     const pageSize = Math.min(parsePositiveInt(req.query?.pageSize, 20), 500);
     const skip = (page - 1) * pageSize;
@@ -474,7 +474,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const equipamento = await buscarEquipamentoCompleto(
-      req.usuario.tenantId,
+      req.tenantContext,
       req.params.id
     );
 
@@ -491,7 +491,7 @@ router.get('/:id', async (req, res) => {
 
 router.get('/:id/historico', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const equipamentoId = req.params.id;
     const categoria = normalizarOpcional(req.query?.categoria);
     const subcategoria = normalizarOpcional(req.query?.subcategoria);
@@ -536,7 +536,7 @@ router.get('/:id/historico', async (req, res) => {
 
 router.get('/:id/historico/exportar', async (req, res) => {
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const equipamentoId = req.params.id;
     const categoria = normalizarOpcional(req.query?.categoria);
     const subcategoria = normalizarOpcional(req.query?.subcategoria);
@@ -580,7 +580,7 @@ router.get('/:id/historico/exportar', async (req, res) => {
 // ==============================
 router.patch('/:id/historico/:eventoId', admin, async (req, res) => {
   const { id, eventoId } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { titulo, descricao } = req.body;
 
   try {
@@ -609,7 +609,7 @@ router.patch('/:id/historico/:eventoId', admin, async (req, res) => {
 
 router.delete('/:id/historico/:eventoId', admin, async (req, res) => {
   const { id, eventoId } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const evento = await prisma.historicoAtivoEvento.findFirst({
@@ -642,7 +642,7 @@ router.patch(
   uploadFor('equipamentos'),
   async (req, res, next) => {
     const { id } = req.params;
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
     const usuarioId = req.usuario.id;
 
     // ATENÇÃO: novoStatus precisa preservar o case (PascalCase no enum:
@@ -807,7 +807,7 @@ router.post('/', validate(equipamentoSchema), async (req, res) => {
   const { dataInstalacao, unidadeId, ...restante } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const unidade = await validarUnidadeDoTenant(tenantId, unidadeId);
     await validarPatrimonioUnico({
@@ -912,7 +912,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
   const { dataInstalacao, unidadeId, ...restante } = dados;
 
   try {
-    const tenantId = req.usuario.tenantId;
+    const tenantId = req.tenantContext;
 
     const equipamento = await prisma.equipamento.findFirst({
       where: {
@@ -1093,7 +1093,7 @@ router.put('/:id', validate(equipamentoUpdateSchema), async (req, res) => {
 // ==============================
 router.delete('/:id', admin, async (req, res) => {
   const { id } = req.params;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const equipamento = await prisma.equipamento.findFirst({
@@ -1163,7 +1163,7 @@ router.post(
   uploadFor('equipamentos'),
   async (req, res, next) => {
     try {
-      const tenantId = req.usuario.tenantId;
+      const tenantId = req.tenantContext;
       const usuarioId = req.usuario.id;
       const equipamentoId = req.params.id;
 
@@ -1195,7 +1195,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
   try {
     await removerAnexo({
       resource: 'equipamentos',
-      tenantId: req.usuario.tenantId,
+      tenantId: req.tenantContext,
       usuarioId: req.usuario.id,
       entityId: req.params.id,
       anexoId: req.params.anexoId,
@@ -1220,7 +1220,7 @@ router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
 // ==============================
 router.get('/:id/acessorios', async (req, res) => {
   const equipamentoId = req.params.id;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const equipamento = await prisma.equipamento.findFirst({
@@ -1264,7 +1264,7 @@ router.get('/:id/acessorios', async (req, res) => {
 router.post('/:id/acessorios', async (req, res) => {
   const equipamentoId = req.params.id;
   const { nome, numeroSerie, descricao } = req.body;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   if (!nome || typeof nome !== 'string' || nome.trim() === '') {
     return res.status(400).json({
@@ -1367,7 +1367,7 @@ router.put('/:id/acessorios/:acessorioId', async (req, res) => {
   const equipamentoId = req.params.id;
   const acessorioId = req.params.acessorioId;
   const { nome, numeroSerie, descricao } = req.body;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   if (!nome || typeof nome !== 'string' || nome.trim() === '') {
     return res.status(400).json({
@@ -1471,7 +1471,7 @@ router.put('/:id/acessorios/:acessorioId', async (req, res) => {
 router.delete('/:id/acessorios/:acessorioId', async (req, res) => {
   const equipamentoId = req.params.id;
   const acessorioId = req.params.acessorioId;
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
 
   try {
     const acessorio = await prisma.acessorio.findFirst({

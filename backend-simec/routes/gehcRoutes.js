@@ -45,7 +45,7 @@ const whereRmGe = {
 
 // ─── GET /api/gehc/status ─────────────────────────────────────────────────────
 router.get('/status', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const [total, vinculados, semVinculo, vinculadosLista, totalSnapshots, alertasAtivos, snapshotsValidos, temToken] =
       await Promise.all([
@@ -133,7 +133,7 @@ router.get('/status', async (req, res) => {
 
 // ─── POST /api/gehc/credenciais ───────────────────────────────────────────────
 router.post('/credenciais', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { login, password } = req.body;
   if (!login || !password) return res.status(400).json({ error: 'login e password são obrigatórios.' });
   try {
@@ -147,7 +147,7 @@ router.post('/credenciais', admin, async (req, res) => {
 // ─── DELETE /api/gehc/credenciais ─────────────────────────────────────────────
 router.delete('/credenciais', admin, async (req, res) => {
   try {
-    await removerCredenciais(req.usuario.tenantId);
+    await removerCredenciais(req.tenantContext);
     res.json({ ok: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -165,7 +165,7 @@ router.delete('/credenciais', admin, async (req, res) => {
 // revertidos (são idempotentes), mas o cliente saberá exatamente onde parou.
 // Ver ADR-016 (automacao da integracao GE).
 router.post('/onboard', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { login, password } = req.body;
 
   if (!login || !password) {
@@ -230,7 +230,7 @@ router.post('/onboard', admin, async (req, res) => {
 
 // ─── POST /api/gehc/auth ──────────────────────────────────────────────────────
 router.post('/auth', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   if (!(await temCredenciaisConfiguradas(tenantId))) {
     return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
@@ -244,13 +244,13 @@ router.post('/auth', admin, async (req, res) => {
 
 // ─── DELETE /api/gehc/auth ────────────────────────────────────────────────────
 router.delete('/auth', admin, async (req, res) => {
-  await invalidarTokensGehc(req.usuario.tenantId);
+  await invalidarTokensGehc(req.tenantContext);
   res.json({ ok: true });
 });
 
 // ─── POST /api/gehc/discovery ─────────────────────────────────────────────────
 router.post('/discovery', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   if (!(await temCredenciaisConfiguradas(tenantId))) {
     return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
@@ -280,7 +280,7 @@ router.post('/discovery', admin, async (req, res) => {
 
 // ─── POST /api/gehc/monitor ───────────────────────────────────────────────────
 router.post('/monitor', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   if (!(await temCredenciaisConfiguradas(tenantId))) {
     return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
@@ -295,7 +295,7 @@ router.post('/monitor', admin, async (req, res) => {
 // ─── POST /api/gehc/sync ──────────────────────────────────────────────────────
 // Sincroniza contratos, OS, utilização e uptime de todos os equipamentos vinculados
 router.post('/sync', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   if (!(await temCredenciaisConfiguradas(tenantId))) {
     return res.status(503).json({ error: 'Credenciais GE não configuradas. Salve o login e senha primeiro.' });
   }
@@ -311,7 +311,7 @@ router.post('/sync', admin, async (req, res) => {
 
 // ─── PUT /api/gehc/equipamento/:equipamentoId/vincular ────────────────────────
 router.put('/equipamento/:equipamentoId/vincular', admin, async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
   const { gehcAssetId } = req.body;
   if (!gehcAssetId) return res.status(400).json({ error: 'gehcAssetId é obrigatório.' });
@@ -325,7 +325,7 @@ router.put('/equipamento/:equipamentoId/vincular', admin, async (req, res) => {
 
 // ─── DELETE /api/gehc/equipamento/:equipamentoId/vincular ─────────────────────
 router.delete('/equipamento/:equipamentoId/vincular', admin, async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
   try {
     await desvincularEquipamento(tenantId, equipamentoId);
@@ -337,7 +337,7 @@ router.delete('/equipamento/:equipamentoId/vincular', admin, async (req, res) =>
 
 // ─── GET /api/gehc/equipamento/:equipamentoId/snapshots ───────────────────────
 router.get('/equipamento/:equipamentoId/snapshots', async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
   const dias = Number(req.query.dias) || 30;
   const desde = new Date();
@@ -361,7 +361,7 @@ router.get('/equipamento/:equipamentoId/snapshots', async (req, res) => {
 
 // ─── GET /api/gehc/equipamento/:equipamentoId/contrato ────────────────────────
 router.get('/equipamento/:equipamentoId/contrato', async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
   try {
     const contrato = await prisma.gehcContrato.findUnique({
@@ -376,7 +376,7 @@ router.get('/equipamento/:equipamentoId/contrato', async (req, res) => {
 
 // ─── GET /api/gehc/equipamento/:equipamentoId/os ──────────────────────────────
 router.get('/equipamento/:equipamentoId/os', async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
   const limite = Math.min(Number(req.query.limite) || 50, 200);
 
@@ -400,7 +400,7 @@ router.get('/equipamento/:equipamentoId/os', async (req, res) => {
 
 // ─── GET /api/gehc/equipamento/:equipamentoId/utilizacao ──────────────────────
 router.get('/equipamento/:equipamentoId/utilizacao', async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
   const meses = Math.min(Number(req.query.meses) || 12, 36);
   const desde = new Date();
@@ -424,7 +424,7 @@ router.get('/equipamento/:equipamentoId/utilizacao', async (req, res) => {
 // ─── GET /api/gehc/equipamento/:equipamentoId/resumo ──────────────────────────
 // Tudo de uma vez: snapshot atual + contrato + últimas OS + utilização recente
 router.get('/equipamento/:equipamentoId/resumo', async (req, res) => {
-  const tenantId       = req.usuario.tenantId;
+  const tenantId       = req.tenantContext;
   const { equipamentoId } = req.params;
 
   try {
@@ -475,7 +475,7 @@ router.get('/equipamento/:equipamentoId/resumo', async (req, res) => {
 // ─── GET /api/gehc/equipamento/:equipamentoId/historico/grafico ───────────────
 // Dados agregados para graficos: helio (media diaria) e pressao (media 6h)
 router.get('/equipamento/:equipamentoId/historico/grafico', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { equipamentoId } = req.params;
   const { inicio, fim } = req.query;
 
@@ -533,7 +533,7 @@ router.get('/equipamento/:equipamentoId/historico/grafico', async (req, res) => 
 // ─── GET /api/gehc/equipamento/:equipamentoId/historico ───────────────────────
 // Snapshots paginados para tabela de historico de saude
 router.get('/equipamento/:equipamentoId/historico', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { equipamentoId } = req.params;
   const { inicio, fim } = req.query;
   const pagina = Math.max(1, Number(req.query.pagina) || 1);
@@ -573,7 +573,7 @@ router.get('/equipamento/:equipamentoId/historico', async (req, res) => {
 // ─── GET /api/gehc/equipamento/:equipamentoId/historico/export ────────────────
 // Exportacao CSV do historico de saude
 router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { equipamentoId } = req.params;
   const { inicio, fim } = req.query;
 
@@ -621,7 +621,7 @@ router.get('/equipamento/:equipamentoId/historico/export', async (req, res) => {
 
 // ─── GET /api/gehc/equipamento/:equipamentoId/historico/export-pdf ─────────────
 router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { equipamentoId } = req.params;
   const { inicio, fim, modo } = req.query;
 
@@ -690,7 +690,7 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
 // ─── GET /api/gehc/alertas/suspensoes ────────────────────────────────────────
 // Lista suspensões ativas (não expiradas) do tenant
 router.get('/alertas/suspensoes', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   try {
     const suspensoes = await prisma.gehcAlertaSuspensao.findMany({
       where: { tenantId, suspensoAte: { gt: new Date() } },
@@ -719,7 +719,7 @@ router.get('/alertas/suspensoes', async (req, res) => {
 // ─── POST /api/gehc/alertas/suspensoes ───────────────────────────────────────
 // Cria uma suspensão temporária de alertas
 router.post('/alertas/suspensoes', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { equipamentoId, tipoEvento, motivo, duracaoHoras } = req.body;
 
   if (!duracaoHoras || duracaoHoras <= 0) {
@@ -748,7 +748,7 @@ router.post('/alertas/suspensoes', admin, async (req, res) => {
 // ─── DELETE /api/gehc/alertas/suspensoes/:id ──────────────────────────────────
 // Remove uma suspensão antes do prazo
 router.delete('/alertas/suspensoes/:id', admin, async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const { id } = req.params;
   try {
     await prisma.gehcAlertaSuspensao.deleteMany({ where: { id, tenantId } });
@@ -761,7 +761,7 @@ router.delete('/alertas/suspensoes/:id', admin, async (req, res) => {
 // ─── GET /api/gehc/bi/utilizacao ─────────────────────────────────────────────
 // BI de utilização GE: agrega exames e pacientes por unidade → equipamento → mês
 router.get('/bi/utilizacao', async (req, res) => {
-  const tenantId = req.usuario.tenantId;
+  const tenantId = req.tenantContext;
   const meses = Math.min(Number(req.query.meses) || 12, 36);
 
   const inicio = new Date();
