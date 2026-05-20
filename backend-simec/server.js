@@ -39,6 +39,8 @@ import controleQualidadeRoutes from './routes/controleQualidadeRoutes.js';
 import metricsRoutes from './routes/metricsRoutes.js';
 import saudeRoutes from './routes/saudeRoutes.js';
 import superadminImpersonacaoRoutes from './routes/superadminImpersonacaoRoutes.js';
+import superadminUsuariosRoutes from './routes/superadminUsuariosRoutes.js';
+import superadminAuditoriaRoutes from './routes/superadminAuditoriaRoutes.js';
 
 import cookieParser from 'cookie-parser';
 import { metricsMiddleware } from './middleware/metricsMiddleware.js';
@@ -200,6 +202,8 @@ app.use('/api/superadmin', superadminTenantsRoutes);
 app.use('/api/superadmin/help', superadminHelpRoutes);
 app.use('/api/superadmin/saude', saudeRoutes);
 app.use('/api/superadmin/impersonar', superadminImpersonacaoRoutes);
+app.use('/api/superadmin/usuarios', superadminUsuariosRoutes);
+app.use('/api/superadmin/auditoria', superadminAuditoriaRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);

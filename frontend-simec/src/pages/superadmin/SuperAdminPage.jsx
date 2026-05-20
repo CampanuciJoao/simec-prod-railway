@@ -4,7 +4,9 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBookOpen,
   faBuildingShield,
+  faClockRotateLeft,
   faHeartPulse,
+  faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { PageHeader, PageLayout, ResponsiveTabs } from '@/components/ui';
@@ -21,16 +23,28 @@ function SuperAdminPage() {
       path: '/superadmin/tenants',
     },
     {
-      id: 'ajuda',
-      label: 'Base de ajuda',
-      icon: <FontAwesomeIcon icon={faBookOpen} />,
-      path: '/superadmin/ajuda',
+      id: 'usuarios',
+      label: 'Usuários',
+      icon: <FontAwesomeIcon icon={faUsers} />,
+      path: '/superadmin/usuarios',
+    },
+    {
+      id: 'auditoria',
+      label: 'Auditoria',
+      icon: <FontAwesomeIcon icon={faClockRotateLeft} />,
+      path: '/superadmin/auditoria',
     },
     {
       id: 'saude',
       label: 'Saúde do sistema',
       icon: <FontAwesomeIcon icon={faHeartPulse} />,
       path: '/superadmin/saude',
+    },
+    {
+      id: 'ajuda',
+      label: 'Base de ajuda',
+      icon: <FontAwesomeIcon icon={faBookOpen} />,
+      path: '/superadmin/ajuda',
     },
   ];
 
