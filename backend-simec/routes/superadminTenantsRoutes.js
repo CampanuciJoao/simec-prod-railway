@@ -1,6 +1,9 @@
 import express from 'express';
 
-import { proteger, superadmin } from '../middleware/authMiddleware.js';
+import {
+  proteger,
+  requireSystemTenant,
+} from '../middleware/authMiddleware.js';
 import {
   alterarStatusTenantService,
   bootstrapAdminTenantService,
@@ -13,7 +16,10 @@ import {
 const router = express.Router();
 
 router.use(proteger);
-router.use(superadmin);
+// Plano de controle: apenas superadmin do Tenant System pode gerenciar
+// tenants. Falha-segura para o caso (transitório) de superadmin legado em
+// CUSTOMER que ainda não foi rebaixado.
+router.use(requireSystemTenant);
 
 router.get('/tenants', async (req, res) => {
   try {

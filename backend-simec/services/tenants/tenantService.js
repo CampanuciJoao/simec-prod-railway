@@ -54,6 +54,8 @@ function mapTenantListItem(item) {
       unidades: item._count.unidades,
       equipamentos: item._count.equipamentos,
       alertas: item._count.alertas,
+      manutencoes: item._count.manutencoes,
+      osCorretivas: item._count.osCorretivas,
     },
   };
 }
@@ -83,6 +85,8 @@ export async function detalharTenantService(id) {
         unidades: tenant._count.unidades,
         equipamentos: tenant._count.equipamentos,
         alertas: tenant._count.alertas,
+        manutencoes: tenant._count.manutencoes,
+        osCorretivas: tenant._count.osCorretivas,
         historicoEventos: tenant._count.historicoAtivoEventos,
       },
     },
@@ -206,6 +210,15 @@ export async function alterarStatusTenantService({ id, ativo, autor }) {
       ok: false,
       status: 404,
       message: 'Tenant nao encontrado.',
+    };
+  }
+
+  // Tenant System nunca pode ser inativado — superadmins ficariam órfãos.
+  if (atual.kind === 'SYSTEM' && !ativo) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'O Tenant System nao pode ser inativado.',
     };
   }
 

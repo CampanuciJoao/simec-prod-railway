@@ -6,6 +6,7 @@ export function listarTenants() {
       id: true,
       nome: true,
       slug: true,
+      kind: true,
       timezone: true,
       locale: true,
       ativo: true,
@@ -20,12 +21,12 @@ export function listarTenants() {
           unidades: true,
           equipamentos: true,
           alertas: true,
+          manutencoes: true,
+          osCorretivas: true,
         },
       },
     },
-    orderBy: {
-      nome: 'asc',
-    },
+    orderBy: [{ kind: 'asc' }, { nome: 'asc' }],
   });
 }
 
@@ -36,6 +37,7 @@ export function buscarTenantPorId(id) {
       id: true,
       nome: true,
       slug: true,
+      kind: true,
       timezone: true,
       locale: true,
       ativo: true,
@@ -50,6 +52,8 @@ export function buscarTenantPorId(id) {
           unidades: true,
           equipamentos: true,
           alertas: true,
+          manutencoes: true,
+          osCorretivas: true,
           historicoAtivoEventos: true,
         },
       },
