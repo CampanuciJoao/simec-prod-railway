@@ -11,7 +11,6 @@ import {
   faCircleNotch,
   faTriangleExclamation,
   faClockRotateLeft,
-  faChartPie,
   faMagnifyingGlassChart,
   faLightbulb,
   faThumbsUp,
@@ -488,7 +487,7 @@ function CartaoInsight({ insight, onFeedback, onResolver, onDescartar }) {
             type="button"
             variant="ghost"
             onClick={() => onDescartar(insight.id)}
-            title="Descartar — sinaliza para a IA que este insight era falso positivo"
+            title="Descartar — falso positivo. A IA respeita esse feedback e não reavalia este tipo de insight para esse equipamento por 60 dias."
           >
             <FontAwesomeIcon icon={faTriangleExclamation} />
             <span className="ml-1 text-xs">Descartar (incorreto)</span>
@@ -882,12 +881,47 @@ function GehcAprendizadoTab() {
         <InfoCard
           icon={faFilePdf}
           label="PDFs baixados"
-          value={String(status?.pdfsBaixados ?? 0)}
+          value={
+            <>
+              <span>{String(status?.pdfsBaixados ?? 0)}</span>
+              {status?.coberturaPct !== null && status?.coberturaPct !== undefined && (
+                <span
+                  className="ml-2 text-xs font-semibold"
+                  style={{ color: CorEcobertura(status.coberturaPct) }}
+                  title={`${status.pdfsBaixados} de ${status.totalOs} OSs com PDF baixado`}
+                >
+                  {status.coberturaPct}% das OSs
+                </span>
+              )}
+              {status?.pdfsComErro > 0 && (
+                <span
+                  className="ml-2 text-xs"
+                  style={{ color: 'var(--color-danger)' }}
+                  title="PDFs que falharam o download (pode ser erro permanente como S3 expirado)"
+                >
+                  · {status.pdfsComErro} com erro
+                </span>
+              )}
+            </>
+          }
         />
         <InfoCard
           icon={faMagnifyingGlassChart}
           label="PDFs analisados"
-          value={String(status?.pdfsExtraidos ?? 0)}
+          value={
+            <>
+              <span>{String(status?.pdfsExtraidos ?? 0)}</span>
+              {status?.coberturaExtracaoPct !== null && status?.coberturaExtracaoPct !== undefined && (
+                <span
+                  className="ml-2 text-xs font-semibold"
+                  style={{ color: CorEcobertura(status.coberturaExtracaoPct) }}
+                  title={`${status.pdfsExtraidos} de ${status.pdfsBaixados} PDFs já passaram pela extração LLM`}
+                >
+                  {status.coberturaExtracaoPct}% dos baixados
+                </span>
+              )}
+            </>
+          }
         />
         <InfoCard
           icon={faBrain}
