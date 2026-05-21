@@ -8,7 +8,7 @@ import { Button, Input } from '@/components/ui';
 import { forgotPassword } from '@/services/api';
 
 function ForgotPasswordPage() {
-  const [tenant, setTenant] = useState('simec-default');
+  const [tenant, setTenant] = useState('cerdil');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
