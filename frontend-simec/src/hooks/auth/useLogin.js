@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function useLogin() {
-  const [tenant, setTenant] = useState('simec-default');
+  const [tenant, setTenant] = useState('cerdil');
   const [username, setUsername] = useState('');
   const [senha, setSenha] = useState('');
   const [error, setError] = useState('');
