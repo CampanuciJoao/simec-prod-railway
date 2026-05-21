@@ -3,9 +3,11 @@ import { useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
+import { useAuth } from '@/contexts/AuthContext';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
 import AdicionarNotaModal from '@/components/osCorretiva/AdicionarNotaModal';
+import EditarNotaModal from '@/components/osCorretiva/EditarNotaModal';
 import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTerceiroModal';
 import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/ConfirmacaoFinalVisitaCorretiva';
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
@@ -29,6 +31,7 @@ const TIPO_COLORS = {
 function DetalhesOsCorretivaPage() {
   const { id } = useParams();
   const page = useDetalhesOsCorretivaPage(id);
+  const { isAdmin } = useAuth();
   const { os } = page;
   const isEncerrada = os?.status === 'Concluida' || os?.status === 'Cancelada';
 
@@ -52,6 +55,16 @@ function DetalhesOsCorretivaPage() {
         isOpen={page.notaModal.isOpen}
         onClose={page.notaModal.closeModal}
         onConfirm={page.handleAdicionarNota}
+        submitting={page.submitting}
+        fieldErrors={page.fieldErrors}
+      />
+
+      <EditarNotaModal
+        isOpen={page.editarNotaModal.isOpen}
+        onClose={page.editarNotaModal.closeModal}
+        onConfirm={page.handleEditarNota}
+        evento={page.editarNotaModal.modalData}
+        timezone={os?.equipamento?.unidade?.timezone}
         submitting={page.submitting}
         fieldErrors={page.fieldErrors}
       />
@@ -175,6 +188,11 @@ function DetalhesOsCorretivaPage() {
             <OsCorretivaTimeline
               timeline={os.timeline || []}
               timezone={os.equipamento?.unidade?.timezone}
+              onEditarEvento={
+                isAdmin
+                  ? (evento) => page.editarNotaModal.openModal(evento)
+                  : undefined
+              }
             />
           </div>
         </div>

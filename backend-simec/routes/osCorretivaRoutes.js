@@ -4,6 +4,7 @@ import validate from '../middleware/validate.js';
 import {
   abrirOsSchema,
   notaAndamentoSchema,
+  editarNotaAndamentoSchema,
   agendarVisitaSchema,
   registrarResultadoSchema,
   concluirOsSchema,
@@ -14,6 +15,7 @@ import {
   obterOsCorretivaDetalhadaService,
   abrirOsCorretivaService,
   adicionarNotaOsCorretivaService,
+  editarNotaOsCorretivaService,
   agendarVisitaTerceiroService,
   iniciarVisitaTerceiroService,
   registrarResultadoVisitaService,
@@ -115,6 +117,30 @@ router.post('/:id/notas', validate(notaAndamentoSchema), async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_NOTA_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao adicionar nota.' });
+  }
+});
+
+// Edição admin: ajustar texto e/ou data de nota já registrada.
+// Útil para corrigir registros retroativos fora de ordem cronológica.
+router.patch('/:id/notas/:notaId', admin, validate(editarNotaAndamentoSchema), async (req, res) => {
+  try {
+    const resultado = await editarNotaOsCorretivaService({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+      osId: req.params.id,
+      notaId: req.params.notaId,
+      dados: req.validatedData,
+    });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+        ...(resultado.fieldErrors ? { fieldErrors: resultado.fieldErrors } : {}),
+      });
+    }
+    return res.status(resultado.status).json(resultado.data);
+  } catch (error) {
+    console.error('[OS_CORRETIVA_NOTA_EDIT_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao editar nota.' });
   }
 });
 

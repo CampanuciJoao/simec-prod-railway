@@ -21,6 +21,7 @@ import { removerAlertasOsCorretivaDaOS } from '../alertas/osCorretiva/osCorretiv
 import {
   validarAbrirOs,
   validarNota,
+  validarEdicaoNota,
   validarAgendarVisita,
   validarRegistrarResultado,
   validarConcluirOs,
@@ -214,6 +215,53 @@ export async function adicionarNotaOsCorretivaService({ tenantId, usuarioId, osI
   });
 
   return { ok: true, status: 201, data: nota };
+}
+
+// ─── Edição admin de nota ────────────────────────────────────────────────────
+// Permite ajustar texto e/ou data de uma nota já registrada. Restrito a
+// admin (controle na rota). Usado para corrigir registros retroativos
+// onde a hora salva pelo sistema fica fora de ordem cronológica com os
+// outros eventos da OS.
+export async function editarNotaOsCorretivaService({
+  tenantId,
+  usuarioId,
+  osId,
+  notaId,
+  dados,
+}) {
+  const v = validarEdicaoNota(dados);
+  if (!v.ok) return { ok: false, status: 400, message: v.message, fieldErrors: v.fieldErrors };
+
+  const os = await buscarOsResumo({ tenantId, osId });
+  if (!os) return { ok: false, status: 404, message: 'OS Corretiva não encontrada.' };
+
+  // Nota precisa pertencer à OS e ao tenant — defesa contra IDs cruzados.
+  const nota = await prisma.notaAndamento.findFirst({
+    where: { id: notaId, tenantId, osCorretivaId: osId },
+  });
+  if (!nota) {
+    return { ok: false, status: 404, message: 'Nota de andamento não encontrada.' };
+  }
+
+  const update = {};
+  if (v.data.nota !== undefined) update.nota = v.data.nota;
+  if (v.data.data !== undefined) update.data = new Date(v.data.data);
+
+  const atualizada = await prisma.notaAndamento.update({
+    where: { id: notaId },
+    data: update,
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDICAO',
+    entidade: 'NotaAndamento',
+    entidadeId: notaId,
+    detalhes: `Nota da OS ${os.numeroOS} editada (${Object.keys(update).join(', ')}).`,
+  });
+
+  return { ok: true, status: 200, data: atualizada };
 }
 
 // ─── Agendar visita de terceiro ───────────────────────────────────────────────

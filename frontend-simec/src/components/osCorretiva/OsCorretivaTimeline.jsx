@@ -3,6 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFolderOpen, faStickyNote, faTruck, faClipboardCheck, faCheckCircle, faBan,
+  faPenToSquare,
 } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
@@ -18,9 +19,10 @@ const TIPO_CONFIG = {
   cancelamento: { icon: faBan, color: '#6b7280', label: 'Cancelamento' },
 };
 
-function TimelineItem({ evento, timezone }) {
+function TimelineItem({ evento, timezone, onEditar }) {
   const cfg = TIPO_CONFIG[evento.tipo] || TIPO_CONFIG.nota;
   const fmt = (iso) => formatarDataHora(iso, { timeZone: timezone });
+  const podeEditar = Boolean(onEditar && evento.editavel && evento.id);
 
   const descricaoTexto = (() => {
     if (evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista) {
@@ -66,6 +68,18 @@ function TimelineItem({ evento, timezone }) {
               Registro retroativo
             </span>
           )}
+          {podeEditar ? (
+            <button
+              type="button"
+              onClick={() => onEditar(evento)}
+              className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition hover:opacity-80"
+              style={{ color: 'var(--brand-primary)' }}
+              title="Editar texto ou hora (admin)"
+            >
+              <FontAwesomeIcon icon={faPenToSquare} className="text-[10px]" />
+              Editar
+            </button>
+          ) : null}
         </div>
         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
           {evento.titulo}
@@ -95,7 +109,7 @@ function TimelineItem({ evento, timezone }) {
   );
 }
 
-function OsCorretivaTimeline({ timeline, timezone: tzProp }) {
+function OsCorretivaTimeline({ timeline, timezone: tzProp, onEditarEvento }) {
   const tz = useUnidadeTimezone({ timezone: tzProp });
 
   if (!timeline || timeline.length === 0) {
@@ -115,7 +129,12 @@ function OsCorretivaTimeline({ timeline, timezone: tzProp }) {
       </h2>
       <div>
         {timeline.map((evento, idx) => (
-          <TimelineItem key={idx} evento={evento} timezone={tz} />
+          <TimelineItem
+            key={evento.id || idx}
+            evento={evento}
+            timezone={tz}
+            onEditar={onEditarEvento}
+          />
         ))}
       </div>
     </Card>
@@ -125,6 +144,7 @@ function OsCorretivaTimeline({ timeline, timezone: tzProp }) {
 OsCorretivaTimeline.propTypes = {
   timeline: PropTypes.array.isRequired,
   timezone: PropTypes.string,
+  onEditarEvento: PropTypes.func,
 };
 
 export default OsCorretivaTimeline;
