@@ -1,12 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
 import prisma from '../prismaService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const logoPath = path.resolve(__dirname, '../../assets/logo-simec.png');
+import { resolverLogoParaPdf } from './_pdfLogoHelper.js';
 
 const C = {
   black: '#1e293b',
@@ -66,14 +60,21 @@ function checkPageBreak(doc, neededHeight = 60) {
 }
 
 function drawHeader(doc, os, options) {
-  const { locale, timeZone } = options;
+  const { locale, timeZone, logoSource = null } = options;
   const W = doc.page.width;
 
   doc.save().rect(0, 0, W, 52).fill(C.black).restore();
 
-  if (fs.existsSync(logoPath)) doc.image(logoPath, 12, 5, { fit: [42, 42] });
+  const hasLogo = !!logoSource;
+  if (hasLogo) {
+    try {
+      doc.image(logoSource, 12, 5, { fit: [42, 42] });
+    } catch (err) {
+      console.warn('[OS_PDF] Falha ao renderizar logo:', err.message);
+    }
+  }
 
-  const tx = fs.existsSync(logoPath) ? 60 : 14;
+  const tx = hasLogo ? 60 : 14;
   doc.font('Helvetica-Bold').fontSize(15).fillColor(C.white).text('SIMEC', tx, 10);
   doc.font('Helvetica').fontSize(7.5).fillColor(C.border).text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
   doc.font('Helvetica').fontSize(8).fillColor(C.border).text(`Gerado em: ${fmt(new Date(), locale, timeZone)}`, 0, 20, { align: 'right', width: W - 14, lineBreak: false });
@@ -205,9 +206,11 @@ export async function obterDadosPdfOsCorretiva({ tenantId, osId }) {
 
 // ─── Generate ─────────────────────────────────────────────────────────────────
 
-export function gerarPdfOsCorretivaBuffer(os, options = {}) {
+export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
+  const { locale = 'pt-BR', timeZone = 'UTC' } = options;
+  const logoSource = await resolverLogoParaPdf(os?.tenantId);
+
   return new Promise((resolve, reject) => {
-    const { locale = 'pt-BR', timeZone = 'UTC' } = options;
     const chunks = [];
 
     const doc = new PDFDocument({
@@ -220,7 +223,7 @@ export function gerarPdfOsCorretivaBuffer(os, options = {}) {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    drawHeader(doc, os, { locale, timeZone });
+    drawHeader(doc, os, { locale, timeZone, logoSource });
 
     // ── Dados do equipamento
     sectionTitle(doc, 'DADOS DO EQUIPAMENTO');

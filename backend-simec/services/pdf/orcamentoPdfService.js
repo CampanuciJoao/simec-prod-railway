@@ -1,12 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
 import prisma from '../prismaService.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const logoPath = path.resolve(__dirname, '../../assets/logo-simec.png');
+import { resolverLogoParaPdf } from './_pdfLogoHelper.js';
 
 const C = {
   black:      '#000000',
@@ -52,11 +46,18 @@ function box(doc, x, y, w, h, { fill, stroke = BORDER } = {}) {
   doc.restore();
 }
 
-function drawHeader(doc) {
+function drawHeader(doc, logoSource = null) {
   const W = doc.page.width;
   doc.save().rect(0, 0, W, 52).fill('#1e293b').restore();
-  if (fs.existsSync(logoPath)) doc.image(logoPath, 12, 5, { fit: [42, 42] });
-  const tx = fs.existsSync(logoPath) ? 60 : 14;
+  const hasLogo = !!logoSource;
+  if (hasLogo) {
+    try {
+      doc.image(logoSource, 12, 5, { fit: [42, 42] });
+    } catch (err) {
+      console.warn('[ORCAMENTO_PDF] Falha ao renderizar logo:', err.message);
+    }
+  }
+  const tx = hasLogo ? 60 : 14;
   doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff').text('SIMEC', tx, 10);
   doc.font('Helvetica').fontSize(7.5).fillColor('#cbd5e1').text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
   const gerado = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date());
@@ -110,15 +111,16 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
 }
 
 export async function gerarPdfOrcamentoBuffer(orcamento) {
+  const logoSource = await resolverLogoParaPdf(orcamento?.tenantId);
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 48, left: 36, right: 36 }, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-    doc.on('pageAdded', () => drawHeader(doc));
+    doc.on('pageAdded', () => drawHeader(doc, logoSource));
 
-    drawHeader(doc);
+    drawHeader(doc, logoSource);
 
     const marginX  = 36;
     const contentW = doc.page.width - marginX * 2;
