@@ -24,6 +24,16 @@ function pipelineValido(nome) {
   return Object.values(PIPELINE_NAMES).includes(nome);
 }
 
+// Escopo 'global' (tenantId=null em ai_pipeline_estados) e privilegiado:
+// pausa/retoma o pipeline para todos os tenants ao mesmo tempo. So aceita
+// se a identidade ORIGINAL do request for superadmin do Tenant System,
+// independente de impersonacao em curso. Admin de tenant comum (Cerdil
+// etc) so pode operar no proprio tenant.
+function ehSuperadminSystem(req) {
+  const u = req.usuario;
+  return Boolean(u && u.role === 'superadmin' && u.tenant?.kind === 'SYSTEM');
+}
+
 async function logAuditoria({ tenantId, autorId, acao, entidadeId, detalhes }) {
   try {
     await prisma.logAuditoria.create({
@@ -829,12 +839,14 @@ router.get('/pdf/:documentId', async (req, res) => {
   const tenantId = req.tenantContext;
   const { documentId } = req.params;
   try {
-    const doc = await prisma.gehcPdfDocumento.findUnique({
-      where:  { documentId },
-      select: { tenantId: true, r2Key: true, fileName: true, baixadoEm: true },
+    // Scoped por (tenantId, documentId): se o PDF eh de outro tenant, retorna
+    // 404 sem revelar que ele existe (falha-segura). Antes usava findUnique
+    // por PK global e revelava a existencia via 403 separado.
+    const doc = await prisma.gehcPdfDocumento.findFirst({
+      where:  { tenantId, documentId },
+      select: { r2Key: true, fileName: true, baixadoEm: true },
     });
     if (!doc) return res.status(404).json({ error: 'Documento não encontrado.' });
-    if (doc.tenantId !== tenantId) return res.status(403).json({ error: 'Acesso negado.' });
     if (!doc.r2Key || !doc.baixadoEm) return res.status(409).json({ error: 'PDF ainda não baixado.' });
 
     const r2Object = await getFromR2(doc.r2Key);
@@ -895,7 +907,11 @@ router.get('/atividade', async (req, res) => {
 router.get('/pipelines', async (req, res) => {
   const tenantId = req.tenantContext;
   try {
-    const pipelines = await listarEstados({ tenantId });
+    // Superadmin do Tenant System enxerga o kill switch 'global' + identidade
+    // de quem operou globalmente. Admin de tenant comum so ve seus pipelines
+    // e estado herdado (com pausadoPor/motivo mascarados).
+    const escopoVisivel = ehSuperadminSystem(req) ? 'system' : 'tenant';
+    const pipelines = await listarEstados({ tenantId, escopoVisivel });
     res.json({ pipelines });
   } catch (err) {
     console.error('[GEHC_APRENDIZADO] /pipelines:', err.message);
@@ -916,9 +932,14 @@ router.post('/pipelines/:pipeline/pausar', admin, async (req, res) => {
     return res.status(400).json({ error: `Pipeline desconhecido: ${pipeline}` });
   }
 
-  // Pausa global só se a aplicação suportar superadmin futuramente; por hora,
-  // todos os admin podem pausar o próprio tenant. Pausa global mexe no campo
-  // tenantId=null da tabela ai_pipeline_estados.
+  // Pausa global exige superadmin do Tenant System. Admin de tenant
+  // comum so pode pausar o proprio tenant — ignora silenciosamente o
+  // escopo='global' do body em vez de aceitar.
+  if (escopo === 'global' && !ehSuperadminSystem(req)) {
+    return res.status(403).json({
+      error: 'Pausa global de pipeline reservada ao superadmin do Tenant System.',
+    });
+  }
   const escopoFinal = escopo === 'global' ? null : tenantId;
 
   try {
@@ -1007,6 +1028,11 @@ router.post('/pipelines/:pipeline/retomar', admin, async (req, res) => {
     return res.status(400).json({ error: `Pipeline desconhecido: ${pipeline}` });
   }
 
+  if (escopo === 'global' && !ehSuperadminSystem(req)) {
+    return res.status(403).json({
+      error: 'Retomada global de pipeline reservada ao superadmin do Tenant System.',
+    });
+  }
   const escopoFinal = escopo === 'global' ? null : tenantId;
 
   try {

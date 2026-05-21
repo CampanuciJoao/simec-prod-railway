@@ -150,8 +150,16 @@ export async function registrarExecucao(pipeline, { ok, mensagem, metrics, durac
 /**
  * Lista o estado atual de todos os pipelines conhecidos para um tenant.
  * Inclui a definição mesmo quando não há linha persistida (default: ativo).
+ *
+ * `escopoVisivel`:
+ *   - 'system' (superadmin no Tenant System): ve o pipeline 'global' (kill
+ *     switch) e os nomes de quem pausou/retomou globalmente.
+ *   - 'tenant' (admin de cliente): NAO ve o pipeline 'global' e quando um
+ *     pipeline herda estado do global, os campos pausadoPor/retomadoPor
+ *     ficam mascarados como "administrador SIMEC" para nao vazar
+ *     identidade cross-tenant.
  */
-export async function listarEstados({ tenantId = null } = {}) {
+export async function listarEstados({ tenantId = null, escopoVisivel = 'tenant' } = {}) {
   const linhas = await prisma.aiPipelineEstado.findMany({
     where: { OR: [{ tenantId: null }, { tenantId }] },
     include: {
@@ -165,10 +173,19 @@ export async function listarEstados({ tenantId = null } = {}) {
     porChave.set(`${linha.tenantId ?? 'global'}::${linha.pipeline}`, linha);
   }
 
-  return Object.values(PIPELINE_NAMES).map((pipeline) => {
+  const usuarioMascarado = { id: null, nome: 'Administrador SIMEC' };
+
+  const pipelinesVisiveis = escopoVisivel === 'system'
+    ? Object.values(PIPELINE_NAMES)
+    : Object.values(PIPELINE_NAMES).filter((p) => p !== PIPELINE_NAMES.GLOBAL);
+
+  return pipelinesVisiveis.map((pipeline) => {
     const linhaTenant = tenantId ? porChave.get(`${tenantId}::${pipeline}`) : null;
     const linhaGlobal = porChave.get(`global::${pipeline}`);
     const linha = linhaTenant || linhaGlobal || null;
+
+    const ehHerdadoDoGlobal = !linhaTenant && Boolean(linhaGlobal);
+    const mascarar = ehHerdadoDoGlobal && escopoVisivel !== 'system';
 
     return {
       pipeline,
@@ -176,15 +193,15 @@ export async function listarEstados({ tenantId = null } = {}) {
       ativo:         linha ? linha.ativo : true,
       escopo:        linhaTenant ? 'tenant' : (linhaGlobal ? 'global' : 'default'),
       pausadoEm:     linha?.pausadoEm  || null,
-      pausadoPor:    linha?.pausadoPor || null,
-      motivoPausa:   linha?.motivoPausa || null,
+      pausadoPor:    mascarar ? (linha?.pausadoPor ? usuarioMascarado : null) : (linha?.pausadoPor || null),
+      motivoPausa:   mascarar ? null : (linha?.motivoPausa || null),
       retomadoEm:    linha?.retomadoEm  || null,
-      retomadoPor:   linha?.retomadoPor || null,
+      retomadoPor:   mascarar ? (linha?.retomadoPor ? usuarioMascarado : null) : (linha?.retomadoPor || null),
       // Telemetria da ultima execucao
       ultimaExecucaoEm:        linha?.ultimaExecucaoEm        || null,
       ultimaExecucaoOk:        linha?.ultimaExecucaoOk        ?? null,
-      ultimaExecucaoMensagem:  linha?.ultimaExecucaoMensagem  || null,
-      ultimaExecucaoMetrics:   linha?.ultimaExecucaoMetrics   || null,
+      ultimaExecucaoMensagem:  mascarar ? null : (linha?.ultimaExecucaoMensagem  || null),
+      ultimaExecucaoMetrics:   mascarar ? null : (linha?.ultimaExecucaoMetrics   || null),
       ultimaExecucaoDuracaoMs: linha?.ultimaExecucaoDuracaoMs ?? null,
     };
   });
