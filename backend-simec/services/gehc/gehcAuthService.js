@@ -2,6 +2,10 @@ import { chromium } from 'playwright';
 import prisma from '../prismaService.js';
 import { encryptToken, decryptToken } from './gehcCrypto.js';
 import { observeGehcAuth } from '../metrics/metricsService.js';
+import {
+  getSharedRedisClient,
+  isSharedRedisUnavailable,
+} from '../redis/sharedRedisClient.js';
 
 const GEHC_PORTAL_URL = 'https://www.gehealthcare.com.br/account';
 const REFRESH_URL     = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
@@ -254,6 +258,74 @@ function calcularExpiracao(stored) {
   return { expirado: true, motivo: 'sem expiresAt e sem referencia temporal' };
 }
 
+// ─── Lock distribuído no Redis ────────────────────────────────────────────────
+// Sem isso, múltiplos jobs do worker (gehc-monitorar-saude,
+// gehc-capturar-pdfs, knowledge-layer-sync, ia-insights) detectam token
+// expirado ao mesmo tempo e disparam Playwright em paralelo. Resultado:
+// um sucede, outros falham com timeout/erro de sessão concorrente, e
+// jobs como GEHC_MONITOR desistem da execução inteira.
+//
+// O lock garante que apenas UM worker renova por vez por tenant. Os
+// demais aguardam por polling do banco e usam os tokens novos assim
+// que aparecem. Resolve o race observado em 2026-05-21.
+
+const REFRESH_LOCK_TTL_S = 120;
+const REFRESH_WAIT_TIMEOUT_MS = 90_000;
+const REFRESH_WAIT_POLL_MS = 1500;
+
+function refreshLockKey(tenantId) {
+  return `gehc:auth_lock:${tenantId}`;
+}
+
+async function tryAcquireRefreshLock(tenantId) {
+  const redis = getSharedRedisClient();
+  if (!redis || isSharedRedisUnavailable()) {
+    // Sem Redis: modo degradado — sem lock distribuído. Mantém o
+    // comportamento antigo (com risco de race) em vez de bloquear tudo.
+    console.warn('[GEHC_AUTH] Redis indisponível — refresh sem lock distribuído.');
+    return true;
+  }
+  try {
+    const result = await redis.set(refreshLockKey(tenantId), '1', 'EX', REFRESH_LOCK_TTL_S, 'NX');
+    return result === 'OK';
+  } catch (err) {
+    console.warn(`[GEHC_AUTH] Falha ao adquirir lock (${err.message}) — prosseguindo sem.`);
+    return true;
+  }
+}
+
+async function releaseRefreshLock(tenantId) {
+  const redis = getSharedRedisClient();
+  if (!redis || isSharedRedisUnavailable()) return;
+  try {
+    await redis.del(refreshLockKey(tenantId));
+  } catch {
+    // expira sozinho via TTL
+  }
+}
+
+// Aguarda outro worker renovar fazendo polling no banco. Retorna assim
+// que vê tokens válidos. Lança erro se estourar timeout.
+async function aguardarRefreshConcorrente(tenantId) {
+  const inicio = Date.now();
+  console.log(`[GEHC_AUTH] Lock ocupado para tenant ${tenantId} — aguardando outro worker renovar.`);
+
+  while (Date.now() - inicio < REFRESH_WAIT_TIMEOUT_MS) {
+    await new Promise((r) => setTimeout(r, REFRESH_WAIT_POLL_MS));
+    const recheck = await lerTokens(tenantId);
+    if (recheck) {
+      const { expirado } = calcularExpiracao(recheck);
+      if (!expirado) {
+        const esperaSegundos = Math.round((Date.now() - inicio) / 1000);
+        console.log(`[GEHC_AUTH] Tokens renovados por outro worker para tenant ${tenantId} (espera=${esperaSegundos}s).`);
+        return { accessToken: recheck.accessToken, idToken: recheck.idToken };
+      }
+    }
+  }
+
+  throw new Error(`Timeout (${Math.round(REFRESH_WAIT_TIMEOUT_MS / 1000)}s) aguardando renovação concorrente de tokens GEHC.`);
+}
+
 export async function obterTokensGehc(tenantId) {
   const stored = await lerTokens(tenantId);
 
@@ -265,21 +337,39 @@ export async function obterTokensGehc(tenantId) {
     }
 
     console.log(`[GEHC_AUTH] Token suspeito para tenant ${tenantId} (${motivo}) — renovando.`);
+  }
 
-    if (stored.refreshToken) {
+  // Tenta adquirir lock. Apenas o vencedor faz refresh; demais aguardam.
+  const adquirido = await tryAcquireRefreshLock(tenantId);
+
+  if (!adquirido) {
+    return aguardarRefreshConcorrente(tenantId);
+  }
+
+  try {
+    // Re-le do banco DEPOIS de adquirir o lock: pode ser que outro worker
+    // tenha renovado entre o lerTokens() inicial e a aquisição do lock.
+    const recheck = await lerTokens(tenantId);
+    if (recheck && !calcularExpiracao(recheck).expirado) {
+      return { accessToken: recheck.accessToken, idToken: recheck.idToken };
+    }
+
+    if (recheck?.refreshToken) {
       try {
         console.log(`[GEHC_AUTH] Tentando refresh via API para tenant ${tenantId}...`);
-        const novos = await refreshViaApi(stored.refreshToken);
+        const novos = await refreshViaApi(recheck.refreshToken);
         await salvarTokens(tenantId, novos);
         return { accessToken: novos.accessToken, idToken: novos.idToken };
       } catch (err) {
         console.warn(`[GEHC_AUTH] Refresh falhou (${err.message}) — refazendo login completo.`);
       }
     }
-  }
 
-  const novos = await capturarTokensViaPlaywright(tenantId);
-  return { accessToken: novos.accessToken, idToken: novos.idToken };
+    const novos = await capturarTokensViaPlaywright(tenantId);
+    return { accessToken: novos.accessToken, idToken: novos.idToken };
+  } finally {
+    await releaseRefreshLock(tenantId);
+  }
 }
 
 export async function invalidarTokensGehc(tenantId) {
