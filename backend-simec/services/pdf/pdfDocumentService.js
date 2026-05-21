@@ -1,8 +1,8 @@
 import PDFDocument from 'pdfkit';
 import {
   resolverLogoSimec,
-  prepararTenantInfo,
-  drawTenantInfoBlock,
+  prepararEntidadeInfo,
+  drawEntidadeInfoBlock,
 } from './_pdfLogoHelper.js';
 
 const LOGO_SIMEC = resolverLogoSimec();
@@ -65,11 +65,24 @@ function getMaxY(doc) {
   return doc.page.height - doc.page.margins.bottom - 24;
 }
 
-// Prepara informações do tenant (logo + nome + contatos) para o bloco
-// "Dados da Empresa" desenhado abaixo do header. Idempotente: se já
-// vier setado em options.tenantInfo, mantém.
+// Prepara informações da entidade exibida no bloco "Dados da Empresa":
+// Unidade quando há unidadeId disponível (CNPJ + endereço fiscal),
+// senão fallback no Tenant (só nome + contatos da conta). Idempotente.
 async function injectTenantInfo(payload, options = {}) {
   if (options.tenantInfo) return options;
+
+  const unidadeId =
+    options.unidadeId ||
+    payload?.unidadeId ||
+    payload?.unidade?.id ||
+    payload?.equipamento?.unidadeId ||
+    payload?.equipamento?.unidade?.id ||
+    payload?.manutencao?.equipamento?.unidadeId ||
+    payload?.manutencao?.unidadeId ||
+    payload?.contrato?.unidadeId ||
+    payload?.os?.equipamento?.unidadeId ||
+    null;
+
   const tenantId =
     options.tenantId ||
     payload?.tenantId ||
@@ -77,7 +90,8 @@ async function injectTenantInfo(payload, options = {}) {
     payload?.contrato?.tenantId ||
     payload?.manutencao?.tenantId ||
     null;
-  options.tenantInfo = await prepararTenantInfo(tenantId);
+
+  options.tenantInfo = await prepararEntidadeInfo({ unidadeId, tenantId });
   return options;
 }
 
@@ -737,7 +751,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
   options = await injectTenantInfo(dados, options);
   const title = `RELATORIO EXECUTIVO DE PERFORMANCE - ${safeText(dados?.ano)}`;
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
 
   const fmt = (v, suffix = '') => (v !== null && v !== undefined ? `${v}${suffix}` : '—');
 
@@ -877,7 +891,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
 export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
   options = await injectTenantInfo(resultado, options);
   const doc = createDocument('RELATORIO', options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
   if (resultado?.tipoRelatorio === 'inventarioEquipamentos') {
@@ -950,7 +964,7 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
   options = await injectTenantInfo(payload, options);
   const title = 'RELATORIO DE AUDITORIA DE ATIVO';
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Contexto do equipamento');
@@ -977,7 +991,7 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
   options = await injectTenantInfo(manutencao, options);
   const title = `ORDEM DE SERVICO: ${safeText(manutencao?.numeroOS, 'SEM_NUMERO')}`;
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Informações do equipamento');
@@ -1069,7 +1083,7 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
   const { locale, timeZone } = options;
   const title = `CONTRATO Nº ${safeText(contrato?.numeroContrato, 'SEM NUMERO')}`;
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
 
   drawSectionTitle(doc, 'Dados do contrato');
   drawInfoGrid(doc, [
@@ -1117,7 +1131,7 @@ export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
   options = await injectTenantInfo(payload, options);
   const title = 'RELATORIO DE UTILIZACAO GE HEALTHCARE';
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
   const { periodo, totais, unidades = [] } = payload;
@@ -1303,7 +1317,7 @@ export async function gerarPdfSaudeResumidoBuffer(payload, options = {}) {
     : { estatisticas: { total: 0 }, eventos: [], diarios: [], veredito: 'Sem leituras no periodo selecionado.' };
 
   const doc = createDocument('RELATORIO DE SAUDE DO ATIVO - RESUMIDO', options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
 
   _saudeContextoEMetricas(doc, payload, analise.estatisticas);
 
@@ -1342,7 +1356,7 @@ export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
     : { estatisticas: { total: 0 }, eventos: [], diarios: [], veredito: 'Sem leituras no periodo selecionado.' };
 
   const doc = createDocument('RELATORIO DE SAUDE DO ATIVO - COMPLETO', options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
 
   _saudeContextoEMetricas(doc, payload, analise.estatisticas);
 
@@ -1393,7 +1407,7 @@ export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
   options = await injectTenantInfo(ocorrencia, options);
   const title = 'REGISTRO DE OCORRENCIA';
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
   drawSectionTitle(doc, 'Equipamento');
@@ -1456,7 +1470,7 @@ export async function gerarPdfConformidadeCqBuffer(payload, options = {}) {
   options = await injectTenantInfo(payload, options);
   const title = 'RELATÓRIO DE CONFORMIDADE — CONTROLE DE QUALIDADE';
   const doc = createDocument(title, options);
-  drawTenantInfoBlock(doc, options?.tenantInfo);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
   // Bloco da norma logo no topo
