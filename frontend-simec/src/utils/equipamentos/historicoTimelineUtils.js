@@ -83,17 +83,11 @@ function getResumoOperacional(item, metadata, referenciaDetalhes) {
   }
 
   if (referenciaDetalhes?.dataHoraAbertura) {
-    resumo.push({
-      label: 'Abertura',
-      value: formatarDataHora(referenciaDetalhes.dataHoraInicioEvento || referenciaDetalhes.dataHoraAbertura),
-    });
+    resumo.push({ label: 'Abertura', value: formatarDataHora(referenciaDetalhes.dataHoraAbertura) });
   }
 
   if (referenciaDetalhes?.dataHoraConclusao) {
-    resumo.push({
-      label: 'Conclusão',
-      value: formatarDataHora(referenciaDetalhes.dataHoraFimEvento || referenciaDetalhes.dataHoraConclusao),
-    });
+    resumo.push({ label: 'Conclusão', value: formatarDataHora(referenciaDetalhes.dataHoraConclusao) });
   }
 
   if (metadata?.equipamentoOperante === true) {

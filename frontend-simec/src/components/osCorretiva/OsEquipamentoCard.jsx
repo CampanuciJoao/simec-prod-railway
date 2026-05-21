@@ -82,20 +82,12 @@ function OsEquipamentoCard({ os }) {
         <InfoRow icon={faHospital} label="Unidade" value={eq?.unidade?.nomeSistema} />
         <InfoRow icon={faMicrochip} label="Fabricante" value={eq?.fabricante} />
         <InfoRow icon={faUser} label="Solicitante" value={os.solicitante} />
-        {/* Abertura/Conclusão exibem a hora REAL do evento (quando retroativo).
-            O timestamp do registro no sistema fica apenas na timeline,
-            com a badge "Registro retroativo". */}
-        <InfoRow
-          icon={faClock}
-          label="Abertura"
-          value={formatarDataHora(os.dataHoraInicioEvento || os.dataHoraAbertura)}
-        />
+        {/* "Abertura"/"Conclusão" sao registros de SISTEMA — quando o
+            usuario interagiu com o SIMEC. A hora real do evento (quando
+            retroativo) vive na timeline, sao registros diferentes. */}
+        <InfoRow icon={faClock} label="Abertura" value={formatarDataHora(os.dataHoraAbertura)} />
         {os.dataHoraConclusao && (
-          <InfoRow
-            icon={faCheckCircle}
-            label="Conclusão"
-            value={formatarDataHora(os.dataHoraFimEvento || os.dataHoraConclusao)}
-          />
+          <InfoRow icon={faCheckCircle} label="Conclusão" value={formatarDataHora(os.dataHoraConclusao)} />
         )}
         {os.dataHoraCancelamento && (
           <InfoRow icon={faBan} label="Cancelamento" value={formatarDataHora(os.dataHoraCancelamento)} />
