@@ -254,14 +254,19 @@ export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
     infoRow(doc, 'Número da OS', os.numeroOS);
     infoRow(doc, 'Status da OS', STATUS_OS[os.status] || os.status);
     infoRow(doc, 'Solicitante', os.solicitante);
-    infoRow(doc, 'Abertura', fmt(os.dataHoraAbertura, locale, timeZone));
+    // Abertura/Conclusão exibem a hora REAL do evento (quando retroativo).
+    // O timestamp de registro no sistema fica apenas no log de auditoria e
+    // na badge "Registro retroativo" da timeline visual.
+    const dataAberturaExibida = os.dataHoraInicioEvento || os.dataHoraAbertura;
+    infoRow(doc, 'Abertura', fmt(dataAberturaExibida, locale, timeZone));
     infoRow(doc, 'Aberta por', os.autor?.nome || 'N/A');
     infoRow(doc, 'Descrição do problema', os.descricaoProblema);
 
     const concluidaViaVisita = (os.visitas || []).some(v => v.resultado);
 
   if (os.status === 'Concluida' && os.dataHoraConclusao && !concluidaViaVisita) {
-      infoRow(doc, 'Conclusão', fmt(os.dataHoraConclusao, locale, timeZone));
+      const dataConclusaoExibida = os.dataHoraFimEvento || os.dataHoraConclusao;
+      infoRow(doc, 'Conclusão', fmt(dataConclusaoExibida, locale, timeZone));
       if (os.observacoesFinais) {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Observações finais:', 54, doc.y);
         doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.observacoesFinais), 54, doc.y + 2, { width: doc.page.width - 108 });
@@ -287,7 +292,7 @@ function buildTimeline(os, timeZone = 'UTC') {
 
   eventos.push({
     tipo: 'abertura',
-    dataHora: os.dataHoraAbertura,
+    dataHora: os.dataHoraInicioEvento || os.dataHoraAbertura,
     titulo: `OS aberta — Status: ${STATUS_EQ[os.statusEquipamentoAbertura] || os.statusEquipamentoAbertura}`,
     descricao: `Solicitante: ${safe(os.solicitante)}. ${safe(os.descricaoProblema)}`,
   });
@@ -323,14 +328,18 @@ function buildTimeline(os, timeZone = 'UTC') {
     }
   }
 
+  // Conclusao/cancelamento sao empurrados ao FIM apos o sort cronologico
+  // — regra semantica: encerramento da OS sempre por ultimo.
+  eventos.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
+
   if (os.status === 'Concluida' && os.dataHoraConclusao) {
     eventos.push({
       tipo: 'conclusao',
-      dataHora: os.dataHoraConclusao,
+      dataHora: os.dataHoraFimEvento || os.dataHoraConclusao,
       titulo: 'OS concluída — Equipamento retornou a Operante',
       descricao: os.observacoesFinais || 'Manutenção corretiva encerrada com sucesso.',
     });
   }
 
-  return eventos.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
+  return eventos;
 }
