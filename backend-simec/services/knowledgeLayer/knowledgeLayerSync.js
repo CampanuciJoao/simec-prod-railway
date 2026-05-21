@@ -5,13 +5,18 @@
 //   2. Mapeia para o formato comum {fonte, tipoEvento, severidade, causa, resumo, detalhes}
 //   3. Faz upsert idempotente via (refFonteTipo, refFonteId, tipoEvento)
 //
-// Sao 5 produtores hoje:
+// Sao 6 produtores hoje:
 //   1. PDF GE extraido        -> 1 evento por OS GE (corretiva ou pm)
 //   2. Telemetria GE          -> eventos so quando ha anomalia detectada
 //   3. OS interna SIMEC       -> 1 evento por OS interna (abertura) +
 //                                1 ao concluir (futuro)
 //   4. Visita de terceiro     -> 1 evento por visita (agendada/concluida)
 //   5. Alerta GEHC saude      -> 1 evento por alerta gerado
+//   6. Notas de andamento     -> 1 evento por nota (OS corretiva ou
+//                                manutencao). Aqui mora o diagnostico
+//                                tecnico real ("trocado regulador X,
+//                                vazamento na linha Y") — insumo mais
+//                                rico para o embedding e RAG.
 //
 // Os produtores rodam em paralelo dentro do tenant. Falha de um nao bloqueia
 // os outros.
@@ -499,6 +504,86 @@ async function produzirEventosAlertasGEHC({ tenantId }) {
   return { fonte: 'alerta_telemetria', criados, atualizados, erros, total: alertas.length };
 }
 
+// ─── Produtor 6: Notas de andamento (texto tecnico do diagnostico) ──────────
+//
+// Cada NotaAndamento vira 1 evento. Eh o produtor com texto mais rico:
+// o tecnico/usuario descreve o que viu, mediu, trocou. Vai direto pro
+// embedding e alimenta RAG/similaridade.
+//
+// Notas podem pertencer a OsCorretiva OU Manutencao (FKs nullable). O
+// equipamentoId vem da OS pai. Notas orfas (sem pai) sao puladas.
+//
+// Severidade fixa em 'info' (peso 0 no score de risco). Uma nota nao
+// eh incidente — eh a narrativa do que se faz durante o incidente. O
+// peso do incidente ja vive no evento da OS-pai. Info evita inflar
+// score de risco mesmo com OS muito chatty (varias notas no mesmo dia).
+
+async function produzirEventosNotasAndamento({ tenantId }) {
+  const notas = await prisma.notaAndamento.findMany({
+    where: { tenantId },
+    include: {
+      autor:        { select: { nome: true } },
+      osCorretiva:  { select: { equipamentoId: true, numeroOS: true, status: true } },
+      manutencao:   { select: { equipamentoId: true, numeroOS: true, status: true, tipo: true } },
+    },
+  });
+
+  let criados = 0;
+  let atualizados = 0;
+  let erros = 0;
+
+  for (const n of notas) {
+    try {
+      const ehCorretiva = Boolean(n.osCorretiva);
+      const ehManutencao = Boolean(n.manutencao);
+      if (!ehCorretiva && !ehManutencao) continue;
+
+      const pai = ehCorretiva ? n.osCorretiva : n.manutencao;
+      if (!pai?.equipamentoId) continue;
+
+      const tipoEvento = ehCorretiva ? 'nota_os_corretiva' : 'nota_manutencao';
+      const contextoOs = ehCorretiva
+        ? `OS Corretiva #${pai.numeroOS}`
+        : `${pai.tipo || 'Manutencao'} #${pai.numeroOS}`;
+
+      // Resumo prefixa o contexto da OS pra o embedding amarrar a nota
+      // ao tipo de OS-pai, mesmo quando o texto da nota for laconico.
+      const resumo = trunc(`${contextoOs} — ${n.nota}`, 800);
+
+      const r = await upsertEvento({
+        tenantId,
+        equipamentoId: pai.equipamentoId,
+        ocorridoEm: n.data,
+        fonte: 'os_simec',
+        tipoEvento,
+        severidade: 'info',
+        causaCategoria: null,
+        resumo,
+        detalhesJson: {
+          numeroOS: pai.numeroOS,
+          osStatus: pai.status,
+          osTipo:   ehManutencao ? n.manutencao.tipo : 'Corretiva',
+          notaCompleta: n.nota,
+          origem:       n.origem,
+          tecnicoNome:  n.tecnicoNome,
+          autorNome:    n.autor?.nome || null,
+          foiEditada:   Boolean(n.editadoEm),
+          editadoEm:    n.editadoEm,
+        },
+        refFonteTipo: 'nota_andamento',
+        refFonteId:   n.id,
+      });
+      if (r === 'created') criados++;
+      else atualizados++;
+    } catch (err) {
+      console.error(`[KL_PRODUTOR_NOTA] Erro ${n.id}:`, err.message);
+      erros++;
+    }
+  }
+
+  return { fonte: 'notas_andamento', criados, atualizados, erros, total: notas.length };
+}
+
 // ─── Orquestrador por tenant ─────────────────────────────────────────────────
 
 export async function sincronizarKnowledgeLayerTenant({ tenantId } = {}) {
@@ -518,6 +603,7 @@ export async function sincronizarKnowledgeLayerTenant({ tenantId } = {}) {
     produzirEventosOSInterna({ tenantId }),
     produzirEventosVisitaTerceiro({ tenantId }),
     produzirEventosAlertasGEHC({ tenantId }),
+    produzirEventosNotasAndamento({ tenantId }),
   ]);
 
   const sumario = {};

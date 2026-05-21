@@ -49,6 +49,12 @@ const PM_OK_HORIZONTE_DIAS      = 270;
 const JANELA_ACIONAMENTO_DIAS   = 90;
 const MIN_ACIONAMENTOS          = 3;
 
+// Cooldown apos descarte/feedback negativo: o gerador respeita a decisao
+// do usuario por N dias para o mesmo (equipamento, tipo). Sem isso, todo
+// run do cron ressuscita o falso positivo. O usuario pode "forcar" a
+// reanalise marcando como resolvido (sem feedbackUtil=false).
+const FEEDBACK_COOLDOWN_DIAS    = 60;
+
 // Tipos de evento que indicam manutencao concluida — qualquer fonte. Eventos
 // anteriores a uma manutencao concluida sao descartados nos detectores que
 // medem "estado atual" do equipamento (risco_alto, reincidencia_causa).
@@ -90,6 +96,29 @@ function diasAtras(n) {
 
 async function upsertInsight({ tenantId, equipamentoId, tipo, severidade, titulo, descricao, recomendacao, evidencia, validoAteDias = 30 }) {
   const validoAte = new Date(Date.now() + validoAteDias * 86_400_000);
+
+  // Cooldown: se o usuario descartou (feedbackUtil=false) um insight do mesmo
+  // (equipamento, tipo) ha menos de FEEDBACK_COOLDOWN_DIAS, respeitamos a
+  // decisao e nao re-criamos. Pulamos qualquer insight ativo do mesmo tipo
+  // tambem porque o update abaixo limparia o feedback dele. So pegamos
+  // descartes JA resolvidos (resolvidoEm preenchido) — feedback em ativo
+  // continua sendo um sinal "leve" que sera limpo no proximo update.
+  const desdeCooldown = new Date(Date.now() - FEEDBACK_COOLDOWN_DIAS * 86_400_000);
+  const descarteRecente = await prisma.iaInsight.findFirst({
+    where: {
+      tenantId, equipamentoId, tipo,
+      feedbackUtil: false,
+      feedbackEm: { gte: desdeCooldown },
+      resolvidoEm: { not: null },
+    },
+    select: { id: true, feedbackEm: true },
+  });
+  if (descarteRecente) {
+    console.log(`[IA_INSIGHTS] Cooldown ativo — pulando ${tipo} para eq=${equipamentoId} ` +
+      `(descartado em ${descarteRecente.feedbackEm.toISOString().slice(0, 10)}).`);
+    return null;
+  }
+
   const existente = await prisma.iaInsight.findFirst({
     where: { tenantId, equipamentoId, tipo, resolvidoEm: null },
   });
