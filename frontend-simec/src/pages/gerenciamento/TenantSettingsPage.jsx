@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { faBuilding } from '@fortawesome/free-solid-svg-icons';
 
 import { getTenantSettings, updateTenantSettings } from '@/services/api';
@@ -12,6 +12,7 @@ import {
   ResponsiveGrid,
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
+import LogoUploadCard from '@/components/gerenciamento/LogoUploadCard';
 
 function TenantSettingsPage() {
   const { addToast } = useToast();
@@ -19,26 +20,21 @@ function TenantSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
-      try {
-        setLoading(true);
-        const response = await getTenantSettings();
-        if (active) setFormData(response);
-      } catch {
-        addToast('Erro ao carregar configuracoes da empresa.', 'error');
-      } finally {
-        if (active) setLoading(false);
-      }
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await getTenantSettings();
+      setFormData(response);
+    } catch {
+      addToast('Erro ao carregar configuracoes da empresa.', 'error');
+    } finally {
+      setLoading(false);
     }
-
-    load();
-    return () => {
-      active = false;
-    };
   }, [addToast]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const handleChange = (field, value) => {
     setFormData((current) => ({
@@ -98,6 +94,13 @@ function TenantSettingsPage() {
               required
             />
           </ResponsiveGrid>
+        </FormSection>
+
+        <FormSection
+          title="Logo da empresa"
+          description="O logo aparece no canto superior dos PDFs gerados (orçamentos, OS, relatórios, conformidade ANVISA). Sem logo configurado, os PDFs usam o logo SIMEC default."
+        >
+          <LogoUploadCard temLogo={!!formData.temLogo} onChange={load} />
         </FormSection>
 
         <FormSection title="Contatos operacionais">

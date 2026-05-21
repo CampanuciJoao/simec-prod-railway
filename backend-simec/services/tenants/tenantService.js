@@ -313,10 +313,16 @@ export async function obterTenantSettingsService(tenantId) {
     };
   }
 
+  // logoPath é interno (R2). O frontend não precisa do path em si — apenas
+  // saber se há logo (pra renderizar via GET /api/tenant/logo) e o
+  // updatedAt do tenant pra forçar refresh da imagem após upload.
   return {
     ok: true,
     status: 200,
-    data: settings,
+    data: {
+      ...settings,
+      temLogo: !!settings.logoPath,
+    },
   };
 }
 

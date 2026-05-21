@@ -131,6 +131,7 @@ export function buscarTenantSettings(tenantId) {
       contatoNome: true,
       contatoEmail: true,
       contatoTelefone: true,
+      logoPath: true,
       updatedAt: true,
     },
   });

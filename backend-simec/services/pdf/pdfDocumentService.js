@@ -1,14 +1,5 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import PDFDocument from 'pdfkit';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const logoPath = path.resolve(
-  __dirname,
-  '../../assets/logo-simec.png'
-);
+import { resolverLogoParaPdf } from './_pdfLogoHelper.js';
 
 const COLORS = {
   slate900: '#1e293b',
@@ -68,16 +59,36 @@ function getMaxY(doc) {
   return doc.page.height - doc.page.margins.bottom - 24;
 }
 
+// Injeta options.logoSource buscando o logo do tenant (com fallback no
+// logo SIMEC). Cada gerarPdfXxxBuffer chama isto no início; idempotente
+// (se options.logoSource já vier setado, mantém).
+async function injectLogoSource(payload, options = {}) {
+  if (options.logoSource) return options;
+  const tenantId =
+    options.tenantId ||
+    payload?.tenantId ||
+    payload?.equipamento?.tenantId ||
+    payload?.contrato?.tenantId ||
+    payload?.manutencao?.tenantId ||
+    null;
+  options.logoSource = await resolverLogoParaPdf(tenantId);
+  return options;
+}
+
 function drawHeader(doc, title, options = {}) {
-  const { locale, timeZone } = options;
+  const { locale, timeZone, logoSource = null } = options;
   const pageWidth = doc.page.width;
   const bandH = 52;
 
   doc.save().rect(0, 0, pageWidth, bandH).fill(COLORS.slate900).restore();
 
-  const hasLogo = fs.existsSync(logoPath);
+  const hasLogo = !!logoSource;
   if (hasLogo) {
-    doc.image(logoPath, 12, 5, { fit: [42, 42] });
+    try {
+      doc.image(logoSource, 12, 5, { fit: [42, 42] });
+    } catch (err) {
+      console.warn('[PDF_HEADER] Falha ao renderizar logo:', err.message);
+    }
   }
 
   const textX = hasLogo ? 60 : 14;
@@ -717,6 +728,7 @@ function drawBarChart(doc, { title, labels, values, unit = '', color = COLORS.bl
 }
 
 export async function gerarPdfBIBuffer(dados, options = {}) {
+  options = await injectLogoSource(dados, options);
   const title = `RELATORIO EXECUTIVO DE PERFORMANCE - ${safeText(dados?.ano)}`;
   const doc = createDocument(title, options);
 
@@ -856,6 +868,7 @@ export async function gerarPdfBIBuffer(dados, options = {}) {
 }
 
 export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
+  options = await injectLogoSource(resultado, options);
   const doc = createDocument('RELATORIO', options);
   const { locale, timeZone } = options;
 
@@ -926,6 +939,7 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
 }
 
 export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) {
+  options = await injectLogoSource(payload, options);
   const title = 'RELATORIO DE AUDITORIA DE ATIVO';
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
@@ -951,6 +965,7 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
 }
 
 export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
+  options = await injectLogoSource(manutencao, options);
   const title = `ORDEM DE SERVICO: ${safeText(manutencao?.numeroOS, 'SEM_NUMERO')}`;
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
@@ -1040,6 +1055,7 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
 }
 
 export async function gerarPdfContratoBuffer(contrato, options = {}) {
+  options = await injectLogoSource(contrato, options);
   const { locale, timeZone } = options;
   const title = `CONTRATO Nº ${safeText(contrato?.numeroContrato, 'SEM NUMERO')}`;
   const doc = createDocument(title, options);
@@ -1087,6 +1103,7 @@ export async function gerarPdfContratoBuffer(contrato, options = {}) {
 }
 
 export async function gerarPdfUtilizacaoGehcBuffer(payload, options = {}) {
+  options = await injectLogoSource(payload, options);
   const title = 'RELATORIO DE UTILIZACAO GE HEALTHCARE';
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
@@ -1263,6 +1280,7 @@ function _saudeTabelaEventos(doc, eventos, locale, timeZone, { somenteCriticos =
  * o essencial sem inflar o documento.
  */
 export async function gerarPdfSaudeResumidoBuffer(payload, options = {}) {
+  options = await injectLogoSource(payload, options);
   const { locale, timeZone } = options;
   const snapshots = payload?.snapshots || [];
 
@@ -1301,6 +1319,7 @@ export async function gerarPdfSaudeResumidoBuffer(payload, options = {}) {
  * Substitui a tabela bruta antiga (snapshot-a-snapshot) por agregacao diaria.
  */
 export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
+  options = await injectLogoSource(payload, options);
   const { locale, timeZone } = options;
   const snapshots = payload?.snapshots || [];
 
@@ -1357,6 +1376,7 @@ export async function gerarPdfSaudeEquipamentoBuffer(payload, options = {}) {
 }
 
 export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
+  options = await injectLogoSource(ocorrencia, options);
   const title = 'REGISTRO DE OCORRENCIA';
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
@@ -1418,6 +1438,7 @@ export async function gerarPdfOcorrenciaBuffer(ocorrencia, options = {}) {
 //     ]
 //   }
 export async function gerarPdfConformidadeCqBuffer(payload, options = {}) {
+  options = await injectLogoSource(payload, options);
   const title = 'RELATÓRIO DE CONFORMIDADE — CONTROLE DE QUALIDADE';
   const doc = createDocument(title, options);
   const { locale, timeZone } = options;
