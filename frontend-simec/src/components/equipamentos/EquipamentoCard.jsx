@@ -83,7 +83,7 @@ function EquipamentoCard({
               </Badge>
             ) : null}
           </div>
-          <Col label="Nº Série / Tag" value={equipamento.tag} />
+          <Col label="Número de série" value={equipamento.tag} />
           <Col label="Tipo" value={equipamento.tipo} />
           <Col label="Fabricante" value={equipamento.fabricante} />
           <Col label="Unidade" value={equipamento.unidade?.nomeSistema} />

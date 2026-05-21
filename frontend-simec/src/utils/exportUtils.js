@@ -88,7 +88,7 @@ export const exportarRelatorioCSV = (relatorio, nomeArquivo, timezone = 'UTC') =
         case 'equipamentosServicos': {
             tituloRelatorio = 'Relatório de Equipamentos e Serviços Vinculados';
             headers = [
-                'Unidade', 'Modelo', 'Tipo', 'Tag', 'Status', 'Fabricante',
+                'Unidade', 'Modelo', 'Tipo', 'Número de série', 'Status', 'Fabricante',
                 'Setor', 'Nº Patrimônio', 'Registro ANVISA',
                 'Qtd. Contratos', 'Nº(s) Contrato', 'Fornecedor(es)', 'Vencimento Contrato',
                 'Qtd. Seguros', 'Nº Apólice(s)', 'Seguradora(s)', 'Vencimento Seguro',

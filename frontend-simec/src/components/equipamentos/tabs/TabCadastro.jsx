@@ -18,7 +18,7 @@ function TabCadastro({ equipamentoInicial }) {
 
   const items = [
     { key: 'modelo', label: 'Modelo', value: equipamentoInicial.modelo },
-    { key: 'tag', label: 'Numero de serie (Tag)', value: equipamentoInicial.tag },
+    { key: 'tag', label: 'Número de série', value: equipamentoInicial.tag },
     { key: 'tipo', label: 'Tipo', value: equipamentoInicial.tipo },
     { key: 'setor', label: 'Localizacao', value: equipamentoInicial.setor },
     {

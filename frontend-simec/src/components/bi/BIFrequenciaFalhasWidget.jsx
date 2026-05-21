@@ -55,7 +55,7 @@ function BIFrequenciaFalhasWidget({ items, onSelectEquipamento }) {
                 className="mt-1 text-xs"
                 style={{ color: 'var(--text-muted)' }}
               >
-                Tag: {equipamento.tag}
+                Nº série: {equipamento.tag}
               </div>
             </div>
 

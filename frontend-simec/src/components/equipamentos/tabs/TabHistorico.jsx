@@ -379,7 +379,7 @@ function TabHistoricoAtivo({ equipamento }) {
                   </div>
                 </div>
                 <div>
-                  <div style={{ color: 'var(--text-muted)' }}>Tag</div>
+                  <div style={{ color: 'var(--text-muted)' }}>Número de série</div>
                   <div style={{ color: 'var(--text-primary)' }}>
                     {equipamento?.tag || 'N/A'}
                   </div>
