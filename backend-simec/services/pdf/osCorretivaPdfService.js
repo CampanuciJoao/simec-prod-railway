@@ -1,6 +1,12 @@
 import PDFDocument from 'pdfkit';
 import prisma from '../prismaService.js';
-import { resolverLogoParaPdf } from './_pdfLogoHelper.js';
+import {
+  resolverLogoSimec,
+  prepararTenantInfo,
+  drawTenantInfoBlock,
+} from './_pdfLogoHelper.js';
+
+const LOGO_SIMEC = resolverLogoSimec();
 
 const C = {
   black: '#1e293b',
@@ -60,17 +66,17 @@ function checkPageBreak(doc, neededHeight = 60) {
 }
 
 function drawHeader(doc, os, options) {
-  const { locale, timeZone, logoSource = null } = options;
+  const { locale, timeZone } = options;
   const W = doc.page.width;
 
   doc.save().rect(0, 0, W, 52).fill(C.black).restore();
 
-  const hasLogo = !!logoSource;
+  const hasLogo = !!LOGO_SIMEC;
   if (hasLogo) {
     try {
-      doc.image(logoSource, 12, 5, { fit: [42, 42] });
+      doc.image(LOGO_SIMEC, 12, 5, { fit: [42, 42] });
     } catch (err) {
-      console.warn('[OS_PDF] Falha ao renderizar logo:', err.message);
+      console.warn('[OS_PDF] Falha ao renderizar logo SIMEC:', err.message);
     }
   }
 
@@ -208,7 +214,7 @@ export async function obterDadosPdfOsCorretiva({ tenantId, osId }) {
 
 export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
   const { locale = 'pt-BR', timeZone = 'UTC' } = options;
-  const logoSource = await resolverLogoParaPdf(os?.tenantId);
+  const tenantInfo = await prepararTenantInfo(os?.tenantId);
 
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -223,7 +229,10 @@ export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    drawHeader(doc, os, { locale, timeZone, logoSource });
+    drawHeader(doc, os, { locale, timeZone });
+
+    // Bloco "Dados da Empresa" (cliente) só na primeira página.
+    drawTenantInfoBlock(doc, tenantInfo);
 
     // ── Dados do equipamento
     sectionTitle(doc, 'DADOS DO EQUIPAMENTO');

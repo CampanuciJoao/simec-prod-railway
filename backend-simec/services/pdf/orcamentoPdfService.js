@@ -1,6 +1,12 @@
 import PDFDocument from 'pdfkit';
 import prisma from '../prismaService.js';
-import { resolverLogoParaPdf } from './_pdfLogoHelper.js';
+import {
+  resolverLogoSimec,
+  prepararTenantInfo,
+  drawTenantInfoBlock,
+} from './_pdfLogoHelper.js';
+
+const LOGO_SIMEC = resolverLogoSimec();
 
 const C = {
   black:      '#000000',
@@ -46,15 +52,15 @@ function box(doc, x, y, w, h, { fill, stroke = BORDER } = {}) {
   doc.restore();
 }
 
-function drawHeader(doc, logoSource = null) {
+function drawHeader(doc) {
   const W = doc.page.width;
   doc.save().rect(0, 0, W, 52).fill('#1e293b').restore();
-  const hasLogo = !!logoSource;
+  const hasLogo = !!LOGO_SIMEC;
   if (hasLogo) {
     try {
-      doc.image(logoSource, 12, 5, { fit: [42, 42] });
+      doc.image(LOGO_SIMEC, 12, 5, { fit: [42, 42] });
     } catch (err) {
-      console.warn('[ORCAMENTO_PDF] Falha ao renderizar logo:', err.message);
+      console.warn('[ORCAMENTO_PDF] Falha ao renderizar logo SIMEC:', err.message);
     }
   }
   const tx = hasLogo ? 60 : 14;
@@ -111,16 +117,19 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
 }
 
 export async function gerarPdfOrcamentoBuffer(orcamento) {
-  const logoSource = await resolverLogoParaPdf(orcamento?.tenantId);
+  const tenantInfo = await prepararTenantInfo(orcamento?.tenantId);
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 48, left: 36, right: 36 }, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-    doc.on('pageAdded', () => drawHeader(doc, logoSource));
+    doc.on('pageAdded', () => drawHeader(doc));
 
-    drawHeader(doc, logoSource);
+    drawHeader(doc);
+
+    // Bloco "Dados da Empresa" (cliente) só na primeira página.
+    drawTenantInfoBlock(doc, tenantInfo, { x: 36, width: doc.page.width - 72 });
 
     const marginX  = 36;
     const contentW = doc.page.width - marginX * 2;
