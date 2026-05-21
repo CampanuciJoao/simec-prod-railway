@@ -171,16 +171,20 @@ export function validarRegistrarResultado(payload) {
 
 export const concluirOsSchema = z.object({
   observacoesFinais: z.string().max(2000).optional(),
-  // Hora real em que a OS foi concluida. Pode ser anterior a "agora" para
-  // registro retroativo (problema resolvido fisicamente antes de fechar no
-  // sistema). Nao pode ser futura.
-  dataHoraConclusao: z.string().datetime({ message: 'Data/hora de conclusão inválida.' }).optional(),
+  // Hora real em que o problema foi efetivamente resolvido. Pode ser
+  // anterior a "agora" (registro retroativo); nao pode ser futura. O
+  // momento em que o admin marcou a conclusao no sistema fica em
+  // dataHoraConclusao (sempre = new Date() no service).
+  dataHoraFimEvento: z
+    .string()
+    .datetime({ offset: true, message: 'Data/hora do evento inválida.' })
+    .optional(),
 }).superRefine((data, ctx) => {
-  if (data.dataHoraConclusao && new Date(data.dataHoraConclusao) > new Date()) {
+  if (data.dataHoraFimEvento && new Date(data.dataHoraFimEvento) > new Date()) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
-      path: ['dataHoraConclusao'],
-      message: 'A hora de conclusão não pode ser futura.',
+      path: ['dataHoraFimEvento'],
+      message: 'A hora do evento não pode ser futura.',
     });
   }
 });
@@ -205,5 +209,10 @@ export function validarMoverOsEquipamento(payload) {
 export function validarConcluirOs(payload) {
   const result = concluirOsSchema.safeParse(payload);
   if (result.success) return { ok: true, data: result.data };
-  return { ok: false, message: 'Dados inválidos para conclusão da OS.', fieldErrors: {} };
+  const fieldErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (key) fieldErrors[key] = issue.message;
+  }
+  return { ok: false, message: 'Dados inválidos para conclusão da OS.', fieldErrors };
 }

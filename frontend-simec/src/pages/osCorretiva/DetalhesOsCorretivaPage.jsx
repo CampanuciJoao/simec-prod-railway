@@ -82,6 +82,7 @@ function DetalhesOsCorretivaPage() {
         onClose={page.concluirModal.closeModal}
         onConfirm={page.handleConcluirOs}
         submitting={page.submitting}
+        timezone={os?.equipamento?.unidade?.timezone}
       />
 
       <CancelarOsModal

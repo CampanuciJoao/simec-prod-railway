@@ -244,8 +244,28 @@ export async function editarNotaOsCorretivaService({
   }
 
   const update = {};
-  if (v.data.nota !== undefined) update.nota = v.data.nota;
-  if (v.data.data !== undefined) update.data = new Date(v.data.data);
+  const antes = {};
+  const depois = {};
+  if (v.data.nota !== undefined && v.data.nota !== nota.nota) {
+    update.nota = v.data.nota;
+    antes.nota = nota.nota;
+    depois.nota = v.data.nota;
+  }
+  if (v.data.data !== undefined) {
+    const novaData = new Date(v.data.data);
+    if (novaData.getTime() !== nota.data.getTime()) {
+      update.data = novaData;
+      antes.data = nota.data.toISOString();
+      depois.data = novaData.toISOString();
+    }
+  }
+
+  if (Object.keys(update).length === 0) {
+    return { ok: true, status: 200, data: nota };
+  }
+
+  update.editadoEm = new Date();
+  update.editadoPorId = usuarioId;
 
   const atualizada = await prisma.notaAndamento.update({
     where: { id: notaId },
@@ -258,7 +278,7 @@ export async function editarNotaOsCorretivaService({
     acao: 'EDICAO',
     entidade: 'NotaAndamento',
     entidadeId: notaId,
-    detalhes: `Nota da OS ${os.numeroOS} editada (${Object.keys(update).join(', ')}).`,
+    detalhes: `Nota da OS ${os.numeroOS} editada. ${JSON.stringify({ antes, depois })}`,
   });
 
   return { ok: true, status: 200, data: atualizada };
@@ -509,9 +529,14 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     };
   }
 
-  const dataHoraConclusao = v.data.dataHoraConclusao
-    ? new Date(v.data.dataHoraConclusao)
-    : new Date();
+  // dataHoraConclusao = momento do click no sistema (sempre agora).
+  // dataHoraFimEvento = hora real em que o problema foi resolvido (pode ser
+  // anterior a agora — registro retroativo). Quando o admin nao informa,
+  // assume-se que o problema foi resolvido agora.
+  const dataHoraConclusao = new Date();
+  const dataHoraFimEvento = v.data.dataHoraFimEvento
+    ? new Date(v.data.dataHoraFimEvento)
+    : null;
 
   await prisma.$transaction(async (tx) => {
     await tx.osCorretiva.update({
@@ -519,6 +544,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
       data: {
         status: 'Concluida',
         dataHoraConclusao,
+        dataHoraFimEvento,
         observacoesFinais: v.data.observacoesFinais || null,
       },
     });
@@ -540,7 +566,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
     referenciaId: osId,
     referenciaTipo: 'os_corretiva',
     metadata: { resultado: 'Operante', origem: 'resolucao_interna' },
-    dataEvento: dataHoraConclusao,
+    dataEvento: dataHoraFimEvento || dataHoraConclusao,
   });
 
   await registrarLog({

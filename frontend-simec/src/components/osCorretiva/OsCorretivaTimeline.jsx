@@ -68,6 +68,19 @@ function TimelineItem({ evento, timezone, onEditar }) {
               Registro retroativo
             </span>
           )}
+          {evento.meta?.editado && (
+            <span
+              className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+              style={{
+                backgroundColor: 'var(--color-info-surface, #dbeafe)',
+                color: 'var(--color-info, #1d4ed8)',
+                border: '1px solid var(--color-info-soft, #93c5fd)',
+              }}
+              title={`Editado em ${fmt(evento.meta.editadoEm)}`}
+            >
+              Editado
+            </span>
+          )}
           {podeEditar ? (
             <button
               type="button"
@@ -94,10 +107,25 @@ function TimelineItem({ evento, timezone, onEditar }) {
             Registrado no sistema em {fmt(evento.meta.dataHoraRegistro)}.
           </p>
         )}
-        {evento.meta?.registradoPor && (
+        {evento.meta?.editado ? (
           <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Registrado por: <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{evento.meta.registradoPor}</span>
+            Editado por:{' '}
+            <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+              {evento.meta.editadoPorNome || 'Administrador'}
+            </span>
+            {evento.meta.editadoEm && (
+              <> em {fmt(evento.meta.editadoEm)}</>
+            )}
+            {evento.meta.registradoPor && (
+              <span className="opacity-70"> · Registrado originalmente por {evento.meta.registradoPor}</span>
+            )}
           </p>
+        ) : (
+          evento.meta?.registradoPor && (
+            <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+              Registrado por: <span className="font-medium" style={{ color: 'var(--text-secondary)' }}>{evento.meta.registradoPor}</span>
+            </p>
+          )
         )}
         {resumoOs && (
           <p className="mt-2 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>

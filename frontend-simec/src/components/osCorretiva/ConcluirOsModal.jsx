@@ -1,27 +1,62 @@
 import React, { useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faCheckCircle } from '@fortawesome/free-solid-svg-icons';
+import { faCheckCircle, faClock } from '@fortawesome/free-solid-svg-icons';
 import { Drawer, Button, Input, Textarea } from '@/components/ui';
 
-function ConcluirOsModal({ isOpen, onClose, onConfirm, submitting }) {
+// Converte input datetime-local (wall-clock na timezone do tenant) em ISO
+// UTC. Mesma lógica usada no EditarNotaModal — extraída aqui para evitar
+// drift entre componentes; quando aparecer um terceiro consumidor, mover
+// para utils/timeUtils.
+function inputLocalParaIso(valor, timezone) {
+  if (!valor) return null;
+  try {
+    const [datePart, timePart] = valor.split('T');
+    const [Y, M, D] = datePart.split('-').map(Number);
+    const [h, m] = timePart.split(':').map(Number);
+    const utcEpoch = Date.UTC(Y, M - 1, D, h, m);
+    const tz = timezone || 'UTC';
+    const tzFmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      hour12: false,
+      timeZoneName: 'shortOffset',
+    });
+    const parts = tzFmt.formatToParts(new Date(utcEpoch));
+    const offsetPart = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT';
+    const match = offsetPart.match(/GMT([+-]?)(\d{1,2})(?::(\d{2}))?/);
+    let offsetMinutes = 0;
+    if (match) {
+      const sign = match[1] === '-' ? -1 : 1;
+      const hh = Number(match[2] || 0);
+      const mm = Number(match[3] || 0);
+      offsetMinutes = sign * (hh * 60 + mm);
+    }
+    return new Date(utcEpoch - offsetMinutes * 60 * 1000).toISOString();
+  } catch {
+    return null;
+  }
+}
+
+function ConcluirOsModal({ isOpen, onClose, onConfirm, submitting, timezone }) {
   const [observacoesFinais, setObservacoesFinais] = useState('');
-  const [dataHoraConclusao, setDataHoraConclusao] = useState('');
+  const [dataHoraFimLocal, setDataHoraFimLocal] = useState('');
 
   function handleClose() {
     setObservacoesFinais('');
-    setDataHoraConclusao('');
+    setDataHoraFimLocal('');
     onClose();
   }
 
   async function handleConfirm() {
     const payload = { observacoesFinais: observacoesFinais || undefined };
-    if (dataHoraConclusao) {
-      payload.dataHoraConclusao = new Date(dataHoraConclusao).toISOString();
+    if (dataHoraFimLocal) {
+      const iso = inputLocalParaIso(dataHoraFimLocal, timezone);
+      if (iso) payload.dataHoraFimEvento = iso;
     }
     await onConfirm(payload);
     setObservacoesFinais('');
-    setDataHoraConclusao('');
+    setDataHoraFimLocal('');
   }
 
   return (
@@ -57,13 +92,14 @@ function ConcluirOsModal({ isOpen, onClose, onConfirm, submitting }) {
         </div>
 
         <Input
-          label="Hora da conclusão"
+          label="Hora real da conclusão (opcional)"
           type="datetime-local"
-          value={dataHoraConclusao}
-          onChange={(e) => setDataHoraConclusao(e.target.value)}
+          value={dataHoraFimLocal}
+          onChange={(e) => setDataHoraFimLocal(e.target.value)}
+          leadingIcon={<FontAwesomeIcon icon={faClock} />}
         />
         <p className="-mt-3 text-xs" style={{ color: 'var(--text-muted)' }}>
-          Quando o problema foi efetivamente resolvido. Deixe vazio para usar a hora atual.
+          Quando o problema foi efetivamente resolvido. Útil para registro retroativo, quando a OS é fechada no sistema depois do reparo. Deixe vazio para usar a hora atual.
         </p>
 
         <Textarea
@@ -83,8 +119,9 @@ ConcluirOsModal.propTypes = {
   onClose: PropTypes.func.isRequired,
   onConfirm: PropTypes.func.isRequired,
   submitting: PropTypes.bool,
+  timezone: PropTypes.string,
 };
 
-ConcluirOsModal.defaultProps = { submitting: false };
+ConcluirOsModal.defaultProps = { submitting: false, timezone: null };
 
 export default ConcluirOsModal;
