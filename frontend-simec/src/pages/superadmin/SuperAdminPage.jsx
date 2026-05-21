@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBookOpen,
+  faBrain,
   faBuildingShield,
   faClockRotateLeft,
   faHeartPulse,
@@ -39,6 +40,12 @@ function SuperAdminPage() {
       label: 'Saúde do sistema',
       icon: <FontAwesomeIcon icon={faHeartPulse} />,
       path: '/superadmin/saude',
+    },
+    {
+      id: 'aprendizado',
+      label: 'Aprendizado da IA',
+      icon: <FontAwesomeIcon icon={faBrain} />,
+      path: '/superadmin/aprendizado',
     },
     {
       id: 'ajuda',
