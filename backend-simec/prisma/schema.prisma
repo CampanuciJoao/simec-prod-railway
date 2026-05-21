@@ -140,6 +140,7 @@ model Usuario {
   alertasLidos             AlertaLidoPorUsuario[]
   logsDeAuditoria          LogAuditoria[]
   notasDeAndamento         NotaAndamento[]
+  notasEditadas            NotaAndamento[]        @relation("NotaAndamentoEditadoPor")
   osCorretivas             OsCorretiva[]
   manutencaoEventos        ManutencaoEvento[]
   authSessions             AuthSession[]
@@ -631,9 +632,15 @@ model NotaAndamento {
   osCorretivaId String?  @map("os_corretiva_id")
   autorId       String?  @map("autor_id")
   tecnicoNome   String?  @map("tecnico_nome")
+  // Edição admin: marca quando e por quem a nota foi corrigida. Detalhe
+  // antes/depois fica em LogAuditoria; aqui só o ponteiro pra exibir
+  // "Editado por X em Y" na timeline.
+  editadoEm     DateTime? @map("editado_em")
+  editadoPorId  String?   @map("editado_por_id")
 
   tenant      Tenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   autor       Usuario?     @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  editadoPor  Usuario?     @relation("NotaAndamentoEditadoPor", fields: [editadoPorId], references: [id], onDelete: SetNull)
   manutencao  Manutencao?  @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
   osCorretiva OsCorretiva? @relation(fields: [tenantId, osCorretivaId], references: [tenantId, id], onDelete: Cascade)
 
@@ -1489,6 +1496,10 @@ model OsCorretiva {
   status                    StatusOsCorretiva @default(Aberta)
   tipo                      TipoOsCorretiva   @default(Ocorrencia)
   dataHoraConclusao         DateTime?         @map("data_hora_conclusao")
+  // Hora real em que o problema foi resolvido (registro retroativo de
+  // conclusao). Quando nulo, dataHoraConclusao representa tambem o
+  // momento do evento. Espelha o pattern de dataHoraInicioEvento.
+  dataHoraFimEvento         DateTime?         @map("data_hora_fim_evento")
   observacoesFinais         String?           @map("observacoes_finais") @db.Text
   motivoCancelamento        String?           @map("motivo_cancelamento") @db.Text
   dataHoraCancelamento      DateTime?         @map("data_hora_cancelamento")

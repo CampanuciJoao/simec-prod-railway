@@ -104,6 +104,7 @@ function buildTimeline(os) {
   });
 
   for (const nota of os.notas || []) {
+    const foiEditada = Boolean(nota.editadoEm);
     eventos.push({
       tipo: 'nota',
       id: nota.id,
@@ -113,10 +114,12 @@ function buildTimeline(os) {
       meta: {
         tecnicoNome: nota.tecnicoNome || nota.autor?.nome,
         registradoPor: nota.autor?.nome || null,
+        ...(foiEditada ? {
+          editado: true,
+          editadoEm: nota.editadoEm,
+          editadoPorNome: nota.editadoPor?.nome || null,
+        } : {}),
       },
-      // Notas são editáveis por admin (texto + data). Demais eventos
-      // (abertura, conclusão, visita) são derivados de campos
-      // estruturados da OS — não editáveis pela timeline.
       editavel: true,
     });
   }
@@ -180,14 +183,29 @@ function buildTimeline(os) {
     }
   }
 
-  // Evento de conclusão só aparece quando a OS foi encerrada sem visita (ex: resolução interna)
+  // Conclusão e cancelamento são empurrados ao FIM da timeline depois do
+  // sort cronológico — semanticamente representam o encerramento da OS e
+  // devem aparecer por último mesmo quando registrados retroativamente
+  // com data anterior a outros eventos.
+  eventos.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
+
   if (os.status === 'Concluida' && os.dataHoraConclusao && !visitaConclusiva) {
+    // Conclusão pode ser retroativa: dataHoraFimEvento = hora real, e
+    // dataHoraConclusao = momento em que o admin marcou no sistema.
+    const dataHoraEventoConclusao = os.dataHoraFimEvento || os.dataHoraConclusao;
+    const isConclusaoRetroativa = Boolean(os.dataHoraFimEvento);
     eventos.push({
       tipo: 'conclusao',
-      dataHora: os.dataHoraConclusao,
+      dataHora: dataHoraEventoConclusao,
       titulo: 'OS concluída — Equipamento Operante',
       descricao: os.observacoesFinais || 'Manutenção corretiva encerrada.',
-      meta: { statusFinal: 'Operante' },
+      meta: {
+        statusFinal: 'Operante',
+        ...(isConclusaoRetroativa ? {
+          registroRetroativo: true,
+          dataHoraRegistro: os.dataHoraConclusao,
+        } : {}),
+      },
     });
   }
 
@@ -201,6 +219,5 @@ function buildTimeline(os) {
     });
   }
 
-  eventos.sort((a, b) => new Date(a.dataHora) - new Date(b.dataHora));
   return eventos;
 }

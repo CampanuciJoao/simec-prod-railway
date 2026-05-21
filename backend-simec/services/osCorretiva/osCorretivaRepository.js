@@ -12,6 +12,7 @@ const INCLUDE_NOTAS = (tenantId) => ({
     orderBy: { data: 'asc' },
     include: {
       autor: { select: { nome: true } },
+      editadoPor: { select: { nome: true } },
     },
   },
 });
