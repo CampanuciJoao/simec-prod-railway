@@ -254,19 +254,17 @@ export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
     infoRow(doc, 'Número da OS', os.numeroOS);
     infoRow(doc, 'Status da OS', STATUS_OS[os.status] || os.status);
     infoRow(doc, 'Solicitante', os.solicitante);
-    // Abertura/Conclusão exibem a hora REAL do evento (quando retroativo).
-    // O timestamp de registro no sistema fica apenas no log de auditoria e
-    // na badge "Registro retroativo" da timeline visual.
-    const dataAberturaExibida = os.dataHoraInicioEvento || os.dataHoraAbertura;
-    infoRow(doc, 'Abertura', fmt(dataAberturaExibida, locale, timeZone));
+    // "Abertura"/"Conclusao" sao registros de SISTEMA (quando o usuario
+    // interagiu com o SIMEC). A hora real do evento, quando retroativa,
+    // aparece na TIMELINE CRONOLOGICA abaixo — sao registros diferentes.
+    infoRow(doc, 'Abertura', fmt(os.dataHoraAbertura, locale, timeZone));
     infoRow(doc, 'Aberta por', os.autor?.nome || 'N/A');
     infoRow(doc, 'Descrição do problema', os.descricaoProblema);
 
     const concluidaViaVisita = (os.visitas || []).some(v => v.resultado);
 
   if (os.status === 'Concluida' && os.dataHoraConclusao && !concluidaViaVisita) {
-      const dataConclusaoExibida = os.dataHoraFimEvento || os.dataHoraConclusao;
-      infoRow(doc, 'Conclusão', fmt(dataConclusaoExibida, locale, timeZone));
+      infoRow(doc, 'Conclusão', fmt(os.dataHoraConclusao, locale, timeZone));
       if (os.observacoesFinais) {
         doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.muted).text('Observações finais:', 54, doc.y);
         doc.font('Helvetica').fontSize(8.5).fillColor(C.dark).text(safe(os.observacoesFinais), 54, doc.y + 2, { width: doc.page.width - 108 });
