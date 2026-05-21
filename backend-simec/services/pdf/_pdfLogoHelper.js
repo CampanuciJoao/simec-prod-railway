@@ -137,14 +137,29 @@ export function drawEntidadeInfoBlock(doc, info, opts = {}) {
   }
 
   const padding = 8;
-  const alturaTitulo = 14;
-  const alturaDetalhe = 11;
-  const alturaContent = linhas.reduce(
-    (acc, l) => acc + (l.tipo === 'titulo' ? alturaTitulo : alturaDetalhe),
-    0
-  );
-  const blockHeight = alturaContent + padding * 2;
-  const logoSize = Math.min(36, blockHeight - padding * 2);
+  const logoSize = info.logoBuffer ? 36 : 0;
+  const cursorX = x + padding + (logoSize ? logoSize + padding : 0);
+  const textoWidth = width - (cursorX - x) - padding;
+
+  // Mede a altura real de cada linha respeitando wrap natural. Evita o
+  // bug do PDFKit com `ellipsis:true`+`lineBreak:false` que rendia
+  // truncava em glifos do subset de fonte e cuspia lixo quando o nome
+  // do cliente nao cabia em uma linha.
+  const espacamentoLinha = 2;
+  const linhasComAltura = linhas.map((linha) => {
+    if (linha.tipo === 'titulo') {
+      doc.font('Helvetica-Bold').fontSize(10.5);
+    } else {
+      doc.font('Helvetica').fontSize(8);
+    }
+    const altura = doc.heightOfString(linha.texto, { width: textoWidth });
+    return { ...linha, altura };
+  });
+
+  const alturaContent =
+    linhasComAltura.reduce((acc, l) => acc + l.altura, 0) +
+    espacamentoLinha * Math.max(linhasComAltura.length - 1, 0);
+  const blockHeight = Math.max(alturaContent + padding * 2, logoSize + padding * 2);
 
   // Caixa sutil
   doc.save();
@@ -155,41 +170,27 @@ export function drawEntidadeInfoBlock(doc, info, opts = {}) {
     .fillAndStroke();
   doc.restore();
 
-  let cursorX = x + padding;
-
-  // Logo do cliente à esquerda
+  // Logo do cliente à esquerda (centralizado verticalmente)
   if (info.logoBuffer) {
     try {
       const logoY = y + (blockHeight - logoSize) / 2;
-      doc.image(info.logoBuffer, cursorX, logoY, { fit: [logoSize, logoSize] });
-      cursorX += logoSize + padding;
+      doc.image(info.logoBuffer, x + padding, logoY, { fit: [logoSize, logoSize] });
     } catch (err) {
       console.warn('[PDF_ENTIDADE_BLOCK] Falha ao renderizar logo:', err.message);
     }
   }
 
-  // Texto à direita do logo
-  const textoWidth = width - (cursorX - x) - padding;
-  let textoY = y + padding;
+  // Texto à direita do logo (centralizado verticalmente no bloco)
+  let textoY = y + (blockHeight - alturaContent) / 2;
 
-  for (const linha of linhas) {
+  for (const linha of linhasComAltura) {
     if (linha.tipo === 'titulo') {
       doc.font('Helvetica-Bold').fontSize(10.5).fillColor('#0f172a');
-      doc.text(linha.texto, cursorX, textoY, {
-        width: textoWidth,
-        lineBreak: false,
-        ellipsis: true,
-      });
-      textoY += alturaTitulo;
     } else {
       doc.font('Helvetica').fontSize(8).fillColor('#475569');
-      doc.text(linha.texto, cursorX, textoY, {
-        width: textoWidth,
-        lineBreak: false,
-        ellipsis: true,
-      });
-      textoY += alturaDetalhe;
     }
+    doc.text(linha.texto, cursorX, textoY, { width: textoWidth });
+    textoY += linha.altura + espacamentoLinha;
   }
 
   doc.y = y + blockHeight + 10;
