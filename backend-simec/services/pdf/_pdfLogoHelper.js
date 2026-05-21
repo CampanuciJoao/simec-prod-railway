@@ -5,8 +5,11 @@
 //          entidade exibida no bloco "Dados da Empresa":
 //            - Se unidadeId: usa dados da Unidade (CNPJ, endereço,
 //              cidade/UF) + logo do tenant da unidade.
-//            - Se só tenantId: fallback para Tenant.nome + contatos.
+//            - Se só tenantId: fallback para Tenant.nome + logo.
 //            - Tenant System: null (sem identidade exibível).
+//          Contatos do Tenant (contatoNome/Email/Telefone) NAO entram
+//          no bloco — sao dados do contrato SaaS, nao identidade do
+//          cliente em documento operacional.
 //   drawEntidadeInfoBlock(doc, info, opts) — desenha caixa com logo
 //          do cliente + linhas de informação. Padrão IBM Maximo:
 //          identidade fiscal real do site, não da conta SaaS.
@@ -58,15 +61,7 @@ export async function prepararEntidadeInfo({ unidadeId, tenantId } = {}) {
       const unidade = await prisma.unidade.findUnique({
         where: { id: unidadeId },
         include: {
-          tenant: {
-            select: {
-              nome: true,
-              kind: true,
-              contatoNome: true,
-              contatoEmail: true,
-              contatoTelefone: true,
-            },
-          },
+          tenant: { select: { kind: true } },
         },
       });
 
@@ -79,9 +74,6 @@ export async function prepararEntidadeInfo({ unidadeId, tenantId } = {}) {
           cnpj: formatarCnpj(unidade.cnpj),
           enderecoLinha1: endereco.linha1 || null,
           enderecoLinha2: endereco.linha2 || null,
-          contatoNome: unidade.tenant.contatoNome,
-          contatoEmail: unidade.tenant.contatoEmail,
-          contatoTelefone: unidade.tenant.contatoTelefone,
           logoBuffer: logoTenant?.buffer || null,
         };
       }
@@ -91,13 +83,7 @@ export async function prepararEntidadeInfo({ unidadeId, tenantId } = {}) {
     if (tenantId) {
       const tenant = await prisma.tenant.findUnique({
         where: { id: tenantId },
-        select: {
-          nome: true,
-          kind: true,
-          contatoNome: true,
-          contatoEmail: true,
-          contatoTelefone: true,
-        },
+        select: { nome: true, kind: true },
       });
       if (!tenant || tenant.kind === 'SYSTEM') return null;
       const logoTenant = await obterLogoBuffer(tenantId);
@@ -107,9 +93,6 @@ export async function prepararEntidadeInfo({ unidadeId, tenantId } = {}) {
         cnpj: null,
         enderecoLinha1: null,
         enderecoLinha2: null,
-        contatoNome: tenant.contatoNome,
-        contatoEmail: tenant.contatoEmail,
-        contatoTelefone: tenant.contatoTelefone,
         logoBuffer: logoTenant?.buffer || null,
       };
     }
@@ -125,7 +108,7 @@ export async function prepararEntidadeInfo({ unidadeId, tenantId } = {}) {
 // Layout (até 3 linhas de texto + logo à esquerda):
 //   Linha 1: Nome Principal (bold)
 //   Linha 2: CNPJ · Endereço, número
-//   Linha 3: Bairro · Cidade/UF · CEP · Contato/email/telefone
+//   Linha 3: Bairro · Cidade/UF · CEP
 //
 // Cada linha sem conteúdo é omitida e o bloco se encolhe.
 export function drawEntidadeInfoBlock(doc, info, opts = {}) {
@@ -148,15 +131,9 @@ export function drawEntidadeInfoBlock(doc, info, opts = {}) {
     linhas.push({ tipo: 'detalhe', texto: linha2Items.join(' · ') });
   }
 
-  // Linha 3: cidade/UF/CEP + contatos
-  const linha3Items = [
-    info.enderecoLinha2,
-    info.contatoNome ? `Contato: ${info.contatoNome}` : null,
-    info.contatoEmail,
-    info.contatoTelefone,
-  ].filter(Boolean);
-  if (linha3Items.length) {
-    linhas.push({ tipo: 'detalhe', texto: linha3Items.join(' · ') });
+  // Linha 3: cidade/UF/CEP
+  if (info.enderecoLinha2) {
+    linhas.push({ tipo: 'detalhe', texto: info.enderecoLinha2 });
   }
 
   const padding = 8;
