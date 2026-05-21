@@ -11,6 +11,16 @@ const INITIAL_DASHBOARD_STATE = {
   manutencoesPorTipo: [],
 };
 
+// enum -> rotulo formal em PT-BR. `key` (enum bruto) preserva semantica
+// para cor e filtro de navegacao; `name` e o texto exibido na legenda.
+const STATUS_EQUIPAMENTO_LABELS = {
+  Operante: 'Operante',
+  Inoperante: 'Inoperante',
+  UsoLimitado: 'Uso limitado',
+  EmManutencao: 'Em manutenção',
+  Desativado: 'Desativado',
+};
+
 function normalizarStatusEquipamentos(statusEquipamentos) {
   const labels = statusEquipamentos?.labels || [];
   const values = statusEquipamentos?.data || [];
@@ -19,10 +29,14 @@ function normalizarStatusEquipamentos(statusEquipamentos) {
     return [];
   }
 
-  return labels.map((label, index) => ({
-    name: String(label),
-    value: Number(values[index] ?? 0),
-  }));
+  return labels.map((label, index) => {
+    const key = String(label);
+    return {
+      key,
+      name: STATUS_EQUIPAMENTO_LABELS[key] || key,
+      value: Number(values[index] ?? 0),
+    };
+  });
 }
 
 function normalizarManutencoesPorTipo(manutencoesPorTipoMes) {
@@ -59,11 +73,11 @@ export function adaptDashboardResponse(response) {
   );
 
   const ativos =
-    statusEquipamentos.find((item) => item.name === 'Operante')?.value || 0;
+    statusEquipamentos.find((item) => item.key === 'Operante')?.value || 0;
 
   const inativos =
-    (statusEquipamentos.find((item) => item.name === 'Inoperante')?.value || 0) +
-    (statusEquipamentos.find((item) => item.name === 'UsoLimitado')?.value || 0);
+    (statusEquipamentos.find((item) => item.key === 'Inoperante')?.value || 0) +
+    (statusEquipamentos.find((item) => item.key === 'UsoLimitado')?.value || 0);
 
   return {
     totalEquipamentos: Number(response?.equipamentosCount ?? 0),

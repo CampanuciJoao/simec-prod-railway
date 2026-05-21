@@ -87,6 +87,10 @@ function normalizarDados(input) {
   const itens = input
     .filter((item) => item && typeof item === 'object')
     .map((item) => ({
+      // key (enum bruto) e opcional — usado para cor/filtro quando o name
+      // foi traduzido para PT-BR. Fallback para name preserva consumidores
+      // antigos que so passam {name, value}.
+      key: item.key ? String(item.key).trim() : null,
       name: String(item.name || '').trim(),
       value: Number(item.value || 0),
     }))
@@ -96,8 +100,9 @@ function normalizarDados(input) {
 
   return {
     labels: itens.map((i) => i.name),
+    keys: itens.map((i) => i.key || i.name),
     values: itens.map((i) => i.value),
-    colors: itens.map((i) => getStatusColor(i.name)),
+    colors: itens.map((i) => getStatusColor(i.key || i.name)),
   };
 }
 
@@ -206,8 +211,10 @@ function DonutChart({ data = [], emptyMessage = 'Sem dados válidos para o gráf
     ? (event, elements) => {
         if (!elements.length) return;
         const index = elements[0].index;
-        const label = chartData?.labels?.[index];
-        if (label) onClickSegment(label);
+        // Prefere o enum bruto (key) para o filtro de navegação. Cai
+        // no label exibido se o consumidor não tiver passado key.
+        const segmento = normalized?.keys?.[index] || chartData?.labels?.[index];
+        if (segmento) onClickSegment(segmento);
       }
     : undefined;
 
