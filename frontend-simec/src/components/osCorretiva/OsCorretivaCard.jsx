@@ -122,7 +122,7 @@ function OsCorretivaCard({ os, isAdmin, onDelete }) {
             <InfoCard icon={faMicrochip} label="Equipamento" value={os.equipamento?.apelido || os.equipamento?.modelo || '---'} />
             <InfoCard icon={faHospital} label="Unidade" value={os.equipamento?.unidade?.nomeSistema || '---'} />
             <InfoCard icon={faUser} label="Solicitante" value={os.solicitante || '---'} />
-            <InfoCard icon={faClock} label="Abertura" value={formatarDataHora(os.dataHoraAbertura)} />
+            <InfoCard icon={faClock} label="Abertura" value={formatarDataHora(os.dataHoraInicioEvento || os.dataHoraAbertura)} />
           </div>
 
           {os.ultimaVisita && (
