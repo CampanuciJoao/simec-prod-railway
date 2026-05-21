@@ -107,10 +107,10 @@ function EquipamentoForm({
       >
         <ResponsiveGrid preset="form">
           <Input
-            label="Tag"
+            label="Número de série"
             value={formData.tag}
             onChange={(e) => handleChange('tag', e.target.value)}
-            placeholder="Ex.: RX-1024"
+            placeholder="Ex.: MRR11625"
             required
           />
 

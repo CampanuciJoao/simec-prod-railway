@@ -69,7 +69,7 @@ function TabVisaoGeral({ equipamento, editHref }) {
             />
             <InfoCard
               icon={faMicrochip}
-              label="Tag"
+              label="Número de série"
               value={equipamento.tag || 'N/A'}
             />
             <InfoCard

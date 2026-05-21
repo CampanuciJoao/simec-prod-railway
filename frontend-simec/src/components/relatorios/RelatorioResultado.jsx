@@ -62,7 +62,7 @@ function RelatorioResultado({ resultado }) {
   if (tipoRelatorio === 'inventarioEquipamentos') {
     const headers = [
       { key: 'modelo', label: 'Modelo', align: 'left' },
-      { key: 'tag', label: 'N Serie / Tag', align: 'center' },
+      { key: 'tag', label: 'Número de série', align: 'center' },
       { key: 'fabricante', label: 'Fabricante', align: 'center' },
       { key: 'anvisa', label: 'Registro ANVISA', align: 'center' },
       { key: 'status', label: 'Status', align: 'center' },

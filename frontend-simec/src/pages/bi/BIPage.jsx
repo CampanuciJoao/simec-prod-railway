@@ -383,7 +383,7 @@ function BIPage() {
                           </colgroup>
                           <thead>
                             <tr style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                              {['Equipamento', 'Tag', 'Exames', 'Pacientes', 'Média/Dia', 'Uptime'].map((h, i) => (
+                              {['Equipamento', 'Número de série', 'Exames', 'Pacientes', 'Média/Dia', 'Uptime'].map((h, i) => (
                                 <th
                                   key={h}
                                   className="py-2 px-2"
@@ -418,7 +418,7 @@ function BIPage() {
                                     {eq.nome}
                                   </td>
                                   <td className="py-2 px-2 truncate"
-                                    data-label="Tag"
+                                    data-label="Número de série"
                                     style={{
                                       fontFamily: 'var(--font-mono)',
                                       fontSize: 12,

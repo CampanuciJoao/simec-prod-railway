@@ -137,7 +137,7 @@ export function useEquipamentoForm({ initialData, isEditing }) {
       !formData.tipo ||
       !formData.unidadeId
     ) {
-      return 'Tag, modelo, tipo e unidade são obrigatórios.';
+      return 'Número de série, modelo, tipo e unidade são obrigatórios.';
     }
 
     if (

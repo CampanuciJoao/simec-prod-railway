@@ -76,7 +76,7 @@ function DetalhesEquipamentoPage() {
       <div className="space-y-6">
         <PageHeader
           title={`Detalhes do Equipamento: ${equipamento.modelo}`}
-          subtitle={`Tag: ${equipamento.tag || 'N/A'}`}
+          subtitle={`Nº série: ${equipamento.tag || 'N/A'}`}
           icon={faMicrochip}
           actions={backAction}
         />

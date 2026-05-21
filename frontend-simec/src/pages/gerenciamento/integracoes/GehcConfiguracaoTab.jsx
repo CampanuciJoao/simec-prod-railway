@@ -8,7 +8,6 @@ import {
   faCircleExclamation,
   faCircleXmark,
   faHeartPulse,
-  faKey,
   faLink,
   faLinkSlash,
   faPenToSquare,
@@ -363,7 +362,7 @@ function ListaSemVinculo({ lista, vincularState, onVincular }) {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{eq.apelido || eq.tag}</p>
-                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Tag: {eq.tag} · {eq.modelo || 'modelo não informado'}</p>
+                <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Nº série: {eq.tag} · {eq.modelo || 'modelo não informado'}</p>
               </div>
               <FontAwesomeIcon icon={faLinkSlash} style={{ color: 'var(--color-warning)' }} />
             </div>

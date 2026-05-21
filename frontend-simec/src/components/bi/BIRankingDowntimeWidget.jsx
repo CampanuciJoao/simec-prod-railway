@@ -38,7 +38,7 @@ function BIRankingDowntimeWidget({ items, expanded = false }) {
               style={{ color: 'var(--text-muted)' }}
             >
               <th className="px-4 py-3">Equipamento</th>
-              <th className="px-4 py-3">Tag</th>
+              <th className="px-4 py-3">Número de série</th>
               <th className="px-4 py-3">Unidade</th>
               <th className="px-4 py-3 text-center">Tempo parado</th>
             </tr>
