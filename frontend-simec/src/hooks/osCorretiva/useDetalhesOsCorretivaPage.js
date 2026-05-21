@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import {
   getOsCorretivaById,
   adicionarNota,
+  editarNotaOsCorretiva,
   agendarVisita,
   registrarResultadoVisita,
   concluirOsCorretiva,
@@ -22,6 +23,7 @@ export function useDetalhesOsCorretivaPage(osId) {
   const [fieldErrors, setFieldErrors] = useState({});
 
   const notaModal = useModal();
+  const editarNotaModal = useModal();
   const visitaModal = useModal();
   const resultadoModal = useModal();
   const concluirModal = useModal();
@@ -64,6 +66,25 @@ export function useDetalhesOsCorretivaPage(osId) {
       setSubmitting(false);
     }
   }, [osId, addToast, notaModal, fetchOs]);
+
+  const handleEditarNota = useCallback(async (dados) => {
+    const notaId = editarNotaModal.modalData?.id;
+    if (!notaId) return;
+    setSubmitting(true);
+    setFieldErrors({});
+    try {
+      await editarNotaOsCorretiva(osId, notaId, dados);
+      addToast('Nota atualizada com sucesso.', 'success');
+      editarNotaModal.closeModal();
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao editar nota.';
+      setFieldErrors(err?.response?.data?.fieldErrors || {});
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, editarNotaModal, fetchOs]);
 
   const handleAgendarVisita = useCallback(async (dados) => {
     setSubmitting(true);
@@ -171,12 +192,14 @@ export function useDetalhesOsCorretivaPage(osId) {
     error,
     fieldErrors,
     notaModal,
+    editarNotaModal,
     visitaModal,
     resultadoModal,
     concluirModal,
     cancelarModal,
     moverModal,
     handleAdicionarNota,
+    handleEditarNota,
     handleAgendarVisita,
     handleRegistrarResultado,
     handleConcluirOs,

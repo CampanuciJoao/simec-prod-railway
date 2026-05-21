@@ -106,6 +106,7 @@ function buildTimeline(os) {
   for (const nota of os.notas || []) {
     eventos.push({
       tipo: 'nota',
+      id: nota.id,
       dataHora: nota.data,
       titulo: `Nota de andamento — ${nota.tecnicoNome || nota.autor?.nome || 'Técnico'}`,
       descricao: nota.nota,
@@ -113,6 +114,10 @@ function buildTimeline(os) {
         tecnicoNome: nota.tecnicoNome || nota.autor?.nome,
         registradoPor: nota.autor?.nome || null,
       },
+      // Notas são editáveis por admin (texto + data). Demais eventos
+      // (abertura, conclusão, visita) são derivados de campos
+      // estruturados da OS — não editáveis pela timeline.
+      editavel: true,
     });
   }
 

@@ -61,6 +61,36 @@ export function validarNota(payload) {
   return { ok: false, message: 'Dados inválidos para nota de andamento.', fieldErrors };
 }
 
+// Edição admin de nota: campos opcionais — pode alterar só o texto, só
+// a data, ou ambos. Ao menos um deve vir. data deve ser ISO válida.
+export const editarNotaAndamentoSchema = z
+  .object({
+    nota: z.string().min(1).max(2000).optional(),
+    data: z
+      .string()
+      .datetime({ offset: true, message: 'Data inválida (formato ISO esperado).' })
+      .optional(),
+  })
+  .refine((d) => d.nota !== undefined || d.data !== undefined, {
+    message: 'Informe ao menos um campo para editar (nota ou data).',
+  });
+
+export function validarEdicaoNota(payload) {
+  const result = editarNotaAndamentoSchema.safeParse(payload);
+  if (result.success) return { ok: true, data: result.data };
+
+  const fieldErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (key) fieldErrors[key] = issue.message;
+  }
+  return {
+    ok: false,
+    message: 'Dados inválidos para edição da nota.',
+    fieldErrors,
+  };
+}
+
 export const agendarVisitaSchema = z.object({
   prestadorNome: z.string().min(1, 'Nome do prestador é obrigatório.').max(200),
   dataHoraInicioPrevista: z.string().datetime({ message: 'Data/hora de início inválida.' }),
