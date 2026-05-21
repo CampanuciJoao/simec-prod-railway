@@ -2,8 +2,8 @@ import PDFDocument from 'pdfkit';
 import prisma from '../prismaService.js';
 import {
   resolverLogoSimec,
-  prepararTenantInfo,
-  drawTenantInfoBlock,
+  prepararEntidadeInfo,
+  drawEntidadeInfoBlock,
 } from './_pdfLogoHelper.js';
 
 const LOGO_SIMEC = resolverLogoSimec();
@@ -214,7 +214,10 @@ export async function obterDadosPdfOsCorretiva({ tenantId, osId }) {
 
 export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
   const { locale = 'pt-BR', timeZone = 'UTC' } = options;
-  const tenantInfo = await prepararTenantInfo(os?.tenantId);
+  const tenantInfo = await prepararEntidadeInfo({
+    unidadeId: os?.equipamento?.unidadeId || os?.equipamento?.unidade?.id,
+    tenantId: os?.tenantId,
+  });
 
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -232,7 +235,7 @@ export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
     drawHeader(doc, os, { locale, timeZone });
 
     // Bloco "Dados da Empresa" (cliente) só na primeira página.
-    drawTenantInfoBlock(doc, tenantInfo);
+    drawEntidadeInfoBlock(doc, tenantInfo);
 
     // ── Dados do equipamento
     sectionTitle(doc, 'DADOS DO EQUIPAMENTO');

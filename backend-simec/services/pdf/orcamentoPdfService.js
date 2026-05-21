@@ -2,8 +2,8 @@ import PDFDocument from 'pdfkit';
 import prisma from '../prismaService.js';
 import {
   resolverLogoSimec,
-  prepararTenantInfo,
-  drawTenantInfoBlock,
+  prepararEntidadeInfo,
+  drawEntidadeInfoBlock,
 } from './_pdfLogoHelper.js';
 
 const LOGO_SIMEC = resolverLogoSimec();
@@ -117,7 +117,10 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
 }
 
 export async function gerarPdfOrcamentoBuffer(orcamento) {
-  const tenantInfo = await prepararTenantInfo(orcamento?.tenantId);
+  const tenantInfo = await prepararEntidadeInfo({
+    unidadeId: orcamento?.unidadeId || orcamento?.unidade?.id,
+    tenantId: orcamento?.tenantId,
+  });
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 48, left: 36, right: 36 }, bufferPages: true });
     const chunks = [];
@@ -129,7 +132,7 @@ export async function gerarPdfOrcamentoBuffer(orcamento) {
     drawHeader(doc);
 
     // Bloco "Dados da Empresa" (cliente) só na primeira página.
-    drawTenantInfoBlock(doc, tenantInfo, { x: 36, width: doc.page.width - 72 });
+    drawEntidadeInfoBlock(doc, tenantInfo, { x: 36, width: doc.page.width - 72 });
 
     const marginX  = 36;
     const contentW = doc.page.width - marginX * 2;
