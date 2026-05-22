@@ -53,6 +53,14 @@ function corCategoria(cat) {
   return 'purple';
 }
 
+// Normaliza woNumber pra "WO-NNNN" — tolera dados legados que vieram com
+// prefixo no banco e novos que vem apenas com o numero. Evita "WO-WO-".
+function formatarWO(wo) {
+  if (!wo) return '';
+  const num = String(wo).replace(/^WO[-\s]?/i, '');
+  return `WO-${num}`;
+}
+
 function ExtracoesRecentesSection() {
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -154,7 +162,7 @@ function ExtracoesRecentesSection() {
                         {e.identificadorPortal || e.gehcServiceId || '—'}
                       </div>
                       {e.woNumber && (
-                        <div style={{ color: 'var(--text-muted)' }}>WO-{e.woNumber}</div>
+                        <div style={{ color: 'var(--text-muted)' }}>{formatarWO(e.woNumber)}</div>
                       )}
                       {e.relacionadas?.length > 0 && (
                         <div
