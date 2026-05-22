@@ -14,6 +14,8 @@ const LABEL_CATEGORIA_CURTO = {
   // Corretiva
   infra_chiller_cliente: 'Chiller predial',
   cryo_compressor: 'Cryo compressor',
+  cryo_adsorber: 'Cryo · Adsorber',
+  cryo_coldhead: 'Cryo · Coldhead',
   magneto_helio: 'Magneto / hélio',
   bobina: 'Bobina',
   gradiente: 'Gradiente',

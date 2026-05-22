@@ -21,22 +21,22 @@ import {
   incrementarUsoLicoes,
 } from '../ai/categoriaFeedbackService.js';
 
-// v6: agregacao de PDFs irmaos do mesmo case GE. Quando um Case tem
-// multiplos PDFs (diferentes WOs — engenheiro remoto + engenheiro de
-// campo), o LLM agora ve o contexto dos irmaos no prompt. Resolve o
-// caso comum onde o PDF do engenheiro remoto eh genericazo ("verificar
-// no local") e so o PDF do engenheiro de campo tem o diagnostico real.
-// Antes ambos eram categorizados independentes, deixando o primeiro
-// como 'desconhecido' mesmo o segundo tendo a resposta.
+// v7: + cryo_adsorber e cryo_coldhead na taxonomia corretiva. GE
+// classifica trocas programadas por horas de uso (adsorber 30.000h,
+// coldhead 32-50k h) como "Corrective Repair" (SE03) — mesmo sendo
+// manutencao planejada. Sem essas categorias, casos com peça cryo
+// trocada caiam em 'desconhecido' ou 'cryo_compressor' (errado).
 //
-// v5: + contaminacao_metal, artefato_imagem, interferencia_rf,
-// uso_operador na taxonomia corretiva.
-const LLM_EXTRACTOR_VERSION = 6;
+// v6: agregacao de PDFs irmaos do mesmo case GE.
+// v5: + contaminacao_metal, artefato_imagem, interferencia_rf, uso_operador.
+const LLM_EXTRACTOR_VERSION = 7;
 
 // Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
 const TAXONOMIA_CAUSAS_CORRETIVA = [
   'infra_chiller_cliente',  // chiller predial do hospital (problema do cliente, nao do magneto)
-  'cryo_compressor',         // compressor do criostato (LCC, helium compressor)
+  'cryo_compressor',         // compressor do criostato (LCC, helium compressor) — modo de FALHA real
+  'cryo_adsorber',           // troca programada do adsorber (typ. 30.000h) — manutencao classificada como SE03
+  'cryo_coldhead',           // troca programada do coldhead (typ. 32-50k h) — manutencao classificada como SE03
   'magneto_helio',           // nivel/pressao de helio fora de spec
   'bobina',                  // bobinas (corpo, cabeca, etc)
   'gradiente',               // amplificador/sistema de gradiente
@@ -180,7 +180,12 @@ function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerfor
 - "inspecao visual" sem intervencao: pm_inspecao_visual`
     : `Heuristicas PARA CORRETIVA (causa-raiz — escolha pela CAUSA, nao pelo efeito):
 - "chiller" ou "chiller externo" ou "chiller predial" + cliente: infra_chiller_cliente
-- "compressor off" + cryo/criogenia: cryo_compressor
+- "compressor off" + cryo/criogenia: cryo_compressor (modo de FALHA real)
+- "adsorber" + horas de uso (ex: "30.000hrs", "30k horas") + peca trocada: cryo_adsorber
+  (NAO eh falha real — troca programada por vida util. GE classifica como
+  SE03 mas o conteudo eh PM. PREFERIR este sobre 'desconhecido'.)
+- "coldhead" / "cold head" + horas de uso + peca trocada: cryo_coldhead
+  (idem cryo_adsorber — troca programada do coldhead)
 - "nivel de helio" ou "quench" sem causa externa: magneto_helio
 - "mesa", "correia", "ruido ao deslocar": mesa_mecanica
 - "bobina" (cabeca, corpo, joelho) — sem cabo solto: bobina

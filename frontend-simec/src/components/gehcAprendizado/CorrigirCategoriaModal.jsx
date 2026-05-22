@@ -25,6 +25,8 @@ const LABELS_CATEGORIA = {
   // Corretiva
   infra_chiller_cliente: 'Chiller predial (cliente)',
   cryo_compressor: 'Compressor do criostato',
+  cryo_adsorber: 'Adsorber (troca programada)',
+  cryo_coldhead: 'Coldhead (troca programada)',
   magneto_helio: 'Magneto / hélio',
   bobina: 'Bobina',
   gradiente: 'Gradiente',
