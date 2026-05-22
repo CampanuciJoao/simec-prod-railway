@@ -25,7 +25,18 @@
 import pdfParse from 'pdf-parse';
 import crypto from 'crypto';
 
-const EXTRACTOR_VERSION = 1;
+// v2: NEXT_LABEL_LOOKAHEAD expandido pra cobrir o formato ANTIGO da GE
+// (com "Verificacao / Testes Realizados", "Horas", "Pecas", "Despesas",
+// "Ferramenta", "Nro de Serie", footer "Relatorio de servico", "Caso N
+// Page X of Y"). Antes o regex de "Causa do problema" nao tinha onde
+// parar nesses PDFs e sugava o resto do documento, gerando rootCauseRaw
+// gigante e ilegivel. Tambem afrouxa o boundary `\n\s*` para `\s*` —
+// alguns PDFs vem comprimidos em poucas linhas e o newline nunca aparece.
+const EXTRACTOR_VERSION = 2;
+
+// Falha-segura: nenhum campo deveria passar disso em PDF normal. Trunca
+// silenciosamente quando passa — sinal de regex runaway.
+const TAMANHO_MAXIMO_CAMPO = 4000;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,15 +65,88 @@ export function parseDateBR(s) {
 // ─── Regex builder ────────────────────────────────────────────────────────────
 
 // Captura tudo entre o rotulo e o proximo rotulo conhecido (lookahead).
-// Inclui o seguinte conjunto de rotulos como possiveis terminadores para
-// nao "comer" o texto da proxima secao.
-const NEXT_LABEL_LOOKAHEAD = `(?=\\n\\s*(?:N[uú]mero do Caso|Tipo do Servi[cç]o|Data de abertura|Status do Equip|CLIENTE|Nome do Site|INFORMA[CÇ][AÃ]O|System ID|S[eé]rie|S[eé]rial|Modalidade|UDI|Lot number|Sala\\/|SEGURAN[CÇ]A|Engenheiro|Problema descrito|Problema analisado|A[cç][oõ]es tomadas|Causa do problema|Testes realizados|HORAS DE TRABALHO|Tipo de Servi[cç]o|WO-\\d|$)|$)`;
+// Cobre 2 formatos da GE em produção:
+//
+//   Formato NOVO (relatorios pos-2025):
+//     Causa do problema, Testes realizados, HORAS DE TRABALHO,
+//     Tipo de Servico (header da tabela)
+//
+//   Formato ANTIGO (relatorios pre-2025 e alguns SE03 esporadicos):
+//     Verificacao / Testes Realizados, Horas (header da tabela),
+//     Pecas, Despesas, Ferramenta, Nro de Serie, footer
+//     "Relatorio de servico Caso NNNNN Page X of Y", "Assinatura do Tecnico"
+//
+// Boundary afrouxado de `\n\s*` para `\s*` — alguns PDFs vem com texto
+// comprimido em poucas linhas e o newline nunca aparece, fazendo a regex
+// estourar ate o final do documento.
+//
+// Dois tipos de tokens, pra evitar falso match em texto livre:
+//   1. LABELS_COM_DOIS_PONTOS: exigem `:` apos o rotulo (ex: "Causa do
+//      problema:"). Sao os campos estruturados do relatorio.
+//   2. SECTION_HEADERS: cabecalhos de secao/tabela que aparecem isolados,
+//      sem `:`. Usam \b (word boundary) para nao casar em meio de palavra
+//      (ex: "informacao" no texto livre nao deve casar com "INFORMACAO").
+
+const LABELS_COM_DOIS_PONTOS = [
+  // Cabecalho
+  'N[uú]mero do Caso', 'Tipo do Servi[cç]o', 'Data de abertura', 'Status do Equip(?:a)?mento',
+  'Nome do Site', 'System ID', 'S[eé]rie', 'S[eé]rial', 'Modalidade', 'UDI',
+  'Lot number', 'Sala\\/ ?Departamento', 'Engenheiro', 'Nome do Contato',
+  'Endere[cç]o', 'Nome do Cliente',
+  // Formato NOVO
+  'Problema descrito pelo Cliente', 'Problema analisado pelo engenheiro',
+  'A[cç][oõ]es tomadas', 'Causa do problema', 'Testes realizados',
+  // Formato ANTIGO
+  'Problema Relatado', 'Problema Identificado', 'A[cç][aã]o realizada',
+  'Causa do Problema',
+  'Verifica[cç][aã]o\\s*\\/?\\s*Testes Realizados',
+  'Nome T[eé]cnico', 'Data\\/Hora',
+];
+
+// Section headers EXIGEM contexto especifico (palavras posteriores ou
+// formato distintivo) para nao casar em texto livre. Antes "CLIENTE" e
+// "Horas" sozinhos casavam com "cliente." e "horas" em texto natural por
+// causa do flag /i, truncando capturas no meio.
+const SECTION_HEADERS = [
+  // Cabeçalhos de seção do formato GE (sempre seguidos do nome completo)
+  '\\bINFORMA[CÇ][AÃ]O DO EQUIPAMENTO\\b',
+  '\\bSEGURAN[CÇ]A DO PACIENTE\\b',
+  '\\bHORAS DE TRABALHO\\b',
+  '\\bDADOS DO EQUIPAMENTO\\b',
+  '\\bDetalhes do (?:Cliente|Equipamento)\\b',
+  // Headers de tabela formato antigo — exigem coluna seguinte
+  '\\bHoras\\s+TIPO\\b',
+  '\\bPe[cç]as\\s*\\n', '\\bDespesas\\s*\\n', '\\bFerramenta\\s*\\n',
+  '\\bNro de S[eé]rie\\b',
+  // Footer / paginação
+  '\\bRelat[oó]rio de servi[cç]o\\b',
+  '\\bCaso\\s+\\d{6,}\\s+Page\\b', // "Caso 16802404 Page 1 of 2" no rodape
+  '\\bPage\\s+\\d+\\s+of\\s+\\d+\\b',
+  '\\bAssinatura do (?:T[eé]cnico|Cliente)\\b',
+  // Bloco WO numerado (WO-NNNNNNNN)
+  '\\bWO[-\\s]?\\d{6,}\\b',
+];
+
+const NEXT_LABEL_LOOKAHEAD = `(?=\\s*(?:` +
+  // Labels com dois pontos: exigem `:` ou similar logo apos
+  LABELS_COM_DOIS_PONTOS.map((l) => `${l}\\s*:`).join('|') +
+  '|' +
+  // Section headers: ja tem \b inline
+  SECTION_HEADERS.join('|') +
+  `)|$)`;
 
 function captureField(label, text) {
   // Permite acentos opcionais e pequenas variantes de encoding.
   const re = new RegExp(`${label}\\s*:?\\s*([\\s\\S]*?)${NEXT_LABEL_LOOKAHEAD}`, 'i');
   const m = text.match(re);
-  return m?.[1] || null;
+  if (!m) return null;
+  const valor = m[1] || '';
+  // Trunca defensivamente — se passou disso, eh sinal de regex runaway
+  // (provavelmente PDF com formato nao previsto). Melhor cortar do que
+  // entupir o LLM com lixo.
+  return valor.length > TAMANHO_MAXIMO_CAMPO
+    ? valor.slice(0, TAMANHO_MAXIMO_CAMPO)
+    : valor;
 }
 
 // ─── Extracao principal ───────────────────────────────────────────────────────
@@ -90,11 +174,28 @@ export async function extrairCamposDoPdf(pdfBuffer) {
   const systemId         = trim(captureField('System ID', text));
   const serialNumber     = trim(captureField('N[uú]mero do (?:S[eé]rial|Serial)', text));
   const engineerFullName = trim(captureField('Engenheiro', text));
-  const problemReported  = trimMulti(captureField('Problema descrito pelo Cliente', text));
-  const problemAnalyzed  = trimMulti(captureField('Problema analisado pelo engenheiro', text));
-  const actionsTaken     = trimMulti(captureField('A[cç][oõ]es tomadas', text));
-  const rootCauseRaw     = trim(captureField('Causa do problema', text));
-  const testsPerformed   = trimMulti(captureField('Testes realizados', text));
+  // Cada campo aceita label do formato NOVO ou do formato ANTIGO (pre-2025).
+  // Os fallbacks cobrem reports legados que ainda existem no backlog.
+  const problemReported  = trimMulti(
+    captureField('Problema descrito pelo Cliente', text) ||
+    captureField('Problema Relatado',              text)
+  );
+  const problemAnalyzed  = trimMulti(
+    captureField('Problema analisado pelo engenheiro', text) ||
+    captureField('Problema Identificado',              text)
+  );
+  const actionsTaken     = trimMulti(
+    captureField('A[cç][oõ]es tomadas', text) ||
+    captureField('A[cç][aã]o realizada', text)
+  );
+  const rootCauseRaw     = trim(
+    captureField('Causa do problema', text) ||
+    captureField('Causa do Problema', text)
+  );
+  const testsPerformed   = trimMulti(
+    captureField('Testes realizados',                       text) ||
+    captureField('Verifica[cç][aã]o\\s*\\/?\\s*Testes Realizados', text)
+  );
 
   // WO-XXXXX vem isolado, sem rotulo "WO:".
   const woMatch = text.match(/\bWO[-\s]?(\d{6,})\b/);
