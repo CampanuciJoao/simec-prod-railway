@@ -47,18 +47,62 @@ async function sincronizarOrdensServico(tenantId, equipamentoId, assetId, tokens
   if (!items?.length) return 0;
 
   let novas = 0;
+  let backfills = 0;
+
+  // Mapeia raw activities (resposta GE GraphQL) para forma compacta usada
+  // pelo LLM como contexto. Strip campos que nao servem pro raciocinio
+  // (timeSheets etc) — preserva so o que e narrativa tecnica.
+  function compactarActivities(activities) {
+    if (!Array.isArray(activities)) return null;
+    const compactas = activities
+      .filter((a) => a?.correctiveAction || a?.engineer)
+      .map((a) => ({
+        id:            a.id || null,
+        type:          a.activityType   || null,
+        status:        a.activityStatus || null,
+        startedAt:     a.startedDateTime || a.startedWorkingDateTime || null,
+        engineer:      a.engineer
+          ? `${a.engineer.engineerFirstName || ''} ${a.engineer.engineerLastName || ''}`.trim()
+          : null,
+        action:        a.correctiveAction || null,
+      }));
+    return compactas.length ? compactas : null;
+  }
 
   for (const os of items) {
     const serviceId = os.id ?? os.serviceTrackingNumber;
     if (!serviceId) continue;
 
-    const existe = await prisma.gehcOrdemServico.findUnique({ where: { gehcServiceId: String(serviceId) } });
-    if (existe) continue;
+    const activitiesJson = compactarActivities(os.activitiesV2);
 
-    const ultimaAtividade = os.activitiesV2?.at(-1);
-    const engenheiro = ultimaAtividade?.engineer
-      ? `${ultimaAtividade.engineer.engineerFirstName ?? ''} ${ultimaAtividade.engineer.engineerLastName ?? ''}`.trim()
+    // A query GraphQL ordena activities por startedDateTime DESC, entao
+    // [0] eh a MAIS RECENTE (e [-1] eh a mais antiga, bug anterior).
+    // A mais recente costuma ser a do field engineer com o diagnostico
+    // real — exatamente o que queremos no resumo.
+    const atividadeRecente = os.activitiesV2?.[0] || null;
+    const engenheiro = atividadeRecente?.engineer
+      ? `${atividadeRecente.engineer.engineerFirstName ?? ''} ${atividadeRecente.engineer.engineerLastName ?? ''}`.trim()
       : null;
+
+    const existe = await prisma.gehcOrdemServico.findUnique({ where: { gehcServiceId: String(serviceId) } });
+
+    if (existe) {
+      // Backfill: se a OS ja existe mas activitiesJson esta null (pre-feature),
+      // ou se engenheiro/action eram da activity errada (antiga vs nova),
+      // atualizar APENAS os campos do timeline — preserva resto intocado.
+      if (existe.activitiesJson === null && activitiesJson) {
+        await prisma.gehcOrdemServico.update({
+          where: { gehcServiceId: String(serviceId) },
+          data: {
+            activitiesJson,
+            engineerName:     engenheiro || existe.engineerName,
+            correctiveAction: atividadeRecente?.correctiveAction || existe.correctiveAction,
+          },
+        });
+        backfills++;
+      }
+      continue;
+    }
 
     await prisma.gehcOrdemServico.create({
       data: {
@@ -73,13 +117,17 @@ async function sincronizarOrdensServico(tenantId, equipamentoId, assetId, tokens
         requestedAt:        os.requestedDateTime  ? new Date(os.requestedDateTime) : null,
         scheduledDate:      os.scheduledDate      ? new Date(os.scheduledDate)     : null,
         engineerName:       engenheiro,
-        correctiveAction:   ultimaAtividade?.correctiveAction ?? null,
+        correctiveAction:   atividadeRecente?.correctiveAction ?? null,
+        activitiesJson,
         rawJson:            JSON.stringify(os),
       },
     });
     novas++;
   }
 
+  if (backfills > 0) {
+    console.log(`[GEHC_SYNC] Backfill: ${backfills} OS(s) ganharam activitiesJson agora.`);
+  }
   return novas;
 }
 
