@@ -22,6 +22,8 @@ const LABEL_CATEGORIA_CURTO = {
   software: 'Software',
   rede_dados: 'Rede / DICOM',
   infra_eletrica: 'Energia predial',
+  cabo_conector: 'Cabo / conector',
+  monitor_console: 'Monitor / console',
   desconhecido: 'Desconhecido',
   // PM
   pm_adsorber: 'PM · Adsorber',
