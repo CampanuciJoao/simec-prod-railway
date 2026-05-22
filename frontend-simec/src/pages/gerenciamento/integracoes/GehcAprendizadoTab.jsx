@@ -32,6 +32,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useGehcAprendizado } from '@/hooks/gerenciamento/useGehcAprendizado';
 import { urlPdfDocumento, getExtracoesDiagnostico, getCausaDetalhe } from '@/services/api/gehcAprendizadoApi';
+import ExtracoesRecentesSection from '@/components/gehcAprendizado/ExtracoesRecentesSection';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -1016,6 +1017,14 @@ function GehcAprendizadoTab() {
         description="Cobertura de PDF por equipamento + causas dominantes. Menor cobertura primeiro — esses são os que a IA tem menos contexto para aprender."
       >
         <TabelaEquipamentos equipamentos={equipamentos} />
+      </PageSection>
+
+      {/* Extrações recentes para revisão/correção */}
+      <PageSection
+        title="Extrações recentes (revisar e corrigir)"
+        description="Cada correção que você faz aqui alimenta o aprendizado coletivo da IA — anonimizado e cross-tenant. Foque nas de baixa confiança ou sem categoria clara."
+      >
+        <ExtracoesRecentesSection />
       </PageSection>
 
       {/* Atividade recente */}

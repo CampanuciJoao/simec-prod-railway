@@ -62,6 +62,7 @@ model Tenant {
   eventosEquipamento        EventoEquipamento[]
   eventoEmbeddings          EventoEquipamentoEmbedding[]
   iaInsights                IaInsight[]
+  iaCategoriaLabels         IaCategoriaLabel[]
   telegramNotificacoes      TelegramNotificacao[]
   telegramVinculacaoTokens  TelegramVinculacaoToken[]
   alertConfigs              AlertConfig[]
@@ -149,6 +150,7 @@ model Usuario {
   orcamentosComoAprovador  Orcamento[]            @relation("OrcamentoAprovador")
   aiPipelinesPausados      AiPipelineEstado[]     @relation("AiPipelinePausadoPor")
   aiPipelinesRetomados     AiPipelineEstado[]     @relation("AiPipelineRetomadoPor")
+  iaCategoriaLabelsAutor   IaCategoriaLabel[]     @relation("IaCategoriaLabelAutor")
   aceitesTermos            AceiteTermo[]
   testesQualidadeAutor     TesteQualidade[]       @relation("TesteQualidadeAutor")
   testesQualidadeDeletados TesteQualidade[]       @relation("TesteQualidadeDeletadoPor")
@@ -974,6 +976,7 @@ model GehcPdfExtraido {
 
   tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   pdfDocumento GehcPdfDocumento @relation(fields: [pdfDocumentoId], references: [id], onDelete: Cascade)
+  categoriaLabels IaCategoriaLabel[]
 
   @@index([tenantId, rootCauseCategory])
   @@index([tenantId, solucaoAplicada])
@@ -1185,6 +1188,66 @@ model AiPipelineEstado {
   retomadoPor Usuario? @relation("AiPipelineRetomadoPor", fields: [retomadoPorId], references: [id], onDelete: SetNull)
 
   @@map("ai_pipeline_estados")
+}
+
+// ─── Feedback supervisionado da IA — correções de categoria ─────────────────
+//
+// Dois modelos colaborando:
+//
+// IaCategoriaLabel (TENANT-SCOPED, privado):
+//   Auditoria de quem corrigiu o quê. Permite responder "este insight veio
+//   de uma OS que o admin Y do tenant X corrigiu em DD/MM". Não vaza entre
+//   tenants. Drill-down só no escopo do próprio cliente.
+//
+// IaCategoriaLicao (CROSS-TENANT, anonimizado):
+//   A lição técnica despersonalizada extraída de cada correção — "OS com
+//   expressão Y foi corrigida para categoria Z". SEM tenantId, SEM equipamentoId,
+//   SEM número de OS. É o ATIVO COLETIVO do produto: cliente novo entra e
+//   já se beneficia das correções dos clientes anteriores via few-shot no
+//   prompt do LLM, sem nunca ver dado deles.
+
+model IaCategoriaLabel {
+  id                   String @id @default(uuid())
+  tenantId             String
+  pdfExtraidoId        String @map("pdf_extraido_id")
+
+  categoriaOriginal    String? @map("categoria_original") // o que a IA disse (pode ser null se nunca classificou)
+  categoriaCorreta     String  @map("categoria_correta")  // o que o admin disse
+  comentario           String? @db.Text                   // motivo opcional informado pelo admin
+  autorId              String? @map("autor_id")
+  licaoId              String? @map("licao_id")           // FK para a lição cross-tenant derivada
+
+  createdAt            DateTime @default(now()) @map("created_at")
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pdfExtraido GehcPdfExtraido   @relation(fields: [pdfExtraidoId], references: [id], onDelete: Cascade)
+  autor       Usuario?          @relation("IaCategoriaLabelAutor", fields: [autorId], references: [id], onDelete: SetNull)
+  licao       IaCategoriaLicao? @relation(fields: [licaoId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([pdfExtraidoId])
+  @@map("ia_categoria_labels")
+}
+
+model IaCategoriaLicao {
+  id                String @id @default(uuid())
+  // SEM tenantId — esta tabela é cross-tenant por design.
+
+  textoDespersonalizado String @map("texto_despersonalizado") @db.Text
+  categoriaCorreta      String @map("categoria_correta")
+  serviceTypeCode       String? @map("service_type_code") // SE02 (PM) ou SE03/SE05 (corretiva)
+
+  ativa             Boolean  @default(true) // permite desativar lições problemáticas sem deletar
+  vezesAplicada     Int      @default(0) @map("vezes_aplicada") // contador de uso em few-shot
+
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  labels IaCategoriaLabel[]
+
+  @@index([ativa, categoriaCorreta])
+  @@index([ativa, serviceTypeCode])
+  @@map("ia_categoria_licoes")
 }
 
 // ─── GE Health Cloud — Utilização e Uptime mensais ───────────────────────────

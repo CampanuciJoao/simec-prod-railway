@@ -57,9 +57,25 @@ export async function extrairUmPdf({ pdfDocumento, buffer: bufferInline = null }
     return { ok: false, erro: `regex_failed: ${regex.erro}` };
   }
 
+  // 2.5. Le serviceTypeCode da OS pai — passamos pro LLM saber se eh PM
+  // (SE02) ou Corretiva. PMs usam taxonomia de componente serviceado, nao
+  // de causa-raiz. Query extra pequena vale o ganho de qualidade.
+  let serviceTypeCode = null;
+  try {
+    const osPai = await prisma.gehcPdfDocumento.findUnique({
+      where: { id: pdfDocumentoId },
+      select: { ordemServico: { select: { serviceTypeCode: true } } },
+    });
+    serviceTypeCode = osPai?.ordemServico?.serviceTypeCode || null;
+  } catch { /* sem serviceTypeCode segue tratando como corretiva */ }
+
   // 3. Camada 2: LLM. Falha aqui nao bloqueia — persiste o que tem da Camada 1
   //    com llmError preenchido para retry no proximo cron.
-  const llm = await extrairCamposViaLlm({ tenantId, regexCampos: regex.campos });
+  const llm = await extrairCamposViaLlm({
+    tenantId,
+    regexCampos: regex.campos,
+    serviceTypeCode,
+  });
 
   // 4. Persiste tudo.
   const dataBase = {

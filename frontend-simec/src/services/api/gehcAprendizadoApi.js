@@ -51,6 +51,18 @@ export const getAprendizadoAtividade = () =>
 export const getAprendizadoPipelines = () =>
   api.get('/gehc/aprendizado/pipelines').then((r) => r.data);
 
+// Feedback supervisionado de categoria
+export const getTaxonomias = () =>
+  api.get('/gehc/aprendizado/taxonomias').then((r) => r.data);
+
+export const getExtracoesRecentes = (limite = 30) =>
+  api.get('/gehc/aprendizado/extracoes-recentes', { params: { limite } }).then((r) => r.data);
+
+export const postCategoriaCorrecao = ({ pdfExtraidoId, categoriaCorreta, comentario }) =>
+  api.post('/gehc/aprendizado/categoria-correcao', {
+    pdfExtraidoId, categoriaCorreta, comentario,
+  }).then((r) => r.data);
+
 export const postPausarPipeline = (pipeline, { motivo, escopo = 'tenant' } = {}) =>
   api.post(`/gehc/aprendizado/pipelines/${pipeline}/pausar`, { motivo, escopo }).then((r) => r.data);
 

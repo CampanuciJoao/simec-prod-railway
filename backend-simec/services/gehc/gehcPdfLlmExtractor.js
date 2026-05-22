@@ -15,13 +15,18 @@
 import { generateJsonWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
 import { logLlmUsage } from '../ai/llmUsageLogger.js';
 import { AI_CONFIG } from '../ai/config.js';
+import {
+  buscarLicoesParaFewShot,
+  incrementarUsoLicoes,
+} from '../ai/categoriaFeedbackService.js';
 
-// Bumpamos para 2 ao adicionar solucaoAplicada — o orquestrador reprocessa
-// automaticamente extracoes com extractorVersion menor (ver
-// gehcPdfExtractionOrchestrator.js). Backlog antigo ganha o campo novo.
-const LLM_EXTRACTOR_VERSION = 2;
+// v3: taxonomia separada para PMs (preventivas). Antes PMs caiam em
+// 'desconhecido' porque a taxonomia anterior era so de modos de falha
+// (corretivas). Agora SE02 vira categoria por COMPONENTE serviceado.
+const LLM_EXTRACTOR_VERSION = 3;
 
-const TAXONOMIA_CAUSAS = [
+// Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
+const TAXONOMIA_CAUSAS_CORRETIVA = [
   'infra_chiller_cliente',  // chiller predial do hospital (problema do cliente, nao do magneto)
   'cryo_compressor',         // compressor do criostato (LCC, helium compressor)
   'magneto_helio',           // nivel/pressao de helio fora de spec
@@ -33,6 +38,31 @@ const TAXONOMIA_CAUSAS = [
   'rede_dados',              // conectividade, DICOM, fluxo de imagem
   'infra_eletrica',          // energia predial, no-break, aterramento
   'desconhecido',            // LLM nao conseguiu categorizar com confianca
+];
+
+// Taxonomia de manutencao preventiva — usada quando a OS eh PM (SE02).
+// Cada categoria representa um COMPONENTE/PROCEDIMENTO programado, nao
+// um modo de falha. Universal entre tenants — sao todos componentes
+// padronizados de equipamentos GE Healthcare.
+const TAXONOMIA_CAUSAS_PM = [
+  'pm_adsorber',           // troca de adsorber (tipico a cada 30.000h)
+  'pm_coldhead',           // coldhead / cabeca fria (tipico 32-50k h)
+  'pm_chiller_periodica',  // PM do chiller (limpeza, filtros, fluido)
+  'pm_compressor',         // PM do compressor de helio / cryo
+  'pm_calibracao_coil',    // calibracao/tune de bobinas
+  'pm_calibracao_geral',   // shimming, tuning, calibracao do magneto
+  'pm_inspecao_visual',    // inspecao sem intervencao
+  'pm_filtro',             // troca de filtros (agua, ar, oleo)
+  'pm_bateria',            // troca de bateria (MRU, UPS, etc)
+  'pm_software_update',    // atualizacao programada de firmware/software
+  'pm_limpeza_lubrif',     // limpeza e lubrificacao programadas
+  'pm_generica',           // PM identificada por serviceTypeCode mas sem componente claro
+];
+
+// Uniao para validacao — qualquer das duas taxonomias eh valida.
+const TAXONOMIA_CAUSAS = [
+  ...TAXONOMIA_CAUSAS_CORRETIVA,
+  ...TAXONOMIA_CAUSAS_PM,
 ];
 
 // Catalogo de solucoes aplicadas — base de aprendizado cross-tenant.
@@ -52,19 +82,64 @@ const TAXONOMIA_SOLUCOES = [
   'desconhecido',            // LLM nao conseguiu classificar a solucao
 ];
 
-function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed }) {
+// Formata as licoes cross-tenant como bloco de few-shot examples para o
+// prompt. Vazio se nao houver licoes — o prompt segue sem essa secao.
+function formatarFewShot(licoes) {
+  if (!licoes?.length) return '';
+  const exemplos = licoes
+    .map((l, idx) => `Exemplo ${idx + 1}:\n  Texto: ${l.textoDespersonalizado}\n  Categoria correta: ${l.categoriaCorreta}`)
+    .join('\n\n');
+  return `\n\nExemplos de correcoes anteriores (de admins humanos em casos similares — use como referencia, NAO copie literalmente):\n${exemplos}\n`;
+}
+
+function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode, fewShotBlock = '' }) {
+  // SE02 = manutencao preventiva. As outras (SE03, SE05) sao corretivas/
+  // emergenciais. O tipo determina QUAL taxonomia o LLM deve usar.
+  const ehPm = serviceTypeCode === 'SE02';
+  const taxonomiaAlvo = ehPm ? TAXONOMIA_CAUSAS_PM : TAXONOMIA_CAUSAS_CORRETIVA;
+
+  const contextoTipo = ehPm
+    ? 'Esta eh uma MANUTENCAO PREVENTIVA programada (GE serviceTypeCode=SE02). NAO existe modo de falha — a OS descreve uma intervencao programada por horas de uso. Classifique pelo COMPONENTE serviceado/trocado, nao por causa-raiz de falha.'
+    : `Esta eh uma OS CORRETIVA (GE serviceTypeCode=${serviceTypeCode || 'desconhecido'}). Classifique pelo modo de falha / causa-raiz do problema.`;
+
+  const heuristicas = ehPm
+    ? `Heuristicas PARA PM (componente serviceado):
+- "adsorber" trocado / "adsorber replacement": pm_adsorber
+- "coldhead" / "cold head" trocado / inspecionado: pm_coldhead
+- "chiller" PM / limpeza / filtro do chiller: pm_chiller_periodica
+- "compressor" PM / troca de compressor de helio: pm_compressor
+- "bobina" / "coil" calibrada / tunada / inspecionada: pm_calibracao_coil
+- "shimming", "tuning", "calibracao do magneto", "boresight": pm_calibracao_geral
+- "filtro" trocado (agua, ar, oleo): pm_filtro
+- "bateria", "MRU battery", "UPS battery" trocada: pm_bateria
+- "firmware update", "patch", "atualizacao de software": pm_software_update
+- "limpeza", "lubrificacao", "cleaning": pm_limpeza_lubrif
+- so "testes ok" / "liberado para uso" sem componente claro: pm_generica
+- "inspecao visual" sem intervencao: pm_inspecao_visual`
+    : `Heuristicas PARA CORRETIVA (causa-raiz):
+- "chiller" ou "chiller externo" ou "chiller predial" + cliente: infra_chiller_cliente
+- "compressor off" + cryo/criogenia: cryo_compressor
+- "nivel de helio" ou "quench" sem causa externa: magneto_helio
+- "mesa", "correia", "ruido ao deslocar": mesa_mecanica
+- "bobina" (cabeca, corpo, joelho): bobina
+- "gradiente", "GP/AGI", "amplificador de gradiente": gradiente
+- "rede", "DICOM", "fluxo de imagens": rede_dados
+- "software", "host", "MRU", "OS GE", "boot": software`;
+
   return `Voce e um especialista em manutencao de equipamentos de Ressonancia Magnetica GE Healthcare.
 Analise o relato de uma OS abaixo e responda APENAS com um JSON valido na estrutura especificada.
+
+CONTEXTO IMPORTANTE: ${contextoTipo}
 
 Texto da OS:
 - Causa do problema (raw): ${rootCauseRaw || '(vazio)'}
 - Problema analisado: ${(problemAnalyzed || '').slice(0, 1500)}
 - Acoes tomadas: ${(actionsTaken || '').slice(0, 1500)}
-- Testes realizados: ${(testsPerformed || '').slice(0, 800)}
+- Testes realizados: ${(testsPerformed || '').slice(0, 800)}${fewShotBlock}
 
 Responda apenas com este JSON, sem markdown, sem comentarios:
 {
-  "rootCauseCategory": "uma das: ${TAXONOMIA_CAUSAS.join(' | ')}",
+  "rootCauseCategory": "uma das: ${taxonomiaAlvo.join(' | ')}",
   "solucaoAplicada": "uma das: ${TAXONOMIA_SOLUCOES.join(' | ')}",
   "confianca": 0.0,
   "raciocinio": "uma frase curta explicando a categorizacao e a solucao",
@@ -79,21 +154,13 @@ Responda apenas com este JSON, sem markdown, sem comentarios:
 }
 
 Regras:
-- rootCauseCategory: escolha SEMPRE um da lista. Use 'desconhecido' se confianca < 0.5.
+- rootCauseCategory: escolha SEMPRE um da lista acima (taxonomia ${ehPm ? 'PM' : 'corretiva'}). Use '${ehPm ? 'pm_generica' : 'desconhecido'}' se confianca < 0.5.
 - solucaoAplicada: classifique a INTERVENCAO descrita em actionsTaken. Use 'desconhecido' se nao houver indicacao clara, 'sem_acao' se foi so observacao/inspecao sem intervencao.
 - confianca: 0 a 1, baseada em quao explicito esta o sintoma no texto.
 - measurements: extraia APENAS valores numericos explicitos no texto. Use null para os nao mencionados. "outras" = chave-valor para metricas adicionais que aparecerem (ex: "fluxo_gpm", "tensao_v").
 - partsReplaced: liste pecas trocadas ou aplicadas, em portugues (ex: ["bateria MRU", "bobina cabeca"]). Vazio se nada foi trocado. ATENCAO: NUNCA inclua numero de serie, modelo proprietario unico nem nome de pessoas — apenas categoria generica da peca.
 
-Heuristicas para a categoria:
-- "chiller" ou "chiller externo" ou "chiller predial" + cliente: infra_chiller_cliente
-- "compressor off" + cryo/criogenia: cryo_compressor
-- "nivel de helio" ou "quench" sem causa externa: magneto_helio
-- "mesa", "correia", "ruido ao deslocar": mesa_mecanica
-- "bobina" (cabeca, corpo, joelho): bobina
-- "gradiente", "GP/AGI", "amplificador de gradiente": gradiente
-- "rede", "DICOM", "fluxo de imagens": rede_dados
-- "software", "host", "MRU", "OS GE", "boot": software
+${heuristicas}
 
 Heuristicas para a solucao:
 - "trocada", "substituida", "replaced" + peca: troca_peca
@@ -108,13 +175,26 @@ Heuristicas para a solucao:
 - so inspecao/observacao/nao houve falha: sem_acao`;
 }
 
-export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
+export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCode = null }) {
   const llm = getLlmRuntimeInfo();
   if (!llm.available) {
     return { ok: false, erro: 'llm_indisponivel', llmModel: null };
   }
 
-  const prompt = montarPrompt(regexCampos);
+  const ehPm = serviceTypeCode === 'SE02';
+
+  // Few-shot examples cross-tenant: lições despersonalizadas de correções
+  // anteriores (de qualquer tenant). Falha-segura — se a busca quebrar,
+  // segue sem few-shot. Limite baixo (5) pra não inflar tokens.
+  let licoes = [];
+  try {
+    licoes = await buscarLicoesParaFewShot({ serviceTypeCode, limite: 5 });
+  } catch (err) {
+    console.warn(`[LLM_EXTRACTOR] Falha ao buscar licoes few-shot: ${err.message}`);
+  }
+  const fewShotBlock = formatarFewShot(licoes);
+
+  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode, fewShotBlock });
   const promptLen = prompt.length;
 
   let resultado;
@@ -124,10 +204,14 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
     return { ok: false, erro: `llm_call_failed: ${err.message}`, llmModel: llm.activeModel };
   }
 
-  // Valida categoria
+  // Valida categoria — aceita qualquer das duas taxonomias mas garante
+  // que o valor pertence ao SUBCONJUNTO certo pro tipo de OS. Se o LLM
+  // confundiu (deu causa corretiva pra PM ou vice-versa), cai pro
+  // fallback adequado.
   const cat = resultado?.rootCauseCategory;
-  if (!cat || !TAXONOMIA_CAUSAS.includes(cat)) {
-    resultado.rootCauseCategory = 'desconhecido';
+  const taxonomiaEsperada = ehPm ? TAXONOMIA_CAUSAS_PM : TAXONOMIA_CAUSAS_CORRETIVA;
+  if (!cat || !taxonomiaEsperada.includes(cat)) {
+    resultado.rootCauseCategory = ehPm ? 'pm_generica' : 'desconhecido';
   }
 
   // Valida solucao aplicada
@@ -146,6 +230,14 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
     completionTokens: Math.ceil(JSON.stringify(resultado).length / 4),
   });
 
+  // Contabiliza uso das licoes few-shot (metrica de impacto do feedback
+  // supervisionado). Nao bloqueia.
+  if (licoes.length) {
+    incrementarUsoLicoes(licoes.map((l) => l.id)).catch((err) =>
+      console.warn(`[LLM_EXTRACTOR] Falha incrementar uso licoes: ${err.message}`)
+    );
+  }
+
   return {
     ok: true,
     llmModel: llm.activeModel,
@@ -163,4 +255,6 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos }) {
 
 export const LLM_EXTRACTOR_VERSION_EXPORT = LLM_EXTRACTOR_VERSION;
 export const TAXONOMIA_CAUSAS_EXPORT = TAXONOMIA_CAUSAS;
+export const TAXONOMIA_CAUSAS_CORRETIVA_EXPORT = TAXONOMIA_CAUSAS_CORRETIVA;
+export const TAXONOMIA_CAUSAS_PM_EXPORT = TAXONOMIA_CAUSAS_PM;
 export const TAXONOMIA_SOLUCOES_EXPORT = TAXONOMIA_SOLUCOES;
