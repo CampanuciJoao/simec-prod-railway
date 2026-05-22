@@ -24,6 +24,10 @@ const LABEL_CATEGORIA_CURTO = {
   infra_eletrica: 'Energia predial',
   cabo_conector: 'Cabo / conector',
   monitor_console: 'Monitor / console',
+  contaminacao_metal: 'Contaminação metal',
+  interferencia_rf: 'Interferência RF',
+  artefato_imagem: 'Artefato imagem',
+  uso_operador: 'Uso / operação',
   desconhecido: 'Desconhecido',
   // PM
   pm_adsorber: 'PM · Adsorber',
