@@ -849,6 +849,11 @@ model GehcOrdemServico {
   scheduledDate      DateTime? @map("scheduled_date")
   engineerName       String?   @map("engineer_name")
   correctiveAction   String?   @map("corrective_action") @db.Text
+  // Timeline completa de activities da OS (engenheiro remoto, escalonamento
+  // para campo, follow-ups). Cada item carrega correctiveAction, engineer,
+  // startedDateTime, activityType. Insumo rico pro LLM — antes era jogado
+  // fora, ficando so o correctiveAction da ultima activity no campo acima.
+  activitiesJson     Json?     @map("activities_json")
   rawJson            String?   @map("raw_json") @db.Text
   sincronizadoEm     DateTime  @default(now()) @map("sincronizado_em")
 

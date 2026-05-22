@@ -21,15 +21,16 @@ import {
   incrementarUsoLicoes,
 } from '../ai/categoriaFeedbackService.js';
 
-// v7: + cryo_adsorber e cryo_coldhead na taxonomia corretiva. GE
-// classifica trocas programadas por horas de uso (adsorber 30.000h,
-// coldhead 32-50k h) como "Corrective Repair" (SE03) — mesmo sendo
-// manutencao planejada. Sem essas categorias, casos com peça cryo
-// trocada caiam em 'desconhecido' ou 'cryo_compressor' (errado).
+// v8: timeline de activities da OS GE injetada no prompt. Cada activity
+// (engenheiro remoto, escalacao, follow-up de campo) carrega correctiveAction
+// rico que antes nao chegava no LLM — moravam so no `activitiesV2` do
+// GraphQL e eram descartadas no sync. Agora persistidas em
+// GehcOrdemServico.activitiesJson e injetadas como bloco de contexto.
 //
+// v7: + cryo_adsorber e cryo_coldhead.
 // v6: agregacao de PDFs irmaos do mesmo case GE.
 // v5: + contaminacao_metal, artefato_imagem, interferencia_rf, uso_operador.
-const LLM_EXTRACTOR_VERSION = 7;
+const LLM_EXTRACTOR_VERSION = 8;
 
 // Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
 const TAXONOMIA_CAUSAS_CORRETIVA = [
@@ -96,6 +97,49 @@ const TAXONOMIA_SOLUCOES = [
   'desconhecido',            // LLM nao conseguiu classificar a solucao
 ];
 
+// Busca activities da OS GE pai do PDF (timeline do portal: engenheiro
+// remoto, escalacao para campo, follow-ups). Cada activity tem texto
+// rico (correctiveAction) que NAO entra no PDF — moram so na resposta
+// GraphQL do GE. Sem essa funcao o LLM perdia 60-80% do contexto narrativo
+// do case. Retorna lista vazia se sem pdfDocumentoId ou se a OS pai nao
+// tem activities armazenadas (sync antigo).
+async function buscarActivitiesDaOsPai({ pdfDocumentoId }) {
+  if (!pdfDocumentoId) return [];
+  try {
+    const doc = await prisma.gehcPdfDocumento.findUnique({
+      where: { id: pdfDocumentoId },
+      select: {
+        ordemServico: { select: { activitiesJson: true } },
+      },
+    });
+    const activities = doc?.ordemServico?.activitiesJson;
+    return Array.isArray(activities) ? activities : [];
+  } catch (err) {
+    console.warn(`[LLM_EXTRACTOR] Falha buscar activities da OS pai: ${err.message}`);
+    return [];
+  }
+}
+
+// Formata activities como bloco de timeline no prompt. Ordena por
+// startedAt asc (cronologico — o jeito que ser humano le).
+function formatarActivities(activities) {
+  if (!activities?.length) return '';
+  const ordenadas = [...activities].sort((a, b) => {
+    const ta = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+    const tb = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+    return ta - tb;
+  });
+  const blocos = ordenadas.map((a, idx) => {
+    const linhas = [`Activity ${idx + 1}` +
+                    (a.type ? ` (${a.type})` : '') +
+                    (a.engineer ? ` — ${a.engineer}` : '') +
+                    (a.startedAt ? ` em ${a.startedAt.slice(0, 10)}` : '') + ':'];
+    if (a.action) linhas.push(`  ${a.action.slice(0, 600)}`);
+    return linhas.join('\n');
+  });
+  return `\n\nTimeline de activities da OS no portal GE (engenheiro remoto -> campo -> follow-ups — leia para entender o fluxo completo do diagnostico, mesmo quando o PDF for resumido):\n${blocos.join('\n\n')}\n`;
+}
+
 // Busca PDFs irmaos do mesmo Case GE (mesmo caseNumber, mesmo tenant,
 // diferente PDF). Retorna lista vazia se sem irmaos ou sem caseNumber.
 // Limitado a 4 irmaos para nao inflar tokens — basta pra captar o
@@ -154,7 +198,7 @@ function formatarFewShot(licoes) {
   return `\n\nExemplos de correcoes anteriores (de admins humanos em casos similares — use como referencia, NAO copie literalmente):\n${exemplos}\n`;
 }
 
-function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode, fewShotBlock = '', siblingsBlock = '' }) {
+function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode, fewShotBlock = '', siblingsBlock = '', activitiesBlock = '' }) {
   // SE02 = manutencao preventiva. As outras (SE03, SE05) sao corretivas/
   // emergenciais. O tipo determina QUAL taxonomia o LLM deve usar.
   const ehPm = serviceTypeCode === 'SE02';
@@ -212,7 +256,7 @@ Texto da OS:
 - Causa do problema (raw): ${rootCauseRaw || '(vazio)'}
 - Problema analisado: ${(problemAnalyzed || '').slice(0, 1500)}
 - Acoes tomadas: ${(actionsTaken || '').slice(0, 1500)}
-- Testes realizados: ${(testsPerformed || '').slice(0, 800)}${siblingsBlock}${fewShotBlock}
+- Testes realizados: ${(testsPerformed || '').slice(0, 800)}${activitiesBlock}${siblingsBlock}${fewShotBlock}
 
 Responda apenas com este JSON, sem markdown, sem comentarios:
 {
@@ -283,7 +327,14 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCo
   });
   const siblingsBlock = formatarSiblings(siblings);
 
-  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode, fewShotBlock, siblingsBlock });
+  // Timeline de activities da OS no portal GE — texto que aparece como
+  // "Engenheiro Remoto X respondeu... Engenheiro de campo Y respondeu..."
+  // e NAO esta no PDF. Mora so no GraphQL e ja foi persistido em
+  // GehcOrdemServico.activitiesJson pelo sync. Insumo mais rico do LLM.
+  const activities = await buscarActivitiesDaOsPai({ pdfDocumentoId });
+  const activitiesBlock = formatarActivities(activities);
+
+  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode, fewShotBlock, siblingsBlock, activitiesBlock });
   const promptLen = prompt.length;
 
   let resultado;
