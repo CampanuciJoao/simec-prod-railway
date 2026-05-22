@@ -12,6 +12,7 @@
 //
 // Custo estimado com gpt-4.1-mini: ~US$ 0,001 por OS. Mil OSs = US$ 1.
 
+import prisma from '../prismaService.js';
 import { generateJsonWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
 import { logLlmUsage } from '../ai/llmUsageLogger.js';
 import { AI_CONFIG } from '../ai/config.js';
@@ -20,12 +21,17 @@ import {
   incrementarUsoLicoes,
 } from '../ai/categoriaFeedbackService.js';
 
-// v5: + contaminacao_metal, artefato_imagem, interferencia_rf, uso_operador.
-// Cobre o padrao "OS aberta sem defeito real de hardware, mas com sintoma
-// observado" — comum em RM (spike noise por metal no campo, drift,
-// interferencia externa, uso indevido). Antes caiam em 'desconhecido'
-// porque nenhum subsistema casava.
-const LLM_EXTRACTOR_VERSION = 5;
+// v6: agregacao de PDFs irmaos do mesmo case GE. Quando um Case tem
+// multiplos PDFs (diferentes WOs — engenheiro remoto + engenheiro de
+// campo), o LLM agora ve o contexto dos irmaos no prompt. Resolve o
+// caso comum onde o PDF do engenheiro remoto eh genericazo ("verificar
+// no local") e so o PDF do engenheiro de campo tem o diagnostico real.
+// Antes ambos eram categorizados independentes, deixando o primeiro
+// como 'desconhecido' mesmo o segundo tendo a resposta.
+//
+// v5: + contaminacao_metal, artefato_imagem, interferencia_rf,
+// uso_operador na taxonomia corretiva.
+const LLM_EXTRACTOR_VERSION = 6;
 
 // Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
 const TAXONOMIA_CAUSAS_CORRETIVA = [
@@ -90,6 +96,54 @@ const TAXONOMIA_SOLUCOES = [
   'desconhecido',            // LLM nao conseguiu classificar a solucao
 ];
 
+// Busca PDFs irmaos do mesmo Case GE (mesmo caseNumber, mesmo tenant,
+// diferente PDF). Retorna lista vazia se sem irmaos ou sem caseNumber.
+// Limitado a 4 irmaos para nao inflar tokens — basta pra captar o
+// diagnostico no padrao "remoto + campo + (opcional follow-up)".
+async function buscarSiblingsDoCase({ tenantId, caseNumber, pdfDocumentoIdAtual }) {
+  if (!caseNumber || !tenantId) return [];
+  try {
+    const siblings = await prisma.gehcPdfExtraido.findMany({
+      where: {
+        tenantId,
+        caseNumber,
+        ...(pdfDocumentoIdAtual ? { NOT: { pdfDocumentoId: pdfDocumentoIdAtual } } : {}),
+      },
+      take: 4,
+      orderBy: { extraidoEm: 'asc' },
+      select: {
+        woNumber: true,
+        engineerFullName: true,
+        problemAnalyzed: true,
+        actionsTaken: true,
+        rootCauseRaw: true,
+        testsPerformed: true,
+      },
+    });
+    return siblings;
+  } catch (err) {
+    console.warn(`[LLM_EXTRACTOR] Falha buscar siblings do case ${caseNumber}: ${err.message}`);
+    return [];
+  }
+}
+
+// Formata os PDFs irmaos como bloco de contexto adicional no prompt.
+// Cada irmao vira um sub-bloco com seus campos resumidos. Limita
+// agressivamente o tamanho de cada campo para nao explodir tokens.
+function formatarSiblings(siblings) {
+  if (!siblings?.length) return '';
+  const blocos = siblings.map((s, idx) => {
+    const linhas = [`PDF irmao ${idx + 1}` + (s.woNumber ? ` (${s.woNumber})` : '') +
+                    (s.engineerFullName ? ` — ${s.engineerFullName}` : '') + ':'];
+    if (s.problemAnalyzed)  linhas.push(`  Problema analisado: ${s.problemAnalyzed.slice(0, 500)}`);
+    if (s.actionsTaken)     linhas.push(`  Acoes tomadas: ${s.actionsTaken.slice(0, 500)}`);
+    if (s.rootCauseRaw)     linhas.push(`  Causa raw: ${s.rootCauseRaw.slice(0, 300)}`);
+    if (s.testsPerformed)   linhas.push(`  Testes: ${s.testsPerformed.slice(0, 300)}`);
+    return linhas.join('\n');
+  });
+  return `\n\nOutros PDFs do mesmo Case GE (mesmo numero de caso, WOs diferentes — use o contexto deles tambem):\n${blocos.join('\n\n')}\n`;
+}
+
 // Formata as licoes cross-tenant como bloco de few-shot examples para o
 // prompt. Vazio se nao houver licoes — o prompt segue sem essa secao.
 function formatarFewShot(licoes) {
@@ -100,7 +154,7 @@ function formatarFewShot(licoes) {
   return `\n\nExemplos de correcoes anteriores (de admins humanos em casos similares — use como referencia, NAO copie literalmente):\n${exemplos}\n`;
 }
 
-function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode, fewShotBlock = '' }) {
+function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode, fewShotBlock = '', siblingsBlock = '' }) {
   // SE02 = manutencao preventiva. As outras (SE03, SE05) sao corretivas/
   // emergenciais. O tipo determina QUAL taxonomia o LLM deve usar.
   const ehPm = serviceTypeCode === 'SE02';
@@ -153,7 +207,7 @@ Texto da OS:
 - Causa do problema (raw): ${rootCauseRaw || '(vazio)'}
 - Problema analisado: ${(problemAnalyzed || '').slice(0, 1500)}
 - Acoes tomadas: ${(actionsTaken || '').slice(0, 1500)}
-- Testes realizados: ${(testsPerformed || '').slice(0, 800)}${fewShotBlock}
+- Testes realizados: ${(testsPerformed || '').slice(0, 800)}${siblingsBlock}${fewShotBlock}
 
 Responda apenas com este JSON, sem markdown, sem comentarios:
 {
@@ -193,7 +247,7 @@ Heuristicas para a solucao:
 - so inspecao/observacao/nao houve falha: sem_acao`;
 }
 
-export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCode = null }) {
+export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCode = null, pdfDocumentoId = null }) {
   const llm = getLlmRuntimeInfo();
   if (!llm.available) {
     return { ok: false, erro: 'llm_indisponivel', llmModel: null };
@@ -212,7 +266,19 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCo
   }
   const fewShotBlock = formatarFewShot(licoes);
 
-  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode, fewShotBlock });
+  // PDFs irmaos do mesmo Case GE (mesmo caseNumber). Captura o cenario
+  // remoto+campo: PDF 1 (engenheiro remoto) eh generico e isolado seria
+  // 'desconhecido'; PDF 2 (engenheiro de campo) tem o diagnostico real.
+  // Com o sibling block, ambos veem o contexto completo do case e
+  // categorizam consistentemente.
+  const siblings = await buscarSiblingsDoCase({
+    tenantId,
+    caseNumber: regexCampos?.caseNumber,
+    pdfDocumentoIdAtual: pdfDocumentoId,
+  });
+  const siblingsBlock = formatarSiblings(siblings);
+
+  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode, fewShotBlock, siblingsBlock });
   const promptLen = prompt.length;
 
   let resultado;
