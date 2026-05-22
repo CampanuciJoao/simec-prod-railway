@@ -167,7 +167,20 @@ export async function extrairCamposDoPdf(pdfBuffer) {
   // Hash do texto para detectar mudancas em reprocessamentos
   const rawTextHash = crypto.createHash('sha256').update(text).digest('hex');
 
-  const caseNumber       = trim(captureField('N[uú]mero do Caso', text));
+  // Captura o numero do caso GE de 3 fontes (em ordem de preferencia):
+  //   1. "Numero do Caso: NNNNNNN" — header do formato NOVO
+  //   2. "Caso NNNNNNN" como rotulo de bloco no formato ANTIGO
+  //      (aparece em "Caso 15913807" antes da secao "Tipo de Caso:")
+  //   3. "Caso NNNNNNN Page X of Y" no rodape
+  // Sem isso, PDFs do formato antigo ficavam com caseNumber=null e
+  // perdiam o vinculo com PDFs irmaos do mesmo case (siblings aggregation
+  // nao funciona, SR{caseNumber} fica vazio, cross-refs nao resolvem).
+  const caseNumber = trim(
+    captureField('N[uú]mero do Caso', text) ||
+    text.match(/\bCaso\s+(\d{6,9})\b(?!\s*Page)/i)?.[1] ||
+    text.match(/\bCaso\s+(\d{6,9})\s+Page\s+\d+\s+of/i)?.[1] ||
+    null
+  );
   const serviceType      = trim(captureField('Tipo do Servi[cç]o', text));
   const openedAtRaw      = trim(captureField('Data de abertura do Caso', text));
   const equipmentStatus  = trim(captureField('Status do Equip(?:a)?mento', text));
@@ -197,9 +210,12 @@ export async function extrairCamposDoPdf(pdfBuffer) {
     captureField('Verifica[cç][aã]o\\s*\\/?\\s*Testes Realizados', text)
   );
 
-  // WO-XXXXX vem isolado, sem rotulo "WO:".
+  // WO-XXXXX vem isolado, sem rotulo "WO:". Armazena APENAS o numero
+  // (sem prefixo "WO-") — quem renderizar adiciona "WO-" na frente. Antes
+  // o extractor retornava "WO-NNNN" e o frontend tambem prefixava, dando
+  // "WO-WO-NNNN" duplicado.
   const woMatch = text.match(/\bWO[-\s]?(\d{6,})\b/);
-  const woNumber = woMatch ? `WO-${woMatch[1]}` : null;
+  const woNumber = woMatch ? woMatch[1] : null;
 
   // Total de minutos = soma das colunas "Total de Minutos" da tabela final.
   // Cada linha da tabela termina com um numero (minutos). Capturamos todos.

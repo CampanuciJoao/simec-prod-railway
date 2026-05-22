@@ -61,6 +61,15 @@ function labelDe(categoria) {
   return LABELS_CATEGORIA[categoria] || categoria;
 }
 
+// Normaliza woNumber pra "WO-NNNN" — tolera prefixo legado no banco
+// (dados antigos vinham com "WO-NNN" gravado) e dados novos so com
+// numero. Sem isso aparecia "WO-WO-NNNN" duplicado.
+function formatarWO(wo) {
+  if (!wo) return '';
+  const num = String(wo).replace(/^WO[-\s]?/i, '');
+  return `WO-${num}`;
+}
+
 function CampoOS({ icon, label, texto }) {
   return (
     <div
@@ -206,7 +215,7 @@ function CorrigirCategoriaModal({ isOpen, extracao, onClose, onSaved }) {
           {/* Identificadores secundarios: WO + gehcServiceId interno */}
           {(extracao.woNumber || extracao.gehcServiceId) && (
             <div className="mt-1 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
-              {extracao.woNumber && <>WO-{extracao.woNumber}</>}
+              {extracao.woNumber && <>{formatarWO(extracao.woNumber)}</>}
               {extracao.woNumber && extracao.gehcServiceId && <> · </>}
               {extracao.gehcServiceId && <>{extracao.gehcServiceId}</>}
             </div>
