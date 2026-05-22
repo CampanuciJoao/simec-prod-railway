@@ -1,8 +1,18 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFloppyDisk, faLightbulb } from '@fortawesome/free-solid-svg-icons';
+import {
+  faFloppyDisk,
+  faLightbulb,
+  faFileLines,
+  faStethoscope,
+  faScrewdriverWrench,
+  faFlask,
+  faBoxOpen,
+  faFilePdf,
+} from '@fortawesome/free-solid-svg-icons';
 import { Drawer, Button, Textarea } from '@/components/ui';
+import { urlPdfDocumento } from '@/services/api/gehcAprendizadoApi';
 import {
   getTaxonomias,
   postCategoriaCorrecao,
@@ -39,6 +49,32 @@ const LABELS_CATEGORIA = {
 function labelDe(categoria) {
   return LABELS_CATEGORIA[categoria] || categoria;
 }
+
+function CampoOS({ icon, label, texto }) {
+  return (
+    <div
+      className="rounded-lg p-2.5 text-xs"
+      style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-soft)' }}
+    >
+      <div className="flex items-center gap-2 font-semibold" style={{ color: 'var(--text-muted)' }}>
+        <FontAwesomeIcon icon={icon} className="text-[10px]" />
+        {label}
+      </div>
+      <div
+        className="mt-1 whitespace-pre-wrap break-words"
+        style={{ color: 'var(--text-secondary)' }}
+      >
+        {texto}
+      </div>
+    </div>
+  );
+}
+
+CampoOS.propTypes = {
+  icon: PropTypes.object.isRequired,
+  label: PropTypes.string.isRequired,
+  texto: PropTypes.string.isRequired,
+};
 
 function CorrigirCategoriaModal({ isOpen, extracao, onClose, onSaved }) {
   const [taxonomias, setTaxonomias] = useState({ corretiva: [], pm: [] });
@@ -118,46 +154,130 @@ function CorrigirCategoriaModal({ isOpen, extracao, onClose, onSaved }) {
       }
     >
       <div className="space-y-4 p-5">
+        {/* Cabeçalho: identificação da OS */}
         <div
-          className="rounded-xl p-3 text-xs"
+          className="rounded-xl p-3"
           style={{ backgroundColor: 'var(--bg-surface-soft)', border: '1px solid var(--border-soft)' }}
         >
-          <div className="font-semibold" style={{ color: 'var(--text-primary)' }}>
-            OS {extracao.caseNumber || extracao.woNumber || extracao.gehcServiceId || '—'}
-            {extracao.serviceTypeCode && (
-              <span
-                className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
-                style={{
-                  backgroundColor: ehPm ? 'var(--color-info-surface, #dbeafe)' : 'var(--color-warning-surface)',
-                  color: ehPm ? 'var(--color-info, #1d4ed8)' : 'var(--color-warning)',
-                }}
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+              OS {extracao.caseNumber || extracao.woNumber || extracao.gehcServiceId || '—'}
+              {extracao.serviceTypeCode && (
+                <span
+                  className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
+                  style={{
+                    backgroundColor: ehPm ? 'var(--color-info-surface, #dbeafe)' : 'var(--color-warning-surface)',
+                    color: ehPm ? 'var(--color-info, #1d4ed8)' : 'var(--color-warning)',
+                  }}
+                >
+                  {ehPm ? 'Preventiva' : extracao.serviceTypeCode}
+                </span>
+              )}
+            </div>
+            {extracao.documentId && (
+              <a
+                href={urlPdfDocumento(extracao.documentId)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-xs font-medium"
+                style={{ color: 'var(--brand-primary)' }}
+                title="Abrir PDF original numa nova aba"
               >
-                {ehPm ? 'Preventiva' : extracao.serviceTypeCode}
-              </span>
+                <FontAwesomeIcon icon={faFilePdf} />
+                Abrir PDF original
+              </a>
             )}
           </div>
-          <div className="mt-1" style={{ color: 'var(--text-muted)' }}>
+          <div className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
             {extracao.equipamento?.apelido || extracao.equipamento?.tag || '—'}
+            {extracao.equipamento?.modelo && <> · {extracao.equipamento.modelo}</>}
           </div>
-          {extracao.problemDescription && (
-            <div className="mt-2" style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-medium">Problema relatado:</span> {extracao.problemDescription}
+        </div>
+
+        {/* O que a IA decidiu e por quê */}
+        <div
+          className="rounded-xl p-3 text-xs space-y-2"
+          style={{
+            backgroundColor: 'var(--color-warning-surface)',
+            border: '1px solid var(--color-warning-soft, #fde68a)',
+          }}
+        >
+          <div className="flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            <FontAwesomeIcon icon={faLightbulb} style={{ color: 'var(--color-warning)' }} />
+            O que a IA decidiu
+          </div>
+          <div style={{ color: 'var(--text-secondary)' }}>
+            <span className="font-medium">Categoria:</span>{' '}
+            <strong>{labelDe(extracao.rootCauseCategory)}</strong>
+            {extracao.llmConfianca != null && (
+              <> · confiança <strong>{Math.round(extracao.llmConfianca * 100)}%</strong></>
+            )}
+          </div>
+          {extracao.llmRaciocinio && (
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-medium">Raciocínio:</span> <em>{extracao.llmRaciocinio}</em>
             </div>
+          )}
+          {extracao.solucaoAplicada && (
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-medium">Solução identificada:</span> {extracao.solucaoAplicada}
+            </div>
+          )}
+          {Array.isArray(extracao.partsReplaced) && extracao.partsReplaced.length > 0 && (
+            <div style={{ color: 'var(--text-secondary)' }}>
+              <span className="font-medium">Peças extraídas:</span>{' '}
+              {extracao.partsReplaced.join(' · ')}
+            </div>
+          )}
+        </div>
+
+        {/* O que está escrito na OS (insumo do LLM) */}
+        <div className="space-y-3">
+          <div className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+            Texto da OS que a IA leu
+          </div>
+
+          {extracao.problemDescription && (
+            <CampoOS
+              icon={faFileLines}
+              label="Problema relatado (sumário da OS)"
+              texto={extracao.problemDescription}
+            />
           )}
           {extracao.rootCauseRaw && (
-            <div className="mt-1" style={{ color: 'var(--text-secondary)' }}>
-              <span className="font-medium">Causa (raw):</span> {extracao.rootCauseRaw}
-            </div>
+            <CampoOS
+              icon={faStethoscope}
+              label="Causa raiz reportada (raw)"
+              texto={extracao.rootCauseRaw}
+            />
           )}
-          <div className="mt-2 flex items-center gap-2">
-            <FontAwesomeIcon icon={faLightbulb} style={{ color: 'var(--color-warning)' }} />
-            <span style={{ color: 'var(--text-secondary)' }}>
-              IA classificou como: <strong>{labelDe(extracao.rootCauseCategory)}</strong>
-              {extracao.llmConfianca != null && (
-                <> · confiança {Math.round(extracao.llmConfianca * 100)}%</>
-              )}
-            </span>
-          </div>
+          {extracao.problemAnalyzed && (
+            <CampoOS
+              icon={faStethoscope}
+              label="Problema analisado"
+              texto={extracao.problemAnalyzed}
+            />
+          )}
+          {extracao.actionsTaken && (
+            <CampoOS
+              icon={faScrewdriverWrench}
+              label="Ações tomadas"
+              texto={extracao.actionsTaken}
+            />
+          )}
+          {extracao.testsPerformed && (
+            <CampoOS
+              icon={faFlask}
+              label="Testes realizados"
+              texto={extracao.testsPerformed}
+            />
+          )}
+          {!extracao.rootCauseRaw && !extracao.problemAnalyzed && !extracao.actionsTaken && !extracao.testsPerformed && (
+            <p className="text-xs italic" style={{ color: 'var(--text-muted)' }}>
+              <FontAwesomeIcon icon={faBoxOpen} className="mr-1" />
+              O PDF não trouxe nenhum desses campos preenchidos. A IA decidiu com base só no sumário acima — provavelmente daí veio a baixa confiança.
+            </p>
+          )}
         </div>
 
         <div>
