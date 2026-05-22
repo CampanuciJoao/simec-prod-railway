@@ -70,11 +70,13 @@ export async function extrairUmPdf({ pdfDocumento, buffer: bufferInline = null }
   } catch { /* sem serviceTypeCode segue tratando como corretiva */ }
 
   // 3. Camada 2: LLM. Falha aqui nao bloqueia — persiste o que tem da Camada 1
-  //    com llmError preenchido para retry no proximo cron.
+  //    com llmError preenchido para retry no proximo cron. Passa pdfDocumentoId
+  //    pra excluir self da busca de PDFs irmaos do mesmo Case GE.
   const llm = await extrairCamposViaLlm({
     tenantId,
     regexCampos: regex.campos,
     serviceTypeCode,
+    pdfDocumentoId,
   });
 
   // 4. Persiste tudo.
