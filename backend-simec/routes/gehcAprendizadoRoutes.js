@@ -20,6 +20,10 @@ import {
   TAXONOMIA_CAUSAS_CORRETIVA_EXPORT,
   TAXONOMIA_CAUSAS_PM_EXPORT,
 } from '../services/gehc/gehcPdfLlmExtractor.js';
+import {
+  detectarReferenciasCruzadas,
+  resolverReferencias,
+} from '../services/gehc/gehcCrossRefDetector.js';
 
 const router = express.Router();
 
@@ -254,22 +258,44 @@ router.get('/extracoes-recentes', async (req, res) => {
       },
     });
 
-    res.json({
-      itens: itens.map((e) => ({
+    // Para cada extracao, detecta cross-refs no texto e resolve contra o
+    // banco do tenant (so encontra OSs do mesmo cliente). Processado em
+    // paralelo para nao serializar N queries.
+    const enriquecidos = await Promise.all(itens.map(async (e) => {
+      const refs = detectarReferenciasCruzadas([
+        e.problemAnalyzed,
+        e.actionsTaken,
+        e.testsPerformed,
+        e.rootCauseRaw,
+      ]);
+      let relacionadas = [];
+      if (refs.length) {
+        try {
+          relacionadas = await resolverReferencias({
+            prisma,
+            tenantId,
+            refs,
+            pdfExtraidoIdAtual: e.id,
+          });
+        } catch (err) {
+          console.warn('[GEHC_APRENDIZADO] resolverReferencias falhou:', err.message);
+        }
+      }
+
+      return {
         id: e.id,
         caseNumber:        e.caseNumber,
         woNumber:          e.woNumber,
+        // SR{caseNumber} eh o identificador que aparece no portal da GE —
+        // mais reconhecivel que o gehcServiceId interno. Quando ha case,
+        // priorizar; senao cair no gehcServiceId.
+        identificadorPortal: e.caseNumber ? `SR${e.caseNumber}` : null,
         rootCauseCategory: e.rootCauseCategory,
         solucaoAplicada:   e.solucaoAplicada,
-        // Textos longos do PDF — sao o que o admin precisa ler pra avaliar
-        // se a IA acertou. Limite 1500 cobre o que o LLM viu (ele recebe
-        // truncado a 1500 no prompt).
         rootCauseRaw:      e.rootCauseRaw  || null,
         problemAnalyzed:   e.problemAnalyzed?.slice(0, 1500) || null,
         actionsTaken:      e.actionsTaken?.slice(0, 1500) || null,
         testsPerformed:    e.testsPerformed?.slice(0, 800)  || null,
-        // O que a IA "pensou" durante a classificacao — campo crucial pra
-        // o admin entender o erro antes de corrigir.
         llmRaciocinio:     e.llmRaciocinio || null,
         llmConfianca:      e.llmConfianca,
         partsReplaced:     Array.isArray(e.partsReplacedJson) ? e.partsReplacedJson : [],
@@ -280,8 +306,11 @@ router.get('/extracoes-recentes', async (req, res) => {
         problemDescription: e.pdfDocumento?.ordemServico?.problemDescription || null,
         documentId:        e.pdfDocumento?.documentId || null,
         correcaoAdmin:     e.categoriaLabels?.[0] || null,
-      })),
-    });
+        relacionadas,
+      };
+    }));
+
+    res.json({ itens: enriquecidos });
   } catch (err) {
     console.error('[GEHC_APRENDIZADO] /extracoes-recentes:', err.message);
     res.status(500).json({ error: err.message });
