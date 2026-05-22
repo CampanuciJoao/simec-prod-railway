@@ -20,10 +20,10 @@ import {
   incrementarUsoLicoes,
 } from '../ai/categoriaFeedbackService.js';
 
-// v3: taxonomia separada para PMs (preventivas). Antes PMs caiam em
-// 'desconhecido' porque a taxonomia anterior era so de modos de falha
-// (corretivas). Agora SE02 vira categoria por COMPONENTE serviceado.
-const LLM_EXTRACTOR_VERSION = 3;
+// v4: + cabo_conector e monitor_console na taxonomia corretiva. Casos de
+// mau contato / hardware periferico antes caiam em 'desconhecido' porque
+// nenhum subsistema cobria. Sao causa-raiz frequentes em manutencao real.
+const LLM_EXTRACTOR_VERSION = 4;
 
 // Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
 const TAXONOMIA_CAUSAS_CORRETIVA = [
@@ -37,6 +37,8 @@ const TAXONOMIA_CAUSAS_CORRETIVA = [
   'software',                // falha de SW, host, MRU, configuracao
   'rede_dados',              // conectividade, DICOM, fluxo de imagem
   'infra_eletrica',          // energia predial, no-break, aterramento
+  'cabo_conector',           // mau contato, cabo solto/oxidado, conector danificado (qualquer subsistema)
+  'monitor_console',         // monitor, console do operador, perifericos fisicos (mouse, teclado, intercom, leitor)
   'desconhecido',            // LLM nao conseguiu categorizar com confianca
 ];
 
@@ -116,15 +118,20 @@ function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerfor
 - "limpeza", "lubrificacao", "cleaning": pm_limpeza_lubrif
 - so "testes ok" / "liberado para uso" sem componente claro: pm_generica
 - "inspecao visual" sem intervencao: pm_inspecao_visual`
-    : `Heuristicas PARA CORRETIVA (causa-raiz):
+    : `Heuristicas PARA CORRETIVA (causa-raiz — escolha pela CAUSA, nao pelo efeito):
 - "chiller" ou "chiller externo" ou "chiller predial" + cliente: infra_chiller_cliente
 - "compressor off" + cryo/criogenia: cryo_compressor
 - "nivel de helio" ou "quench" sem causa externa: magneto_helio
 - "mesa", "correia", "ruido ao deslocar": mesa_mecanica
-- "bobina" (cabeca, corpo, joelho): bobina
+- "bobina" (cabeca, corpo, joelho) — sem cabo solto: bobina
 - "gradiente", "GP/AGI", "amplificador de gradiente": gradiente
 - "rede", "DICOM", "fluxo de imagens": rede_dados
-- "software", "host", "MRU", "OS GE", "boot": software`;
+- "software", "host", "MRU", "OS GE", "boot": software
+- "no-break", "queda de energia", "aterramento", "ups": infra_eletrica
+- "mau contato", "cabo solto", "conector oxidado/danificado", "reconectar", "loose cable", "cabo do monitor": cabo_conector
+  (PREFERIR este sobre o subsistema afetado quando a causa for explicitamente cabling/conector)
+- "monitor", "tela", "display", "console" + falha/preta/sem video (e nao for cabo): monitor_console
+- "teclado", "mouse", "intercom", "leitor de cartao" defeituosos: monitor_console`;
 
   return `Voce e um especialista em manutencao de equipamentos de Ressonancia Magnetica GE Healthcare.
 Analise o relato de uma OS abaixo e responda APENAS com um JSON valido na estrutura especificada.
