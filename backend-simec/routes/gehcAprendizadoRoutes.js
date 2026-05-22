@@ -260,15 +260,25 @@ router.get('/extracoes-recentes', async (req, res) => {
         caseNumber:        e.caseNumber,
         woNumber:          e.woNumber,
         rootCauseCategory: e.rootCauseCategory,
-        rootCauseRaw:      e.rootCauseRaw?.slice(0, 200) || null,
-        problemAnalyzed:   e.problemAnalyzed?.slice(0, 200) || null,
-        actionsTaken:      e.actionsTaken?.slice(0, 200) || null,
+        solucaoAplicada:   e.solucaoAplicada,
+        // Textos longos do PDF — sao o que o admin precisa ler pra avaliar
+        // se a IA acertou. Limite 1500 cobre o que o LLM viu (ele recebe
+        // truncado a 1500 no prompt).
+        rootCauseRaw:      e.rootCauseRaw  || null,
+        problemAnalyzed:   e.problemAnalyzed?.slice(0, 1500) || null,
+        actionsTaken:      e.actionsTaken?.slice(0, 1500) || null,
+        testsPerformed:    e.testsPerformed?.slice(0, 800)  || null,
+        // O que a IA "pensou" durante a classificacao — campo crucial pra
+        // o admin entender o erro antes de corrigir.
+        llmRaciocinio:     e.llmRaciocinio || null,
         llmConfianca:      e.llmConfianca,
+        partsReplaced:     Array.isArray(e.partsReplacedJson) ? e.partsReplacedJson : [],
         extraidoEm:        e.extraidoEm,
         equipamento:       e.pdfDocumento?.equipamento || null,
         gehcServiceId:     e.pdfDocumento?.ordemServico?.gehcServiceId || null,
         serviceTypeCode:   e.pdfDocumento?.ordemServico?.serviceTypeCode || null,
-        problemDescription: e.pdfDocumento?.ordemServico?.problemDescription?.slice(0, 200) || null,
+        problemDescription: e.pdfDocumento?.ordemServico?.problemDescription || null,
+        documentId:        e.pdfDocumento?.documentId || null,
         correcaoAdmin:     e.categoriaLabels?.[0] || null,
       })),
     });
