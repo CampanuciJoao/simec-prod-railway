@@ -20,10 +20,12 @@ import {
   incrementarUsoLicoes,
 } from '../ai/categoriaFeedbackService.js';
 
-// v4: + cabo_conector e monitor_console na taxonomia corretiva. Casos de
-// mau contato / hardware periferico antes caiam em 'desconhecido' porque
-// nenhum subsistema cobria. Sao causa-raiz frequentes em manutencao real.
-const LLM_EXTRACTOR_VERSION = 4;
+// v5: + contaminacao_metal, artefato_imagem, interferencia_rf, uso_operador.
+// Cobre o padrao "OS aberta sem defeito real de hardware, mas com sintoma
+// observado" — comum em RM (spike noise por metal no campo, drift,
+// interferencia externa, uso indevido). Antes caiam em 'desconhecido'
+// porque nenhum subsistema casava.
+const LLM_EXTRACTOR_VERSION = 5;
 
 // Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
 const TAXONOMIA_CAUSAS_CORRETIVA = [
@@ -39,6 +41,10 @@ const TAXONOMIA_CAUSAS_CORRETIVA = [
   'infra_eletrica',          // energia predial, no-break, aterramento
   'cabo_conector',           // mau contato, cabo solto/oxidado, conector danificado (qualquer subsistema)
   'monitor_console',         // monitor, console do operador, perifericos fisicos (mouse, teclado, intercom, leitor)
+  'contaminacao_metal',      // objeto ferromagnetico no campo (agulha, clipe, ferramenta) — spike noise por metal
+  'interferencia_rf',        // interferencia externa de RF (celular, equipamento proximo, falha de blindagem da sala)
+  'artefato_imagem',         // degradacao de qualidade SEM causa hardware clara (drift, shim ruim, vibracao ambiente)
+  'uso_operador',            // uso indevido, protocolo errado, paciente nao colaborou (sem falha real do equipamento)
   'desconhecido',            // LLM nao conseguiu categorizar com confianca
 ];
 
@@ -131,7 +137,12 @@ function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerfor
 - "mau contato", "cabo solto", "conector oxidado/danificado", "reconectar", "loose cable", "cabo do monitor": cabo_conector
   (PREFERIR este sobre o subsistema afetado quando a causa for explicitamente cabling/conector)
 - "monitor", "tela", "display", "console" + falha/preta/sem video (e nao for cabo): monitor_console
-- "teclado", "mouse", "intercom", "leitor de cartao" defeituosos: monitor_console`;
+- "teclado", "mouse", "intercom", "leitor de cartao" defeituosos: monitor_console
+- "metal no campo", "agulha", "clipe", "grampo", "objeto ferromagnetico", "spike noise" + inspecao de metais: contaminacao_metal
+- "interferencia RF externa", "celular proximo", "equipamento adjacente interferindo", "blindagem da sala": interferencia_rf
+- "drift", "artefato sem causa", "vibracao ambiente", "shim ruim sem hardware defeituoso", "imagem degradada sem componente identificado": artefato_imagem
+- "uso indevido", "protocolo errado", "paciente nao colaborou", "operador orientado a configurar diferente", "nao era falha do equipamento": uso_operador
+  (PREFERIR uso_operador sobre 'sem_acao' como solucao quando a OS for so orientacao)`;
 
   return `Voce e um especialista em manutencao de equipamentos de Ressonancia Magnetica GE Healthcare.
 Analise o relato de uma OS abaixo e responda APENAS com um JSON valido na estrutura especificada.

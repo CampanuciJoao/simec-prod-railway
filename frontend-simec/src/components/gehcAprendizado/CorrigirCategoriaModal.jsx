@@ -35,6 +35,10 @@ const LABELS_CATEGORIA = {
   infra_eletrica: 'Energia predial',
   cabo_conector: 'Cabo / conector',
   monitor_console: 'Monitor / console',
+  contaminacao_metal: 'Contaminação metálica no magneto',
+  interferencia_rf: 'Interferência de RF externa',
+  artefato_imagem: 'Artefato de imagem (sem hardware)',
+  uso_operador: 'Uso / operação',
   desconhecido: 'Desconhecido',
   // PM
   pm_adsorber: 'PM — Adsorber',
