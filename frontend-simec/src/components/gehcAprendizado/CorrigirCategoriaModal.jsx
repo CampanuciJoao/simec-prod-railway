@@ -10,6 +10,9 @@ import {
   faFlask,
   faBoxOpen,
   faFilePdf,
+  faLink,
+  faArrowUpRightFromSquare,
+  faCircleQuestion,
 } from '@fortawesome/free-solid-svg-icons';
 import { Drawer, Button, Textarea } from '@/components/ui';
 import { urlPdfDocumento } from '@/services/api/gehcAprendizadoApi';
@@ -161,7 +164,7 @@ function CorrigirCategoriaModal({ isOpen, extracao, onClose, onSaved }) {
         >
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-              OS {extracao.caseNumber || extracao.woNumber || extracao.gehcServiceId || '—'}
+              {extracao.identificadorPortal || extracao.gehcServiceId || '—'}
               {extracao.serviceTypeCode && (
                 <span
                   className="ml-2 rounded px-1.5 py-0.5 text-[10px] uppercase tracking-wide"
@@ -192,6 +195,14 @@ function CorrigirCategoriaModal({ isOpen, extracao, onClose, onSaved }) {
             {extracao.equipamento?.apelido || extracao.equipamento?.tag || '—'}
             {extracao.equipamento?.modelo && <> · {extracao.equipamento.modelo}</>}
           </div>
+          {/* Identificadores secundarios: WO + gehcServiceId interno */}
+          {(extracao.woNumber || extracao.gehcServiceId) && (
+            <div className="mt-1 text-[11px] font-mono" style={{ color: 'var(--text-muted)' }}>
+              {extracao.woNumber && <>WO-{extracao.woNumber}</>}
+              {extracao.woNumber && extracao.gehcServiceId && <> · </>}
+              {extracao.gehcServiceId && <>{extracao.gehcServiceId}</>}
+            </div>
+          )}
         </div>
 
         {/* O que a IA decidiu e por quê */}
@@ -279,6 +290,89 @@ function CorrigirCategoriaModal({ isOpen, extracao, onClose, onSaved }) {
             </p>
           )}
         </div>
+
+        {/* Casos relacionados detectados no texto */}
+        {extracao.relacionadas?.length > 0 && (
+          <div className="space-y-2">
+            <div className="text-xs font-bold uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+              <FontAwesomeIcon icon={faLink} className="mr-1.5" />
+              Casos relacionados (detectados no texto)
+            </div>
+            <div className="space-y-2">
+              {extracao.relacionadas.map((rel, idx) => (
+                <div
+                  key={`${rel.tipo}-${rel.numero}-${idx}`}
+                  className="rounded-lg p-2.5 text-xs"
+                  style={{
+                    backgroundColor: rel.encontradoNoSistema
+                      ? 'var(--color-success-surface, #dcfce7)'
+                      : 'var(--bg-surface)',
+                    border: `1px solid ${
+                      rel.encontradoNoSistema
+                        ? 'var(--color-success-soft, #86efac)'
+                        : 'var(--border-soft)'
+                    }`,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {rel.tipo === 'case' ? (
+                        <>SR{rel.numero}</>
+                      ) : (
+                        <>WO-{rel.numero}</>
+                      )}
+                      {rel.encontradoNoSistema ? (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                          style={{
+                            backgroundColor: 'var(--color-success-soft, #86efac)',
+                            color: 'var(--color-success, #166534)',
+                          }}
+                        >
+                          No sistema
+                        </span>
+                      ) : (
+                        <span
+                          className="rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                          style={{
+                            backgroundColor: 'var(--bg-surface-soft)',
+                            color: 'var(--text-muted)',
+                          }}
+                          title="Referenciada no texto mas ainda não importada"
+                        >
+                          <FontAwesomeIcon icon={faCircleQuestion} /> Não importada
+                        </span>
+                      )}
+                    </div>
+                    {rel.encontradoNoSistema && rel.documentId && (
+                      <a
+                        href={urlPdfDocumento(rel.documentId)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-[11px]"
+                        style={{ color: 'var(--brand-primary)' }}
+                      >
+                        <FontAwesomeIcon icon={faArrowUpRightFromSquare} />
+                        Abrir PDF
+                      </a>
+                    )}
+                  </div>
+                  {rel.encontradoNoSistema && rel.rootCauseCategory && (
+                    <div className="mt-1" style={{ color: 'var(--text-secondary)' }}>
+                      Categoria IA: <strong>{labelDe(rel.rootCauseCategory)}</strong>
+                    </div>
+                  )}
+                  <div className="mt-0.5 text-[10px] italic" style={{ color: 'var(--text-muted)' }}>
+                    Referência encontrada em: "{rel.match}"
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] italic" style={{ color: 'var(--text-muted)' }}>
+              Cases mencionados no texto da OS. Quando "No sistema", já foram importados da GE e você pode abrir o PDF deles para contexto. "Não importada" significa que o número aparece no texto mas o PDF ainda não foi baixado/extraído.
+            </p>
+          </div>
+        )}
 
         <div>
           <label

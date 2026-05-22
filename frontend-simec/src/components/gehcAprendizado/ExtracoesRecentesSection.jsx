@@ -142,7 +142,21 @@ function ExtracoesRecentesSection() {
                       {formatarDataHora(e.extraidoEm)}
                     </td>
                     <td className="px-3 py-2 font-mono text-xs">
-                      {e.caseNumber || e.woNumber || e.gehcServiceId || '—'}
+                      <div style={{ color: 'var(--text-primary)' }} className="font-semibold">
+                        {e.identificadorPortal || e.gehcServiceId || '—'}
+                      </div>
+                      {e.woNumber && (
+                        <div style={{ color: 'var(--text-muted)' }}>WO-{e.woNumber}</div>
+                      )}
+                      {e.relacionadas?.length > 0 && (
+                        <div
+                          className="mt-0.5 text-[10px]"
+                          style={{ color: 'var(--brand-primary)' }}
+                          title={`Referencia: ${e.relacionadas.map((r) => r.match).join(', ')}`}
+                        >
+                          + {e.relacionadas.length} {e.relacionadas.length === 1 ? 'relacionado' : 'relacionados'}
+                        </div>
+                      )}
                     </td>
                     <td className="px-3 py-2 text-xs">
                       <div style={{ color: 'var(--text-primary)' }}>
