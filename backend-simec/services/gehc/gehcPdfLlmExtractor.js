@@ -15,6 +15,10 @@
 import { generateJsonWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
 import { logLlmUsage } from '../ai/llmUsageLogger.js';
 import { AI_CONFIG } from '../ai/config.js';
+import {
+  buscarLicoesParaFewShot,
+  incrementarUsoLicoes,
+} from '../ai/categoriaFeedbackService.js';
 
 // v3: taxonomia separada para PMs (preventivas). Antes PMs caiam em
 // 'desconhecido' porque a taxonomia anterior era so de modos de falha
@@ -78,7 +82,17 @@ const TAXONOMIA_SOLUCOES = [
   'desconhecido',            // LLM nao conseguiu classificar a solucao
 ];
 
-function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode }) {
+// Formata as licoes cross-tenant como bloco de few-shot examples para o
+// prompt. Vazio se nao houver licoes — o prompt segue sem essa secao.
+function formatarFewShot(licoes) {
+  if (!licoes?.length) return '';
+  const exemplos = licoes
+    .map((l, idx) => `Exemplo ${idx + 1}:\n  Texto: ${l.textoDespersonalizado}\n  Categoria correta: ${l.categoriaCorreta}`)
+    .join('\n\n');
+  return `\n\nExemplos de correcoes anteriores (de admins humanos em casos similares — use como referencia, NAO copie literalmente):\n${exemplos}\n`;
+}
+
+function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerformed, serviceTypeCode, fewShotBlock = '' }) {
   // SE02 = manutencao preventiva. As outras (SE03, SE05) sao corretivas/
   // emergenciais. O tipo determina QUAL taxonomia o LLM deve usar.
   const ehPm = serviceTypeCode === 'SE02';
@@ -121,7 +135,7 @@ Texto da OS:
 - Causa do problema (raw): ${rootCauseRaw || '(vazio)'}
 - Problema analisado: ${(problemAnalyzed || '').slice(0, 1500)}
 - Acoes tomadas: ${(actionsTaken || '').slice(0, 1500)}
-- Testes realizados: ${(testsPerformed || '').slice(0, 800)}
+- Testes realizados: ${(testsPerformed || '').slice(0, 800)}${fewShotBlock}
 
 Responda apenas com este JSON, sem markdown, sem comentarios:
 {
@@ -168,7 +182,19 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCo
   }
 
   const ehPm = serviceTypeCode === 'SE02';
-  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode });
+
+  // Few-shot examples cross-tenant: lições despersonalizadas de correções
+  // anteriores (de qualquer tenant). Falha-segura — se a busca quebrar,
+  // segue sem few-shot. Limite baixo (5) pra não inflar tokens.
+  let licoes = [];
+  try {
+    licoes = await buscarLicoesParaFewShot({ serviceTypeCode, limite: 5 });
+  } catch (err) {
+    console.warn(`[LLM_EXTRACTOR] Falha ao buscar licoes few-shot: ${err.message}`);
+  }
+  const fewShotBlock = formatarFewShot(licoes);
+
+  const prompt = montarPrompt({ ...regexCampos, serviceTypeCode, fewShotBlock });
   const promptLen = prompt.length;
 
   let resultado;
@@ -203,6 +229,14 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCo
     promptTokens: Math.ceil(promptLen / 4),  // estimativa grosseira
     completionTokens: Math.ceil(JSON.stringify(resultado).length / 4),
   });
+
+  // Contabiliza uso das licoes few-shot (metrica de impacto do feedback
+  // supervisionado). Nao bloqueia.
+  if (licoes.length) {
+    incrementarUsoLicoes(licoes.map((l) => l.id)).catch((err) =>
+      console.warn(`[LLM_EXTRACTOR] Falha incrementar uso licoes: ${err.message}`)
+    );
+  }
 
   return {
     ok: true,

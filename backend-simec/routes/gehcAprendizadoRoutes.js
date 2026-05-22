@@ -15,6 +15,11 @@ import {
 } from '../services/ai/aiPipelineState.js';
 import { perguntarIaSobreEquipamento } from '../services/ai/ragSearchService.js';
 import { dispararPipeline, statusDoJobDoPipeline } from '../services/ai/pipelineDispatcher.js';
+import { registrarCorrecaoCategoria } from '../services/ai/categoriaFeedbackService.js';
+import {
+  TAXONOMIA_CAUSAS_CORRETIVA_EXPORT,
+  TAXONOMIA_CAUSAS_PM_EXPORT,
+} from '../services/gehc/gehcPdfLlmExtractor.js';
 
 const router = express.Router();
 
@@ -163,6 +168,160 @@ router.patch('/insights/:id/feedback', async (req, res) => {
     });
     res.json({ ok: true, insight: atualizado });
   } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/aprendizado/taxonomias ────────────────────────────────────
+// Devolve as duas taxonomias (corretiva + PM) pra UI montar dropdowns
+// do modal "Corrigir categoria". Estatica — nao bate em DB.
+router.get('/taxonomias', (req, res) => {
+  res.json({
+    corretiva: TAXONOMIA_CAUSAS_CORRETIVA_EXPORT,
+    pm:        TAXONOMIA_CAUSAS_PM_EXPORT,
+  });
+});
+
+// ─── POST /api/gehc/aprendizado/categoria-correcao ───────────────────────────
+// Admin corrige a categoria de um PDF extraido. Cria:
+//  - IaCategoriaLabel (privado do tenant, auditoria)
+//  - IaCategoriaLicao (cross-tenant, despersonalizado) — alimenta few-shot
+//    no prompt da proxima extracao de qualquer tenant.
+router.post('/categoria-correcao', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const usuarioId = req.usuario.id;
+  const { pdfExtraidoId, categoriaCorreta, comentario } = req.body || {};
+
+  if (!pdfExtraidoId || !categoriaCorreta) {
+    return res.status(400).json({
+      error: 'Campos pdfExtraidoId e categoriaCorreta sao obrigatorios.',
+    });
+  }
+
+  try {
+    const r = await registrarCorrecaoCategoria({
+      tenantId,
+      usuarioId,
+      pdfExtraidoId,
+      categoriaCorreta,
+      comentario,
+    });
+    if (!r.ok) return res.status(400).json({ error: r.message });
+
+    await logAuditoria({
+      tenantId,
+      autorId: usuarioId,
+      acao: 'AI_CATEGORIA_CORRIGIDA',
+      entidadeId: pdfExtraidoId,
+      detalhes: {
+        categoriaCorreta,
+        comentario: comentario?.slice(0, 200) || null,
+        licaoCriada: Boolean(r.licao),
+      },
+    });
+
+    res.json({ ok: true, label: r.label, licaoId: r.licao?.id || null });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /categoria-correcao:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/aprendizado/extracoes-recentes ────────────────────────────
+// Lista as N extracoes mais recentes do tenant (com categoria atribuida
+// pela IA), para o admin poder revisar e corrigir.
+router.get('/extracoes-recentes', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const limite = Math.min(Number(req.query?.limite) || 30, 100);
+  try {
+    const itens = await prisma.gehcPdfExtraido.findMany({
+      where: { tenantId, extraidoEm: { not: null } },
+      take: limite,
+      orderBy: { extraidoEm: 'desc' },
+      include: {
+        pdfDocumento: {
+          select: {
+            documentId: true,
+            equipamento: { select: { tag: true, apelido: true, modelo: true } },
+            ordemServico: { select: { gehcServiceId: true, serviceTypeCode: true, problemDescription: true } },
+          },
+        },
+        categoriaLabels: {
+          take: 1,
+          orderBy: { createdAt: 'desc' },
+          select: { categoriaCorreta: true, autorId: true, createdAt: true },
+        },
+      },
+    });
+
+    res.json({
+      itens: itens.map((e) => ({
+        id: e.id,
+        caseNumber:        e.caseNumber,
+        woNumber:          e.woNumber,
+        rootCauseCategory: e.rootCauseCategory,
+        rootCauseRaw:      e.rootCauseRaw?.slice(0, 200) || null,
+        problemAnalyzed:   e.problemAnalyzed?.slice(0, 200) || null,
+        actionsTaken:      e.actionsTaken?.slice(0, 200) || null,
+        llmConfianca:      e.llmConfianca,
+        extraidoEm:        e.extraidoEm,
+        equipamento:       e.pdfDocumento?.equipamento || null,
+        gehcServiceId:     e.pdfDocumento?.ordemServico?.gehcServiceId || null,
+        serviceTypeCode:   e.pdfDocumento?.ordemServico?.serviceTypeCode || null,
+        problemDescription: e.pdfDocumento?.ordemServico?.problemDescription?.slice(0, 200) || null,
+        correcaoAdmin:     e.categoriaLabels?.[0] || null,
+      })),
+    });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /extracoes-recentes:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/aprendizado/categoria-correcoes ───────────────────────────
+// Lista correcoes feitas no tenant (auditoria + drill-down).
+router.get('/categoria-correcoes', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const limite = Math.min(Number(req.query?.limite) || 50, 200);
+  try {
+    const itens = await prisma.iaCategoriaLabel.findMany({
+      where: { tenantId },
+      take: limite,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        autor: { select: { nome: true } },
+        pdfExtraido: {
+          select: {
+            id: true,
+            caseNumber: true,
+            woNumber: true,
+            pdfDocumento: {
+              select: {
+                ordemServico: {
+                  select: { gehcServiceId: true, serviceTypeCode: true },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    res.json({
+      itens: itens.map((l) => ({
+        id: l.id,
+        categoriaOriginal: l.categoriaOriginal,
+        categoriaCorreta:  l.categoriaCorreta,
+        comentario:        l.comentario,
+        autor:             l.autor?.nome || null,
+        createdAt:         l.createdAt,
+        caseNumber:        l.pdfExtraido?.caseNumber,
+        woNumber:          l.pdfExtraido?.woNumber,
+        gehcServiceId:     l.pdfExtraido?.pdfDocumento?.ordemServico?.gehcServiceId,
+        serviceTypeCode:   l.pdfExtraido?.pdfDocumento?.ordemServico?.serviceTypeCode,
+      })),
+    });
+  } catch (err) {
+    console.error('[GEHC_APRENDIZADO] /categoria-correcoes:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
