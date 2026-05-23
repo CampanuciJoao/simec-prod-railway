@@ -21,16 +21,18 @@ import {
   incrementarUsoLicoes,
 } from '../ai/categoriaFeedbackService.js';
 
-// v8: timeline de activities da OS GE injetada no prompt. Cada activity
-// (engenheiro remoto, escalacao, follow-up de campo) carrega correctiveAction
-// rico que antes nao chegava no LLM — moravam so no `activitiesV2` do
-// GraphQL e eram descartadas no sync. Agora persistidas em
-// GehcOrdemServico.activitiesJson e injetadas como bloco de contexto.
+// v9: + 6 categorias pra gaps reais observados na producao Cerdil:
+// acessorio_paciente (campainha, tubing, trigger), fonte_pet_germanio
+// (fonte de pino do PET), tubo_raio_x (X-ray tube), inspecao_predictiva
+// (alertas OnWatch IBIS/SNR/DQA), upgrade_instalacao (RAMP DOWN,
+// recargas SW), consulta_informacao (duvidas/apoio sem intervencao).
+// Regra "peça trocada é decisiva" adicionada nas heuristicas.
 //
+// v8: timeline de activities GE no prompt.
 // v7: + cryo_adsorber e cryo_coldhead.
-// v6: agregacao de PDFs irmaos do mesmo case GE.
+// v6: agregacao de PDFs irmaos.
 // v5: + contaminacao_metal, artefato_imagem, interferencia_rf, uso_operador.
-const LLM_EXTRACTOR_VERSION = 8;
+const LLM_EXTRACTOR_VERSION = 9;
 
 // Taxonomia de causa-raiz — usada quando a OS eh CORRETIVA (problema real).
 const TAXONOMIA_CAUSAS_CORRETIVA = [
@@ -52,6 +54,12 @@ const TAXONOMIA_CAUSAS_CORRETIVA = [
   'interferencia_rf',        // interferencia externa de RF (celular, equipamento proximo, falha de blindagem da sala)
   'artefato_imagem',         // degradacao de qualidade SEM causa hardware clara (drift, shim ruim, vibracao ambiente)
   'uso_operador',            // uso indevido, protocolo errado, paciente nao colaborou (sem falha real do equipamento)
+  'acessorio_paciente',      // campainha (squeeze bulb), trigger, tubing pneumatico, mangueira de acessorio — acessorios de uso clinico
+  'fonte_pet_germanio',      // fonte de pino do PET (germanio Ge-68) — peca radioativa com vida util, troca programada
+  'tubo_raio_x',             // X-ray tube (tubo de raio-x do CT/PET-CT) — peca de alto custo com vida util
+  'inspecao_predictiva',     // alertas OnWatch/predictive (IBIS, SNR, DQA, RMS Peak, Coherent Noise, Coil Checks) — sintoma reportado por regra automatica
+  'upgrade_instalacao',      // RAMP DOWN, recarga de software (LFC) programada, upgrade do sistema — atividade nao corretiva nem PM regular
+  'consulta_informacao',     // consulta tecnica do cliente (dados do equipamento, duvidas), apoio entre engenheiros (service task sem cliente) — sem intervencao no equipamento
   'desconhecido',            // LLM nao conseguiu categorizar com confianca
 ];
 
@@ -245,7 +253,26 @@ function montarPrompt({ rootCauseRaw, problemAnalyzed, actionsTaken, testsPerfor
 - "interferencia RF externa", "celular proximo", "equipamento adjacente interferindo", "blindagem da sala": interferencia_rf
 - "drift", "artefato sem causa", "vibracao ambiente", "shim ruim sem hardware defeituoso", "imagem degradada sem componente identificado": artefato_imagem
 - "uso indevido", "protocolo errado", "paciente nao colaborou", "operador orientado a configurar diferente", "nao era falha do equipamento": uso_operador
-  (PREFERIR uso_operador sobre 'sem_acao' como solucao quando a OS for so orientacao)`;
+  (PREFERIR uso_operador sobre 'sem_acao' como solucao quando a OS for so orientacao)
+- "campainha", "squeeze bulb", "trigger", "tubing pneumatico", "mangueira de acessorio", "kit cleaning de bobina" como peca trocada: acessorio_paciente
+- "fonte de pino", "Ge-68", "germanio" + PET + vida util: fonte_pet_germanio
+- "X-ray tube", "tubo de raio-x" trocado / vida util: tubo_raio_x
+- "IBIS Test Results", "Coherent Noise", "SNR alert", "DQA", "RMS Peak Error", "Coil Checks", "OW Generated", "OnWatch alert", "predictive alert" como sintoma: inspecao_predictiva
+  (sao alertas automaticos de regra preditiva, nao falha real de hardware. Geralmente acoes "monitoramento, nenhuma acao necessaria")
+- "RAMP DOWN", "RAMP UP" (sem quench), "Upgrade", "Recarga de Software", "LFC completa", "Reconfiguracao de caracteres" programados: upgrade_instalacao
+- "duvidas tecnicas", "informacoes detalhadas do equipamento", "solicitar insumos", "Debrief de pecas utilizadas em PM", "Apoio tecnico" (engenheiro pra engenheiro): consulta_informacao
+  (sem intervencao no equipamento — geralmente phone support ou service task)
+
+REGRA DECISIVA — peca trocada eh sinal forte da categoria:
+  - "Adsorber" / "Sumitomo F-50" -> cryo_adsorber (independente do texto)
+  - "Cold head" / "Coldhead" -> cryo_coldhead
+  - "Keyboard" / "Mouse" / "USB Button" -> monitor_console
+  - "Image Compute Node" / "ICN" -> software (computacao do host)
+  - "tubing pneumatic" / "squeeze bulb" -> acessorio_paciente
+  - "Fonte de Pino" / "Pin source" -> fonte_pet_germanio
+  - "X-ray tube" -> tubo_raio_x
+  Quando partsReplaced contem peca da lista, PREFERIR essa categoria
+  sobre qualquer ambiguidade no texto.`;
 
   return `Voce e um especialista em manutencao de equipamentos de Ressonancia Magnetica GE Healthcare.
 Analise o relato de uma OS abaixo e responda APENAS com um JSON valido na estrutura especificada.

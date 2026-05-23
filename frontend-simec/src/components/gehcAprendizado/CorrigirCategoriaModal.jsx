@@ -41,6 +41,12 @@ const LABELS_CATEGORIA = {
   interferencia_rf: 'Interferência de RF externa',
   artefato_imagem: 'Artefato de imagem (sem hardware)',
   uso_operador: 'Uso / operação',
+  acessorio_paciente: 'Acessório do paciente',
+  fonte_pet_germanio: 'Fonte de pino PET (Ge-68)',
+  tubo_raio_x: 'Tubo de raio-X',
+  inspecao_predictiva: 'Inspeção predictiva (OnWatch)',
+  upgrade_instalacao: 'Upgrade / instalação',
+  consulta_informacao: 'Consulta / informação',
   desconhecido: 'Desconhecido',
   // PM
   pm_adsorber: 'PM — Adsorber',
