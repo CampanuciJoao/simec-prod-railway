@@ -444,6 +444,7 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
           status: 'Concluida',
           dataHoraConclusao: dataFimReal,
           observacoesFinais: v.data.observacoes || null,
+          concluidoPorId: usuarioId,
         },
       });
 
@@ -546,6 +547,7 @@ export async function concluirOsCorretivaService({ tenantId, usuarioId, osId, da
         dataHoraConclusao,
         dataHoraFimEvento,
         observacoesFinais: v.data.observacoesFinais || null,
+        concluidoPorId: usuarioId,
       },
     });
 
@@ -609,6 +611,7 @@ export async function cancelarOsCorretivaService({ tenantId, usuarioId, osId, mo
         status: 'Cancelada',
         motivoCancelamento: motivoCancelamento.trim(),
         dataHoraCancelamento: new Date(),
+        canceladoPorId: usuarioId,
       },
     });
 
