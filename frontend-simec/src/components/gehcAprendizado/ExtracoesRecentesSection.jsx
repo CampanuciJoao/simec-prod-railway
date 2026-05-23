@@ -30,6 +30,12 @@ const LABEL_CATEGORIA_CURTO = {
   interferencia_rf: 'Interferência RF',
   artefato_imagem: 'Artefato imagem',
   uso_operador: 'Uso / operação',
+  acessorio_paciente: 'Acessório paciente',
+  fonte_pet_germanio: 'Fonte pino PET',
+  tubo_raio_x: 'Tubo raio-X',
+  inspecao_predictiva: 'Inspeção predictiva',
+  upgrade_instalacao: 'Upgrade / instalação',
+  consulta_informacao: 'Consulta / info',
   desconhecido: 'Desconhecido',
   // PM
   pm_adsorber: 'PM · Adsorber',
