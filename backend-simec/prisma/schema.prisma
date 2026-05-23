@@ -151,6 +151,8 @@ model Usuario {
   aiPipelinesPausados      AiPipelineEstado[]     @relation("AiPipelinePausadoPor")
   aiPipelinesRetomados     AiPipelineEstado[]     @relation("AiPipelineRetomadoPor")
   iaCategoriaLabelsAutor   IaCategoriaLabel[]     @relation("IaCategoriaLabelAutor")
+  osCorretivasConcluidas   OsCorretiva[]          @relation("OsCorretivaConcluidoPor")
+  osCorretivasCanceladas   OsCorretiva[]          @relation("OsCorretivaCanceladoPor")
   aceitesTermos            AceiteTermo[]
   testesQualidadeAutor     TesteQualidade[]       @relation("TesteQualidadeAutor")
   testesQualidadeDeletados TesteQualidade[]       @relation("TesteQualidadeDeletadoPor")
@@ -1572,14 +1574,20 @@ model OsCorretiva {
   motivoCancelamento        String?           @map("motivo_cancelamento") @db.Text
   dataHoraCancelamento      DateTime?         @map("data_hora_cancelamento")
   autorId                   String?           @map("autor_id")
+  // Quem concluiu / cancelou no SIMEC — rastreio de auditoria distinto do
+  // autor (que abriu). Espelha pattern NotaAndamento.editadoPorId.
+  concluidoPorId            String?           @map("concluido_por_id")
+  canceladoPorId            String?           @map("cancelado_por_id")
   createdAt                 DateTime          @default(now())
   updatedAt                 DateTime          @updatedAt
 
-  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento Equipamento      @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
-  autor       Usuario?         @relation(fields: [autorId], references: [id], onDelete: SetNull)
-  notas       NotaAndamento[]
-  visitas     VisitaTerceiro[]
+  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  equipamento  Equipamento      @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  autor        Usuario?         @relation(fields: [autorId], references: [id], onDelete: SetNull)
+  concluidoPor Usuario?         @relation("OsCorretivaConcluidoPor", fields: [concluidoPorId], references: [id], onDelete: SetNull)
+  canceladoPor Usuario?         @relation("OsCorretivaCanceladoPor", fields: [canceladoPorId], references: [id], onDelete: SetNull)
+  notas        NotaAndamento[]
+  visitas      VisitaTerceiro[]
 
   @@unique([tenantId, numeroOS])
   @@unique([tenantId, id])

@@ -201,6 +201,7 @@ function buildTimeline(os) {
       descricao: os.observacoesFinais || 'Manutenção corretiva encerrada.',
       meta: {
         statusFinal: 'Operante',
+        registradoPor: os.concluidoPor?.nome || null,
         ...(isConclusaoRetroativa ? {
           registroRetroativo: true,
           dataHoraRegistro: os.dataHoraConclusao,
@@ -215,7 +216,10 @@ function buildTimeline(os) {
       dataHora: os.dataHoraCancelamento,
       titulo: 'OS cancelada',
       descricao: os.motivoCancelamento || 'OS cancelada sem motivo registrado.',
-      meta: { motivoCancelamento: os.motivoCancelamento },
+      meta: {
+        motivoCancelamento: os.motivoCancelamento,
+        registradoPor: os.canceladoPor?.nome || null,
+      },
     });
   }
 

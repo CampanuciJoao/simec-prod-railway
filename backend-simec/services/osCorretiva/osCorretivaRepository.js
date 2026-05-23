@@ -28,7 +28,9 @@ function includeCompleto(tenantId) {
     ...INCLUDE_EQUIPAMENTO,
     ...INCLUDE_NOTAS(tenantId),
     ...INCLUDE_VISITAS,
-    autor: { select: { nome: true } },
+    autor:        { select: { nome: true } },
+    concluidoPor: { select: { nome: true } },
+    canceladoPor: { select: { nome: true } },
   };
 }
 
