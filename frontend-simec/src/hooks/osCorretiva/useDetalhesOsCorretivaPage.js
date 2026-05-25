@@ -4,6 +4,7 @@ import {
   adicionarNota,
   editarNotaOsCorretiva,
   agendarVisita,
+  reagendarVisita,
   registrarResultadoVisita,
   concluirOsCorretiva,
   cancelarOsCorretiva,
@@ -25,6 +26,7 @@ export function useDetalhesOsCorretivaPage(osId) {
   const notaModal = useModal();
   const editarNotaModal = useModal();
   const visitaModal = useModal();
+  const reagendarVisitaModal = useModal();
   const resultadoModal = useModal();
   const concluirModal = useModal();
   const cancelarModal = useModal();
@@ -102,6 +104,25 @@ export function useDetalhesOsCorretivaPage(osId) {
       setSubmitting(false);
     }
   }, [osId, addToast, visitaModal, fetchOs]);
+
+  const handleReagendarVisita = useCallback(async (dados) => {
+    const visitaId = reagendarVisitaModal.modalData?.id;
+    if (!visitaId) return;
+    setSubmitting(true);
+    setFieldErrors({});
+    try {
+      await reagendarVisita(osId, visitaId, dados);
+      addToast('Visita reagendada com sucesso.', 'success');
+      reagendarVisitaModal.closeModal();
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao reagendar visita.';
+      setFieldErrors(err?.response?.data?.fieldErrors || {});
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, reagendarVisitaModal, fetchOs]);
 
   const handleRegistrarResultado = useCallback(async (dados, visitaIdOverride) => {
     const visitaId = visitaIdOverride || resultadoModal.modalData?.visitaId;
@@ -194,6 +215,7 @@ export function useDetalhesOsCorretivaPage(osId) {
     notaModal,
     editarNotaModal,
     visitaModal,
+    reagendarVisitaModal,
     resultadoModal,
     concluirModal,
     cancelarModal,
@@ -201,6 +223,7 @@ export function useDetalhesOsCorretivaPage(osId) {
     handleAdicionarNota,
     handleEditarNota,
     handleAgendarVisita,
+    handleReagendarVisita,
     handleRegistrarResultado,
     handleConcluirOs,
     handleCancelarOs,

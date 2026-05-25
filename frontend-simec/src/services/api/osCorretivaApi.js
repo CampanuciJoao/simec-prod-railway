@@ -19,6 +19,12 @@ export const editarNotaOsCorretiva = (id, notaId, data) =>
 export const agendarVisita = (id, data) =>
   api.post(`/os-corretiva/${id}/visitas`, data).then((res) => res.data);
 
+// Reagendar visita Agendada. data = { prestadorNome?, dataHoraInicioPrevista,
+// dataHoraFimPrevista, motivo }. Marca a antiga como Reagendada e cria
+// uma nova Agendada (mantem OS em AguardandoTerceiro).
+export const reagendarVisita = (id, visitaId, data) =>
+  api.patch(`/os-corretiva/${id}/visitas/${visitaId}/reagendar`, data).then((res) => res.data);
+
 export const iniciarVisita = (id, visitaId) =>
   api.post(`/os-corretiva/${id}/visitas/${visitaId}/iniciar`).then((res) => res.data);
 

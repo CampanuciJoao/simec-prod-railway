@@ -6,6 +6,7 @@ import {
   notaAndamentoSchema,
   editarNotaAndamentoSchema,
   agendarVisitaSchema,
+  reagendarVisitaSchema,
   registrarResultadoSchema,
   concluirOsSchema,
   moverOsEquipamentoSchema,
@@ -17,6 +18,7 @@ import {
   adicionarNotaOsCorretivaService,
   editarNotaOsCorretivaService,
   agendarVisitaTerceiroService,
+  reagendarVisitaTerceiroService,
   iniciarVisitaTerceiroService,
   registrarResultadoVisitaService,
   concluirOsCorretivaService,
@@ -178,6 +180,32 @@ router.post('/:id/visitas/:visitaId/iniciar', async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_INICIAR_VISITA_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao confirmar chegada do técnico.' });
+  }
+});
+
+// Reagendar visita Agendada (imprevisto antes do tecnico chegar). Cria
+// nova VisitaTerceiro com datas novas (e opcionalmente novo prestador)
+// e marca a antiga como Reagendada. OS continua AguardandoTerceiro.
+router.patch('/:id/visitas/:visitaId/reagendar', validate(reagendarVisitaSchema), async (req, res) => {
+  try {
+    const resultado = await reagendarVisitaTerceiroService({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+      osId: req.params.id,
+      visitaId: req.params.visitaId,
+      dados: req.validatedData,
+    });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+        ...(resultado.fieldErrors ? { fieldErrors: resultado.fieldErrors } : {}),
+        ...(resultado.conflito ? { conflito: resultado.conflito } : {}),
+      });
+    }
+    return res.json(adaptarOsCorretivaResponse(resultado.data));
+  } catch (error) {
+    console.error('[OS_CORRETIVA_REAGENDAR_VISITA_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao reagendar visita.' });
   }
 });
 

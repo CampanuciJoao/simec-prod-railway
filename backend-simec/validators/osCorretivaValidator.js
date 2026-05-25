@@ -119,6 +119,40 @@ export function validarAgendarVisita(payload) {
   return { ok: false, message: 'Dados inválidos para agendamento de visita.', fieldErrors };
 }
 
+// Reagendar visita Agendada (sem cancelar a OS). Difere do agendar:
+// - prestadorNome eh opcional (null/undefined = mantem o atual)
+// - motivo eh obrigatorio (justificativa do reagendamento — auditoria)
+export const reagendarVisitaSchema = z.object({
+  prestadorNome: z.string().min(1).max(200).optional().nullable(),
+  dataHoraInicioPrevista: z.string().datetime({ message: 'Data/hora de início inválida.' }),
+  dataHoraFimPrevista: z.string().datetime({ message: 'Data/hora de fim inválida.' }),
+  motivo: z.string()
+    .min(3, 'Motivo do reagendamento é obrigatório (mínimo 3 caracteres).')
+    .max(500, 'Motivo muito longo (máximo 500 caracteres).'),
+}).superRefine((data, ctx) => {
+  const inicio = new Date(data.dataHoraInicioPrevista);
+  const fim = new Date(data.dataHoraFimPrevista);
+  if (fim <= inicio) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['dataHoraFimPrevista'],
+      message: 'A data/hora de fim deve ser posterior ao início.',
+    });
+  }
+});
+
+export function validarReagendarVisita(payload) {
+  const result = reagendarVisitaSchema.safeParse(payload);
+  if (result.success) return { ok: true, data: result.data };
+
+  const fieldErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (key) fieldErrors[key] = issue.message;
+  }
+  return { ok: false, message: 'Dados inválidos para reagendamento de visita.', fieldErrors };
+}
+
 export const registrarResultadoSchema = z.object({
   resultado: z.enum(['Operante', 'PrazoEstendido'], {
     errorMap: () => ({ message: 'Resultado inválido.' }),

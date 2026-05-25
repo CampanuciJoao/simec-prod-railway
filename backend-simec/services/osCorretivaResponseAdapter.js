@@ -24,6 +24,7 @@ const STATUS_VISITA_LABELS = {
   EmExecucao: 'Em execução',
   Concluida: 'Concluída',
   PrazoEstendido: 'Prazo estendido',
+  Reagendada: 'Reagendada',
 };
 
 function adaptarVisita(visita) {
@@ -149,10 +150,17 @@ function buildTimeline(os) {
   }
 
   for (const visita of visitas) {
+    // Visitas Reagendadas viram bloco proprio na timeline (em vez de
+    // 'visita_agendada') — diferencia visualmente que aquela visita
+    // foi remarcada antes de acontecer (status final passou de Agendada
+    // para Reagendada).
+    const ehReagendada = visita.status === 'Reagendada';
     eventos.push({
-      tipo: 'visita_agendada',
+      tipo: ehReagendada ? 'visita_reagendada' : 'visita_agendada',
       dataHora: visita.createdAt,
-      titulo: `Visita agendada — ${visita.prestadorNome}`,
+      titulo: ehReagendada
+        ? `Visita reagendada — ${visita.prestadorNome}`
+        : `Visita agendada — ${visita.prestadorNome}`,
       descricao: null,
       meta: {
         visitaId: visita.id,

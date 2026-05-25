@@ -23,6 +23,7 @@ import {
   validarNota,
   validarEdicaoNota,
   validarAgendarVisita,
+  validarReagendarVisita,
   validarRegistrarResultado,
   validarConcluirOs,
   validarMoverOsEquipamento,
@@ -399,6 +400,140 @@ export async function iniciarVisitaTerceiroService({ tenantId, usuarioId, osId, 
     entidade: 'VisitaTerceiro',
     entidadeId: visitaId,
     detalhes: `Chegada do técnico confirmada na visita da OS ${visita.osCorretiva.id}. Status: EmExecucao.`,
+  });
+
+  const osAtualizada = await buscarOsPorId({ tenantId, osId });
+  return { ok: true, data: osAtualizada };
+}
+
+// ─── Reagendar visita Agendada (sem cancelar a OS) ────────────────────────────
+//
+// Caso de uso: a empresa avisou imprevisto na data combinada, ou o cliente
+// precisa trocar de prestador. Em vez de cancelar a OS inteira (perdendo
+// historico e numero), o admin reagenda a visita.
+//
+// Padrao: cria NOVA VisitaTerceiro e marca a antiga como 'Reagendada' —
+// preserva auditoria completa. Espelha o que ja acontece em 'PrazoEstendido'
+// (resultado=PrazoEstendido em registrarResultadoVisitaService).
+//
+// Pre-condicoes:
+// - visita existe, pertence a OS e ao tenant
+// - visita.status === 'Agendada' (nao reagenda EmExecucao ou Concluida)
+// - sem conflito de horario com outras visitas do mesmo equipamento
+//
+// Motivo eh obrigatorio — vai no log de auditoria e fica visivel na timeline.
+
+export async function reagendarVisitaTerceiroService({ tenantId, usuarioId, osId, visitaId, dados }) {
+  const v = validarReagendarVisita(dados);
+  if (!v.ok) return { ok: false, status: 400, message: v.message, fieldErrors: v.fieldErrors };
+
+  const visita = await buscarVisitaPorId({ tenantId, visitaId });
+  if (!visita) return { ok: false, status: 404, message: 'Visita não encontrada.' };
+  if (visita.osCorretiva.id !== osId) {
+    return { ok: false, status: 422, message: 'Visita não pertence a esta OS.' };
+  }
+  if (visita.status !== 'Agendada') {
+    return {
+      ok: false,
+      status: 422,
+      message: 'Só é possível reagendar visitas com status Agendada. Para visitas em execução, registre o resultado e use Prazo Estendido se precisar.',
+    };
+  }
+
+  const inicioUtc = new Date(v.data.dataHoraInicioPrevista);
+  const fimUtc    = new Date(v.data.dataHoraFimPrevista);
+
+  // Conflito ignora a propria visita (ela vai ser marcada como Reagendada)
+  const conflito = await buscarConflitoVisitaPorEquipamento({
+    tenantId,
+    equipamentoId: visita.osCorretiva.equipamentoId,
+    inicioUtc,
+    fimUtc,
+    ignorarVisitaId: visitaId,
+  });
+  if (conflito) {
+    const inicio = conflito.dataHoraInicioPrevista.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const fim    = conflito.dataHoraFimPrevista.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const data   = conflito.dataHoraInicioPrevista.toLocaleDateString('pt-BR');
+    return {
+      ok: false,
+      status: 409,
+      message: `Já existe uma visita agendada para este equipamento nesse horário (${conflito.osCorretiva.numeroOS} — ${conflito.prestadorNome}, ${data} das ${inicio} às ${fim}). Escolha outro horário.`,
+      conflito: {
+        visitaId: conflito.id,
+        numeroOS: conflito.osCorretiva.numeroOS,
+        prestadorNome: conflito.prestadorNome,
+        dataHoraInicioPrevista: conflito.dataHoraInicioPrevista,
+        dataHoraFimPrevista: conflito.dataHoraFimPrevista,
+      },
+    };
+  }
+
+  // Prestador eh opcional — null/undefined = mantem o atual
+  const prestadorAntigo = visita.prestadorNome;
+  const prestadorNovo   = v.data.prestadorNome?.trim() || prestadorAntigo;
+  const datasAntigas    = {
+    inicio: visita.dataHoraInicioPrevista,
+    fim:    visita.dataHoraFimPrevista,
+  };
+
+  // Transacao: marca antiga + cria nova. Get-or-fail no commit pra
+  // evitar estado parcial.
+  const novaVisita = await prisma.$transaction(async (tx) => {
+    await tx.visitaTerceiro.update({
+      where: { tenantId_id: { tenantId, id: visitaId } },
+      data:  { status: 'Reagendada' },
+    });
+
+    return tx.visitaTerceiro.create({
+      data: {
+        tenant: { connect: { id: tenantId } },
+        osCorretiva: { connect: { tenantId_id: { tenantId, id: osId } } },
+        prestadorNome: prestadorNovo,
+        dataHoraInicioPrevista: inicioUtc,
+        dataHoraFimPrevista:    fimUtc,
+        status: 'Agendada',
+      },
+    });
+  });
+
+  // Evento no historico do equipamento (rastreio cross-OS)
+  await registrarEventoHistoricoAtivo({
+    tenantId,
+    equipamentoId: visita.osCorretiva.equipamentoId,
+    tipoEvento: 'os_corretiva_visita_reagendada',
+    categoria: 'manutencao',
+    subcategoria: 'reagendamento',
+    titulo: `Visita reagendada — OS ${visita.osCorretiva.numeroOS}`,
+    descricao: `Motivo: ${v.data.motivo}. De ${datasAntigas.inicio.toISOString()} (${prestadorAntigo}) para ${inicioUtc.toISOString()} (${prestadorNovo}).`,
+    origem: 'usuario',
+    status: 'AguardandoTerceiro',
+    impactaAnalise: false,
+    referenciaId: osId,
+    referenciaTipo: 'os_corretiva',
+    metadata: {
+      visitaAntigaId: visitaId,
+      visitaNovaId:   novaVisita.id,
+      prestadorAntigo,
+      prestadorNovo,
+      datasAntigas:   { inicio: datasAntigas.inicio, fim: datasAntigas.fim },
+      datasNovas:     { inicio: inicioUtc, fim: fimUtc },
+      motivo: v.data.motivo,
+    },
+    dataEvento: new Date(),
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDIÇÃO',
+    entidade: 'VisitaTerceiro',
+    entidadeId: visitaId,
+    detalhes: `Visita da OS ${visita.osCorretiva.numeroOS} reagendada. ${
+      prestadorAntigo !== prestadorNovo
+        ? `Prestador: ${prestadorAntigo} → ${prestadorNovo}. `
+        : ''
+    }Datas: ${datasAntigas.inicio.toISOString()} → ${inicioUtc.toISOString()}. Motivo: ${v.data.motivo}`,
   });
 
   const osAtualizada = await buscarOsPorId({ tenantId, osId });
