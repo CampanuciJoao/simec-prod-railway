@@ -57,9 +57,13 @@ export function AlertasProvider({ children }) {
     }
 
     try {
+      // status='NaoVisto': sino so mostra alertas pendentes. Antes trazia
+      // tudo (incluindo vistos), entao "dispensar" persistia no banco mas
+      // o alerta voltava ao recarregar porque a query nao filtrava. Agora
+      // os vistos somem efetivamente do feed.
       const [resumo, recentes] = await Promise.all([
         getResumoAlertas(),
-        getAlertas({ pageSize: 8 }),
+        getAlertas({ pageSize: 8, status: 'NaoVisto' }),
       ]);
 
       setNaoVistos(Number(resumo?.naoVistos || 0));
