@@ -14,10 +14,15 @@ import { useManutencoes } from '@/hooks/manutencoes/useManutencoes';
 import { useOsCorretiva } from '@/hooks/osCorretiva/useOsCorretiva';
 import { useModal } from '@/hooks/shared/useModal';
 
+// 'aguardando' eh pseudo-status que agrupa Pendente + Agendada +
+// EmAndamento + AguardandoConfirmacao — todos os estados onde a
+// manutencao ainda demanda alguma acao do usuario. Label "Agendada"
+// foi escolhida porque cobre o caso de uso mais comum (visualizar
+// PMs com data marcada) sem o jargao "Aguardando acao" que confunde.
 const STATUS_LABELS = {
-  aguardando: 'Aguardando ação',
+  aguardando: 'Agendada',
   Pendente: 'Em Triagem',
-  Agendada: 'Agendada',
+  Agendada: 'Apenas Agendada',
   EmAndamento: 'Em Andamento',
   AguardandoConfirmacao: 'Aguardando Confirmação',
   Concluida: 'Concluída',
@@ -96,9 +101,9 @@ export function useTabManutencoes() {
   // ─── Filtros (config para GlobalFilterBar) ──────────────────────────────
   const selectFilters = useMemo(() => {
     const statusOptions = [
-      { value: 'aguardando', label: 'Aguardando ação' },
+      { value: 'aguardando', label: 'Agendada' },
       { value: 'Pendente', label: 'Em Triagem' },
-      { value: 'Agendada', label: 'Agendada' },
+      { value: 'Agendada', label: 'Apenas Agendada' },
       { value: 'EmAndamento', label: 'Em Andamento' },
       { value: 'AguardandoConfirmacao', label: 'Aguardando Confirmação' },
       { value: 'Concluida', label: 'Concluída' },
