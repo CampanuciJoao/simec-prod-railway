@@ -184,33 +184,39 @@ function _cabecalhoTitulo(doc, { marginX, contentW }) {
 //   full width, separado da linha de fornecedores
 
 function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
-  const rowH   = 30;
   const rightW = contentW - leftW;
   const y      = doc.y;
+  const padY   = 9;
+
+  const titulo = safe(orc.titulo, '—');
+  const tipo   = TIPO_LABEL[orc.tipo] || orc.tipo || '';
+  const und    = orc.unidade?.nomeSistema || orc.unidade?.nomeFantasia || '';
+  const meta   = [tipo, und].filter(Boolean).join('   ·   ');
+
+  // Mede a altura real de cada texto pra dimensionar a row dinamicamente.
+  // Antes era rowH=30 fixo com lineBreak:false+ellipsis:true — titulos
+  // longos ("Batente de Portas para Sala de TC Canon") eram truncados.
+  doc.font('Helvetica-Bold').fontSize(12);
+  const hTitulo = doc.heightOfString(titulo, { width: leftW - 16 });
+  doc.font('Helvetica-Bold').fontSize(9);
+  const hMeta = meta ? doc.heightOfString(meta, { width: rightW - 12 }) : 0;
+  const rowH = Math.max(30, Math.max(hTitulo, hMeta) + padY * 2);
 
   // célula esquerda: título
   box(doc, marginX, y, leftW, rowH);
   doc
     .font('Helvetica-Bold').fontSize(12).fillColor(TEXT)
-    .text(safe(orc.titulo, '—'), marginX + 10, y + 9, {
+    .text(titulo, marginX + 10, y + padY, {
       width: leftW - 16,
-      lineBreak: false,
-      ellipsis: true,
     });
 
   // célula direita: metadados com borda própria
   box(doc, marginX + leftW, y, rightW, rowH, { fill: C.gray50 });
-  const tipo  = TIPO_LABEL[orc.tipo] || orc.tipo || '';
-  const und   = orc.unidade?.nomeSistema || orc.unidade?.nomeFantasia || '';
-  const meta  = [tipo, und].filter(Boolean).join('   ·   ');
-
   doc
     .font('Helvetica-Bold').fontSize(9).fillColor(TEXT)
-    .text(meta, marginX + leftW + 6, y + 11, {
+    .text(meta, marginX + leftW + 6, y + padY, {
       width: rightW - 12,
       align: 'center',
-      lineBreak: false,
-      ellipsis: true,
     });
 
   doc.y = y + rowH;
@@ -312,18 +318,27 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
 
   // ── linhas de item ──
   for (const item of itens) {
-    const rowH  = 22;
     const ry    = doc.y;
     const isRed = item.isDestaque;
     const fg    = isRed ? C.red : TEXT;
     const bg    = isRed ? C.redLight : C.white;
 
+    // Altura dinamica da row: mede a altura real da descricao (que eh
+    // quem mais cresce). Antes era rowH=22 fixo com lineBreak:false +
+    // ellipsis:true — descricoes longas ("Batentes + dobradiças +
+    // guarnição + fechadura") eram cortadas no meio.
+    const descricao = safe(item.descricao);
+    doc.font(isRed ? 'Helvetica-Bold' : 'Helvetica').fontSize(9);
+    const hDesc = doc.heightOfString(descricao, { width: descW - 12 });
+    const padY = 7;
+    const rowH = Math.max(22, hDesc + padY * 2);
+
     box(doc, marginX,         ry, descW, rowH, { fill: bg });
     box(doc, marginX + descW, ry, dataW, rowH, { fill: bg });
     doc.font(isRed ? 'Helvetica-Bold' : 'Helvetica').fontSize(9).fillColor(fg)
-      .text(safe(item.descricao), marginX + 6, ry + 7, { width: descW - 12, lineBreak: false, ellipsis: true });
+      .text(descricao, marginX + 6, ry + padY, { width: descW - 12 });
     doc.font('Helvetica').fontSize(8).fillColor(isRed ? C.red : C.gray600)
-      .text(fmtData(item.data), marginX + descW + 4, ry + 7, { width: dataW - 8, align: 'center', lineBreak: false });
+      .text(fmtData(item.data), marginX + descW + 4, ry + padY, { width: dataW - 8, align: 'center', lineBreak: false });
 
     let cx = marginX + leftW;
     for (let i = 0; i < nForn; i++) {
@@ -338,8 +353,9 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
       const desconto  = Number(preco?.desconto || 0);
       const exibir    = valor > 0 ? fmt(valor - desconto) : '—';
       const textColor = isRed ? C.red : (isAprv ? C.green : TEXT);
+      // Valor centralizado verticalmente em rows altas
       doc.font('Helvetica-Bold').fontSize(9).fillColor(textColor)
-        .text(exibir, cx + 4, ry + 7, { width: w - 8, align: 'center' });
+        .text(exibir, cx + 4, ry + (rowH / 2) - 5, { width: w - 8, align: 'center', lineBreak: false });
       cx += w;
     }
 
