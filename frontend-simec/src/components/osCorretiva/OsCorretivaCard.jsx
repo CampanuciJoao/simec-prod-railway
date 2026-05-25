@@ -118,17 +118,47 @@ function OsCorretivaCard({ os, isAdmin, onDelete }) {
             </div>
           </div>
 
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <InfoCard icon={faMicrochip} label="Equipamento" value={os.equipamento?.apelido || os.equipamento?.modelo || '---'} />
-            <InfoCard icon={faHospital} label="Unidade" value={os.equipamento?.unidade?.nomeSistema || '---'} />
-            <InfoCard icon={faUser} label="Solicitante" value={os.solicitante || '---'} />
-            <InfoCard icon={faClock} label="Abertura" value={formatarDataHora(os.dataHoraAbertura)} />
-          </div>
+          {/* Quando ha visita Agendada ou EmExecucao, substituimos
+              Solicitante/Abertura por Inicio/Fim agendado da visita —
+              mesma logica visual da PM Agendada. Para OSs sem visita
+              programada, mantemos Solicitante + Abertura. */}
+          {(() => {
+            const visitaProgramada = os.ultimaVisita
+              && (os.ultimaVisita.status === 'Agendada' || os.ultimaVisita.status === 'EmExecucao')
+              ? os.ultimaVisita
+              : null;
+
+            return (
+              <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <InfoCard icon={faMicrochip} label="Equipamento" value={os.equipamento?.apelido || os.equipamento?.modelo || '---'} />
+                <InfoCard icon={faHospital} label="Unidade" value={os.equipamento?.unidade?.nomeSistema || '---'} />
+                {visitaProgramada ? (
+                  <>
+                    <InfoCard
+                      icon={faClock}
+                      label="Início agendado"
+                      value={formatarDataHora(visitaProgramada.dataHoraInicioPrevista)}
+                    />
+                    <InfoCard
+                      icon={faClock}
+                      label="Fim agendado"
+                      value={formatarDataHora(visitaProgramada.dataHoraFimPrevista)}
+                    />
+                  </>
+                ) : (
+                  <>
+                    <InfoCard icon={faUser} label="Solicitante" value={os.solicitante || '---'} />
+                    <InfoCard icon={faClock} label="Abertura" value={formatarDataHora(os.dataHoraAbertura)} />
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           {os.ultimaVisita && (
             <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
               <FontAwesomeIcon icon={faTruck} />
-              <span>Última visita: {os.ultimaVisita.prestadorNome} — {os.ultimaVisita.statusLabel || os.ultimaVisita.status}</span>
+              <span>Visita: {os.ultimaVisita.prestadorNome} — {os.ultimaVisita.statusLabel || os.ultimaVisita.status}</span>
             </div>
           )}
         </div>

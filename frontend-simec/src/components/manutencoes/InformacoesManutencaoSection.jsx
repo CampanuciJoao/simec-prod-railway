@@ -29,16 +29,26 @@ const ORIGENS = [
   { value: 'externo', label: 'Empresa / Tecnico externo' },
 ];
 
+// Formato BR (DD/MM/YYYY HH:mm) — o input HTML armazena em YYYY-MM-DD,
+// mas o resumo aparece pro usuario que espera DD/MM/YYYY.
+function formatarDataBR(dataIso) {
+  if (!dataIso) return '';
+  const [ano, mes, dia] = String(dataIso).split('-');
+  if (!ano || !mes || !dia) return dataIso;
+  return `${dia}/${mes}/${ano}`;
+}
+
 function montarAgendamentoResumo(formData) {
-  const inicio = [formData?.agendamentoDataInicioLocal, formData?.agendamentoHoraInicioLocal]
-    .filter(Boolean)
-    .join(' ');
-  const fim = [formData?.agendamentoDataFimLocal, formData?.agendamentoHoraFimLocal]
-    .filter(Boolean)
-    .join(' ');
+  const dataI = formatarDataBR(formData?.agendamentoDataInicioLocal);
+  const horaI = formData?.agendamentoHoraInicioLocal || '';
+  const dataF = formatarDataBR(formData?.agendamentoDataFimLocal);
+  const horaF = formData?.agendamentoHoraFimLocal || '';
+
+  const inicio = [dataI, horaI].filter(Boolean).join(' ');
+  const fim    = [dataF, horaF].filter(Boolean).join(' ');
 
   if (!inicio && !fim) return null;
-  if (inicio && fim) return `${inicio} ate ${fim}`;
+  if (inicio && fim) return `${inicio} até ${fim}`;
   return inicio || fim;
 }
 
