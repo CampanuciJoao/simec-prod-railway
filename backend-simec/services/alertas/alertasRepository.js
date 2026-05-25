@@ -60,14 +60,14 @@ export async function listarAlertasPaginado({ tenantId, userId, baseline, page, 
           select: { visto: true, dataVisto: true },
         },
       },
-      // Alertas sao sobre eventos com data limite (PM vence em N dias,
-      // contrato vencendo, calibracao no prazo). Ordenamos por `data` ASC
-      // — o que esta mais proximo (ou ja vencido) aparece primeiro. Esses
-      // sao os que demandam acao primeiro.
-      // Desempate por createdAt DESC: alertas da mesma manutencao
-      // (todos com data = dataHoraAgendamentoInicio) saem com o mais
-      // recente em cima (ex: "iniciada" acima de "1h antes").
-      orderBy: [{ data: 'asc' }, { createdAt: 'desc' }],
+      // Ordenado como feed de notificacoes — mais RECENTE primeiro.
+      // `data` (evento) DESC primario, desempate por `createdAt` DESC para
+      // alertas da mesma manutencao saem com o mais recente em cima
+      // (ex: "iniciada" acima de "1h antes").
+      // Nota: anteriormente foi testado ASC para priorizar "mais proximo
+      // do vencimento", mas o caso de uso do sino eh feed de notificacao
+      // (ultima novidade primeiro), nao agenda. Mantido DESC.
+      orderBy: [{ data: 'desc' }, { createdAt: 'desc' }],
       skip,
       take: pageSize,
     }),
