@@ -47,6 +47,17 @@ export function useTabManutencoes() {
   }, [manut.filtros?.status]);
 
   // ─── Items unificados ────────────────────────────────────────────────────
+  // Ordenacao depende do status filtrado:
+  //   - "aguardando" / Pendente / Agendada / EmAndamento → asc (proxima primeiro)
+  //     Eventos FUTUROS: usuario quer ver a manutencao mais proxima no topo
+  //   - Concluida / Cancelada / sem filtro → desc (mais recente primeiro)
+  //     Eventos PASSADOS: ver os ultimos primeiro
+  // Espelha o default do backend (services/manutencao/index.js).
+  const ordemAscendente = useMemo(() => {
+    const s = manut.filtros?.status;
+    return ['aguardando', 'Pendente', 'Agendada', 'EmAndamento'].includes(s);
+  }, [manut.filtros?.status]);
+
   const unifiedItems = useMemo(() => {
     const m = manut.manutencoes.map((item) => ({
       ...item,
@@ -63,9 +74,11 @@ export function useTabManutencoes() {
     return [...m, ...o].sort((a, b) => {
       if (!a._sortDate) return 1;
       if (!b._sortDate) return -1;
-      return new Date(b._sortDate) - new Date(a._sortDate);
+      return ordemAscendente
+        ? new Date(a._sortDate) - new Date(b._sortDate)
+        : new Date(b._sortDate) - new Date(a._sortDate);
     });
-  }, [manut.manutencoes, osc.osCorretivas, oscStatusAplicavel]);
+  }, [manut.manutencoes, osc.osCorretivas, oscStatusAplicavel, ordemAscendente]);
 
   // ─── KPIs combinados ─────────────────────────────────────────────────────
   const metricas = useMemo(() => ({
