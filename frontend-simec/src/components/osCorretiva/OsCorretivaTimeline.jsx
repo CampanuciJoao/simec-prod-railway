@@ -3,7 +3,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faFolderOpen, faStickyNote, faTruck, faClipboardCheck, faCheckCircle, faBan,
-  faPenToSquare,
+  faPenToSquare, faClockRotateLeft,
 } from '@fortawesome/free-solid-svg-icons';
 import { Card } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
@@ -14,6 +14,7 @@ const TIPO_CONFIG = {
   nota: { icon: faStickyNote, color: '#334155', label: 'Nota de andamento' },
   promovida_corretiva: { icon: faClipboardCheck, color: '#dc2626', label: 'Promovida a Corretiva' },
   visita_agendada: { icon: faTruck, color: '#7c3aed', label: 'Visita agendada' },
+  visita_reagendada: { icon: faClockRotateLeft, color: '#f59e0b', label: 'Visita reagendada' },
   resultado_visita: { icon: faClipboardCheck, color: '#059669', label: 'Resultado da visita' },
   conclusao: { icon: faCheckCircle, color: '#16a34a', label: 'Conclusão' },
   cancelamento: { icon: faBan, color: '#6b7280', label: 'Cancelamento' },
@@ -25,8 +26,10 @@ function TimelineItem({ evento, timezone, onEditar }) {
   const podeEditar = Boolean(onEditar && evento.editavel && evento.id);
 
   const descricaoTexto = (() => {
-    if (evento.tipo === 'visita_agendada' && evento.meta?.dataHoraInicioPrevista) {
-      return `Previsão: ${fmt(evento.meta.dataHoraInicioPrevista)} até ${fmt(evento.meta.dataHoraFimPrevista)}`;
+    if ((evento.tipo === 'visita_agendada' || evento.tipo === 'visita_reagendada')
+        && evento.meta?.dataHoraInicioPrevista) {
+      const prefixo = evento.tipo === 'visita_reagendada' ? 'Previsão original' : 'Previsão';
+      return `${prefixo}: ${fmt(evento.meta.dataHoraInicioPrevista)} até ${fmt(evento.meta.dataHoraFimPrevista)}`;
     }
     return evento.descricao || null;
   })();

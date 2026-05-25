@@ -1,7 +1,7 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft } from '@fortawesome/free-solid-svg-icons';
+import { faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft, faRotate } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import { useAuth } from '@/contexts/AuthContext';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
@@ -9,6 +9,7 @@ import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
 import AdicionarNotaModal from '@/components/osCorretiva/AdicionarNotaModal';
 import EditarNotaModal from '@/components/osCorretiva/EditarNotaModal';
 import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTerceiroModal';
+import ReagendarVisitaModal from '@/components/osCorretiva/ReagendarVisitaModal';
 import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/ConfirmacaoFinalVisitaCorretiva';
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
 import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
@@ -49,6 +50,10 @@ function DetalhesOsCorretivaPage() {
         (v.status === 'Agendada' && new Date(v.dataHoraFimPrevista) - agora <= JANELA_MS))
   );
 
+  // Visita ativa Agendada (sem ter chegado ainda) — habilita botao
+  // "Reagendar visita" quando OS esta AguardandoTerceiro.
+  const visitaAtivaAgendada = os.visitas?.find((v) => v.status === 'Agendada') || null;
+
   return (
     <>
       <AdicionarNotaModal
@@ -73,6 +78,16 @@ function DetalhesOsCorretivaPage() {
         isOpen={page.visitaModal.isOpen}
         onClose={page.visitaModal.closeModal}
         onConfirm={page.handleAgendarVisita}
+        submitting={page.submitting}
+        fieldErrors={page.fieldErrors}
+      />
+
+      <ReagendarVisitaModal
+        isOpen={page.reagendarVisitaModal.isOpen}
+        onClose={page.reagendarVisitaModal.closeModal}
+        onConfirm={page.handleReagendarVisita}
+        visita={page.reagendarVisitaModal.modalData}
+        timezone={os?.equipamento?.unidade?.timezone}
         submitting={page.submitting}
         fieldErrors={page.fieldErrors}
       />
@@ -161,6 +176,21 @@ function DetalhesOsCorretivaPage() {
                   <Button type="button" variant="secondary" onClick={page.visitaModal.openModal}>
                     <FontAwesomeIcon icon={faTruck} />
                     Agendar visita
+                  </Button>
+                )}
+
+                {/* Reagendar visita: quando OS esta AguardandoTerceiro
+                    e existe visita Agendada (nao reagenda EmExecucao —
+                    pra isso use Prazo Estendido no resultado da visita). */}
+                {os.status === 'AguardandoTerceiro' && visitaAtivaAgendada && (
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => page.reagendarVisitaModal.openModal(visitaAtivaAgendada)}
+                    title="Reagendar a visita atual (mantem a OS aberta)"
+                  >
+                    <FontAwesomeIcon icon={faRotate} />
+                    Reagendar visita
                   </Button>
                 )}
 

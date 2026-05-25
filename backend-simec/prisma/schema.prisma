@@ -1640,6 +1640,7 @@ enum StatusVisitaTerceiro {
   EmExecucao
   Concluida
   PrazoEstendido
+  Reagendada
 }
 
 enum ResultadoVisita {
