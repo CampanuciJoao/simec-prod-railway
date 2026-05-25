@@ -108,6 +108,18 @@ export async function listarManutencoesService({
   const page = parsePositiveInt(filters?.page, 1);
   const pageSize = Math.min(parsePositiveInt(filters?.pageSize, 20), 100);
 
+  // Default de ordenacao depende do status filtrado:
+  //   - Pendente / Agendada / EmAndamento / "aguardando" (pseudo) -> 'asc'
+  //     (eventos FUTUROS / aguardando: a mais proxima primeiro)
+  //   - Concluida / Cancelada / sem filtro de status -> 'desc'
+  //     (eventos PASSADOS: a mais recente primeiro)
+  // Se o cliente passar sortDirection explicitamente, respeita.
+  const STATUS_FUTUROS = ['aguardando', 'Pendente', 'Agendada', 'EmAndamento'];
+  const sortDirectionDefault = STATUS_FUTUROS.includes(filters?.status) ? 'asc' : 'desc';
+  const sortDirection = filters?.sortDirection
+    ? (filters.sortDirection === 'asc' ? 'asc' : 'desc')
+    : sortDirectionDefault;
+
   const manutencoes = await listarManutencoes({
     tenantId,
     equipamentoId: filters?.equipamentoId,
@@ -118,7 +130,7 @@ export async function listarManutencoesService({
     page,
     pageSize,
     sortBy: filters?.sortBy || 'dataHoraAgendamentoInicio',
-    sortDirection: filters?.sortDirection === 'asc' ? 'asc' : 'desc',
+    sortDirection,
     incluirNotas: !!filters?.equipamentoId,
   });
 
