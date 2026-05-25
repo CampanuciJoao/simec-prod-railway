@@ -60,11 +60,14 @@ export async function listarAlertasPaginado({ tenantId, userId, baseline, page, 
           select: { visto: true, dataVisto: true },
         },
       },
-      // Ordena por data do evento (DESC) e desempata por createdAt (DESC).
-      // Sem o desempate, alertas da mesma manutencao (todos com data =
-      // dataHoraAgendamentoInicio) saiam em ordem indefinida — o alerta
-      // mais recente (ex: "iniciada") aparecia abaixo do "1h antes".
-      orderBy: [{ data: 'desc' }, { createdAt: 'desc' }],
+      // Alertas sao sobre eventos com data limite (PM vence em N dias,
+      // contrato vencendo, calibracao no prazo). Ordenamos por `data` ASC
+      // — o que esta mais proximo (ou ja vencido) aparece primeiro. Esses
+      // sao os que demandam acao primeiro.
+      // Desempate por createdAt DESC: alertas da mesma manutencao
+      // (todos com data = dataHoraAgendamentoInicio) saem com o mais
+      // recente em cima (ex: "iniciada" acima de "1h antes").
+      orderBy: [{ data: 'asc' }, { createdAt: 'desc' }],
       skip,
       take: pageSize,
     }),
