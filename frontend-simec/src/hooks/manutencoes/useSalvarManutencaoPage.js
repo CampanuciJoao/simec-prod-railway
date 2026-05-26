@@ -23,6 +23,10 @@ export function useSalvarManutencaoPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  // Mensagem do ultimo erro de submit — exibida inline acima do botao
+  // pra garantir feedback visivel (toast some rapido e pode passar
+  // despercebido em forms longos).
+  const [submitError, setSubmitError] = useState('');
 
   const fetchData = useCallback(async () => {
     try {
@@ -61,6 +65,7 @@ export function useSalvarManutencaoPage() {
     async (formData) => {
       try {
         setSubmitting(true);
+        setSubmitError('');
 
         if (isEditing) {
           await updateManutencao(manutencaoId, formData);
@@ -75,8 +80,11 @@ export function useSalvarManutencaoPage() {
         const mensagem =
           err?.response?.data?.message || 'Erro ao salvar a manutencao.';
 
+        // Mostra inline (persistente) E como toast (transiente). Sem
+        // rethrow — quem chama trata pelos states (submitError +
+        // submitting=false), evita unhandled promise rejection no console.
+        setSubmitError(mensagem);
         addToast(mensagem, 'error');
-        throw err;
       } finally {
         setSubmitting(false);
       }
@@ -96,6 +104,7 @@ export function useSalvarManutencaoPage() {
     loading,
     submitting,
     error,
+    submitError,
     handleSave,
     goBack,
   };

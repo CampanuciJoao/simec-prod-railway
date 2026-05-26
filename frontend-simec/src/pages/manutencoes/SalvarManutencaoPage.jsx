@@ -95,6 +95,7 @@ function SalvarManutencaoPage() {
         onSubmit={page.handleSave}
         isEditing={page.isEditing}
         isSubmitting={page.submitting}
+        submitError={page.submitError}
         todosEquipamentos={page.equipamentos}
         unidadesDisponiveis={page.unidades}
       />
