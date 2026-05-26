@@ -264,25 +264,38 @@ function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, 
 // ─── 3. Forma de Pagamento ────────────────────────────────────────────────────
 
 function _formaPagamento(doc, fornecedores, { marginX, leftW, fornWidths }) {
-  const rowH = 24;
-  const y    = doc.y;
+  const y = doc.y;
+  const padY = 7;
+
+  // Mede altura real de cada celula (forma de pagamento por fornecedor)
+  // e usa a maior pra dimensionar a row. Antes rowH=24 fixo + ellipsis
+  // truncava "50% de entrada / 50% em 30 dias" ou similar.
+  doc.font('Helvetica').fontSize(8.5);
+  const alturas = fornecedores.map((forn, i) => {
+    const texto = safe(forn.formaPagamento, '—');
+    return doc.heightOfString(texto, { width: fornWidths[i] - 8 });
+  });
+  const maxAlturaForn = alturas.length ? Math.max(...alturas) : 0;
+  const rowH = Math.max(24, maxAlturaForn + padY * 2);
 
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
     .font('Helvetica-Bold').fontSize(7.5).fillColor(TEXT)
-    .text('FORMA DE PAGAMENTO', marginX + 8, y + 8, { width: leftW - 16, lineBreak: false });
+    .text('FORMA DE PAGAMENTO', marginX + 8, y + (rowH / 2) - 4, { width: leftW - 16, lineBreak: false });
 
   let cx = marginX + leftW;
   for (let i = 0; i < fornecedores.length; i++) {
     const w = fornWidths[i];
     box(doc, cx, y, w, rowH);
+    const texto = safe(fornecedores[i].formaPagamento, '—');
+    // Centraliza verticalmente o bloco de texto na celula
+    const hTexto = alturas[i] || 0;
+    const offsetY = (rowH - hTexto) / 2;
     doc
       .font('Helvetica').fontSize(8.5).fillColor(TEXT)
-      .text(safe(fornecedores[i].formaPagamento, '—'), cx + 4, y + 7, {
+      .text(texto, cx + 4, y + offsetY, {
         width: w - 8,
         align: 'center',
-        lineBreak: false,
-        ellipsis: true,
       });
     cx += w;
   }
