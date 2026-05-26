@@ -52,10 +52,14 @@ function adaptarManutencoesPorMes(manutencoesDosUltimos6Meses = []) {
     return acc;
   }, {});
 
+  // Agrupa por dataConclusao (quando a manutencao foi EXECUTADA) — antes
+  // usava createdAt e mostrava manutencoes agendadas no mes, distorcendo
+  // o "Historico". O repository ja filtra por status=Concluida, entao
+  // todas as linhas aqui tem dataConclusao preenchido.
   manutencoesDosUltimos6Meses.forEach((manutencao) => {
-    if (!manutencao.createdAt || !manutencao.tipo) return;
+    if (!manutencao.dataConclusao || !manutencao.tipo) return;
 
-    const chaveMes = `${MESES_NOMES[getMonth(manutencao.createdAt)]}/${getYear(manutencao.createdAt)
+    const chaveMes = `${MESES_NOMES[getMonth(manutencao.dataConclusao)]}/${getYear(manutencao.dataConclusao)
       .toString()
       .slice(-2)}`;
 
