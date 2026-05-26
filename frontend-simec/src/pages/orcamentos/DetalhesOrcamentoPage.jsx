@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   PageLayout,
@@ -10,6 +11,7 @@ import {
   Textarea,
   LoadingState,
 } from '@/components/ui';
+import PreviewOrcamentoPdfModal from '@/components/orcamentos/PreviewOrcamentoPdfModal';
 import {
   faFileInvoiceDollar,
   faArrowLeft,
@@ -35,6 +37,7 @@ function DetalhesOrcamentoPage() {
   const tz = useTenantTimezone();
   const isAdmin = usuario?.role === 'admin' || usuario?.role === 'superadmin';
   const p = useDetalhesOrcamento();
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   if (p.loading) return <LoadingState />;
   if (!p.orcamento) return <PageState empty emptyTitle="Orçamento não encontrado" />;
@@ -101,7 +104,15 @@ function DetalhesOrcamentoPage() {
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => exportarOrcamentoPDF(orc.id)}
+                onClick={() => {
+                  // Rascunho abre preview inline (usuario valida sem
+                  // precisar baixar). Aprovados/rejeitados baixam direto.
+                  if (orc.status === 'RASCUNHO') {
+                    setPreviewOpen(true);
+                  } else {
+                    exportarOrcamentoPDF(orc.id);
+                  }
+                }}
               >
                 <FontAwesomeIcon icon={faFilePdf} className="mr-2" />
                 {orc.status === 'RASCUNHO' ? 'Preview PDF' : 'Baixar PDF'}
@@ -362,6 +373,12 @@ function DetalhesOrcamentoPage() {
           </div>
         </div>
       )}
+
+      <PreviewOrcamentoPdfModal
+        isOpen={previewOpen}
+        orcamentoId={orc.id}
+        onClose={() => setPreviewOpen(false)}
+      />
     </PageLayout>
   );
 }
