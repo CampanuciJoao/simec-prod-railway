@@ -121,6 +121,20 @@ export const exportarOrcamentoPDF = (orcamentoId) =>
     `orcamento_${orcamentoId.slice(-6).toUpperCase()}.pdf`
   );
 
+// Versao "preview": retorna um Object URL temporario (blob: URL) que
+// pode ser plugado num <iframe> pra renderizar o PDF inline na pagina,
+// sem trigger de download. Quem chama eh responsavel por revogar o URL
+// quando fechar o preview (window.URL.revokeObjectURL).
+export async function carregarOrcamentoPdfBlobUrl(orcamentoId) {
+  const response = await api.request({
+    responseType: 'blob',
+    url: `/pdfs/orcamento/${orcamentoId}`,
+    method: 'get',
+  });
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  return window.URL.createObjectURL(blob);
+}
+
 export const exportarContratoPDF = (contratoId) =>
   baixarPdf(
     { url: `/pdfs/contrato/${contratoId}`, method: 'get' },
