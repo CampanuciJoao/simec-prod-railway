@@ -57,16 +57,22 @@ export function buscarResumoDashboard({
       where: { tenantId },
       _count: { id: true },
     }),
+    // Grafico "Historico de manutencoes" mostra manutencoes EXECUTADAS
+    // (concluidas) por mes — nao as agendadas. Filtra por status Concluida
+    // e usa dataConclusao tanto pro filtro temporal quanto pro agrupamento
+    // no adapter. Manutencoes em andamento ou agendadas para o futuro
+    // nao entram no historico.
     prisma.manutencao.findMany({
       where: {
         tenantId,
-        createdAt: { gte: seisMesesAtras },
+        status: 'Concluida',
+        dataConclusao: { gte: seisMesesAtras },
       },
       select: {
-        createdAt: true,
+        dataConclusao: true,
         tipo: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { dataConclusao: 'desc' },
       take: 500,
     }),
     prisma.alerta.findMany({
