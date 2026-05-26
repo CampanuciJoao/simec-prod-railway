@@ -19,6 +19,7 @@ function ManutencaoForm({
   onSubmit,
   isEditing,
   isSubmitting = false,
+  submitError = '',
   todosEquipamentos,
   unidadesDisponiveis,
 }) {
@@ -42,7 +43,14 @@ function ManutencaoForm({
 
     if (!isValid || isSubmitting) return;
 
-    await onSubmit(formData);
+    // try/catch defensivo — onSubmit ja trata o erro internamente
+    // (toast + submitError state). Evita unhandled promise rejection
+    // no console quando o backend retorna 409/422/etc.
+    try {
+      await onSubmit(formData);
+    } catch {
+      /* erro ja foi exibido inline (submitError) + toast */
+    }
   };
 
   const unidadesOptions = (unidades || []).map((unidade) => ({
@@ -204,6 +212,19 @@ function ManutencaoForm({
         ) : null}
       </PageSection>
 
+      {submitError ? (
+        <div
+          className="rounded-xl border px-4 py-3 text-sm"
+          style={{
+            backgroundColor: 'var(--color-danger-surface, #fee2e2)',
+            borderColor: 'var(--color-danger-soft, #fca5a5)',
+            color: 'var(--color-danger, #b91c1c)',
+          }}
+        >
+          <strong>Não foi possível agendar:</strong> {submitError}
+        </div>
+      ) : null}
+
       <div className="flex justify-end">
         <Button type="submit" disabled={!isValid || isSubmitting}>
           {isSubmitting
@@ -224,6 +245,7 @@ ManutencaoForm.propTypes = {
   onSubmit: PropTypes.func.isRequired,
   isEditing: PropTypes.bool,
   isSubmitting: PropTypes.bool,
+  submitError: PropTypes.string,
   todosEquipamentos: PropTypes.arrayOf(PropTypes.object),
   unidadesDisponiveis: PropTypes.arrayOf(PropTypes.object),
 };
