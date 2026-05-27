@@ -92,6 +92,43 @@ export const ExecutionAgent = {
 
     const contextoUsuario = { usuarioId, usuarioNome, tenantId, tenantTimezone };
 
+    // Pede confirmacao explicita de intent antes de criar sessao. Acionado
+    // pelo Planner quando confianca < 0.85 em AGENDAR vs RELATORIO. Mostra
+    // 2 sugestoes ortogonais ("agendar nova" / "consultar historico") —
+    // o usuario clica e a proxima mensagem caira na heuristica forte
+    // (TERMOS_CONSULTA_FORTES ou TERMOS_AGENDAMENTO_FORTES).
+    if (plano.acao === 'PEDIR_CONFIRMACAO_INTENT') {
+      const intent = plano.intent_proposto;
+      const mensagem =
+        intent === 'AGENDAR_MANUTENCAO'
+          ? 'Não tenho certeza se você quer **agendar uma nova manutenção** ou **consultar o histórico**. Qual dos dois?'
+          : 'Não tenho certeza se você quer **consultar o histórico** ou **agendar uma nova manutenção**. Qual dos dois?';
+
+      // Renderizado pelo ChatMessageBubble como botoes clicaveis. Cada
+      // botao envia 'message' como nova mensagem do usuario, que cai
+      // direto na heuristica forte (TERMOS_CONSULTA_FORTES ou
+      // TERMOS_AGENDAMENTO_FORTES) e roteia certo.
+      const resposta = respostaAgente(mensagem, {
+        meta: {
+          intent: 'CONFIRMACAO_INTENT',
+          intent_proposto: intent,
+          confianca: plano.confianca,
+          actions: [
+            { id: 'consultar', label: 'Consultar histórico', message: 'quero saber o histórico', variant: 'primary' },
+            { id: 'agendar', label: 'Agendar nova manutenção', message: 'quero agendar uma manutenção', variant: 'secondary' },
+          ],
+        },
+      });
+      contexto.resposta = resposta;
+      adicionarAuditoria(contexto, {
+        agente: 'ExecutionAgent',
+        acao: 'CONFIRMACAO_INTENT_PEDIDA',
+        intent_proposto: intent,
+        confianca: plano.confianca,
+      });
+      return resposta;
+    }
+
     if (plano.acao === 'RESET') {
       for (const sessao of plano.cancelar_sessoes) {
         await cancelarSessao(sessao, mensagem);
@@ -146,8 +183,17 @@ export const ExecutionAgent = {
       await cancelarSessao(sessao, mensagem);
     }
 
-    // Pré-popular sessão de agendamento com entidades extraídas
-    if (plano.acao === 'NOVA_SESSAO' && plano.dominio === 'AGENDAMENTO') {
+    // Pré-popular sessão de agendamento com entidades extraídas — APENAS
+    // quando confianca de interpretacao >= 0.85. Confianca menor passa
+    // antes pelo PEDIR_CONFIRMACAO_INTENT, mas como defesa em profundidade
+    // tambem nao pre-populamos aqui. Evita criar sessao no caminho errado
+    // quando intent foi classificado por LLM com baixa certeza.
+    const confiancaInterpretacao = contexto.interpretacao?.confianca ?? 0;
+    if (
+      plano.acao === 'NOVA_SESSAO' &&
+      plano.dominio === 'AGENDAMENTO' &&
+      confiancaInterpretacao >= 0.85
+    ) {
       const sessaoPrePopulada = await prePopularSessaoAgendamento(contexto, tenantId);
       if (sessaoPrePopulada) {
         plano.sessao_alvo = sessaoPrePopulada;

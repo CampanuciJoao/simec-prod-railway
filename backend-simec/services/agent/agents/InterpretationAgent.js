@@ -18,46 +18,100 @@ const TERMOS_BATCH_AGENDAMENTO = [
   'manutencao em massa', 'agendamento em lote',
 ];
 
-const TERMOS_AGENDAMENTO = [
-  'agendar', 'marcar', 'abrir os', 'abrir uma os', 'abrir chamado',
-  'nova manutencao', 'novo agendamento', 'quero agendar', 'preciso agendar',
-  'gostaria de agendar',
+// Verbos de ACAO inequivocos — usuario quer CRIAR algo.
+// Heuristica forte: presenca destes = AGENDAR_MANUTENCAO com alta confianca,
+// MESMO se a frase tambem tiver palavras como "preventiva" / "unidade".
+const TERMOS_AGENDAMENTO_FORTES = [
+  'agendar', 'agende', 'agenda uma', 'agenda essa', 'agenda essa',
+  'marcar', 'marque', 'marca uma',
+  'abrir os', 'abrir uma os', 'abrir chamado', 'abre os', 'abre uma os',
+  'criar os', 'criar uma os', 'cria uma os',
+  'nova manutencao', 'novo agendamento',
+  'quero agendar', 'preciso agendar', 'gostaria de agendar',
+  'pode agendar', 'poderia agendar',
 ];
 
-const TERMOS_RELATORIO = [
-  'quando foi', 'qual foi', 'ultima', 'mais recente', 'historico', 'relatorio',
-  'quantas', 'quais', 'listar', 'liste', 'mostrar', 'mostre', 'consulta',
+// Verbos de CONSULTA inequivocos — usuario quer SABER algo, nao criar.
+// Heuristica forte: presenca destes = RELATORIO com alta confianca,
+// MESMO se a frase tambem tiver palavras como "preventiva" / "manutencao".
+const TERMOS_CONSULTA_FORTES = [
+  'quando foi', 'quando ocorreu', 'quando aconteceu',
+  'qual foi', 'quais foram', 'qual a ultima', 'qual foi a ultima',
+  'gostaria de saber', 'queria saber', 'quero saber', 'preciso saber',
+  'gostaria de ver', 'queria ver', 'quero ver', 'preciso ver',
+  'me diga', 'me diz', 'me mostra', 'me mostre', 'me informa',
+  'consultar', 'consulte', 'consulta o', 'consulta a',
+  'me passa', 'me passe', 'me da', 'me de',
+  'historico', 'relatorio',
+];
+
+// Termos GENERICOS de relatorio — sozinhos nao sao decisivos, mas casados
+// com ausencia de verbo de acao indicam consulta.
+const TERMOS_RELATORIO_FRACOS = [
+  'ultima', 'ultimo', 'mais recente',
+  'listar', 'liste', 'mostrar', 'mostre', 'consulta',
   'feita em', 'feitas em', 'no periodo', 'periodo', 'ultimo ano',
-  'preventivas', 'corretivas',
+  'preventiva', 'preventivas', 'corretiva', 'corretivas',
+  'quantas', 'quais',
 ];
 
 const TERMOS_ANALYTICS = [
   'mais paradas', 'mais corretivas', 'mais preventivas', 'mais manutencoes',
-  'top equipamentos', 'ranking', 'tendencia', 'tendencia', 'por setor',
+  'top equipamentos', 'ranking', 'tendencia', 'por setor',
   'por unidade', 'backlog', 'em aberto', 'quais tiveram mais', 'pior equipamento',
-  'melhor unidade', 'distribuicao', 'distribuicao', 'comparar unidades',
+  'melhor unidade', 'distribuicao', 'comparar unidades',
   'comparar setores', 'risco alto', 'equipamentos criticos',
   'mes a mes', 'evolucao mensal',
 ];
 
+// Classifica por heuristica seguindo regra de PRECEDENCIA:
+//
+// 1. SEGURO (termo muito especifico)
+// 2. BATCH_AGENDAMENTO (subset de AGENDAR mas com termos exclusivos)
+// 3. Detecta CONFLITO consulta+acao — se ambos presentes, devolve null
+//    pra deixar o LLM (com few-shot) ou o caminho de confirmacao decidir
+// 4. CONSULTA_FORTE sozinho → RELATORIO (cobre o caso "quando foi a ultima
+//    preventiva" que antes caia errado em AGENDAR via LLM sem few-shot)
+// 5. AGENDAMENTO_FORTE sozinho → AGENDAR_MANUTENCAO
+// 6. ANALYTICS (agregado)
+// 7. RELATORIO_FRACOS (fallback de termos genericos)
 function classificarHeuristica(msg) {
   const m = normalizarTexto(msg);
 
   if (TERMOS_SEGURO.some((t) => m.includes(t))) {
     return { intent: 'SEGURO', confianca: 0.9 };
   }
-  // BATCH antes de AGENDAMENTO — contém termos de agendamento
+
   if (TERMOS_BATCH_AGENDAMENTO.some((t) => m.includes(t))) {
     return { intent: 'BATCH_AGENDAMENTO', confianca: 0.92 };
   }
-  if (TERMOS_AGENDAMENTO.some((t) => m.includes(t))) {
-    return { intent: 'AGENDAR_MANUTENCAO', confianca: 0.9 };
+
+  const temConsultaForte = TERMOS_CONSULTA_FORTES.some((t) => m.includes(t));
+  const temAcaoForte = TERMOS_AGENDAMENTO_FORTES.some((t) => m.includes(t));
+
+  // Conflito: usuario disse "quero saber E depois agendar". Caso raro,
+  // mas existe. Devolve null pra LLM (com few-shot) decidir — o caminho
+  // de baixa confianca no Planner ainda vai pedir confirmacao.
+  if (temConsultaForte && temAcaoForte) {
+    return null;
   }
+
+  if (temConsultaForte) {
+    return { intent: 'RELATORIO', confianca: 0.92 };
+  }
+
+  if (temAcaoForte) {
+    return { intent: 'AGENDAR_MANUTENCAO', confianca: 0.92 };
+  }
+
   if (TERMOS_ANALYTICS.some((t) => m.includes(t))) {
     return { intent: 'ANALYTICS', confianca: 0.88 };
   }
-  if (TERMOS_RELATORIO.some((t) => m.includes(t))) {
-    return { intent: 'RELATORIO', confianca: 0.85 };
+
+  if (TERMOS_RELATORIO_FRACOS.some((t) => m.includes(t))) {
+    // Confianca menor — termos genericos sem verbo decisivo. O Planner
+    // pode pedir confirmacao se threshold < 0.85.
+    return { intent: 'RELATORIO', confianca: 0.78 };
   }
 
   return null;
@@ -94,7 +148,28 @@ Valores possíveis para intent:
 - "ANALYTICS": análises agregadas — top equipamentos, tendência, backlog
 - "OUTRO": saudação ou conversa sem ação clara
 
+REGRA CRÍTICA — distinguir CONSULTA (RELATORIO) de AÇÃO (AGENDAR):
+- Verbos de CONSULTA: "saber", "ver", "consultar", "mostrar", "quando foi", "qual foi", "me diga" → RELATORIO
+- Verbos de AÇÃO: "agendar", "marcar", "abrir OS", "criar", "agenda essa" → AGENDAR_MANUTENCAO
+- Palavras como "preventiva", "corretiva", "manutenção", "unidade", "equipamento" SOZINHAS não decidem — o que decide é o VERBO PRINCIPAL.
+
+Exemplos:
+"quando foi a última preventiva na TC Sede?" → RELATORIO (verbo: saber quando)
+"qual foi a última manutenção do RM" → RELATORIO
+"gostaria de saber quando foi a última preventiva" → RELATORIO
+"agenda uma preventiva pra TC pra terça" → AGENDAR_MANUTENCAO (verbo: agendar)
+"marcar manutenção do mamógrafo" → AGENDAR_MANUTENCAO
+"preciso agendar uma preventiva no RM" → AGENDAR_MANUTENCAO
+"quero abrir um chamado, o RM está com problema" → AGENDAR_MANUTENCAO
+"preventivas vencidas no parque" → ANALYTICS
+"top equipamentos com mais corretivas" → ANALYTICS
+"oi, tudo bem?" → OUTRO
+
+Para extração de "equipamento", capture o termo como o usuário escreveu, incluindo apelidos parciais ("Tomografia Evo" → equipamento: "Tomografia Evo"; a busca fuzzy resolve depois).
+
 Urgência: "Alta" (quebrou/parou/urgente), "Media" (preventiva/revisão), "Baixa" (planejamento)
+
+Se você não tem certeza entre RELATORIO e AGENDAR_MANUTENCAO, devolva a confiança ≤ 0.7 — o sistema vai pedir confirmação ao usuário em vez de assumir.
 
 Mensagem: "${sanitizarMensagem(mensagem)}"`;
 
