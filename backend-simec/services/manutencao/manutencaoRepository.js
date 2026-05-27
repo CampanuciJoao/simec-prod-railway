@@ -362,6 +362,7 @@ export async function listarManutencoes({
       if (MANUTENCAO_STATUS_AGUARDANDO.includes(item.status)) {
         acc.aguardando += item._count.id;
       }
+      if (item.status === 'AguardandoConfirmacao') acc.aguardandoConfirmacao = item._count.id;
       if (item.status === 'EmAndamento') acc.emAndamento = item._count.id;
       if (item.status === 'Concluida') acc.concluidas = item._count.id;
       if (item.status === 'Cancelada') acc.canceladas = item._count.id;
@@ -371,6 +372,7 @@ export async function listarManutencoes({
       total: totalSemStatus,
       emAndamento: 0,
       aguardando: 0,
+      aguardandoConfirmacao: 0,
       concluidas: 0,
       canceladas: 0,
     }

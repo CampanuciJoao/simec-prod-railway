@@ -6,6 +6,7 @@ const COLS_CLASSES = {
   3: 'sm:grid-cols-2 lg:grid-cols-3',
   4: 'sm:grid-cols-2 xl:grid-cols-4',
   5: 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5',
+  6: 'sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6',
 };
 
 function KpiGrid({ children, className = '', cols = 4 }) {
@@ -26,7 +27,7 @@ function KpiGrid({ children, className = '', cols = 4 }) {
 KpiGrid.propTypes = {
   children: PropTypes.node,
   className: PropTypes.string,
-  cols: PropTypes.oneOf([3, 4, 5]),
+  cols: PropTypes.oneOf([3, 4, 5, 6]),
 };
 
 export default KpiGrid;
