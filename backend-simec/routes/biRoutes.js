@@ -146,7 +146,8 @@ router.get('/indicadores', async (req, res) => {
           tag: equip.tag,
           unidadeId: equip.unidadeId,
           unidade: equip.unidade?.nomeSistema || 'N/A',
-          corretivas: 0,
+          corretivas: 0,    // OS com tipo=Corretiva (visita de terceiro agendada / chamado de campo)
+          ocorrencias: 0,   // OS com tipo=Ocorrencia (problema relatado sem acionar terceiro)
           preventivas: 0,
           horasParado: 0,
         };
@@ -187,7 +188,14 @@ router.get('/indicadores', async (req, res) => {
       garantirStatsEquip(eId, os.equipamento);
       garantirStatsUnidade(uId, uNome);
 
-      statsEquip[eId].corretivas += 1;
+      // Separa o que vai como CORRETIVA real (acionou terceiro) de simples
+      // OCORRENCIA (problema relatado, ainda sem chamado de visita). Antes
+      // tudo entrava como corretiva — inflava reincidencia e KPIs.
+      if (os.tipo === 'Corretiva') {
+        statsEquip[eId].corretivas += 1;
+      } else {
+        statsEquip[eId].ocorrencias += 1;
+      }
 
       const horas = calcularHorasParadoOsCorretiva(os);
       statsEquip[eId].horasParado += horas;
@@ -195,7 +203,10 @@ router.get('/indicadores', async (req, res) => {
     }
 
     const manutencoesPreventivas = manutencoes.filter(m => m.tipo === 'Preventiva').length;
-    const manutencoesCorretivas = manutencoes.filter(m => m.tipo === 'Corretiva').length + osCorretivas.length;
+    const manutencoesCorretivas =
+      manutencoes.filter(m => m.tipo === 'Corretiva').length +
+      osCorretivas.filter(os => os.tipo === 'Corretiva').length;
+    const totalOcorrencias = osCorretivas.filter(os => os.tipo === 'Ocorrencia').length;
 
     // MTTR (Mean Time To Repair) — média em horas das OS corretivas concluídas
     let mttrHoras = null;
@@ -240,12 +251,15 @@ router.get('/indicadores', async (req, res) => {
         (m) => m.tipo === 'Preventiva' && m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx
       ).length;
 
+      // Corretivas no mes: so OS Corretivas reais (que tiveram visita) +
+      // manutencoes manuais tipo Corretiva. Ocorrencias soltas nao contam
+      // pra evitar inflar o grafico "Evolucao mensal".
       const corrMes =
         manutencoes.filter(
           (m) => m.tipo === 'Corretiva' && m.dataConclusao && new Date(m.dataConclusao).getMonth() === mesIdx
         ).length +
         osCorretivas.filter(
-          (os) => os.dataHoraConclusao && new Date(os.dataHoraConclusao).getMonth() === mesIdx
+          (os) => os.tipo === 'Corretiva' && os.dataHoraConclusao && new Date(os.dataHoraConclusao).getMonth() === mesIdx
         ).length;
 
       const downtimeMes =
@@ -278,7 +292,10 @@ router.get('/indicadores', async (req, res) => {
       ? Math.round(((totalHorasFlota - totalDowntimeFlota) / totalHorasFlota) * 100000) / 1000
       : null;
 
-    // Reincidentes — equipamentos com ≥ 2 ocorrências corretivas
+    // Reincidentes — equipamentos com ≥ 2 OS CORRETIVAS reais (visita de
+    // terceiro de campo). Ocorrencias soltas nao contam — antes inflavam
+    // o ranking e mostravam reincidencia falsa em equipamentos que so
+    // tiveram registros sem intervencao.
     const reincidentes = Object.values(statsEquip)
       .filter((e) => e.corretivas >= 2)
       .sort((a, b) => b.corretivas - a.corretivas)
@@ -290,6 +307,7 @@ router.get('/indicadores', async (req, res) => {
         totalAtivos: totalEquipamentos,
         preventivas: manutencoesPreventivas,
         corretivas: manutencoesCorretivas,
+        ocorrencias: totalOcorrencias,
         totalManutencoesConcluidas: manutencoes.length + osCorretivas.length,
       },
       kpis: {
