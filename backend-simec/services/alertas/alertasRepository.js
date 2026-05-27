@@ -61,13 +61,15 @@ export async function listarAlertasPaginado({ tenantId, userId, baseline, page, 
         },
       },
       // Ordenado como feed de notificacoes — mais RECENTE primeiro.
-      // `data` (evento) DESC primario, desempate por `createdAt` DESC para
-      // alertas da mesma manutencao saem com o mais recente em cima
-      // (ex: "iniciada" acima de "1h antes").
-      // Nota: anteriormente foi testado ASC para priorizar "mais proximo
-      // do vencimento", mas o caso de uso do sino eh feed de notificacao
-      // (ultima novidade primeiro), nao agenda. Mantido DESC.
-      orderBy: [{ data: 'desc' }, { createdAt: 'desc' }],
+      // Chave primaria: `createdAt` DESC (quando o alerta apareceu no
+      // sistema). `data` (campo do evento) eh secundaria so como desempate.
+      // Antes era o inverso (`data` primario), mas isso jogava pro topo
+      // alertas com `data` futura (ex: "CQ vence em 90 dias" com data
+      // 17/08/2026) acima de alertas atuais — quem filtra "Visto" via uma
+      // lista aparentemente fora de ordem cronologica. O campo `data`
+      // continua importando pra ordenar alertas criados no mesmo lote
+      // (ex: "iniciada" acima de "1h antes" quando o cron dispara junto).
+      orderBy: [{ createdAt: 'desc' }, { data: 'desc' }],
       skip,
       take: pageSize,
     }),
