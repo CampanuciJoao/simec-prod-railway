@@ -5,6 +5,7 @@ import {
   faCircleCheck,
   faCircleXmark,
   faClock,
+  faHourglassHalf,
   faPersonRunning,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -31,15 +32,23 @@ function ManutencoesTab({ tab, isAdmin, onDeleteManutencao, onDeleteOs }) {
     tab.activeKpi === key ? 'ring-2 ring-offset-2 ring-offset-transparent' : '';
 
   if (tab.loading) {
-    return <SkeletonList rows={6} cols={5} />;
+    return <SkeletonList rows={6} cols={6} />;
   }
 
   const isEmpty = !tab.loading && !tab.error && tab.items.length === 0;
+  const aguardandoConfirmacaoCount = tab.metricas?.aguardandoConfirmacao ?? 0;
+  // Destaque so quando ha pendencia — card "chamativo" para o admin
+  // localizar rapido manutencoes finalizadas pelo executor aguardando
+  // confirmacao. Anel ambar forte + sombra; sem pendencia fica neutro.
+  const aguardandoConfirmacaoHighlight =
+    aguardandoConfirmacaoCount > 0
+      ? 'ring-2 ring-amber-400 ring-offset-2 ring-offset-transparent shadow-lg shadow-amber-200/40'
+      : '';
 
   return (
     <PageSection>
       <div className="space-y-6">
-        <KpiGrid cols={5}>
+        <KpiGrid cols={6}>
           <KpiCard
             icon={faClock}
             title="Total"
@@ -66,6 +75,22 @@ function ManutencoesTab({ tab, isAdmin, onDeleteManutencao, onDeleteOs }) {
             tone="orange"
             onClick={() => tab.handleSelectKpi('emAndamento')}
             className={kpiActive('emAndamento')}
+          />
+          <KpiCard
+            icon={faHourglassHalf}
+            title="Aguardando confirmação"
+            value={aguardandoConfirmacaoCount}
+            subtitle={
+              aguardandoConfirmacaoCount > 0
+                ? 'Confirme a finalização'
+                : 'Sem pendências'
+            }
+            tone="yellow"
+            onClick={() => tab.handleSelectKpi('aguardandoConfirmacao')}
+            className={[
+              kpiActive('aguardandoConfirmacao'),
+              aguardandoConfirmacaoHighlight,
+            ].filter(Boolean).join(' ')}
           />
           <KpiCard
             icon={faCircleCheck}

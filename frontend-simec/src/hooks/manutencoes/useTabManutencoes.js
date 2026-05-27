@@ -94,6 +94,10 @@ export function useTabManutencoes() {
     // "Em andamento" exclusivo para Manutencao — OsCorretiva-Corretiva fica
     // representada em "Agendadas" por estar em AguardandoTerceiro.
     emAndamento: manut.metricas?.emAndamento ?? 0,
+    // Manutencoes finalizadas pelo executor aguardando o admin confirmar.
+    // Exposto como KPI proprio porque "some" dentro de "Agendadas" e o
+    // admin perdia muito tempo achando essas pendencias.
+    aguardandoConfirmacao: manut.metricas?.aguardandoConfirmacao ?? 0,
     concluidas: (manut.metricas?.concluidas ?? 0) + (osc.metricas?.concluidas ?? 0),
     canceladas: (manut.metricas?.canceladas ?? 0) + (osc.metricas?.canceladas ?? 0),
   }), [manut.metricas, osc.metricas]);
@@ -212,6 +216,7 @@ export function useTabManutencoes() {
     if (!sM && !sO) return 'total';
     if (sM === 'aguardando' && sO === 'aguardando') return 'agendadas';
     if (sM === 'EmAndamento' && !sO) return 'emAndamento';
+    if (sM === 'AguardandoConfirmacao' && !sO) return 'aguardandoConfirmacao';
     if (sM === 'Concluida' && sO === 'Concluida') return 'concluidas';
     if (sM === 'Cancelada' && sO === 'Cancelada') return 'canceladas';
     return null;
@@ -222,6 +227,7 @@ export function useTabManutencoes() {
       total: '',
       agendadas: 'aguardando',
       emAndamento: 'EmAndamento',
+      aguardandoConfirmacao: 'AguardandoConfirmacao',
       concluidas: 'Concluida',
       canceladas: 'Cancelada',
     };
@@ -229,6 +235,7 @@ export function useTabManutencoes() {
       total: '',
       agendadas: 'aguardando',
       emAndamento: '',
+      aguardandoConfirmacao: '',
       concluidas: 'Concluida',
       canceladas: 'Cancelada',
     };
