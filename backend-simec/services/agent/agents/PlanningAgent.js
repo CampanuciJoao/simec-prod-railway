@@ -48,6 +48,36 @@ export const PlanningAgent = {
       return plano;
     }
 
+    // Confianca baixa em AGENDAR vs RELATORIO — pede confirmacao explicita
+    // ao usuario ANTES de criar sessao. Resolve o caso classico onde a
+    // pergunta "quando foi a ultima preventiva" caia errado em AGENDAR
+    // (LLM via palavras como "preventiva" + "unidade"). So aciona quando:
+    //   - intent ainda eh ambiguo (AGENDAR ou RELATORIO)
+    //   - confianca < 0.85 (heuristica forte tem 0.92, passa direto)
+    //   - nao ha sessao ativa que ja contextualize a conversa
+    const INTENTS_AMBIGUOS_FREQUENTES = ['AGENDAR_MANUTENCAO', 'RELATORIO'];
+    const confianca = interpretacao?.confianca ?? 0;
+    const semSessaoAtiva = !agendamento && !relatorio && !seguro && !batch;
+    if (
+      INTENTS_AMBIGUOS_FREQUENTES.includes(intent) &&
+      confianca < 0.85 &&
+      semSessaoAtiva
+    ) {
+      const plano = {
+        acao: 'PEDIR_CONFIRMACAO_INTENT',
+        dominio: null,
+        sessao_alvo: null,
+        acao_contexto: null,
+        cancelar_sessoes: [],
+        intent_proposto: intent,
+        confianca,
+        raciocinio: `Confiança ${confianca.toFixed(2)} abaixo do limiar 0.85 — pedindo confirmação`,
+      };
+      contexto.plano = plano;
+      adicionarAuditoria(contexto, { agente: 'PlanningAgent', ...plano });
+      return plano;
+    }
+
     // ANALYTICS é sempre stateless — não depende de sessão ativa
     if (intent === 'ANALYTICS') {
       const plano = {
