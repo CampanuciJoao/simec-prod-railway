@@ -14,6 +14,9 @@ export function criarContexto({ mensagem, usuarioId, usuarioNome, tenantId, tena
       seguro: null,
       batch: null,
     },
+    // Catalogo compacto de equipamentos do tenant (modelo|tipo|tag|unidade),
+    // carregado pelo Orchestrator e usado pelo LLM na interpretacao.
+    catalogoEquipamentos: [],
     interpretacao: null,
     plano: null,
     validacao: null,

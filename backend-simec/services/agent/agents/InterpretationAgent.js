@@ -122,9 +122,28 @@ function sanitizarMensagem(msg = '') {
   return String(msg).replace(/"/g, '\\"').slice(0, 500);
 }
 
-async function interpretarComLlm(mensagem) {
+// Monta a secao de catalogo dentro do prompt. Limita a 60 linhas pra
+// nao explodir tokens em tenant grande (cada linha ~50-80 chars). Cliente
+// com >60 equipamentos ainda tem o entityResolver em sessao como rede.
+function formatarCatalogoParaPrompt(catalogo) {
+  if (!Array.isArray(catalogo) || catalogo.length === 0) return '';
+  const linhas = catalogo.slice(0, 60).map((l) => `- ${l}`).join('\n');
+  return `
+
+CATALOGO DE EQUIPAMENTOS DESTE CLIENTE (use para resolver apelidos no campo "equipamento"):
+${linhas}
+
+REGRA: se o usuário escrever um apelido parcial (ex: "Tomografia Evo"),
+identifique o modelo COMPLETO no catalogo acima e preencha o campo
+"equipamento" com o modelo exato (ex: "Revolution Evo"). Se nenhum item
+casar com confiança razoável, preencha com o termo do usuário literal.`;
+}
+
+async function interpretarComLlm(mensagem, catalogoEquipamentos = []) {
   const llm = getLlmRuntimeInfo();
   if (!llm.available) return null;
+
+  const secaoCatalogo = formatarCatalogoParaPrompt(catalogoEquipamentos);
 
   const prompt = `Você é um agente de interpretação de tarefas hospitalares. Analise a mensagem e retorne um JSON com esta estrutura:
 
@@ -165,11 +184,9 @@ Exemplos:
 "top equipamentos com mais corretivas" → ANALYTICS
 "oi, tudo bem?" → OUTRO
 
-Para extração de "equipamento", capture o termo como o usuário escreveu, incluindo apelidos parciais ("Tomografia Evo" → equipamento: "Tomografia Evo"; a busca fuzzy resolve depois).
-
 Urgência: "Alta" (quebrou/parou/urgente), "Media" (preventiva/revisão), "Baixa" (planejamento)
 
-Se você não tem certeza entre RELATORIO e AGENDAR_MANUTENCAO, devolva a confiança ≤ 0.7 — o sistema vai pedir confirmação ao usuário em vez de assumir.
+Se você não tem certeza entre RELATORIO e AGENDAR_MANUTENCAO, devolva a confiança ≤ 0.7 — o sistema vai pedir confirmação ao usuário em vez de assumir.${secaoCatalogo}
 
 Mensagem: "${sanitizarMensagem(mensagem)}"`;
 
@@ -205,7 +222,7 @@ export const InterpretationAgent = {
   capacidades: ['classificar_intencao', 'extrair_entidades', 'detectar_urgencia'],
 
   async executar(contexto) {
-    const { mensagem } = contexto;
+    const { mensagem, catalogoEquipamentos = [] } = contexto;
 
     const heuristica = classificarHeuristica(mensagem);
 
@@ -223,7 +240,7 @@ export const InterpretationAgent = {
       return resultado;
     }
 
-    const llmResult = await interpretarComLlm(mensagem);
+    const llmResult = await interpretarComLlm(mensagem, catalogoEquipamentos);
 
     if (llmResult?.intent && INTENTS_VALIDOS.includes(llmResult.intent)) {
       const resultado = {
