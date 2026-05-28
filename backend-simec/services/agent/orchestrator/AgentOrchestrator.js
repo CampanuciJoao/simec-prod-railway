@@ -7,6 +7,7 @@ import { ExecutionAgent } from '../agents/ExecutionAgent.js';
 import { AuditAgent } from '../agents/AuditAgent.js';
 import { respostaAgente } from '../core/agentResponse.js';
 import { criarContexto } from './AgentContext.js';
+import { getCatalogoEquipamentos } from '../shared/equipamentoCatalog.js';
 
 async function carregarSessoes(tenantId, sessionKey) {
   const [agendamento, relatorio, seguro, batch] = await Promise.all([
@@ -24,7 +25,15 @@ export async function RoteadorAgente({ mensagem, usuarioId, usuarioNome, tenantI
 
     await AgentSessionRepository.expirarSessoesAntigas(tenantId, contexto.sessionKey);
 
-    contexto.sessoes = await carregarSessoes(tenantId, contexto.sessionKey);
+    // Sessoes + catalogo de equipamentos em paralelo — ambos sao input
+    // do InterpretationAgent (catalogo eh usado pelo LLM pra resolver
+    // apelidos parciais tipo "Tomografia Evo" -> "Revolution Evo").
+    const [sessoes, catalogoEquipamentos] = await Promise.all([
+      carregarSessoes(tenantId, contexto.sessionKey),
+      getCatalogoEquipamentos(tenantId),
+    ]);
+    contexto.sessoes = sessoes;
+    contexto.catalogoEquipamentos = catalogoEquipamentos;
 
     await InterpretationAgent.executar(contexto);
     await TaskDecomposerAgent.executar(contexto);
