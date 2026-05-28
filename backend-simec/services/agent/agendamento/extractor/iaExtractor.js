@@ -80,7 +80,9 @@ REGRAS DE EXTRAÇÃO:
 
   for (let tentativa = 1; tentativa <= 2; tentativa++) {
     try {
-      const texto = await generateTextWithLlm(prompt);
+      const texto = await generateTextWithLlm(prompt, {
+        feature: 'agente_agendamento_extracao',
+      });
       const match = texto.match(/\{[\s\S]*\}/);
 
       if (!match) {

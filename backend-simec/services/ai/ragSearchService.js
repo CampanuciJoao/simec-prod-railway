@@ -112,7 +112,11 @@ Resposta (em portugues, objetiva, 2-4 paragrafos, citando evidencias):`;
 
   let resposta;
   try {
-    resposta = await generateTextWithLlm(prompt);
+    resposta = await generateTextWithLlm(prompt, {
+      feature: 'rag_search',
+      tenantId,
+      ...(equipamentoId ? { refType: 'Equipamento', refId: equipamentoId } : {}),
+    });
   } catch (err) {
     return { ok: false, motivo: `llm_failed: ${err.message}` };
   }

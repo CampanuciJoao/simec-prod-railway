@@ -209,8 +209,8 @@ export async function extrairApolice(buffer, { password = null, tenantId = null 
   let bruto;
   try {
     bruto = await generateJsonWithLlm(prompt, {
+      feature: 'seguro_apolice_extracao',
       tenantId,
-      feature: 'apolice-extractor',
     });
   } catch (err) {
     throw new ApoliceExtractorError(

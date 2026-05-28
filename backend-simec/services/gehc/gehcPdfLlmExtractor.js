@@ -14,7 +14,9 @@
 
 import prisma from '../prismaService.js';
 import { generateJsonWithLlm, getLlmRuntimeInfo } from '../ai/llmService.js';
-import { logLlmUsage } from '../ai/llmUsageLogger.js';
+// Nota: log de uso de tokens migrou para LlmCallLog (tabela dedicada).
+// Agora eh feito automaticamente pelo wrapper generateTextWithLlm quando
+// passamos { feature, tenantId, refType, refId } como options.
 import { AI_CONFIG } from '../ai/config.js';
 import {
   buscarLicoesParaFewShot,
@@ -366,7 +368,14 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCo
 
   let resultado;
   try {
-    resultado = await generateJsonWithLlm(prompt);
+    // Passa atribuicao de custo pro LlmCallLog: feature + tenant + ref pra
+    // OS de origem (permite traceback "este USD veio dessa OS").
+    resultado = await generateJsonWithLlm(prompt, {
+      feature: 'gehc_pdf_extracao',
+      tenantId,
+      refType: 'GehcPdfDocumento',
+      refId: pdfDocumentoId,
+    });
   } catch (err) {
     return { ok: false, erro: `llm_call_failed: ${err.message}`, llmModel: llm.activeModel };
   }
@@ -387,15 +396,10 @@ export async function extrairCamposViaLlm({ tenantId, regexCampos, serviceTypeCo
     resultado.solucaoAplicada = 'desconhecido';
   }
 
-  // Telemetria de uso (nao bloqueia)
-  await logLlmUsage({
-    tenantId,
-    feature: 'gehc_pdf_extracao',
-    provider: AI_CONFIG.provider,
-    model: llm.activeModel,
-    promptTokens: Math.ceil(promptLen / 4),  // estimativa grosseira
-    completionTokens: Math.ceil(JSON.stringify(resultado).length / 4),
-  });
+  // Telemetria de uso movida pro wrapper generateTextWithLlm — registra
+  // automaticamente em LlmCallLog com tokens REAIS (resposta do provider),
+  // duracao, custo USD e status. Estimativa promptLen/4 nao eh mais
+  // necessaria.
 
   // Contabiliza uso das licoes few-shot (metrica de impacto do feedback
   // supervisionado). Nao bloqueia.

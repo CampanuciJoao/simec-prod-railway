@@ -120,7 +120,9 @@ Use hoje=${new Date().toISOString()}. Período em null = não especificado.
 Mensagem: "${String(mensagem).slice(0, 500)}"`;
 
   try {
-    const resposta = await generateTextWithLlm(prompt);
+    const resposta = await generateTextWithLlm(prompt, {
+      feature: 'agente_analytics',
+    });
     const parsed = parsearJson(resposta);
     if (!parsed) return { tipo: 'DESCONHECIDO', periodo: null, tipoManutencao: null, limite: 10 };
     return {

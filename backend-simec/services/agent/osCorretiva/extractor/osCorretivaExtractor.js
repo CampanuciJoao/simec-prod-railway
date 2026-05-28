@@ -104,7 +104,9 @@ REGRAS:
 9. Campos não mencionados → null. Nunca invente.`;
 
   try {
-    const texto = await generateTextWithLlm(prompt);
+    const texto = await generateTextWithLlm(prompt, {
+      feature: 'agente_os_corretiva_extracao',
+    });
     const bruto = parsearJsonBruto(texto);
     if (!bruto) return { equipamentoTexto: null, unidadeTexto: null, descricaoProblema: null, statusEquipamentoAbertura: null, prestadorNome: null, data: null, horaInicio: null, horaFim: null, confirmacao, osIndex, novaOcorrencia: null };
 

@@ -220,8 +220,8 @@ async function extrairDoPdf({ pdfBuffer, tenantId }) {
   let resposta;
   try {
     resposta = await generateJsonWithLlm(prompt, {
+      feature: 'importacao_lote_manutencao',
       tenantId,
-      feature: 'manutencao_calendario_extractor',
     });
   } catch (err) {
     return { ok: false, erro: `llm_falhou: ${err.message}`, entradas: [] };

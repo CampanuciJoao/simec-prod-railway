@@ -139,7 +139,7 @@ identifique o modelo COMPLETO no catalogo acima e preencha o campo
 casar com confiança razoável, preencha com o termo do usuário literal.`;
 }
 
-async function interpretarComLlm(mensagem, catalogoEquipamentos = []) {
+async function interpretarComLlm(mensagem, catalogoEquipamentos = [], tenantId = null) {
   const llm = getLlmRuntimeInfo();
   if (!llm.available) return null;
 
@@ -191,7 +191,10 @@ Se você não tem certeza entre RELATORIO e AGENDAR_MANUTENCAO, devolva a confia
 Mensagem: "${sanitizarMensagem(mensagem)}"`;
 
   try {
-    return await generateJsonWithLlm(prompt);
+    return await generateJsonWithLlm(prompt, {
+      feature: 'agente_interpretacao',
+      tenantId,
+    });
   } catch (err) {
     console.error('[INTERPRETATION_AGENT] Erro no LLM:', err.message);
     return null;
@@ -222,7 +225,7 @@ export const InterpretationAgent = {
   capacidades: ['classificar_intencao', 'extrair_entidades', 'detectar_urgencia'],
 
   async executar(contexto) {
-    const { mensagem, catalogoEquipamentos = [] } = contexto;
+    const { mensagem, catalogoEquipamentos = [], tenantId = null } = contexto;
 
     const heuristica = classificarHeuristica(mensagem);
 
@@ -240,7 +243,7 @@ export const InterpretationAgent = {
       return resultado;
     }
 
-    const llmResult = await interpretarComLlm(mensagem, catalogoEquipamentos);
+    const llmResult = await interpretarComLlm(mensagem, catalogoEquipamentos, tenantId);
 
     if (llmResult?.intent && INTENTS_VALIDOS.includes(llmResult.intent)) {
       const resultado = {

@@ -178,7 +178,9 @@ OUTRO
 `;
 
   try {
-    const textoResposta = await generateTextWithLlm(prompt);
+    const textoResposta = await generateTextWithLlm(prompt, {
+      feature: 'agente_intent_classifier',
+    });
     const detectada = extrairCategoriaValida(textoResposta);
 
     console.log(

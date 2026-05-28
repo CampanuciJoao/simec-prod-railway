@@ -72,6 +72,7 @@ model Tenant {
   alertaFeedbacks           AlertaFeedback[]
   impersonacoes             Impersonacao[]               @relation("ImpersonacaoTenantAlvo")
   logsAuditoriaImpersonadas LogAuditoria[]               @relation("LogAuditoriaActedAs")
+  llmCallLogs               LlmCallLog[]
 
   @@map("tenants")
 }
@@ -592,6 +593,43 @@ model LogAuditoria {
   @@index([tenantId, autorId, timestamp])
   @@index([actedAsTenantId, timestamp])
   @@map("log_auditoria")
+}
+
+// Registro de cada chamada a um LLM (OpenAI / Gemini / embedding).
+// Permite rastrear custo POR TENANT + POR FEATURE + POR MODELO. Antes
+// soh tinhamos LogAuditoria com 'LLM_USAGE' (sem custo, sem duracao,
+// misturado com auditoria de acao de usuario). Agora eh tabela dedicada:
+//   - cada chamada loga input/output tokens, custo USD calculado via
+//     tabela de precos (services/ai/llmPricing.js), duracao e status
+//     (ok / fallback / error)
+//   - tenantId nullable: chamadas cross-tenant (eval set, jobs globais)
+//     usam null em vez de inflar um tenant arbitrario
+//   - refType/refId: ponteiro logico (sem FK) pra entidade origem da
+//     chamada — ex: GehcPdfDocumento, IaConversa, EventoEquipamento.
+//     Permite traceback "este custo veio dessa OS".
+model LlmCallLog {
+  id           String   @id @default(uuid())
+  tenantId     String?  @map("tenant_id")
+  feature      String   // gehc_pdf_extract, agente_conversa, agente_interpretacao, embedding, insight_enrich
+  provider     String   // openai, gemini
+  model        String   // gpt-4.1-mini, gemini-2.5-flash, text-embedding-3-small
+  status       String   // ok, fallback, error
+  tokensIn     Int      @default(0) @map("tokens_in")
+  tokensOut    Int      @default(0) @map("tokens_out")
+  costUsd      Decimal  @default(0) @db.Decimal(12, 8) @map("cost_usd")
+  durationMs   Int      @default(0) @map("duration_ms")
+  refType      String?  @map("ref_type")
+  refId        String?  @map("ref_id")
+  errorMessage String?  @map("error_message")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  tenant Tenant? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([feature, createdAt])
+  @@index([provider, status, createdAt])
+  @@index([createdAt])
+  @@map("llm_call_log")
 }
 
 model Anexo {

@@ -37,7 +37,9 @@ Valores possíveis para "filtro":
 Mensagem: "${mensagem}"`;
 
   try {
-    const resposta = await generateTextWithLlm(prompt);
+    const resposta = await generateTextWithLlm(prompt, {
+      feature: 'agente_task_decomposer',
+    });
     const match = resposta.match(/\{[\s\S]*\}/);
     if (!match) return { filtro: 'VENCIDOS', setor: null, unidade: null, tipoManutencao: null, data: null, horaInicio: null, horaFim: null };
     const parsed = JSON.parse(match[0]);

@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { AI_CONFIG } from '../config.js';
-import { logLlmUsage } from '../llmUsageLogger.js';
 
+// Provider retorna { text, usage: { promptTokens, completionTokens } }.
+// O wrapper central (llmService.generateTextWithLlm) eh quem mede tempo,
+// determina status (ok/fallback) e grava no LlmCallLog — providers nao
+// duplicam logica de log nem de pricing.
 export const OpenAIProvider = {
   name: 'openai',
 
@@ -13,7 +16,7 @@ export const OpenAIProvider = {
     return AI_CONFIG.openai.model;
   },
 
-  async generateText(prompt, { tenantId, feature } = {}) {
+  async generateText(prompt) {
     if (!AI_CONFIG.openai.apiKey) {
       throw new Error('OPENAI_PROVIDER_UNAVAILABLE');
     }
@@ -41,18 +44,13 @@ export const OpenAIProvider = {
       throw new Error('OPENAI_EMPTY_RESPONSE');
     }
 
-    const usage = response?.data?.usage;
-    if (usage) {
-      logLlmUsage({
-        tenantId,
-        feature,
-        provider: 'openai',
-        model: AI_CONFIG.openai.model,
-        promptTokens: usage.prompt_tokens,
-        completionTokens: usage.completion_tokens,
-      });
-    }
-
-    return text;
+    const usage = response?.data?.usage || {};
+    return {
+      text,
+      usage: {
+        promptTokens: usage.prompt_tokens || 0,
+        completionTokens: usage.completion_tokens || 0,
+      },
+    };
   },
 };
