@@ -1,6 +1,5 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { AI_CONFIG } from '../config.js';
-import { logLlmUsage } from '../llmUsageLogger.js';
 
 let cachedClient = null;
 
@@ -10,6 +9,8 @@ function getClient() {
   return cachedClient;
 }
 
+// Mesmo contrato do OpenAIProvider: retorna { text, usage }. O wrapper
+// central eh responsavel por medir tempo + gravar no LlmCallLog.
 export const GeminiProvider = {
   name: 'gemini',
 
@@ -21,7 +22,7 @@ export const GeminiProvider = {
     return AI_CONFIG.gemini.model;
   },
 
-  async generateText(prompt, { tenantId, feature } = {}) {
+  async generateText(prompt) {
     const client = getClient();
 
     if (!client) {
@@ -40,18 +41,13 @@ export const GeminiProvider = {
       throw new Error('GEMINI_EMPTY_RESPONSE');
     }
 
-    const usage = result?.response?.usageMetadata;
-    if (usage) {
-      logLlmUsage({
-        tenantId,
-        feature,
-        provider: 'gemini',
-        model: AI_CONFIG.gemini.model,
-        promptTokens: usage.promptTokenCount,
-        completionTokens: usage.candidatesTokenCount,
-      });
-    }
-
-    return text;
+    const usage = result?.response?.usageMetadata || {};
+    return {
+      text,
+      usage: {
+        promptTokens: usage.promptTokenCount || 0,
+        completionTokens: usage.candidatesTokenCount || 0,
+      },
+    };
   },
 };

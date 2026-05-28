@@ -6,6 +6,7 @@ import {
   faBrain,
   faBuildingShield,
   faClockRotateLeft,
+  faCoins,
   faHeartPulse,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
@@ -46,6 +47,12 @@ function SuperAdminPage() {
       label: 'Aprendizado da IA',
       icon: <FontAwesomeIcon icon={faBrain} />,
       path: '/superadmin/aprendizado',
+    },
+    {
+      id: 'llm-custo',
+      label: 'Custo LLM',
+      icon: <FontAwesomeIcon icon={faCoins} />,
+      path: '/superadmin/llm-custo',
     },
     {
       id: 'ajuda',

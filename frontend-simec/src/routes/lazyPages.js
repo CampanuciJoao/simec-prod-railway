@@ -119,6 +119,9 @@ export const SuperAdminAuditoriaPage = React.lazy(() =>
 export const SuperAdminAprendizadoPage = React.lazy(() =>
   import('@/pages/superadmin/SuperAdminAprendizadoPage')
 );
+export const SuperAdminLlmCallLogPage = React.lazy(() =>
+  import('@/pages/superadmin/SuperAdminLlmCallLogPage')
+);
 export const OrcamentosPage = React.lazy(() =>
   import('@/pages/orcamentos/OrcamentosPage')
 );

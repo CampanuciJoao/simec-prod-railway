@@ -153,7 +153,9 @@ Regras:
 - Gere apenas insights relevantes e práticos, em português.`;
 
   try {
-    const resultado = await generateJsonWithLlm(prompt);
+    const resultado = await generateJsonWithLlm(prompt, {
+      feature: 'proactivity_agent',
+    });
     return Array.isArray(resultado) ? resultado : [];
   } catch (err) {
     console.error('[PROACTIVITY_AGENT] Erro ao gerar insights:', err.message);

@@ -239,8 +239,8 @@ export async function extrairLaudoCq({ pdfBuffer, tenantId, catalogoTipos }) {
   let respostaCrua;
   try {
     respostaCrua = await generateJsonWithLlm(prompt, {
+      feature: 'cq_laudo_extracao',
       tenantId,
-      feature: 'cq_laudo_extractor',
     });
   } catch (err) {
     return { ok: false, erro: `llm_falhou: ${err.message}` };

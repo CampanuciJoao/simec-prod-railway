@@ -141,8 +141,8 @@ export async function responderConversacional({
 
   try {
     const resposta = await generateJsonWithLlm(prompt, {
+      feature: 'agente_conversa',
       tenantId: contextoUsuario.tenantId,
-      feature: 'agent_conversacional',
     });
 
     const mensagemFinal = String(resposta?.mensagem || '').trim();
