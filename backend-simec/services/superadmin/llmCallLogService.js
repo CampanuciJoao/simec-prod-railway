@@ -1,4 +1,6 @@
 import prisma from '../prismaService.js';
+import { getRateLimitSnapshot } from '../ai/llmRateLimit.js';
+import { getCircuitBreakerSnapshot } from '../ai/llmCircuitBreaker.js';
 
 // Servico de leitura para o painel SuperAdmin. So eh exposto via
 // /api/superadmin/llm-call-log/* — protegido por requireSystemTenant.
@@ -67,6 +69,11 @@ export async function resumoGeralService({ de, ate } = {}) {
       chamadas: row._count.id,
       custoUsd: toNumber(row._sum.costUsd),
     })),
+    // Snapshots em tempo real (in-memory do processo atual) — uteis
+    // pra debugging em produção: ver se rate limit esta segurando
+    // chamadas ou se algum circuit breaker abriu.
+    rateLimit: getRateLimitSnapshot(),
+    circuitBreaker: getCircuitBreakerSnapshot(),
   };
 }
 

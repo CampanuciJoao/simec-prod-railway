@@ -6,6 +6,8 @@ import {
   faBoltLightning,
   faChartLine,
   faTriangleExclamation,
+  faShield,
+  faGaugeHigh,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -93,19 +95,22 @@ function TabelaSimples({ colunas, linhas, emptyMessage }) {
         <tbody>
           {linhas.map((linha, idx) => (
             <tr key={idx} style={{ borderTop: '1px solid var(--border-soft)' }}>
-              {colunas.map((c) => (
-                <td
-                  key={c.key}
-                  className={[
-                    'px-3 py-2',
-                    c.align === 'right' ? 'text-right font-mono tabular-nums' : '',
-                    c.mono ? 'font-mono' : '',
-                  ].join(' ')}
-                  style={c.style}
-                >
-                  {c.render ? c.render(linha) : linha[c.key]}
-                </td>
-              ))}
+              {colunas.map((c) => {
+                const style = typeof c.style === 'function' ? c.style(linha) : c.style;
+                return (
+                  <td
+                    key={c.key}
+                    className={[
+                      'px-3 py-2',
+                      c.align === 'right' ? 'text-right font-mono tabular-nums' : '',
+                      c.mono ? 'font-mono' : '',
+                    ].join(' ')}
+                    style={style}
+                  >
+                    {c.render ? c.render(linha) : linha[c.key]}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
@@ -175,6 +180,100 @@ export default function SuperAdminLlmCallLogPage() {
                 hint={`${fmtInt(resumo.distribuicaoStatus?.error || 0)} erros`}
                 tone={resumo.taxaErro > 0.01 ? 'red' : 'slate'}
               />
+            </div>
+          </PageSection>
+
+          <PageSection
+            title="Proteção em tempo real"
+            subtitle="Rate limiter (token bucket) e circuit breaker do processo atual — útil para debug em produção"
+          >
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div
+                className="rounded-xl border p-4"
+                style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface)' }}
+              >
+                <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  <FontAwesomeIcon icon={faGaugeHigh} />
+                  <span>Rate limiter</span>
+                </div>
+                <TabelaSimples
+                  colunas={[
+                    { key: 'provider', label: 'Provider', mono: true, render: (r) => r.provider },
+                    {
+                      key: 'inFlight',
+                      label: 'Em voo / max',
+                      align: 'right',
+                      render: (r) => `${r.inFlight} / ${r.maxConcurrent}`,
+                    },
+                    {
+                      key: 'windowCount',
+                      label: 'No minuto / rpm',
+                      align: 'right',
+                      render: (r) => `${r.windowCount} / ${r.rpm}`,
+                    },
+                    {
+                      key: 'queueLength',
+                      label: 'Fila',
+                      align: 'right',
+                      render: (r) => fmtInt(r.queueLength),
+                      style: (r) =>
+                        r.queueLength > 0 ? { color: 'var(--color-warning)' } : null,
+                    },
+                  ]}
+                  linhas={Object.entries(resumo.rateLimit || {}).map(([provider, s]) => ({
+                    provider,
+                    ...s,
+                  }))}
+                  emptyMessage="Sem dados de rate limit ainda."
+                />
+              </div>
+
+              <div
+                className="rounded-xl border p-4"
+                style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface)' }}
+              >
+                <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-wide" style={{ color: 'var(--text-muted)' }}>
+                  <FontAwesomeIcon icon={faShield} />
+                  <span>Circuit breaker</span>
+                </div>
+                <TabelaSimples
+                  colunas={[
+                    { key: 'provider', label: 'Provider', mono: true, render: (r) => r.provider },
+                    {
+                      key: 'estado',
+                      label: 'Estado',
+                      mono: true,
+                      render: (r) => r.estado,
+                      style: (r) => ({
+                        color:
+                          r.estado === 'closed'
+                            ? 'var(--color-success)'
+                            : r.estado === 'open'
+                            ? 'var(--color-danger)'
+                            : 'var(--color-warning)',
+                        fontWeight: 600,
+                      }),
+                    },
+                    {
+                      key: 'taxaErro',
+                      label: 'Taxa de erro',
+                      align: 'right',
+                      render: (r) => fmtPct(r.taxaErro),
+                    },
+                    {
+                      key: 'eventos',
+                      label: 'Eventos (60s)',
+                      align: 'right',
+                      render: (r) => fmtInt(r.eventos),
+                    },
+                  ]}
+                  linhas={Object.entries(resumo.circuitBreaker || {}).map(([provider, s]) => ({
+                    provider,
+                    ...s,
+                  }))}
+                  emptyMessage="Sem eventos no circuit breaker ainda."
+                />
+              </div>
             </div>
           </PageSection>
 
