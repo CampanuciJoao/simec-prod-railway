@@ -4,6 +4,12 @@ import { NoopProvider } from './providers/noopProvider.js';
 import { OpenAIProvider } from './providers/openaiProvider.js';
 import { observeLlmCall } from '../metrics/metricsService.js';
 import { registrarLlmCall } from './llmCallLog.js';
+import { aguardarLimiteEReservar } from './llmRateLimit.js';
+import {
+  decidirPermissao,
+  reportarResultado,
+  CircuitOpenError,
+} from './llmCircuitBreaker.js';
 
 const PROVIDERS = {
   openai: OpenAIProvider,
@@ -54,16 +60,39 @@ export function getLlmRuntimeInfo() {
 //
 // Retorna: string (o texto do LLM). Internamente lida com providers que
 // retornam { text, usage } e desencapsula pra preservar API existente.
+// Executa chamada ao provider com rate limit (token bucket por minuto +
+// concorrencia) e circuit breaker (abre apos taxa de erro alta, evita
+// cascata em outage). Caller (generateTextWithLlm) lida com fallback
+// pro provider secundario quando CircuitOpenError eh lancado.
 async function tentarProvider({ provider, prompt, t0 }) {
-  const result = await provider.generateText(prompt);
+  // 1. Circuit breaker — falha rapida se provider esta em OPEN
+  const permissao = decidirPermissao(provider.name);
+  if (!permissao.allow) {
+    throw new CircuitOpenError(permissao.reason);
+  }
 
-  // Compat: providers novos retornam { text, usage }. Se algum provider
-  // antigo retornar string crua, encapsula com usage zerado.
-  const text = typeof result === 'string' ? result : result.text;
-  const usage = (typeof result === 'object' && result.usage) || { promptTokens: 0, completionTokens: 0 };
-  const durationMs = Math.round(Number(process.hrtime.bigint() - t0) / 1e6);
+  // 2. Rate limiter — espera capacidade (FIFO). Tempo de espera entra
+  //    em durationMs, capturado pelo wrapper central.
+  const handle = await aguardarLimiteEReservar(provider.name);
 
-  return { text, usage, durationMs };
+  let ok = false;
+  try {
+    const result = await provider.generateText(prompt);
+
+    // Compat: providers novos retornam { text, usage }. Se algum provider
+    // antigo retornar string crua, encapsula com usage zerado.
+    const text = typeof result === 'string' ? result : result.text;
+    const usage =
+      (typeof result === 'object' && result.usage) ||
+      { promptTokens: 0, completionTokens: 0 };
+    const durationMs = Math.round(Number(process.hrtime.bigint() - t0) / 1e6);
+
+    ok = true;
+    return { text, usage, durationMs };
+  } finally {
+    handle.release();
+    reportarResultado(provider.name, ok, permissao.half);
+  }
 }
 
 export async function generateTextWithLlm(prompt, options = {}) {
@@ -101,13 +130,18 @@ export async function generateTextWithLlm(prompt, options = {}) {
   } catch (error) {
     const fallbackProvider = getFallbackLlmProvider();
 
+    // Circuit breaker aberto: status especial 'circuit_open'. Distingue
+    // de 'error' real (chamada nem rodou — falha rapida) e nao polui
+    // metricas de erro de provider.
+    const statusErroPrimario = error instanceof CircuitOpenError ? 'circuit_open' : 'error';
+
     if (!fallbackProvider) {
       const durationMs = Math.round(Number(process.hrtime.bigint() - t0) / 1e6);
       observeLlmCall({
         provider: provider.name,
         model,
         feature,
-        status: 'error',
+        status: statusErroPrimario,
         durationSeconds: durationMs / 1000,
       });
       registrarLlmCall({
@@ -115,7 +149,7 @@ export async function generateTextWithLlm(prompt, options = {}) {
         feature,
         provider: provider.name,
         model,
-        status: 'error',
+        status: statusErroPrimario,
         durationMs,
         refType,
         refId,
@@ -124,9 +158,28 @@ export async function generateTextWithLlm(prompt, options = {}) {
       throw error;
     }
 
-    console.warn(
-      `[LLM_FALLBACK] provider=${provider.name} falhou; tentando fallback=${fallbackProvider.name}`
-    );
+    if (statusErroPrimario === 'circuit_open') {
+      console.warn(
+        `[LLM_CIRCUIT_OPEN] provider=${provider.name} ${error.reason}; cai pra fallback=${fallbackProvider.name}`
+      );
+      // Registra a falha rapida em LlmCallLog mesmo assim, pra contar custo zero
+      // mas mostrar no painel que aconteceu.
+      registrarLlmCall({
+        tenantId,
+        feature,
+        provider: provider.name,
+        model,
+        status: 'circuit_open',
+        durationMs: 0,
+        refType,
+        refId,
+        errorMessage: error.reason,
+      });
+    } else {
+      console.warn(
+        `[LLM_FALLBACK] provider=${provider.name} falhou; tentando fallback=${fallbackProvider.name}`
+      );
+    }
 
     const fallbackModel = fallbackProvider.getModel?.() || 'unknown';
     const t1 = process.hrtime.bigint();
