@@ -183,6 +183,37 @@ export default function SuperAdminLlmCallLogPage() {
             </div>
           </PageSection>
 
+          {resumo.pgvectorBackfill ? (
+            <PageSection
+              title="Backfill pgvector"
+              subtitle="Status da migração de embedding JSON para coluna vector(1536) — busca por similaridade fica O(log n) quando 100%"
+            >
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <StatCard
+                  label="Total embeddings"
+                  value={fmtInt(resumo.pgvectorBackfill.total)}
+                  tone="slate"
+                />
+                <StatCard
+                  label="Preenchidos"
+                  value={fmtInt(resumo.pgvectorBackfill.preenchidos)}
+                  hint={`${resumo.pgvectorBackfill.progressoPct}%`}
+                  tone={resumo.pgvectorBackfill.progressoPct === 100 ? 'green' : 'yellow'}
+                />
+                <StatCard
+                  label="Pendentes"
+                  value={fmtInt(resumo.pgvectorBackfill.pendentes)}
+                  hint={
+                    resumo.pgvectorBackfill.pendentes > 0
+                      ? 'Rodar: node scripts/backfill-pgvector.mjs'
+                      : 'Migração completa'
+                  }
+                  tone={resumo.pgvectorBackfill.pendentes === 0 ? 'green' : 'yellow'}
+                />
+              </div>
+            </PageSection>
+          ) : null}
+
           <PageSection
             title="Proteção em tempo real"
             subtitle="Rate limiter (token bucket) e circuit breaker do processo atual — útil para debug em produção"

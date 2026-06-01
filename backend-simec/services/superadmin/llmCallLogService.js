@@ -1,6 +1,7 @@
 import prisma from '../prismaService.js';
 import { getRateLimitSnapshot } from '../ai/llmRateLimit.js';
 import { getCircuitBreakerSnapshot } from '../ai/llmCircuitBreaker.js';
+import { obterStatusBackfill } from '../ai/pgvectorSearch.js';
 
 // Servico de leitura para o painel SuperAdmin. So eh exposto via
 // /api/superadmin/llm-call-log/* — protegido por requireSystemTenant.
@@ -74,6 +75,7 @@ export async function resumoGeralService({ de, ate } = {}) {
     // chamadas ou se algum circuit breaker abriu.
     rateLimit: getRateLimitSnapshot(),
     circuitBreaker: getCircuitBreakerSnapshot(),
+    pgvectorBackfill: await obterStatusBackfill(),
   };
 }
 
