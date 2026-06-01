@@ -8,6 +8,7 @@
 
 import prisma from '../prismaService.js';
 import { gerarEmbedding, EMBEDDING_MODEL_NAME } from './embeddingsService.js';
+import { criarEmbeddingDual } from './pgvectorSearch.js';
 import { estaAtivo, PIPELINE_NAMES } from './aiPipelineState.js';
 
 const RATE_LIMIT_MS = 200; // OpenAI aguenta facil 5 req/s no tier basico
@@ -61,23 +62,20 @@ export async function gerarEmbeddingsTenant({ tenantId, limite = 200 } = {}) {
     }
 
     try {
-      await prisma.eventoEquipamentoEmbedding.create({
-        data: {
-          tenantId,
-          eventoEquipamentoId: ev.id,
-          embedding: r.embedding,
-          model:     r.model,
-          dim:       r.dim,
-          inputText: r.inputText,
-        },
+      // Persiste nas DUAS colunas (JSON antiga + vector nova) via raw
+      // INSERT com ON CONFLICT DO NOTHING — idempotente, sem race.
+      await criarEmbeddingDual({
+        tenantId,
+        eventoEquipamentoId: ev.id,
+        embedding: r.embedding,
+        model:     r.model,
+        dim:       r.dim,
+        inputText: r.inputText,
       });
       sucessos++;
     } catch (err) {
-      // Race condition: outro worker ja criou. OK.
-      if (err.code !== 'P2002') {
-        console.error(`[IA_EMBEDDINGS] Erro persistir ${ev.id}: ${err.message}`);
-        falhas++;
-      }
+      console.error(`[IA_EMBEDDINGS] Erro persistir ${ev.id}: ${err.message}`);
+      falhas++;
     }
 
     await sleep(RATE_LIMIT_MS);

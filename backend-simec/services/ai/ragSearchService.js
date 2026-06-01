@@ -17,18 +17,40 @@
 import prisma from '../prismaService.js';
 import { generateTextWithLlm, getLlmRuntimeInfo } from './llmService.js';
 import { gerarEmbedding, topKSimilares } from './embeddingsService.js';
+import { topKSimilaresPgvector } from './pgvectorSearch.js';
 
 const TOP_K_DEFAULT = 8;
-const MAX_EVENTOS_LIDOS = 2000; // hard limit para nao explodir memoria
+const MAX_EVENTOS_LIDOS = 2000; // hard limit para nao explodir memoria (fallback in-memory)
 
-export async function buscarEventosRelevantes({ tenantId, pergunta, equipamentoId = null, k = TOP_K_DEFAULT }) {
-  // 1. Embedding da pergunta
-  const emb = await gerarEmbedding(pergunta);
-  if (!emb.ok) {
-    return { ok: false, motivo: emb.motivo };
-  }
+// Implementacao via pgvector — busca aproximada O(log n) com indice IVFFlat.
+// Latencia ~25ms ate 100k vetores. Quando embedding_vec esta NULL (nao
+// backfilled ainda), eh excluido — caller cai pro fallback in-memory.
+async function buscarPgvector({ tenantId, queryVector, equipamentoId, k }) {
+  const rows = await topKSimilaresPgvector({
+    tenantId,
+    queryVector,
+    equipamentoId,
+    k,
+    includeEvento: true,
+  });
+  return rows.map((r) => ({
+    eventoId: r.eventoId,
+    similarity: Number((r.similarity ?? 0).toFixed(4)),
+    ocorridoEm: r.ocorridoEm,
+    fonte: r.fonte,
+    tipoEvento: r.tipoEvento,
+    severidade: r.severidade,
+    causaCategoria: r.causaCategoria,
+    resumo: r.resumo,
+    equipamentoId: r.equipamentoId,
+  }));
+}
 
-  // 2. Carrega candidatos (com filtro opcional por equipamento)
+// Implementacao in-memory — fallback historico. Carrega ate 2000
+// candidatos pra Node e calcula cosine 1 a 1. Lento mas correto.
+// Usado quando pgvector retorna vazio (todos os embedding_vec NULL no
+// tenant) ou quando $queryRaw da erro inesperado.
+async function buscarInMemory({ tenantId, queryVector, equipamentoId, modeloEmbedding, k }) {
   const where = { tenantId };
   if (equipamentoId) where.evento = { equipamentoId };
 
@@ -53,31 +75,64 @@ export async function buscarEventosRelevantes({ tenantId, pergunta, equipamentoI
     },
   });
 
-  if (!candidatos.length) {
-    return { ok: true, eventos: [], modeloEmbedding: emb.model };
-  }
+  if (!candidatos.length) return [];
 
-  // 3. Top-K por similaridade
   const ranking = topKSimilares(
-    emb.embedding,
+    queryVector,
     candidatos.map((c) => ({ id: c.id, vetor: c.embedding, evento: c.evento })),
     k
   );
+  return ranking.map((r) => ({
+    eventoId: r.evento.id,
+    similarity: Number(r.similarity?.toFixed(4)),
+    ocorridoEm: r.evento.ocorridoEm,
+    fonte: r.evento.fonte,
+    tipoEvento: r.evento.tipoEvento,
+    severidade: r.evento.severidade,
+    causaCategoria: r.evento.causaCategoria,
+    resumo: r.evento.resumo,
+    equipamentoId: r.evento.equipamentoId,
+  }));
+}
+
+export async function buscarEventosRelevantes({ tenantId, pergunta, equipamentoId = null, k = TOP_K_DEFAULT }) {
+  // 1. Embedding da pergunta
+  const emb = await gerarEmbedding(pergunta);
+  if (!emb.ok) {
+    return { ok: false, motivo: emb.motivo };
+  }
+
+  // 2. Tenta pgvector (rapido). Se vazio (embedding_vec ainda nao
+  // backfilled pra esse tenant) ou erro, cai pro fallback in-memory.
+  let eventos = [];
+  let viaPgvector = false;
+  try {
+    eventos = await buscarPgvector({
+      tenantId,
+      queryVector: emb.embedding,
+      equipamentoId,
+      k,
+    });
+    viaPgvector = eventos.length > 0;
+  } catch (err) {
+    console.warn(`[RAG] pgvector falhou, caindo pro fallback in-memory: ${err.message}`);
+  }
+
+  if (!viaPgvector) {
+    eventos = await buscarInMemory({
+      tenantId,
+      queryVector: emb.embedding,
+      equipamentoId,
+      modeloEmbedding: emb.model,
+      k,
+    });
+  }
 
   return {
     ok: true,
     modeloEmbedding: emb.model,
-    eventos: ranking.map((r) => ({
-      eventoId: r.evento.id,
-      similarity: Number(r.similarity?.toFixed(4)),
-      ocorridoEm: r.evento.ocorridoEm,
-      fonte: r.evento.fonte,
-      tipoEvento: r.evento.tipoEvento,
-      severidade: r.evento.severidade,
-      causaCategoria: r.evento.causaCategoria,
-      resumo: r.evento.resumo,
-      equipamentoId: r.evento.equipamentoId,
-    })),
+    metodoBusca: viaPgvector ? 'pgvector' : 'in_memory',
+    eventos,
   };
 }
 
