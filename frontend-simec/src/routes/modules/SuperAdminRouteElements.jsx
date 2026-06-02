@@ -5,6 +5,7 @@ import {
   SuperAdminAprendizadoPage,
   SuperAdminAuditoriaPage,
   SuperAdminHelpPage,
+  SuperAdminLicaoAuditoriaPage,
   SuperAdminLlmCallLogPage,
   SuperAdminPage,
   SuperAdminSaudePage,
@@ -29,6 +30,7 @@ function SuperAdminRouteElements() {
       <Route path="saude" element={<SuperAdminSaudePage />} />
       <Route path="aprendizado" element={<SuperAdminAprendizadoPage />} />
       <Route path="llm-custo" element={<SuperAdminLlmCallLogPage />} />
+      <Route path="licao-auditoria" element={<SuperAdminLicaoAuditoriaPage />} />
       <Route path="ajuda" element={<SuperAdminHelpPage />} />
     </Route>
   );

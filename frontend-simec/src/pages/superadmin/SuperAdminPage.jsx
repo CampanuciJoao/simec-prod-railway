@@ -8,6 +8,7 @@ import {
   faClockRotateLeft,
   faCoins,
   faHeartPulse,
+  faShieldHalved,
   faUsers,
 } from '@fortawesome/free-solid-svg-icons';
 
@@ -53,6 +54,12 @@ function SuperAdminPage() {
       label: 'Custo LLM',
       icon: <FontAwesomeIcon icon={faCoins} />,
       path: '/superadmin/llm-custo',
+    },
+    {
+      id: 'licao-auditoria',
+      label: 'Auditoria IA',
+      icon: <FontAwesomeIcon icon={faShieldHalved} />,
+      path: '/superadmin/licao-auditoria',
     },
     {
       id: 'ajuda',

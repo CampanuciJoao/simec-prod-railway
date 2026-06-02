@@ -15,6 +15,7 @@ import { executarExtracaoTodosTenants, executarExtracaoPdfsTenant } from './serv
 import { sincronizarKnowledgeLayerTodosTenants, sincronizarKnowledgeLayerTenant } from './services/knowledgeLayer/knowledgeLayerSync.js';
 import { gerarEmbeddingsTodosTenants, gerarEmbeddingsTenant } from './services/ai/eventoEmbeddingsWorker.js';
 import { gerarInsightsTodosTenants, gerarInsightsTenant } from './services/ai/insightsGenerator.js';
+import { auditarLicoesPeriodicamente } from './services/ai/licaoAuditoriaWorker.js';
 import { registrarExecucao, PIPELINE_NAMES } from './services/ai/aiPipelineState.js';
 import prisma from './services/prismaService.js';
 import { getRedisConnectionOptions } from './services/redis/redisConnectionOptions.js';
@@ -356,6 +357,18 @@ const alertasWorker = new Worker(
           return { ok: false, erro: err.message };
         }
       }, { tenantId: job.data.tenantId });
+    }
+
+    if (job?.name === 'ia-auditar-licoes') {
+      // G3: auditoria semanal de licoes cross-tenant. Sem comTelemetria
+      // porque nao se enquadra em pipeline_estado (eh meta-pipeline).
+      try {
+        const r = await auditarLicoesPeriodicamente({ limite: 500 });
+        return { ok: true, ...r };
+      } catch (err) {
+        console.error('[IA_LICAO_AUDIT_WORKER] Erro:', err.message);
+        return { ok: false, erro: err.message };
+      }
     }
 
     if (job?.name === 'gehc-discovery-diario') {
