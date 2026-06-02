@@ -334,9 +334,11 @@ router.get('/gehc-utilizacao', async (req, res) => {
   }
 });
 
-// PDF de ORCAMENTO de Controle de Qualidade — inventario p/ cotacao.
-// Diferenca do /conformidade-cq: foca em listagem do parque, nao em
-// status dos testes. Aceita filtros opcionais unidadeIds[] e modalidades[].
+// PDF de Inventário Controle de Qualidade — listagem do parque pra
+// cotacao. Diferenca do /conformidade-cq: foca em inventario, nao em
+// status dos testes. Path mantido como 'orcamento-cq' por compat com
+// clientes que ja consomem; rotulo mudou no UI/PDF pra "Inventário".
+// Aceita filtros opcionais unidadeIds[] e modalidades[].
 router.post('/orcamento-cq', async (req, res) => {
   try {
     const { unidadeIds, modalidades } = req.body || {};
@@ -350,10 +352,10 @@ router.post('/orcamento-cq', async (req, res) => {
     const buffer = await gerarPdfOrcamentoCqBuffer(dados, getPdfOptions(req));
 
     const dataIso = new Date().toISOString().slice(0, 10);
-    return sendPdf(res, buffer, `orcamento_cq_${dataIso}.pdf`);
+    return sendPdf(res, buffer, `inventario_cq_${dataIso}.pdf`);
   } catch (error) {
-    console.error('[PDF_ORCAMENTO_CQ_ERROR]', error);
-    return mapErrorToResponse(res, error, 'Erro ao gerar relatório de orçamento de CQ.');
+    console.error('[PDF_INVENTARIO_CQ_ERROR]', error);
+    return mapErrorToResponse(res, error, 'Erro ao gerar inventário de CQ.');
   }
 });
 
