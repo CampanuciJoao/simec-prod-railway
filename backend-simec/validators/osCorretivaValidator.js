@@ -154,27 +154,37 @@ export function validarReagendarVisita(payload) {
 }
 
 export const registrarResultadoSchema = z.object({
-  resultado: z.enum(['Operante', 'PrazoEstendido'], {
+  // Resultado da visita:
+  //   Operante       — manutencao OK, equipamento liberado, OS encerra
+  //   PrazoEstendido — manutencao em andamento, equipamento ainda inoperante,
+  //                    precisa de mais tempo (nova visita do MESMO prestador)
+  //   NaoRealizada   — visita NAO aconteceu (no-show do tecnico, peca atrasou,
+  //                    etc). Reagenda sem trocar status do equipamento.
+  //                    Motivo eh OBRIGATORIO pra auditoria.
+  resultado: z.enum(['Operante', 'PrazoEstendido', 'NaoRealizada'], {
     errorMap: () => ({ message: 'Resultado inválido.' }),
   }),
   observacoes: z.string().max(2000).optional(),
+  motivoNaoRealizacao: z.string().min(3).max(500).optional(),
   dataHoraFimReal: z.string().datetime({ message: 'Data/hora de conclusão inválida.' }).optional(),
   novaDataHoraInicioPrevista: z.string().datetime().optional(),
   novaDataHoraFimPrevista: z.string().datetime().optional(),
 }).superRefine((data, ctx) => {
-  if (data.resultado === 'PrazoEstendido') {
+  const precisaNovaData = data.resultado === 'PrazoEstendido' || data.resultado === 'NaoRealizada';
+
+  if (precisaNovaData) {
     if (!data.novaDataHoraInicioPrevista) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['novaDataHoraInicioPrevista'],
-        message: 'Nova data de início é obrigatória ao estender prazo.',
+        message: 'Nova data de início é obrigatória.',
       });
     }
     if (!data.novaDataHoraFimPrevista) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['novaDataHoraFimPrevista'],
-        message: 'Nova data de fim é obrigatória ao estender prazo.',
+        message: 'Nova data de fim é obrigatória.',
       });
     }
     if (
@@ -188,6 +198,14 @@ export const registrarResultadoSchema = z.object({
         message: 'A data/hora de fim deve ser posterior ao início.',
       });
     }
+  }
+
+  if (data.resultado === 'NaoRealizada' && !data.motivoNaoRealizacao) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['motivoNaoRealizacao'],
+      message: 'Informe o motivo pelo qual a manutenção não foi realizada.',
+    });
   }
 });
 

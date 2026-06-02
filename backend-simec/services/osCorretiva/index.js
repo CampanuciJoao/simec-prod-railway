@@ -551,7 +551,11 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
   if (visita.osCorretiva.id !== osId) {
     return { ok: false, status: 422, message: 'Visita não pertence a esta OS.' };
   }
-  if (visita.status === 'Concluida' || visita.status === 'PrazoEstendido') {
+  if (
+    visita.status === 'Concluida' ||
+    visita.status === 'PrazoEstendido' ||
+    visita.status === 'NaoRealizada'
+  ) {
     return { ok: false, status: 422, message: 'Esta visita já teve resultado registrado.' };
   }
 
@@ -603,15 +607,29 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
       dataEvento: new Date(),
     });
 
-  } else {
-    // PrazoEstendido — cria nova visita
+  } else if (v.data.resultado === 'PrazoEstendido' || v.data.resultado === 'NaoRealizada') {
+    // PrazoEstendido — manutencao em andamento, equipamento continua
+    //                  inoperante, precisa de mais tempo
+    // NaoRealizada   — visita nao aconteceu (no-show), reagenda sem
+    //                  trocar status do equipamento
+    //
+    // Ambos: marca visita atual com status correspondente + cria nova
+    // visita (mesmo prestador, novas datas) + OS continua em
+    // AguardandoTerceiro. NUNCA toca no equipamento aqui — quem libera
+    // eh o resultado Operante.
+    const novoStatus = v.data.resultado;
+    const obsFinal =
+      v.data.resultado === 'NaoRealizada'
+        ? v.data.motivoNaoRealizacao
+        : v.data.observacoes || null;
+
     await atualizarVisita({
       tenantId,
       visitaId,
       data: {
-        status: 'PrazoEstendido',
-        resultado: 'PrazoEstendido',
-        observacoes: v.data.observacoes || null,
+        status: novoStatus,
+        resultado: novoStatus,
+        observacoes: obsFinal,
         dataHoraFimReal: new Date(),
       },
     });
@@ -623,8 +641,6 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
       dataHoraInicioPrevista: v.data.novaDataHoraInicioPrevista,
       dataHoraFimPrevista: v.data.novaDataHoraFimPrevista,
     });
-
-    // Mantém status AguardandoTerceiro
   }
 
   await registrarLog({

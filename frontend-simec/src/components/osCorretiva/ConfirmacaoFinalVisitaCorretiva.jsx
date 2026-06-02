@@ -4,6 +4,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCheckCircle,
   faClockRotateLeft,
+  faCircleXmark,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
 import { Button, Input, PageSection, Textarea } from '@/components/ui';
@@ -19,22 +20,34 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
   const [novaDataHoraInicioPrevista, setNovaDataHoraInicioPrevista] = useState('');
   const [novaDataHoraFimPrevista, setNovaDataHoraFimPrevista] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [motivoNaoRealizacao, setMotivoNaoRealizacao] = useState('');
 
   const canConfirm =
     modo === 'operante'
       ? !!dataHoraFimReal
       : modo === 'estender'
       ? !!(novaDataHoraInicioPrevista && novaDataHoraFimPrevista)
+      : modo === 'nao_realizada'
+      ? !!(novaDataHoraInicioPrevista && novaDataHoraFimPrevista && motivoNaoRealizacao.trim().length >= 3)
       : false;
 
   function handleConfirm() {
     if (!modo) return;
-    const payload = { observacoes: observacoes || undefined };
+    const payload = {};
     if (modo === 'operante') {
       payload.resultado = 'Operante';
       payload.dataHoraFimReal = new Date(dataHoraFimReal).toISOString();
-    } else {
+      if (observacoes) payload.observacoes = observacoes;
+    } else if (modo === 'estender') {
       payload.resultado = 'PrazoEstendido';
+      payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
+      payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
+      if (observacoes) payload.observacoes = observacoes;
+    } else {
+      // nao_realizada: manutencao nao aconteceu, reagenda sem trocar
+      // status do equipamento. Motivo eh obrigatorio.
+      payload.resultado = 'NaoRealizada';
+      payload.motivoNaoRealizacao = motivoNaoRealizacao.trim();
       payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
       payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
     }
@@ -95,6 +108,14 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
               <FontAwesomeIcon icon={faClockRotateLeft} />
               Continua inoperante — estender prazo
             </Button>
+            <Button
+              type="button"
+              variant={modo === 'nao_realizada' ? 'danger' : 'secondary'}
+              onClick={() => setModo('nao_realizada')}
+            >
+              <FontAwesomeIcon icon={faCircleXmark} />
+              Manutenção não ocorreu — reagendar
+            </Button>
           </div>
         </div>
 
@@ -149,6 +170,42 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
                 onChange={(e) => setObservacoes(e.target.value)}
                 placeholder="Explique por que o equipamento continua inoperante e o que sera feito."
               />
+            </div>
+          </div>
+        )}
+
+        {modo === 'nao_realizada' && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Textarea
+                label="Por que a manutenção não ocorreu? *"
+                rows={3}
+                value={motivoNaoRealizacao}
+                onChange={(e) => setMotivoNaoRealizacao(e.target.value)}
+                placeholder="Ex: técnico não compareceu, peça não chegou, prestador remarcou..."
+              />
+              <FieldError error={fieldErrors?.motivoNaoRealizacao} />
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Status do equipamento não será alterado. A OS continua aberta com a nova data.
+              </p>
+            </div>
+            <div>
+              <Input
+                label="Nova previsão de início *"
+                type="datetime-local"
+                value={novaDataHoraInicioPrevista}
+                onChange={(e) => setNovaDataHoraInicioPrevista(e.target.value)}
+              />
+              <FieldError error={fieldErrors?.novaDataHoraInicioPrevista} />
+            </div>
+            <div>
+              <Input
+                label="Nova previsão de término *"
+                type="datetime-local"
+                value={novaDataHoraFimPrevista}
+                onChange={(e) => setNovaDataHoraFimPrevista(e.target.value)}
+              />
+              <FieldError error={fieldErrors?.novaDataHoraFimPrevista} />
             </div>
           </div>
         )}
