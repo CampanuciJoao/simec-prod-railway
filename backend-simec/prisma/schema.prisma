@@ -152,6 +152,7 @@ model Usuario {
   aiPipelinesPausados      AiPipelineEstado[]     @relation("AiPipelinePausadoPor")
   aiPipelinesRetomados     AiPipelineEstado[]     @relation("AiPipelineRetomadoPor")
   iaCategoriaLabelsAutor   IaCategoriaLabel[]     @relation("IaCategoriaLabelAutor")
+  iaLicaoAuditoriasRevisor IaLicaoAuditoria[]     @relation("IaLicaoAuditoriaRevisor")
   osCorretivasConcluidas   OsCorretiva[]          @relation("OsCorretivaConcluidoPor")
   osCorretivasCanceladas   OsCorretiva[]          @relation("OsCorretivaCanceladoPor")
   aceitesTermos            AceiteTermo[]
@@ -1285,14 +1286,67 @@ model IaCategoriaLicao {
   ativa             Boolean  @default(true) // permite desativar lições problemáticas sem deletar
   vezesAplicada     Int      @default(0) @map("vezes_aplicada") // contador de uso em few-shot
 
+  // Status de auditoria — preenchido pelo detector adversarial. Quando
+  // o detector flagra padrao suspeito (potencial leak), a licao fica em
+  // QUARENTENA: status='QUARENTENA' + ativa=false. So volta a alimentar
+  // few-shot apos revisao manual do superadmin (APROVADA) OU eh
+  // mantida desativada (REJEITADA).
+  status            String   @default("APROVADA")  // APROVADA | QUARENTENA | REJEITADA
+  ultimaAuditoriaEm DateTime? @map("ultima_auditoria_em")
+
+  // Proveniencia despersonalizada: SHA-256 do labelId que originou a
+  // licao (hash nao-reversivel — nao re-identifica o tenant, mas
+  // permite cross-reference em caso de incidente). O recalculo eh feito
+  // sob demanda pra responder "quais licoes vieram de labels do tenant X".
+  labelHash         String? @map("label_hash")
+
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
-  labels IaCategoriaLabel[]
+  labels     IaCategoriaLabel[]
+  auditorias IaLicaoAuditoria[]
 
   @@index([ativa, categoriaCorreta])
   @@index([ativa, serviceTypeCode])
+  @@index([status, createdAt(sort: Desc)])
   @@map("ia_categoria_licoes")
+}
+
+// Trilha de auditoria de cada licao cross-tenant. Cada entrada representa
+// uma execucao do detector adversarial (sincrona ao criar + semanal via
+// job). Permite: ver historico de uma licao, contar quais padroes mais
+// pegam, justificar revisao manual ("o que disparou alerta?").
+model IaLicaoAuditoria {
+  id          String @id @default(uuid())
+  licaoId     String @map("licao_id")
+
+  // Resultado: 'limpa' (passou) ou 'suspeita' (detector flagou)
+  resultado   String
+
+  // Padroes encontrados (JSON array de strings). Ex: ['nome_proprio_sem_titulo',
+  // 'numero_curto_isolado']. Permite agregacao no painel.
+  padroes     Json   @default("[]")
+
+  // Trecho problematico (truncado a 200 chars) — pra revisao manual.
+  trecho      String?
+
+  // Fonte da auditoria: 'sincrono' (na criacao) ou 'job_semanal'
+  origem      String
+
+  // Quando o superadmin revisar manualmente, registramos quem + decisao
+  revisadoPor String?  @map("revisado_por")
+  revisadoEm  DateTime? @map("revisado_em")
+  decisao     String?  // 'APROVADA' | 'REJEITADA' (manter desativada)
+
+  criadoEm    DateTime @default(now()) @map("criado_em")
+
+  licao   IaCategoriaLicao @relation(fields: [licaoId], references: [id], onDelete: Cascade)
+  revisor Usuario?         @relation("IaLicaoAuditoriaRevisor", fields: [revisadoPor], references: [id], onDelete: SetNull)
+
+  @@index([licaoId, criadoEm(sort: Desc)])
+  @@index([resultado, criadoEm(sort: Desc)])
+  @@index([decisao, criadoEm(sort: Desc)])
+  @@map("ia_licao_auditoria")
 }
 
 // ─── GE Health Cloud — Utilização e Uptime mensais ───────────────────────────

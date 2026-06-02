@@ -43,6 +43,7 @@ import superadminUsuariosRoutes from './routes/superadminUsuariosRoutes.js';
 import superadminAuditoriaRoutes from './routes/superadminAuditoriaRoutes.js';
 import superadminAprendizadoRoutes from './routes/superadminAprendizadoRoutes.js';
 import superadminLlmCallLogRoutes from './routes/superadminLlmCallLogRoutes.js';
+import superadminLicaoAuditoriaRoutes from './routes/superadminLicaoAuditoriaRoutes.js';
 
 import cookieParser from 'cookie-parser';
 import { metricsMiddleware } from './middleware/metricsMiddleware.js';
@@ -208,6 +209,7 @@ app.use('/api/superadmin/usuarios', superadminUsuariosRoutes);
 app.use('/api/superadmin/auditoria', superadminAuditoriaRoutes);
 app.use('/api/superadmin/aprendizado', superadminAprendizadoRoutes);
 app.use('/api/superadmin/llm-call-log', superadminLlmCallLogRoutes);
+app.use('/api/superadmin/licao-auditoria', superadminLicaoAuditoriaRoutes);
 app.use('/api/tenant', tenantSettingsRoutes);
 app.use('/api/help', helpRoutes);
 app.use('/api/orcamentos', orcamentosRoutes);

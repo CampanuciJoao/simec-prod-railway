@@ -403,6 +403,29 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job IA (ia-gerar-insights) agendado a cada 6h.');
 
+    // IA: auditoria semanal de licoes cross-tenant (G3). Roda detector
+    // adversarial em todas as IaCategoriaLicao ativas que nao foram
+    // re-auditadas nos ultimos 7 dias. Move suspeitas pra QUARENTENA
+    // automaticamente — feedback loop pra evolucao do detector.
+    const repeatables11 = await queue.getRepeatableJobs();
+    for (const job of repeatables11) {
+      if (job.name === 'ia-auditar-licoes') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'ia-auditar-licoes',
+      {},
+      {
+        repeat: { every: 7 * 24 * 60 * 60 * 1000 }, // 7 dias
+        removeOnComplete: 4,
+        removeOnFail: 8,
+      }
+    );
+
+    console.log('[QUEUE] Job IA (ia-auditar-licoes) agendado semanalmente.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {

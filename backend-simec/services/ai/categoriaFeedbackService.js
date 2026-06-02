@@ -14,8 +14,23 @@
 // Próximo cliente que entrar já chega com o aprendizado coletivo dos
 // anteriores, sem nunca ver dado deles.
 
+import crypto from 'node:crypto';
+
 import prisma from '../prismaService.js';
 import { TAXONOMIA_CAUSAS_EXPORT } from '../gehc/gehcPdfLlmExtractor.js';
+import { detectarPadroesSuspeitos } from './licaoAnonimizacaoAuditor.js';
+
+// SHA-256 de labelId — proveniencia nao-reversivel. Usado pra responder
+// "quais licoes vieram de labels do tenant X" recalculando o hash dos
+// labels dele em tempo de incidente. Salt pro hash nao ser brute-forcable.
+const LICAO_HASH_SALT = process.env.IA_LICAO_HASH_SALT || 'simec-ia-licao-v1';
+
+function hashLabelId(labelId) {
+  return crypto
+    .createHash('sha256')
+    .update(`${LICAO_HASH_SALT}:${labelId}`)
+    .digest('hex');
+}
 
 // Regras de scrubbing — aplicadas em ordem. Determinísticas (sem LLM)
 // para evitar custo e ter previsibilidade. Pensa "nunca deixar passar
@@ -120,18 +135,45 @@ export async function registrarCorrecaoCategoria({
   // Cria a lição cross-tenant primeiro. Se texto despersonalizado idêntico
   // já existir com mesma categoria, reusa em vez de duplicar.
   let licao = null;
+  let auditoriaSync = null;
   if (textoLicao) {
     licao = await prisma.iaCategoriaLicao.findFirst({
       where: { textoDespersonalizado: textoLicao, categoriaCorreta },
     });
     if (!licao) {
+      // Auditor adversarial — segunda passada apos despersonalizar().
+      // Se flagrar padroes suspeitos, a licao eh criada em QUARENTENA:
+      // status='QUARENTENA' + ativa=false. Nao alimenta few-shot ate
+      // revisao manual no painel SuperAdmin.
+      auditoriaSync = detectarPadroesSuspeitos(textoLicao);
+
       licao = await prisma.iaCategoriaLicao.create({
         data: {
           textoDespersonalizado: textoLicao,
           categoriaCorreta,
           serviceTypeCode,
+          status: auditoriaSync.suspeita ? 'QUARENTENA' : 'APROVADA',
+          ativa: !auditoriaSync.suspeita,
+          ultimaAuditoriaEm: new Date(),
         },
       });
+
+      // Grava trilha de auditoria — sempre, mesmo se passou limpo
+      await prisma.iaLicaoAuditoria.create({
+        data: {
+          licaoId: licao.id,
+          resultado: auditoriaSync.suspeita ? 'suspeita' : 'limpa',
+          padroes: auditoriaSync.padroes,
+          trecho: auditoriaSync.trecho,
+          origem: 'sincrono',
+        },
+      });
+
+      if (auditoriaSync.suspeita) {
+        console.warn(
+          `[LICAO_QUARENTENA] id=${licao.id} padroes=${auditoriaSync.padroes.join(',')}`
+        );
+      }
     }
   }
 
@@ -169,7 +211,18 @@ export async function registrarCorrecaoCategoria({
     data: { rootCauseCategory: categoriaCorreta },
   });
 
-  return { ok: true, label, licao };
+  // Preenche labelHash na licao (proveniencia nao-reversivel). So preenche
+  // se a licao foi criada AGORA (label nova) — licao reusada ja tem hash
+  // de outro label. Hash multiplo poderia virar coluna separada se um
+  // dia precisarmos rastrear N origens.
+  if (licao && !licao.labelHash && label) {
+    await prisma.iaCategoriaLicao.update({
+      where: { id: licao.id },
+      data: { labelHash: hashLabelId(label.id) },
+    });
+  }
+
+  return { ok: true, label, licao, auditoria: auditoriaSync };
 }
 
 /**
@@ -183,7 +236,9 @@ export async function registrarCorrecaoCategoria({
 export async function buscarLicoesParaFewShot({ serviceTypeCode, limite = 5 }) {
   // Sem serviceTypeCode (PDF sem OS pai): busca lições mais aplicadas em
   // geral, sem filtro por tipo.
-  const where = { ativa: true };
+  // Filtra ativa=true E status='APROVADA' (defesa em profundidade — uma
+  // licao em QUARENTENA nao deve alimentar few-shot mesmo se ativa por bug).
+  const where = { ativa: true, status: 'APROVADA' };
   if (serviceTypeCode) {
     where.OR = [
       { serviceTypeCode },
