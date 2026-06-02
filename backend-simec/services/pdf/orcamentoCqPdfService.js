@@ -15,7 +15,7 @@
 // leitura pelo prestador que vai cotar.
 
 import prisma from '../prismaService.js';
-import { MODALIDADES_COM_CQ } from '../controleQualidade/index.js';
+import { buildWhereModalidadeCq } from '../controleQualidade/modalidadesCqMatcher.js';
 
 const MAX_EQUIPAMENTOS = 500; // teto defensivo — orcamento real raro passa de 100
 
@@ -24,14 +24,17 @@ export async function obterDadosPdfOrcamentoCq({
   unidadeIds = null,
   modalidades = null,
 }) {
-  const modalidadesEfetivas =
+  // Filtro de modalidade: ou usa lista explicita (string match exato)
+  // ou usa o matcher robusto que cobre variacoes de cadastro
+  // (Mamografo/Mamografia, com/sem acento, DR/Raio-X, etc).
+  const filtroModalidade =
     Array.isArray(modalidades) && modalidades.length > 0
-      ? modalidades
-      : MODALIDADES_COM_CQ;
+      ? { tipo: { in: modalidades } }
+      : buildWhereModalidadeCq();
 
   const whereEquipamento = {
     tenantId,
-    tipo: { in: modalidadesEfetivas },
+    ...filtroModalidade,
     status: { notIn: ['Vendido', 'Desativado'] },
   };
   if (Array.isArray(unidadeIds) && unidadeIds.length > 0) {
@@ -99,6 +102,6 @@ export async function obterDadosPdfOrcamentoCq({
       truncado: equipamentos.length === MAX_EQUIPAMENTOS,
     },
     unidades: [...porUnidade.values()],
-    modalidadesFiltradas: modalidadesEfetivas,
+    modalidadesFiltradas: Array.isArray(modalidades) && modalidades.length > 0 ? modalidades : 'matcher_padrao',
   };
 }
