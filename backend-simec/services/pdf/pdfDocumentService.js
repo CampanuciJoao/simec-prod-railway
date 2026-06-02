@@ -1602,15 +1602,15 @@ export async function gerarPdfOrcamentoCqBuffer(payload, options = {}) {
     },
   ]);
 
-  // Distribuicao por modalidade — usa as MESMAS larguras do total da
-  // tabela de equipamentos por unidade (485px) pra ficar alinhada
-  // verticalmente com o restante do relatorio.
+  // Distribuicao por modalidade — alinhada com a largura total da area
+  // util da pagina (495px = 595 A4 - 50 margem esq - 50 margem dir),
+  // mesma extensao dos KpiCards do Resumo.
   const dist = Array.isArray(r.distribuicaoModalidade) ? r.distribuicaoModalidade : [];
   if (dist.length > 0) {
     drawSectionTitle(doc, 'Distribuição por modalidade');
     drawTable(doc, {
       headers: ['Modalidade', 'Quantidade'],
-      columnWidths: [385, 100],
+      columnWidths: [395, 100],
       rows: dist.map((d) => [safeText(d.modalidade), String(d.quantidade)]),
       emptyMessage: 'Sem equipamentos.',
     });
@@ -1644,11 +1644,11 @@ export async function gerarPdfOrcamentoCqBuffer(payload, options = {}) {
       // Larguras pensadas pra acomodar:
       //  - "Tomografia Computadorizada" sem corte feio (precisa de >=120)
       //  - Numeros de serie longos como "S2VUM3HW500004P" (15-16 chars,
-      //    precisa de >=130 com padding)
-      // Total 485 = area util de pagina com margens default.
+      //    precisa de >=140 com padding)
+      // Total 495 = area util A4 com margens 50/50.
       drawTable(doc, {
         headers: ['Modalidade', 'Modelo', 'Fabricante', 'Nº Série (TAG)'],
-        columnWidths: [125, 135, 85, 140],
+        columnWidths: [130, 135, 85, 145],
         rows: equipamentos.map((e) => [
           safeText(e.tipo),
           safeText(e.modelo),
