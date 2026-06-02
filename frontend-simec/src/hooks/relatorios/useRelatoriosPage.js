@@ -130,7 +130,7 @@ export function useRelatoriosPage() {
         await exportarOrcamentoCqPDF({
           unidadeIds: filtros.unidadeId ? [filtros.unidadeId] : null,
         });
-        addToast('Relatório de orçamento de CQ baixado.', 'success');
+        addToast('Inventário de CQ baixado.', 'success');
         return;
       }
 
@@ -175,7 +175,7 @@ export function useRelatoriosPage() {
       },
       {
         value: 'orcamentoCq',
-        label: 'Orçamento de Controle de Qualidade (PDF)',
+        label: 'Inventário Controle de Qualidade',
       },
     ],
     []
@@ -185,7 +185,7 @@ export function useRelatoriosPage() {
     const tipoLabel = {
       inventarioEquipamentos: 'Inventário',
       manutencoesRealizadas: 'Manutenções',
-      orcamentoCq: 'Orçamento CQ',
+      orcamentoCq: 'Inventário CQ',
     }[filtros.tipoRelatorio] || '—';
     return {
       unidades: unidadesDisponiveis.length,
@@ -209,7 +209,7 @@ export function useRelatoriosPage() {
               {
                 inventarioEquipamentos: 'Inventário',
                 manutencoesRealizadas: 'Manutenções',
-                orcamentoCq: 'Orçamento CQ',
+                orcamentoCq: 'Inventário CQ',
               }[filtros.tipoRelatorio] || filtros.tipoRelatorio
             }`,
             value: filtros.tipoRelatorio,

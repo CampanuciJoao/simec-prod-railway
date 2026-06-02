@@ -1566,12 +1566,12 @@ export async function gerarPdfConformidadeCqBuffer(payload, options = {}) {
   return finalizeDocument(doc);
 }
 
-// Relatorio para ORCAMENTO de Controle de Qualidade — lista inventario
-// de equipamentos das modalidades reguladas por unidade. Foco em
-// cotacao (modelo, fabricante, TAG/serie, CNPJ), nao em conformidade.
+// Inventario Controle de Qualidade — lista equipamentos das modalidades
+// reguladas por unidade. Foco em cotacao (modelo, fabricante, TAG/serie,
+// CNPJ), nao em status atual dos testes.
 export async function gerarPdfOrcamentoCqBuffer(payload, options = {}) {
   options = await injectTenantInfo(payload, options);
-  const title = 'RELATÓRIO PARA ORÇAMENTO — CONTROLE DE QUALIDADE';
+  const title = 'INVENTÁRIO CONTROLE DE QUALIDADE';
   const doc = createDocument(title, options);
   drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
@@ -1602,13 +1602,15 @@ export async function gerarPdfOrcamentoCqBuffer(payload, options = {}) {
     },
   ]);
 
-  // Distribuicao por modalidade
+  // Distribuicao por modalidade — usa as MESMAS larguras do total da
+  // tabela de equipamentos por unidade (485px) pra ficar alinhada
+  // verticalmente com o restante do relatorio.
   const dist = Array.isArray(r.distribuicaoModalidade) ? r.distribuicaoModalidade : [];
   if (dist.length > 0) {
     drawSectionTitle(doc, 'Distribuição por modalidade');
     drawTable(doc, {
       headers: ['Modalidade', 'Quantidade'],
-      columnWidths: [320, 80],
+      columnWidths: [385, 100],
       rows: dist.map((d) => [safeText(d.modalidade), String(d.quantidade)]),
       emptyMessage: 'Sem equipamentos.',
     });
