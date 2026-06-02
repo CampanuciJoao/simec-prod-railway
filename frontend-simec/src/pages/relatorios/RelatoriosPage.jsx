@@ -12,7 +12,6 @@ import {
   RelatoriosFiltersSection,
   RelatoriosActiveFiltersBar,
   RelatorioResultado,
-  RelatoriosRapidosSection,
 } from '@/components/relatorios';
 
 // UI
@@ -50,8 +49,6 @@ function RelatoriosPage() {
           />
         ) : (
           <>
-            <RelatoriosRapidosSection />
-
             <RelatoriosMetricsSection metricas={page.metricas} />
 
             <RelatoriosFiltersSection

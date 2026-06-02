@@ -5,7 +5,7 @@ import {
   gerarRelatorio,
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
-import { exportarRelatorioPDF } from '@/services/api/pdfApi';
+import { exportarRelatorioPDF, exportarOrcamentoCqPDF } from '@/services/api/pdfApi';
 import { getErrorMessage } from '../../utils/getErrorMessage';
 
 export function useRelatoriosPage() {
@@ -105,6 +105,16 @@ export function useRelatoriosPage() {
     setError('');
 
     try {
+      // Orcamento CQ eh um PDF pre-formatado — nao tem preview tabular
+      // como os outros relatorios. Baixa direto.
+      if (filtros.tipoRelatorio === 'orcamentoCq') {
+        await exportarOrcamentoCqPDF({
+          unidadeIds: filtros.unidadeId ? [filtros.unidadeId] : null,
+        });
+        addToast('Relatório de orçamento de CQ baixado.', 'success');
+        return;
+      }
+
       const resultado = await gerarRelatorio(filtros);
       setResultadoRelatorio(resultado);
     } catch (err) {
@@ -163,18 +173,24 @@ export function useRelatoriosPage() {
         value: 'manutencoesRealizadas',
         label: 'Manutenções Realizadas',
       },
+      {
+        value: 'orcamentoCq',
+        label: 'Orçamento de Controle de Qualidade (PDF)',
+      },
     ],
     []
   );
 
   const metricas = useMemo(() => {
+    const tipoLabel = {
+      inventarioEquipamentos: 'Inventário',
+      manutencoesRealizadas: 'Manutenções',
+      orcamentoCq: 'Orçamento CQ',
+    }[filtros.tipoRelatorio] || '—';
     return {
       unidades: unidadesDisponiveis.length,
       fabricantes: fabricantesUnicos.length,
-      tipoAtual:
-        filtros.tipoRelatorio === 'inventarioEquipamentos'
-          ? 'Inventário'
-          : 'Manutenções',
+      tipoAtual: tipoLabel,
       registros:
         Array.isArray(resultadoRelatorio?.dados) ? resultadoRelatorio.dados.length : 0,
     };
@@ -190,9 +206,11 @@ export function useRelatoriosPage() {
         ? {
             key: 'tipoRelatorio',
             label: `Tipo: ${
-              filtros.tipoRelatorio === 'inventarioEquipamentos'
-                ? 'Inventário'
-                : 'Manutenções'
+              {
+                inventarioEquipamentos: 'Inventário',
+                manutencoesRealizadas: 'Manutenções',
+                orcamentoCq: 'Orçamento CQ',
+              }[filtros.tipoRelatorio] || filtros.tipoRelatorio
             }`,
             value: filtros.tipoRelatorio,
           }
