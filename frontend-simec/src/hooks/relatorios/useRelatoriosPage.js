@@ -105,16 +105,6 @@ export function useRelatoriosPage() {
     setError('');
 
     try {
-      // Orcamento CQ eh um PDF pre-formatado — nao tem preview tabular
-      // como os outros relatorios. Baixa direto.
-      if (filtros.tipoRelatorio === 'orcamentoCq') {
-        await exportarOrcamentoCqPDF({
-          unidadeIds: filtros.unidadeId ? [filtros.unidadeId] : null,
-        });
-        addToast('Relatório de orçamento de CQ baixado.', 'success');
-        return;
-      }
-
       const resultado = await gerarRelatorio(filtros);
       setResultadoRelatorio(resultado);
     } catch (err) {
@@ -132,14 +122,24 @@ export function useRelatoriosPage() {
       return;
     }
 
-    const nomeArquivo = `relatorio_${resultadoRelatorio.tipoRelatorio}_${new Date()
-      .toISOString()
-      .split('T')[0]}`;
-
     try {
+      // Orcamento CQ tem PDF dedicado com layout pre-formatado (agrupado
+      // por unidade com cabecalho CNPJ etc), diferente do PDF generico
+      // de exportarRelatorioPDF. Roteamos pra esse PDF especifico.
+      if (resultadoRelatorio.tipoRelatorio === 'orcamentoCq') {
+        await exportarOrcamentoCqPDF({
+          unidadeIds: filtros.unidadeId ? [filtros.unidadeId] : null,
+        });
+        addToast('Relatório de orçamento de CQ baixado.', 'success');
+        return;
+      }
+
+      const nomeArquivo = `relatorio_${resultadoRelatorio.tipoRelatorio}_${new Date()
+        .toISOString()
+        .split('T')[0]}`;
       await exportarRelatorioPDF(filtros, `${nomeArquivo}.pdf`);
     } catch (err) {
-      const message = getErrorMessage(err, 'Falha ao exportar o relatÃ³rio em PDF.');
+      const message = getErrorMessage(err, 'Falha ao exportar o relatório em PDF.');
       addToast(message, 'error');
     }
   };

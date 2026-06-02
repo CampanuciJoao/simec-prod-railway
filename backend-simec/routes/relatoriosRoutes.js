@@ -8,6 +8,7 @@ import {
   buscarInventarioEquipamentos,
   buscarEquipamentosComServicos,
 } from '../services/reportQueryService.js';
+import { obterDadosPdfOrcamentoCq } from '../services/pdf/orcamentoCqPdfService.js';
 import { proteger } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -65,6 +66,34 @@ router.post('/gerar', async (req, res) => {
         fabricante: fabricante ? String(fabricante).trim() : null,
         status: status ? String(status).trim() : null,
       });
+    }
+
+    // ORCAMENTO DE CONTROLE DE QUALIDADE — inventario achatado das
+    // modalidades reguladas (RDC 611) com colunas: unidade, CNPJ,
+    // modalidade, modelo, fabricante, n° serie (TAG). Mesmo dataset
+    // do PDF, formato achatado pra render em tabela.
+    else if (tipoRelatorio === 'orcamentoCq') {
+      const dados = await obterDadosPdfOrcamentoCq({
+        tenantId,
+        unidadeIds: unidadeId ? [unidadeId] : null,
+      });
+      // Achata: 1 linha por equipamento, com unidade/CNPJ replicados.
+      dadosRelatorio = [];
+      for (const u of dados.unidades || []) {
+        for (const eq of u.equipamentos || []) {
+          dadosRelatorio.push({
+            unidade: u.unidade?.nomeSistema || '—',
+            cnpj: u.unidade?.cnpj || '—',
+            cidadeUf:
+              [u.unidade?.cidade, u.unidade?.estado].filter(Boolean).join(' / ') ||
+              null,
+            modalidade: eq.tipo || '—',
+            modelo: eq.modelo || '—',
+            fabricante: eq.fabricante || '—',
+            numeroSerie: eq.numeroSerie || '—',
+          });
+        }
+      }
     }
 
     // MANUTENÇÕES REALIZADAS
