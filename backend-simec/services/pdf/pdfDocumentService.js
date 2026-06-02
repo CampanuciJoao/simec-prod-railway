@@ -1639,15 +1639,19 @@ export async function gerarPdfOrcamentoCqBuffer(payload, options = {}) {
         drawParagraph(doc, linha);
       }
 
+      // Larguras pensadas pra acomodar:
+      //  - "Tomografia Computadorizada" sem corte feio (precisa de >=120)
+      //  - Numeros de serie longos como "S2VUM3HW500004P" (15-16 chars,
+      //    precisa de >=130 com padding)
+      // Total 485 = area util de pagina com margens default.
       drawTable(doc, {
-        headers: ['Modalidade', 'Modelo', 'Fabricante', 'Nº Série (TAG)', 'Ano'],
-        columnWidths: [120, 130, 90, 95, 50],
+        headers: ['Modalidade', 'Modelo', 'Fabricante', 'Nº Série (TAG)'],
+        columnWidths: [125, 135, 85, 140],
         rows: equipamentos.map((e) => [
           safeText(e.tipo),
           safeText(e.modelo),
           safeText(e.fabricante),
           safeText(e.numeroSerie),
-          safeText(e.anoFabricacao, '—'),
         ]),
         emptyMessage: 'Sem equipamentos nesta unidade.',
       });

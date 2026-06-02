@@ -147,6 +147,39 @@ function RelatorioResultado({ resultado }) {
     return <TableShell headers={headers} rows={rows} />;
   }
 
+  if (tipoRelatorio === 'orcamentoCq') {
+    const headers = [
+      { key: 'unidade', label: 'Unidade', align: 'left' },
+      { key: 'cnpj', label: 'CNPJ', align: 'center' },
+      { key: 'modalidade', label: 'Modalidade', align: 'left' },
+      { key: 'modelo', label: 'Modelo', align: 'left' },
+      { key: 'fabricante', label: 'Fabricante', align: 'center' },
+      { key: 'numeroSerie', label: 'Nº Série (TAG)', align: 'center' },
+    ];
+
+    const rows = dados.map((item, index) => (
+      <tr key={`${item.numeroSerie || item.modelo}-${index}`} className="hover:bg-slate-50">
+        <td className="px-4 py-3 text-left">
+          <div className="font-semibold text-slate-900">{item.unidade || '—'}</div>
+          {item.cidadeUf ? (
+            <div className="mt-1 text-xs text-slate-500">{item.cidadeUf}</div>
+          ) : null}
+        </td>
+        <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">
+          {item.cnpj || '—'}
+        </td>
+        <td className="px-4 py-3 text-left text-slate-700">{item.modalidade || '—'}</td>
+        <td className="px-4 py-3 text-left font-medium text-slate-900">{item.modelo || '—'}</td>
+        <td className="px-4 py-3 text-center text-slate-700">{item.fabricante || '—'}</td>
+        <td className="px-4 py-3 text-center font-mono text-xs text-slate-700">
+          {item.numeroSerie || '—'}
+        </td>
+      </tr>
+    ));
+
+    return <TableShell headers={headers} rows={rows} />;
+  }
+
   if (tipoRelatorio === 'tempoParada') {
     const headers = [
       { key: 'equipamento', label: 'Equipamento', align: 'left' },

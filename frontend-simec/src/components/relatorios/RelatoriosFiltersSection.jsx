@@ -3,8 +3,6 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 
-import { faFilePdf } from '@fortawesome/free-solid-svg-icons';
-
 import {
   Button,
   DateInput,
@@ -146,14 +144,8 @@ function RelatoriosFiltersSection({
 
         <div className="flex flex-wrap items-end gap-3">
           <Button type="submit" disabled={loading}>
-            <FontAwesomeIcon icon={isOrcamentoCq ? faFilePdf : faSearch} />
-            {loading
-              ? isOrcamentoCq
-                ? 'Gerando PDF...'
-                : 'Gerando...'
-              : isOrcamentoCq
-              ? 'Baixar PDF'
-              : 'Gerar relatório'}
+            <FontAwesomeIcon icon={faSearch} />
+            {loading ? 'Gerando...' : 'Gerar relatório'}
           </Button>
         </div>
       </form>
