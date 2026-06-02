@@ -1733,12 +1733,14 @@ enum StatusVisitaTerceiro {
   Concluida
   PrazoEstendido
   Reagendada
+  NaoRealizada
 }
 
 enum ResultadoVisita {
   Operante
   PrazoEstendido
   Pendente
+  NaoRealizada
 }
 
 model TelegramNotificacao {

@@ -25,6 +25,7 @@ const STATUS_VISITA_LABELS = {
   Concluida: 'Concluída',
   PrazoEstendido: 'Prazo estendido',
   Reagendada: 'Reagendada',
+  NaoRealizada: 'Não realizada',
 };
 
 function adaptarVisita(visita) {
