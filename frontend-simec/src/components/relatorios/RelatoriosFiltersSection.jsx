@@ -3,6 +3,8 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faSearch } from '@fortawesome/free-solid-svg-icons';
 
+import { faFilePdf } from '@fortawesome/free-solid-svg-icons';
+
 import {
   Button,
   DateInput,
@@ -37,11 +39,23 @@ function RelatoriosFiltersSection({
 }) {
   const isManutencoes = filtros.tipoRelatorio === 'manutencoesRealizadas';
   const isInventario = filtros.tipoRelatorio === 'inventarioEquipamentos';
+  const isOrcamentoCq = filtros.tipoRelatorio === 'orcamentoCq';
+
+  // Orcamento CQ tem set de filtros enxuto: so unidade importa. Modalidade
+  // ja eh filtrada no backend (modalidades reguladas), fabricante/data nao
+  // se aplicam. Esconder os campos evita confusao.
+  const mostraFabricante = !isOrcamentoCq;
+  const mostraTipo = isInventario;
+  const mostraDatas = isManutencoes;
 
   return (
     <PageSection
       title="Filtros do relatório"
-      description="Defina os critérios para gerar o relatório desejado."
+      description={
+        isOrcamentoCq
+          ? 'Filtre por unidade para limitar o escopo. Em branco gera para todo o parque.'
+          : 'Defina os critérios para gerar o relatório desejado.'
+      }
     >
       <form onSubmit={onSubmit} className="space-y-6">
         <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
@@ -74,22 +88,24 @@ function RelatoriosFiltersSection({
             </Select>
           </Field>
 
-          <Field label="Fabricante">
-            <Select
-              name="fabricante"
-              value={filtros.fabricante}
-              onChange={onChange}
-            >
-              <option value="">Todos</option>
-              {fabricantesOptions.map((f) => (
-                <option key={f.value} value={f.value}>
-                  {f.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {mostraFabricante && (
+            <Field label="Fabricante">
+              <Select
+                name="fabricante"
+                value={filtros.fabricante}
+                onChange={onChange}
+              >
+                <option value="">Todos</option>
+                {fabricantesOptions.map((f) => (
+                  <option key={f.value} value={f.value}>
+                    {f.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
 
-          {isInventario && (
+          {mostraTipo && (
             <Field label="Tipo">
               <Select
                 name="tipo"
@@ -106,7 +122,7 @@ function RelatoriosFiltersSection({
             </Field>
           )}
 
-          {isManutencoes ? (
+          {mostraDatas ? (
             <Field label="Data início">
               <DateInput
                 name="dataInicio"
@@ -114,11 +130,9 @@ function RelatoriosFiltersSection({
                 onChange={onChange}
               />
             </Field>
-          ) : (
-            <div className="hidden xl:block" />
-          )}
+          ) : null}
 
-          {isManutencoes && (
+          {mostraDatas && (
             <Field label="Data fim">
               <DateInput
                 name="dataFim"
@@ -132,8 +146,14 @@ function RelatoriosFiltersSection({
 
         <div className="flex flex-wrap items-end gap-3">
           <Button type="submit" disabled={loading}>
-            <FontAwesomeIcon icon={faSearch} />
-            {loading ? 'Gerando...' : 'Gerar relatório'}
+            <FontAwesomeIcon icon={isOrcamentoCq ? faFilePdf : faSearch} />
+            {loading
+              ? isOrcamentoCq
+                ? 'Gerando PDF...'
+                : 'Gerando...'
+              : isOrcamentoCq
+              ? 'Baixar PDF'
+              : 'Gerar relatório'}
           </Button>
         </div>
       </form>
