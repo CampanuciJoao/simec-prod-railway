@@ -11,6 +11,8 @@ import {
   gerarPdfUtilizacaoGehcBuffer,
 } from '../services/pdf/pdfDocumentService.js';
 import { obterDadosPdfConformidadeCq } from '../services/pdf/conformidadeCqPdfService.js';
+import { obterDadosPdfOrcamentoCq } from '../services/pdf/orcamentoCqPdfService.js';
+import { gerarPdfOrcamentoCqBuffer } from '../services/pdf/pdfDocumentService.js';
 import {
   obterDadosPdfBI,
   obterDadosPdfHistoricoEquipamento,
@@ -329,6 +331,29 @@ router.get('/gehc-utilizacao', async (req, res) => {
   } catch (err) {
     console.error('[PDF_GEHC_UTILIZACAO]', err.message);
     return res.status(500).json({ message: 'Erro ao gerar PDF de utilização GE.' });
+  }
+});
+
+// PDF de ORCAMENTO de Controle de Qualidade — inventario p/ cotacao.
+// Diferenca do /conformidade-cq: foca em listagem do parque, nao em
+// status dos testes. Aceita filtros opcionais unidadeIds[] e modalidades[].
+router.post('/orcamento-cq', async (req, res) => {
+  try {
+    const { unidadeIds, modalidades } = req.body || {};
+
+    const dados = await obterDadosPdfOrcamentoCq({
+      tenantId: req.tenantContext,
+      unidadeIds: Array.isArray(unidadeIds) ? unidadeIds : null,
+      modalidades: Array.isArray(modalidades) ? modalidades : null,
+    });
+
+    const buffer = await gerarPdfOrcamentoCqBuffer(dados, getPdfOptions(req));
+
+    const dataIso = new Date().toISOString().slice(0, 10);
+    return sendPdf(res, buffer, `orcamento_cq_${dataIso}.pdf`);
+  } catch (error) {
+    console.error('[PDF_ORCAMENTO_CQ_ERROR]', error);
+    return mapErrorToResponse(res, error, 'Erro ao gerar relatório de orçamento de CQ.');
   }
 });
 

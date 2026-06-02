@@ -1565,3 +1565,104 @@ export async function gerarPdfConformidadeCqBuffer(payload, options = {}) {
 
   return finalizeDocument(doc);
 }
+
+// Relatorio para ORCAMENTO de Controle de Qualidade — lista inventario
+// de equipamentos das modalidades reguladas por unidade. Foco em
+// cotacao (modelo, fabricante, TAG/serie, CNPJ), nao em conformidade.
+export async function gerarPdfOrcamentoCqBuffer(payload, options = {}) {
+  options = await injectTenantInfo(payload, options);
+  const title = 'RELATÓRIO PARA ORÇAMENTO — CONTROLE DE QUALIDADE';
+  const doc = createDocument(title, options);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
+  const { locale, timeZone } = options;
+
+  drawParagraph(
+    doc,
+    'Inventário de equipamentos das modalidades reguladas pela RDC ANVISA 611/2022 e ' +
+      'recomendadas pela boa prática de engenharia clínica. Use este documento como base ' +
+      'para solicitar orçamento de serviços de Controle de Qualidade junto a prestadores ' +
+      'credenciados.'
+  );
+
+  // Resumo executivo
+  drawSectionTitle(doc, 'Resumo');
+  const r = payload?.resumo || {};
+  drawKpiCards(doc, [
+    { label: 'Equipamentos', value: safeText(r.totalEquipamentos, 0), color: COLORS.blue },
+    { label: 'Unidades', value: safeText(r.totalUnidades, 0), color: COLORS.blue },
+    {
+      label: 'Modalidades',
+      value: safeText((r.distribuicaoModalidade || []).length, 0),
+      color: COLORS.slate700,
+    },
+    {
+      label: 'Emitido em',
+      value: formatDateTime(payload?.emitidoEm || new Date(), locale, timeZone),
+      color: COLORS.slate700,
+    },
+  ]);
+
+  // Distribuicao por modalidade
+  const dist = Array.isArray(r.distribuicaoModalidade) ? r.distribuicaoModalidade : [];
+  if (dist.length > 0) {
+    drawSectionTitle(doc, 'Distribuição por modalidade');
+    drawTable(doc, {
+      headers: ['Modalidade', 'Quantidade'],
+      columnWidths: [320, 80],
+      rows: dist.map((d) => [safeText(d.modalidade), String(d.quantidade)]),
+      emptyMessage: 'Sem equipamentos.',
+    });
+  }
+
+  // Tabelas por unidade — corpo do relatorio
+  const unidades = Array.isArray(payload?.unidades) ? payload.unidades : [];
+  if (unidades.length === 0) {
+    drawSectionTitle(doc, 'Equipamentos por unidade');
+    drawParagraph(
+      doc,
+      'Nenhum equipamento de modalidade regulada encontrado com os filtros aplicados.'
+    );
+  } else {
+    for (const u of unidades) {
+      const equipamentos = Array.isArray(u?.equipamentos) ? u.equipamentos : [];
+      if (doc.y + 150 > getMaxY(doc)) doc.addPage();
+
+      const nomeUnidade = u.unidade?.nomeSistema || 'Unidade';
+      const cnpj = u.unidade?.cnpj || '—';
+      drawGroupHeader(doc, nomeUnidade, `CNPJ: ${cnpj} · ${equipamentos.length} equipamento(s)`);
+
+      if (u.unidade?.nomeFantasia || u.unidade?.cidade) {
+        const linha = [
+          u.unidade?.nomeFantasia,
+          [u.unidade?.cidade, u.unidade?.estado].filter(Boolean).join(' / '),
+        ].filter(Boolean).join(' · ');
+        drawParagraph(doc, linha);
+      }
+
+      drawTable(doc, {
+        headers: ['Modalidade', 'Modelo', 'Fabricante', 'Nº Série (TAG)', 'Ano'],
+        columnWidths: [120, 130, 90, 95, 50],
+        rows: equipamentos.map((e) => [
+          safeText(e.tipo),
+          safeText(e.modelo),
+          safeText(e.fabricante),
+          safeText(e.numeroSerie),
+          safeText(e.anoFabricacao, '—'),
+        ]),
+        emptyMessage: 'Sem equipamentos nesta unidade.',
+      });
+    }
+  }
+
+  if (r.truncado) {
+    if (doc.y + 60 > getMaxY(doc)) doc.addPage();
+    drawSectionTitle(doc, 'Observação');
+    drawParagraph(
+      doc,
+      'Relatório truncado para os primeiros 500 equipamentos. Para um parque maior, ' +
+        'gere relatórios separados por unidade.'
+    );
+  }
+
+  return finalizeDocument(doc);
+}

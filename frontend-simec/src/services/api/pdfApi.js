@@ -57,6 +57,20 @@ export const exportarConformidadeCqPDF = ({ unidadeId, responsavelTecnico = null
     'conformidade_cq.pdf'
   );
 
+// Relatorio de inventario pra solicitar orcamento de CQ junto a
+// prestadores credenciados. Lista equipamentos de modalidades reguladas
+// (RDC 611) com modalidade, modelo, fabricante, TAG (nº serie), unidade
+// e CNPJ. Filtros opcionais por unidade/modalidade.
+export const exportarOrcamentoCqPDF = ({ unidadeIds = null, modalidades = null } = {}) =>
+  baixarPdf(
+    {
+      url: '/pdfs/orcamento-cq',
+      method: 'post',
+      data: { unidadeIds, modalidades },
+    },
+    `orcamento_cq_${new Date().toISOString().slice(0, 10)}.pdf`
+  );
+
 export const exportarUtilizacaoGehcPDF = (meses = 12) =>
   baixarPdf(
     { url: '/pdfs/gehc-utilizacao', method: 'get', params: { meses } },
