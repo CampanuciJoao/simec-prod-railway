@@ -62,6 +62,7 @@ function DetalhesOsCorretivaPage() {
         onConfirm={page.handleAdicionarNota}
         submitting={page.submitting}
         fieldErrors={page.fieldErrors}
+        statusAtualEquipamento={os?.equipamento?.status || null}
       />
 
       <EditarNotaModal

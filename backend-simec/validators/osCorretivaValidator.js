@@ -44,9 +44,22 @@ export function validarAbrirOs(payload) {
   };
 }
 
+// Status validos para alteracao DURANTE uma OS em andamento. Nao inclui
+// Desativado/Vendido (fim de vida — exigem fluxo proprio fora da OS).
+const STATUS_EQUIPAMENTO_VALIDO_EM_OS = [
+  'Operante',
+  'UsoLimitado',
+  'Inoperante',
+  'EmManutencao',
+];
+
 export const notaAndamentoSchema = z.object({
   nota: z.string().min(1, 'O texto da nota é obrigatório.').max(2000),
   tecnicoNome: z.string().min(1, 'Nome do técnico é obrigatório.').max(120).optional(),
+  // Atualizar status do equipamento junto com a nota — opcional. Permite
+  // registrar transicoes do tipo "em teste" -> "operante em observacao"
+  // (UsoLimitado) sem precisar concluir a OS.
+  novoStatusEquipamento: z.enum(STATUS_EQUIPAMENTO_VALIDO_EM_OS).optional(),
 });
 
 export function validarNota(payload) {
