@@ -225,13 +225,28 @@ function _linhaTituloOrcamento(doc, orc, { marginX, contentW, leftW }) {
 // ─── 3. Linha de fornecedores (alinhada com colunas da tabela) ───────────────
 
 function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, leftW, fornWidths }) {
-  const rowH = 36;
-  const y    = doc.y;
+  const y = doc.y;
+  const numTopOffset = 3;     // y onde comeca o numero grande do fornecedor
+  const numHeight = 18;       // altura visual do "1." / "2." / etc
+  const gapNumNome = 2;       // espaco entre numero e nome
+  const padBottom = 5;        // padding inferior da celula
+
+  // Mede altura real do NOME do fornecedor em cada coluna (com a mesma
+  // font que sera usada no render). Altura da row = maior nome +
+  // espaco pro numero + paddings. Antes rowH=36 fixo + ellipsis
+  // truncava nomes tipo "Petel Materiais Elétricos".
+  doc.font('Helvetica').fontSize(8.5);
+  const alturasNomes = fornecedores.map((forn, i) => {
+    const texto = safe(forn.nome, '—');
+    return doc.heightOfString(texto, { width: fornWidths[i] - 8, align: 'center' });
+  });
+  const maxAlturaNome = alturasNomes.length ? Math.max(...alturasNomes) : 12;
+  const rowH = Math.max(36, numTopOffset + numHeight + gapNumNome + maxAlturaNome + padBottom);
 
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
     .font('Helvetica-Bold').fontSize(8).fillColor(C.gray600)
-    .text('Fornecedores / Prestadores', marginX + 8, y + 14, {
+    .text('Fornecedores / Prestadores', marginX + 8, y + (rowH / 2) - 4, {
       width: leftW - 16,
       lineBreak: false,
     });
@@ -246,14 +261,12 @@ function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, 
     const numLabel = isAprv ? `✓ ${i + 1}` : String(i + 1);
     doc
       .font('Helvetica-Bold').fontSize(13).fillColor(isAprv ? C.green : TEXT)
-      .text(numLabel, cx, y + 3, { width: w, align: 'center' });
+      .text(numLabel, cx, y + numTopOffset, { width: w, align: 'center' });
     doc
       .font('Helvetica').fontSize(8.5).fillColor(isAprv ? C.green : C.gray600)
-      .text(safe(forn.nome, '—'), cx + 4, y + 21, {
+      .text(safe(forn.nome, '—'), cx + 4, y + numTopOffset + numHeight + gapNumNome, {
         width: w - 8,
         align: 'center',
-        lineBreak: false,
-        ellipsis: true,
       });
     cx += w;
   }
