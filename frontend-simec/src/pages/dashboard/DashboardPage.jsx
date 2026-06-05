@@ -239,10 +239,13 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
  */
 function GaugeBox({ label, value, tone = 'ok' }) {
   const tones = {
-    ok:   { border: 'var(--border-default)',     bg: 'var(--bg-surface)',          color: 'var(--text-primary)' },
-    good: { border: 'var(--color-success-soft)', bg: 'var(--color-success-surface)', color: 'var(--color-success)' },
-    warn: { border: 'var(--color-warning-soft)', bg: 'var(--color-warning-surface)', color: 'var(--color-warning)' },
-    crit: { border: 'var(--color-danger)',       bg: 'var(--color-danger-surface)', color: 'var(--color-danger)' },
+    ok:    { border: 'var(--border-default)',     bg: 'var(--bg-surface)',           color: 'var(--text-primary)' },
+    good:  { border: 'var(--color-success-soft)', bg: 'var(--color-success-surface)', color: 'var(--color-success)' },
+    warn:  { border: 'var(--color-warning-soft)', bg: 'var(--color-warning-surface)', color: 'var(--color-warning)' },
+    crit:  { border: 'var(--color-danger)',       bg: 'var(--color-danger-surface)', color: 'var(--color-danger)' },
+    // 'muted' = sem leitura disponivel. Cinza neutro pra deixar claro
+    // que o slot existe mas o sensor nao reportou (ou equip offline).
+    muted: { border: 'var(--border-soft)',        bg: 'var(--bg-surface-soft)',      color: 'var(--text-muted)' },
   };
   const t = tones[tone] || tones.ok;
   return (
@@ -363,39 +366,41 @@ function SaudeRMs() {
             </div>
           </div>
 
+          {/* Sempre renderiza os 4 gauges — mesmo offline. Sem leitura
+              vira "—" em tom neutro pra deixar claro que o slot existe
+              mas o sensor nao reportou. Antes a UI escondia gauges null
+              e ficava ambiguo: "esse equipamento nao tem o sensor?" ou
+              "captura falhou?". Agora sempre 4 slots visiveis. */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            {s.heliumLevelPct != null && (
-              <GaugeBox
-                label="Hélio"
-                value={`${s.heliumLevelPct}%`}
-                tone={
-                  s.heliumLevelPct < 30 ? 'crit'
-                  : s.heliumLevelPct < 70 ? 'warn'
-                  : 'good'
-                }
-              />
-            )}
-            {s.heliumPressurePsi != null && (
-              <GaugeBox
-                label="Pressão"
-                value={`${s.heliumPressurePsi} PSI`}
-                tone="ok"
-              />
-            )}
-            {s.compressorStatus && (
-              <GaugeBox
-                label="Compressor"
-                value={s.compressorStatus}
-                tone={s.compressorStatus === 'ON' ? 'good' : 'crit'}
-              />
-            )}
-            {s.coolantTempC != null && (
-              <GaugeBox
-                label="Temperatura"
-                value={`${s.coolantTempC}°C`}
-                tone="ok"
-              />
-            )}
+            <GaugeBox
+              label="Hélio"
+              value={s.heliumLevelPct != null ? `${s.heliumLevelPct}%` : '—'}
+              tone={
+                s.heliumLevelPct == null ? 'muted'
+                : s.heliumLevelPct < 30 ? 'crit'
+                : s.heliumLevelPct < 70 ? 'warn'
+                : 'good'
+              }
+            />
+            <GaugeBox
+              label="Pressão"
+              value={s.heliumPressurePsi != null ? `${s.heliumPressurePsi} PSI` : '—'}
+              tone={s.heliumPressurePsi == null ? 'muted' : 'ok'}
+            />
+            <GaugeBox
+              label="Compressor"
+              value={s.compressorStatus || '—'}
+              tone={
+                !s.compressorStatus ? 'muted'
+                : s.compressorStatus === 'ON' ? 'good'
+                : 'crit'
+              }
+            />
+            <GaugeBox
+              label="Temperatura"
+              value={s.coolantTempC != null ? `${s.coolantTempC}°C` : '—'}
+              tone={s.coolantTempC == null ? 'muted' : 'ok'}
+            />
           </div>
         </div>
       ))}
