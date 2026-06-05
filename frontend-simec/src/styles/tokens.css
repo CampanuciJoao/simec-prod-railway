@@ -1,8 +1,12 @@
 :root {
-  /* Famílias tipográficas — refinamento sutil sobre o tema azul corporativo */
-  --font-body:    'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-display: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-  --font-mono:    'Geist Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
+  /* Famílias tipográficas — self-hosted via @fontsource-variable
+     (main.jsx). Nome exposto pelo pacote eh 'Geist Variable' /
+     'Geist Mono Variable'. Mantemos 'Geist'/'Geist Mono' como
+     fallback intermediario pra browsers que ja tem a fonte em cache
+     do Google Fonts. */
+  --font-body:    'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Geist Variable', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --font-mono:    'Geist Mono Variable', 'Geist Mono', ui-monospace, 'SFMono-Regular', 'Menlo', monospace;
 
   --brand-primary: #2563eb;
   --brand-primary-hover: #1d4ed8;

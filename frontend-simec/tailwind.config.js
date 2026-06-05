@@ -11,10 +11,10 @@ export default {
         secondary: "#64748b",
       },
       fontFamily: {
-        sans:    ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
-        display: ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
-        body:    ['Geist', 'system-ui', '-apple-system', 'sans-serif'],
-        mono:    ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        sans:    ['"Geist Variable"', 'Geist', 'system-ui', '-apple-system', 'sans-serif'],
+        display: ['"Geist Variable"', 'Geist', 'system-ui', '-apple-system', 'sans-serif'],
+        body:    ['"Geist Variable"', 'Geist', 'system-ui', '-apple-system', 'sans-serif'],
+        mono:    ['"Geist Mono Variable"', '"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       letterSpacing: {
         'display-tight': '-0.015em',
