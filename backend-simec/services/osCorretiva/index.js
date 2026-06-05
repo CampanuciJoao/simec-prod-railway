@@ -206,16 +206,72 @@ export async function adicionarNotaOsCorretivaService({ tenantId, usuarioId, osI
     await atualizarOsCorretiva({ tenantId, osId, data: { status: 'EmAndamento' } });
   }
 
+  // Atualizacao opcional do status do equipamento junto com a nota.
+  // Caso de uso: durante testes pos-reparo, marcar como UsoLimitado
+  // ('operante em observacao') antes de concluir. Registra evento
+  // historico com a transicao pra auditoria.
+  let statusEquipAntes = null;
+  let statusEquipDepois = null;
+  if (v.data.novoStatusEquipamento) {
+    const equipAtual = await prisma.equipamento.findFirst({
+      where: { tenantId, id: os.equipamentoId },
+      select: { status: true },
+    });
+    statusEquipAntes = equipAtual?.status || null;
+    statusEquipDepois = v.data.novoStatusEquipamento;
+
+    if (statusEquipAntes !== statusEquipDepois) {
+      await prisma.equipamento.update({
+        where: { id: os.equipamentoId },
+        data: { status: statusEquipDepois },
+      });
+
+      await registrarEventoHistoricoAtivo({
+        tenantId,
+        equipamentoId: os.equipamentoId,
+        tipoEvento: 'equipamento_status_atualizado',
+        categoria: 'manutencao',
+        subcategoria: os.tipo,
+        titulo: `Status do equipamento: ${statusEquipAntes} → ${statusEquipDepois}`,
+        descricao: `Atualizado durante a OS ${os.numeroOS}. Nota: ${v.data.nota.slice(0, 240)}`,
+        origem: 'usuario',
+        status: os.status,
+        impactaAnalise: true,
+        referenciaId: osId,
+        referenciaTipo: 'os_corretiva',
+        metadata: {
+          numeroOS: os.numeroOS,
+          statusAnterior: statusEquipAntes,
+          statusNovo: statusEquipDepois,
+          notaId: nota.id,
+        },
+        dataEvento: new Date(),
+      });
+    }
+  }
+
   await registrarLog({
     tenantId,
     usuarioId,
     acao: 'CRIAÇÃO',
     entidade: 'NotaAndamento',
     entidadeId: nota.id,
-    detalhes: `Nota adicionada à OS ${os.numeroOS}.`,
+    detalhes:
+      statusEquipDepois && statusEquipAntes !== statusEquipDepois
+        ? `Nota adicionada à OS ${os.numeroOS}. Status do equipamento: ${statusEquipAntes} → ${statusEquipDepois}.`
+        : `Nota adicionada à OS ${os.numeroOS}.`,
   });
 
-  return { ok: true, status: 201, data: nota };
+  return {
+    ok: true,
+    status: 201,
+    data: {
+      nota,
+      ...(statusEquipDepois && statusEquipAntes !== statusEquipDepois
+        ? { statusEquipamentoAtualizado: { de: statusEquipAntes, para: statusEquipDepois } }
+        : {}),
+    },
+  };
 }
 
 // ─── Edição admin de nota ────────────────────────────────────────────────────
