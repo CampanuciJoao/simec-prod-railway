@@ -213,10 +213,12 @@ export function detectarEventos(snapshots, estatisticas) {
     }
   }
 
-  // Status anomalo de compressor/cryocooler
-  const statusNormais = new Set(['OK', 'Normal', 'Running', 'On']);
+  // Status anomalo de compressor/cryocooler. Comparacao case-insensitive
+  // pq o GE manda 'ON' (todo caps) mas o set tinha 'On' — bug que fazia
+  // toda leitura normal virar evento critico no relatorio.
+  const statusNormaisLower = new Set(['ok', 'normal', 'running', 'on']);
   for (const s of snapshots) {
-    if (s.compressorStatus && !statusNormais.has(s.compressorStatus)) {
+    if (s.compressorStatus && !statusNormaisLower.has(String(s.compressorStatus).toLowerCase())) {
       eventos.push({
         capturedAt: s.capturedAt,
         metrica: 'Compressor',
