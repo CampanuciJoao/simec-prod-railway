@@ -227,8 +227,13 @@ function drawGroupHeader(doc, title, rightText = null) {
   doc.y = y + 24;
 }
 
-function drawSectionTitle(doc, title) {
-  ensureSpace(doc, 60);
+// Desenha um titulo de secao. Quando o caller sabe que o conteudo
+// abaixo tem altura minima conhecida (ex: tabela com header + 1 row),
+// passar { minContentBelow: N } pra garantir que o titulo nao fique
+// orfa no fim da pagina enquanto o conteudo vai pra proxima.
+function drawSectionTitle(doc, title, opts = {}) {
+  const minContentBelow = Math.max(0, Number(opts?.minContentBelow) || 0);
+  ensureSpace(doc, 60 + minContentBelow);
   doc.moveDown(0.8);
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
@@ -1051,7 +1056,9 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
     ? notas.filter((n) => n?.data && new Date(n.data).getTime() > cutoff)
     : [];
 
-  drawSectionTitle(doc, 'Histórico do chamado / notas técnicas');
+  // Reserva titulo + cabecalho da tabela + 1a row mesmo se vazia
+  // pra nao orfar o titulo.
+  drawSectionTitle(doc, 'Histórico do chamado / notas técnicas', { minContentBelow: 60 });
   drawTable(doc, {
     headers: ['Data/Hora', 'Responsavel', 'Nota / andamento'],
     columnWidths: [100, 130, 265],
@@ -1063,18 +1070,21 @@ export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
     emptyMessage: 'Sem notas registradas.',
   });
 
-  // Bloco de encerramento em destaque (so se houver)
+  // Bloco de encerramento em destaque (so se houver). Reserva
+  // titulo + 1 a 2 infoRows abaixo pra nao orfar.
   if (ehEncerrada && dataEncerramento) {
-    drawSectionTitle(doc, `Encerramento da OS — ${manutencao.status}`);
+    const minBaixo = manutencao?.tecnicoResponsavel ? 28 : 16;
+    drawSectionTitle(doc, `Encerramento da OS — ${manutencao.status}`, { minContentBelow: minBaixo });
     infoRow(doc, 'Encerrada em', formatDateTime(dataEncerramento, locale, timeZone));
     if (manutencao?.tecnicoResponsavel) {
       infoRow(doc, 'Responsável', manutencao.tecnicoResponsavel);
     }
   }
 
-  // Notas pos-encerramento (so renderiza secao se houver)
+  // Notas pos-encerramento (so renderiza secao se houver). Reserva
+  // titulo + cabecalho da tabela + 1a row pra nao orfar o titulo.
   if (notasPos.length > 0) {
-    drawSectionTitle(doc, `Notas de pós-encerramento (${notasPos.length})`);
+    drawSectionTitle(doc, `Notas de pós-encerramento (${notasPos.length})`, { minContentBelow: 60 });
     drawTable(doc, {
       headers: ['Data/Hora', 'Responsavel', 'Nota / andamento'],
       columnWidths: [100, 130, 265],
