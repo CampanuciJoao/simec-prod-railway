@@ -416,6 +416,7 @@ function drawSingleMetricChart(doc, { title, unit, labels, values, color = COLOR
   const ML = 48; // espaço para rótulos Y com valores reais
   const MR = 10;
   const MB = 24; // espaço para rótulos X
+  const HEADER_H = 28; // drawGroupHeader (~18 da barra + ~10 de gap)
 
   const pageL  = doc.page.margins.left;
   const totalW = doc.page.width - pageL - doc.page.margins.right;
@@ -424,7 +425,10 @@ function drawSingleMetricChart(doc, { title, unit, labels, values, color = COLOR
   const plotH  = chartHeight;
   const n      = labels.length;
 
-  ensureSpace(doc, plotH + MB + 36);
+  // Reserva espaco pro BLOCO INTEIRO (header + chart + rotulos X +
+  // margem inferior) ANTES de desenhar. Antes ensureSpace media so o
+  // chart e o header acabava orfa no fim da pagina + chart na proxima.
+  ensureSpace(doc, HEADER_H + plotH + MB + 12);
 
   // cabeçalho do gráfico
   drawGroupHeader(doc, title);
@@ -584,6 +588,7 @@ function drawMultiLineChart(doc, { title, labels, series, chartHeight = 110 }) {
   const ML = 40;
   const MR = 10;
   const MB = 32;
+  const HEADER_H = 28; // drawGroupHeader (~18 da barra + ~10 de gap)
   const pageL = doc.page.margins.left;
   const totalW = doc.page.width - pageL - doc.page.margins.right;
   const plotX = pageL + ML;
@@ -591,7 +596,10 @@ function drawMultiLineChart(doc, { title, labels, series, chartHeight = 110 }) {
   const plotH = chartHeight;
   const n = labels.length;
 
-  ensureSpace(doc, plotH + MB + 50);
+  // Reserva o bloco INTEIRO antes do desenho (header + chart + rotulos +
+  // legenda). Sem isso o header podia ficar orfa no fim da pagina e o
+  // chart estourar pra proxima.
+  ensureSpace(doc, HEADER_H + plotH + MB + 24);
   drawGroupHeader(doc, title);
   const plotY = doc.y;
 
@@ -683,6 +691,7 @@ function drawBarChart(doc, { title, labels, values, unit = '', color = COLORS.bl
   const ML = 44;
   const MR = 10;
   const MB = 24;
+  const HEADER_H = 28; // drawGroupHeader (~18 da barra + ~10 de gap)
   const pageL = doc.page.margins.left;
   const totalW = doc.page.width - pageL - doc.page.margins.right;
   const plotX = pageL + ML;
@@ -690,7 +699,9 @@ function drawBarChart(doc, { title, labels, values, unit = '', color = COLORS.bl
   const plotH = chartHeight;
   const n = labels.length;
 
-  ensureSpace(doc, plotH + MB + 50);
+  // Reserva o bloco INTEIRO (header + chart + rotulos X) antes do
+  // desenho — evita orfa do titulo no fim da pagina.
+  ensureSpace(doc, HEADER_H + plotH + MB + 12);
   drawGroupHeader(doc, title);
   const plotY = doc.y;
 
