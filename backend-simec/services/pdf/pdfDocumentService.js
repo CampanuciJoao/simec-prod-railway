@@ -1324,8 +1324,18 @@ export async function gerarPdfSaudeResumidoBuffer(payload, options = {}) {
   drawSectionTitle(doc, 'Avaliacao do periodo');
   drawParagraph(doc, analise.veredito);
 
-  drawSectionTitle(doc, 'Eventos criticos identificados');
-  _saudeTabelaEventos(doc, analise.eventos, locale, timeZone, { somenteCriticos: true });
+  // GRAFICOS PRIMEIRO — leitura visual rapida da tendencia das metricas.
+  // Tabelas de eventos vem depois pra detalhar pontos especificos.
+  _saudeGraficos(doc, snapshots, locale, timeZone);
+
+  // Eventos criticos so aparecem quando EXISTEM. Antes mostrava sempre
+  // a secao com a tabela vazia ou cheia de falsos positivos (bug do
+  // case-sensitive em compressorStatus, ja corrigido em saudeAnalytics).
+  const criticos = analise.eventos.filter((e) => e.severidade === 'critico');
+  if (criticos.length > 0) {
+    drawSectionTitle(doc, 'Eventos criticos identificados');
+    _saudeTabelaEventos(doc, criticos, locale, timeZone, { somenteCriticos: true });
+  }
 
   const totalAtencao = analise.eventos.filter((e) => e.severidade === 'atencao').length;
   if (totalAtencao > 0) {
@@ -1336,7 +1346,15 @@ export async function gerarPdfSaudeResumidoBuffer(payload, options = {}) {
     );
   }
 
-  _saudeGraficos(doc, snapshots, locale, timeZone);
+  // Mensagem positiva quando o periodo esta limpo — antes ficava uma
+  // tabela vazia e silenciosa que parecia bug.
+  if (criticos.length === 0 && totalAtencao === 0 && snapshots.length > 0) {
+    drawSectionTitle(doc, 'Eventos no periodo');
+    drawParagraph(
+      doc,
+      'Nenhum evento fora do padrao foi identificado no periodo selecionado. Todas as leituras de helio, pressao, temperatura e compressor permaneceram dentro dos limites esperados.',
+    );
+  }
 
   return finalizeDocument(doc);
 }
@@ -1363,6 +1381,9 @@ export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
   drawSectionTitle(doc, 'Avaliacao do periodo');
   drawParagraph(doc, analise.veredito);
 
+  // GRAFICOS PRIMEIRO — leitura visual rapida da tendencia das metricas.
+  // Depois vem as tabelas (resumo diario + eventos cronologicos), que
+  // sao o detalhamento tecnico.
   _saudeGraficos(doc, snapshots, locale, timeZone);
 
   // Resumo diario — 1 linha por dia
@@ -1386,8 +1407,18 @@ export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
     emptyMessage: 'Sem leituras agregaveis no periodo.',
   });
 
-  drawSectionTitle(doc, 'Eventos fora do padrao (cronologico)');
-  _saudeTabelaEventos(doc, analise.eventos, locale, timeZone);
+  // Tabela de eventos so aparece se existirem. Quando o periodo esta
+  // 100% dentro do esperado, mostra mensagem em vez de tabela vazia.
+  if (analise.eventos.length > 0) {
+    drawSectionTitle(doc, 'Eventos fora do padrao (cronologico)');
+    _saudeTabelaEventos(doc, analise.eventos, locale, timeZone);
+  } else {
+    drawSectionTitle(doc, 'Eventos fora do padrao');
+    drawParagraph(
+      doc,
+      'Nenhum evento fora do padrao foi identificado no periodo selecionado.',
+    );
+  }
 
   return finalizeDocument(doc);
 }
