@@ -195,26 +195,34 @@ export const registrarResultadoSchema = z.object({
   novaDataHoraInicioPrevista: z.string().datetime().optional(),
   novaDataHoraFimPrevista: z.string().datetime().optional(),
 }).superRefine((data, ctx) => {
-  const precisaNovaData = data.resultado === 'PrazoEstendido' || data.resultado === 'NaoRealizada';
+  // Datas de nova visita sao OPCIONAIS nos casos PrazoEstendido e
+  // NaoRealizada. Quando admin tem data agora, criamos visita nova
+  // (OS -> AguardandoTerceiro). Quando nao tem, OS volta pra
+  // EmAndamento ate marcar depois pelo botao 'Agendar visita'.
+  //
+  // Regra unica de coerencia: se UMA data foi informada, a OUTRA tambem
+  // precisa vir + fim > inicio. Tudo-ou-nada.
+  const temInicio = !!data.novaDataHoraInicioPrevista;
+  const temFim = !!data.novaDataHoraFimPrevista;
+  const aceitaDatas = data.resultado === 'PrazoEstendido' || data.resultado === 'NaoRealizada';
 
-  if (precisaNovaData) {
-    if (!data.novaDataHoraInicioPrevista) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['novaDataHoraInicioPrevista'],
-        message: 'Nova data de início é obrigatória.',
-      });
-    }
-    if (!data.novaDataHoraFimPrevista) {
+  if (aceitaDatas) {
+    if (temInicio && !temFim) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         path: ['novaDataHoraFimPrevista'],
-        message: 'Nova data de fim é obrigatória.',
+        message: 'Informe a previsão de término ou deixe as duas datas em branco.',
+      });
+    }
+    if (!temInicio && temFim) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['novaDataHoraInicioPrevista'],
+        message: 'Informe a previsão de início ou deixe as duas datas em branco.',
       });
     }
     if (
-      data.novaDataHoraInicioPrevista &&
-      data.novaDataHoraFimPrevista &&
+      temInicio && temFim &&
       new Date(data.novaDataHoraFimPrevista) <= new Date(data.novaDataHoraInicioPrevista)
     ) {
       ctx.addIssue({

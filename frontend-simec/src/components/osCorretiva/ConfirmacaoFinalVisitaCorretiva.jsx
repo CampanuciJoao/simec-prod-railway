@@ -24,13 +24,23 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
   const [motivoNaoRealizacao, setMotivoNaoRealizacao] = useState('');
   const [novoStatusEquipamento, setNovoStatusEquipamento] = useState('UsoLimitado');
 
+  // Coerencia de datas: tudo-ou-nada. Se admin preencheu uma so, o
+  // outro fica obrigatorio. Vazio nos dois = sem nova visita (OS vai
+  // pra EmAndamento ate marcar depois).
+  const datasCoerentes = (() => {
+    const temInicio = !!novaDataHoraInicioPrevista;
+    const temFim = !!novaDataHoraFimPrevista;
+    if (temInicio !== temFim) return false; // so um preenchido
+    return true;
+  })();
+
   const canConfirm =
     modo === 'operante'
       ? !!dataHoraFimReal
       : modo === 'estender'
-      ? !!(novaDataHoraInicioPrevista && novaDataHoraFimPrevista)
+      ? datasCoerentes
       : modo === 'nao_realizada'
-      ? !!(novaDataHoraInicioPrevista && novaDataHoraFimPrevista && motivoNaoRealizacao.trim().length >= 3)
+      ? !!(motivoNaoRealizacao.trim().length >= 3 && datasCoerentes)
       : modo === 'problema_persiste'
       ? !!(novoStatusEquipamento && observacoes.trim().length >= 3)
       : false;
@@ -44,16 +54,21 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
       if (observacoes) payload.observacoes = observacoes;
     } else if (modo === 'estender') {
       payload.resultado = 'PrazoEstendido';
-      payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
-      payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
+      // Datas opcionais. Quando ausentes, OS vai pra EmAndamento.
+      if (novaDataHoraInicioPrevista && novaDataHoraFimPrevista) {
+        payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
+        payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
+      }
       if (observacoes) payload.observacoes = observacoes;
     } else if (modo === 'nao_realizada') {
       // nao_realizada: manutencao nao aconteceu, reagenda sem trocar
-      // status do equipamento. Motivo eh obrigatorio.
+      // status do equipamento. Motivo eh obrigatorio. Datas opcionais.
       payload.resultado = 'NaoRealizada';
       payload.motivoNaoRealizacao = motivoNaoRealizacao.trim();
-      payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
-      payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
+      if (novaDataHoraInicioPrevista && novaDataHoraFimPrevista) {
+        payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
+        payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
+      }
     } else {
       // problema_persiste: visita aconteceu mas problema continua.
       // SEM nova data ainda — OS volta pra EmAndamento. Equipamento
@@ -165,7 +180,7 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <div>
               <Input
-                label="Nova previsao de inicio *"
+                label="Nova previsão de início (opcional)"
                 type="datetime-local"
                 value={novaDataHoraInicioPrevista}
                 onChange={(e) => setNovaDataHoraInicioPrevista(e.target.value)}
@@ -174,7 +189,7 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
             </div>
             <div>
               <Input
-                label="Nova previsao de termino *"
+                label="Nova previsão de término (opcional)"
                 type="datetime-local"
                 value={novaDataHoraFimPrevista}
                 onChange={(e) => setNovaDataHoraFimPrevista(e.target.value)}
@@ -183,12 +198,16 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
             </div>
             <div className="md:col-span-2">
               <Textarea
-                label="Motivo da extensao"
+                label="Motivo da extensão"
                 rows={3}
                 value={observacoes}
                 onChange={(e) => setObservacoes(e.target.value)}
-                placeholder="Explique por que o equipamento continua inoperante e o que sera feito."
+                placeholder="Explique por que o equipamento continua inoperante e o que será feito."
               />
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                Se você ainda não tem previsão de nova visita, deixe as duas datas em branco.
+                A OS continua aberta em <strong>Em Andamento</strong> até você agendar a próxima visita.
+              </p>
             </div>
           </div>
         )}
@@ -205,12 +224,12 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
               />
               <FieldError error={fieldErrors?.motivoNaoRealizacao} />
               <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
-                Status do equipamento não será alterado. A OS continua aberta com a nova data.
+                Status do equipamento não será alterado.
               </p>
             </div>
             <div>
               <Input
-                label="Nova previsão de início *"
+                label="Nova previsão de início (opcional)"
                 type="datetime-local"
                 value={novaDataHoraInicioPrevista}
                 onChange={(e) => setNovaDataHoraInicioPrevista(e.target.value)}
@@ -219,12 +238,18 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
             </div>
             <div>
               <Input
-                label="Nova previsão de término *"
+                label="Nova previsão de término (opcional)"
                 type="datetime-local"
                 value={novaDataHoraFimPrevista}
                 onChange={(e) => setNovaDataHoraFimPrevista(e.target.value)}
               />
               <FieldError error={fieldErrors?.novaDataHoraFimPrevista} />
+            </div>
+            <div className="md:col-span-2">
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                Se ainda não tem previsão de nova visita, deixe as duas datas em branco.
+                A OS continua aberta em <strong>Em Andamento</strong> até você agendar.
+              </p>
             </div>
           </div>
         )}

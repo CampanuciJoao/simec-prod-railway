@@ -670,15 +670,21 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
     // NaoRealizada   — visita nao aconteceu (no-show), reagenda sem
     //                  trocar status do equipamento
     //
-    // Ambos: marca visita atual com status correspondente + cria nova
-    // visita (mesmo prestador, novas datas) + OS continua em
-    // AguardandoTerceiro. NUNCA toca no equipamento aqui — quem libera
-    // eh o resultado Operante.
+    // Ambos marcam a visita atual com status correspondente.
+    //
+    // Quanto a nova visita:
+    //   - COM datas: cria visita nova (mesmo prestador) + OS continua
+    //     em AguardandoTerceiro
+    //   - SEM datas: nao cria visita + OS volta pra EmAndamento (admin
+    //     agenda depois pelo fluxo 'Agendar visita')
+    //
+    // NUNCA toca no equipamento aqui — quem libera eh o resultado Operante.
     const novoStatus = v.data.resultado;
     const obsFinal =
       v.data.resultado === 'NaoRealizada'
         ? v.data.motivoNaoRealizacao
         : v.data.observacoes || null;
+    const temDatas = !!(v.data.novaDataHoraInicioPrevista && v.data.novaDataHoraFimPrevista);
 
     await atualizarVisita({
       tenantId,
@@ -691,13 +697,22 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
       },
     });
 
-    await criarVisitaTerceiro({
-      tenantId,
-      osId,
-      prestadorNome: visita.prestadorNome,
-      dataHoraInicioPrevista: v.data.novaDataHoraInicioPrevista,
-      dataHoraFimPrevista: v.data.novaDataHoraFimPrevista,
-    });
+    if (temDatas) {
+      await criarVisitaTerceiro({
+        tenantId,
+        osId,
+        prestadorNome: visita.prestadorNome,
+        dataHoraInicioPrevista: v.data.novaDataHoraInicioPrevista,
+        dataHoraFimPrevista: v.data.novaDataHoraFimPrevista,
+      });
+    } else {
+      // Sem nova visita marcada — OS volta pra EmAndamento (aberta,
+      // sem terceiro pendente). Admin pode agendar quando tiver data.
+      await prisma.osCorretiva.update({
+        where: { tenantId_id: { tenantId, id: osId } },
+        data: { status: 'EmAndamento' },
+      });
+    }
   } else if (v.data.resultado === 'ProblemaPersiste') {
     // ProblemaPersiste — visita executada, manutencao tentada, problema
     // continua. Equipamento parcial (UsoLimitado) ou parado (Inoperante).
