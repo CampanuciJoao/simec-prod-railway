@@ -1734,6 +1734,7 @@ enum StatusVisitaTerceiro {
   PrazoEstendido
   Reagendada
   NaoRealizada
+  ProblemaPersiste
 }
 
 enum ResultadoVisita {
@@ -1741,6 +1742,7 @@ enum ResultadoVisita {
   PrazoEstendido
   Pendente
   NaoRealizada
+  ProblemaPersiste
 }
 
 model TelegramNotificacao {

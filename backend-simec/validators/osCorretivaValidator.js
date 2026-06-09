@@ -166,19 +166,31 @@ export function validarReagendarVisita(payload) {
   return { ok: false, message: 'Dados inválidos para reagendamento de visita.', fieldErrors };
 }
 
+// Status do equipamento aceitos quando resultado=ProblemaPersiste —
+// nao faz sentido marcar Operante (a manutencao nao resolveu, entao nao
+// esta 100% operante); EmManutencao tambem nao faz sentido aqui (nao
+// ha intervencao ativa pendente).
+const STATUS_EQUIP_PROBLEMA_PERSISTE = ['UsoLimitado', 'Inoperante'];
+
 export const registrarResultadoSchema = z.object({
   // Resultado da visita:
-  //   Operante       — manutencao OK, equipamento liberado, OS encerra
-  //   PrazoEstendido — manutencao em andamento, equipamento ainda inoperante,
-  //                    precisa de mais tempo (nova visita do MESMO prestador)
-  //   NaoRealizada   — visita NAO aconteceu (no-show do tecnico, peca atrasou,
-  //                    etc). Reagenda sem trocar status do equipamento.
-  //                    Motivo eh OBRIGATORIO pra auditoria.
-  resultado: z.enum(['Operante', 'PrazoEstendido', 'NaoRealizada'], {
+  //   Operante         — manutencao OK, equipamento liberado, OS encerra
+  //   PrazoEstendido   — manutencao em andamento, equipamento ainda inoperante,
+  //                      precisa de mais tempo (nova visita do MESMO prestador
+  //                      ja agendada)
+  //   NaoRealizada     — visita NAO aconteceu (no-show do tecnico, peca atrasou,
+  //                      etc). Reagenda sem trocar status do equipamento.
+  //                      Motivo eh OBRIGATORIO pra auditoria.
+  //   ProblemaPersiste — visita ocorreu, manutencao foi executada, mas o
+  //                      problema NAO ficou resolvido. Equipamento em uso
+  //                      limitado ou inoperante. SEM nova data — OS volta
+  //                      pra EmAndamento ate proxima visita ser agendada.
+  resultado: z.enum(['Operante', 'PrazoEstendido', 'NaoRealizada', 'ProblemaPersiste'], {
     errorMap: () => ({ message: 'Resultado inválido.' }),
   }),
   observacoes: z.string().max(2000).optional(),
   motivoNaoRealizacao: z.string().min(3).max(500).optional(),
+  novoStatusEquipamento: z.enum(STATUS_EQUIP_PROBLEMA_PERSISTE).optional(),
   dataHoraFimReal: z.string().datetime({ message: 'Data/hora de conclusão inválida.' }).optional(),
   novaDataHoraInicioPrevista: z.string().datetime().optional(),
   novaDataHoraFimPrevista: z.string().datetime().optional(),
@@ -219,6 +231,23 @@ export const registrarResultadoSchema = z.object({
       path: ['motivoNaoRealizacao'],
       message: 'Informe o motivo pelo qual a manutenção não foi realizada.',
     });
+  }
+
+  if (data.resultado === 'ProblemaPersiste') {
+    if (!data.novoStatusEquipamento) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['novoStatusEquipamento'],
+        message: 'Informe o status do equipamento (uso limitado ou inoperante).',
+      });
+    }
+    if (!data.observacoes || data.observacoes.trim().length < 3) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['observacoes'],
+        message: 'Descreva o que foi feito e por que o problema persiste.',
+      });
+    }
   }
 });
 
