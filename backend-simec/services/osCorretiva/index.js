@@ -610,7 +610,8 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
   if (
     visita.status === 'Concluida' ||
     visita.status === 'PrazoEstendido' ||
-    visita.status === 'NaoRealizada'
+    visita.status === 'NaoRealizada' ||
+    visita.status === 'ProblemaPersiste'
   ) {
     return { ok: false, status: 422, message: 'Esta visita já teve resultado registrado.' };
   }
@@ -696,6 +697,62 @@ export async function registrarResultadoVisitaService({ tenantId, usuarioId, osI
       prestadorNome: visita.prestadorNome,
       dataHoraInicioPrevista: v.data.novaDataHoraInicioPrevista,
       dataHoraFimPrevista: v.data.novaDataHoraFimPrevista,
+    });
+  } else if (v.data.resultado === 'ProblemaPersiste') {
+    // ProblemaPersiste — visita executada, manutencao tentada, problema
+    // continua. Equipamento parcial (UsoLimitado) ou parado (Inoperante).
+    // SEM nova visita ainda — OS volta pra EmAndamento ate o admin
+    // agendar nova visita via fluxo padrao "Agendar visita".
+    const novoStatusEq = v.data.novoStatusEquipamento;
+    const obsFinal = v.data.observacoes || null;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.visitaTerceiro.update({
+        where: { tenantId_id: { tenantId, id: visitaId } },
+        data: {
+          status: 'ProblemaPersiste',
+          resultado: 'ProblemaPersiste',
+          observacoes: obsFinal,
+          dataHoraFimReal: new Date(),
+        },
+      });
+
+      // OS volta pra EmAndamento (visivel como aberta, sem terceiro
+      // agendado). Quando admin marcar nova visita, volta pra
+      // AguardandoTerceiro pelo fluxo existente.
+      await tx.osCorretiva.update({
+        where: { tenantId_id: { tenantId, id: osId } },
+        data: { status: 'EmAndamento' },
+      });
+
+      // Atualiza status do equipamento conforme escolhido (UsoLimitado
+      // ou Inoperante). Antes era so quem chega como Operante na
+      // abertura voltava pra Operante no fim; aqui forcamos explicito.
+      await tx.equipamento.update({
+        where: { id: os.equipamentoId },
+        data: { status: novoStatusEq },
+      });
+    });
+
+    await registrarEventoHistoricoAtivo({
+      tenantId,
+      equipamentoId: os.equipamentoId,
+      tipoEvento: 'os_corretiva_problema_persiste',
+      categoria: 'manutencao',
+      subcategoria: os.tipo,
+      titulo: `OS ${os.numeroOS} — visita executada, problema persiste`,
+      descricao: obsFinal || 'Manutenção realizada mas problema persiste.',
+      origem: 'usuario',
+      status: 'EmAndamento',
+      impactaAnalise: true,
+      referenciaId: osId,
+      referenciaTipo: 'os_corretiva',
+      metadata: {
+        resultado: 'ProblemaPersiste',
+        novoStatusEquipamento: novoStatusEq,
+        prestadorNome: visita.prestadorNome,
+      },
+      dataEvento: new Date(),
     });
   }
 

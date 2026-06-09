@@ -5,9 +5,10 @@ import {
   faCheckCircle,
   faClockRotateLeft,
   faCircleXmark,
+  faCircleExclamation,
   faTriangleExclamation,
 } from '@fortawesome/free-solid-svg-icons';
-import { Button, Input, PageSection, Textarea } from '@/components/ui';
+import { Button, Input, PageSection, Select, Textarea } from '@/components/ui';
 
 function FieldError({ error }) {
   if (!error) return null;
@@ -21,6 +22,7 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
   const [novaDataHoraFimPrevista, setNovaDataHoraFimPrevista] = useState('');
   const [observacoes, setObservacoes] = useState('');
   const [motivoNaoRealizacao, setMotivoNaoRealizacao] = useState('');
+  const [novoStatusEquipamento, setNovoStatusEquipamento] = useState('UsoLimitado');
 
   const canConfirm =
     modo === 'operante'
@@ -29,6 +31,8 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
       ? !!(novaDataHoraInicioPrevista && novaDataHoraFimPrevista)
       : modo === 'nao_realizada'
       ? !!(novaDataHoraInicioPrevista && novaDataHoraFimPrevista && motivoNaoRealizacao.trim().length >= 3)
+      : modo === 'problema_persiste'
+      ? !!(novoStatusEquipamento && observacoes.trim().length >= 3)
       : false;
 
   function handleConfirm() {
@@ -43,13 +47,20 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
       payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
       payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
       if (observacoes) payload.observacoes = observacoes;
-    } else {
+    } else if (modo === 'nao_realizada') {
       // nao_realizada: manutencao nao aconteceu, reagenda sem trocar
       // status do equipamento. Motivo eh obrigatorio.
       payload.resultado = 'NaoRealizada';
       payload.motivoNaoRealizacao = motivoNaoRealizacao.trim();
       payload.novaDataHoraInicioPrevista = new Date(novaDataHoraInicioPrevista).toISOString();
       payload.novaDataHoraFimPrevista = new Date(novaDataHoraFimPrevista).toISOString();
+    } else {
+      // problema_persiste: visita aconteceu mas problema continua.
+      // SEM nova data ainda — OS volta pra EmAndamento. Equipamento
+      // vira UsoLimitado ou Inoperante (escolha do admin).
+      payload.resultado = 'ProblemaPersiste';
+      payload.novoStatusEquipamento = novoStatusEquipamento;
+      payload.observacoes = observacoes.trim();
     }
     onConfirm(payload);
   }
@@ -115,6 +126,14 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
             >
               <FontAwesomeIcon icon={faCircleXmark} />
               Manutenção não ocorreu — reagendar
+            </Button>
+            <Button
+              type="button"
+              variant={modo === 'problema_persiste' ? 'warning' : 'secondary'}
+              onClick={() => setModo('problema_persiste')}
+            >
+              <FontAwesomeIcon icon={faCircleExclamation} />
+              Visita executada — problema persiste
             </Button>
           </div>
         </div>
@@ -206,6 +225,36 @@ function ConfirmacaoFinalVisitaCorretiva({ visita, onConfirm, submitting, fieldE
                 onChange={(e) => setNovaDataHoraFimPrevista(e.target.value)}
               />
               <FieldError error={fieldErrors?.novaDataHoraFimPrevista} />
+            </div>
+          </div>
+        )}
+
+        {modo === 'problema_persiste' && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div className="md:col-span-2">
+              <Textarea
+                label="O que foi feito e por que o problema persiste? *"
+                rows={3}
+                value={observacoes}
+                onChange={(e) => setObservacoes(e.target.value)}
+                placeholder="Ex: trocada bobina X, mas problema no conector 5 continua. Aguardando peça Y para nova tentativa."
+              />
+              <FieldError error={fieldErrors?.observacoes} />
+            </div>
+            <div className="md:col-span-2">
+              <Select
+                label="Status do equipamento *"
+                value={novoStatusEquipamento}
+                onChange={(e) => setNovoStatusEquipamento(e.target.value)}
+              >
+                <option value="UsoLimitado">Uso limitado (operante com restrição)</option>
+                <option value="Inoperante">Inoperante</option>
+              </Select>
+              <FieldError error={fieldErrors?.novoStatusEquipamento} />
+              <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                A OS continua aberta em <strong>Em Andamento</strong> (sem prazo de visita).
+                Agende nova visita quando tiver previsão pelo botão &quot;Agendar visita&quot;.
+              </p>
             </div>
           </div>
         )}
