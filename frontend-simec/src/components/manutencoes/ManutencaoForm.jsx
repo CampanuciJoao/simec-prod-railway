@@ -4,8 +4,9 @@ import PropTypes from 'prop-types';
 import {
   Button,
   DateInput,
+  FormSection,
   Input,
-  PageSection,
+  ResponsiveGrid,
   Select,
   Textarea,
   TimeInput,
@@ -66,14 +67,18 @@ function ManutencaoForm({
     }));
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5">
-      <PageSection title="Equipamento e classificação">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <FormSection
+        title="Equipamento e classificação"
+        description="Selecione a unidade, o equipamento e o tipo de manutenção."
+      >
+        <ResponsiveGrid preset="form">
           <Select
             label="Unidade"
             value={formData.unidadeId}
             onChange={(event) => handleChange('unidadeId', event.target.value)}
             options={unidadesOptions}
+            required
           />
 
           <Select
@@ -84,6 +89,7 @@ function ManutencaoForm({
             }
             options={equipamentosOptions}
             disabled={!formData.unidadeId}
+            required
           />
 
           <Select
@@ -95,6 +101,7 @@ function ManutencaoForm({
               { value: 'Calibracao', label: 'Calibração' },
               { value: 'Inspecao',   label: 'Inspeção' },
             ]}
+            required
           />
 
           <Input
@@ -103,8 +110,9 @@ function ManutencaoForm({
             onChange={(event) =>
               handleChange('tecnicoResponsavel', event.target.value)
             }
+            placeholder="Nome do técnico ou empresa"
           />
-        </div>
+        </ResponsiveGrid>
 
         {formData.unidadeId && equipamentosOptions.length === 0 ? (
           <div
@@ -118,10 +126,13 @@ function ManutencaoForm({
             Nenhum equipamento encontrado para a unidade selecionada.
           </div>
         ) : null}
-      </PageSection>
+      </FormSection>
 
-      <PageSection title="Descrição e contexto">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <FormSection
+        title="Descrição e contexto"
+        description="Descreva o problema ou serviço a ser executado."
+      >
+        <ResponsiveGrid preset="form">
           {isCorretiva ? (
             <Input
               label="Número do chamado"
@@ -130,10 +141,11 @@ function ManutencaoForm({
                 handleChange('numeroChamado', event.target.value)
               }
               required
+              placeholder="Ex.: 8765432"
             />
           ) : null}
 
-          <div className="lg:col-span-2">
+          <div className="xl:col-span-3 md:col-span-2">
             <Textarea
               label="Descrição do serviço"
               value={formData.descricaoProblemaServico}
@@ -142,55 +154,59 @@ function ManutencaoForm({
               }
               rows={5}
               required={isCorretiva}
+              placeholder="Detalhe o problema, serviço esperado ou checklist da manutenção..."
             />
           </div>
-        </div>
-      </PageSection>
+        </ResponsiveGrid>
+      </FormSection>
 
-      <PageSection title="Agendamento">
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <div className="space-y-4">
-            <DateInput
-              label="Data de início"
-              value={formData.agendamentoDataInicioLocal}
-              onChange={(event) =>
-                handleChange('agendamentoDataInicioLocal', event.target.value)
-              }
-            />
+      <FormSection
+        title="Agendamento"
+        description="Defina o intervalo de execução previsto da manutenção."
+      >
+        <ResponsiveGrid preset="form">
+          <DateInput
+            label="Data de início"
+            value={formData.agendamentoDataInicioLocal}
+            onChange={(event) =>
+              handleChange('agendamentoDataInicioLocal', event.target.value)
+            }
+            required
+          />
 
-            <TimeInput
-              label="Hora inicial"
-              name="agendamentoHoraInicioLocal"
-              value={formData.agendamentoHoraInicioLocal}
-              onChange={(event) =>
-                handleChange('agendamentoHoraInicioLocal', event.target.value)
-              }
-              error={fieldErrors.agendamentoHoraInicioLocal}
-              required
-            />
-          </div>
+          <TimeInput
+            label="Hora inicial"
+            name="agendamentoHoraInicioLocal"
+            value={formData.agendamentoHoraInicioLocal}
+            onChange={(event) =>
+              handleChange('agendamentoHoraInicioLocal', event.target.value)
+            }
+            error={fieldErrors.agendamentoHoraInicioLocal}
+            required
+          />
 
-          <div className="space-y-4">
-            <DateInput
-              label="Data de término"
-              value={formData.agendamentoDataFimLocal}
-              onChange={(event) =>
-                handleChange('agendamentoDataFimLocal', event.target.value)
-              }
-            />
+          <div className="hidden xl:block" aria-hidden="true" />
 
-            <TimeInput
-              label="Hora final"
-              name="agendamentoHoraFimLocal"
-              value={formData.agendamentoHoraFimLocal}
-              onChange={(event) =>
-                handleChange('agendamentoHoraFimLocal', event.target.value)
-              }
-              error={fieldErrors.agendamentoHoraFimLocal}
-              required
-            />
-          </div>
-        </div>
+          <DateInput
+            label="Data de término"
+            value={formData.agendamentoDataFimLocal}
+            onChange={(event) =>
+              handleChange('agendamentoDataFimLocal', event.target.value)
+            }
+            required
+          />
+
+          <TimeInput
+            label="Hora final"
+            name="agendamentoHoraFimLocal"
+            value={formData.agendamentoHoraFimLocal}
+            onChange={(event) =>
+              handleChange('agendamentoHoraFimLocal', event.target.value)
+            }
+            error={fieldErrors.agendamentoHoraFimLocal}
+            required
+          />
+        </ResponsiveGrid>
 
         {!intervaloValido &&
         formData.agendamentoDataInicioLocal &&
@@ -210,7 +226,7 @@ function ManutencaoForm({
             O término precisa ser posterior ao início da manutenção.
           </div>
         ) : null}
-      </PageSection>
+      </FormSection>
 
       {submitError ? (
         <div

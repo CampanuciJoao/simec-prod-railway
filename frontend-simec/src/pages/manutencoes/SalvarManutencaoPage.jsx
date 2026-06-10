@@ -78,27 +78,29 @@ function SalvarManutencaoPage() {
 
   return (
     <PageLayout padded fullHeight>
-      <PageHeader
-        title={title}
-        subtitle={subtitle}
-        icon={faWrench}
-        actions={
-          <Button variant="secondary" onClick={page.goBack}>
-            <FontAwesomeIcon icon={faArrowLeft} />
-            Voltar
-          </Button>
-        }
-      />
+      <div className="space-y-6">
+        <PageHeader
+          title={title}
+          subtitle={subtitle}
+          icon={faWrench}
+          actions={
+            <Button variant="secondary" onClick={page.goBack}>
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar
+            </Button>
+          }
+        />
 
-      <ManutencaoForm
-        initialData={page.initialData}
-        onSubmit={page.handleSave}
-        isEditing={page.isEditing}
-        isSubmitting={page.submitting}
-        submitError={page.submitError}
-        todosEquipamentos={page.equipamentos}
-        unidadesDisponiveis={page.unidades}
-      />
+        <ManutencaoForm
+          initialData={page.initialData}
+          onSubmit={page.handleSave}
+          isEditing={page.isEditing}
+          isSubmitting={page.submitting}
+          submitError={page.submitError}
+          todosEquipamentos={page.equipamentos}
+          unidadesDisponiveis={page.unidades}
+        />
+      </div>
     </PageLayout>
   );
 }
