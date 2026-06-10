@@ -51,6 +51,19 @@ export function useTabManutencoes() {
     return !s || s === 'aguardando' || s === 'Concluida' || s === 'Cancelada';
   }, [manut.filtros?.status]);
 
+  // Tipo filtrado tambem suprime OsCorretiva quando NAO eh 'Corretiva'.
+  // useOsCorretiva esta fixado em tipoFixo='Corretiva' (linha 41), entao
+  // se o usuario filtrou Preventiva/Calibracao/Inspecao, OS Corretivas
+  // NAO devem aparecer. Antes esse caso vazava — bug visivel: filtro
+  // 'Tipo: Preventiva' trazia OCs Corretivas misturadas.
+  const oscTipoAplicavel = useMemo(() => {
+    const t = manut.filtros?.tipo;
+    return !t || t === 'Corretiva';
+  }, [manut.filtros?.tipo]);
+
+  // Combinado: so mostra OsCorretiva se AMBOS status e tipo permitem.
+  const oscIncluido = oscStatusAplicavel && oscTipoAplicavel;
+
   // ─── Items unificados ────────────────────────────────────────────────────
   // Ordenacao depende do status filtrado:
   //   - "aguardando" / Pendente / Agendada / EmAndamento → asc (proxima primeiro)
@@ -69,7 +82,7 @@ export function useTabManutencoes() {
       _kind: 'manutencao',
       _sortDate: item.dataHoraAgendamentoInicio || item.createdAt || '',
     }));
-    const o = oscStatusAplicavel
+    const o = oscIncluido
       ? osc.osCorretivas.map((item) => ({
           ...item,
           _kind: 'osCorretiva',
@@ -83,7 +96,7 @@ export function useTabManutencoes() {
         ? new Date(a._sortDate) - new Date(b._sortDate)
         : new Date(b._sortDate) - new Date(a._sortDate);
     });
-  }, [manut.manutencoes, osc.osCorretivas, oscStatusAplicavel, ordemAscendente]);
+  }, [manut.manutencoes, osc.osCorretivas, oscIncluido, ordemAscendente]);
 
   // ─── KPIs combinados ─────────────────────────────────────────────────────
   const metricas = useMemo(() => ({
@@ -250,12 +263,12 @@ export function useTabManutencoes() {
   const totalCarregado = unifiedItems.length;
   const totalGeral =
     (manut.pagination?.total ?? 0) +
-    (oscStatusAplicavel ? osc.pagination?.total ?? 0 : 0);
+    (oscIncluido ? osc.pagination?.total ?? 0 : 0);
   const hasNextPage = Boolean(
     manut.pagination?.hasNextPage ||
-      (oscStatusAplicavel && osc.pagination?.hasNextPage)
+      (oscIncluido && osc.pagination?.hasNextPage)
   );
-  const loadingMore = manut.loadingMore || (oscStatusAplicavel && osc.loadingMore);
+  const loadingMore = manut.loadingMore || (oscIncluido && osc.loadingMore);
   const loading = (manut.loading || osc.loading) && totalCarregado === 0;
   const error = manut.error;
 
