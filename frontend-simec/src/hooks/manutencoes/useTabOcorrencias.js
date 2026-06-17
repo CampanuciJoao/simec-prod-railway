@@ -27,15 +27,44 @@ export function useTabOcorrencias() {
   const osc = useOsCorretiva({ tipoFixo: 'Ocorrencia' });
   const deleteModal = useModal();
 
-  const items = useMemo(
-    () =>
-      osc.osCorretivas.map((item) => ({
-        ...item,
-        _kind: 'osCorretiva',
-        _sortDate: item.dataHoraAbertura || item.createdAt || '',
-      })),
-    [osc.osCorretivas]
-  );
+  // Ordem que faz sentido pro usuario: PENDENTES primeiro (acao
+  // necessaria), depois Concluidas, depois Canceladas. Dentro de cada
+  // grupo, mais antiga primeiro nos pendentes (esperando ha mais tempo
+  // = prioridade) e mais recente primeiro nos passados (Concluida/
+  // Cancelada).
+  //
+  // Antes o backend devolvia tudo ordenado por dataHoraAbertura desc e
+  // a tela misturava Concluida e EmAndamento — usuario reclamava de se
+  // perder buscando "o que ainda precisa de acao".
+  const items = useMemo(() => {
+    const STATUS_PRIORIDADE = {
+      Aberta: 0,
+      EmAndamento: 0,
+      AguardandoTerceiro: 0,
+      Concluida: 1,
+      Cancelada: 2,
+    };
+
+    const enriquecidos = osc.osCorretivas.map((item) => ({
+      ...item,
+      _kind: 'osCorretiva',
+      _sortDate: item.dataHoraAbertura || item.createdAt || '',
+      _grupo: STATUS_PRIORIDADE[item.status] ?? 99,
+    }));
+
+    return enriquecidos.sort((a, b) => {
+      // 1. Grupo de prioridade (pendente -> concluida -> cancelada)
+      if (a._grupo !== b._grupo) return a._grupo - b._grupo;
+      // 2. Dentro do grupo: pendentes ASC (mais antiga ha mais tempo
+      //    esperando), passados DESC (mais recente primeiro)
+      const ehPendente = a._grupo === 0;
+      const ta = a._sortDate ? new Date(a._sortDate).getTime() : 0;
+      const tb = b._sortDate ? new Date(b._sortDate).getTime() : 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return ehPendente ? ta - tb : tb - ta;
+    });
+  }, [osc.osCorretivas]);
 
   // KPIs: Total | Em andamento (Aberta+EmAndamento) | Concluídas | Canceladas
   const metricas = useMemo(() => ({
