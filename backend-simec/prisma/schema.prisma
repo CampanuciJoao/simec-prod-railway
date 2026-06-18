@@ -1602,6 +1602,7 @@ model OrcamentoFornecedor {
   orcamentoId    String
   nome           String
   formaPagamento String?
+  prazo          String?
   ordem          Int
 
   orcamento Orcamento            @relation(fields: [orcamentoId], references: [id], onDelete: Cascade)

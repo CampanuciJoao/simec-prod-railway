@@ -167,6 +167,7 @@ function _desenhar(doc, orc, { marginX, contentW }) {
   _linhaTituloOrcamento(doc, orc, { marginX, contentW, ...cols });
   _linhaFornecedores(doc, fornecedores, aprovadoId, { marginX, contentW, ...cols });
   _formaPagamento(doc, fornecedores, { marginX, contentW, ...cols });
+  _prazo(doc, fornecedores, { marginX, contentW, ...cols });
   _tabelaItens(doc, fornecedores, itens, aprovadoId, { marginX, contentW, ...cols });
   _observacao(doc, orc, { marginX, contentW });
   _assinatura(doc, orc, { marginX, contentW });
@@ -288,15 +289,35 @@ function _linhaFornecedores(doc, fornecedores, fornecedorAprovadoId, { marginX, 
 // ─── 3. Forma de Pagamento ────────────────────────────────────────────────────
 
 function _formaPagamento(doc, fornecedores, { marginX, leftW, fornWidths }) {
+  _linhaInfoFornecedor(doc, fornecedores, { marginX, leftW, fornWidths }, {
+    label: 'FORMA DE PAGAMENTO',
+    campo: 'formaPagamento',
+  });
+}
+
+// ─── 4. Prazo ─────────────────────────────────────────────────────────────────
+
+function _prazo(doc, fornecedores, { marginX, leftW, fornWidths }) {
+  // Mesma estrutura visual de 'Forma de pagamento' — uma linha por
+  // fornecedor com prazo de entrega/execucao informado pelo prestador
+  // (texto livre). Renderiza sempre, com '—' quando vazio, pra manter
+  // alinhamento da tabela.
+  _linhaInfoFornecedor(doc, fornecedores, { marginX, leftW, fornWidths }, {
+    label: 'PRAZO',
+    campo: 'prazo',
+  });
+}
+
+// Helper compartilhado: desenha uma linha rotulada com 1 celula por
+// fornecedor + altura dinamica baseada no maior texto. Usado tanto
+// por 'Forma de pagamento' quanto por 'Prazo'.
+function _linhaInfoFornecedor(doc, fornecedores, { marginX, leftW, fornWidths }, { label, campo }) {
   const y = doc.y;
   const padY = 7;
 
-  // Mede altura real de cada celula (forma de pagamento por fornecedor)
-  // e usa a maior pra dimensionar a row. Antes rowH=24 fixo + ellipsis
-  // truncava "50% de entrada / 50% em 30 dias" ou similar.
   doc.font('Helvetica').fontSize(8.5);
   const alturas = fornecedores.map((forn, i) => {
-    const texto = safe(forn.formaPagamento, '—');
+    const texto = safe(forn?.[campo], '—');
     return doc.heightOfString(texto, { width: fornWidths[i] - 8 });
   });
   const maxAlturaForn = alturas.length ? Math.max(...alturas) : 0;
@@ -305,14 +326,13 @@ function _formaPagamento(doc, fornecedores, { marginX, leftW, fornWidths }) {
   box(doc, marginX, y, leftW, rowH, { fill: C.gray100 });
   doc
     .font('Helvetica-Bold').fontSize(7.5).fillColor(TEXT)
-    .text('FORMA DE PAGAMENTO', marginX + 8, y + (rowH / 2) - 4, { width: leftW - 16, lineBreak: false });
+    .text(label, marginX + 8, y + (rowH / 2) - 4, { width: leftW - 16, lineBreak: false });
 
   let cx = marginX + leftW;
   for (let i = 0; i < fornecedores.length; i++) {
     const w = fornWidths[i];
     box(doc, cx, y, w, rowH);
-    const texto = safe(fornecedores[i].formaPagamento, '—');
-    // Centraliza verticalmente o bloco de texto na celula
+    const texto = safe(fornecedores[i]?.[campo], '—');
     const hTexto = alturas[i] || 0;
     const offsetY = (rowH - hTexto) / 2;
     doc

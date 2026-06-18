@@ -136,6 +136,22 @@ function OrcamentoBuilderTable({
                       color: 'var(--text-secondary)',
                     }}
                   />
+
+                  {/* Prazo de entrega/execucao — texto livre por fornecedor.
+                      Aparece como linha propria no PDF logo abaixo de
+                      'Forma de pagamento'. */}
+                  <input
+                    type="text"
+                    value={forn.prazo || ''}
+                    onChange={(e) => onAtualizarFornecedor(forn.id, 'prazo', e.target.value)}
+                    placeholder="Prazo (ex.: 15 dias úteis)"
+                    className="mt-1.5 w-full rounded-lg border px-2.5 py-1 text-center text-xs focus:outline-none"
+                    style={{
+                      borderColor: 'var(--border-default)',
+                      backgroundColor: 'var(--bg-surface-subtle)',
+                      color: 'var(--text-secondary)',
+                    }}
+                  />
                 </th>
               ))}
 

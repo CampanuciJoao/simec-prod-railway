@@ -13,7 +13,7 @@ function tempId() {
 }
 
 function novoFornecedor(ordem) {
-  return { id: tempId(), nome: '', formaPagamento: '', ordem };
+  return { id: tempId(), nome: '', formaPagamento: '', prazo: '', ordem };
 }
 
 function novoItem(ordem) {
@@ -66,6 +66,7 @@ export function useSalvarOrcamento() {
           id: f.id,
           nome: f.nome,
           formaPagamento: f.formaPagamento || '',
+          prazo: f.prazo || '',
           ordem: f.ordem,
         }));
         setFornecedores(fList.length ? fList : [novoFornecedor(0)]);
@@ -183,6 +184,7 @@ export function useSalvarOrcamento() {
       id: f.id,
       nome: f.nome,
       formaPagamento: f.formaPagamento || null,
+      prazo: f.prazo || null,
       ordem: f.ordem,
     })),
     itens: itens.map((item) => ({
