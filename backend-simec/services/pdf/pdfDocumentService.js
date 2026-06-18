@@ -1012,7 +1012,112 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
     rows: buildHistoricoRows(payload?.eventos || [], locale, timeZone),
   });
 
+  _detalhamentoOrdensServico(doc, payload?.eventos || [], locale, timeZone);
+
   return finalizeDocument(doc);
+}
+
+// Detalhamento por OS: agrupa eventos por (referenciaTipo + referenciaId),
+// monta um bloco por OS com descricao do problema/servico e tabela de
+// notas de andamento em ordem cronologica (do inicio ao fim).
+//
+// Ignora eventos sem referenciaDetalhes (ex: 'criacao_ativo' que nao
+// pertence a uma OS especifica).
+function _detalhamentoOrdensServico(doc, eventos, locale, timeZone) {
+  const ordensPorChave = new Map();
+  for (const ev of eventos) {
+    if (!ev.referenciaTipo || !ev.referenciaId || !ev.referenciaDetalhes) continue;
+    if (ev.referenciaTipo !== 'manutencao' && ev.referenciaTipo !== 'os_corretiva') continue;
+    const chave = `${ev.referenciaTipo}:${ev.referenciaId}`;
+    if (!ordensPorChave.has(chave)) {
+      ordensPorChave.set(chave, {
+        tipo: ev.referenciaTipo,
+        detalhes: ev.referenciaDetalhes,
+        dataReferencia: ev.dataEvento || ev.createdAt,
+      });
+    }
+  }
+
+  if (ordensPorChave.size === 0) return;
+
+  // Ordena ordens cronologicamente (mais antiga primeiro — leitura
+  // natural "do inicio ao fim" do equipamento).
+  const ordens = [...ordensPorChave.values()].sort((a, b) => {
+    const ta = a.dataReferencia ? new Date(a.dataReferencia).getTime() : 0;
+    const tb = b.dataReferencia ? new Date(b.dataReferencia).getTime() : 0;
+    return ta - tb;
+  });
+
+  drawSectionTitle(doc, 'Detalhamento das ordens de serviço');
+
+  for (const ord of ordens) {
+    const d = ord.detalhes;
+    const isManut = ord.tipo === 'manutencao';
+
+    const numeroOS = d.numeroOS || '—';
+    const tipo = d.tipo || (isManut ? 'Manutenção' : 'OS Corretiva');
+    const status = d.status || '—';
+    const descricao = isManut
+      ? (d.descricaoProblemaServico || 'Sem descrição registrada.')
+      : (d.descricaoProblema || 'Sem descrição registrada.');
+    const responsavel = isManut
+      ? (d.tecnicoResponsavel || null)
+      : (d.solicitante || null);
+    const notas = Array.isArray(d.notasAndamento) ? d.notasAndamento : [];
+
+    // Reserva header + linha de info + paragrafo descritivo + (tabela
+    // ou paragrafo "sem notas") antes de desenhar pra evitar orfa.
+    drawSectionTitle(doc, `OS ${numeroOS} — ${tipo}`, { minContentBelow: 80 });
+
+    drawInfoGrid(
+      doc,
+      [
+        { label: 'Status', value: status },
+        responsavel
+          ? {
+              label: isManut ? 'Responsável' : 'Solicitante',
+              value: responsavel,
+            }
+          : null,
+        d.numeroChamado ? { label: 'Nº chamado', value: d.numeroChamado } : null,
+        d.dataHoraAbertura
+          ? { label: 'Abertura', value: formatDateTime(d.dataHoraAbertura, locale, timeZone) }
+          : d.dataHoraAgendamentoInicio
+          ? { label: 'Início agendado', value: formatDateTime(d.dataHoraAgendamentoInicio, locale, timeZone) }
+          : null,
+        d.dataHoraConclusao
+          ? { label: 'Conclusão', value: formatDateTime(d.dataHoraConclusao, locale, timeZone) }
+          : d.dataConclusao
+          ? { label: 'Conclusão', value: formatDateTime(d.dataConclusao, locale, timeZone) }
+          : null,
+      ].filter(Boolean),
+      2
+    );
+
+    drawSectionTitle(doc, 'Descrição do problema / serviço', { minContentBelow: 30 });
+    drawParagraph(doc, descricao);
+
+    if (notas.length > 0) {
+      drawSectionTitle(doc, `Andamentos (${notas.length})`, { minContentBelow: 60 });
+      // Notas ordenadas ASC (do inicio ao fim — leitura natural)
+      const notasOrdenadas = [...notas].sort((a, b) => {
+        const ta = a?.data ? new Date(a.data).getTime() : 0;
+        const tb = b?.data ? new Date(b.data).getTime() : 0;
+        return ta - tb;
+      });
+      drawTable(doc, {
+        headers: ['Data/Hora', 'Responsável', 'Andamento'],
+        columnWidths: [100, 110, 285],
+        rows: notasOrdenadas.map((n) => [
+          formatDateTime(n?.data, locale, timeZone),
+          safeText(n?.autor?.nome || n?.tecnicoNome, 'Sistema'),
+          safeText(n?.nota, '-'),
+        ]),
+      });
+    } else {
+      drawParagraph(doc, 'Sem andamentos registrados nesta OS.');
+    }
+  }
 }
 
 export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
