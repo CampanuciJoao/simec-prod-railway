@@ -96,6 +96,27 @@ function OrcamentoTabelaVisualizacao({ orcamento, calcularTotalFornecedor }) {
               );
             })}
           </tr>
+          {/* Linha de prazo */}
+          <tr>
+            {fornecedores.map((f) => {
+              const isAprv = f.id === aprovadoId;
+              return (
+                <th
+                  key={f.id}
+                  className="border-b border-r px-3 py-1 text-center text-xs"
+                  style={{
+                    borderColor: 'var(--border-soft)',
+                    backgroundColor: isAprv
+                      ? 'color-mix(in srgb, #16a34a 10%, transparent)'
+                      : 'var(--bg-surface-subtle)',
+                    color: isAprv ? '#16a34a' : 'var(--text-muted)',
+                  }}
+                >
+                  {f.prazo || '—'}
+                </th>
+              );
+            })}
+          </tr>
         </thead>
 
         <tbody>

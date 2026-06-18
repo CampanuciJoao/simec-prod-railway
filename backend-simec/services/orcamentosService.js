@@ -69,6 +69,7 @@ export async function criarOrcamento({ tenantId, criadoPorId, dados }) {
             orcamentoId: orcamento.id,
             nome: f.nome,
             formaPagamento: f.formaPagamento || null,
+            prazo: f.prazo || null,
             ordem: f.ordem,
           },
         })
@@ -151,6 +152,7 @@ export async function atualizarOrcamento({ tenantId, id, dados }) {
             orcamentoId: id,
             nome: f.nome,
             formaPagamento: f.formaPagamento || null,
+            prazo: f.prazo || null,
             ordem: f.ordem,
           },
         })

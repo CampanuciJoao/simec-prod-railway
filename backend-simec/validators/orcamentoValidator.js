@@ -9,6 +9,7 @@ const fornecedorSchema = z.object({
   id: z.string().optional(),
   nome: z.string().min(1, 'Nome do fornecedor é obrigatório.'),
   formaPagamento: z.string().nullable().optional(),
+  prazo: z.string().nullable().optional(),
   ordem: z.number().int().min(0),
 });
 
