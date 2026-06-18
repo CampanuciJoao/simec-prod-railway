@@ -95,35 +95,44 @@ async function injectTenantInfo(payload, options = {}) {
   return options;
 }
 
+// Distancia entre o topo absoluto da pagina e o inicio da faixa preta.
+// Antes a faixa comecava em y=0 — impressoras com margem minima cortavam
+// parte do logo/SIMEC. Esse offset deixa um respiro seguro pra qualquer
+// impressora (a maioria respeita margens de >=10mm = ~28pt). 24pt eh um
+// meio termo — nao desperdica espaco demais e protege contra corte.
+const HEADER_TOP_OFFSET = 24;
+
 function drawHeader(doc, title, options = {}) {
   const { locale, timeZone } = options;
   const pageWidth = doc.page.width;
   const bandH = 52;
+  const bandTop = HEADER_TOP_OFFSET;
+  const bandBottom = bandTop + bandH;
 
-  doc.save().rect(0, 0, pageWidth, bandH).fill(COLORS.slate900).restore();
+  doc.save().rect(0, bandTop, pageWidth, bandH).fill(COLORS.slate900).restore();
 
   const hasLogo = !!LOGO_SIMEC;
   if (hasLogo) {
     try {
-      doc.image(LOGO_SIMEC, 12, 5, { fit: [42, 42] });
+      doc.image(LOGO_SIMEC, 12, bandTop + 5, { fit: [42, 42] });
     } catch (err) {
       console.warn('[PDF_HEADER] Falha ao renderizar logo SIMEC:', err.message);
     }
   }
 
   const textX = hasLogo ? 60 : 14;
-  doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.white).text('SIMEC', textX, 10);
+  doc.font('Helvetica-Bold').fontSize(15).fillColor(COLORS.white).text('SIMEC', textX, bandTop + 10);
   doc
     .font('Helvetica')
     .fontSize(7.5)
     .fillColor(COLORS.slate300)
-    .text('Sistema de Gestão de Equipamentos de Radiologia', textX, 30);
+    .text('Sistema de Gestão de Equipamentos de Radiologia', textX, bandTop + 30);
 
   doc
     .font('Helvetica')
     .fontSize(8)
     .fillColor(COLORS.slate300)
-    .text(`Gerado em: ${formatDateTime(new Date(), locale, timeZone)}`, 0, 20, {
+    .text(`Gerado em: ${formatDateTime(new Date(), locale, timeZone)}`, 0, bandTop + 20, {
       align: 'right',
       width: pageWidth - 14,
       lineBreak: false,
@@ -133,9 +142,9 @@ function drawHeader(doc, title, options = {}) {
     .font('Helvetica-Bold')
     .fontSize(14)
     .fillColor(COLORS.slate900)
-    .text(title, 50, bandH + 12, { align: 'center', width: pageWidth - 100 });
+    .text(title, 50, bandBottom + 12, { align: 'center', width: pageWidth - 100 });
 
-  const sepY = bandH + 38;
+  const sepY = bandBottom + 38;
   doc.moveTo(50, sepY).lineTo(pageWidth - 50, sepY).lineWidth(1).strokeColor(COLORS.slate300).stroke();
 
   doc.y = sepY + 14;
@@ -166,7 +175,10 @@ function drawFooter(doc) {
 function createDocument(title, options = {}) {
   const doc = new PDFDocument({
     size: 'A4',
-    margins: { top: 110, bottom: 48, left: 50, right: 50 },
+    // top: 134 = HEADER_TOP_OFFSET (24) + bandH (52) + separadora (38) +
+    //            doc.y (14) + folga (~6) = espaco onde header termina,
+    //            primeira linha de conteudo comeca abaixo dele
+    margins: { top: 134, bottom: 48, left: 50, right: 50 },
     bufferPages: true,
   });
 
