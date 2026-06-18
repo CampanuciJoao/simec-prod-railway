@@ -88,6 +88,9 @@ function normalizarReferenciaOsCorretiva(os) {
     descricaoProblema: os.descricaoProblema || null,
     dataHoraAbertura: toIsoOrNull(os.dataHoraAbertura),
     dataHoraConclusao: toIsoOrNull(os.dataHoraConclusao),
+    notasAndamento: Array.isArray(os.notasAndamento)
+      ? os.notasAndamento.map(normalizarNotaAndamento).filter(Boolean)
+      : [],
   };
 }
 
@@ -224,6 +227,11 @@ async function carregarReferenciasHistorico(db, eventos = [], tenantId) {
             descricaoProblema: true,
             dataHoraAbertura: true,
             dataHoraConclusao: true,
+            notasAndamento: {
+              where: { tenantId },
+              orderBy: { data: 'asc' },
+              include: { autor: { select: { nome: true } } },
+            },
           },
         })
       : [],
