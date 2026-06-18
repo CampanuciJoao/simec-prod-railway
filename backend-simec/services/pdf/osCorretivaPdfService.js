@@ -65,31 +65,38 @@ function checkPageBreak(doc, neededHeight = 60) {
   if (doc.y + neededHeight > maxY(doc)) doc.addPage();
 }
 
+// Offset do topo absoluto ate o inicio da faixa preta — protege
+// contra corte de impressora (margens minimas de ~10mm).
+const HEADER_TOP_OFFSET = 24;
+
 function drawHeader(doc, os, options) {
   const { locale, timeZone } = options;
   const W = doc.page.width;
+  const bandTop = HEADER_TOP_OFFSET;
+  const bandH = 52;
+  const bandBottom = bandTop + bandH;
 
-  doc.save().rect(0, 0, W, 52).fill(C.black).restore();
+  doc.save().rect(0, bandTop, W, bandH).fill(C.black).restore();
 
   const hasLogo = !!LOGO_SIMEC;
   if (hasLogo) {
     try {
-      doc.image(LOGO_SIMEC, 12, 5, { fit: [42, 42] });
+      doc.image(LOGO_SIMEC, 12, bandTop + 5, { fit: [42, 42] });
     } catch (err) {
       console.warn('[OS_PDF] Falha ao renderizar logo SIMEC:', err.message);
     }
   }
 
   const tx = hasLogo ? 60 : 14;
-  doc.font('Helvetica-Bold').fontSize(15).fillColor(C.white).text('SIMEC', tx, 10);
-  doc.font('Helvetica').fontSize(7.5).fillColor(C.border).text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
-  doc.font('Helvetica').fontSize(8).fillColor(C.border).text(`Gerado em: ${fmt(new Date(), locale, timeZone)}`, 0, 20, { align: 'right', width: W - 14, lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(15).fillColor(C.white).text('SIMEC', tx, bandTop + 10);
+  doc.font('Helvetica').fontSize(7.5).fillColor(C.border).text('Sistema de Gestão de Equipamentos de Radiologia', tx, bandTop + 30);
+  doc.font('Helvetica').fontSize(8).fillColor(C.border).text(`Gerado em: ${fmt(new Date(), locale, timeZone)}`, 0, bandTop + 20, { align: 'right', width: W - 14, lineBreak: false });
 
   const tipoOS = (os.visitas && os.visitas.length > 0) ? 'Corretiva' : 'Ocorrência';
   const titulo = `Ordem de Serviço ${tipoOS} — Nº ${os.numeroOS}`;
-  doc.font('Helvetica-Bold').fontSize(13).fillColor(C.black).text(titulo, 50, 66, { align: 'center', width: W - 100 });
+  doc.font('Helvetica-Bold').fontSize(13).fillColor(C.black).text(titulo, 50, bandBottom + 14, { align: 'center', width: W - 100 });
 
-  const sepY = 90;
+  const sepY = bandBottom + 38;
   doc.moveTo(50, sepY).lineTo(W - 50, sepY).lineWidth(0.8).strokeColor(C.border).stroke();
   doc.y = sepY + 12;
 }
@@ -224,7 +231,8 @@ export async function gerarPdfOsCorretivaBuffer(os, options = {}) {
 
     const doc = new PDFDocument({
       size: 'A4',
-      margins: { top: 110, bottom: 48, left: 50, right: 50 },
+      // top 134 = HEADER_TOP_OFFSET (24) + faixa (52) + separadora (38) + y (12) + folga
+      margins: { top: 134, bottom: 48, left: 50, right: 50 },
       bufferPages: true,
     });
 

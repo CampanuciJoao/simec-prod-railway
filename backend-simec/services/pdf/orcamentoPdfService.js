@@ -52,24 +52,33 @@ function box(doc, x, y, w, h, { fill, stroke = BORDER } = {}) {
   doc.restore();
 }
 
+// Offset do topo absoluto da pagina ate o inicio da faixa preta.
+// Protege contra corte de impressora (a maioria respeita margens >=10mm).
+const HEADER_TOP_OFFSET = 24;
+
 function drawHeader(doc) {
   const W = doc.page.width;
-  doc.save().rect(0, 0, W, 52).fill('#1e293b').restore();
+  const bandTop = HEADER_TOP_OFFSET;
+  const bandH = 52;
+  const bandBottom = bandTop + bandH;
+  doc.save().rect(0, bandTop, W, bandH).fill('#1e293b').restore();
   const hasLogo = !!LOGO_SIMEC;
   if (hasLogo) {
     try {
-      doc.image(LOGO_SIMEC, 12, 5, { fit: [42, 42] });
+      doc.image(LOGO_SIMEC, 12, bandTop + 5, { fit: [42, 42] });
     } catch (err) {
       console.warn('[ORCAMENTO_PDF] Falha ao renderizar logo SIMEC:', err.message);
     }
   }
   const tx = hasLogo ? 60 : 14;
-  doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff').text('SIMEC', tx, 10);
-  doc.font('Helvetica').fontSize(7.5).fillColor('#cbd5e1').text('Sistema de Gestão de Equipamentos de Radiologia', tx, 30);
+  doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff').text('SIMEC', tx, bandTop + 10);
+  doc.font('Helvetica').fontSize(7.5).fillColor('#cbd5e1').text('Sistema de Gestão de Equipamentos de Radiologia', tx, bandTop + 30);
   const gerado = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date());
-  doc.font('Helvetica').fontSize(8).fillColor('#cbd5e1').text(`Gerado em: ${gerado}`, 0, 20, { align: 'right', width: W - 14, lineBreak: false });
-  doc.moveTo(50, 90).lineTo(W - 50, 90).lineWidth(0.8).strokeColor('#cbd5e1').stroke();
-  doc.y = 104;
+  doc.font('Helvetica').fontSize(8).fillColor('#cbd5e1').text(`Gerado em: ${gerado}`, 0, bandTop + 20, { align: 'right', width: W - 14, lineBreak: false });
+  // Linha separadora 38pt abaixo da faixa
+  const sepY = bandBottom + 38;
+  doc.moveTo(50, sepY).lineTo(W - 50, sepY).lineWidth(0.8).strokeColor('#cbd5e1').stroke();
+  doc.y = sepY + 14;
 }
 
 function drawFooter(doc) {
@@ -122,7 +131,9 @@ export async function gerarPdfOrcamentoBuffer(orcamento) {
     tenantId: orcamento?.tenantId,
   });
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ size: 'A4', margins: { top: 110, bottom: 48, left: 36, right: 36 }, bufferPages: true });
+    // margin top 134 acomoda HEADER_TOP_OFFSET (24) + faixa (52) +
+    // separadora (38) + y inicial (14) + folga (~6)
+    const doc = new PDFDocument({ size: 'A4', margins: { top: 134, bottom: 48, left: 36, right: 36 }, bufferPages: true });
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
