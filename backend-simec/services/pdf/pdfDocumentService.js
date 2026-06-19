@@ -997,7 +997,8 @@ export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) 
   const eventos = Array.isArray(payload?.eventos) ? payload.eventos : [];
 
   _relAuditoriaContexto(doc, payload);
-  _relAuditoriaResumo(doc, eventos);
+  // Bloco 'Resumo' (4 KPI cards) removido a pedido — numeros agregados
+  // ficavam redundantes no PDF, ja que a listagem detalha cada OS.
   _relAuditoriaOrdens(doc, eventos, locale, timeZone);
   _relAuditoriaEventosOrfaos(doc, eventos, locale, timeZone);
 
@@ -1075,61 +1076,6 @@ function _relAuditoriaContexto(doc, payload) {
   drawInfoGrid(doc, cells, 3);
 }
 
-// ─── Resumo (4 KPI cards coloridos) ──────────────────────────────────────────
-
-function _relContaOrdens(eventos) {
-  const por = new Map();
-  for (const ev of eventos) {
-    if (ev?.referenciaTipo !== 'manutencao' && ev?.referenciaTipo !== 'os_corretiva') continue;
-    if (!ev?.referenciaId) continue;
-    const chave = `${ev.referenciaTipo}:${ev.referenciaId}`;
-    if (!por.has(chave)) {
-      por.set(chave, ev.referenciaDetalhes?.status || 'Aberta');
-    }
-  }
-  let total = 0;
-  let concluidas = 0;
-  let emAndamento = 0;
-  let agendadas = 0;
-  for (const status of por.values()) {
-    total += 1;
-    if (status === 'Concluida') concluidas += 1;
-    else if (status === 'Agendada' || status === 'Pendente' || status === 'AguardandoConfirmacao') agendadas += 1;
-    else if (status === 'Cancelada') { /* nao classifica em andamento nem concluida */ }
-    else emAndamento += 1;
-  }
-  return { total, concluidas, emAndamento, agendadas };
-}
-
-function _relAuditoriaResumo(doc, eventos) {
-  const k = _relContaOrdens(eventos);
-  drawSectionTitle(doc, 'Resumo', { minContentBelow: 70 });
-
-  const ml = doc.page.margins.left;
-  const totalW = doc.page.width - ml - doc.page.margins.right;
-  const gapX = 10;
-  const cardW = (totalW - gapX * 3) / 4;
-  const cardH = 64;
-  ensureSpace(doc, cardH + 12);
-  const y = doc.y;
-
-  const cards = [
-    { label: 'Total de OS',  value: k.total,       color: '#475569' },
-    { label: 'Concluídas',   value: k.concluidas,  color: '#16a34a' },
-    { label: 'Em andamento', value: k.emAndamento, color: '#b45309' },
-    { label: 'Agendadas',    value: k.agendadas,   color: '#2563eb' },
-  ];
-  cards.forEach((c, i) => {
-    const x = ml + i * (cardW + gapX);
-    doc.save().roundedRect(x, y, cardW, cardH, 4).fillAndStroke('#ffffff', '#e2e8f0').restore();
-    doc.font('Helvetica-Bold').fontSize(22).fillColor(c.color)
-      .text(String(c.value), x, y + 10, { width: cardW, align: 'center', lineBreak: false });
-    doc.font('Helvetica').fontSize(8).fillColor('#64748b')
-      .text(c.label, x, y + 40, { width: cardW, align: 'center', lineBreak: false });
-  });
-  doc.y = y + cardH + 8;
-}
-
 // ─── Bloco de uma OS (header + descricao + linha do tempo) ───────────────────
 
 function _relAgruparEventosPorOs(eventos) {
@@ -1193,9 +1139,11 @@ function _relAuditoriaUmaOs(doc, ord, locale, timeZone) {
   const numeroOS = d.numeroOS || '—';
   const tipo = d.tipo || (isManut ? 'Manutenção' : 'OS Corretiva');
   const status = d.status || 'Aberta';
-  const descricao = isManut
-    ? (d.descricaoProblemaServico || null)
-    : (d.descricaoProblema || null);
+  const descricao = _relNormalizarTexto(
+    isManut
+      ? (d.descricaoProblemaServico || null)
+      : (d.descricaoProblema || null)
+  );
   const responsavel = isManut ? (d.tecnicoResponsavel || null) : null;
   const solicitante = !isManut ? (d.solicitante || null) : null;
   const dataAbertura = d.dataHoraAbertura || (ord.eventos[0]?.dataEvento);
@@ -1276,9 +1224,13 @@ function _relAuditoriaTimeline(doc, eventos, locale, timeZone) {
   const indentX = ml + 18;
   const W = doc.page.width - indentX - doc.page.margins.right;
 
+  // Label da linha do tempo — usa coordenada explicita e empurra doc.y
+  // manualmente. Antes ficava com lineBreak:false + moveDown que nao
+  // movia y o suficiente, e o 1o evento sobrepunha o label.
+  const labelY = doc.y;
   doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#64748b')
-    .text('LINHA DO TEMPO', ml + 12, doc.y, { lineBreak: false });
-  doc.moveDown(0.5);
+    .text('LINHA DO TEMPO', ml + 12, labelY, { lineBreak: false });
+  doc.y = labelY + 14;
 
   for (const ev of eventos) {
     _relAuditoriaUmEvento(doc, ev, { ml, indentX, W, locale, timeZone });
@@ -1286,8 +1238,8 @@ function _relAuditoriaTimeline(doc, eventos, locale, timeZone) {
 }
 
 function _relAuditoriaUmEvento(doc, ev, { ml, indentX, W, locale, timeZone }) {
-  const titulo = ev?.titulo || '—';
-  const descricao = ev?.descricao || null;
+  const titulo = _relNormalizarTexto(ev?.titulo || '—');
+  const descricao = _relNormalizarTexto(ev?.descricao || null);
   const autor = ev?.autor?.nome || null;
   const dataIso = ev?.dataEvento || ev?.createdAt || null;
   const isRetroativo = ev?.retroativo === true || ev?.metadata?.retroativo === true;
@@ -1357,6 +1309,53 @@ function _relCorBulletPorEvento(ev) {
   return '#94a3b8';
 }
 
+// Labels formais em pt-BR para tipos de evento que aparecem como
+// cabecalho de cards 'Sistema' (eventos sem OS associada). Antes
+// aparecia o token cru do enum ('equipamento_criado', 'mudanca_status')
+// — fica feio em documento impresso.
+const REL_EVENTO_LABELS = {
+  equipamento_criado: 'Equipamento cadastrado no SIMEC',
+  criacao_ativo: 'Equipamento cadastrado no SIMEC',
+  mudanca_status: 'Mudança de status',
+  alteracao_cadastral: 'Alteração cadastral',
+  alteracao_unidade: 'Transferência de unidade',
+  transferencia: 'Transferência',
+  equipamento_atualizado: 'Equipamento atualizado',
+  status_atualizado: 'Status atualizado',
+  desativacao: 'Equipamento desativado',
+  reativacao: 'Equipamento reativado',
+};
+
+function _relLabelDoEvento(tipoEvento) {
+  if (!tipoEvento) return 'Evento do sistema';
+  if (REL_EVENTO_LABELS[tipoEvento]) return REL_EVENTO_LABELS[tipoEvento];
+  // Fallback: snake_case -> Title Case ("disposicao_final" -> "Disposicao final")
+  return String(tipoEvento)
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+// Normaliza nomes de status que aparecem em textos descritivos vindos
+// do banco ('EmManutencao' -> 'Em manutenção'). Aplicado on-the-fly no
+// PDF — nao toca no banco.
+const REL_STATUS_NO_TEXTO = [
+  [/EmManutencao/g, 'Em manutenção'],
+  [/UsoLimitado/g, 'Uso limitado'],
+  [/AguardandoConfirmacao/g, 'Aguardando confirmação'],
+  [/AguardandoTerceiro/g, 'Aguardando terceiro'],
+  [/EmAndamento/g, 'Em andamento'],
+  [/PrazoEstendido/g, 'Prazo estendido'],
+  [/NaoRealizada/g, 'Não realizada'],
+  [/ProblemaPersiste/g, 'Problema persiste'],
+];
+
+function _relNormalizarTexto(texto) {
+  if (!texto || typeof texto !== 'string') return texto;
+  let saida = texto;
+  for (const [re, sub] of REL_STATUS_NO_TEXTO) saida = saida.replace(re, sub);
+  return saida;
+}
+
 // ─── Eventos orfaos (criacao_ativo, alteracoes cadastrais sem OS) ────────────
 
 function _relAuditoriaEventosOrfaos(doc, eventos, locale, timeZone) {
@@ -1388,12 +1387,15 @@ function _relAuditoriaUmEventoIsolado(doc, ev, locale, timeZone) {
   // Header escuro como uma OS
   doc.save().rect(ml, yh, W, headerH).fillAndStroke('#1e293b', '#0f172a').restore();
 
-  const titulo = ev?.tipoEvento ? `Evento: ${ev.tipoEvento}` : 'Evento do sistema';
+  // Titulo formal em pt-BR (em vez do token cru 'equipamento_criado' /
+  // 'mudanca_status'). Mapa em REL_EVENTO_LABELS.
+  const titulo = _relLabelDoEvento(ev?.tipoEvento);
   doc.font('Helvetica-Bold').fontSize(10).fillColor('#ffffff')
-    .text(titulo, ml + 10, yh + 9, { width: 220, lineBreak: false });
+    .text(titulo, ml + 10, yh + 9, { width: 280, lineBreak: false });
 
-  // Chip "Sistema"
-  _relDrawChip(doc, ml + 240, yh + 8, 'Sistema', REL_STATUS_COR.Pendente);
+  // Chip "Sistema" — posicao depende da largura do titulo (aproximada)
+  const chipX = ml + 10 + Math.min(280, doc.widthOfString(titulo) + 12);
+  _relDrawChip(doc, chipX, yh + 8, 'Sistema', REL_STATUS_COR.Pendente);
 
   // Data a direita
   doc.font('Helvetica').fontSize(6.5).fillColor('#94a3b8')
