@@ -990,135 +990,430 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
 
 export async function gerarPdfHistoricoEquipamentoBuffer(payload, options = {}) {
   options = await injectTenantInfo(payload, options);
-  const title = 'RELATORIO DE AUDITORIA DE ATIVO';
+  const title = 'RELATÓRIO DE AUDITORIA DE ATIVO';
   const doc = createDocument(title, options);
   drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
+  const eventos = Array.isArray(payload?.eventos) ? payload.eventos : [];
 
-  drawSectionTitle(doc, 'Contexto do equipamento');
-  infoRow(doc, 'Equipamento', payload?.equipamento?.modelo);
-  infoRow(doc, 'Número de série (TAG)', payload?.equipamento?.tag);
-  infoRow(doc, 'Unidade', payload?.equipamento?.unidade);
-  infoRow(doc, 'Período',
-    payload?.filtros?.dataInicio || payload?.filtros?.dataFim
-      ? `${safeText(payload?.filtros?.dataInicio, 'Início')} até ${safeText(payload?.filtros?.dataFim, 'Hoje')}`
-      : 'Histórico completo',
-  );
-
-  drawSectionTitle(doc, 'Linha do tempo');
-  drawTable(doc, {
-    headers: ['Data', 'Categoria', 'Evento / OS', 'Responsavel', 'Status'],
-    columnWidths: [95, 75, 180, 75, 70],
-    rows: buildHistoricoRows(payload?.eventos || [], locale, timeZone),
-  });
-
-  _detalhamentoOrdensServico(doc, payload?.eventos || [], locale, timeZone);
+  _relAuditoriaContexto(doc, payload);
+  _relAuditoriaResumo(doc, eventos);
+  _relAuditoriaOrdens(doc, eventos, locale, timeZone);
+  _relAuditoriaEventosOrfaos(doc, eventos, locale, timeZone);
 
   return finalizeDocument(doc);
 }
 
-// Detalhamento por OS: agrupa eventos por (referenciaTipo + referenciaId),
-// monta um bloco por OS com descricao do problema/servico e tabela de
-// notas de andamento em ordem cronologica (do inicio ao fim).
-//
-// Ignora eventos sem referenciaDetalhes (ex: 'criacao_ativo' que nao
-// pertence a uma OS especifica).
-function _detalhamentoOrdensServico(doc, eventos, locale, timeZone) {
-  const ordensPorChave = new Map();
+// ─── Cores e helpers de chip ─────────────────────────────────────────────────
+
+const REL_TIPO_COR = {
+  Corretiva:  { bg: '#fee2e2', text: '#dc2626', border: '#fecaca' },
+  Ocorrencia: { bg: '#fef3c7', text: '#b45309', border: '#fde68a' },
+  Preventiva: { bg: '#dbeafe', text: '#2563eb', border: '#bfdbfe' },
+  Calibracao: { bg: '#e0e7ff', text: '#4f46e5', border: '#c7d2fe' },
+  Inspecao:   { bg: '#cffafe', text: '#0891b2', border: '#a5f3fc' },
+};
+
+const REL_STATUS_COR = {
+  Aberta:              { bg: '#fef3c7', text: '#b45309', border: '#fde68a' },
+  EmAndamento:         { bg: '#fef3c7', text: '#b45309', border: '#fde68a' },
+  AguardandoTerceiro:  { bg: '#fef3c7', text: '#b45309', border: '#fde68a' },
+  Agendada:            { bg: '#dbeafe', text: '#2563eb', border: '#bfdbfe' },
+  Pendente:            { bg: '#f1f5f9', text: '#475569', border: '#cbd5e1' },
+  AguardandoConfirmacao: { bg: '#dbeafe', text: '#2563eb', border: '#bfdbfe' },
+  Concluida:           { bg: '#dcfce7', text: '#16a34a', border: '#bbf7d0' },
+  Cancelada:           { bg: '#fee2e2', text: '#991b1b', border: '#fecaca' },
+};
+
+const REL_STATUS_LABEL = {
+  Aberta: 'Aberta',
+  EmAndamento: 'Em andamento',
+  AguardandoTerceiro: 'Aguardando terceiro',
+  Agendada: 'Agendada',
+  Pendente: 'Pendente',
+  AguardandoConfirmacao: 'Aguardando confirmação',
+  Concluida: 'Concluída',
+  Cancelada: 'Cancelada',
+};
+
+function _relDrawChip(doc, x, y, label, cores, opts = {}) {
+  const padX = 6;
+  const padY = 3;
+  const fontSize = opts.fontSize || 7.5;
+  doc.font('Helvetica-Bold').fontSize(fontSize);
+  const textW = doc.widthOfString(label);
+  const w = textW + padX * 2;
+  const h = fontSize + padY * 2;
+  doc
+    .save()
+    .roundedRect(x, y, w, h, 3)
+    .fillAndStroke(cores.bg, cores.border)
+    .restore();
+  doc.fillColor(cores.text).text(label, x + padX, y + padY, { lineBreak: false });
+  return w;
+}
+
+// ─── Contexto do equipamento (tabela 2-col label/value) ─────────────────────
+
+function _relAuditoriaContexto(doc, payload) {
+  const eq = payload?.equipamento || {};
+  const filtros = payload?.filtros || {};
+  const periodo =
+    filtros.dataInicio || filtros.dataFim
+      ? `${safeText(filtros.dataInicio, 'Início')} até ${safeText(filtros.dataFim, 'Hoje')}`
+      : 'Histórico completo';
+
+  drawSectionTitle(doc, 'Contexto do equipamento', { minContentBelow: 60 });
+
+  const cells = [
+    { label: 'Equipamento', value: eq.modelo || 'N/A' },
+    { label: 'TAG', value: eq.tag || 'N/A' },
+    { label: 'Fabricante', value: eq.fabricante || 'Siemens Healthineers' },
+    { label: 'Unidade', value: eq.unidade || 'N/A' },
+    { label: 'Período', value: periodo },
+  ];
+  drawInfoGrid(doc, cells, 3);
+}
+
+// ─── Resumo (4 KPI cards coloridos) ──────────────────────────────────────────
+
+function _relContaOrdens(eventos) {
+  const por = new Map();
   for (const ev of eventos) {
-    if (!ev.referenciaTipo || !ev.referenciaId || !ev.referenciaDetalhes) continue;
-    if (ev.referenciaTipo !== 'manutencao' && ev.referenciaTipo !== 'os_corretiva') continue;
+    if (ev?.referenciaTipo !== 'manutencao' && ev?.referenciaTipo !== 'os_corretiva') continue;
+    if (!ev?.referenciaId) continue;
     const chave = `${ev.referenciaTipo}:${ev.referenciaId}`;
-    if (!ordensPorChave.has(chave)) {
-      ordensPorChave.set(chave, {
-        tipo: ev.referenciaTipo,
-        detalhes: ev.referenciaDetalhes,
-        dataReferencia: ev.dataEvento || ev.createdAt,
-      });
+    if (!por.has(chave)) {
+      por.set(chave, ev.referenciaDetalhes?.status || 'Aberta');
     }
   }
+  let total = 0;
+  let concluidas = 0;
+  let emAndamento = 0;
+  let agendadas = 0;
+  for (const status of por.values()) {
+    total += 1;
+    if (status === 'Concluida') concluidas += 1;
+    else if (status === 'Agendada' || status === 'Pendente' || status === 'AguardandoConfirmacao') agendadas += 1;
+    else if (status === 'Cancelada') { /* nao classifica em andamento nem concluida */ }
+    else emAndamento += 1;
+  }
+  return { total, concluidas, emAndamento, agendadas };
+}
 
-  if (ordensPorChave.size === 0) return;
+function _relAuditoriaResumo(doc, eventos) {
+  const k = _relContaOrdens(eventos);
+  drawSectionTitle(doc, 'Resumo', { minContentBelow: 70 });
 
-  // Ordena ordens cronologicamente (mais antiga primeiro — leitura
-  // natural "do inicio ao fim" do equipamento).
-  const ordens = [...ordensPorChave.values()].sort((a, b) => {
-    const ta = a.dataReferencia ? new Date(a.dataReferencia).getTime() : 0;
-    const tb = b.dataReferencia ? new Date(b.dataReferencia).getTime() : 0;
-    return ta - tb;
+  const ml = doc.page.margins.left;
+  const totalW = doc.page.width - ml - doc.page.margins.right;
+  const gapX = 10;
+  const cardW = (totalW - gapX * 3) / 4;
+  const cardH = 64;
+  ensureSpace(doc, cardH + 12);
+  const y = doc.y;
+
+  const cards = [
+    { label: 'Total de OS',  value: k.total,       color: '#475569' },
+    { label: 'Concluídas',   value: k.concluidas,  color: '#16a34a' },
+    { label: 'Em andamento', value: k.emAndamento, color: '#b45309' },
+    { label: 'Agendadas',    value: k.agendadas,   color: '#2563eb' },
+  ];
+  cards.forEach((c, i) => {
+    const x = ml + i * (cardW + gapX);
+    doc.save().roundedRect(x, y, cardW, cardH, 4).fillAndStroke('#ffffff', '#e2e8f0').restore();
+    doc.font('Helvetica-Bold').fontSize(22).fillColor(c.color)
+      .text(String(c.value), x, y + 10, { width: cardW, align: 'center', lineBreak: false });
+    doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+      .text(c.label, x, y + 40, { width: cardW, align: 'center', lineBreak: false });
   });
+  doc.y = y + cardH + 8;
+}
 
-  drawSectionTitle(doc, 'Detalhamento das ordens de serviço');
+// ─── Bloco de uma OS (header + descricao + linha do tempo) ───────────────────
+
+function _relAgruparEventosPorOs(eventos) {
+  const por = new Map();
+  for (const ev of eventos) {
+    if (ev?.referenciaTipo !== 'manutencao' && ev?.referenciaTipo !== 'os_corretiva') continue;
+    if (!ev?.referenciaId) continue;
+    const chave = `${ev.referenciaTipo}:${ev.referenciaId}`;
+    if (!por.has(chave)) {
+      por.set(chave, {
+        tipo: ev.referenciaTipo,
+        referenciaId: ev.referenciaId,
+        detalhes: ev.referenciaDetalhes || null,
+        eventos: [],
+      });
+    }
+    por.get(chave).eventos.push(ev);
+  }
+  // Eventos asc dentro de cada OS — do inicio ao fim
+  for (const grp of por.values()) {
+    grp.eventos.sort((a, b) => new Date(a.dataEvento) - new Date(b.dataEvento));
+  }
+  return [...por.values()];
+}
+
+function _relOrdenarOs(ordens) {
+  // 1. Em andamento primeiro (acao pendente), 2. Agendadas, 3. Concluidas,
+  //    4. Canceladas. Dentro de cada grupo, mais recente primeiro.
+  const PRIO = {
+    Aberta: 0, EmAndamento: 0, AguardandoTerceiro: 0, AguardandoConfirmacao: 0,
+    Agendada: 1, Pendente: 1,
+    Concluida: 2,
+    Cancelada: 3,
+  };
+  return [...ordens].sort((a, b) => {
+    const sa = a.detalhes?.status || 'Aberta';
+    const sb = b.detalhes?.status || 'Aberta';
+    const pa = PRIO[sa] ?? 9;
+    const pb = PRIO[sb] ?? 9;
+    if (pa !== pb) return pa - pb;
+    const da = a.eventos.length ? new Date(a.eventos[a.eventos.length - 1].dataEvento).getTime() : 0;
+    const db = b.eventos.length ? new Date(b.eventos[b.eventos.length - 1].dataEvento).getTime() : 0;
+    return db - da;
+  });
+}
+
+function _relAuditoriaOrdens(doc, eventos, locale, timeZone) {
+  const ordens = _relOrdenarOs(_relAgruparEventosPorOs(eventos));
+  if (ordens.length === 0) return;
+
+  drawSectionTitle(doc, 'Ordens de serviço — histórico do ativo', { minContentBelow: 80 });
 
   for (const ord of ordens) {
-    const d = ord.detalhes;
-    const isManut = ord.tipo === 'manutencao';
-
-    const numeroOS = d.numeroOS || '—';
-    const tipo = d.tipo || (isManut ? 'Manutenção' : 'OS Corretiva');
-    const status = d.status || '—';
-    const descricao = isManut
-      ? (d.descricaoProblemaServico || 'Sem descrição registrada.')
-      : (d.descricaoProblema || 'Sem descrição registrada.');
-    const responsavel = isManut
-      ? (d.tecnicoResponsavel || null)
-      : (d.solicitante || null);
-    const notas = Array.isArray(d.notasAndamento) ? d.notasAndamento : [];
-
-    // Reserva header + linha de info + paragrafo descritivo + (tabela
-    // ou paragrafo "sem notas") antes de desenhar pra evitar orfa.
-    drawSectionTitle(doc, `OS ${numeroOS} — ${tipo}`, { minContentBelow: 80 });
-
-    drawInfoGrid(
-      doc,
-      [
-        { label: 'Status', value: status },
-        responsavel
-          ? {
-              label: isManut ? 'Responsável' : 'Solicitante',
-              value: responsavel,
-            }
-          : null,
-        d.numeroChamado ? { label: 'Nº chamado', value: d.numeroChamado } : null,
-        d.dataHoraAbertura
-          ? { label: 'Abertura', value: formatDateTime(d.dataHoraAbertura, locale, timeZone) }
-          : d.dataHoraAgendamentoInicio
-          ? { label: 'Início agendado', value: formatDateTime(d.dataHoraAgendamentoInicio, locale, timeZone) }
-          : null,
-        d.dataHoraConclusao
-          ? { label: 'Conclusão', value: formatDateTime(d.dataHoraConclusao, locale, timeZone) }
-          : d.dataConclusao
-          ? { label: 'Conclusão', value: formatDateTime(d.dataConclusao, locale, timeZone) }
-          : null,
-      ].filter(Boolean),
-      2
-    );
-
-    drawSectionTitle(doc, 'Descrição do problema / serviço', { minContentBelow: 30 });
-    drawParagraph(doc, descricao);
-
-    if (notas.length > 0) {
-      drawSectionTitle(doc, `Andamentos (${notas.length})`, { minContentBelow: 60 });
-      // Notas ordenadas ASC (do inicio ao fim — leitura natural)
-      const notasOrdenadas = [...notas].sort((a, b) => {
-        const ta = a?.data ? new Date(a.data).getTime() : 0;
-        const tb = b?.data ? new Date(b.data).getTime() : 0;
-        return ta - tb;
-      });
-      drawTable(doc, {
-        headers: ['Data/Hora', 'Responsável', 'Andamento'],
-        columnWidths: [100, 110, 285],
-        rows: notasOrdenadas.map((n) => [
-          formatDateTime(n?.data, locale, timeZone),
-          safeText(n?.autor?.nome || n?.tecnicoNome, 'Sistema'),
-          safeText(n?.nota, '-'),
-        ]),
-      });
-    } else {
-      drawParagraph(doc, 'Sem andamentos registrados nesta OS.');
-    }
+    _relAuditoriaUmaOs(doc, ord, locale, timeZone);
   }
 }
+
+function _relAuditoriaUmaOs(doc, ord, locale, timeZone) {
+  const d = ord.detalhes || {};
+  const isManut = ord.tipo === 'manutencao';
+  const numeroOS = d.numeroOS || '—';
+  const tipo = d.tipo || (isManut ? 'Manutenção' : 'OS Corretiva');
+  const status = d.status || 'Aberta';
+  const descricao = isManut
+    ? (d.descricaoProblemaServico || null)
+    : (d.descricaoProblema || null);
+  const responsavel = isManut ? (d.tecnicoResponsavel || null) : null;
+  const solicitante = !isManut ? (d.solicitante || null) : null;
+  const dataAbertura = d.dataHoraAbertura || (ord.eventos[0]?.dataEvento);
+  const dataConclusao = d.dataHoraConclusao || d.dataConclusao || null;
+  const dataAgendamento = d.dataHoraAgendamentoInicio || null;
+
+  ensureSpace(doc, 120);
+
+  const ml = doc.page.margins.left;
+  const W = doc.page.width - ml - doc.page.margins.right;
+  const headerH = 28;
+  const yh = doc.y;
+
+  // Header colorido da OS — fundo escuro com numero + chips
+  doc.save().rect(ml, yh, W, headerH).fillAndStroke('#1e293b', '#0f172a').restore();
+
+  // Numero OS
+  doc.font('Helvetica-Bold').fontSize(11).fillColor('#ffffff')
+    .text(numeroOS, ml + 10, yh + 9, { width: 140, lineBreak: false });
+
+  // Chips de tipo + status logo apos o numero
+  const corTipo = REL_TIPO_COR[tipo] || REL_TIPO_COR.Corretiva;
+  const corStatus = REL_STATUS_COR[status] || REL_STATUS_COR.Aberta;
+  const tipoChipX = ml + 10 + 100;
+  const tipoChipW = _relDrawChip(doc, tipoChipX, yh + 8, tipo, corTipo);
+  _relDrawChip(doc, tipoChipX + tipoChipW + 6, yh + 8, REL_STATUS_LABEL[status] || status, corStatus);
+
+  // Metadados a direita (3 colunas pequenas)
+  const colW = 95;
+  const rightX = ml + W - colW * 3 - 4;
+  const metaLabels = [];
+  if (dataAbertura) {
+    metaLabels.push({ k: 'Abertura', v: formatDate(dataAbertura, locale, timeZone) });
+  }
+  if (dataAgendamento && !dataAbertura) {
+    metaLabels.push({ k: 'Agendado', v: formatDateTime(dataAgendamento, locale, timeZone) });
+  }
+  if (dataConclusao) {
+    metaLabels.push({ k: 'Conclusão', v: formatDateTime(dataConclusao, locale, timeZone) });
+  } else if (d.dataHoraInicioReal || d.dataInicioReal) {
+    metaLabels.push({ k: 'Início', v: formatDateTime(d.dataInicioReal || d.dataHoraInicioReal, locale, timeZone) });
+  }
+  if (solicitante) metaLabels.push({ k: 'Solicitante', v: solicitante });
+  if (responsavel) metaLabels.push({ k: 'Responsável', v: responsavel });
+  metaLabels.slice(0, 3).forEach((m, i) => {
+    const x = rightX + i * colW;
+    doc.font('Helvetica').fontSize(6.5).fillColor('#94a3b8')
+      .text(m.k, x, yh + 5, { width: colW - 4, align: 'right', lineBreak: false });
+    doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff')
+      .text(m.v, x, yh + 14, { width: colW - 4, align: 'right', lineBreak: false });
+  });
+
+  doc.y = yh + headerH;
+
+  // Bloco da descrição — caixa cinza clara com texto
+  if (descricao) {
+    const descY = doc.y;
+    doc.font('Helvetica').fontSize(8.5).fillColor('#334155');
+    const descH = doc.heightOfString(descricao, { width: W - 24 }) + 16;
+    doc.save().rect(ml, descY, W, descH).fillAndStroke('#f8fafc', '#e2e8f0').restore();
+    doc.fillColor('#334155')
+      .text(descricao, ml + 12, descY + 8, { width: W - 24 });
+    doc.y = descY + descH + 4;
+  }
+
+  // Linha do tempo desta OS
+  _relAuditoriaTimeline(doc, ord.eventos, locale, timeZone);
+
+  doc.moveDown(0.5);
+}
+
+// ─── Linha do tempo de eventos (bullet + texto) ──────────────────────────────
+
+function _relAuditoriaTimeline(doc, eventos, locale, timeZone) {
+  if (!eventos.length) return;
+
+  const ml = doc.page.margins.left;
+  const indentX = ml + 18;
+  const W = doc.page.width - indentX - doc.page.margins.right;
+
+  doc.font('Helvetica-Bold').fontSize(7.5).fillColor('#64748b')
+    .text('LINHA DO TEMPO', ml + 12, doc.y, { lineBreak: false });
+  doc.moveDown(0.5);
+
+  for (const ev of eventos) {
+    _relAuditoriaUmEvento(doc, ev, { ml, indentX, W, locale, timeZone });
+  }
+}
+
+function _relAuditoriaUmEvento(doc, ev, { ml, indentX, W, locale, timeZone }) {
+  const titulo = ev?.titulo || '—';
+  const descricao = ev?.descricao || null;
+  const autor = ev?.autor?.nome || null;
+  const dataIso = ev?.dataEvento || ev?.createdAt || null;
+  const isRetroativo = ev?.retroativo === true || ev?.metadata?.retroativo === true;
+  const corBullet = _relCorBulletPorEvento(ev);
+
+  // Pre-mede altura total do bloco
+  doc.font('Helvetica-Bold').fontSize(9);
+  const altTitulo = doc.heightOfString(titulo, { width: W });
+  let altDescr = 0;
+  if (descricao) {
+    doc.font('Helvetica').fontSize(8.5);
+    altDescr = doc.heightOfString(descricao, { width: W });
+  }
+  const altAutor = autor ? 11 : 0;
+  const altTotal = 11 /* data */ + (isRetroativo ? 11 : 0) + altTitulo + altDescr + altAutor + 12;
+  ensureSpace(doc, altTotal);
+
+  const yIni = doc.y;
+  // Bolinha + linha vertical
+  doc.save()
+    .circle(ml + 12, yIni + 5, 3)
+    .lineWidth(1.2)
+    .strokeColor(corBullet)
+    .stroke()
+    .restore();
+
+  // Data
+  doc.font('Helvetica').fontSize(8).fillColor('#64748b')
+    .text(formatDateTime(dataIso, locale, timeZone), indentX, yIni, { lineBreak: false });
+
+  let yCur = yIni + 11;
+  if (isRetroativo) {
+    doc.font('Helvetica-Bold').fontSize(7).fillColor('#b45309')
+      .text('[Registro retroativo]', indentX, yCur, { lineBreak: false });
+    yCur += 11;
+  }
+
+  // Titulo
+  doc.font('Helvetica-Bold').fontSize(9).fillColor('#0f172a')
+    .text(titulo, indentX, yCur, { width: W });
+  yCur = doc.y;
+
+  // Descricao
+  if (descricao) {
+    doc.font('Helvetica').fontSize(8.5).fillColor('#334155')
+      .text(descricao, indentX, yCur, { width: W });
+    yCur = doc.y;
+  }
+
+  // Autor
+  if (autor) {
+    doc.font('Helvetica').fontSize(7.5).fillColor('#94a3b8')
+      .text(`— ${autor}`, indentX, yCur, { lineBreak: false });
+    yCur += 11;
+  }
+
+  doc.y = yCur + 4;
+}
+
+function _relCorBulletPorEvento(ev) {
+  const tipo = String(ev?.tipoEvento || '').toLowerCase();
+  if (tipo.includes('concluida') || tipo.includes('concluído')) return '#16a34a';
+  if (tipo.includes('cancelada')) return '#dc2626';
+  if (tipo.includes('problema_persiste') || tipo.includes('falha')) return '#dc2626';
+  if (tipo.includes('promovida') || tipo.includes('promovid')) return '#b45309';
+  if (tipo.includes('aberta')) return '#64748b';
+  return '#94a3b8';
+}
+
+// ─── Eventos orfaos (criacao_ativo, alteracoes cadastrais sem OS) ────────────
+
+function _relAuditoriaEventosOrfaos(doc, eventos, locale, timeZone) {
+  const orfaos = eventos.filter(
+    (ev) =>
+      !ev?.referenciaTipo ||
+      !ev?.referenciaId ||
+      (ev.referenciaTipo !== 'manutencao' && ev.referenciaTipo !== 'os_corretiva')
+  );
+  if (orfaos.length === 0) return;
+
+  // Ordena cronologico (mais antigo primeiro)
+  const ordenados = [...orfaos].sort(
+    (a, b) => new Date(a.dataEvento) - new Date(b.dataEvento)
+  );
+
+  for (const ev of ordenados) {
+    _relAuditoriaUmEventoIsolado(doc, ev, locale, timeZone);
+  }
+}
+
+function _relAuditoriaUmEventoIsolado(doc, ev, locale, timeZone) {
+  ensureSpace(doc, 80);
+  const ml = doc.page.margins.left;
+  const W = doc.page.width - ml - doc.page.margins.right;
+  const headerH = 28;
+  const yh = doc.y;
+
+  // Header escuro como uma OS
+  doc.save().rect(ml, yh, W, headerH).fillAndStroke('#1e293b', '#0f172a').restore();
+
+  const titulo = ev?.tipoEvento ? `Evento: ${ev.tipoEvento}` : 'Evento do sistema';
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#ffffff')
+    .text(titulo, ml + 10, yh + 9, { width: 220, lineBreak: false });
+
+  // Chip "Sistema"
+  _relDrawChip(doc, ml + 240, yh + 8, 'Sistema', REL_STATUS_COR.Pendente);
+
+  // Data a direita
+  doc.font('Helvetica').fontSize(6.5).fillColor('#94a3b8')
+    .text('Data', ml + W - 130, yh + 5, { width: 120, align: 'right', lineBreak: false });
+  doc.font('Helvetica-Bold').fontSize(8).fillColor('#ffffff')
+    .text(formatDateTime(ev?.dataEvento, locale, timeZone), ml + W - 130, yh + 14, {
+      width: 120,
+      align: 'right',
+      lineBreak: false,
+    });
+
+  doc.y = yh + headerH + 4;
+
+  _relAuditoriaTimeline(doc, [ev], locale, timeZone);
+  doc.moveDown(0.5);
+}
+
+// (Funcao _detalhamentoOrdensServico antiga removida — substituida pelas
+//  novas funcoes _relAuditoriaOrdens/_relAuditoriaUmaOs com layout em
+//  cards estilizados + linha do tempo com bolinhas.)
 
 export async function gerarPdfOSManutencaoBuffer(manutencao, options = {}) {
   options = await injectTenantInfo(manutencao, options);
