@@ -35,6 +35,21 @@ function formatarLabel(valor) {
   return String(valor).replace(/([A-Z])/g, ' $1').trim();
 }
 
+// Grupo de prioridade pra ordenacao da lista unificada:
+//  0 = pendentes (demandam acao do usuario)
+//  1 = concluidas (passado)
+//  2 = canceladas (passado, deprioritizadas)
+const STATUS_PRIORIDADE_MANUT = {
+  Aberta: 0,
+  Pendente: 0,
+  Agendada: 0,
+  EmAndamento: 0,
+  AguardandoTerceiro: 0,
+  AguardandoConfirmacao: 0,
+  Concluida: 1,
+  Cancelada: 2,
+};
+
 export function useTabManutencoes() {
   const navigate = useNavigate();
   const manut = useManutencoes();
@@ -65,38 +80,36 @@ export function useTabManutencoes() {
   const oscIncluido = oscStatusAplicavel && oscTipoAplicavel;
 
   // ─── Items unificados ────────────────────────────────────────────────────
-  // Ordenacao depende do status filtrado:
-  //   - "aguardando" / Pendente / Agendada / EmAndamento → asc (proxima primeiro)
-  //     Eventos FUTUROS: usuario quer ver a manutencao mais proxima no topo
-  //   - Concluida / Cancelada / sem filtro → desc (mais recente primeiro)
-  //     Eventos PASSADOS: ver os ultimos primeiro
-  // Espelha o default do backend (services/manutencao/index.js).
-  const ordemAscendente = useMemo(() => {
-    const s = manut.filtros?.status;
-    return ['aguardando', 'Pendente', 'Agendada', 'EmAndamento'].includes(s);
-  }, [manut.filtros?.status]);
-
+  // Ordenacao em 2 niveis (mesmo padrao da aba Ocorrencias):
+  //   1. Pendentes (Aberta/Pendente/Agendada/EmAndamento/AguardandoTerceiro
+  //      /AguardandoConfirmacao) primeiro — demandam acao
+  //   2. Concluidas depois
+  //   3. Canceladas por ultimo
+  //   Dentro de cada grupo, mais recente primeiro (DESC).
   const unifiedItems = useMemo(() => {
     const m = manut.manutencoes.map((item) => ({
       ...item,
       _kind: 'manutencao',
       _sortDate: item.dataHoraAgendamentoInicio || item.createdAt || '',
+      _grupo: STATUS_PRIORIDADE_MANUT[item.status] ?? 99,
     }));
     const o = oscIncluido
       ? osc.osCorretivas.map((item) => ({
           ...item,
           _kind: 'osCorretiva',
           _sortDate: item.dataHoraAbertura || item.createdAt || '',
+          _grupo: STATUS_PRIORIDADE_MANUT[item.status] ?? 99,
         }))
       : [];
     return [...m, ...o].sort((a, b) => {
-      if (!a._sortDate) return 1;
-      if (!b._sortDate) return -1;
-      return ordemAscendente
-        ? new Date(a._sortDate) - new Date(b._sortDate)
-        : new Date(b._sortDate) - new Date(a._sortDate);
+      if (a._grupo !== b._grupo) return a._grupo - b._grupo;
+      const ta = a._sortDate ? new Date(a._sortDate).getTime() : 0;
+      const tb = b._sortDate ? new Date(b._sortDate).getTime() : 0;
+      if (!ta) return 1;
+      if (!tb) return -1;
+      return tb - ta;
     });
-  }, [manut.manutencoes, osc.osCorretivas, oscIncluido, ordemAscendente]);
+  }, [manut.manutencoes, osc.osCorretivas, oscIncluido]);
 
   // ─── KPIs combinados ─────────────────────────────────────────────────────
   const metricas = useMemo(() => ({

@@ -55,14 +55,14 @@ export function useTabOcorrencias() {
     return enriquecidos.sort((a, b) => {
       // 1. Grupo de prioridade (pendente -> concluida -> cancelada)
       if (a._grupo !== b._grupo) return a._grupo - b._grupo;
-      // 2. Dentro do grupo: pendentes ASC (mais antiga ha mais tempo
-      //    esperando), passados DESC (mais recente primeiro)
-      const ehPendente = a._grupo === 0;
+      // 2. Dentro do grupo: SEMPRE DESC (mais recente primeiro). O
+      //    usuario prefere ver o que abriu agora no topo, tanto em
+      //    pendentes quanto em concluidos/cancelados.
       const ta = a._sortDate ? new Date(a._sortDate).getTime() : 0;
       const tb = b._sortDate ? new Date(b._sortDate).getTime() : 0;
       if (!ta) return 1;
       if (!tb) return -1;
-      return ehPendente ? ta - tb : tb - ta;
+      return tb - ta;
     });
   }, [osc.osCorretivas]);
 

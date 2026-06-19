@@ -641,13 +641,17 @@ export async function deletarManutencao({
   tenantId,
   manutencaoId,
 }) {
-  return prisma.manutencao.delete({
-    where: {
-      tenantId_id: {
-        tenantId,
-        id: manutencaoId,
-      },
-    },
+  // Limpa eventos do historico do ativo antes do delete pra nao deixar
+  // vestigio (OS registrada/concluida/etc continuariam aparecendo no
+  // PDF de auditoria mesmo apos exclusao). FK referencial nao apaga
+  // automaticamente porque referenciaId eh string solta (sem foreign key).
+  return prisma.$transaction(async (tx) => {
+    await tx.historicoAtivoEvento.deleteMany({
+      where: { tenantId, referenciaTipo: 'manutencao', referenciaId: manutencaoId },
+    });
+    return tx.manutencao.delete({
+      where: { tenantId_id: { tenantId, id: manutencaoId } },
+    });
   });
 }
 

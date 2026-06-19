@@ -1095,6 +1095,14 @@ export async function excluirOsCorretivaService({ tenantId, usuarioId, osId }) {
 
     await tx.notaAndamento.deleteMany({ where: { tenantId, osCorretivaId: osId } });
     await tx.visitaTerceiro.deleteMany({ where: { tenantId, osCorretivaId: osId } });
+    // Limpa eventos do historico do ativo vinculados a essa OS — antes
+    // ficava "vestigio" no historico (OS aberta, promovida, concluida
+    // ainda apareciam) mesmo apos exclusao. Como exclusao so eh permitida
+    // pra OS Aberta, o impacto eh pequeno (poucos eventos), mas a coerencia
+    // de auditoria pede limpeza completa.
+    await tx.historicoAtivoEvento.deleteMany({
+      where: { tenantId, referenciaTipo: 'os_corretiva', referenciaId: osId },
+    });
     await tx.osCorretiva.delete({ where: { tenantId_id: { tenantId, id: osId } } });
   });
 
