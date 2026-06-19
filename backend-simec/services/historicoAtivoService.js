@@ -79,6 +79,15 @@ function normalizarReferenciaManutencao(manutencao) {
 function normalizarReferenciaOsCorretiva(os) {
   if (!os) return null;
 
+  // Normaliza 'notas' (nome da relacao na OsCorretiva) pra
+  // 'notasAndamento' (mesmo nome que Manutencao usa) — assim UI/PDF
+  // consomem o mesmo shape independente do tipo da OS.
+  const notasRaw = Array.isArray(os.notas)
+    ? os.notas
+    : Array.isArray(os.notasAndamento)
+    ? os.notasAndamento
+    : [];
+
   return {
     id: os.id,
     numeroOS: os.numeroOS,
@@ -88,9 +97,7 @@ function normalizarReferenciaOsCorretiva(os) {
     descricaoProblema: os.descricaoProblema || null,
     dataHoraAbertura: toIsoOrNull(os.dataHoraAbertura),
     dataHoraConclusao: toIsoOrNull(os.dataHoraConclusao),
-    notasAndamento: Array.isArray(os.notasAndamento)
-      ? os.notasAndamento.map(normalizarNotaAndamento).filter(Boolean)
-      : [],
+    notasAndamento: notasRaw.map(normalizarNotaAndamento).filter(Boolean),
   };
 }
 
@@ -227,7 +234,11 @@ async function carregarReferenciasHistorico(db, eventos = [], tenantId) {
             descricaoProblema: true,
             dataHoraAbertura: true,
             dataHoraConclusao: true,
-            notasAndamento: {
+            // No schema da OsCorretiva a relacao chama-se 'notas'
+            // (em Manutencao chama 'notasAndamento'). Normalizamos
+            // pro mesmo nome ('notasAndamento') em normalizarReferencia
+            // pra UI/PDF nao precisar saber a diferenca.
+            notas: {
               where: { tenantId },
               orderBy: { data: 'asc' },
               include: { autor: { select: { nome: true } } },
