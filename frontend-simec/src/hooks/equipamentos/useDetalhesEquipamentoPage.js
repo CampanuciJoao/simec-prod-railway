@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { useParams, useLocation } from 'react-router-dom';
+import { useParams, useLocation, useSearchParams } from 'react-router-dom';
 import {
   faChartLine,
   faClipboardCheck,
@@ -21,16 +21,32 @@ const MODALIDADES_COM_CQ = new Set([
   'Ultrassonografia',
 ]);
 
+// Ressonâncias recebem a aba "Saúde" sempre — mesmo sem integração GE
+// ativa (estado vazio orienta o usuario). Outros tipos só ganham a aba
+// se houver gehcAssetId casado.
+const TIPOS_RESSONANCIA = new Set([
+  'Ressonancia Magnetica',
+  'Ressonância Magnética',
+]);
+
 import { useEquipamentoDetalhes } from './useEquipamentoDetalhes';
 
 export function useDetalhesEquipamentoPage() {
   const { equipamentoId } = useParams();
   const location = useLocation();
-  const [abaAtiva, setAbaAtiva] = useState(location.state?.tab || 'visaoGeral');
+  const [searchParams] = useSearchParams();
+  // Prioridade: querystring (deep-link de alerta) > location.state (nav interna) > default
+  const tabInicial = searchParams.get('tab') || location.state?.tab || 'visaoGeral';
+  const [abaAtiva, setAbaAtiva] = useState(tabInicial);
 
   useEffect(() => {
+    const fromQuery = searchParams.get('tab');
+    if (fromQuery) {
+      setAbaAtiva(fromQuery);
+      return;
+    }
     if (location.state?.tab) setAbaAtiva(location.state.tab);
-  }, [location.state?.tab]);
+  }, [location.state?.tab, searchParams]);
 
   const {
     equipamento,
@@ -47,8 +63,11 @@ export function useDetalhesEquipamentoPage() {
       { id: 'anexos',      label: 'Anexos',         icon: faPaperclip  },
       { id: 'cobertura',   label: 'Cobertura',      icon: faShieldAlt  },
     ];
-    if (equipamento?.gehcAssetId) {
-      base.push({ id: 'saudeGehc', label: 'Saúde GE', icon: faHeartPulse });
+    const eRessonancia = equipamento?.tipo && TIPOS_RESSONANCIA.has(equipamento.tipo);
+    // Ressonância sempre tem aba Saúde (com estado vazio quando nao tem
+    // integracao). Outros equipamentos só ganham se houver gehcAssetId.
+    if (eRessonancia || equipamento?.gehcAssetId) {
+      base.push({ id: 'saudeGehc', label: 'Saúde', icon: faHeartPulse });
     }
     if (equipamento?.tipo && MODALIDADES_COM_CQ.has(equipamento.tipo)) {
       base.push({ id: 'controleQualidade', label: 'Controle de Qualidade', icon: faClipboardCheck });
