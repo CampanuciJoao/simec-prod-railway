@@ -5,6 +5,7 @@ import {
   abrirOsSchema,
   notaAndamentoSchema,
   editarNotaAndamentoSchema,
+  editarDescricaoOsSchema,
   agendarVisitaSchema,
   reagendarVisitaSchema,
   registrarResultadoSchema,
@@ -17,6 +18,7 @@ import {
   abrirOsCorretivaService,
   adicionarNotaOsCorretivaService,
   editarNotaOsCorretivaService,
+  editarDescricaoOsCorretivaService,
   agendarVisitaTerceiroService,
   reagendarVisitaTerceiroService,
   iniciarVisitaTerceiroService,
@@ -122,6 +124,30 @@ router.post('/:id/notas', validate(notaAndamentoSchema), async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_NOTA_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao adicionar nota.' });
+  }
+});
+
+// Editar descrição original da OS — correção retroativa de typo /
+// ajuste do texto do problema. Restrito a admin: e o "registro inicial"
+// da OS, edicao precisa de motivo e fica em LogAuditoria com antes/depois.
+router.patch('/:id/descricao', admin, validate(editarDescricaoOsSchema), async (req, res) => {
+  try {
+    const resultado = await editarDescricaoOsCorretivaService({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+      osId: req.params.id,
+      dados: req.validatedData,
+    });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({
+        message: resultado.message,
+        ...(resultado.fieldErrors ? { fieldErrors: resultado.fieldErrors } : {}),
+      });
+    }
+    return res.json(adaptarOsCorretivaResponse(resultado.data));
+  } catch (error) {
+    console.error('[OS_CORRETIVA_EDITAR_DESCRICAO_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao editar descrição da OS.' });
   }
 });
 

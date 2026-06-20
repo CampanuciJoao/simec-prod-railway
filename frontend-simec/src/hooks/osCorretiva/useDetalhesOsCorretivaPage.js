@@ -3,6 +3,7 @@ import {
   getOsCorretivaById,
   adicionarNota,
   editarNotaOsCorretiva,
+  editarDescricaoOsCorretiva,
   agendarVisita,
   reagendarVisita,
   registrarResultadoVisita,
@@ -27,6 +28,7 @@ export function useDetalhesOsCorretivaPage(osId) {
 
   const notaModal = useModal();
   const editarNotaModal = useModal();
+  const editarDescricaoModal = useModal();
   const visitaModal = useModal();
   const reagendarVisitaModal = useModal();
   const resultadoModal = useModal();
@@ -192,6 +194,23 @@ export function useDetalhesOsCorretivaPage(osId) {
     }
   }, [osId, addToast, moverModal, fetchOs]);
 
+  const handleEditarDescricao = useCallback(async (dados) => {
+    setSubmitting(true);
+    setFieldErrors({});
+    try {
+      await editarDescricaoOsCorretiva(osId, dados);
+      addToast('Descrição da OS atualizada.', 'success');
+      editarDescricaoModal.closeModal();
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao editar descrição.';
+      setFieldErrors(err?.response?.data?.fieldErrors || {});
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, editarDescricaoModal, fetchOs]);
+
   const handleUploadAnexos = useCallback(async (formData) => {
     setSubmitting(true);
     try {
@@ -244,6 +263,7 @@ export function useDetalhesOsCorretivaPage(osId) {
     fieldErrors,
     notaModal,
     editarNotaModal,
+    editarDescricaoModal,
     visitaModal,
     reagendarVisitaModal,
     resultadoModal,
@@ -252,6 +272,7 @@ export function useDetalhesOsCorretivaPage(osId) {
     moverModal,
     handleAdicionarNota,
     handleEditarNota,
+    handleEditarDescricao,
     handleAgendarVisita,
     handleReagendarVisita,
     handleRegistrarResultado,

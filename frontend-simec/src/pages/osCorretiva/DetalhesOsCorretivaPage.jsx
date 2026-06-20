@@ -1,13 +1,14 @@
 import React from 'react';
 import { useParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft, faRotate } from '@fortawesome/free-solid-svg-icons';
+import { faFilePdf, faClipboardList, faTruck, faCheck, faBan, faRightLeft, faRotate, faPenToSquare } from '@fortawesome/free-solid-svg-icons';
 import { useDetalhesOsCorretivaPage } from '@/hooks/osCorretiva/useDetalhesOsCorretivaPage';
 import { useAuth } from '@/contexts/AuthContext';
 import OsCorretivaTimeline from '@/components/osCorretiva/OsCorretivaTimeline';
 import OsEquipamentoCard from '@/components/osCorretiva/OsEquipamentoCard';
 import AdicionarNotaModal from '@/components/osCorretiva/AdicionarNotaModal';
 import EditarNotaModal from '@/components/osCorretiva/EditarNotaModal';
+import EditarDescricaoOsModal from '@/components/osCorretiva/EditarDescricaoOsModal';
 import AgendarVisitaTerceiroModal from '@/components/osCorretiva/AgendarVisitaTerceiroModal';
 import ReagendarVisitaModal from '@/components/osCorretiva/ReagendarVisitaModal';
 import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/ConfirmacaoFinalVisitaCorretiva';
@@ -71,6 +72,15 @@ function DetalhesOsCorretivaPage() {
         onConfirm={page.handleEditarNota}
         evento={page.editarNotaModal.modalData}
         timezone={os?.equipamento?.unidade?.timezone}
+        submitting={page.submitting}
+        fieldErrors={page.fieldErrors}
+      />
+
+      <EditarDescricaoOsModal
+        isOpen={page.editarDescricaoModal.isOpen}
+        onClose={page.editarDescricaoModal.closeModal}
+        onConfirm={page.handleEditarDescricao}
+        descricaoOriginal={os?.descricaoProblema}
         submitting={page.submitting}
         fieldErrors={page.fieldErrors}
       />
@@ -151,6 +161,21 @@ function DetalhesOsCorretivaPage() {
               <FontAwesomeIcon icon={faFilePdf} />
               Exportar PDF
             </Button>
+
+            {/* Editar descrição: restrito a admin. Disponivel inclusive em
+                OS Concluida/Cancelada — typo descoberto depois e o caso
+                principal. Antes/depois + motivo ficam em LogAuditoria. */}
+            {isAdmin && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={page.editarDescricaoModal.openModal}
+                title="Editar descrição da OS (admin)"
+              >
+                <FontAwesomeIcon icon={faPenToSquare} />
+                Editar descrição
+              </Button>
+            )}
 
             {!isEncerrada && (
               <>

@@ -16,6 +16,11 @@ export const adicionarNota = (id, data) =>
 export const editarNotaOsCorretiva = (id, notaId, data) =>
   api.patch(`/os-corretiva/${id}/notas/${notaId}`, data).then((res) => res.data);
 
+// Edição admin do descritivo original. data = { descricaoProblema, motivo }
+// (motivo obrigatorio pra rastreabilidade em LogAuditoria).
+export const editarDescricaoOsCorretiva = (id, data) =>
+  api.patch(`/os-corretiva/${id}/descricao`, data).then((res) => res.data);
+
 export const agendarVisita = (id, data) =>
   api.post(`/os-corretiva/${id}/visitas`, data).then((res) => res.data);
 
