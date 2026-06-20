@@ -61,6 +61,17 @@ const RESOURCE_POLICIES = {
     describe: (entity) => `OS ${entity.numeroOS || entity.id}`,
   },
 
+  osCorretivas: {
+    relationField: 'osCorretivaId',
+    entityName: 'OS Corretiva',
+    findById: async ({ tenantId, entityId }) =>
+      prisma.osCorretiva.findFirst({
+        where: { id: entityId, tenantId },
+        select: { id: true, numeroOS: true },
+      }),
+    describe: (entity) => `OS ${entity.numeroOS || entity.id}`,
+  },
+
   controleQualidade: {
     relationField: 'testeQualidadeId',
     entityName: 'Teste de Qualidade',

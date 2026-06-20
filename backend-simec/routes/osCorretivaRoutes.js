@@ -31,6 +31,9 @@ import {
   adaptarListaOsCorretivasResponse,
 } from '../services/osCorretivaResponseAdapter.js';
 import { buscarEventosHistorico } from '../services/historicoAtivoService.js';
+import { uploadFor } from '../middleware/uploadMiddleware.js';
+import { adicionarAnexos, removerAnexo } from '../services/uploads/anexoService.js';
+import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
 router.use(proteger);
@@ -281,6 +284,84 @@ router.post('/:id/cancelar', async (req, res) => {
   } catch (error) {
     console.error('[OS_CORRETIVA_CANCELAR_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao cancelar OS Corretiva.' });
+  }
+});
+
+// Anexos: usuario pediu poder anexar fotos/documentos durante e
+// **depois de fechada** a OS. Por isso nao bloqueamos por status —
+// a checagem de tenant + existencia esta no anexoPolicyService.
+router.post('/:id/anexos', uploadFor('osCorretivas'), async (req, res, next) => {
+  try {
+    const tenantId = req.tenantContext;
+    const usuarioId = req.usuario.id;
+    const osId = req.params.id;
+
+    await adicionarAnexos({
+      resource: 'osCorretivas',
+      tenantId,
+      usuarioId,
+      entityId: osId,
+      files: req.files,
+    });
+
+    const resultado = await obterOsCorretivaDetalhadaService({ tenantId, osId });
+    if (!resultado.ok) {
+      return res.status(resultado.status).json({ message: resultado.message });
+    }
+
+    const nomes = (req.files || []).map((f) => f.originalname).join(', ');
+    if (nomes) {
+      await registrarLog({
+        tenantId,
+        usuarioId,
+        acao: 'UPLOAD',
+        entidade: 'OsCorretiva',
+        entidadeId: osId,
+        detalhes: `Anexo(s) adicionado(s) à OS ${resultado.data?.numeroOS || osId}: ${nomes}.`,
+      });
+    }
+
+    return res.status(201).json(adaptarOsCorretivaResponse(resultado.data));
+  } catch (error) {
+    console.error('[OS_CORRETIVA_UPLOAD_ERROR]', error);
+    return next(error);
+  }
+});
+
+router.delete('/:id/anexos/:anexoId', async (req, res, next) => {
+  try {
+    const tenantId = req.tenantContext;
+    const usuarioId = req.usuario.id;
+    const osId = req.params.id;
+    const anexoId = req.params.anexoId;
+
+    const antes = await obterOsCorretivaDetalhadaService({ tenantId, osId });
+    const anexoAntes = (antes?.data?.anexos || []).find((a) => a.id === anexoId);
+
+    await removerAnexo({
+      resource: 'osCorretivas',
+      tenantId,
+      usuarioId,
+      entityId: osId,
+      anexoId,
+    });
+
+    await registrarLog({
+      tenantId,
+      usuarioId,
+      acao: 'EXCLUSÃO',
+      entidade: 'OsCorretiva',
+      entidadeId: osId,
+      detalhes: `Anexo removido da OS ${antes?.data?.numeroOS || osId}: ${anexoAntes?.nomeOriginal || anexoId}.`,
+    });
+
+    return res.status(204).send();
+  } catch (error) {
+    console.error('[OS_CORRETIVA_ANEXO_DELETE_ERROR]', error);
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return next(error);
   }
 });
 

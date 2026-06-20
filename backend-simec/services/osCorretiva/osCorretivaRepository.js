@@ -23,11 +23,19 @@ const INCLUDE_VISITAS = {
   },
 };
 
+const INCLUDE_ANEXOS = (tenantId) => ({
+  anexos: {
+    where: { tenantId },
+    orderBy: { createdAt: 'desc' },
+  },
+});
+
 function includeCompleto(tenantId) {
   return {
     ...INCLUDE_EQUIPAMENTO,
     ...INCLUDE_NOTAS(tenantId),
     ...INCLUDE_VISITAS,
+    ...INCLUDE_ANEXOS(tenantId),
     autor:        { select: { nome: true } },
     concluidoPor: { select: { nome: true } },
     canceladoPor: { select: { nome: true } },

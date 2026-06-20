@@ -73,6 +73,17 @@ export const UPLOAD_FIELD_REGISTRY = {
     relationField: 'manutencaoId',
   },
 
+  osCorretivas: {
+    resource: 'osCorretivas',
+    fieldName: 'file',
+    folder: 'os-corretivas',
+    maxCount: DEFAULT_MAX_FILE_COUNT,
+    maxFileSize: DEFAULT_MAX_FILE_SIZE,
+    allowedMimeTypes: DEFAULT_ALLOWED_MIME_TYPES,
+    logEntity: 'OsCorretiva',
+    relationField: 'osCorretivaId',
+  },
+
   controleQualidade: {
     resource: 'controleQualidade',
     fieldName: 'file',

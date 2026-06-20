@@ -46,5 +46,17 @@ export const excluirOsCorretiva = (id) =>
 export const downloadPdfOsCorretiva = (id) =>
   api.get(`/pdfs/os-corretiva/${id}`, { responseType: 'blob' });
 
+// Anexos: aceita FormData (campo 'file' multivalorado, pra suportar drop
+// de multiplos arquivos). Funciona inclusive em OS Concluida/Cancelada.
+export const uploadAnexosOsCorretiva = (id, formData) =>
+  api
+    .post(`/os-corretiva/${id}/anexos`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    .then((res) => res.data);
+
+export const removerAnexoOsCorretiva = (id, anexoId) =>
+  api.delete(`/os-corretiva/${id}/anexos/${anexoId}`).then((res) => res.data);
+
 export const getHistoricoOsCorretiva = (id) =>
   api.get(`/os-corretiva/${id}/historico`).then((res) => res.data);
