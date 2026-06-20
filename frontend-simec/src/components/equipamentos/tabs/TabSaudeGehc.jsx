@@ -303,7 +303,38 @@ function SecaoUtilizacao({ utilizacao }) {
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 function TabSaudeGehc({ equipamentoId, equipamento }) {
+  // Hook precisa ser chamado sempre (rules-of-hooks). Quando o equipamento
+  // nao tem gehcAssetId, o hook ainda dispara mas a UI mostra estado vazio
+  // amigavel antes de qualquer outro retorno.
   const { resumo, loading, error } = useGehcSaude(equipamentoId);
+
+  // Equipamento sem vinculo GE — comum em equipamentos GE recem-cadastrados
+  // antes do discovery cross-ref casar pelo numero de serie.
+  if (!equipamento?.gehcAssetId) {
+    return (
+      <div
+        className="flex items-start gap-3 rounded-2xl border px-4 py-4"
+        style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+      >
+        <FontAwesomeIcon
+          icon={faCircleExclamation}
+          className="mt-0.5 shrink-0"
+          style={{ color: 'var(--color-warning)' }}
+        />
+        <div>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            Monitoramento GE Health Cloud não ativo
+          </p>
+          <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
+            Este equipamento ainda não foi vinculado ao portal GE. O monitoramento de hélio, pressão, fluxo e compressor depende dessa integração.
+          </p>
+          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+            A vinculação acontece automaticamente quando o número de série bate com o cadastro GE. Se o equipamento já estiver no portal, confira a tag e número de série na aba Visão Geral.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (loading) return <LoadingState message="Carregando dados GE Health Cloud..." />;
 
@@ -324,9 +355,6 @@ function TabSaudeGehc({ equipamentoId, equipamento }) {
           </p>
           <p className="mt-1 text-sm" style={{ color: 'var(--text-muted)' }}>
             {error}
-          </p>
-          <p className="mt-2 text-xs" style={{ color: 'var(--text-muted)' }}>
-            Execute <strong>POST /api/gehc/discovery</strong> para vincular este equipamento ao portal GE, depois <strong>/api/gehc/sync</strong> para importar os dados.
           </p>
         </div>
       </div>

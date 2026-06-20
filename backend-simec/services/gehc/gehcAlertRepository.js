@@ -206,6 +206,11 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
   let mudouContagem = false;
   let criados = 0;
 
+  // Link compartilhado por todos os alertas GEHC_SAUDE deste equipamento.
+  // Aponta direto pra aba de monitoramento (querystring lida pelo hook
+  // useDetalhesEquipamentoPage). Sem isso, "Detalhes" no AlertaItem cai em '#'.
+  const linkSaude = `/equipamentos/detalhes/${equipamentoId}?tab=saudeGehc`;
+
   // Detecção de normalização do compressor: verifica ANTES da auto-resolução apagar o alerta
   const { compressorStatus } = snapshot;
   const compressorOffId   = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, 'compressor-off');
@@ -261,6 +266,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
             tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
             tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
             tipoEvento: ALERT_EVENTOS.GEHC_COMPRESSOR_ON,
+            link: linkSaude,
           },
         });
         criados++;
@@ -307,6 +313,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
             tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
             tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
             tipoEvento: ALERT_EVENTOS.GEHC_EQUIPAMENTO_OFFLINE,
+            link: linkSaude,
           },
         });
         criados++;
@@ -322,15 +329,18 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
 
     const existente = await prisma.alerta.findUnique({
       where: { tenantId_id: { tenantId, id: alertaId } },
-      select: { id: true, subtitulo: true },
+      select: { id: true, subtitulo: true, link: true },
     });
 
-    if (existente?.subtitulo === regra.subtitulo) continue;
+    // Curto-circuito: subtitulo igual E link ja preenchido — nao mexe.
+    // Quando link estiver vazio (alertas pre-deep-link), forca update
+    // pra backfill sem precisar de migration.
+    if (existente?.subtitulo === regra.subtitulo && existente?.link) continue;
 
     if (existente) {
       await prisma.alerta.update({
         where: { tenantId_id: { tenantId, id: alertaId } },
-        data: { subtitulo: regra.subtitulo, data: new Date() },
+        data: { subtitulo: regra.subtitulo, data: new Date(), link: linkSaude },
       });
     } else {
       await prisma.alerta.create({
@@ -344,6 +354,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
           tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
           tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
           tipoEvento: regra.evento,
+          link: linkSaude,
         },
       });
       criados++;
