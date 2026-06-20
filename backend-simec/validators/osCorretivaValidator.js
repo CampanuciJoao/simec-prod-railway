@@ -104,6 +104,36 @@ export function validarEdicaoNota(payload) {
   };
 }
 
+// Edição da descrição original da OS (correção de typo, ajuste do texto
+// do problema). Motivo é obrigatório — exige justificativa por
+// auditoria, ja que e o registro inicial da OS.
+export const editarDescricaoOsSchema = z.object({
+  descricaoProblema: z
+    .string()
+    .min(3, 'A descrição deve ter ao menos 3 caracteres.')
+    .max(2000, 'A descrição deve ter no máximo 2000 caracteres.'),
+  motivo: z
+    .string()
+    .min(3, 'Informe o motivo da edição (3-500 caracteres).')
+    .max(500, 'Motivo deve ter no máximo 500 caracteres.'),
+});
+
+export function validarEdicaoDescricao(payload) {
+  const result = editarDescricaoOsSchema.safeParse(payload);
+  if (result.success) return { ok: true, data: result.data };
+
+  const fieldErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0];
+    if (key) fieldErrors[key] = issue.message;
+  }
+  return {
+    ok: false,
+    message: 'Dados inválidos para edição da descrição.',
+    fieldErrors,
+  };
+}
+
 export const agendarVisitaSchema = z.object({
   prestadorNome: z.string().min(1, 'Nome do prestador é obrigatório.').max(200),
   dataHoraInicioPrevista: z.string().datetime({ message: 'Data/hora de início inválida.' }),

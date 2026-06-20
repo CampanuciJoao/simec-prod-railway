@@ -22,6 +22,7 @@ import {
   validarAbrirOs,
   validarNota,
   validarEdicaoNota,
+  validarEdicaoDescricao,
   validarAgendarVisita,
   validarReagendarVisita,
   validarRegistrarResultado,
@@ -338,6 +339,54 @@ export async function editarNotaOsCorretivaService({
     detalhes: `Nota da OS ${os.numeroOS} editada. ${JSON.stringify({ antes, depois })}`,
   });
 
+  return { ok: true, status: 200, data: atualizada };
+}
+
+// ─── Editar descrição original da OS ─────────────────────────────────────────
+// Correção de typo / ajuste no descritivo. Motivo é obrigatório e o
+// antes/depois fica em LogAuditoria pra rastreabilidade — auditoria
+// futura precisa saber o que mudou e por quê. A edição é permitida
+// inclusive em OS concluída/cancelada (correção retroativa é o caso
+// principal — typo descoberto depois).
+export async function editarDescricaoOsCorretivaService({
+  tenantId,
+  usuarioId,
+  osId,
+  dados,
+}) {
+  const v = validarEdicaoDescricao(dados);
+  if (!v.ok) return { ok: false, status: 400, message: v.message, fieldErrors: v.fieldErrors };
+
+  const osCompleta = await buscarOsPorId({ tenantId, osId });
+  if (!osCompleta) return { ok: false, status: 404, message: 'OS Corretiva não encontrada.' };
+
+  const descricaoAntes = osCompleta.descricaoProblema || '';
+  const descricaoDepois = v.data.descricaoProblema;
+
+  if (descricaoAntes === descricaoDepois) {
+    return { ok: true, status: 200, data: osCompleta };
+  }
+
+  await atualizarOsCorretiva({
+    tenantId,
+    osId,
+    data: { descricaoProblema: descricaoDepois },
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'EDICAO',
+    entidade: 'OsCorretiva',
+    entidadeId: osId,
+    detalhes: `Descrição da OS ${osCompleta.numeroOS} editada. ${JSON.stringify({
+      motivo: v.data.motivo,
+      antes: descricaoAntes,
+      depois: descricaoDepois,
+    })}`,
+  });
+
+  const atualizada = await buscarOsPorId({ tenantId, osId });
   return { ok: true, status: 200, data: atualizada };
 }
 
