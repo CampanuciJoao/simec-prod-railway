@@ -611,13 +611,13 @@ model LogAuditoria {
 model LlmCallLog {
   id           String   @id @default(uuid())
   tenantId     String?  @map("tenant_id")
-  feature      String   // gehc_pdf_extract, agente_conversa, agente_interpretacao, embedding, insight_enrich
-  provider     String   // openai, gemini
-  model        String   // gpt-4.1-mini, gemini-2.5-flash, text-embedding-3-small
-  status       String   // ok, fallback, error
+  feature      String // gehc_pdf_extract, agente_conversa, agente_interpretacao, embedding, insight_enrich
+  provider     String // openai, gemini
+  model        String // gpt-4.1-mini, gemini-2.5-flash, text-embedding-3-small
+  status       String // ok, fallback, error
   tokensIn     Int      @default(0) @map("tokens_in")
   tokensOut    Int      @default(0) @map("tokens_out")
-  costUsd      Decimal  @default(0) @db.Decimal(12, 8) @map("cost_usd")
+  costUsd      Decimal  @default(0) @map("cost_usd") @db.Decimal(12, 8)
   durationMs   Int      @default(0) @map("duration_ms")
   refType      String?  @map("ref_type")
   refId        String?  @map("ref_id")
@@ -642,6 +642,7 @@ model Anexo {
   unidadeId        String?  @map("unidade_id")
   equipamentoId    String?  @map("equipamento_id")
   manutencaoId     String?  @map("manutencao_id")
+  osCorretivaId    String?  @map("os_corretiva_id")
   seguroId         String?  @map("seguro_id")
   contratoId       String?  @map("contrato_id")
   testeQualidadeId String?  @map("teste_qualidade_id")
@@ -652,6 +653,7 @@ model Anexo {
   contrato       Contrato?       @relation(fields: [tenantId, contratoId], references: [tenantId, id], onDelete: Cascade)
   equipamento    Equipamento?    @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
   manutencao     Manutencao?     @relation(fields: [tenantId, manutencaoId], references: [tenantId, id], onDelete: Cascade)
+  osCorretiva    OsCorretiva?    @relation(fields: [tenantId, osCorretivaId], references: [tenantId, id], onDelete: Cascade)
   seguro         Seguro?         @relation(fields: [tenantId, seguroId], references: [tenantId, id], onDelete: Cascade)
   unidade        Unidade?        @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
   testeQualidade TesteQualidade? @relation(fields: [tenantId, testeQualidadeId], references: [tenantId, id], onDelete: Cascade)
@@ -659,6 +661,7 @@ model Anexo {
   @@index([tenantId, unidadeId])
   @@index([tenantId, equipamentoId])
   @@index([tenantId, manutencaoId])
+  @@index([tenantId, osCorretivaId])
   @@index([tenantId, seguroId])
   @@index([tenantId, contratoId])
   @@index([tenantId, testeQualidadeId])
@@ -666,15 +669,15 @@ model Anexo {
 }
 
 model NotaAndamento {
-  id            String   @id @default(uuid())
+  id            String    @id @default(uuid())
   tenantId      String
   nota          String
-  data          DateTime @default(now())
-  origem        String   @default("manual")
-  manutencaoId  String?  @map("manutencao_id")
-  osCorretivaId String?  @map("os_corretiva_id")
-  autorId       String?  @map("autor_id")
-  tecnicoNome   String?  @map("tecnico_nome")
+  data          DateTime  @default(now())
+  origem        String    @default("manual")
+  manutencaoId  String?   @map("manutencao_id")
+  osCorretivaId String?   @map("os_corretiva_id")
+  autorId       String?   @map("autor_id")
+  tecnicoNome   String?   @map("tecnico_nome")
   // Edição admin: marca quando e por quem a nota foi corrigida. Detalhe
   // antes/depois fica em LogAuditoria; aqui só o ponteiro pra exibir
   // "Editado por X em Y" na timeline.
@@ -1020,8 +1023,8 @@ model GehcPdfExtraido {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  tenant       Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  pdfDocumento GehcPdfDocumento @relation(fields: [pdfDocumentoId], references: [id], onDelete: Cascade)
+  tenant          Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  pdfDocumento    GehcPdfDocumento   @relation(fields: [pdfDocumentoId], references: [id], onDelete: Cascade)
   categoriaLabels IaCategoriaLabel[]
 
   @@index([tenantId, rootCauseCategory])
@@ -1253,17 +1256,17 @@ model AiPipelineEstado {
 //   prompt do LLM, sem nunca ver dado deles.
 
 model IaCategoriaLabel {
-  id                   String @id @default(uuid())
-  tenantId             String
-  pdfExtraidoId        String @map("pdf_extraido_id")
+  id            String @id @default(uuid())
+  tenantId      String
+  pdfExtraidoId String @map("pdf_extraido_id")
 
-  categoriaOriginal    String? @map("categoria_original") // o que a IA disse (pode ser null se nunca classificou)
-  categoriaCorreta     String  @map("categoria_correta")  // o que o admin disse
-  comentario           String? @db.Text                   // motivo opcional informado pelo admin
-  autorId              String? @map("autor_id")
-  licaoId              String? @map("licao_id")           // FK para a lição cross-tenant derivada
+  categoriaOriginal String? @map("categoria_original") // o que a IA disse (pode ser null se nunca classificou)
+  categoriaCorreta  String  @map("categoria_correta") // o que o admin disse
+  comentario        String? @db.Text // motivo opcional informado pelo admin
+  autorId           String? @map("autor_id")
+  licaoId           String? @map("licao_id") // FK para a lição cross-tenant derivada
 
-  createdAt            DateTime @default(now()) @map("created_at")
+  createdAt DateTime @default(now()) @map("created_at")
 
   tenant      Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   pdfExtraido GehcPdfExtraido   @relation(fields: [pdfExtraidoId], references: [id], onDelete: Cascade)
@@ -1276,32 +1279,32 @@ model IaCategoriaLabel {
 }
 
 model IaCategoriaLicao {
-  id                String @id @default(uuid())
+  id String @id @default(uuid())
   // SEM tenantId — esta tabela é cross-tenant por design.
 
-  textoDespersonalizado String @map("texto_despersonalizado") @db.Text
-  categoriaCorreta      String @map("categoria_correta")
+  textoDespersonalizado String  @map("texto_despersonalizado") @db.Text
+  categoriaCorreta      String  @map("categoria_correta")
   serviceTypeCode       String? @map("service_type_code") // SE02 (PM) ou SE03/SE05 (corretiva)
 
-  ativa             Boolean  @default(true) // permite desativar lições problemáticas sem deletar
-  vezesAplicada     Int      @default(0) @map("vezes_aplicada") // contador de uso em few-shot
+  ativa         Boolean @default(true) // permite desativar lições problemáticas sem deletar
+  vezesAplicada Int     @default(0) @map("vezes_aplicada") // contador de uso em few-shot
 
   // Status de auditoria — preenchido pelo detector adversarial. Quando
   // o detector flagra padrao suspeito (potencial leak), a licao fica em
   // QUARENTENA: status='QUARENTENA' + ativa=false. So volta a alimentar
   // few-shot apos revisao manual do superadmin (APROVADA) OU eh
   // mantida desativada (REJEITADA).
-  status            String   @default("APROVADA")  // APROVADA | QUARENTENA | REJEITADA
+  status            String    @default("APROVADA") // APROVADA | QUARENTENA | REJEITADA
   ultimaAuditoriaEm DateTime? @map("ultima_auditoria_em")
 
   // Proveniencia despersonalizada: SHA-256 do labelId que originou a
   // licao (hash nao-reversivel — nao re-identifica o tenant, mas
   // permite cross-reference em caso de incidente). O recalculo eh feito
   // sob demanda pra responder "quais licoes vieram de labels do tenant X".
-  labelHash         String? @map("label_hash")
+  labelHash String? @map("label_hash")
 
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   labels     IaCategoriaLabel[]
   auditorias IaLicaoAuditoria[]
@@ -1317,28 +1320,28 @@ model IaCategoriaLicao {
 // job). Permite: ver historico de uma licao, contar quais padroes mais
 // pegam, justificar revisao manual ("o que disparou alerta?").
 model IaLicaoAuditoria {
-  id          String @id @default(uuid())
-  licaoId     String @map("licao_id")
+  id      String @id @default(uuid())
+  licaoId String @map("licao_id")
 
   // Resultado: 'limpa' (passou) ou 'suspeita' (detector flagou)
-  resultado   String
+  resultado String
 
   // Padroes encontrados (JSON array de strings). Ex: ['nome_proprio_sem_titulo',
   // 'numero_curto_isolado']. Permite agregacao no painel.
-  padroes     Json   @default("[]")
+  padroes Json @default("[]")
 
   // Trecho problematico (truncado a 200 chars) — pra revisao manual.
-  trecho      String?
+  trecho String?
 
   // Fonte da auditoria: 'sincrono' (na criacao) ou 'job_semanal'
-  origem      String
+  origem String
 
   // Quando o superadmin revisar manualmente, registramos quem + decisao
-  revisadoPor String?  @map("revisado_por")
+  revisadoPor String?   @map("revisado_por")
   revisadoEm  DateTime? @map("revisado_em")
-  decisao     String?  // 'APROVADA' | 'REJEITADA' (manter desativada)
+  decisao     String? // 'APROVADA' | 'REJEITADA' (manter desativada)
 
-  criadoEm    DateTime @default(now()) @map("criado_em")
+  criadoEm DateTime @default(now()) @map("criado_em")
 
   licao   IaCategoriaLicao @relation(fields: [licaoId], references: [id], onDelete: Cascade)
   revisor Usuario?         @relation("IaLicaoAuditoriaRevisor", fields: [revisadoPor], references: [id], onDelete: SetNull)
@@ -1681,6 +1684,7 @@ model OsCorretiva {
   canceladoPor Usuario?         @relation("OsCorretivaCanceladoPor", fields: [canceladoPorId], references: [id], onDelete: SetNull)
   notas        NotaAndamento[]
   visitas      VisitaTerceiro[]
+  anexos       Anexo[]
 
   @@unique([tenantId, numeroOS])
   @@unique([tenantId, id])

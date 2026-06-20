@@ -10,6 +10,8 @@ import {
   cancelarOsCorretiva,
   downloadPdfOsCorretiva,
   moverOsCorretivaEquipamento,
+  uploadAnexosOsCorretiva,
+  removerAnexoOsCorretiva,
 } from '../../services/api/osCorretivaApi';
 import { useModal } from '../shared/useModal';
 import { useToast } from '../../contexts/ToastContext';
@@ -190,6 +192,34 @@ export function useDetalhesOsCorretivaPage(osId) {
     }
   }, [osId, addToast, moverModal, fetchOs]);
 
+  const handleUploadAnexos = useCallback(async (formData) => {
+    setSubmitting(true);
+    try {
+      await uploadAnexosOsCorretiva(osId, formData);
+      addToast('Anexo(s) enviado(s) com sucesso.', 'success');
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao enviar anexo.';
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, fetchOs]);
+
+  const handleRemoverAnexo = useCallback(async (anexoId) => {
+    setSubmitting(true);
+    try {
+      await removerAnexoOsCorretiva(osId, anexoId);
+      addToast('Anexo removido.', 'success');
+      await fetchOs();
+    } catch (err) {
+      const msg = err?.response?.data?.message || 'Erro ao remover anexo.';
+      addToast(msg, 'error');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [osId, addToast, fetchOs]);
+
   const handleExportarPdf = useCallback(async () => {
     try {
       const response = await downloadPdfOsCorretiva(osId);
@@ -229,6 +259,8 @@ export function useDetalhesOsCorretivaPage(osId) {
     handleCancelarOs,
     handleMoverEquipamento,
     handleExportarPdf,
+    handleUploadAnexos,
+    handleRemoverAnexo,
     refetch: fetchOs,
   };
 }

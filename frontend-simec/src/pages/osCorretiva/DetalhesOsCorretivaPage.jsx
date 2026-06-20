@@ -14,7 +14,7 @@ import ConfirmacaoFinalVisitaCorretiva from '@/components/osCorretiva/Confirmaca
 import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
 import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
 import MoverOsEquipamentoModal from '@/components/osCorretiva/MoverOsEquipamentoModal';
-import { PageLayout, PageState, Button, BackButton } from '@/components/ui';
+import { PageLayout, PageState, Button, BackButton, AttachmentSection } from '@/components/ui';
 
 const STATUS_COLORS = {
   Aberta: '#2563eb',
@@ -239,6 +239,33 @@ function DetalhesOsCorretivaPage() {
             />
           </div>
         )}
+
+        {/* Anexos: disponivel inclusive em OS Concluida/Cancelada (pedido do
+            usuario) — laudos, fotos, comprovantes de servico chegam depois. */}
+        <div className="mt-6">
+          <AttachmentSection
+            title="Anexos da OS"
+            summaryTitle="Fotos e documentos"
+            summaryText="PDFs, imagens, laudos e comprovantes desta OS."
+            iconTone="danger"
+            attachments={Array.isArray(os.anexos) ? os.anexos : []}
+            uploadLabel="Anexar arquivo"
+            emptyMessage="Nenhum anexo enviado para esta OS."
+            isUploading={page.submitting}
+            isDeleting={page.submitting}
+            multiple
+            onUpload={async (filesOrFile) => {
+              const files = Array.isArray(filesOrFile) ? filesOrFile : [filesOrFile];
+              if (!files.length) return;
+              const formData = new FormData();
+              files.forEach((file) => formData.append('file', file));
+              await page.handleUploadAnexos(formData);
+            }}
+            onDelete={(attachment) => page.handleRemoverAnexo(attachment.id)}
+            getAttachmentName={(attachment) => attachment.nomeOriginal}
+            getAttachmentUrl={(attachment) => attachment.path}
+          />
+        </div>
       </PageLayout>
     </>
   );
