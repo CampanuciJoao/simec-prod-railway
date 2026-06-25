@@ -59,9 +59,28 @@ export function useDetalhesOsCorretivaPage(osId) {
   const handleAdicionarNota = useCallback(async (dados) => {
     setSubmitting(true);
     setFieldErrors({});
+    // Modal pode mandar 'arquivos' (File[]) junto com a nota.
+    // A nota e gravada primeiro (e o registro de auditoria principal);
+    // anexos sobem depois. Se anexo falhar, a nota fica e o erro vira toast
+    // — usuario re-anexa via secao da pagina principal sem perder o registro.
+    const { arquivos, ...dadosNota } = dados || {};
     try {
-      await adicionarNota(osId, dados);
-      addToast('Nota adicionada com sucesso.', 'success');
+      await adicionarNota(osId, dadosNota);
+
+      if (Array.isArray(arquivos) && arquivos.length > 0) {
+        try {
+          const formData = new FormData();
+          arquivos.forEach((file) => formData.append('file', file));
+          await uploadAnexosOsCorretiva(osId, formData);
+          addToast(`Andamento registrado com ${arquivos.length} anexo(s).`, 'success');
+        } catch (uploadErr) {
+          const msg = uploadErr?.response?.data?.message || 'Andamento registrado, mas houve erro ao enviar anexo(s).';
+          addToast(msg, 'error');
+        }
+      } else {
+        addToast('Nota adicionada com sucesso.', 'success');
+      }
+
       notaModal.closeModal();
       await fetchOs();
     } catch (err) {
