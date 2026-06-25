@@ -52,6 +52,28 @@ function box(doc, x, y, w, h, { fill, stroke = BORDER } = {}) {
   doc.restore();
 }
 
+// Escolhe o maior fontSize entre [minSize, maxSize] que faz o texto caber
+// em uma unica linha dentro de maxWidth. Usado em celulas de valor — quando
+// o numero e grande (R$ 429.435,01 numa coluna estreita), antes o PDFKit
+// quebrava em duas linhas que vazavam pra fora da celula. Com shrink +
+// lineBreak:false, o numero sempre cabe inteiro, ainda que com fonte menor.
+function pickFontSize(doc, text, font, maxWidth, maxSize, minSize = 7) {
+  doc.font(font);
+  let size = maxSize;
+  while (size > minSize) {
+    doc.fontSize(size);
+    if (doc.widthOfString(text) <= maxWidth) return size;
+    size -= 0.5;
+  }
+  return minSize;
+}
+
+// Y de topo do texto pra ficar verticalmente centralizado dentro da row,
+// dado um fontSize. Aproximacao: altura da linha ≈ fontSize * 1.2.
+function yCenterTexto(rowY, rowH, fontSize) {
+  return rowY + (rowH - fontSize * 1.2) / 2;
+}
+
 // Offset do topo absoluto da pagina ate o inicio da faixa preta.
 // Protege contra corte de impressora (a maioria respeita margens >=10mm).
 const HEADER_TOP_OFFSET = 24;
@@ -410,9 +432,12 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
       const desconto  = Number(preco?.desconto || 0);
       const exibir    = valor > 0 ? fmt(valor - desconto) : '—';
       const textColor = isRed ? C.red : (isAprv ? C.green : TEXT);
-      // Valor centralizado verticalmente em rows altas
-      doc.font('Helvetica-Bold').fontSize(9).fillColor(textColor)
-        .text(exibir, cx + 4, ry + (rowH / 2) - 5, { width: w - 8, align: 'center', lineBreak: false });
+      // Auto-shrink: garante que o numero cabe em 1 linha mesmo em
+      // colunas estreitas. Sem isso, R$ 429.435,01 quebra em duas
+      // linhas e vaza pra fora da celula.
+      const fsValor = pickFontSize(doc, exibir, 'Helvetica-Bold', w - 8, 9, 7);
+      doc.font('Helvetica-Bold').fontSize(fsValor).fillColor(textColor)
+        .text(exibir, cx + 4, yCenterTexto(ry, rowH, fsValor), { width: w - 8, align: 'center', lineBreak: false });
       cx += w;
     }
 
@@ -437,8 +462,12 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
     }, 0);
 
     box(doc, cx, totalY, w, totalH, { fill: isAprv ? C.greenLight : C.redLight });
-    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(isAprv ? C.green : C.red)
-      .text(fmt(total), cx + 4, totalY + 9, { width: w - 8, align: 'center' });
+    // Auto-shrink + lineBreak:false: era o ponto onde "R$ 429.435,01"
+    // quebrava em duas linhas e sangrava pra fora da row de Valor Total.
+    const totalTexto = fmt(total);
+    const fsTotal = pickFontSize(doc, totalTexto, 'Helvetica-Bold', w - 8, 9.5, 7);
+    doc.font('Helvetica-Bold').fontSize(fsTotal).fillColor(isAprv ? C.green : C.red)
+      .text(totalTexto, cx + 4, yCenterTexto(totalY, totalH, fsTotal), { width: w - 8, align: 'center', lineBreak: false });
     cx += w;
   }
 
