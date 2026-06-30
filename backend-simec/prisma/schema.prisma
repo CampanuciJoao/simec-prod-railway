@@ -846,6 +846,11 @@ model GehcToken {
   expiresAt    DateTime? @map("expires_at")
   gehcLogin    String?   @map("gehc_login") @db.Text
   gehcPassword String?   @map("gehc_password") @db.Text
+  // storageState completo do Playwright (cookies + localStorage) encriptado
+  // via AES-256-GCM. Persistir entre execucoes mantem o device trust da
+  // GE (cookies de logon.gehealthcare.com), pulando o gate de 2FA que
+  // travava o relogin pos-migracao do portal em jun/2026.
+  storageState String?   @map("storage_state") @db.Text
   capturedAt   DateTime  @default(now()) @map("captured_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
 

@@ -7,17 +7,21 @@ import {
   isSharedRedisUnavailable,
 } from '../redis/sharedRedisClient.js';
 
-const GEHC_PORTAL_URL = 'https://www.gehealthcare.com.br/account';
-const REFRESH_URL     = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
+// URLs do portal pos-migracao GE BR (jun/2026). Antes era .com.br/account
+// e .com.br/myequipment, mas o dominio antigo redireciona pra cá e o path
+// antigo /myequipment virou 404. Ver doc completo em
+// simec/GEHC - Portal URLs e Fluxo Auth.txt
+const GEHC_PORTAL_URL = 'https://www.gehealthcare.com/pt-br/account';
+const GEHC_MYEQUIPMENT_URL = 'https://www.gehealthcare.com/pt-br/account/myequipment';
+const REFRESH_URL = 'https://www.gehealthcare.com/api/v1/RefreshToken';
 
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
-// TTL conservador aplicado quando capturamos tokens sem `expires_in` explícito
-// (acontece na estratégia 1 — header CDX, ver capturarTokensViaPlaywright).
+// TTL conservador aplicado quando capturamos tokens sem `expires_in` explícito.
 // 50 minutos é menor que o ciclo típico de expiração da GE (~60min), então
 // disparamos refresh/relogin antes do servidor da fonte revogar o token.
-// Sem isso, tokens ficavam considerados eternamente válidos e o monitor
-// silenciava 401 sem renovar (incidente 2026-05-10, ver ADR-015).
+// Incidente 2026-05-10: tokens sem expiresAt eram considerados eternamente
+// válidos e o monitor silenciava 401 sem renovar.
 const FALLBACK_TTL_MS = 50 * 60 * 1000;
 
 // ─── Credenciais por tenant ───────────────────────────────────────────────────
@@ -33,7 +37,7 @@ export async function salvarCredenciais(tenantId, login, password) {
 export async function removerCredenciais(tenantId) {
   await prisma.gehcToken.updateMany({
     where: { tenantId },
-    data:  { gehcLogin: null, gehcPassword: null, accessToken: null, idToken: null, refreshToken: null, expiresAt: null },
+    data:  { gehcLogin: null, gehcPassword: null, accessToken: null, idToken: null, refreshToken: null, expiresAt: null, storageState: null },
   });
 }
 
@@ -55,6 +59,46 @@ export async function temCredenciaisConfiguradas(tenantId) {
   return !!(process.env.GEHC_LOGIN && process.env.GEHC_PASSWORD);
 }
 
+// ─── StorageState do Playwright (cookies + localStorage) ─────────────────────
+// Persiste o storageState completo do Playwright entre execucoes pra preservar
+// o cookie de device trust da GE Healthcare (logon.gehealthcare.com, httpOnly).
+// Sem isso, o login programatico cai no gate GEIDP2FAPage e nunca completa.
+// Descoberta em 2026-06-30 via inspecao do portal real (cookies access_token
+// e id_token estao no .gehealthcare.com sem httpOnly, mas o cookie de trust
+// fica no domain logon e e' httpOnly — so capturavel via context.storageState()).
+
+export async function salvarStorageState(tenantId, storageState) {
+  if (!storageState) return;
+  const json = typeof storageState === 'string' ? storageState : JSON.stringify(storageState);
+  await prisma.gehcToken.upsert({
+    where:  { tenantId },
+    create: { id: crypto.randomUUID(), tenantId, storageState: encryptToken(json) },
+    update: { storageState: encryptToken(json), updatedAt: new Date() },
+  });
+}
+
+export async function lerStorageState(tenantId) {
+  const row = await prisma.gehcToken.findUnique({
+    where:  { tenantId },
+    select: { storageState: true },
+  });
+  if (!row?.storageState) return null;
+  try {
+    const json = decryptToken(row.storageState);
+    return JSON.parse(json);
+  } catch (err) {
+    console.warn(`[GEHC_AUTH] storageState corrompido para tenant ${tenantId}: ${err.message}`);
+    return null;
+  }
+}
+
+export async function removerStorageState(tenantId) {
+  await prisma.gehcToken.updateMany({
+    where: { tenantId },
+    data:  { storageState: null },
+  });
+}
+
 // ─── Tokens por tenant ────────────────────────────────────────────────────────
 
 async function salvarTokens(tenantId, { accessToken, idToken, refreshToken, expiresAt }) {
@@ -68,7 +112,6 @@ async function salvarTokens(tenantId, { accessToken, idToken, refreshToken, expi
     create: { id: crypto.randomUUID(), tenantId, ...enc, expiresAt: expiresAt ?? null },
     update: { ...enc, expiresAt: expiresAt ?? null, updatedAt: new Date() },
   });
-  // Token salvo com sucesso = auth válida pra esse tenant
   observeGehcAuth(tenantId, true);
 }
 
@@ -102,6 +145,24 @@ async function refreshViaApi(refreshToken) {
   };
 }
 
+// ─── Extracao de tokens a partir de cookies do contexto ──────────────────────
+// Descoberta 2026-06-30: tokens access_token e id_token ficam em cookies
+// NAO-httpOnly no domain .gehealthcare.com. Em vez de interceptar requests
+// (que depende de timing do SPA), lemos direto via context.cookies().
+
+function tokensDosCookies(cookies) {
+  const find = (nome) => cookies.find((c) => c.name === nome)?.value || null;
+  const accessToken = find('access_token');
+  const idToken     = find('id_token');
+  if (!accessToken || !idToken) return null;
+  return {
+    accessToken,
+    idToken,
+    refreshToken: null,
+    expiresAt:    new Date(Date.now() + FALLBACK_TTL_MS),
+  };
+}
+
 // ─── Login completo via Playwright ───────────────────────────────────────────
 
 export async function capturarTokensViaPlaywright(tenantId) {
@@ -115,62 +176,63 @@ export async function capturarTokensViaPlaywright(tenantId) {
 
   console.log('[GEHC_AUTH] Iniciando login via Playwright para capturar tokens...');
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
-  const page    = await context.newPage();
-
-  let resolveToken, rejectToken;
-  const tokenPromise = new Promise((res, rej) => { resolveToken = res; rejectToken = rej; });
-
-  const CDX_HOST = 'cx-us-prd-services.cloud.gehealthcare.com';
-
-  // Estratégia 1: interceptar requests de saída para a API CDX
-  page.on('request', (request) => {
-    if (!request.url().includes(CDX_HOST)) return;
-    const h = request.headers();
-    // Loga o corpo da requisição para revelar a query GraphQL real do portal
-    const body = request.postData();
-    if (body) {
-      try {
-        const parsed = JSON.parse(body);
-        console.log('[GEHC_AUTH] CDX query capturada:', JSON.stringify({ operationName: parsed.operationName, query: parsed.query?.slice(0, 300) }));
-      } catch { /* ignorar */ }
-    }
-    if (h['accesstoken'] && h['idtoken']) {
-      console.log(`[GEHC_AUTH] Tokens capturados via header de request CDX. TTL fallback: ${FALLBACK_TTL_MS / 60000}min.`);
-      resolveToken({
-        accessToken: h['accesstoken'],
-        idToken: h['idtoken'],
-        refreshToken: null,
-        expiresAt: new Date(Date.now() + FALLBACK_TTL_MS),
-      });
-    }
+  // Anti-detection: GE Healthcare detecta Playwright headless pelo
+  // navigator.webdriver e user-agent "HeadlessChrome", o que ativa o
+  // gate GEIDP2FAPage. Combinando com storageState persistente (cookie
+  // de device trust no logon.gehealthcare.com), conseguimos pular o 2FA.
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
   });
 
-  // Estratégia 2: interceptar resposta JSON com access_token (OAuth token endpoint)
-  page.on('response', async (response) => {
-    if (response.status() < 200 || response.status() >= 300) return;
-    if (!(response.headers()['content-type'] ?? '').includes('json')) return;
-    try {
-      const json = await response.json().catch(() => null);
-      if (json?.access_token && json?.id_token) {
-        console.log('[GEHC_AUTH] Tokens capturados via resposta JSON OAuth.');
-        resolveToken({
-          accessToken:  json.access_token,
-          idToken:      json.id_token,
-          refreshToken: json.refresh_token ?? null,
-          expiresAt:    json.expires_in ? new Date(Date.now() + json.expires_in * 1000) : null,
-        });
-      }
-    } catch { /* ignorar */ }
+  const storageState = await lerStorageState(tenantId);
+  if (storageState) {
+    console.log(`[GEHC_AUTH] storageState anterior carregado (${storageState.cookies?.length || 0} cookies).`);
+  } else {
+    console.log('[GEHC_AUTH] Sem storageState anterior — primeira execucao ou foi limpo.');
+  }
+
+  const context = await browser.newContext({
+    storageState: storageState || undefined,
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 },
+    locale: 'pt-BR',
+    timezoneId: 'America/Sao_Paulo',
   });
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
+  const page = await context.newPage();
 
   try {
-    // domcontentloaded: não espera scripts de analytics — só o DOM
+    // Atalho: se ja temos cookies validos do storageState, tenta direto
+    // a pagina de equipamentos. Se autenticar sem login form, ganhamos.
+    if (storageState?.cookies?.some((c) => c.name === 'access_token')) {
+      console.log('[GEHC_AUTH] Tentando atalho via storageState (sem digitar credenciais)...');
+      await page.goto(GEHC_MYEQUIPMENT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+      const cookies = await context.cookies();
+      const tokens = tokensDosCookies(cookies);
+      if (tokens) {
+        console.log(`[GEHC_AUTH] Atalho funcionou — tokens extraidos dos cookies (storageState valido). access_token=${tokens.accessToken.slice(0, 8)}... idtoken=${tokens.idToken.slice(0, 8)}...`);
+        await salvarTokens(tenantId, tokens);
+        // Atualiza storageState (cookies podem ter sido renovados).
+        const novoState = await context.storageState();
+        await salvarStorageState(tenantId, novoState);
+        await browser.close();
+        return tokens;
+      }
+      console.log('[GEHC_AUTH] Atalho nao funcionou — cookies expirados ou ausentes. Fazendo login normal.');
+    }
+
+    // Login normal via formulario.
     await page.goto(GEHC_PORTAL_URL, { waitUntil: 'domcontentloaded', timeout: 60000 });
     console.log('[GEHC_AUTH] URL após goto:', page.url());
 
-    // GEIDP usa input[type="text"] para username, não type="email"
     const emailInput = page.locator([
       'input[name="username"]',
       'input[name="email"]',
@@ -187,41 +249,62 @@ export async function capturarTokensViaPlaywright(tenantId) {
     await passInput.waitFor({ timeout: 10000 });
     await passInput.fill(password);
 
-    // Tenta clicar no botão submit; fallback para Enter
     const submitBtn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Sign"), button:has-text("Entrar"), button:has-text("Login")').first();
-    const hasSubmit = await submitBtn.count() > 0;
-    if (hasSubmit) {
+    if ((await submitBtn.count()) > 0) {
+      console.log('[GEHC_AUTH] Botao submit encontrado, clicando.');
       await submitBtn.click();
     } else {
+      console.log('[GEHC_AUTH] Sem botao submit — usando Enter no campo password.');
       await passInput.press('Enter');
     }
-    console.log('[GEHC_AUTH] Credenciais enviadas, aguardando tokens...');
+    console.log('[GEHC_AUTH] Credenciais enviadas, aguardando autenticacao...');
 
-    // Aguarda a página autenticar (URL muda ou inputs somem)
-    await page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }).catch(() => {});
+    // Espera ate (a) password sumir, (b) URL mudar do /account inicial.
+    const urlPreSubmit = page.url();
+    try {
+      await Promise.race([
+        page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }),
+        page.waitForURL((url) => url.toString() !== urlPreSubmit, { timeout: 30000 }),
+      ]);
+    } catch {
+      console.warn('[GEHC_AUTH] Apos submit: password input ainda presente E URL nao mudou em 30s.');
+    }
+    console.log(`[GEHC_AUTH] URL pos-submit: ${page.url()}`);
 
-    // Força o SPA a chamar a API CDX navegando para a lista de equipamentos
-    await page.goto('https://www.gehealthcare.com.br/myequipment', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-    console.log('[GEHC_AUTH] Navegando para myequipment para forçar chamadas à API CDX...');
+    // Navega pra myequipment pra o SPA renovar cookies e disparar CDX
+    // (o portal renova tokens nesse momento).
+    await page.goto(GEHC_MYEQUIPMENT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+    console.log(`[GEHC_AUTH] URL pos-myequipment: ${page.url()}`);
 
-    // Aguarda networkidle para que o SPA faça TODAS as chamadas GraphQL (incluindo listagem de equipamentos)
-    // antes de capturar os tokens — o listener de 'request' loga cada query CDX feita neste período
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {
-      console.log('[GEHC_AUTH] networkidle timeout — prosseguindo com tokens já capturados.');
-    });
+    // Le tokens dos cookies (descoberta 2026-06-30 — access_token e
+    // id_token sao cookies JS-visiveis).
+    const cookies = await context.cookies();
+    const tokens = tokensDosCookies(cookies);
 
-    const tokensCaptured = await Promise.race([
-      tokenPromise,
-      new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout aguardando tokens após login (45s)')), 45000)),
-    ]);
+    if (!tokens) {
+      // Diagnostico denso quando falha
+      try { await page.screenshot({ path: '/tmp/gehc_auth_post_submit.png', fullPage: true }); } catch {}
+      const html = await page.content().catch(() => '');
+      console.error(`[GEHC_AUTH] Cookies sem access_token/id_token. URL: ${page.url()}`);
+      console.error(`[GEHC_AUTH] Cookies disponiveis: ${cookies.map((c) => c.name).join(', ')}`);
+      console.error(`[GEHC_AUTH] HTML pos-submit (${html.length} chars). Primeiros 800: ${html.slice(0, 800).replace(/\s+/g, ' ')}`);
+      throw new Error('Tokens nao encontrados nos cookies pos-login (provavelmente parou em 2FA ou login falhou).');
+    }
 
-    await salvarTokens(tenantId, tokensCaptured);
+    console.log(`[GEHC_AUTH] Tokens extraidos dos cookies. access_token=${tokens.accessToken.slice(0, 8)}... idtoken=${tokens.idToken.slice(0, 8)}...`);
+
+    // Persiste storageState INTEIRO (cookies httpOnly do logon.gehealthcare.com
+    // + nao-httpOnly + localStorage). Proxima execucao usa pra pular 2FA.
+    const novoState = await context.storageState();
+    await salvarStorageState(tenantId, novoState);
+    console.log(`[GEHC_AUTH] storageState persistido (${novoState.cookies?.length || 0} cookies).`);
+
+    await salvarTokens(tenantId, tokens);
     console.log(`[GEHC_AUTH] Tokens salvos para tenant ${tenantId}.`);
-    return tokensCaptured;
+    return tokens;
   } catch (err) {
-    rejectToken?.(err);
-    // Screenshot para diagnóstico — salvo em /tmp para não poluir o projeto
-    await page.screenshot({ path: '/tmp/gehc_auth_error.png', fullPage: true }).catch(() => {});
+    try { await page.screenshot({ path: '/tmp/gehc_auth_error.png', fullPage: true }); } catch {}
     const html = await page.content().catch(() => '');
     console.error('[GEHC_AUTH] Erro. URL atual:', page.url());
     console.error('[GEHC_AUTH] Inputs visíveis:', html.match(/<input[^>]+>/g)?.join('\n') ?? 'nenhum');
@@ -234,7 +317,6 @@ export async function capturarTokensViaPlaywright(tenantId) {
 // ─── Ponto de entrada principal ───────────────────────────────────────────────
 
 function calcularExpiracao(stored) {
-  // Caso explícito: temos expiresAt da fonte (OAuth response com expires_in).
   if (stored.expiresAt) {
     return {
       expirado: stored.expiresAt.getTime() - Date.now() < EXPIRY_MARGIN_MS,
@@ -242,10 +324,6 @@ function calcularExpiracao(stored) {
     };
   }
 
-  // Caso histórico: tokens salvos antes do TTL fallback existir podem ter
-  // expiresAt null. Tratamos como suspeitos depois de FALLBACK_TTL_MS da
-  // última atualização — protege contra o cenário do incidente 2026-05-10
-  // (token sem expiresAt considerado eternamente válido).
   const referencia = stored.updatedAt || stored.capturedAt;
   if (referencia) {
     const idade = Date.now() - new Date(referencia).getTime();
@@ -259,15 +337,10 @@ function calcularExpiracao(stored) {
 }
 
 // ─── Lock distribuído no Redis ────────────────────────────────────────────────
-// Sem isso, múltiplos jobs do worker (gehc-monitorar-saude,
-// gehc-capturar-pdfs, knowledge-layer-sync, ia-insights) detectam token
-// expirado ao mesmo tempo e disparam Playwright em paralelo. Resultado:
-// um sucede, outros falham com timeout/erro de sessão concorrente, e
-// jobs como GEHC_MONITOR desistem da execução inteira.
-//
-// O lock garante que apenas UM worker renova por vez por tenant. Os
-// demais aguardam por polling do banco e usam os tokens novos assim
-// que aparecem. Resolve o race observado em 2026-05-21.
+// Sem isso, multiplos jobs (gehc-monitorar-saude, gehc-capturar-pdfs,
+// knowledge-layer-sync, ia-insights) detectam token expirado e disparam
+// Playwright em paralelo — um sucede, outros falham com timeout. Resolve
+// race observado em 2026-05-21.
 
 const REFRESH_LOCK_TTL_S = 120;
 const REFRESH_WAIT_TIMEOUT_MS = 90_000;
@@ -280,8 +353,6 @@ function refreshLockKey(tenantId) {
 async function tryAcquireRefreshLock(tenantId) {
   const redis = getSharedRedisClient();
   if (!redis || isSharedRedisUnavailable()) {
-    // Sem Redis: modo degradado — sem lock distribuído. Mantém o
-    // comportamento antigo (com risco de race) em vez de bloquear tudo.
     console.warn('[GEHC_AUTH] Redis indisponível — refresh sem lock distribuído.');
     return true;
   }
@@ -304,8 +375,6 @@ async function releaseRefreshLock(tenantId) {
   }
 }
 
-// Aguarda outro worker renovar fazendo polling no banco. Retorna assim
-// que vê tokens válidos. Lança erro se estourar timeout.
 async function aguardarRefreshConcorrente(tenantId) {
   const inicio = Date.now();
   console.log(`[GEHC_AUTH] Lock ocupado para tenant ${tenantId} — aguardando outro worker renovar.`);
@@ -339,7 +408,6 @@ export async function obterTokensGehc(tenantId) {
     console.log(`[GEHC_AUTH] Token suspeito para tenant ${tenantId} (${motivo}) — renovando.`);
   }
 
-  // Tenta adquirir lock. Apenas o vencedor faz refresh; demais aguardam.
   const adquirido = await tryAcquireRefreshLock(tenantId);
 
   if (!adquirido) {
@@ -347,8 +415,6 @@ export async function obterTokensGehc(tenantId) {
   }
 
   try {
-    // Re-le do banco DEPOIS de adquirir o lock: pode ser que outro worker
-    // tenha renovado entre o lerTokens() inicial e a aquisição do lock.
     const recheck = await lerTokens(tenantId);
     if (recheck && !calcularExpiracao(recheck).expirado) {
       return { accessToken: recheck.accessToken, idToken: recheck.idToken };
