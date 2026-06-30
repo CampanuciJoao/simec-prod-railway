@@ -120,8 +120,29 @@ export async function capturarTokensViaPlaywright(tenantId) {
 
   console.log('[GEHC_AUTH] Iniciando login via Playwright para capturar tokens...');
 
-  const browser = await chromium.launch({ headless: true });
-  const context = await browser.newContext();
+  // Flags anti-detection + user-agent realistico. Salesforce SSO detecta
+  // Playwright headless pelo navigator.webdriver + user-agent "HeadlessChrome"
+  // e cai num fluxo de reverificacao que trava esperando autorizacao manual.
+  // Sem essas flags, o redirect pos-login vai pra logon.gehealthcare.com/
+  // loginflow/loginFlowOnly.apexp (incidente 2026-06-30).
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--disable-blink-features=AutomationControlled',
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+    ],
+  });
+  const context = await browser.newContext({
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    viewport: { width: 1366, height: 768 },
+    locale: 'pt-BR',
+    timezoneId: 'America/Sao_Paulo',
+  });
+  // Esconde navigator.webdriver — bot detectors checam isso primeiro.
+  await context.addInitScript(() => {
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  });
   const page    = await context.newPage();
 
   let resolveToken, rejectToken;
@@ -196,14 +217,41 @@ export async function capturarTokensViaPlaywright(tenantId) {
     const submitBtn = page.locator('button[type="submit"], input[type="submit"], button:has-text("Sign"), button:has-text("Entrar"), button:has-text("Login")').first();
     const hasSubmit = await submitBtn.count() > 0;
     if (hasSubmit) {
+      console.log('[GEHC_AUTH] Botao submit encontrado, clicando.');
       await submitBtn.click();
     } else {
+      console.log('[GEHC_AUTH] Sem botao submit — usando Enter no campo password.');
       await passInput.press('Enter');
     }
     console.log('[GEHC_AUTH] Credenciais enviadas, aguardando tokens...');
 
-    // Aguarda a página autenticar (URL muda ou inputs somem)
-    await page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }).catch(() => {});
+    // Aguarda navegacao OU password sumir (login efetivo). Sem o catch
+    // silencioso do codigo antigo — se nada acontece em 30s, e' bot
+    // detection / submit ineficaz, e' melhor falhar explicitamente do
+    // que seguir e cair no SSO loop. Captura tambem mudanca de URL pra
+    // saber se o submit redirecionou.
+    const urlPreSubmit = page.url();
+    try {
+      await Promise.race([
+        page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }),
+        page.waitForURL((url) => url.toString() !== urlPreSubmit, { timeout: 30000 }),
+      ]);
+    } catch {
+      console.warn('[GEHC_AUTH] Apos submit: password input ainda presente E URL nao mudou em 30s — submit pode nao ter funcionado.');
+    }
+    const urlPosSubmit = page.url();
+    console.log(`[GEHC_AUTH] URL pos-submit: ${urlPosSubmit}`);
+
+    // Snapshot diagnostico pos-submit (salvo em /tmp do container Railway).
+    // Quando o auth quebra de novo, esses artefatos ajudam a identificar
+    // se caiu em MFA, captcha, autorizacao OAuth, etc.
+    try {
+      await page.screenshot({ path: '/tmp/gehc_auth_post_submit.png', fullPage: true });
+      const html = await page.content();
+      console.log(`[GEHC_AUTH] HTML pos-submit (${html.length} chars). Primeiros 800: ${html.slice(0, 800).replace(/\s+/g, ' ')}`);
+    } catch (snapErr) {
+      console.warn(`[GEHC_AUTH] Falha ao salvar snapshot pos-submit: ${snapErr.message}`);
+    }
 
     // Força o SPA a chamar a API CDX navegando para a lista de equipamentos.
     // URL nova pos-migracao do portal BR (2026-06): /pt-br/account/myequipment
