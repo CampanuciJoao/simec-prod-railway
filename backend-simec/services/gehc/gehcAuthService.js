@@ -7,8 +7,13 @@ import {
   isSharedRedisUnavailable,
 } from '../redis/sharedRedisClient.js';
 
-const GEHC_PORTAL_URL = 'https://www.gehealthcare.com.br/account';
-const REFRESH_URL     = 'https://www.gehealthcare.com.br/api/v1/RefreshToken';
+// GE migrou o portal brasileiro de www.gehealthcare.com.br/account para
+// www.gehealthcare.com/pt-br/account em 2026-06. O dominio antigo redireciona
+// mas /myequipment no path antigo virou 404 no novo (incidente 2026-06-29).
+// Refresh API: dominio atualizado pra .com tambem; path mantido (endpoint
+// de API, sem locale).
+const GEHC_PORTAL_URL = 'https://www.gehealthcare.com/pt-br/account';
+const REFRESH_URL     = 'https://www.gehealthcare.com/api/v1/RefreshToken';
 
 const EXPIRY_MARGIN_MS = 5 * 60 * 1000;
 
@@ -200,8 +205,10 @@ export async function capturarTokensViaPlaywright(tenantId) {
     // Aguarda a página autenticar (URL muda ou inputs somem)
     await page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }).catch(() => {});
 
-    // Força o SPA a chamar a API CDX navegando para a lista de equipamentos
-    await page.goto('https://www.gehealthcare.com.br/myequipment', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+    // Força o SPA a chamar a API CDX navegando para a lista de equipamentos.
+    // URL nova pos-migracao do portal BR (2026-06): /pt-br/account/myequipment
+    // (antes era /myequipment no dominio .com.br).
+    await page.goto('https://www.gehealthcare.com/pt-br/account/myequipment', { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
     console.log('[GEHC_AUTH] Navegando para myequipment para forçar chamadas à API CDX...');
 
     // Aguarda networkidle para que o SPA faça TODAS as chamadas GraphQL (incluindo listagem de equipamentos)
