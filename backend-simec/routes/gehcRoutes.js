@@ -10,6 +10,9 @@ import {
   salvarCredenciais,
   removerCredenciais,
   temCredenciaisConfiguradas,
+  salvarStorageState,
+  lerStorageState,
+  removerStorageState,
 } from '../services/gehc/gehcAuthService.js';
 import {
   gerarPdfSaudeEquipamentoBuffer,
@@ -246,6 +249,67 @@ router.post('/auth', admin, async (req, res) => {
 router.delete('/auth', admin, async (req, res) => {
   await invalidarTokensGehc(req.tenantContext);
   res.json({ ok: true });
+});
+
+// ─── POST /api/gehc/auth/storage-state ──────────────────────────────────────
+// Fallback manual quando o login programatico cai no 2FA. Usuario exporta o
+// storageState do navegador (logado e com 'lembrar dispositivo' marcado) e
+// importa aqui. Sistema usa esses cookies pra renovar tokens sem ver o gate.
+//
+// Como obter o storageState:
+//   1. Logar no portal pelo navegador normal (passar o 2FA, marcar trust device)
+//   2. Em DevTools Console, executar:
+//      copy(JSON.stringify({
+//        cookies: document.cookie.split(';').map(c => {
+//          const [n,v] = c.trim().split('=');
+//          return { name: n, value: v, domain: '.gehealthcare.com', path: '/' };
+//        }),
+//        origins: []
+//      }))
+//   3. POST aqui com { storageState: <colado do clipboard> }
+//
+// (na verdade o JSON completo precisa vir do Playwright/Chromium —
+// document.cookie nao tem httpOnly. Forma robusta: usar extensao EditThisCookie
+// no Chrome ou rodar Playwright local pra exportar.)
+router.post('/auth/storage-state', admin, async (req, res) => {
+  const tenantId = req.tenantContext;
+  const { storageState } = req.body;
+  if (!storageState) {
+    return res.status(400).json({ error: 'Campo storageState obrigatorio (JSON do Playwright).' });
+  }
+  try {
+    const state = typeof storageState === 'string' ? JSON.parse(storageState) : storageState;
+    if (!Array.isArray(state.cookies)) {
+      return res.status(400).json({ error: 'storageState invalido: esperava { cookies: [...], origins: [...] }.' });
+    }
+    await salvarStorageState(tenantId, state);
+    res.json({
+      ok: true,
+      mensagem: 'storageState importado. Use POST /api/gehc/auth pra capturar tokens reusando esses cookies.',
+      cookies: state.cookies.length,
+      origins: state.origins?.length ?? 0,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete('/auth/storage-state', admin, async (req, res) => {
+  await removerStorageState(req.tenantContext);
+  res.json({ ok: true });
+});
+
+router.get('/auth/storage-state', admin, async (req, res) => {
+  const tenantId = req.tenantContext;
+  const state = await lerStorageState(tenantId);
+  if (!state) return res.json({ existe: false });
+  res.json({
+    existe: true,
+    cookies: state.cookies?.length ?? 0,
+    origins: state.origins?.length ?? 0,
+    // Lista APENAS nomes/domain dos cookies — nunca valores.
+    cookieNames: state.cookies?.map((c) => ({ name: c.name, domain: c.domain, expires: c.expires })) ?? [],
+  });
 });
 
 // ─── POST /api/gehc/discovery ─────────────────────────────────────────────────

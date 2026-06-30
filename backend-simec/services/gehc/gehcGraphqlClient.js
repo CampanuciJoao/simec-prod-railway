@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { invalidarTokensGehc, obterTokensGehc } from './gehcAuthService.js';
 
 const CDX_URL = 'https://cx-us-prd-services.cloud.gehealthcare.com/la-prd-shared-services-cdx-api-gateway';
@@ -5,14 +6,22 @@ const CDX_URL = 'https://cx-us-prd-services.cloud.gehealthcare.com/la-prd-shared
 // Deduplicação de renovação de tokens por tenant — evita múltiplos Playwright simultâneos
 const renovacaoPorTenant = new Map();
 
+// Headers atualizados em 2026-06-30 com base em captura ao vivo do portal real:
+//   - Origin/Referer pos-migracao: gehealthcare.com (sem .br)
+//   - User-Agent: Chrome 149 (era 124 — desatualizado)
+//   - source: 'desktop' — confirmado em todas as requests CDX do portal
+//   - x-request-id: UUID v4 fresh por request — confirmado idem
 function buildHeaders(accessToken, idToken) {
   return {
+    'accept':        '*/*',
     'Content-Type':  'application/json',
     'accesstoken':   accessToken,
     'idtoken':       idToken,
-    'Origin':        'https://www.gehealthcare.com.br',
-    'Referer':       'https://www.gehealthcare.com.br/',
-    'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'source':        'desktop',
+    'x-request-id':  crypto.randomUUID(),
+    'Origin':        'https://www.gehealthcare.com',
+    'Referer':       'https://www.gehealthcare.com/pt-br/account/myequipment',
+    'User-Agent':    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36',
   };
 }
 
