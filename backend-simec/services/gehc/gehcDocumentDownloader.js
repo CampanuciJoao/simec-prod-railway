@@ -48,8 +48,7 @@ import {
   resolverAlertaFalhaSistemica,
 } from './gehcDownloaderAlerter.js';
 
-// URL pos-migracao do portal BR (2026-06). Veja gehcAuthService.js.
-const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com/pt-br/account';
+const PORTAL_LOGIN_URL = 'https://www.gehealthcare.com.br/account';
 
 const RATE_LIMIT_OS_MS     = 1_000;   // espera entre OSs no mesmo tenant (HTTP é rápido)
 const RATE_LIMIT_TENANT_MS = 10_000;  // espera entre tenants
@@ -143,7 +142,7 @@ async function realizarLoginNaPagina(page, login, password) {
   // myequipment-360?assetId=...&srId=... cai na tela de login (URL
   // logon.gehealthcare.com/loginflow/...). Mesma estrategia usada por
   // gehcAuthService.capturarTokensViaPlaywright que ja funciona em prod.
-  await page.goto('https://www.gehealthcare.com/pt-br/account/myequipment', {
+  await page.goto('https://www.gehealthcare.com.br/myequipment', {
     waitUntil: 'domcontentloaded',
     timeout: 60_000,
   }).catch(() => {});

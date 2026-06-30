@@ -1,6 +1,4 @@
 import express from 'express';
-import fs from 'fs';
-import path from 'path';
 import prisma from '../services/prismaService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
 import { descobrirEquipamentosGehc, vincularEquipamentoManual, desvincularEquipamento } from '../services/gehc/gehcDiscovery.js';
@@ -248,35 +246,6 @@ router.post('/auth', admin, async (req, res) => {
 router.delete('/auth', admin, async (req, res) => {
   await invalidarTokensGehc(req.tenantContext);
   res.json({ ok: true });
-});
-
-// ─── GET /api/gehc/auth/debug-snapshot ──────────────────────────────────────
-// Recupera screenshot/HTML do ultimo POST /api/gehc/auth pra diagnostico
-// quando o login Playwright cai em tela inesperada. Salvos em /tmp pelo
-// gehcAuthService.capturarTokensViaPlaywright. Pode retornar PNG (default)
-// ou HTML via ?formato=html. So admin.
-router.get('/auth/debug-snapshot', admin, async (req, res) => {
-  const formato = req.query?.formato === 'html' ? 'html' : 'png';
-  const stage = req.query?.stage === 'error' ? 'error' : 'post_submit';
-  const file = stage === 'error' ? 'gehc_auth_error.png' : 'gehc_auth_post_submit.png';
-  const filePath = path.join('/tmp', file);
-
-  try {
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        error: `Sem snapshot disponivel. Execute POST /api/gehc/auth primeiro pra gerar.`,
-        esperado: filePath,
-      });
-    }
-    if (formato === 'html') {
-      // Para HTML, precisamos persistir tambem — por enquanto so PNG
-      return res.status(400).json({ error: 'Formato html ainda nao implementado. Use formato=png ou veja HTML no log do worker.' });
-    }
-    res.setHeader('Content-Type', 'image/png');
-    return fs.createReadStream(filePath).pipe(res);
-  } catch (err) {
-    return res.status(500).json({ error: err.message });
-  }
 });
 
 // ─── POST /api/gehc/discovery ─────────────────────────────────────────────────
