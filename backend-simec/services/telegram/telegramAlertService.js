@@ -11,6 +11,34 @@ const CATEGORIA_FLAG = {
   CONTROLE_QUALIDADE: 'recebeAlertasControleQualidade',
 };
 
+// Categorias que podem acordar o usuario fora do horario comercial.
+// Sao problemas ativos e urgentes onde esperar 8h pode causar dano
+// (helio evaporando, compressor desligado, OS bloqueando exame).
+//
+// As demais categorias (SEGURO, CONTROLE_QUALIDADE, CONTRATO, MANUTENCAO,
+// RECOMENDACAO) sao "prestes a vencer" — informativas, com janela de dias/
+// semanas antes do prazo. Segurar ate as 9h evita spam de 00:00 quando
+// vencimentos cruzam a janela na virada do dia.
+const CATEGORIAS_URGENTES_24_7 = new Set(['GEHC_SAUDE', 'OS_CORRETIVA']);
+
+const HORA_INICIO_COMERCIAL = 9;   // 09:00 no timezone do tenant
+const HORA_FIM_COMERCIAL    = 20;  // 20:00 (inclusivo — dispara ate 19:59)
+
+function estaEmHorarioComercial(timezone) {
+  try {
+    const fmt = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'UTC',
+      hour: 'numeric',
+      hour12: false,
+    });
+    const hora = Number(fmt.format(new Date()));
+    return hora >= HORA_INICIO_COMERCIAL && hora < HORA_FIM_COMERCIAL;
+  } catch {
+    // Timezone invalido — dispara pra evitar reter alertas eternamente
+    return true;
+  }
+}
+
 // Despacho dirigido aos tenants que tiveram mudanca na ultima rodada de
 // alertas. Usado pelo orchestrator como atalho para entregar rapido. Nao
 // deve ser o unico caminho — caso contrario alertas pendentes em tenants
@@ -54,9 +82,26 @@ export async function dispararPendenciasTelegramTodos() {
 }
 
 async function processarTenant(tenantId) {
+  // Timezone do tenant define o horario comercial local. Alertas nao-
+  // urgentes ficam retidos ate as 09:00 do fuso do cliente pra evitar
+  // notificacao no meio da madrugada quando vencimentos cruzam a janela.
+  const tenant = await prisma.tenant.findUnique({
+    where: { id: tenantId },
+    select: { timezone: true },
+  });
+  const noHorarioComercial = estaEmHorarioComercial(tenant?.timezone);
+
+  const whereAlertas = { tenantId, telegramEnviado: false };
+  if (!noHorarioComercial) {
+    // Fora do horario comercial: so puxa alertas urgentes. Os nao-
+    // urgentes ficam com telegramEnviado=false e serao processados
+    // na proxima rodada dentro do horario comercial.
+    whereAlertas.tipoCategoria = { in: [...CATEGORIAS_URGENTES_24_7] };
+  }
+
   const [alertas, destinatarios] = await Promise.all([
     prisma.alerta.findMany({
-      where: { tenantId, telegramEnviado: false },
+      where: whereAlertas,
       orderBy: { createdAt: 'asc' },
       take: 50,
     }),
