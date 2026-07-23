@@ -1131,33 +1131,11 @@ function _relSegurosUnidadeLabel(s) {
       || (s.tipoAlvo === 'EMPRESARIAL_GERAL' ? 'Todas' : '-');
 }
 
-// "Vinculado a" e' unico campo de escopo do seguro. Regra:
-//   Equipamento → nome + tag do equipamento (com unidade parent no fim)
-//   Veiculo → placa + modelo (com unidade parent no fim)
-//   Unidade → nome da unidade
-//   Empresarial → "Todas as unidades"
+// Vinculo = ativo especifico coberto pela apolice. NAO inclui a unidade
+// parent (essa vai na coluna Unidade separada), pra que numa tabela de
+// equipamento a unidade fique facil de identificar sem ter que ler o
+// texto longo do vinculo.
 function _relSegurosVinculoLabel(s) {
-  if (s.equipamento) {
-    const nome = s.equipamento.apelido || s.equipamento.modelo || 'Equipamento';
-    const tag  = s.equipamento.tag ? ` (${s.equipamento.tag})` : '';
-    const und  = s.equipamento.unidade?.nomeSistema ? ` — ${s.equipamento.unidade.nomeSistema}` : '';
-    return `${nome}${tag}${und}`;
-  }
-  if (s.veiculo) {
-    const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
-    const und    = s.veiculo.unidade?.nomeSistema ? ` — ${s.veiculo.unidade.nomeSistema}` : '';
-    return `${safeText(s.veiculo.placa, 'Veiculo')}${modelo}${und}`;
-  }
-  if (s.tipoAlvo === 'UNIDADE' && s.unidade) return s.unidade.nomeSistema;
-  if (s.unidade) return s.unidade.nomeSistema; // fallback: apolice direta em unidade
-  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Todas as unidades';
-  return '-';
-}
-
-// Vinculo compacto pra tabela de visao geral — mesma logica mas sem
-// duplicar unidade parent, ja que a tabela e' mais estreita e o detalhe
-// tem a informacao completa.
-function _relSegurosVinculoCurto(s) {
   if (s.equipamento) {
     const nome = s.equipamento.apelido || s.equipamento.modelo || 'Equipamento';
     return s.equipamento.tag ? `${nome} (${s.equipamento.tag})` : nome;
@@ -1166,8 +1144,10 @@ function _relSegurosVinculoCurto(s) {
     const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
     return `${safeText(s.veiculo.placa, 'Veiculo')}${modelo}`;
   }
-  if (s.unidade) return s.unidade.nomeSistema;
-  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Todas as unidades';
+  // Predial cobre a propria unidade (nome ja vai na coluna Unidade).
+  // Empresarial cobre toda a empresa. Ambos indicamos explicitamente.
+  if (s.tipoAlvo === 'UNIDADE') return 'Predial';
+  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Empresarial';
   return '-';
 }
 
@@ -1200,8 +1180,8 @@ function _relSegurosAlturaEstimada(s) {
   const COBERTURA_H = s.cobertura ? 30 : 0;
   const SEPARATOR_H = 12;              // linha separadora + gap final
 
-  // Base = header + Vinculado + Inicio + Vencimento + Premio (4 infoRows).
-  const infoRows = 4;
+  // Base = header + Unidade + Vinculado + Inicio + Vencimento + Premio (5 infoRows).
+  const infoRows = 5;
   const infoRowsH = INFO_ROW_H * infoRows;
 
   const lmiH = lmiCount > 0 ? LMI_HEADER_H + lmiCount * LMI_ROW_H + 8 : 0;
@@ -1232,10 +1212,10 @@ function _relSegurosDetalheApolice(doc, s, { locale, timeZone, primeiro }) {
   const titulo = `Apolice ${safeText(s.apoliceNumero)} · ${safeText(s.seguradora)} · ${_relSegurosTipoLabel(s.tipoSeguro)} · ${safeText(s.status)}`;
   drawGroupHeader(doc, titulo);
 
-  // Metadados: so 'Vinculado a' (unificado) + datas + coberturas +
-  // premio. Removida linha 'Unidade' redundante — vinculo ja diz.
-  const vinculo = _relSegurosVinculoLabel(s);
-  infoRow(doc, 'Vinculado a:', vinculo);
+  // Metadados. Unidade + Vinculo separados: em apolice de equipamento,
+  // Unidade aparece explicita mesmo com Vinculo mostrando o ativo.
+  infoRow(doc, 'Unidade:', _relSegurosUnidadeLabel(s));
+  infoRow(doc, 'Vinculado a:', _relSegurosVinculoLabel(s));
   infoRow(doc, 'Inicio:', formatDate(s.dataInicio, locale, timeZone));
 
   const dias = _relSegurosDiasParaVencer(s.dataFim);
@@ -1293,22 +1273,25 @@ function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
   });
 
   // Visao geral (tabela). Ordenacao vem do backend (dataFim asc).
-  // Removida coluna Unidade (redundante: 'Vinculo' ja cobre — se e' predial,
-  // vinculo mostra a unidade; se e' equipamento, mostra equipamento+unidade).
-  // FontSize 8 evita char-level breaks em "Automotivo", "Equipamento",
-  // "R.M. Cassems Ponta Porã", etc.
+  // Unidade + Vinculo sao colunas separadas: usuario pediu Unidade de
+  // volta pra saber a qual unidade um equipamento pertence sem ler texto
+  // longo do Vinculo. FontSize 8 evita char-level breaks em palavras
+  // curtas ("Automotivo", "Equipamento").
   drawSectionTitle(doc, 'Apolices (visao geral)');
   drawTable(doc, {
-    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
-    // Soma = 495 (area util A4). Nº Apolice + Vinculo generosos porque
-    // sao os campos que costumam ter texto mais longo.
-    columnWidths: [90, 90, 65, 105, 50, 50, 45],
+    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Unidade', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
+    // Soma = 495 (area util A4). Tipo/Status/datas suficientes pra
+    // caber Automotivo/Equipamento/Substituido/dd-mm-yyyy sem char-break.
+    // Nomes longos (Seguradora "BRADESCO..." ou Unidade "R.M. Cassems...")
+    // vao wrap-ar em 2 linhas ao nivel de palavra, o que e' aceitavel.
+    columnWidths: [70, 75, 65, 70, 70, 50, 50, 45],
     fontSize: 8,
     rows: dados.map((s) => [
       safeText(s.apoliceNumero),
       safeText(s.seguradora),
       _relSegurosTipoLabel(s.tipoSeguro),
-      _relSegurosVinculoCurto(s),
+      _relSegurosUnidadeLabel(s),
+      _relSegurosVinculoLabel(s),
       formatDate(s.dataInicio, locale, timeZone),
       formatDate(s.dataFim, locale, timeZone),
       safeText(s.status),
