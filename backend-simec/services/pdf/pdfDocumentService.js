@@ -1312,17 +1312,19 @@ function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
     return fa - fb;
   });
 
-  // Visao geral (tabela). Ajustes 2026-07-23 apos feedback:
-  //   - Header "Vencimento" e datas 30/07/2025 estavam quebrando em
-  //     duas linhas → fontSize 7 no header + 7.5 nas celulas + colunas
-  //     de data ampliadas pra 60px cada.
-  //   - "Automotivo"/"Equipamento" tambem quebravam letra por letra →
-  //     Tipo aumentado pra 62px.
+  // Visao geral (tabela). Ajustes 2026-07-23 apos 2 iteracoes de
+  // feedback sobre quebras de linha:
+  //   - Header "Vencimento" quebrando ("Vencimen/to") mesmo em col 60 →
+  //     trocado por "Vencto" (abreviacao BR comum em planilhas)
+  //   - Datas "30/07/2025" quebrando ("30/07/202/5") em col 60 →
+  //     largura fixa em 65 pra dar folga confortavel
+  //   - "Automotivo"/"Equipamento" quebravam letra por letra → Tipo 65
   drawSectionTitle(doc, 'Apolices (visao geral)');
   drawTable(doc, {
-    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Unidade', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
-    // Soma = 495 (area util A4).
-    columnWidths: [58, 70, 62, 65, 70, 60, 60, 50],
+    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Unidade', 'Vinculo', 'Inicio', 'Vencto', 'Status'],
+    // Soma = 495 (area util A4). Colunas de data mais generosas que
+    // as anteriores; header curto "Vencto" evita wrap na header row.
+    columnWidths: [58, 65, 65, 62, 65, 60, 65, 55],
     fontSize: 7.5,
     headerFontSize: 7,
     rows: dadosOrdenados.map((s) => [
