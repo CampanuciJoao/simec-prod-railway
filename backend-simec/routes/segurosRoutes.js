@@ -113,6 +113,34 @@ async function validarUnidadeDoTenant(tenantId, unidadeId) {
   return unidade;
 }
 
+// Upsert de veiculo por placa quando o seguro AUTO e' criado sem veiculoId.
+// Placa e' UNIQUE por tenant (schema.prisma), entao upsert(where placa,
+// create/update) e' seguro. Se ja existe veiculo com essa placa, apenas
+// atualiza modelo (util quando o modelo veio de outra fonte antes).
+// Retorna o veiculoId resolvido.
+async function resolverVeiculoParaSeguro(tenantId, { veiculoId, veiculoPlaca, veiculoModelo, unidadeId }) {
+  if (veiculoId) return veiculoId;
+  if (!veiculoPlaca || !veiculoModelo) return null;
+
+  const placa  = String(veiculoPlaca).trim().toUpperCase();
+  const modelo = String(veiculoModelo).trim();
+  if (!placa || !modelo) return null;
+
+  const veiculo = await prisma.veiculo.upsert({
+    where:  { tenantId_placa: { tenantId, placa } },
+    create: {
+      tenantId, placa, modelo,
+      unidadeId: unidadeId || null,
+    },
+    update: {
+      modelo,
+      ...(unidadeId ? { unidadeId } : {}),
+    },
+    select: { id: true },
+  });
+  return veiculo.id;
+}
+
 async function verificarSobreposicaoCobertura(tenantId, { equipamentoId, dataInicio, dataFim, excluirId }) {
   // SobreposiÃ§Ã£o sÃ³ Ã© verificada para equipamento: o mesmo equipamento nÃ£o pode
   // ter dois seguros ativos no mesmo perÃ­odo. Para unidades, mÃºltiplos seguros
@@ -303,7 +331,12 @@ router.get('/:id', async (req, res) => {
 // ==============================
 router.post('/', validate(seguroSchema), async (req, res) => {
   const dados = req.validatedData;
-  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
+  const {
+    equipamentoId, unidadeId, veiculoId,
+    // Extraidos e usados pelo upsert de veiculo — nao vao para prisma.seguro.
+    veiculoPlaca, veiculoModelo,
+    dataInicio, dataFim, ...resto
+  } = dados;
 
   try {
     const tenantId = req.tenantContext;
@@ -311,6 +344,11 @@ router.post('/', validate(seguroSchema), async (req, res) => {
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
     await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: null });
+
+    // Upsert veiculo se seguro AUTO veio com placa+modelo em vez de veiculoId ja cadastrado.
+    const veiculoIdFinal = await resolverVeiculoParaSeguro(tenantId, {
+      veiculoId, veiculoPlaca, veiculoModelo, unidadeId,
+    });
 
     const novoSeguro = await prisma.seguro.create({
       data: {
@@ -344,12 +382,12 @@ router.post('/', validate(seguroSchema), async (req, res) => {
             }
           : undefined,
 
-        veiculo: veiculoId
+        veiculo: veiculoIdFinal
           ? {
               connect: {
                 tenantId_id: {
                   tenantId,
-                  id: veiculoId,
+                  id: veiculoIdFinal,
                 },
               },
             }
@@ -394,7 +432,11 @@ router.post('/', validate(seguroSchema), async (req, res) => {
 router.put('/:id', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData;
-  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
+  const {
+    equipamentoId, unidadeId, veiculoId,
+    veiculoPlaca, veiculoModelo,
+    dataInicio, dataFim, ...resto
+  } = dados;
 
   try {
     const tenantId = req.tenantContext;
@@ -418,6 +460,11 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
     await validarUnidadeDoTenant(tenantId, unidadeId);
     await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: id });
 
+    // Upsert veiculo se AUTO com placa+modelo em vez de veiculoId ja cadastrado.
+    const veiculoIdFinal = await resolverVeiculoParaSeguro(tenantId, {
+      veiculoId, veiculoPlaca, veiculoModelo, unidadeId,
+    });
+
     const atualizado = await prisma.seguro.update({
       where: {
         tenantId_id: { tenantId, id },
@@ -439,8 +486,8 @@ router.put('/:id', validate(seguroSchema), async (req, res) => {
             ? { disconnect: { tenantId_id: { tenantId, id: seguro.unidadeId } } }
             : undefined,
 
-        veiculo: veiculoId
-          ? { connect: { tenantId_id: { tenantId, id: veiculoId } } }
+        veiculo: veiculoIdFinal
+          ? { connect: { tenantId_id: { tenantId, id: veiculoIdFinal } } }
           : seguro.veiculoId
             ? { disconnect: { tenantId_id: { tenantId, id: seguro.veiculoId } } }
             : undefined,
@@ -705,7 +752,11 @@ router.post('/:id/cancelar', async (req, res) => {
 router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
   const { id } = req.params;
   const dados = req.validatedData;
-  const { equipamentoId, unidadeId, veiculoId, dataInicio, dataFim, ...resto } = dados;
+  const {
+    equipamentoId, unidadeId, veiculoId,
+    veiculoPlaca, veiculoModelo,
+    dataInicio, dataFim, ...resto
+  } = dados;
 
   try {
     const tenantId = req.tenantContext;
@@ -729,6 +780,12 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
     await validarEquipamentoDoTenant(tenantId, equipamentoId);
     await validarUnidadeDoTenant(tenantId, unidadeId);
     await verificarSobreposicaoCobertura(tenantId, { unidadeId, equipamentoId, dataInicio, dataFim, excluirId: id });
+
+    // Renovacao pode manter o mesmo veiculo (via veiculoId) ou trocar
+    // (informando placa+modelo — upsert cria/atualiza).
+    const veiculoIdFinal = await resolverVeiculoParaSeguro(tenantId, {
+      veiculoId, veiculoPlaca, veiculoModelo, unidadeId,
+    });
 
     const alvoDesc = seguroAntigo.unidade?.nomeSistema
       ? `unidade ${seguroAntigo.unidade.nomeSistema}`
@@ -754,8 +811,8 @@ router.post('/:id/renovar', validate(seguroSchema), async (req, res) => {
           unidade: unidadeId
             ? { connect: { tenantId_id: { tenantId, id: unidadeId } } }
             : undefined,
-          veiculo: veiculoId
-            ? { connect: { tenantId_id: { tenantId, id: veiculoId } } }
+          veiculo: veiculoIdFinal
+            ? { connect: { tenantId_id: { tenantId, id: veiculoIdFinal } } }
             : undefined,
         },
       });

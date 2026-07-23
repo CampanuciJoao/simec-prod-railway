@@ -27,6 +27,14 @@ function SeguroBasicosFields({
   unidadesDisponiveis,
   equipamentosFiltrados,
 }) {
+  const isAuto = formData.tipoSeguro === 'AUTO';
+
+  // Placa e' sempre em maiusculas. Normaliza no onChange pra evitar 'abc-1234'.
+  const handlePlacaChange = (e) => {
+    const upper = String(e.target.value || '').toUpperCase();
+    onChange({ target: { name: e.target.name, value: upper } });
+  };
+
   return (
     <>
       <FormSection
@@ -111,7 +119,11 @@ function SeguroBasicosFields({
 
       <FormSection
         title="Vínculo"
-        description="Unidade e equipamento cobertos por esta apólice."
+        description={
+          isAuto
+            ? 'Unidade responsável e dados do veículo coberto por esta apólice.'
+            : 'Unidade e equipamento cobertos por esta apólice.'
+        }
       >
         <ResponsiveGrid preset="form">
           <FieldExtraido extraido={camposExtraidos.has('unidadeId')}>
@@ -128,23 +140,52 @@ function SeguroBasicosFields({
             />
           </FieldExtraido>
 
-          <FieldExtraido extraido={camposExtraidos.has('equipamentoId')}>
-            <Select
-              label="Equipamento"
-              name="equipamentoId"
-              value={formData.equipamentoId || ''}
-              onChange={onChange}
-              options={[...equipamentosFiltrados]
-                .sort((a, b) => equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR'))
-                .map((eq) => ({ value: eq.id, label: equipamentoLabel(eq) }))}
-              placeholder={
-                !formData.unidadeId
-                  ? 'Selecione a unidade primeiro'
-                  : 'Selecione o equipamento (opcional)'
-              }
-              disabled={!formData.unidadeId}
-            />
-          </FieldExtraido>
+          {/* Seguro AUTO: placa + modelo do veículo. Equipamento nao se
+              aplica nesse caso — escondido. Backend faz upsert de veiculo
+              por (tenantId, placa). */}
+          {isAuto ? (
+            <>
+              <FieldExtraido extraido={camposExtraidos.has('veiculoPlaca')}>
+                <Input
+                  label="Placa do veículo"
+                  name="veiculoPlaca"
+                  value={formData.veiculoPlaca || ''}
+                  onChange={handlePlacaChange}
+                  placeholder="Ex.: ABC-1234"
+                  maxLength={10}
+                  required
+                />
+              </FieldExtraido>
+              <FieldExtraido extraido={camposExtraidos.has('veiculoModelo')}>
+                <Input
+                  label="Modelo do veículo"
+                  name="veiculoModelo"
+                  value={formData.veiculoModelo || ''}
+                  onChange={onChange}
+                  placeholder="Ex.: Fiat Strada 1.4"
+                  required
+                />
+              </FieldExtraido>
+            </>
+          ) : (
+            <FieldExtraido extraido={camposExtraidos.has('equipamentoId')}>
+              <Select
+                label="Equipamento"
+                name="equipamentoId"
+                value={formData.equipamentoId || ''}
+                onChange={onChange}
+                options={[...equipamentosFiltrados]
+                  .sort((a, b) => equipamentoSortKey(a).localeCompare(equipamentoSortKey(b), 'pt-BR'))
+                  .map((eq) => ({ value: eq.id, label: equipamentoLabel(eq) }))}
+                placeholder={
+                  !formData.unidadeId
+                    ? 'Selecione a unidade primeiro'
+                    : 'Selecione o equipamento (opcional)'
+                }
+                disabled={!formData.unidadeId}
+              />
+            </FieldExtraido>
+          )}
         </ResponsiveGrid>
       </FormSection>
     </>
