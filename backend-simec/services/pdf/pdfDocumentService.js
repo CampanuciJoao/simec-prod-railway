@@ -922,6 +922,11 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
   drawEntidadeInfoBlock(doc, options?.tenantInfo);
   const { locale, timeZone } = options;
 
+  if (resultado?.tipoRelatorio === 'inventarioSeguros') {
+    _relSegurosPdf(doc, resultado, { locale, timeZone });
+    return finalizeDocument(doc);
+  }
+
   if (resultado?.tipoRelatorio === 'inventarioEquipamentos') {
     drawSectionTitle(doc, 'Inventario de ativos');
 
@@ -1036,6 +1041,218 @@ const REL_STATUS_LABEL = {
   Concluida: 'Concluída',
   Cancelada: 'Cancelada',
 };
+
+// ─── Relatorio de Seguros ────────────────────────────────────────────────────
+
+function _fmtBRL(valor) {
+  const n = Number(valor);
+  if (!Number.isFinite(n) || n === 0) return 'R$ 0,00';
+  return n.toLocaleString('pt-BR', {
+    style: 'currency', currency: 'BRL',
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
+  });
+}
+
+const REL_SEGURO_TIPO_LABEL = {
+  EQUIPAMENTO: 'Equipamento',
+  PREDIAL: 'Predial',
+  AUTO: 'Automotivo',
+  RESPONSABILIDADE_CIVIL: 'Resp. Civil',
+  OUTRO: 'Outro',
+};
+
+const REL_SEGURO_ALVO_LABEL = {
+  EQUIPAMENTO: 'Vinculado a equipamento',
+  UNIDADE: 'Vinculado a unidade',
+  VEICULO: 'Vinculado a veiculo',
+  EMPRESARIAL_GERAL: 'Empresarial',
+};
+
+// LMIs em ordem de exibicao + labels amigaveis. So os nao-zero entram
+// no PDF (evita poluir com 15 linhas "R$ 0,00").
+const REL_SEGURO_LMI_CAMPOS = [
+  { campo: 'lmiResponsabilidadeCivil', label: 'Responsabilidade Civil' },
+  { campo: 'lmiIncendio',              label: 'Incêndio' },
+  { campo: 'lmiRoubo',                 label: 'Roubo' },
+  { campo: 'lmiVidros',                label: 'Vidros' },
+  { campo: 'lmiVendaval',              label: 'Vendaval' },
+  { campo: 'lmiColisao',               label: 'Colisão' },
+  { campo: 'lmiDanosEletricos',        label: 'Danos elétricos' },
+  { campo: 'lmiDanosMateriais',        label: 'Danos materiais' },
+  { campo: 'lmiDanosCausaExterna',     label: 'Danos por causa externa' },
+  { campo: 'lmiDanosCorporais',        label: 'Danos corporais' },
+  { campo: 'lmiDanosMorais',           label: 'Danos morais' },
+  { campo: 'lmiAPP',                   label: 'Acidentes pessoais (APP)' },
+  { campo: 'lmiPerdaLucroBruto',       label: 'Perda de lucro bruto' },
+  { campo: 'lmiVazamentoTanques',      label: 'Vazamento de tanques' },
+];
+
+function _relSegurosFiltroLabel(filtros, total) {
+  const partes = [];
+  const escopoMap = {
+    todos:       'Todos',
+    empresarial: 'Empresariais',
+    equipamento: 'Vinculados a equipamento',
+    veiculo:     'Vinculados a veiculo',
+    unidade:     'Vinculados a unidade',
+  };
+  partes.push(`Escopo: ${escopoMap[filtros.escopoSeguro] || 'Todos'}`);
+  partes.push(`Status: ${filtros.status || 'Todos'}`);
+  if (filtros.seguradora) partes.push(`Seguradora: ${filtros.seguradora}`);
+  if (filtros.vencimentoInicio || filtros.vencimentoFim) {
+    const i = filtros.vencimentoInicio ? formatDate(filtros.vencimentoInicio) : '-';
+    const f = filtros.vencimentoFim    ? formatDate(filtros.vencimentoFim)    : '-';
+    partes.push(`Vencimento entre ${i} e ${f}`);
+  }
+  partes.push(`Total: ${total} apolice(s)`);
+  return partes.join(' · ');
+}
+
+function _relSegurosCalcResumo(dados) {
+  const agora = new Date();
+  const em30d = new Date(agora); em30d.setDate(em30d.getDate() + 30);
+  let vigentes = 0, vencendo30 = 0, premioTotal = 0;
+  for (const s of dados) {
+    if (s.status === 'Ativo' || s.status === 'Vigente') vigentes++;
+    const fim = s.dataFim ? new Date(s.dataFim) : null;
+    if (fim && fim >= agora && fim <= em30d) vencendo30++;
+    premioTotal += Number(s.premioTotal || 0);
+  }
+  return { total: dados.length, vigentes, vencendo30, premioTotal };
+}
+
+function _relSegurosTipoLabel(tipoSeguro) {
+  return REL_SEGURO_TIPO_LABEL[tipoSeguro] || safeText(tipoSeguro);
+}
+
+function _relSegurosUnidadeLabel(s) {
+  // Unidade direta da apolice OU da entidade vinculada (equipamento/veiculo).
+  return s.unidade?.nomeSistema
+      || s.equipamento?.unidade?.nomeSistema
+      || s.veiculo?.unidade?.nomeSistema
+      || (s.tipoAlvo === 'EMPRESARIAL_GERAL' ? 'Todas' : '-');
+}
+
+function _relSegurosVinculoLabel(s) {
+  if (s.equipamento) {
+    const nome = s.equipamento.apelido || s.equipamento.modelo || '-';
+    const tag  = s.equipamento.tag ? ` (${s.equipamento.tag})` : '';
+    return `${nome}${tag}`;
+  }
+  if (s.veiculo) {
+    const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
+    return `${safeText(s.veiculo.placa, 'Veiculo')}${modelo}`;
+  }
+  if (s.tipoAlvo === 'UNIDADE' && s.unidade) return s.unidade.nomeSistema;
+  return '-';
+}
+
+function _relSegurosLmiRows(s) {
+  const rows = [];
+  for (const { campo, label } of REL_SEGURO_LMI_CAMPOS) {
+    const v = Number(s[campo] || 0);
+    if (v > 0) rows.push([label, _fmtBRL(v)]);
+  }
+  return rows;
+}
+
+function _relSegurosDiasParaVencer(dataFim) {
+  if (!dataFim) return null;
+  const fim = new Date(dataFim);
+  const agora = new Date();
+  const ms = fim.getTime() - agora.getTime();
+  return Math.round(ms / (1000 * 60 * 60 * 24));
+}
+
+function _relSegurosDetalheApolice(doc, s, { locale, timeZone }) {
+  // Cabecalho tipo drawGroupHeader — mesma estetica do inventario agrupado.
+  const titulo = `Apolice ${safeText(s.apoliceNumero)} · ${safeText(s.seguradora)} · ${_relSegurosTipoLabel(s.tipoSeguro)} · ${safeText(s.status)}`;
+  drawGroupHeader(doc, titulo);
+
+  // Linhas de metadados.
+  infoRow(doc, 'Unidade:', _relSegurosUnidadeLabel(s));
+  const vinculo = _relSegurosVinculoLabel(s);
+  if (vinculo && vinculo !== '-') infoRow(doc, 'Vinculado a:', vinculo);
+  infoRow(doc, 'Inicio:', formatDate(s.dataInicio, locale, timeZone));
+
+  const dias = _relSegurosDiasParaVencer(s.dataFim);
+  const venc = formatDate(s.dataFim, locale, timeZone);
+  const vencText = dias === null ? venc
+    : dias >= 0 ? `${venc} (${dias} dia(s))`
+    : `${venc} (venceu ha ${Math.abs(dias)} dia(s))`;
+  infoRow(doc, 'Vencimento:', vencText);
+
+  if (s.cobertura) {
+    infoRow(doc, 'Coberturas:', s.cobertura);
+  }
+
+  // Tabela de LMIs — so os nao-zero.
+  const lmiRows = _relSegurosLmiRows(s);
+  if (lmiRows.length > 0) {
+    doc.moveDown(0.4);
+    drawTable(doc, {
+      headers: ['Limite maximo de indenizacao', 'Valor'],
+      columnWidths: [335, 160],
+      rows: lmiRows,
+    });
+  }
+
+  infoRow(doc, 'Premio total:', _fmtBRL(s.premioTotal));
+
+  doc.moveDown(0.6);
+}
+
+function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
+  const dados = resultado?.dados || [];
+  const filtros = resultado?.filtros || {};
+
+  drawSectionTitle(doc, 'Relatorio de seguros');
+  drawParagraph(doc, _relSegurosFiltroLabel(filtros, resultado.total || 0));
+
+  if (!dados.length) {
+    drawParagraph(doc, 'Nenhuma apolice encontrada com os filtros aplicados.');
+    return;
+  }
+
+  // Resumo executivo.
+  const resumo = _relSegurosCalcResumo(dados);
+  drawSectionTitle(doc, 'Resumo executivo');
+  drawTable(doc, {
+    headers: ['Metrica', 'Valor'],
+    columnWidths: [345, 150],
+    rows: [
+      ['Total de apolices',            String(resumo.total)],
+      ['Vigentes (Ativo + Vigente)',   String(resumo.vigentes)],
+      ['Vencendo em ate 30 dias',      String(resumo.vencendo30)],
+      ['Valor total em premios',       _fmtBRL(resumo.premioTotal)],
+    ],
+  });
+
+  // Visao geral (tabela). Ordenacao vem do backend (dataFim asc).
+  drawSectionTitle(doc, 'Apolices (visao geral)');
+  drawTable(doc, {
+    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Unidade', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
+    // Soma = 495 (area util A4 com margens 50/50). Coluna vinculo e
+    // unidade sao um pouco mais largas porque nomes longos aparecem.
+    columnWidths: [55, 65, 55, 70, 65, 55, 55, 75],
+    rows: dados.map((s) => [
+      safeText(s.apoliceNumero),
+      safeText(s.seguradora),
+      _relSegurosTipoLabel(s.tipoSeguro),
+      _relSegurosUnidadeLabel(s),
+      _relSegurosVinculoLabel(s),
+      formatDate(s.dataInicio, locale, timeZone),
+      formatDate(s.dataFim, locale, timeZone),
+      safeText(s.status),
+    ]),
+  });
+
+  // Detalhes por apolice — uma subseçao cada.
+  drawSectionTitle(doc, 'Detalhes por apolice');
+  for (const s of dados) {
+    _relSegurosDetalheApolice(doc, s, { locale, timeZone });
+  }
+}
 
 function _relDrawChip(doc, x, y, label, cores, opts = {}) {
   const padX = 6;

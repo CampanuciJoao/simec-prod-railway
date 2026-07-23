@@ -113,10 +113,11 @@ router.post('/relatorio', async (req, res) => {
       filtros: req.body || {},
     });
     const buffer = await gerarPdfRelatorioBuffer(resultado, getPdfOptions(req));
-    const nomeBase =
-      resultado.tipoRelatorio === 'inventarioEquipamentos'
-        ? 'relatorio_inventario_equipamentos'
-        : 'relatorio_manutencoes_realizadas';
+    const nomeBase = {
+      inventarioEquipamentos:  'relatorio_inventario_equipamentos',
+      inventarioSeguros:       'relatorio_seguros',
+      manutencoesRealizadas:   'relatorio_manutencoes_realizadas',
+    }[resultado.tipoRelatorio] || 'relatorio';
 
     return sendPdf(res, buffer, `${nomeBase}.pdf`);
   } catch (error) {

@@ -57,6 +57,8 @@ function RelatoriosPage() {
               unidadesOptions={page.unidadesOptions}
               fabricantesOptions={page.fabricantesOptions}
               tiposOptions={page.tiposOptions}
+              escopoSeguroOptions={page.escopoSeguroOptions}
+              statusSeguroOptions={page.statusSeguroOptions}
               onChange={page.handleFiltroChange}
               onSubmit={page.handleGerarRelatorio}
               loading={page.loading}

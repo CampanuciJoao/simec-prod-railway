@@ -1,6 +1,7 @@
 import prisma from '../prismaService.js';
 import {
   buscarInventarioEquipamentos,
+  buscarInventarioSeguros,
   buscarManutencoesRealizadas,
 } from '../reportQueryService.js';
 import {
@@ -300,6 +301,11 @@ export async function obterDadosPdfRelatorio({ tenantId, filtros = {} }) {
     fabricante,
     tipo,
     status,
+    // Filtros do relatorio de seguros
+    escopoSeguro,
+    seguradora,
+    vencimentoInicio,
+    vencimentoFim,
   } = filtros;
 
   if (!tipoRelatorio || typeof tipoRelatorio !== 'string') {
@@ -329,6 +335,34 @@ export async function obterDadosPdfRelatorio({ tenantId, filtros = {} }) {
         tipoManutencao: null,
         equipamentoId: null,
         status: status || null,
+      },
+      total: dados.length,
+      dados,
+    };
+  }
+
+  if (tipoRelatorio === 'inventarioSeguros') {
+    const dados = await buscarInventarioSeguros({
+      tenantId,
+      escopo:            escopoSeguro || null,
+      unidadeId:         unidadeId || null,
+      status:            status ? String(status).trim() : null,
+      seguradora:        seguradora ? String(seguradora).trim() : null,
+      vencimentoInicio:  vencimentoInicio || null,
+      vencimentoFim:     vencimentoFim || null,
+    });
+
+    return {
+      tipoRelatorio,
+      tenantId,
+      periodo: { inicio: null, fim: null },
+      filtros: {
+        unidadeId:        unidadeId || null,
+        status:           status || null,
+        escopoSeguro:     escopoSeguro || null,
+        seguradora:       seguradora || null,
+        vencimentoInicio: vencimentoInicio || null,
+        vencimentoFim:    vencimentoFim || null,
       },
       total: dados.length,
       dados,
