@@ -7,6 +7,7 @@ import {
   buscarManutencoesRealizadas,
   buscarInventarioEquipamentos,
   buscarEquipamentosComServicos,
+  buscarInventarioSeguros,
 } from '../services/reportQueryService.js';
 import { obterDadosPdfOrcamentoCq } from '../services/pdf/orcamentoCqPdfService.js';
 import { proteger } from '../middleware/authMiddleware.js';
@@ -27,6 +28,11 @@ router.post('/gerar', async (req, res) => {
     fabricante,
     status,
     tipo,
+    // Filtros do relatorio de seguros
+    escopoSeguro,
+    seguradora,
+    vencimentoInicio,
+    vencimentoFim,
   } = req.body;
 
   const tenantId = req.tenantContext;
@@ -96,6 +102,20 @@ router.post('/gerar', async (req, res) => {
       }
     }
 
+    // INVENTARIO DE SEGUROS — apolices com filtros por escopo, unidade,
+    // status, seguradora e janela de vencimento.
+    else if (tipoRelatorio === 'inventarioSeguros') {
+      dadosRelatorio = await buscarInventarioSeguros({
+        tenantId,
+        escopo:            escopoSeguro || null,
+        unidadeId:         unidadeId || null,
+        status:            status ? String(status).trim() : null,
+        seguradora:        seguradora ? String(seguradora).trim() : null,
+        vencimentoInicio:  vencimentoInicio || null,
+        vencimentoFim:     vencimentoFim || null,
+      });
+    }
+
     // MANUTENÇÕES REALIZADAS
     else if (tipoRelatorio === 'manutencoesRealizadas') {
       if (!dataInicio || !dataFim) {
@@ -149,6 +169,10 @@ router.post('/gerar', async (req, res) => {
         tipoManutencao: tipoManutencao || null,
         equipamentoId: equipamentoId || null,
         status: status || null,
+        escopoSeguro: escopoSeguro || null,
+        seguradora: seguradora || null,
+        vencimentoInicio: vencimentoInicio || null,
+        vencimentoFim: vencimentoFim || null,
       },
       total: Array.isArray(dadosRelatorio) ? dadosRelatorio.length : 0,
       dados: dadosRelatorio,

@@ -19,6 +19,12 @@ export function useRelatoriosPage() {
     tipoManutencao: '',
     dataInicio: '',
     dataFim: '',
+    // Filtros do relatorio de seguros
+    escopoSeguro: '',      // '' = todos | empresarial | equipamento | veiculo | unidade
+    status: '',
+    seguradora: '',
+    vencimentoInicio: '',
+    vencimentoFim: '',
   });
 
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
@@ -177,6 +183,33 @@ export function useRelatoriosPage() {
         value: 'orcamentoCq',
         label: 'Inventário Controle de Qualidade',
       },
+      {
+        value: 'inventarioSeguros',
+        label: 'Relatório de Seguros',
+      },
+    ],
+    []
+  );
+
+  const escopoSeguroOptions = useMemo(
+    () => [
+      { value: '',            label: 'Todos' },
+      { value: 'empresarial', label: 'Empresarial' },
+      { value: 'equipamento', label: 'Vinculado a equipamento' },
+      { value: 'veiculo',     label: 'Vinculado a veículo' },
+      { value: 'unidade',     label: 'Vinculado a unidade' },
+    ],
+    []
+  );
+
+  const statusSeguroOptions = useMemo(
+    () => [
+      { value: '',            label: 'Todos' },
+      { value: 'Ativo',       label: 'Ativo' },
+      { value: 'Vigente',     label: 'Vigente' },
+      { value: 'Expirado',    label: 'Expirado' },
+      { value: 'Cancelado',   label: 'Cancelado' },
+      { value: 'Substituido', label: 'Substituído' },
     ],
     []
   );
@@ -186,6 +219,7 @@ export function useRelatoriosPage() {
       inventarioEquipamentos: 'Inventário',
       manutencoesRealizadas: 'Manutenções',
       orcamentoCq: 'Inventário CQ',
+      inventarioSeguros: 'Seguros',
     }[filtros.tipoRelatorio] || '—';
     return {
       unidades: unidadesDisponiveis.length,
@@ -210,6 +244,7 @@ export function useRelatoriosPage() {
                 inventarioEquipamentos: 'Inventário',
                 manutencoesRealizadas: 'Manutenções',
                 orcamentoCq: 'Inventário CQ',
+                inventarioSeguros: 'Seguros',
               }[filtros.tipoRelatorio] || filtros.tipoRelatorio
             }`,
             value: filtros.tipoRelatorio,
@@ -250,6 +285,49 @@ export function useRelatoriosPage() {
             value: filtros.dataFim,
           }
         : null,
+      // Filtros do relatorio de seguros
+      filtros.escopoSeguro
+        ? {
+            key: 'escopoSeguro',
+            label: `Escopo: ${
+              {
+                empresarial: 'Empresarial',
+                equipamento: 'Vinculado a equipamento',
+                veiculo:     'Vinculado a veículo',
+                unidade:     'Vinculado a unidade',
+              }[filtros.escopoSeguro] || filtros.escopoSeguro
+            }`,
+            value: filtros.escopoSeguro,
+          }
+        : null,
+      filtros.status
+        ? {
+            key: 'status',
+            label: `Status: ${filtros.status}`,
+            value: filtros.status,
+          }
+        : null,
+      filtros.seguradora
+        ? {
+            key: 'seguradora',
+            label: `Seguradora: ${filtros.seguradora}`,
+            value: filtros.seguradora,
+          }
+        : null,
+      filtros.vencimentoInicio
+        ? {
+            key: 'vencimentoInicio',
+            label: `Vence de: ${filtros.vencimentoInicio}`,
+            value: filtros.vencimentoInicio,
+          }
+        : null,
+      filtros.vencimentoFim
+        ? {
+            key: 'vencimentoFim',
+            label: `Vence até: ${filtros.vencimentoFim}`,
+            value: filtros.vencimentoFim,
+          }
+        : null,
     ].filter(Boolean);
   }, [filtros, unidadesOptions]);
 
@@ -266,6 +344,11 @@ export function useRelatoriosPage() {
       tipoManutencao: '',
       dataInicio: '',
       dataFim: '',
+      escopoSeguro: '',
+      status: '',
+      seguradora: '',
+      vencimentoInicio: '',
+      vencimentoFim: '',
     });
   };
 
@@ -280,6 +363,8 @@ export function useRelatoriosPage() {
     tiposOptions,
     unidadesOptions,
     tipoRelatorioOptions,
+    escopoSeguroOptions,
+    statusSeguroOptions,
     metricas,
     activeFilters,
     clearFilter,

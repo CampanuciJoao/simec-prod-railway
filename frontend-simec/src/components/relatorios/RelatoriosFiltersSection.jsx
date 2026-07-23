@@ -6,6 +6,7 @@ import { faSearch } from '@fortawesome/free-solid-svg-icons';
 import {
   Button,
   DateInput,
+  Input,
   PageSection,
   ResponsiveGrid,
   Select,
@@ -31,6 +32,8 @@ function RelatoriosFiltersSection({
   unidadesOptions,
   fabricantesOptions,
   tiposOptions = [],
+  escopoSeguroOptions = [],
+  statusSeguroOptions = [],
   onChange,
   onSubmit,
   loading = false,
@@ -38,11 +41,11 @@ function RelatoriosFiltersSection({
   const isManutencoes = filtros.tipoRelatorio === 'manutencoesRealizadas';
   const isInventario = filtros.tipoRelatorio === 'inventarioEquipamentos';
   const isOrcamentoCq = filtros.tipoRelatorio === 'orcamentoCq';
+  const isSeguros = filtros.tipoRelatorio === 'inventarioSeguros';
 
-  // Orcamento CQ tem set de filtros enxuto: so unidade importa. Modalidade
-  // ja eh filtrada no backend (modalidades reguladas), fabricante/data nao
-  // se aplicam. Esconder os campos evita confusao.
-  const mostraFabricante = !isOrcamentoCq;
+  // Cada tipo mostra seu proprio conjunto de filtros — evita poluir a UI
+  // com campos que nao se aplicam ao relatorio escolhido.
+  const mostraFabricante = !isOrcamentoCq && !isSeguros;
   const mostraTipo = isInventario;
   const mostraDatas = isManutencoes;
 
@@ -140,6 +143,67 @@ function RelatoriosFiltersSection({
               />
             </Field>
           )}
+
+          {/* Filtros exclusivos do relatorio de Seguros */}
+          {isSeguros && (
+            <Field label="Escopo">
+              <Select
+                name="escopoSeguro"
+                value={filtros.escopoSeguro || ''}
+                onChange={onChange}
+              >
+                {escopoSeguroOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {isSeguros && (
+            <Field label="Status da apólice">
+              <Select
+                name="status"
+                value={filtros.status || ''}
+                onChange={onChange}
+              >
+                {statusSeguroOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {isSeguros && (
+            <Field label="Seguradora (opcional)">
+              <Input
+                name="seguradora"
+                value={filtros.seguradora || ''}
+                onChange={onChange}
+                placeholder="Ex.: Porto Seguro"
+              />
+            </Field>
+          )}
+
+          {isSeguros && (
+            <Field label="Vencimento a partir de (opcional)">
+              <DateInput
+                name="vencimentoInicio"
+                value={filtros.vencimentoInicio || ''}
+                onChange={onChange}
+              />
+            </Field>
+          )}
+
+          {isSeguros && (
+            <Field label="Vencimento até (opcional)">
+              <DateInput
+                name="vencimentoFim"
+                value={filtros.vencimentoFim || ''}
+                onChange={onChange}
+                min={filtros.vencimentoInicio || undefined}
+              />
+            </Field>
+          )}
         </ResponsiveGrid>
 
         <div className="flex flex-wrap items-end gap-3">
@@ -159,6 +223,8 @@ RelatoriosFiltersSection.propTypes = {
   unidadesOptions: PropTypes.array.isRequired,
   fabricantesOptions: PropTypes.array.isRequired,
   tiposOptions: PropTypes.array,
+  escopoSeguroOptions: PropTypes.array,
+  statusSeguroOptions: PropTypes.array,
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool,

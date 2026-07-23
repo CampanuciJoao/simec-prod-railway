@@ -159,6 +159,107 @@ export async function buscarEquipamentosComServicos({
 }
 
 /**
+ * Busca inventário de seguros com filtros dinâmicos
+ *
+ * escopo:
+ *   'todos'         → sem filtro por tipoAlvo
+ *   'empresarial'   → tipoAlvo = EMPRESARIAL_GERAL
+ *   'equipamento'   → tipoAlvo = EQUIPAMENTO
+ *   'veiculo'       → tipoAlvo = VEICULO
+ *   'unidade'       → tipoAlvo = UNIDADE
+ *
+ * unidadeId filtra tanto pela unidade DIRETA do seguro quanto pela unidade
+ * do equipamento/veiculo vinculado (caso a apolice cubra um ativo especifico).
+ */
+export async function buscarInventarioSeguros({
+  tenantId,
+  escopo,
+  unidadeId,
+  status,
+  seguradora,
+  vencimentoInicio,
+  vencimentoFim,
+}) {
+  if (!tenantId) throw new Error('TENANT_ID_OBRIGATORIO');
+
+  const ESCOPO_ALVO = {
+    empresarial: 'EMPRESARIAL_GERAL',
+    equipamento: 'EQUIPAMENTO',
+    veiculo:     'VEICULO',
+    unidade:     'UNIDADE',
+  };
+
+  const whereClause = { tenantId };
+
+  if (escopo && ESCOPO_ALVO[escopo]) {
+    whereClause.tipoAlvo = ESCOPO_ALVO[escopo];
+  }
+
+  if (status) {
+    whereClause.status = status;
+  }
+
+  if (seguradora) {
+    whereClause.seguradora = { contains: seguradora, mode: 'insensitive' };
+  }
+
+  if (vencimentoInicio || vencimentoFim) {
+    whereClause.dataFim = {};
+    if (vencimentoInicio) whereClause.dataFim.gte = new Date(vencimentoInicio);
+    if (vencimentoFim) {
+      const fim = new Date(vencimentoFim);
+      fim.setDate(fim.getDate() + 1);
+      fim.setMilliseconds(fim.getMilliseconds() - 1);
+      whereClause.dataFim.lte = fim;
+    }
+  }
+
+  if (unidadeId) {
+    // Match a apolice tem: (a) unidade direta = unidadeId, OU
+    // (b) equipamento na unidade, OU (c) veiculo na unidade.
+    whereClause.OR = [
+      { unidadeId },
+      { equipamento: { unidadeId } },
+      { veiculo: { unidadeId } },
+    ];
+  }
+
+  return prisma.seguro.findMany({
+    where: whereClause,
+    select: {
+      id: true,
+      apoliceNumero: true,
+      seguradora: true,
+      tipoAlvo: true,
+      tipoSeguro: true,
+      status: true,
+      dataInicio: true,
+      dataFim: true,
+      cobertura: true,
+      premioTotal: true,
+      lmiAPP: true,
+      lmiDanosCorporais: true,
+      lmiDanosEletricos: true,
+      lmiDanosMateriais: true,
+      lmiDanosMorais: true,
+      lmiIncendio: true,
+      lmiResponsabilidadeCivil: true,
+      lmiRoubo: true,
+      lmiVidros: true,
+      lmiVendaval: true,
+      lmiColisao: true,
+      lmiDanosCausaExterna: true,
+      lmiPerdaLucroBruto: true,
+      lmiVazamentoTanques: true,
+      unidade:     { select: { id: true, nomeSistema: true } },
+      equipamento: { select: { id: true, apelido: true, modelo: true, tag: true, unidade: { select: { nomeSistema: true } } } },
+      veiculo:     { select: { id: true, placa: true, modelo: true, unidade: { select: { nomeSistema: true } } } },
+    },
+    orderBy: { dataFim: 'asc' },
+  });
+}
+
+/**
  * Busca inventário de equipamentos
  */
 export async function buscarInventarioEquipamentos({
