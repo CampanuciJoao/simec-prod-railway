@@ -103,24 +103,23 @@ function styleDiasVencer(dias) {
   return { color: 'var(--color-success)' };
 }
 
-function unidadeLabel(s) {
-  return s.unidade?.nomeSistema
-      || s.equipamento?.unidade?.nomeSistema
-      || s.veiculo?.unidade?.nomeSistema
-      || (s.tipoAlvo === 'EMPRESARIAL_GERAL' ? 'Todas' : '—');
-}
-
+// 'Vinculado a' unifica o escopo do seguro. Nunca retorna null pra
+// garantir que sempre haja um valor visivel no card.
 function vinculoLabel(s) {
   if (s.equipamento) {
-    const nome = s.equipamento.apelido || s.equipamento.modelo || '—';
+    const nome = s.equipamento.apelido || s.equipamento.modelo || 'Equipamento';
     const tag  = s.equipamento.tag ? ` (${s.equipamento.tag})` : '';
-    return `${nome}${tag}`;
+    const und  = s.equipamento.unidade?.nomeSistema ? ` — ${s.equipamento.unidade.nomeSistema}` : '';
+    return `${nome}${tag}${und}`;
   }
   if (s.veiculo) {
     const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
-    return `${s.veiculo.placa || 'Veículo'}${modelo}`;
+    const und    = s.veiculo.unidade?.nomeSistema ? ` — ${s.veiculo.unidade.nomeSistema}` : '';
+    return `${s.veiculo.placa || 'Veículo'}${modelo}${und}`;
   }
-  return null;
+  if (s.unidade) return s.unidade.nomeSistema;
+  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Todas as unidades';
+  return '—';
 }
 
 function SegurosCards({ apolices }) {
@@ -167,23 +166,14 @@ function SegurosCards({ apolices }) {
               <StatusBadge value={s.status} />
             </div>
 
-            {/* Metadata: unidade, vinculo, datas */}
-            <div className="grid grid-cols-1 gap-y-3 gap-x-6 py-3 text-sm md:grid-cols-2 lg:grid-cols-4">
-              <div>
+            {/* Metadata: vinculo (que ja engloba unidade quando aplicavel) + datas */}
+            <div className="grid grid-cols-1 gap-y-3 gap-x-6 py-3 text-sm md:grid-cols-3">
+              <div className="md:col-span-3 lg:col-span-1">
                 <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
-                  Unidade
+                  Vinculado a
                 </p>
-                <p className="mt-0.5" style={valueStyle}>{unidadeLabel(s)}</p>
+                <p className="mt-0.5" style={valueStyle}>{vinculo}</p>
               </div>
-
-              {vinculo && (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
-                    Vinculado a
-                  </p>
-                  <p className="mt-0.5" style={valueStyle}>{vinculo}</p>
-                </div>
-              )}
 
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>

@@ -323,7 +323,7 @@ function drawParagraph(doc, text) {
   doc.moveDown(0.8);
 }
 
-function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum registro encontrado.' }) {
+function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum registro encontrado.', fontSize = 9, headerFontSize = 8 }) {
   const tableX = doc.page.margins.left;
   const headerHeight = 24;
   const paddingX = 6;
@@ -346,7 +346,7 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
 
       doc
         .font('Helvetica-Bold')
-        .fontSize(8)
+        .fontSize(headerFontSize)
         .fillColor(COLORS.white)
         .text(header, currentX + paddingX, y + 7, {
           width: width - paddingX * 2,
@@ -370,11 +370,9 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
     const cells = headers.map((_, index) => safeText(row[index] ?? '-'));
 
     // Calcula altura usando exatamente a mesma fonte/tamanho do render da
-    // celula (Helvetica 9). Sem isso, heightOfString herdava o estado
-    // anterior (Helvetica-Bold 8 do header) e subdimensionava — texto
-    // vazava da celula ("Bomba Injetora de Contraste" virava "Bomba
-    // Injetora de", "Desativado" virava "Desativad o").
-    doc.font('Helvetica').fontSize(9);
+    // celula. Sem isso, heightOfString herdava o estado anterior (font do
+    // header) e subdimensionava — texto vazava da celula.
+    doc.font('Helvetica').fontSize(fontSize);
     const heights = cells.map((cell, index) =>
       doc.heightOfString(cell, {
         width: columnWidths[index] - paddingX * 2,
@@ -403,7 +401,7 @@ function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum re
 
       doc
         .font('Helvetica')
-        .fontSize(9)
+        .fontSize(fontSize)
         .fillColor(COLORS.slate700)
         .text(cell, currentX + paddingX, y + paddingY, {
           width: width - paddingX * 2,
@@ -1133,17 +1131,43 @@ function _relSegurosUnidadeLabel(s) {
       || (s.tipoAlvo === 'EMPRESARIAL_GERAL' ? 'Todas' : '-');
 }
 
+// "Vinculado a" e' unico campo de escopo do seguro. Regra:
+//   Equipamento → nome + tag do equipamento (com unidade parent no fim)
+//   Veiculo → placa + modelo (com unidade parent no fim)
+//   Unidade → nome da unidade
+//   Empresarial → "Todas as unidades"
 function _relSegurosVinculoLabel(s) {
   if (s.equipamento) {
-    const nome = s.equipamento.apelido || s.equipamento.modelo || '-';
+    const nome = s.equipamento.apelido || s.equipamento.modelo || 'Equipamento';
     const tag  = s.equipamento.tag ? ` (${s.equipamento.tag})` : '';
-    return `${nome}${tag}`;
+    const und  = s.equipamento.unidade?.nomeSistema ? ` — ${s.equipamento.unidade.nomeSistema}` : '';
+    return `${nome}${tag}${und}`;
+  }
+  if (s.veiculo) {
+    const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
+    const und    = s.veiculo.unidade?.nomeSistema ? ` — ${s.veiculo.unidade.nomeSistema}` : '';
+    return `${safeText(s.veiculo.placa, 'Veiculo')}${modelo}${und}`;
+  }
+  if (s.tipoAlvo === 'UNIDADE' && s.unidade) return s.unidade.nomeSistema;
+  if (s.unidade) return s.unidade.nomeSistema; // fallback: apolice direta em unidade
+  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Todas as unidades';
+  return '-';
+}
+
+// Vinculo compacto pra tabela de visao geral — mesma logica mas sem
+// duplicar unidade parent, ja que a tabela e' mais estreita e o detalhe
+// tem a informacao completa.
+function _relSegurosVinculoCurto(s) {
+  if (s.equipamento) {
+    const nome = s.equipamento.apelido || s.equipamento.modelo || 'Equipamento';
+    return s.equipamento.tag ? `${nome} (${s.equipamento.tag})` : nome;
   }
   if (s.veiculo) {
     const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
     return `${safeText(s.veiculo.placa, 'Veiculo')}${modelo}`;
   }
-  if (s.tipoAlvo === 'UNIDADE' && s.unidade) return s.unidade.nomeSistema;
+  if (s.unidade) return s.unidade.nomeSistema;
+  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Todas as unidades';
   return '-';
 }
 
@@ -1164,15 +1188,54 @@ function _relSegurosDiasParaVencer(dataFim) {
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
-function _relSegurosDetalheApolice(doc, s, { locale, timeZone }) {
+// Estima a altura total do bloco de detalhe pra decidir se o card cabe
+// na pagina atual ou se precisa quebrar antes de comecar a desenhar.
+// Mantem info de uma mesma apolice sempre junta.
+function _relSegurosAlturaEstimada(s) {
+  const lmiCount = _relSegurosLmiRows(s).length;
+  const HEADER_H = 28;                 // drawGroupHeader (barra + gap)
+  const INFO_ROW_H = 14;               // altura media de infoRow
+  const LMI_HEADER_H = 24;             // header da tabela LMI
+  const LMI_ROW_H = 22;                // linha da tabela LMI (com padding)
+  const COBERTURA_H = s.cobertura ? 30 : 0;
+  const SEPARATOR_H = 12;              // linha separadora + gap final
+
+  // Base = header + Vinculado + Inicio + Vencimento + Premio (4 infoRows).
+  const infoRows = 4;
+  const infoRowsH = INFO_ROW_H * infoRows;
+
+  const lmiH = lmiCount > 0 ? LMI_HEADER_H + lmiCount * LMI_ROW_H + 8 : 0;
+
+  return HEADER_H + infoRowsH + COBERTURA_H + lmiH + SEPARATOR_H;
+}
+
+function _relSegurosDesenharSeparador(doc) {
+  const y = doc.y + 6;
+  const x = doc.page.margins.left;
+  const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  doc.save().moveTo(x, y).lineTo(x + w, y)
+    .lineWidth(0.5).strokeColor(COLORS.slate200).stroke().restore();
+  doc.y = y + 8;
+}
+
+function _relSegurosDetalheApolice(doc, s, { locale, timeZone, primeiro }) {
+  // Quebra de pagina forcada quando o card nao cabe inteiro no que
+  // sobra da pagina. Evita "meia apolice na pag N, resto na pag N+1"
+  // que o usuario reclamou. Excecao: primeiro card apos a secao de
+  // detalhes — nunca forca porque acabamos de desenhar o titulo.
+  const alturaEstimada = _relSegurosAlturaEstimada(s);
+  if (!primeiro && doc.y + alturaEstimada > getMaxY(doc)) {
+    doc.addPage();
+  }
+
   // Cabecalho tipo drawGroupHeader — mesma estetica do inventario agrupado.
   const titulo = `Apolice ${safeText(s.apoliceNumero)} · ${safeText(s.seguradora)} · ${_relSegurosTipoLabel(s.tipoSeguro)} · ${safeText(s.status)}`;
   drawGroupHeader(doc, titulo);
 
-  // Linhas de metadados.
-  infoRow(doc, 'Unidade:', _relSegurosUnidadeLabel(s));
+  // Metadados: so 'Vinculado a' (unificado) + datas + coberturas +
+  // premio. Removida linha 'Unidade' redundante — vinculo ja diz.
   const vinculo = _relSegurosVinculoLabel(s);
-  if (vinculo && vinculo !== '-') infoRow(doc, 'Vinculado a:', vinculo);
+  infoRow(doc, 'Vinculado a:', vinculo);
   infoRow(doc, 'Inicio:', formatDate(s.dataInicio, locale, timeZone));
 
   const dias = _relSegurosDiasParaVencer(s.dataFim);
@@ -1199,7 +1262,8 @@ function _relSegurosDetalheApolice(doc, s, { locale, timeZone }) {
 
   infoRow(doc, 'Premio total:', _fmtBRL(s.premioTotal));
 
-  doc.moveDown(0.6);
+  // Separador visual entre apolices — linha fina cinza claro.
+  _relSegurosDesenharSeparador(doc);
 }
 
 function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
@@ -1229,28 +1293,33 @@ function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
   });
 
   // Visao geral (tabela). Ordenacao vem do backend (dataFim asc).
+  // Removida coluna Unidade (redundante: 'Vinculo' ja cobre — se e' predial,
+  // vinculo mostra a unidade; se e' equipamento, mostra equipamento+unidade).
+  // FontSize 8 evita char-level breaks em "Automotivo", "Equipamento",
+  // "R.M. Cassems Ponta Porã", etc.
   drawSectionTitle(doc, 'Apolices (visao geral)');
   drawTable(doc, {
-    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Unidade', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
-    // Soma = 495 (area util A4 com margens 50/50). Coluna vinculo e
-    // unidade sao um pouco mais largas porque nomes longos aparecem.
-    columnWidths: [55, 65, 55, 70, 65, 55, 55, 75],
+    headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
+    // Soma = 495 (area util A4). Nº Apolice + Vinculo generosos porque
+    // sao os campos que costumam ter texto mais longo.
+    columnWidths: [90, 90, 65, 105, 50, 50, 45],
+    fontSize: 8,
     rows: dados.map((s) => [
       safeText(s.apoliceNumero),
       safeText(s.seguradora),
       _relSegurosTipoLabel(s.tipoSeguro),
-      _relSegurosUnidadeLabel(s),
-      _relSegurosVinculoLabel(s),
+      _relSegurosVinculoCurto(s),
       formatDate(s.dataInicio, locale, timeZone),
       formatDate(s.dataFim, locale, timeZone),
       safeText(s.status),
     ]),
   });
 
-  // Detalhes por apolice — uma subseçao cada.
+  // Detalhes por apolice — uma subseçao cada, com quebra forçada de pagina
+  // por card pra nao dividir informacao de uma mesma apolice.
   drawSectionTitle(doc, 'Detalhes por apolice');
-  for (const s of dados) {
-    _relSegurosDetalheApolice(doc, s, { locale, timeZone });
+  for (let i = 0; i < dados.length; i++) {
+    _relSegurosDetalheApolice(doc, dados[i], { locale, timeZone, primeiro: i === 0 });
   }
 }
 
