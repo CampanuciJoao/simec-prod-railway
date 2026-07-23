@@ -103,22 +103,27 @@ function styleDiasVencer(dias) {
   return { color: 'var(--color-success)' };
 }
 
-// 'Vinculado a' unifica o escopo do seguro. Nunca retorna null pra
-// garantir que sempre haja um valor visivel no card.
+function unidadeLabel(s) {
+  return s.unidade?.nomeSistema
+      || s.equipamento?.unidade?.nomeSistema
+      || s.veiculo?.unidade?.nomeSistema
+      || (s.tipoAlvo === 'EMPRESARIAL_GERAL' ? 'Todas' : '—');
+}
+
+// Vinculo = ativo especifico coberto (equipamento/veiculo). NAO inclui a
+// unidade parent — essa vai num campo separado, pra ler rapido.
 function vinculoLabel(s) {
   if (s.equipamento) {
     const nome = s.equipamento.apelido || s.equipamento.modelo || 'Equipamento';
     const tag  = s.equipamento.tag ? ` (${s.equipamento.tag})` : '';
-    const und  = s.equipamento.unidade?.nomeSistema ? ` — ${s.equipamento.unidade.nomeSistema}` : '';
-    return `${nome}${tag}${und}`;
+    return `${nome}${tag}`;
   }
   if (s.veiculo) {
     const modelo = s.veiculo.modelo ? ` ${s.veiculo.modelo}` : '';
-    const und    = s.veiculo.unidade?.nomeSistema ? ` — ${s.veiculo.unidade.nomeSistema}` : '';
-    return `${s.veiculo.placa || 'Veículo'}${modelo}${und}`;
+    return `${s.veiculo.placa || 'Veículo'}${modelo}`;
   }
-  if (s.unidade) return s.unidade.nomeSistema;
-  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Todas as unidades';
+  if (s.tipoAlvo === 'UNIDADE') return 'Predial';
+  if (s.tipoAlvo === 'EMPRESARIAL_GERAL') return 'Empresarial';
   return '—';
 }
 
@@ -166,9 +171,16 @@ function SegurosCards({ apolices }) {
               <StatusBadge value={s.status} />
             </div>
 
-            {/* Metadata: vinculo (que ja engloba unidade quando aplicavel) + datas */}
-            <div className="grid grid-cols-1 gap-y-3 gap-x-6 py-3 text-sm md:grid-cols-3">
-              <div className="md:col-span-3 lg:col-span-1">
+            {/* Metadata: unidade + vinculo + datas (4 colunas) */}
+            <div className="grid grid-cols-1 gap-y-3 gap-x-6 py-3 text-sm md:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
+                  Unidade
+                </p>
+                <p className="mt-0.5" style={valueStyle}>{unidadeLabel(s)}</p>
+              </div>
+
+              <div>
                 <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
                   Vinculado a
                 </p>
