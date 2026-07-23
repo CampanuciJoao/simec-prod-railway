@@ -150,13 +150,13 @@ function drawHeader(doc, title, options = {}) {
   doc.y = sepY + 14;
 }
 
-function drawFooter(doc) {
+function drawFooter(doc, { showSignature = true } = {}) {
   const range = doc.bufferedPageRange();
   for (let i = 0; i < range.count; i++) {
     doc.switchToPage(range.start + i);
     const W = doc.page.width;
 
-    if (i === range.count - 1) {
+    if (showSignature && i === range.count - 1) {
       const sigY = doc.page.height - doc.page.margins.bottom - 52;
       doc.moveTo(100, sigY).lineTo(W - 100, sigY).lineWidth(0.8).strokeColor(COLORS.slate300).stroke();
       doc.font('Helvetica').fontSize(8).fillColor(COLORS.slate500)
@@ -192,8 +192,8 @@ function createDocument(title, options = {}) {
   return doc;
 }
 
-function finalizeDocument(doc) {
-  drawFooter(doc);
+function finalizeDocument(doc, options = {}) {
+  drawFooter(doc, options);
 
   return new Promise((resolve, reject) => {
     const chunks = [];
@@ -922,7 +922,8 @@ export async function gerarPdfRelatorioBuffer(resultado, options = {}) {
 
   if (resultado?.tipoRelatorio === 'inventarioSeguros') {
     _relSegurosPdf(doc, resultado, { locale, timeZone });
-    return finalizeDocument(doc);
+    // Sem assinatura tecnica — relatorio administrativo, nao vistoria.
+    return finalizeDocument(doc, { showSignature: false });
   }
 
   if (resultado?.tipoRelatorio === 'inventarioEquipamentos') {
@@ -1168,62 +1169,90 @@ function _relSegurosDiasParaVencer(dataFim) {
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
-// Estima a altura total do bloco de detalhe pra decidir se o card cabe
-// na pagina atual ou se precisa quebrar antes de comecar a desenhar.
-// Mantem info de uma mesma apolice sempre junta.
+// Estimador de altura pra decidir se o card cabe na pagina atual.
+// Compactado apos feedback do usuario: linhas de metadata sao pareadas
+// (Unidade + Vinculado numa linha, Inicio + Vencimento noutra), reduzindo
+// altura em ~40% e aumentando cards por pagina.
 function _relSegurosAlturaEstimada(s) {
   const lmiCount = _relSegurosLmiRows(s).length;
-  const HEADER_H = 28;                 // drawGroupHeader (barra + gap)
-  const INFO_ROW_H = 14;               // altura media de infoRow
-  const LMI_HEADER_H = 24;             // header da tabela LMI
-  const LMI_ROW_H = 22;                // linha da tabela LMI (com padding)
-  const COBERTURA_H = s.cobertura ? 30 : 0;
-  const SEPARATOR_H = 12;              // linha separadora + gap final
+  const HEADER_H = 26;                 // drawGroupHeader compacto
+  const PAR_ROW_H = 22;                // linha pareada (2 campos side-by-side)
+  const LMI_HEADER_H = 22;
+  const LMI_ROW_H = 20;
+  const COBERTURA_H = s.cobertura ? 24 : 0;
+  const SEPARATOR_H = 8;
 
-  // Base = header + Unidade + Vinculado + Inicio + Vencimento + Premio (5 infoRows).
-  const infoRows = 5;
-  const infoRowsH = INFO_ROW_H * infoRows;
+  // 2 linhas pareadas (Unidade/Vinculado + Inicio/Vencimento) + 1 linha premio.
+  const infoBlockH = PAR_ROW_H * 2 + 14;
 
-  const lmiH = lmiCount > 0 ? LMI_HEADER_H + lmiCount * LMI_ROW_H + 8 : 0;
+  const lmiH = lmiCount > 0 ? LMI_HEADER_H + lmiCount * LMI_ROW_H + 4 : 0;
 
-  return HEADER_H + infoRowsH + COBERTURA_H + lmiH + SEPARATOR_H;
+  return HEADER_H + infoBlockH + COBERTURA_H + lmiH + SEPARATOR_H;
 }
 
 function _relSegurosDesenharSeparador(doc) {
-  const y = doc.y + 6;
+  const y = doc.y + 4;
   const x = doc.page.margins.left;
   const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
   doc.save().moveTo(x, y).lineTo(x + w, y)
     .lineWidth(0.5).strokeColor(COLORS.slate200).stroke().restore();
-  doc.y = y + 8;
+  doc.y = y + 6;
+}
+
+// Linha com dois campos "Label: valor" lado a lado. Economiza vertical
+// em relacao a duas infoRow separadas.
+function _relSegurosLinhaPar(doc, esq, dir) {
+  ensureSpace(doc, 18);
+  const x = doc.page.margins.left;
+  const y = doc.y;
+  const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const meia = w / 2;
+
+  const desenharLado = (baseX, { label, valor, valorColor, valorBold }) => {
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(COLORS.slate500)
+      .text(label, baseX, y, { width: meia - 4, continued: true });
+    doc.font(valorBold ? 'Helvetica-Bold' : 'Helvetica')
+      .fontSize(8.5)
+      .fillColor(valorColor || COLORS.slate700)
+      .text(` ${valor}`);
+  };
+
+  desenharLado(x, esq);
+  if (dir) {
+    // Recoloca y no topo da linha pra desenhar o segundo lado sem descer.
+    doc.y = y;
+    desenharLado(x + meia, dir);
+  }
+  doc.moveDown(0.4);
 }
 
 function _relSegurosDetalheApolice(doc, s, { locale, timeZone, primeiro }) {
-  // Quebra de pagina forcada quando o card nao cabe inteiro no que
-  // sobra da pagina. Evita "meia apolice na pag N, resto na pag N+1"
-  // que o usuario reclamou. Excecao: primeiro card apos a secao de
-  // detalhes — nunca forca porque acabamos de desenhar o titulo.
   const alturaEstimada = _relSegurosAlturaEstimada(s);
   if (!primeiro && doc.y + alturaEstimada > getMaxY(doc)) {
     doc.addPage();
   }
 
-  // Cabecalho tipo drawGroupHeader — mesma estetica do inventario agrupado.
+  // Cabecalho compacto tipo drawGroupHeader.
   const titulo = `Apolice ${safeText(s.apoliceNumero)} · ${safeText(s.seguradora)} · ${_relSegurosTipoLabel(s.tipoSeguro)} · ${safeText(s.status)}`;
   drawGroupHeader(doc, titulo);
 
-  // Metadados. Unidade + Vinculo separados: em apolice de equipamento,
-  // Unidade aparece explicita mesmo com Vinculo mostrando o ativo.
-  infoRow(doc, 'Unidade:', _relSegurosUnidadeLabel(s));
-  infoRow(doc, 'Vinculado a:', _relSegurosVinculoLabel(s));
-  infoRow(doc, 'Inicio:', formatDate(s.dataInicio, locale, timeZone));
+  // Metadata pareada: economiza vertical.
+  _relSegurosLinhaPar(doc,
+    { label: 'Unidade:',     valor: _relSegurosUnidadeLabel(s) },
+    { label: 'Vinculado a:', valor: _relSegurosVinculoLabel(s) }
+  );
 
   const dias = _relSegurosDiasParaVencer(s.dataFim);
-  const venc = formatDate(s.dataFim, locale, timeZone);
-  const vencText = dias === null ? venc
-    : dias >= 0 ? `${venc} (${dias} dia(s))`
-    : `${venc} (venceu ha ${Math.abs(dias)} dia(s))`;
-  infoRow(doc, 'Vencimento:', vencText);
+  const vencText = dias === null
+    ? formatDate(s.dataFim, locale, timeZone)
+    : dias >= 0
+    ? `${formatDate(s.dataFim, locale, timeZone)} (${dias} dia(s))`
+    : `${formatDate(s.dataFim, locale, timeZone)} (venceu ha ${Math.abs(dias)} dia(s))`;
+
+  _relSegurosLinhaPar(doc,
+    { label: 'Inicio:',     valor: formatDate(s.dataInicio, locale, timeZone) },
+    { label: 'Vencimento:', valor: vencText }
+  );
 
   if (s.cobertura) {
     infoRow(doc, 'Coberturas:', s.cobertura);
@@ -1232,7 +1261,7 @@ function _relSegurosDetalheApolice(doc, s, { locale, timeZone, primeiro }) {
   // Tabela de LMIs — so os nao-zero.
   const lmiRows = _relSegurosLmiRows(s);
   if (lmiRows.length > 0) {
-    doc.moveDown(0.4);
+    doc.moveDown(0.2);
     drawTable(doc, {
       headers: ['Limite maximo de indenizacao', 'Valor'],
       columnWidths: [335, 160],
@@ -1241,8 +1270,6 @@ function _relSegurosDetalheApolice(doc, s, { locale, timeZone, primeiro }) {
   }
 
   infoRow(doc, 'Premio total:', _fmtBRL(s.premioTotal));
-
-  // Separador visual entre apolices — linha fina cinza claro.
   _relSegurosDesenharSeparador(doc);
 }
 
@@ -1272,21 +1299,33 @@ function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
     ],
   });
 
-  // Visao geral (tabela). Ordenacao vem do backend (dataFim asc).
-  // Unidade + Vinculo sao colunas separadas: usuario pediu Unidade de
-  // volta pra saber a qual unidade um equipamento pertence sem ler texto
-  // longo do Vinculo. FontSize 8 evita char-level breaks em palavras
-  // curtas ("Automotivo", "Equipamento").
+  // Ordena por unidade (alfabetico pt-BR) e, dentro da mesma unidade,
+  // por vencimento crescente. Assim apolices da mesma unidade ficam
+  // agrupadas naturalmente em ambos os blocos (overview e detalhes).
+  const dadosOrdenados = [...dados].sort((a, b) => {
+    const ua = _relSegurosUnidadeLabel(a);
+    const ub = _relSegurosUnidadeLabel(b);
+    const cmp = ua.localeCompare(ub, 'pt-BR');
+    if (cmp !== 0) return cmp;
+    const fa = a.dataFim ? new Date(a.dataFim).getTime() : Infinity;
+    const fb = b.dataFim ? new Date(b.dataFim).getTime() : Infinity;
+    return fa - fb;
+  });
+
+  // Visao geral (tabela). Ajustes 2026-07-23 apos feedback:
+  //   - Header "Vencimento" e datas 30/07/2025 estavam quebrando em
+  //     duas linhas → fontSize 7 no header + 7.5 nas celulas + colunas
+  //     de data ampliadas pra 60px cada.
+  //   - "Automotivo"/"Equipamento" tambem quebravam letra por letra →
+  //     Tipo aumentado pra 62px.
   drawSectionTitle(doc, 'Apolices (visao geral)');
   drawTable(doc, {
     headers: ['Nº Apolice', 'Seguradora', 'Tipo', 'Unidade', 'Vinculo', 'Inicio', 'Vencimento', 'Status'],
-    // Soma = 495 (area util A4). Tipo/Status/datas suficientes pra
-    // caber Automotivo/Equipamento/Substituido/dd-mm-yyyy sem char-break.
-    // Nomes longos (Seguradora "BRADESCO..." ou Unidade "R.M. Cassems...")
-    // vao wrap-ar em 2 linhas ao nivel de palavra, o que e' aceitavel.
-    columnWidths: [70, 75, 65, 70, 70, 50, 50, 45],
-    fontSize: 8,
-    rows: dados.map((s) => [
+    // Soma = 495 (area util A4).
+    columnWidths: [58, 70, 62, 65, 70, 60, 60, 50],
+    fontSize: 7.5,
+    headerFontSize: 7,
+    rows: dadosOrdenados.map((s) => [
       safeText(s.apoliceNumero),
       safeText(s.seguradora),
       _relSegurosTipoLabel(s.tipoSeguro),
@@ -1298,12 +1337,36 @@ function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
     ]),
   });
 
-  // Detalhes por apolice — uma subseçao cada, com quebra forçada de pagina
-  // por card pra nao dividir informacao de uma mesma apolice.
+  // Detalhes por apolice — agrupados por unidade. Cada mudanca de
+  // unidade insere um subtitulo pra separar visualmente e ajudar a
+  // encontrar a apolice desejada.
   drawSectionTitle(doc, 'Detalhes por apolice');
-  for (let i = 0; i < dados.length; i++) {
-    _relSegurosDetalheApolice(doc, dados[i], { locale, timeZone, primeiro: i === 0 });
+  let unidadeAtual = null;
+  for (let i = 0; i < dadosOrdenados.length; i++) {
+    const s = dadosOrdenados[i];
+    const unidade = _relSegurosUnidadeLabel(s);
+    const primeiroDaUnidade = unidade !== unidadeAtual;
+    if (primeiroDaUnidade) {
+      unidadeAtual = unidade;
+      _relSegurosSubtituloUnidade(doc, unidade);
+    }
+    _relSegurosDetalheApolice(doc, s, {
+      locale,
+      timeZone,
+      primeiro: i === 0 || primeiroDaUnidade,
+    });
   }
+}
+
+function _relSegurosSubtituloUnidade(doc, nome) {
+  ensureSpace(doc, 24);
+  const x = doc.page.margins.left;
+  const w = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const y = doc.y + 4;
+  doc.save().rect(x, y, w, 16).fill(COLORS.slate100).restore();
+  doc.font('Helvetica-Bold').fontSize(9).fillColor(COLORS.slate700)
+    .text(nome, x + 8, y + 4, { width: w - 16, lineBreak: false });
+  doc.y = y + 20;
 }
 
 function _relDrawChip(doc, x, y, label, cores, opts = {}) {
