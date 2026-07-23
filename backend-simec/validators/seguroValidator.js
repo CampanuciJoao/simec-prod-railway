@@ -41,6 +41,11 @@ export const seguroSchema = z
     equipamentoId: z.string().nullable().optional(),
     unidadeId: z.string().nullable().optional(),
     veiculoId: z.string().nullable().optional(),
+    // Quando o seguro e' AUTO e o veiculo ainda nao foi cadastrado, o
+    // usuario informa placa + modelo direto no form. Backend faz upsert
+    // por (tenantId, placa) e vincula veiculoId no seguro criado.
+    veiculoPlaca: z.string().max(10).nullable().optional(),
+    veiculoModelo: z.string().max(120).nullable().optional(),
     cobertura: z.string().nullable().optional(),
 
     status: z
@@ -63,5 +68,26 @@ export const seguroSchema = z
         code: z.ZodIssueCode.custom,
         message: 'Equipamento deve estar vinculado a uma unidade.',
       });
+    }
+
+    // AUTO exige que o veiculo seja identificado: seja pelo veiculoId
+    // (veiculo ja cadastrado) OU por placa + modelo (novo veiculo).
+    if (data.tipoSeguro === 'AUTO' && !data.veiculoId) {
+      const semPlaca  = !data.veiculoPlaca  || !data.veiculoPlaca.trim();
+      const semModelo = !data.veiculoModelo || !data.veiculoModelo.trim();
+      if (semPlaca) {
+        ctx.addIssue({
+          path: ['veiculoPlaca'],
+          code: z.ZodIssueCode.custom,
+          message: 'A placa do veiculo e obrigatoria para seguro Auto.',
+        });
+      }
+      if (semModelo) {
+        ctx.addIssue({
+          path: ['veiculoModelo'],
+          code: z.ZodIssueCode.custom,
+          message: 'O modelo do veiculo e obrigatorio para seguro Auto.',
+        });
+      }
     }
   });

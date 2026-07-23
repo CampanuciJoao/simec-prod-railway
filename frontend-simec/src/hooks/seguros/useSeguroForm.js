@@ -24,6 +24,11 @@ export function useSeguroForm({
         dataFim: initialData.dataFim
           ? initialData.dataFim.slice(0, 10)
           : '',
+        // Pre-preenche placa+modelo quando o seguro AUTO ja tem veiculo
+        // vinculado, pra o usuario ver o que esta la sem precisar clicar
+        // em "trocar veiculo".
+        veiculoPlaca:  initialData.veiculo?.placa  || '',
+        veiculoModelo: initialData.veiculo?.modelo || '',
       });
     }
   }, [isEditing, initialData]);
@@ -53,12 +58,18 @@ export function useSeguroForm({
   const buildPayload = () => {
     const lmiFields = sanitizeCoberturasByTipo(formData);
 
+    const tipoSeguro = formData.tipoSeguro || 'EQUIPAMENTO';
     const equipamentoId = formData.equipamentoId || null;
     const unidadeId = formData.unidadeId || null;
     const veiculoId = formData.veiculoId || null;
+    const veiculoPlaca  = formData.veiculoPlaca?.trim()  || null;
+    const veiculoModelo = formData.veiculoModelo?.trim() || null;
 
+    // tipoAlvo derivado do escopo real: AUTO forca VEICULO mesmo se veiculoId
+    // ainda nao existe (backend cria via upsert por placa).
     let tipoAlvo = 'EMPRESARIAL_GERAL';
-    if (equipamentoId) tipoAlvo = 'EQUIPAMENTO';
+    if (tipoSeguro === 'AUTO') tipoAlvo = 'VEICULO';
+    else if (equipamentoId) tipoAlvo = 'EQUIPAMENTO';
     else if (veiculoId) tipoAlvo = 'VEICULO';
     else if (unidadeId) tipoAlvo = 'UNIDADE';
 
@@ -69,11 +80,15 @@ export function useSeguroForm({
       dataFim: formData.dataFim || '',
       premioTotal: Number(formData.premioTotal) || 0,
       status: formData.status || 'Ativo',
-      tipoSeguro: formData.tipoSeguro || 'EQUIPAMENTO',
+      tipoSeguro,
       tipoAlvo,
       equipamentoId,
       unidadeId,
       veiculoId,
+      // AUTO: sempre envia placa+modelo (backend upsert). Outros tipos:
+      // envia null pra evitar validador reclamar de placa parcial.
+      veiculoPlaca:  tipoSeguro === 'AUTO' ? veiculoPlaca  : null,
+      veiculoModelo: tipoSeguro === 'AUTO' ? veiculoModelo : null,
       cobertura: formData.cobertura || null,
       lmiIncendio: lmiFields.lmiIncendio,
       lmiDanosEletricos: lmiFields.lmiDanosEletricos,
