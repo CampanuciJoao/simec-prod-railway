@@ -1,7 +1,7 @@
 import React from 'react';
 import PropTypes from 'prop-types';
 
-import { StatusBadge } from '@/components/ui';
+import { Card, StatusBadge } from '@/components/ui';
 import { formatarDataHora } from '../../utils/timeUtils';
 import { formatarDowntime } from '../../utils/bi/downtimeUtils';
 
@@ -96,12 +96,11 @@ function diasParaVencer(dataFim) {
   return Math.round(ms / (1000 * 60 * 60 * 24));
 }
 
-function corDiasVencer(dias) {
-  if (dias === null) return 'text-slate-500';
-  if (dias < 0) return 'text-slate-500';
-  if (dias < 30) return 'text-red-600 font-semibold';
-  if (dias < 90) return 'text-amber-600 font-semibold';
-  return 'text-emerald-600';
+function styleDiasVencer(dias) {
+  if (dias === null || dias < 0) return { color: 'var(--text-muted)' };
+  if (dias < 30)  return { color: 'var(--color-danger)',  fontWeight: 600 };
+  if (dias < 90)  return { color: 'var(--color-warning)', fontWeight: 600 };
+  return { color: 'var(--color-success)' };
 }
 
 function unidadeLabel(s) {
@@ -125,6 +124,16 @@ function vinculoLabel(s) {
 }
 
 function SegurosCards({ apolices }) {
+  const labelStyle = {
+    color: 'var(--text-muted)',
+  };
+  const valueStyle = {
+    color: 'var(--text-primary)',
+  };
+  const borderStyle = {
+    borderColor: 'var(--border-soft)',
+  };
+
   return (
     <div className="space-y-4">
       {apolices.map((s) => {
@@ -135,20 +144,23 @@ function SegurosCards({ apolices }) {
         const vinculo = vinculoLabel(s);
 
         return (
-          <div
-            key={s.id}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
-          >
+          <Card key={s.id} surface="soft">
             {/* Header: dados principais */}
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-3">
+            <div
+              className="flex flex-wrap items-start justify-between gap-3 border-b pb-3"
+              style={borderStyle}
+            >
               <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-lg font-bold text-slate-900">
+                <span className="text-lg font-bold" style={valueStyle}>
                   Nº {s.apoliceNumero || '—'}
                 </span>
-                <span className="text-sm text-slate-600">
+                <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   {s.seguradora || '—'}
                 </span>
-                <span className="text-xs uppercase tracking-wide text-slate-500">
+                <span
+                  className="text-xs font-semibold uppercase tracking-wide"
+                  style={{ color: 'var(--brand-primary)' }}
+                >
                   {SEGURO_TIPO_LABEL[s.tipoSeguro] || s.tipoSeguro}
                 </span>
               </div>
@@ -156,66 +168,76 @@ function SegurosCards({ apolices }) {
             </div>
 
             {/* Metadata: unidade, vinculo, datas */}
-            <div className="grid grid-cols-1 gap-y-2 gap-x-6 py-3 text-sm text-slate-700 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-y-3 gap-x-6 py-3 text-sm md:grid-cols-2 lg:grid-cols-4">
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
                   Unidade
-                </span>
-                <div>{unidadeLabel(s)}</div>
+                </p>
+                <p className="mt-0.5" style={valueStyle}>{unidadeLabel(s)}</p>
               </div>
 
               {vinculo && (
                 <div>
-                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
                     Vinculado a
-                  </span>
-                  <div>{vinculo}</div>
+                  </p>
+                  <p className="mt-0.5" style={valueStyle}>{vinculo}</p>
                 </div>
               )}
 
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
                   Início
-                </span>
-                <div>{fmtDate(s.dataInicio)}</div>
+                </p>
+                <p className="mt-0.5" style={valueStyle}>{fmtDate(s.dataInicio)}</p>
               </div>
 
               <div>
-                <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <p className="text-xs font-semibold uppercase tracking-wide" style={labelStyle}>
                   Vencimento
-                </span>
-                <div>
+                </p>
+                <p className="mt-0.5" style={valueStyle}>
                   {fmtDate(s.dataFim)}
                   {dias !== null && (
-                    <span className={`ml-2 text-xs ${corDiasVencer(dias)}`}>
+                    <span className="ml-2 text-xs" style={styleDiasVencer(dias)}>
                       {dias >= 0 ? `${dias} dia(s)` : `venceu há ${Math.abs(dias)} dia(s)`}
                     </span>
                   )}
-                </div>
+                </p>
               </div>
             </div>
 
             {/* Coberturas */}
             {s.cobertura && (
-              <div className="border-t border-slate-100 pt-3">
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="border-t pt-3" style={borderStyle}>
+                <p
+                  className="mb-1 text-xs font-semibold uppercase tracking-wide"
+                  style={labelStyle}
+                >
                   Coberturas
-                </div>
-                <div className="text-sm text-slate-700">{s.cobertura}</div>
+                </p>
+                <p className="text-sm" style={valueStyle}>{s.cobertura}</p>
               </div>
             )}
 
             {/* LMIs — chips inline */}
             {lmis.length > 0 && (
-              <div className="mt-3 border-t border-slate-100 pt-3">
-                <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <div className="mt-3 border-t pt-3" style={borderStyle}>
+                <p
+                  className="mb-2 text-xs font-semibold uppercase tracking-wide"
+                  style={labelStyle}
+                >
                   Limites máximos de indenização (LMIs)
-                </div>
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {lmis.map((lmi) => (
                     <span
                       key={lmi.label}
-                      className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs text-slate-700"
+                      className="inline-flex items-center rounded-full px-3 py-1 text-xs"
+                      style={{
+                        backgroundColor: 'var(--bg-surface-subtle)',
+                        color: 'var(--text-primary)',
+                      }}
                     >
                       <strong className="mr-1">{lmi.label}:</strong> {fmtBRL(lmi.valor)}
                     </span>
@@ -225,11 +247,14 @@ function SegurosCards({ apolices }) {
             )}
 
             {/* Rodapé: prêmio total */}
-            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-sm">
-              <span className="text-slate-500">Prêmio total</span>
-              <span className="font-semibold text-slate-900">{fmtBRL(s.premioTotal)}</span>
+            <div
+              className="mt-3 flex items-center justify-between border-t pt-3 text-sm"
+              style={borderStyle}
+            >
+              <span style={labelStyle}>Prêmio total</span>
+              <span className="font-semibold" style={valueStyle}>{fmtBRL(s.premioTotal)}</span>
             </div>
-          </div>
+          </Card>
         );
       })}
     </div>
