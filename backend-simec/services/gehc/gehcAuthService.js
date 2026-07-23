@@ -257,30 +257,51 @@ export async function capturarTokensViaPlaywright(tenantId) {
       console.log('[GEHC_AUTH] Sem botao submit — usando Enter no campo password.');
       await passInput.press('Enter');
     }
-    console.log('[GEHC_AUTH] Credenciais enviadas, aguardando autenticacao...');
+    console.log('[GEHC_AUTH] Credenciais enviadas, aguardando redirect chain completar...');
 
-    // Espera ate (a) password sumir, (b) URL mudar do /account inicial.
-    const urlPreSubmit = page.url();
+    // GEIDP2FAPage e' pagina de TRANSITO da Salesforce — sempre roda
+    // (ate no browser normal), so que dura ms e auto-resolve. Meu erro
+    // antes: interromper com page.goto(myequipment) enquanto ela ainda
+    // resolvia, o que caia no SSO loop. Fix: aguardar url final natural
+    // (www.gehealthcare.com/pt-br/account*) SEM navegar manualmente.
+    // 90s de timeout absorve latencia de rede + analytics + LaunchDarkly
+    // + qualquer transit page intermediaria.
     try {
-      await Promise.race([
-        page.waitForFunction(() => !document.querySelector('input[type="password"]'), { timeout: 30000 }),
-        page.waitForURL((url) => url.toString() !== urlPreSubmit, { timeout: 30000 }),
-      ]);
-    } catch {
-      console.warn('[GEHC_AUTH] Apos submit: password input ainda presente E URL nao mudou em 30s.');
+      await page.waitForURL(
+        (url) => {
+          const s = url.toString();
+          return s.startsWith('https://www.gehealthcare.com/pt-br/account')
+              && !s.includes('logon.gehealthcare.com');
+        },
+        { timeout: 90000 }
+      );
+    } catch (err) {
+      console.warn(`[GEHC_AUTH] Nao chegou em .com/pt-br/account em 90s. URL atual: ${page.url()}. Erro: ${err.message?.slice(0, 100)}`);
     }
-    console.log(`[GEHC_AUTH] URL pos-submit: ${page.url()}`);
+    console.log(`[GEHC_AUTH] URL pos-redirect-chain: ${page.url()}`);
 
-    // Navega pra myequipment pra o SPA renovar cookies e disparar CDX
-    // (o portal renova tokens nesse momento).
-    await page.goto(GEHC_MYEQUIPMENT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-    console.log(`[GEHC_AUTH] URL pos-myequipment: ${page.url()}`);
+    // Aguarda analytics + LaunchDarkly + tudo pos-login terminar de
+    // setar cookies. Sao esses cookies que constroem "device trust" pra
+    // proxima execucao pular step-up mais rapido.
+    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {
+      console.log('[GEHC_AUTH] networkidle timeout — prosseguindo com cookies atuais.');
+    });
 
-    // Le tokens dos cookies (descoberta 2026-06-30 — access_token e
-    // id_token sao cookies JS-visiveis).
-    const cookies = await context.cookies();
-    const tokens = tokensDosCookies(cookies);
+    // Le tokens dos cookies (access_token + id_token sao JS-visiveis
+    // no domain .gehealthcare.com).
+    let cookies = await context.cookies();
+    let tokens = tokensDosCookies(cookies);
+
+    // Fallback: se cookies ainda nao tem os tokens, navegar pra
+    // myequipment forca o SPA a chamar CDX + renovar cookies. Esta e'
+    // a estrategia antiga — vira ultimo recurso agora, nao primeira acao.
+    if (!tokens) {
+      console.log('[GEHC_AUTH] Cookies nao tem tokens ainda, navegando pra myequipment como fallback...');
+      await page.goto(GEHC_MYEQUIPMENT_URL, { waitUntil: 'domcontentloaded', timeout: 30000 }).catch(() => {});
+      await page.waitForLoadState('networkidle', { timeout: 20000 }).catch(() => {});
+      cookies = await context.cookies();
+      tokens = tokensDosCookies(cookies);
+    }
 
     if (!tokens) {
       // Diagnostico denso quando falha
