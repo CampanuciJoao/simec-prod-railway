@@ -1170,24 +1170,31 @@ function _relSegurosDiasParaVencer(dataFim) {
 }
 
 // Estimador de altura pra decidir se o card cabe na pagina atual.
-// Compactado apos feedback do usuario: linhas de metadata sao pareadas
-// (Unidade + Vinculado numa linha, Inicio + Vencimento noutra), reduzindo
-// altura em ~40% e aumentando cards por pagina.
+// Ajustado 2026-07-23 apos feedback do usuario: valores anteriores
+// subestimavam LMI rows (drawTable default 9pt tem row ~28px, nao 20),
+// cobertura longa (wrap multi-linhas), e nao contabilizavam gap do
+// moveDown(1) que drawTable faz apos renderizar. Resultado era "Premio
+// total" orfao no topo da pagina seguinte.
 function _relSegurosAlturaEstimada(s) {
   const lmiCount = _relSegurosLmiRows(s).length;
-  const HEADER_H = 26;                 // drawGroupHeader compacto
-  const PAR_ROW_H = 22;                // linha pareada (2 campos side-by-side)
-  const LMI_HEADER_H = 22;
-  const LMI_ROW_H = 20;
-  const COBERTURA_H = s.cobertura ? 24 : 0;
-  const SEPARATOR_H = 8;
+  const HEADER_H       = 32;   // drawGroupHeader ~18 + gap 14
+  const PAR_ROW_H      = 26;   // linha pareada (safety margin)
+  const LMI_HEADER_H   = 26;   // drawTable header 24 + folga
+  const LMI_ROW_H      = 30;   // drawTable row a 9pt = ~26-28 + safety
+  const TABLE_END_GAP  = 12;   // drawTable faz moveDown(1) no fim
+  const PREMIO_H       = 20;   // infoRow "Premio total" (safety margin)
+  const SEPARATOR_H    = 16;
 
-  // 2 linhas pareadas (Unidade/Vinculado + Inicio/Vencimento) + 1 linha premio.
-  const infoBlockH = PAR_ROW_H * 2 + 14;
+  // Cobertura: wrap multi-linhas. Estimador conservador: 55 chars por
+  // linha em 9pt Helvetica em ~460px de largura.
+  const cobertLen = s.cobertura?.length || 0;
+  const cobertLines = cobertLen === 0 ? 0 : Math.max(1, Math.ceil(cobertLen / 55));
+  const COBERTURA_H = cobertLines > 0 ? 16 + cobertLines * 12 : 0;
 
-  const lmiH = lmiCount > 0 ? LMI_HEADER_H + lmiCount * LMI_ROW_H + 4 : 0;
+  const infoBlockH = PAR_ROW_H * 2; // 2 linhas pareadas
+  const lmiH = lmiCount > 0 ? LMI_HEADER_H + lmiCount * LMI_ROW_H + TABLE_END_GAP : 0;
 
-  return HEADER_H + infoBlockH + COBERTURA_H + lmiH + SEPARATOR_H;
+  return HEADER_H + infoBlockH + COBERTURA_H + lmiH + PREMIO_H + SEPARATOR_H;
 }
 
 function _relSegurosDesenharSeparador(doc) {
@@ -1343,18 +1350,32 @@ function _relSegurosPdf(doc, resultado, { locale, timeZone }) {
   // unidade insere um subtitulo pra separar visualmente e ajudar a
   // encontrar a apolice desejada.
   drawSectionTitle(doc, 'Detalhes por apolice');
+  const SUBTITULO_H = 24;
   let unidadeAtual = null;
   for (let i = 0; i < dadosOrdenados.length; i++) {
     const s = dadosOrdenados[i];
     const unidade = _relSegurosUnidadeLabel(s);
     const primeiroDaUnidade = unidade !== unidadeAtual;
+
     if (primeiroDaUnidade) {
+      // Atomicidade: subtitulo + primeiro card da unidade sao uma
+      // unidade visual. Se nao cabem juntos no que sobra da pagina,
+      // adiciona pagina ANTES do subtitulo — evita subtitulo orfao
+      // no rodape com o card iniciando na proxima pagina.
+      const alturaTotal = SUBTITULO_H + _relSegurosAlturaEstimada(s);
+      if (i > 0 && doc.y + alturaTotal > getMaxY(doc)) {
+        doc.addPage();
+      }
       unidadeAtual = unidade;
       _relSegurosSubtituloUnidade(doc, unidade);
     }
+
     _relSegurosDetalheApolice(doc, s, {
       locale,
       timeZone,
+      // primeiro=true skipa a checagem de altura dentro do detalhe
+      // porque acabamos de garantir espaco acima (ou e' o card
+      // inicial da secao apos drawSectionTitle).
       primeiro: i === 0 || primeiroDaUnidade,
     });
   }
