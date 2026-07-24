@@ -137,6 +137,25 @@ async function processarTenant(tenantId) {
       continue;
     }
 
+    // ATOMIC CLAIM: marca como enviado ANTES de mandar. Sem isso, se
+    // dispararNotificacoesTelegram (do orchestrator) e dispararPendencias
+    // TelegramTodos (do cron drainer) rodam em paralelo — o que acontece
+    // no mesmo minuto — ambos buscam a mesma lista de pendentes e ambos
+    // mandam a mensagem. Resultado: cliente recebe alerta duplicado.
+    //
+    // A trade-off aqui e' at-most-once delivery: se o Telegram falhar
+    // apos o claim, perdemos essa notificacao especifica. Mas duplicar
+    // e' pior que perder — e a maioria dos alertas retorna 200 na
+    // primeira tentativa.
+    const claim = await prisma.alerta.updateMany({
+      where: { id: alerta.id, telegramEnviado: false },
+      data:  { telegramEnviado: true },
+    });
+    if (claim.count === 0) {
+      // Outro worker ja claim-ou este alerta. Pula sem enviar.
+      continue;
+    }
+
     // Tenta enviar para cada destinatario; conta sucessos.
     const resultados = await Promise.allSettled(
       interessados.map(async (dest) => {
@@ -158,14 +177,13 @@ async function processarTenant(tenantId) {
       );
     }
 
-    // Marca como enviado APENAS se pelo menos 1 destinatario recebeu.
-    // Caso contrario, fica pendente para retry no proximo ciclo
-    // (resolve falhas transitorias de rede/rate limit).
-    if (sucessos > 0) {
+    // Falha total (0 sucessos): reverte o claim pra alerta ser retentado
+    // no proximo ciclo (recupera de falhas transitorias tipo rate limit).
+    if (sucessos === 0) {
       await prisma.alerta.update({
         where: { id: alerta.id },
-        data: { telegramEnviado: true },
-      });
+        data:  { telegramEnviado: false },
+      }).catch(() => {});
     }
   }
 }
