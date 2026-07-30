@@ -78,7 +78,7 @@ function yCenterTexto(rowY, rowH, fontSize) {
 // Protege contra corte de impressora (a maioria respeita margens >=10mm).
 const HEADER_TOP_OFFSET = 24;
 
-function drawHeader(doc) {
+function drawHeader(doc, { numero } = {}) {
   const W = doc.page.width;
   const bandTop = HEADER_TOP_OFFSET;
   const bandH = 52;
@@ -95,8 +95,19 @@ function drawHeader(doc) {
   const tx = hasLogo ? 60 : 14;
   doc.font('Helvetica-Bold').fontSize(15).fillColor('#ffffff').text('SIMEC', tx, bandTop + 10);
   doc.font('Helvetica').fontSize(7.5).fillColor('#cbd5e1').text('Sistema de Gestão de Equipamentos de Radiologia', tx, bandTop + 30);
+
+  // Coluna direita: "Gerado em" (linha 1) + "Nº do orçamento" (linha 2).
+  // Numero derivado do id do orcamento (ultimos 6 chars, uppercase) —
+  // mesmo formato usado no nome do arquivo do PDF, pra facilitar
+  // correlacionar arquivo baixado com a apolice no sistema.
   const gerado = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }).format(new Date());
-  doc.font('Helvetica').fontSize(8).fillColor('#cbd5e1').text(`Gerado em: ${gerado}`, 0, bandTop + 20, { align: 'right', width: W - 14, lineBreak: false });
+  doc.font('Helvetica').fontSize(8).fillColor('#cbd5e1')
+    .text(`Gerado em: ${gerado}`, 0, bandTop + 10, { align: 'right', width: W - 14, lineBreak: false });
+  if (numero) {
+    doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff')
+      .text(`Nº ${numero}`, 0, bandTop + 26, { align: 'right', width: W - 14, lineBreak: false });
+  }
+
   // Linha separadora 38pt abaixo da faixa
   const sepY = bandBottom + 38;
   doc.moveTo(50, sepY).lineTo(W - 50, sepY).lineWidth(0.8).strokeColor('#cbd5e1').stroke();
@@ -147,11 +158,21 @@ export async function obterDadosPdfOrcamento({ tenantId, orcamentoId }) {
   return orcamento;
 }
 
+// Numero de exibicao/nome de arquivo do orcamento derivado do id.
+// Formato: ultimos 6 chars uppercase (ex: 'A0F1B2'). E' o mesmo valor
+// usado no nome do PDF gerado — facilita correlacionar arquivo baixado
+// com o registro no sistema.
+export function numeroOrcamento(orcamento) {
+  const id = orcamento?.id || '';
+  return id.slice(-6).toUpperCase();
+}
+
 export async function gerarPdfOrcamentoBuffer(orcamento) {
   const tenantInfo = await prepararEntidadeInfo({
     unidadeId: orcamento?.unidadeId || orcamento?.unidade?.id,
     tenantId: orcamento?.tenantId,
   });
+  const numero = numeroOrcamento(orcamento);
   return new Promise((resolve, reject) => {
     // margin top 134 acomoda HEADER_TOP_OFFSET (24) + faixa (52) +
     // separadora (38) + y inicial (14) + folga (~6)
@@ -160,9 +181,9 @@ export async function gerarPdfOrcamentoBuffer(orcamento) {
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
-    doc.on('pageAdded', () => drawHeader(doc));
+    doc.on('pageAdded', () => drawHeader(doc, { numero }));
 
-    drawHeader(doc);
+    drawHeader(doc, { numero });
 
     // Bloco "Dados da Empresa" (cliente) só na primeira página.
     drawEntidadeInfoBlock(doc, tenantInfo, { x: 36, width: doc.page.width - 72 });
