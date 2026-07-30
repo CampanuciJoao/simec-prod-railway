@@ -132,7 +132,9 @@ export const exportarHistoricoEquipamentoPDF = (
 export const exportarOrcamentoPDF = (orcamentoId) =>
   baixarPdf(
     { url: `/pdfs/orcamento/${orcamentoId}`, method: 'get' },
-    `orcamento_${orcamentoId.slice(-6).toUpperCase()}.pdf`
+    // Fallback caso Content-Disposition seja stripada por proxy. Formato
+    // bate com o nome enviado pelo backend.
+    `Orçamento Nº ${orcamentoId.slice(-6).toUpperCase()}.pdf`
   );
 
 // Versao "preview": retorna um Object URL temporario (blob: URL) que
