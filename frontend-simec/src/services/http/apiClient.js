@@ -49,6 +49,19 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
+// Erro do refresh que indica indisponibilidade transitoria (backend
+// down, deploy, timeout de rede). Nao desloga o usuario — apenas
+// devolve o erro pra request original tratar. Deslogar aqui seria
+// falso-positivo em quase todos os casos.
+function ehErroTransitorioNoRefresh(err) {
+  if (err?.message === 'Refresh token timeout') return true;
+  const status = err?.response?.status;
+  if (status === 502 || status === 503 || status === 504) return true;
+  // Sem response = network error (offline, DNS, TLS handshake fail).
+  if (!err?.response && err?.code) return true;
+  return false;
+}
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -64,7 +77,9 @@ api.interceptors.response.use(
 
       try {
         if (!refreshPromise) {
-          const REFRESH_TIMEOUT_MS = 8_000;
+          // Timeout generoso: cold start do Railway + DB pool aquecendo
+          // podem levar 15-25s. Antes 8s causava falso-logout constante.
+          const REFRESH_TIMEOUT_MS = 30_000;
           const timeoutPromise = new Promise((_, reject) =>
             setTimeout(
               () => reject(new Error('Refresh token timeout')),
@@ -92,12 +107,20 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         refreshPromise = null;
-        clearStoredUserInfo();
 
+        // Erro transitorio (backend indisponivel, timeout de rede) NAO
+        // e' sinal de sessao invalida. Devolve o erro pra request
+        // original — usuario pode retentar sem ter que relogar.
+        if (ehErroTransitorioNoRefresh(refreshError)) {
+          return Promise.reject(refreshError);
+        }
+
+        // 401 explicito no refresh (sessao expirada ou revogada) —
+        // agora sim: limpa storage e redireciona pra login.
+        clearStoredUserInfo();
         if (window.location.pathname !== '/login') {
           window.location.href = '/login';
         }
-
         return Promise.reject(refreshError);
       }
     }

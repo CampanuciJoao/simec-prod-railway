@@ -16,6 +16,7 @@ import {
   marcarPasswordResetTokenComoUsado,
   revogarSessaoPorId,
   revogarSessoesDoUsuario,
+  rotacionarSessao,
 } from './authRepository.js';
 import { registrarLog } from '../logService.js';
 import { enviarEmail } from '../emailService.js';
@@ -39,6 +40,7 @@ const defaultAuthServiceDeps = {
   marcarPasswordResetTokenComoUsado,
   revogarSessaoPorId,
   revogarSessoesDoUsuario,
+  rotacionarSessao,
   registrarLog,
   enviarEmail,
 };
@@ -329,6 +331,20 @@ export async function refreshAuthSessionService(refreshToken) {
     };
   }
 
+  // Sliding session: rotaciona refresh token a cada refresh e estende
+  // expiresAt (14 dias a partir de agora). Usuario ativo NUNCA e'
+  // deslogado por prazo — so' se ficar 14 dias sem usar.
+  const novoRefreshToken = buildRefreshToken();
+  const novoRefreshTokenHash = hashPlainToken(novoRefreshToken);
+  const novoExpiresAt = new Date(
+    Date.now() + REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000
+  );
+  await authServiceDeps.rotacionarSessao({
+    id: session.id,
+    refreshTokenHash: novoRefreshTokenHash,
+    expiresAt: novoExpiresAt,
+  });
+
   const accessToken = jwt.sign(
     buildAuthPayload({
       ...session.usuario,
@@ -343,6 +359,9 @@ export async function refreshAuthSessionService(refreshToken) {
   return {
     ok: true,
     status: 200,
+    // refreshToken novo devolvido pra route setar cookie atualizado.
+    refreshToken: novoRefreshToken,
+    cookieOptions: buildCookieOptions(),
     data: buildAuthResponse(
       {
         ...session.usuario,

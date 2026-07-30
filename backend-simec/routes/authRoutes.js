@@ -136,6 +136,12 @@ export function buildAuthRouter(services = {}) {
         req.cookies?.[REFRESH_TOKEN_COOKIE]
       );
 
+      // Sliding session: seta cookie com o novo refresh token gerado
+      // pelo service (rotacionado a cada refresh).
+      if (resultado.ok && resultado.refreshToken) {
+        setRefreshCookie(res, resultado.refreshToken);
+      }
+
       return res.status(resultado.status).json(
         resultado.ok ? resultado.data : { message: resultado.message }
       );
