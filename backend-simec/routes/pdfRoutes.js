@@ -24,6 +24,7 @@ import {
 import {
   obterDadosPdfOrcamento,
   gerarPdfOrcamentoBuffer,
+  numeroOrcamento,
 } from '../services/pdf/orcamentoPdfService.js';
 import {
   obterDadosPdfOsCorretiva,
@@ -45,7 +46,15 @@ function getPdfOptions(req, unidadeTimezone = null) {
 
 function sendPdf(res, buffer, fileName) {
   res.setHeader('Content-Type', 'application/pdf');
-  res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+  // Content-Disposition com filename ASCII + filename* UTF-8 (RFC 5987).
+  // Sem o filename*= alguns browsers/proxies ignoravam o filename simples
+  // e caiam pra fallback (o segmento final da URL, tipo o UUID) — resultado
+  // era usuario baixando PDFs renomeados de forma confusa.
+  const asciiName = fileName.replace(/[^\x20-\x7e]/g, '_');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`
+  );
   return res.status(200).send(buffer);
 }
 
@@ -189,8 +198,9 @@ router.get('/orcamento/:id', async (req, res) => {
       orcamentoId: req.params.id,
     });
     const buffer = await gerarPdfOrcamentoBuffer(orcamento, getPdfOptions(req));
-    const suffix = orcamento.id.slice(-6).toUpperCase();
-    return sendPdf(res, buffer, `orcamento_${suffix}.pdf`);
+    // Mesmo helper usado no header do PDF — nome do arquivo bate com
+    // o Nº mostrado ao usuario.
+    return sendPdf(res, buffer, `orcamento_${numeroOrcamento(orcamento)}.pdf`);
   } catch (error) {
     console.error('[PDF_ORCAMENTO_ERROR]', error);
     return mapErrorToResponse(res, error, 'Erro ao gerar PDF do orçamento.');
