@@ -130,6 +130,16 @@ export function buscarSessaoPorRefreshHash(refreshTokenHash) {
   });
 }
 
+// Rotaciona a sessao no refresh: novo hash + novo expiresAt.
+// Implementa sliding session — sessao ativa nunca expira; so' expira
+// se ficar N dias sem refresh (usuario inativo por 14 dias).
+export function rotacionarSessao({ id, refreshTokenHash, expiresAt }) {
+  return prisma.authSession.update({
+    where: { id },
+    data: { refreshTokenHash, expiresAt },
+  });
+}
+
 export function revogarSessaoPorId(id) {
   return prisma.authSession.update({
     where: { id },
