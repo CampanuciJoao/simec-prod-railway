@@ -198,9 +198,9 @@ router.get('/orcamento/:id', async (req, res) => {
       orcamentoId: req.params.id,
     });
     const buffer = await gerarPdfOrcamentoBuffer(orcamento, getPdfOptions(req));
-    // Mesmo helper usado no header do PDF — nome do arquivo bate com
-    // o Nº mostrado ao usuario.
-    return sendPdf(res, buffer, `orcamento_${numeroOrcamento(orcamento)}.pdf`);
+    // Formato solicitado pelo usuario. sendPdf trata o encoding UTF-8
+    // do 'ç' e espaco via Content-Disposition RFC 5987 (filename*).
+    return sendPdf(res, buffer, `Orçamento Nº ${numeroOrcamento(orcamento)}.pdf`);
   } catch (error) {
     console.error('[PDF_ORCAMENTO_ERROR]', error);
     return mapErrorToResponse(res, error, 'Erro ao gerar PDF do orçamento.');

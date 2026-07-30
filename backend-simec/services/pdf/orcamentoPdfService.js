@@ -177,6 +177,14 @@ export async function gerarPdfOrcamentoBuffer(orcamento) {
     // margin top 134 acomoda HEADER_TOP_OFFSET (24) + faixa (52) +
     // separadora (38) + y inicial (14) + folga (~6)
     const doc = new PDFDocument({ size: 'A4', margins: { top: 134, bottom: 48, left: 36, right: 36 }, bufferPages: true });
+    // Metadata do PDF. O Title virou fallback pro nome de arquivo quando
+    // o navegador nao consegue ler Content-Disposition — caso classico:
+    // preview via blob URL na PreviewOrcamentoPdfModal, ao clicar "Save"
+    // dentro do visualizador embutido, ele usa Title (senao caia no UUID
+    // do blob URL, tipo '769edfb9-b0bf-...').
+    doc.info.Title  = `Orçamento Nº ${numero}`;
+    doc.info.Author = 'SIMEC';
+    doc.info.Subject = orcamento?.titulo || 'Orçamento';
     const chunks = [];
     doc.on('data', (c) => chunks.push(c));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
