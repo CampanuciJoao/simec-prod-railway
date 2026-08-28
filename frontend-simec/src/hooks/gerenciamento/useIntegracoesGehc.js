@@ -9,6 +9,7 @@ import {
   postGehcCredenciais,
   deleteGehcCredenciais,
   postGehcOnboard,
+  postGehcCronReagendar,
 } from '@/services/api/gehcApi';
 
 export function useIntegracoesGehc() {
@@ -21,12 +22,14 @@ export function useIntegracoesGehc() {
   const [runningMonitor, setRunningMonitor]     = useState(false);
   const [runningCredenciais, setRunningCredenciais] = useState(false);
   const [runningOnboard, setRunningOnboard]     = useState(false);
+  const [runningReagendar, setRunningReagendar] = useState(false);
 
   const [resultDiscovery, setResultDiscovery]     = useState(null);
   const [resultSync, setResultSync]               = useState(null);
   const [resultMonitor, setResultMonitor]         = useState(null);
   const [resultCredenciais, setResultCredenciais] = useState(null);
   const [resultOnboard, setResultOnboard]         = useState(null);
+  const [resultReagendar, setResultReagendar]     = useState(null);
 
   const [vincularState, setVincularState] = useState({});
 
@@ -144,6 +147,23 @@ export function useIntegracoesGehc() {
     }
   }, [carregarStatus]);
 
+  // Reagendar cron GEHC — usado quando saude parou de atualizar
+  // automaticamente (worker Railway perdeu jobs repetitivos apos restart).
+  // Recria todos os cron jobs GEHC e dispara captura imediata.
+  const reagendarCron = useCallback(async () => {
+    setRunningReagendar(true);
+    setResultReagendar(null);
+    try {
+      const res = await postGehcCronReagendar();
+      setResultReagendar({ ok: true, ...res });
+      await carregarStatus();
+    } catch (err) {
+      setResultReagendar({ ok: false, error: err?.response?.data?.error ?? err.message });
+    } finally {
+      setRunningReagendar(false);
+    }
+  }, [carregarStatus]);
+
   // Remove o equipamento das listas locais do ultimo discovery (pendentes
   // de confirmacao + sem match) para que a UI reflita o vinculo manual sem
   // precisar rodar discovery de novo.
@@ -214,6 +234,9 @@ export function useIntegracoesGehc() {
     rodarOnboard,
     runningOnboard,
     resultOnboard,
+    reagendarCron,
+    runningReagendar,
+    resultReagendar,
     vincularEquipamento,
     desvincularEquipamento,
     vincularState,

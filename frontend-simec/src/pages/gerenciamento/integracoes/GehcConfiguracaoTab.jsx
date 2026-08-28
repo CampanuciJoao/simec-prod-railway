@@ -460,6 +460,7 @@ function GehcConfiguracaoTab() {
     rodarDiscovery, runningDiscovery, resultDiscovery,
     rodarSync,      runningSync,      resultSync,
     rodarMonitor,   runningMonitor,   resultMonitor,
+    reagendarCron,  runningReagendar, resultReagendar,
     rodarOnboard,   runningOnboard,   resultOnboard,
     vincularEquipamento, desvincularEquipamento, vincularState,
   } = useIntegracoesGehc();
@@ -480,7 +481,7 @@ function GehcConfiguracaoTab() {
     );
   }
 
-  const anyRunning  = runningDiscovery || runningSync || runningMonitor || runningOnboard;
+  const anyRunning  = runningDiscovery || runningSync || runningMonitor || runningOnboard || runningReagendar;
   const credConfiguradas = status?.credenciais?.configurado;
   const mostrarForm = !credConfiguradas || editandoCredenciais;
 
@@ -574,17 +575,23 @@ function GehcConfiguracaoTab() {
                   <FontAwesomeIcon icon={runningMonitor ? faSpinner : faHeartPulse} spin={runningMonitor} />
                   {runningMonitor ? 'Capturando...' : 'Capturar saúde agora'}
                 </Button>
+                <Button type="button" variant="ghost" onClick={reagendarCron} disabled={anyRunning} className="justify-center" title="Reagendar cron GEHC caso o monitoramento automatico tenha parado">
+                  <FontAwesomeIcon icon={runningReagendar ? faSpinner : faArrowsRotate} spin={runningReagendar} />
+                  {runningReagendar ? 'Reagendando...' : 'Reiniciar monitor. automático'}
+                </Button>
               </div>
 
               <div className="rounded-2xl px-4 py-2 text-xs" style={{ backgroundColor: 'var(--bg-surface-soft)', color: 'var(--text-muted)' }}>
                 <strong>Vincular equipamentos</strong> — conecta as RMs GE do SIMEC ao portal MyEquipment 360 por número de série.
                 {' '}<strong>Sincronizar dados</strong> — importa contratos, histórico de OS e utilização mensal.
                 {' '}<strong>Capturar saúde</strong> — força leitura imediata de hélio, pressão e compressor (automático a cada 2h).
+                {' '}<strong>Reiniciar monit. automático</strong> — recria os cron jobs GEHC no worker (útil se a saúde parou de atualizar sozinha após restart do servidor).
               </div>
 
-              <ResultBanner result={resultDiscovery} nomeAcao="Discovery" />
-              <ResultBanner result={resultSync}      nomeAcao="Sync" />
-              <ResultBanner result={resultMonitor}   nomeAcao="Monitoramento" />
+              <ResultBanner result={resultDiscovery}  nomeAcao="Discovery" />
+              <ResultBanner result={resultSync}       nomeAcao="Sync" />
+              <ResultBanner result={resultMonitor}    nomeAcao="Monitoramento" />
+              <ResultBanner result={resultReagendar}  nomeAcao="Reagendamento do cron" />
             </>
           )}
         </div>

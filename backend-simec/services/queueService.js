@@ -435,6 +435,124 @@ export async function iniciarJobsDeAlertas() {
   }
 }
 
+// Diagnostica o estado atual dos jobs recorrentes GEHC. Usado pelo
+// endpoint de diagnostico + reagendamento — permite ao admin ver se
+// os crons estao registrados e quando rodaram por ultimo, sem precisar
+// abrir logs do Railway.
+export async function diagnosticoJobsGehc() {
+  const queue = getAlertasQueue();
+  if (!queue) {
+    return {
+      queueDisponivel: false,
+      motivo: queueUnavailableReason || 'queue_indisponivel',
+    };
+  }
+
+  const NOMES_GEHC = new Set([
+    'gehc-monitorar-saude',
+    'gehc-sync-dados',
+    'gehc-discovery-diario',
+    'gehc-capturar-pdfs',
+    'gehc-extrair-pdfs',
+  ]);
+
+  const repeatables = await queue.getRepeatableJobs();
+  const registrados = repeatables
+    .filter((j) => NOMES_GEHC.has(j.name))
+    .map((j) => ({
+      name: j.name,
+      next: j.next,
+      every: j.every,
+      cron: j.cron,
+    }));
+
+  const contagens = await queue.getJobCounts('waiting', 'active', 'completed', 'failed', 'delayed');
+
+  const ultimoSnapshot = await prisma.gehcSaudeSnapshot.findFirst({
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  }).catch(() => null);
+
+  return {
+    queueDisponivel: true,
+    jobsRegistrados: registrados,
+    contagens,
+    ultimoSnapshot: ultimoSnapshot?.capturedAt || null,
+    minutosDesdeUltimoSnapshot: ultimoSnapshot
+      ? Math.round((Date.now() - ultimoSnapshot.capturedAt.getTime()) / 60000)
+      : null,
+  };
+}
+
+// Remove e recria TODOS os cron jobs GEHC do queue. Uso principal:
+// recuperacao apos worker do Railway crashar/reiniciar e perder os
+// jobs repetitivos. Idempotente — nao gera duplicatas mesmo se chamado
+// varias vezes. Tambem dispara uma captura imediata pra atualizar snapshot
+// sem esperar o proximo ciclo de 2h.
+export async function reagendarJobsGehc() {
+  const queue = getAlertasQueue();
+  if (!queue) {
+    return {
+      ok: false,
+      motivo: queueUnavailableReason || 'queue_indisponivel',
+    };
+  }
+
+  const NOMES_GEHC = [
+    'gehc-monitorar-saude',
+    'gehc-sync-dados',
+    'gehc-discovery-diario',
+    'gehc-capturar-pdfs',
+    'gehc-extrair-pdfs',
+  ];
+
+  // Remove tudo existente
+  const repeatables = await queue.getRepeatableJobs();
+  let removidos = 0;
+  for (const j of repeatables) {
+    if (NOMES_GEHC.includes(j.name)) {
+      await queue.removeRepeatableByKey(j.key);
+      removidos++;
+    }
+  }
+
+  // Recria com as mesmas configs de iniciarJobsDeAlertas.
+  await queue.add('gehc-monitorar-saude', {}, {
+    repeat: { every: 2 * 60 * 60 * 1000 },
+    removeOnComplete: 50,
+    removeOnFail: 20,
+  });
+  await queue.add('gehc-sync-dados', {}, {
+    repeat: { cron: '0 2 * * *' },
+    removeOnComplete: 10,
+    removeOnFail: 10,
+  });
+  await queue.add('gehc-discovery-diario', {}, {
+    repeat: { cron: '30 2 * * *' },
+    removeOnComplete: 10,
+    removeOnFail: 10,
+  });
+  await queue.add('gehc-capturar-pdfs', {}, {
+    repeat: { cron: '0 */3 * * *' },
+    removeOnComplete: 10,
+    removeOnFail: 10,
+  });
+  await queue.add('gehc-extrair-pdfs', {}, {
+    repeat: { cron: '0 5 * * *' },
+    removeOnComplete: 10,
+    removeOnFail: 10,
+  });
+
+  // Captura imediata pra o admin ver o efeito na hora
+  await queue.add('gehc-monitorar-saude', {}, {
+    jobId: `gehc-monitorar-saude-manual-${Date.now()}`,
+    removeOnComplete: 5,
+    removeOnFail: 5,
+  });
+
+  return { ok: true, removidos, recriados: NOMES_GEHC.length, capturaImediataAgendada: true };
+}
+
 export async function encerrarQueueDeAlertas() {
   try {
     if (alertasQueue) {

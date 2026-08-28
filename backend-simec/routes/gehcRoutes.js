@@ -15,6 +15,10 @@ import {
   removerStorageState,
 } from '../services/gehc/gehcAuthService.js';
 import {
+  diagnosticoJobsGehc,
+  reagendarJobsGehc,
+} from '../services/queueService.js';
+import {
   gerarPdfSaudeEquipamentoBuffer,
   gerarPdfSaudeResumidoBuffer,
   gerarPdfSaudeCompletoBuffer,
@@ -338,6 +342,40 @@ router.post('/discovery', admin, async (req, res) => {
     });
   } catch (err) {
     console.error('[GEHC_ROUTE] Erro no discovery:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── GET /api/gehc/cron-diagnostico ─────────────────────────────────────────
+// Diagnostico dos jobs recorrentes GEHC. Mostra se estao registrados, quando
+// rodam de novo, contagem de jobs no queue, ultimo snapshot capturado. Uso:
+// admin descobrir por que a saude parou de atualizar automaticamente sem
+// precisar abrir logs do Railway.
+router.get('/cron-diagnostico', admin, async (req, res) => {
+  try {
+    const diag = await diagnosticoJobsGehc();
+    res.json(diag);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── POST /api/gehc/cron-reagendar ──────────────────────────────────────────
+// Remove e recria TODOS os cron jobs GEHC. Uso: quando o worker Railway
+// crashou e perdeu os jobs repetitivos, admin clica pra restaurar sem
+// precisar redeploy. Tambem dispara captura imediata de saude.
+router.post('/cron-reagendar', admin, async (req, res) => {
+  try {
+    const resultado = await reagendarJobsGehc();
+    if (!resultado.ok) {
+      return res.status(503).json({ error: resultado.motivo || 'Queue indisponivel.' });
+    }
+    res.json({
+      ok: true,
+      mensagem: `${resultado.recriados} cron(s) reagendado(s). Captura imediata disparada.`,
+      ...resultado,
+    });
+  } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
