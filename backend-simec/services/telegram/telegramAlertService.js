@@ -81,6 +81,12 @@ export async function dispararPendenciasTelegramTodos() {
   return { tenantsProcessados: tenantsPendentes.length };
 }
 
+// Alertas GEHC_SAUDE persistentes (nao resolvidos) sao re-notificados
+// a cada N horas pra manter o operador ciente. Sem isso, um alerta
+// disparado uma vez ficaria silenciado enquanto o problema persistisse
+// (comportamento anterior — usuario relatou "so alertou uma vez").
+const REALERTA_INTERVALO_MS = 24 * 60 * 60 * 1000; // 24h
+
 async function processarTenant(tenantId) {
   // Timezone do tenant define o horario comercial local. Alertas nao-
   // urgentes ficam retidos ate as 09:00 do fuso do cliente pra evitar
@@ -91,11 +97,26 @@ async function processarTenant(tenantId) {
   });
   const noHorarioComercial = estaEmHorarioComercial(tenant?.timezone);
 
-  const whereAlertas = { tenantId, telegramEnviado: false };
+  // Condicao 1: alertas nunca notificados (telegramEnviado=false).
+  // Condicao 2: alertas GEHC_SAUDE persistentes (ALTA/MEDIA) que foram
+  //             notificados ha mais de 24h — re-notifica.
+  const limiteReenvio = new Date(Date.now() - REALERTA_INTERVALO_MS);
+  const whereAlertas = {
+    tenantId,
+    OR: [
+      { telegramEnviado: false },
+      {
+        telegramEnviado: true,
+        tipoCategoria: 'GEHC_SAUDE',
+        prioridade: { in: ['Alta', 'Media'] },
+        telegramEnviadoEm: { lt: limiteReenvio },
+      },
+    ],
+  };
   if (!noHorarioComercial) {
     // Fora do horario comercial: so puxa alertas urgentes. Os nao-
-    // urgentes ficam com telegramEnviado=false e serao processados
-    // na proxima rodada dentro do horario comercial.
+    // urgentes ficam retidos e serao processados na proxima rodada
+    // dentro do horario comercial. GEHC_SAUDE e' urgente 24/7.
     whereAlertas.tipoCategoria = { in: [...CATEGORIAS_URGENTES_24_7] };
   }
 
@@ -137,19 +158,29 @@ async function processarTenant(tenantId) {
       continue;
     }
 
-    // ATOMIC CLAIM: marca como enviado ANTES de mandar. Sem isso, se
-    // dispararNotificacoesTelegram (do orchestrator) e dispararPendencias
-    // TelegramTodos (do cron drainer) rodam em paralelo — o que acontece
-    // no mesmo minuto — ambos buscam a mesma lista de pendentes e ambos
-    // mandam a mensagem. Resultado: cliente recebe alerta duplicado.
-    //
-    // A trade-off aqui e' at-most-once delivery: se o Telegram falhar
-    // apos o claim, perdemos essa notificacao especifica. Mas duplicar
-    // e' pior que perder — e a maioria dos alertas retorna 200 na
-    // primeira tentativa.
+    // ATOMIC CLAIM: marca como enviado ANTES de mandar. Sem isso, dois
+    // workers concorrentes enviam a mesma mensagem duplicada. Condicoes
+    // que permitem o claim:
+    //   (a) alerta nunca notificado (telegramEnviado=false), OU
+    //   (b) alerta persistente GEHC_SAUDE ALTA/MEDIA cuja ultima
+    //       notificacao foi ha mais de REALERTA_INTERVALO_MS (24h)
+    // Setar telegramEnviadoEm=now serve como "marca d'agua" — o proximo
+    // worker que consultar vai ver o valor atualizado e nao vai
+    // reclaim.
     const claim = await prisma.alerta.updateMany({
-      where: { id: alerta.id, telegramEnviado: false },
-      data:  { telegramEnviado: true },
+      where: {
+        id: alerta.id,
+        OR: [
+          { telegramEnviado: false },
+          {
+            telegramEnviado: true,
+            tipoCategoria: 'GEHC_SAUDE',
+            prioridade: { in: ['Alta', 'Media'] },
+            telegramEnviadoEm: { lt: limiteReenvio },
+          },
+        ],
+      },
+      data: { telegramEnviado: true, telegramEnviadoEm: new Date() },
     });
     if (claim.count === 0) {
       // Outro worker ja claim-ou este alerta. Pula sem enviar.
@@ -179,10 +210,12 @@ async function processarTenant(tenantId) {
 
     // Falha total (0 sucessos): reverte o claim pra alerta ser retentado
     // no proximo ciclo (recupera de falhas transitorias tipo rate limit).
+    // Reseta telegramEnviadoEm tambem — foi setado no claim mas o envio
+    // nao completou, entao a "marca d'agua" nao vale.
     if (sucessos === 0) {
       await prisma.alerta.update({
         where: { id: alerta.id },
-        data:  { telegramEnviado: false },
+        data:  { telegramEnviado: false, telegramEnviadoEm: null },
       }).catch(() => {});
     }
   }

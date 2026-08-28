@@ -477,6 +477,10 @@ model Alerta {
   link            String?
   emailEnviado    Boolean @default(false)
   telegramEnviado Boolean @default(false)
+  // Timestamp do ultimo envio Telegram bem-sucedido. Usado pelo drainer
+  // pra decidir re-notificacao de alertas persistentes (default: 24h
+  // apos telegramEnviadoEm, alertas GEHC_SAUDE ALTA/MEDIA sao reenviados).
+  telegramEnviadoEm DateTime? @map("telegram_enviado_em")
 
   // JSON serializado com info adicional para renderizar o alerta.
   // Hoje: { equipamentos: [{ id, label, acao }] } para hyperlinks clicaveis
