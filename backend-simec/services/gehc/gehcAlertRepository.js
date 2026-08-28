@@ -44,6 +44,10 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
   // Alertas de hélio, magneto e cryo são exclusivos de ressonâncias magnéticas
   if (!eRessonancia) return alertas;
 
+  // Metadata anexado a cada regra: metrica (nome do campo do snapshot) e
+  // valor atual. Usados no upsert pra detectar variacao significativa
+  // (ex: pressao subiu +0.5 PSI desde a ultima notificacao Telegram) e
+  // decidir se deve resetar telegramEnviado pra re-notificar.
   if (heliumLevelPct !== null && heliumLevelPct !== undefined) {
     if (heliumLevelPct < t.heliumCritical) {
       alertas.push({
@@ -52,6 +56,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
         titulo: `Nível de hélio crítico — ${equipamentoNome}`,
         subtitulo: `Nível atual: ${heliumLevelPct}% — risco iminente de quench`,
         label: 'helio-critico',
+        metrica: 'heliumLevelPct',
+        valorMetrica: heliumLevelPct,
       });
     } else if (heliumLevelPct < t.heliumWarn) {
       alertas.push({
@@ -60,6 +66,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
         titulo: `Nível de hélio baixo — ${equipamentoNome}`,
         subtitulo: `Nível atual: ${heliumLevelPct}% (recomendado: acima de ${t.heliumWarn}%)`,
         label: 'helio-baixo',
+        metrica: 'heliumLevelPct',
+        valorMetrica: heliumLevelPct,
       });
     }
   }
@@ -71,6 +79,9 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
       titulo: `Compressor desligado — ${equipamentoNome}`,
       subtitulo: `Status atual: ${compressorStatus}. Verifique imediatamente.`,
       label: 'compressor-off',
+      metrica: 'compressorStatus',
+      // Metrica categorica — mudanca do valor sempre re-notifica.
+      valorMetrica: compressorStatus,
     });
   }
 
@@ -82,6 +93,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
         titulo: `Temperatura do resfriador crítica — ${equipamentoNome}`,
         subtitulo: `Temperatura atual: ${coolantTempC}°C (limite crítico: ${t.tempCritical}°C)`,
         label: 'temp-critica',
+        metrica: 'coolantTempC',
+        valorMetrica: coolantTempC,
       });
     } else if (coolantTempC > t.tempWarn) {
       alertas.push({
@@ -90,6 +103,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
         titulo: `Temperatura do resfriador elevada — ${equipamentoNome}`,
         subtitulo: `Temperatura atual: ${coolantTempC}°C (recomendado: abaixo de ${t.tempWarn}°C)`,
         label: 'temp-alta',
+        metrica: 'coolantTempC',
+        valorMetrica: coolantTempC,
       });
     }
   }
@@ -101,6 +116,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
       titulo: `Fluxo do resfriador abaixo do normal — ${equipamentoNome}`,
       subtitulo: `Fluxo atual: ${coolantFlowGpm} GPM (mínimo: ${t.flowMin} GPM)`,
       label: 'fluxo-baixo',
+      metrica: 'coolantFlowGpm',
+      valorMetrica: coolantFlowGpm,
     });
   }
 
@@ -112,6 +129,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
         titulo: `Pressão do hélio crítica — ${equipamentoNome}`,
         subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (faixa segura: ${t.pressureMin}–${t.pressureCriticalMax} PSI).`,
         label: 'pressao-critica',
+        metrica: 'heliumPressurePsi',
+        valorMetrica: heliumPressurePsi,
       });
     } else if (heliumPressurePsi > t.pressureMax) {
       alertas.push({
@@ -120,6 +139,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
         titulo: `Pressão do hélio elevada — ${equipamentoNome}`,
         subtitulo: `Pressão atual: ${heliumPressurePsi} PSI (recomendado: até ${t.pressureMax} PSI).`,
         label: 'pressao-alta',
+        metrica: 'heliumPressurePsi',
+        valorMetrica: heliumPressurePsi,
       });
     }
   }
@@ -131,6 +152,8 @@ function regrasDeAlerta(snapshot, equipamentoNome, eRessonancia = false, thresho
       titulo: `Magneto offline — ${equipamentoNome}`,
       subtitulo: 'O magneto está sem conexão com o sistema GE InSite.',
       label: 'magneto-offline',
+      metrica: 'magnetOnline',
+      valorMetrica: false,
     });
   }
 
@@ -323,24 +346,83 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
     }
   }
 
+  // Limiar de variacao significativa por metrica pra forcar re-notificacao
+  // Telegram. Ajuste conforme pedido do usuario 2026-07-30: pressao helio
+  // re-notifica quando SOBE >= 0.5 PSI (queda nao alerta). Outras metricas
+  // usam o mesmo padrao de "subiu no lado ruim":
+  //   pressao helio        → subiu >= 0.5 PSI
+  //   temperatura resfriador → subiu >= 2 °C
+  //   nivel helio          → CAIU >= 5% (nesse caso, valor menor e' pior)
+  //   fluxo resfriador     → CAIU >= 0.3 GPM
+  function variacaoSignificativaNoPior(metrica, valorAnterior, valorAtual) {
+    if (typeof valorAnterior !== 'number' || typeof valorAtual !== 'number') return false;
+    const delta = valorAtual - valorAnterior;
+    if (metrica === 'heliumPressurePsi')   return delta >=  0.5;
+    if (metrica === 'coolantTempC')        return delta >=  2;
+    if (metrica === 'heliumLevelPct')      return delta <= -5;
+    if (metrica === 'coolantFlowGpm')      return delta <= -0.3;
+    return false;
+  }
+
+  function extrairMetadataAnterior(existente) {
+    if (!existente?.metadataJson) return null;
+    try { return JSON.parse(existente.metadataJson); } catch { return null; }
+  }
+
   // Cria ou atualiza alertas ativos
   for (const regra of regras) {
     const alertaId = buildAlertId(tenantId, ALERT_CATEGORIAS.GEHC_SAUDE, equipamentoId, regra.label);
 
+    const metadataAtual = { metrica: regra.metrica, valorMetrica: regra.valorMetrica };
+    const metadataJson  = JSON.stringify(metadataAtual);
+
     const existente = await prisma.alerta.findUnique({
       where: { tenantId_id: { tenantId, id: alertaId } },
-      select: { id: true, subtitulo: true, link: true },
+      select: { id: true, subtitulo: true, link: true, prioridade: true, metadataJson: true },
     });
 
-    // Curto-circuito: subtitulo igual E link ja preenchido — nao mexe.
-    // Quando link estiver vazio (alertas pre-deep-link), forca update
-    // pra backfill sem precisar de migration.
-    if (existente?.subtitulo === regra.subtitulo && existente?.link) continue;
+    // Detectar mudancas que devem forcar RE-NOTIFICACAO no Telegram
+    // (reset telegramEnviado=false pro drainer pegar de novo):
+    //   1. Escalonamento de prioridade (ex: Media -> Alta)
+    //   2. Variacao significativa da metrica pro lado pior
+    // A re-notificacao no ciclo de 24h fica por conta do drainer via
+    // telegramEnviadoEm — nao precisa resetar aqui.
+    const metadataAnterior = extrairMetadataAnterior(existente);
+    const escalouPrioridade = existente && existente.prioridade !== regra.prioridade;
+    const variouPior = existente && variacaoSignificativaNoPior(
+      regra.metrica,
+      metadataAnterior?.valorMetrica,
+      regra.valorMetrica
+    );
+    const forcarRenotif = escalouPrioridade || variouPior;
+
+    // Curto-circuito: subtitulo igual E link ja preenchido E nao ha
+    // razao pra re-notificar → nao mexe. Quando link estiver vazio
+    // (alertas pre-deep-link), forca update pra backfill.
+    if (existente?.subtitulo === regra.subtitulo && existente?.link && !forcarRenotif) continue;
 
     if (existente) {
+      const updateData = {
+        subtitulo: regra.subtitulo,
+        data: new Date(),
+        link: linkSaude,
+        prioridade: regra.prioridade,
+        metadataJson,
+      };
+      // Reset telegramEnviado APENAS quando ha escalonamento ou variacao
+      // significativa pro pior. Sem isso, cada snapshot faria spam.
+      if (forcarRenotif) {
+        updateData.telegramEnviado = false;
+        console.log(
+          `[GEHC_ALERT] ${equipamentoNome}: forcando re-notif do alerta ${regra.label} — ` +
+          `${escalouPrioridade ? `prioridade ${existente.prioridade}->${regra.prioridade}` : ''}` +
+          `${escalouPrioridade && variouPior ? ' + ' : ''}` +
+          `${variouPior ? `${regra.metrica} ${metadataAnterior?.valorMetrica}->${regra.valorMetrica}` : ''}`
+        );
+      }
       await prisma.alerta.update({
         where: { tenantId_id: { tenantId, id: alertaId } },
-        data: { subtitulo: regra.subtitulo, data: new Date(), link: linkSaude },
+        data: updateData,
       });
     } else {
       await prisma.alerta.create({
@@ -354,6 +436,7 @@ export async function processarAlertasGehc({ tenantId, equipamentoId, equipament
           tipo: ALERT_CATEGORIAS.GEHC_SAUDE,
           tipoCategoria: ALERT_CATEGORIAS.GEHC_SAUDE,
           tipoEvento: regra.evento,
+          metadataJson,
           link: linkSaude,
         },
       });
