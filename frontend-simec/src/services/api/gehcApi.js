@@ -33,6 +33,15 @@ export const postGehcSync = () =>
 export const postGehcMonitor = () =>
   api.post('/gehc/monitor').then((res) => res.data);
 
+// Diagnostico / reagendamento dos crons GEHC (admin). Uso quando saude
+// para de atualizar automaticamente (worker Railway restarta e perde
+// os jobs repetitivos do queue).
+export const getGehcCronDiagnostico = () =>
+  api.get('/gehc/cron-diagnostico').then((res) => res.data);
+
+export const postGehcCronReagendar = () =>
+  api.post('/gehc/cron-reagendar').then((res) => res.data);
+
 export const putVincularEquipamento = (equipamentoId, gehcAssetId) =>
   api.put(`/gehc/equipamento/${equipamentoId}/vincular`, { gehcAssetId }).then((res) => res.data);
 
