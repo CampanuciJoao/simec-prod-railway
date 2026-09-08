@@ -168,8 +168,8 @@ function TabVisaoGeral({ equipamento, editHref }) {
             />
             <InfoCard
               icon={faMicrochip}
-              label="AE Title"
-              value={equipamento.aeTitle || 'N/A'}
+              label="Apelido"
+              value={equipamento.apelido || 'N/A'}
             />
             <InfoCard
               icon={faWrench}
