@@ -164,6 +164,11 @@ export function useSalvarOrcamento() {
     [itens, precos]
   );
 
+  // Ordem dos campos define qual erro recebe scroll+foco quando o usuario
+  // tenta salvar. Titulo primeiro (topo da pagina) porque e o erro mais
+  // comum e o mais facil de perder de vista quando o cadastro e longo.
+  const CAMPOS_ORDEM = ['titulo', 'fornecedores', 'itens'];
+
   const validar = () => {
     const errs = {};
     if (!titulo.trim()) errs.titulo = 'Título é obrigatório.';
@@ -172,7 +177,8 @@ export function useSalvarOrcamento() {
     if (itens.some((i) => !i.descricao.trim()))
       errs.itens = 'Todos os itens precisam de descrição.';
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    const primeiroCampoErro = CAMPOS_ORDEM.find((c) => errs[c]) || null;
+    return { ok: Object.keys(errs).length === 0, errs, primeiroCampoErro };
   };
 
   const montar = () => ({
@@ -203,7 +209,32 @@ export function useSalvarOrcamento() {
   });
 
   const salvar = useCallback(async () => {
-    if (!validar()) return;
+    const { ok, errs, primeiroCampoErro } = validar();
+    if (!ok) {
+      // Feedback moderno: toast global + rolagem/foco ate o primeiro campo
+      // com erro. Antes so aparecia texto embutido na secao — se o usuario
+      // estava no fim da pagina (na tabela), nao via o erro do titulo.
+      const qtd = Object.keys(errs).length;
+      addToast(
+        qtd === 1
+          ? 'Preencha o campo obrigatório destacado.'
+          : `Preencha os ${qtd} campos obrigatórios destacados.`,
+        'error'
+      );
+      if (primeiroCampoErro) {
+        // Timeout curto pra dar tempo do React aplicar o state de erros
+        // (borda vermelha) antes do scroll — assim o campo ja aparece
+        // destacado quando entra na viewport.
+        setTimeout(() => {
+          const el = document.querySelector(`[data-erro-campo="${primeiroCampoErro}"]`);
+          if (!el) return;
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          const focavel = el.querySelector('input, select, textarea, button');
+          focavel?.focus?.();
+        }, 50);
+      }
+      return;
+    }
     setLoading(true);
     try {
       const payload = montar();

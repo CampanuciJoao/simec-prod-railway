@@ -404,6 +404,13 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
   const nForn = fornecedores.length;
   const thH   = 20;
 
+  // Se algum item tem desconto em algum fornecedor, a celula mostra bruto+liquido
+  // e adicionamos linhas Subtotal/Desconto antes do Valor Total. Sem descontos,
+  // comportamento identico ao anterior (compat visual pra quem nao usa desconto).
+  const temAlgumDesconto = itens.some((item) =>
+    (item.precos || []).some((p) => Number(p?.desconto || 0) > 0)
+  );
+
   // ── cabeçalho ──
   const y0 = doc.y;
   box(doc, marginX,         y0, descW, thH, { fill: C.gray100 });
@@ -439,7 +446,11 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
     doc.font(isRed ? 'Helvetica-Bold' : 'Helvetica').fontSize(9);
     const hDesc = doc.heightOfString(descricao, { width: descW - 12 });
     const padY = 7;
-    const rowH = Math.max(22, hDesc + padY * 2);
+    // Se ha desconto em qualquer preco deste item, precisamos de espaco
+    // pra 2 linhas (bruto riscado + liquido). Sem desconto, altura normal.
+    const itemTemDesc = (item.precos || []).some((p) => Number(p?.desconto || 0) > 0);
+    const alturaValor = itemTemDesc ? 26 : 12;
+    const rowH = Math.max(22, hDesc + padY * 2, alturaValor + padY * 2);
 
     box(doc, marginX,         ry, descW, rowH, { fill: bg });
     box(doc, marginX + descW, ry, dataW, rowH, { fill: bg });
@@ -459,18 +470,94 @@ function _tabelaItens(doc, fornecedores, itens, fornecedorAprovadoId, { marginX,
 
       const valor     = Number(preco?.valor    || 0);
       const desconto  = Number(preco?.desconto || 0);
-      const exibir    = valor > 0 ? fmt(valor - desconto) : '—';
+      const liquido   = Math.max(0, valor - desconto);
       const textColor = isRed ? C.red : (isAprv ? C.green : TEXT);
-      // Auto-shrink: garante que o numero cabe em 1 linha mesmo em
-      // colunas estreitas. Sem isso, R$ 429.435,01 quebra em duas
-      // linhas e vaza pra fora da celula.
-      const fsValor = pickFontSize(doc, exibir, 'Helvetica-Bold', w - 8, 9, 7);
-      doc.font('Helvetica-Bold').fontSize(fsValor).fillColor(textColor)
-        .text(exibir, cx + 4, yCenterTexto(ry, rowH, fsValor), { width: w - 8, align: 'center', lineBreak: false });
+
+      if (valor <= 0) {
+        // celula vazia — sem valor, sem desconto
+        const fsValor = pickFontSize(doc, '—', 'Helvetica-Bold', w - 8, 9, 7);
+        doc.font('Helvetica-Bold').fontSize(fsValor).fillColor(textColor)
+          .text('—', cx + 4, yCenterTexto(ry, rowH, fsValor), { width: w - 8, align: 'center', lineBreak: false });
+      } else if (desconto > 0) {
+        // 2 linhas: bruto riscado em cima, liquido em destaque embaixo
+        const brutoTxt   = fmt(valor);
+        const liquidoTxt = fmt(liquido);
+        const fsBruto    = pickFontSize(doc, brutoTxt, 'Helvetica', w - 8, 7.5, 6);
+        const fsLiquido  = pickFontSize(doc, liquidoTxt, 'Helvetica-Bold', w - 8, 9, 7);
+        const totalH2    = fsBruto * 1.2 + 2 + fsLiquido * 1.2;
+        const topY       = ry + (rowH - totalH2) / 2;
+        // Linha 1 — bruto (cinza, riscado)
+        doc.font('Helvetica').fontSize(fsBruto).fillColor(C.gray400)
+          .text(brutoTxt, cx + 4, topY, { width: w - 8, align: 'center', lineBreak: false });
+        // strike manual (PDFKit nao tem strike direto — desenha linha por cima)
+        const brutoW = doc.widthOfString(brutoTxt);
+        const strikeXc = cx + w / 2;
+        const strikeY  = topY + fsBruto * 0.6;
+        doc.save().moveTo(strikeXc - brutoW / 2, strikeY).lineTo(strikeXc + brutoW / 2, strikeY)
+          .lineWidth(0.5).strokeColor(C.gray400).stroke().restore();
+        // Linha 2 — liquido (destaque)
+        doc.font('Helvetica-Bold').fontSize(fsLiquido).fillColor(textColor)
+          .text(liquidoTxt, cx + 4, topY + fsBruto * 1.2 + 2, { width: w - 8, align: 'center', lineBreak: false });
+      } else {
+        // sem desconto — comportamento atual
+        const exibir  = fmt(valor);
+        const fsValor = pickFontSize(doc, exibir, 'Helvetica-Bold', w - 8, 9, 7);
+        doc.font('Helvetica-Bold').fontSize(fsValor).fillColor(textColor)
+          .text(exibir, cx + 4, yCenterTexto(ry, rowH, fsValor), { width: w - 8, align: 'center', lineBreak: false });
+      }
       cx += w;
     }
 
     doc.y = ry + rowH;
+  }
+
+  // ── Subtotal e Desconto (so aparecem quando ha algum desconto) ──
+  const somaPorFornecedor = (extrator) =>
+    fornecedores.map((forn) =>
+      itens.reduce((sum, item) => {
+        const p = item.precos?.find((pp) => pp.fornecedorId === forn.id);
+        return sum + (p ? extrator(p) : 0);
+      }, 0)
+    );
+
+  if (temAlgumDesconto) {
+    const linhaResumoH = 20;
+    const subtotais    = somaPorFornecedor((p) => Number(p.valor || 0));
+    const descontos    = somaPorFornecedor((p) => Number(p.desconto || 0));
+
+    // Subtotal (bruto)
+    const subY = doc.y;
+    box(doc, marginX, subY, leftW, linhaResumoH, { fill: C.gray50 });
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.gray600)
+      .text('Subtotal', marginX + 6, subY + 6, { width: leftW - 12, align: 'right', lineBreak: false });
+    let cxs = marginX + leftW;
+    for (let i = 0; i < nForn; i++) {
+      const w = fornWidths[i];
+      box(doc, cxs, subY, w, linhaResumoH, { fill: C.gray50 });
+      const txt = fmt(subtotais[i]);
+      const fs  = pickFontSize(doc, txt, 'Helvetica', w - 8, 8.5, 7);
+      doc.font('Helvetica').fontSize(fs).fillColor(C.gray600)
+        .text(txt, cxs + 4, yCenterTexto(subY, linhaResumoH, fs), { width: w - 8, align: 'center', lineBreak: false });
+      cxs += w;
+    }
+    doc.y = subY + linhaResumoH;
+
+    // Desconto (negativo)
+    const dscY = doc.y;
+    box(doc, marginX, dscY, leftW, linhaResumoH, { fill: C.redLight });
+    doc.font('Helvetica-Bold').fontSize(8.5).fillColor(C.red)
+      .text('Desconto', marginX + 6, dscY + 6, { width: leftW - 12, align: 'right', lineBreak: false });
+    let cxd = marginX + leftW;
+    for (let i = 0; i < nForn; i++) {
+      const w = fornWidths[i];
+      box(doc, cxd, dscY, w, linhaResumoH, { fill: C.redLight });
+      const txt = descontos[i] > 0 ? `− ${fmt(descontos[i])}` : '—';
+      const fs  = pickFontSize(doc, txt, 'Helvetica-Bold', w - 8, 8.5, 7);
+      doc.font('Helvetica-Bold').fontSize(fs).fillColor(C.red)
+        .text(txt, cxd + 4, yCenterTexto(dscY, linhaResumoH, fs), { width: w - 8, align: 'center', lineBreak: false });
+      cxd += w;
+    }
+    doc.y = dscY + linhaResumoH;
   }
 
   // ── Valor Total ──

@@ -49,7 +49,7 @@ function SalvarOrcamentoPage() {
           description="Identifique o orçamento, o tipo de itens e a unidade solicitante"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-6">
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-3" data-erro-campo="titulo">
               <Input
                 label="Título do Orçamento"
                 required
@@ -92,12 +92,28 @@ function SalvarOrcamentoPage() {
           description="Adicione fornecedores como colunas e itens como linhas. Use ★ para destacar itens especiais (ex: mão de obra)."
         >
           {p.errors.fornecedores && (
-            <p className="mb-3 text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
+            <p
+              data-erro-campo="fornecedores"
+              className="mb-3 rounded-lg border px-3 py-2 text-sm font-medium"
+              style={{
+                color: 'var(--color-danger)',
+                borderColor: 'var(--color-danger)',
+                backgroundColor: 'var(--color-danger-soft)',
+              }}
+            >
               {p.errors.fornecedores}
             </p>
           )}
           {p.errors.itens && (
-            <p className="mb-3 text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
+            <p
+              data-erro-campo="itens"
+              className="mb-3 rounded-lg border px-3 py-2 text-sm font-medium"
+              style={{
+                color: 'var(--color-danger)',
+                borderColor: 'var(--color-danger)',
+                backgroundColor: 'var(--color-danger-soft)',
+              }}
+            >
               {p.errors.itens}
             </p>
           )}
