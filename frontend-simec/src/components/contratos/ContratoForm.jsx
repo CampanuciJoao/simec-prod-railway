@@ -26,6 +26,7 @@ const OPCOES_CATEGORIA = [
   'Manutenção Preventiva',
   'Full Service',
   'Comodato',
+  'Garantia',
 ];
 
 const OPCOES_STATUS = ['Ativo', 'Expirado', 'Cancelado'];
