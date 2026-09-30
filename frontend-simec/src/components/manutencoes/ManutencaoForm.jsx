@@ -164,7 +164,10 @@ function ManutencaoForm({
         title="Agendamento"
         description="Defina o intervalo de execução previsto da manutenção."
       >
-        <ResponsiveGrid preset="form">
+        {/* Grid 2 colunas fixas: cada linha e um par (data + hora). Assim
+            Data/Hora inicial ficam alinhadas em cima e Data/Hora final
+            embaixo, sem spacer que quebrava o alinhamento em md. */}
+        <ResponsiveGrid preset="twoCols">
           <DateInput
             label="Data de início"
             value={formData.agendamentoDataInicioLocal}
@@ -184,8 +187,6 @@ function ManutencaoForm({
             error={fieldErrors.agendamentoHoraInicioLocal}
             required
           />
-
-          <div className="hidden xl:block" aria-hidden="true" />
 
           <DateInput
             label="Data de término"
