@@ -34,6 +34,7 @@ function RelatoriosFiltersSection({
   tiposOptions = [],
   escopoSeguroOptions = [],
   statusSeguroOptions = [],
+  statusEquipamentoOptions = [],
   onChange,
   onSubmit,
   loading = false,
@@ -118,6 +119,23 @@ function RelatoriosFiltersSection({
                   <option key={t.value} value={t.value}>
                     {t.label}
                   </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {/* Status operacional — so pro inventario. Reusa o campo
+              `status` do filtros; o hook limpa esse valor ao trocar
+              o tipo de relatorio pra evitar vazamento entre dominios. */}
+          {isInventario && (
+            <Field label="Status">
+              <Select
+                name="status"
+                value={filtros.status || ''}
+                onChange={onChange}
+              >
+                {statusEquipamentoOptions.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </Select>
             </Field>
@@ -225,6 +243,7 @@ RelatoriosFiltersSection.propTypes = {
   tiposOptions: PropTypes.array,
   escopoSeguroOptions: PropTypes.array,
   statusSeguroOptions: PropTypes.array,
+  statusEquipamentoOptions: PropTypes.array,
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool,

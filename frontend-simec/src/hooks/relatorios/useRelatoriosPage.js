@@ -92,7 +92,15 @@ export function useRelatoriosPage() {
 
   const handleFiltroChange = (e) => {
     const { name, value } = e.target;
-    setFiltros((prev) => ({ ...prev, [name]: value }));
+    setFiltros((prev) => {
+      // Trocar o tipo de relatorio zera o status — equipamento e seguro
+      // tem conjuntos diferentes (Operante vs Vigente etc), entao manter
+      // o valor antigo geraria filtro invalido e resultado vazio.
+      if (name === 'tipoRelatorio' && value !== prev.tipoRelatorio) {
+        return { ...prev, [name]: value, status: '' };
+      }
+      return { ...prev, [name]: value };
+    });
   };
 
   const handleGerarRelatorio = async (e) => {
@@ -214,6 +222,22 @@ export function useRelatoriosPage() {
     []
   );
 
+  // Status operacional do equipamento — espelha os valores aceitos no
+  // cadastro (StatusSelector.jsx). Backend ja aceita `status` em
+  // buscarInventarioEquipamentos; aqui so expomos no formulario.
+  const statusEquipamentoOptions = useMemo(
+    () => [
+      { value: '',             label: 'Todos' },
+      { value: 'Operante',     label: 'Operante' },
+      { value: 'Inoperante',   label: 'Inoperante' },
+      { value: 'UsoLimitado',  label: 'Uso Limitado' },
+      { value: 'EmManutencao', label: 'Em Manutenção' },
+      { value: 'Desativado',   label: 'Desativado' },
+      { value: 'Vendido',      label: 'Vendido' },
+    ],
+    []
+  );
+
   const metricas = useMemo(() => {
     const tipoLabel = {
       inventarioEquipamentos: 'Inventário',
@@ -303,7 +327,14 @@ export function useRelatoriosPage() {
       filtros.status
         ? {
             key: 'status',
-            label: `Status: ${filtros.status}`,
+            label: `Status: ${
+              // Inventario tem valores internos como "EmManutencao" que
+              // precisam de label mais amigavel; seguro ja usa a propria
+              // string como label.
+              filtros.tipoRelatorio === 'inventarioEquipamentos'
+                ? (statusEquipamentoOptions.find((o) => o.value === filtros.status)?.label || filtros.status)
+                : filtros.status
+            }`,
             value: filtros.status,
           }
         : null,
@@ -365,6 +396,7 @@ export function useRelatoriosPage() {
     tipoRelatorioOptions,
     escopoSeguroOptions,
     statusSeguroOptions,
+    statusEquipamentoOptions,
     metricas,
     activeFilters,
     clearFilter,
