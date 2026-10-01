@@ -59,6 +59,7 @@ function RelatoriosPage() {
               tiposOptions={page.tiposOptions}
               escopoSeguroOptions={page.escopoSeguroOptions}
               statusSeguroOptions={page.statusSeguroOptions}
+              statusEquipamentoOptions={page.statusEquipamentoOptions}
               onChange={page.handleFiltroChange}
               onSubmit={page.handleGerarRelatorio}
               loading={page.loading}
