@@ -302,6 +302,16 @@ function TabHistoricoSaude({ equipamentoId }) {
 
       <div>
         <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
+          Temperatura do sistema de resfriamento &mdash; media a cada 6h (&deg;C)
+        </p>
+        {loadingGrafico
+          ? <LoadingState message="Carregando..." />
+          : <GraficoLinha dados={grafico?.temperatura} label="Temperatura" cor="#dc2626" unidade=" &deg;C" />
+        }
+      </div>
+
+      <div>
+        <p className="mb-3 text-sm font-semibold" style={{ color: 'var(--text-secondary)' }}>
           Registros detalhados
         </p>
         <TabelaRegistros equipamentoId={equipamentoId} inicio={inicio} fim={fim} />
