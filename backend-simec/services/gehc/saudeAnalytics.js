@@ -286,6 +286,171 @@ export function agregarPorDia(snapshots, eventos = []) {
   return linhas;
 }
 
+// Mapeamento chave -> campo do snapshot. Usado pra calcular % tempo fora
+// do range tipico. Mantem perto do METRICAS pra ser facil de manter.
+const CAMPO_SNAPSHOT = {
+  helio:       'heliumLevelPct',
+  pressao:     'heliumPressurePsi',
+  temperatura: 'coolantTempC',
+};
+
+// Converte quantidade de criticos / atencao / % tempo fora numa frase
+// acionavel pra diretoria/manutencao. O usuario pediu explicitamente:
+// "se temos muitos problemas com pressão e temperatura, para corrigir
+// com manutencao/troca de chillers". Recomendacao traduz os numeros
+// em acao.
+function _recomendacaoPorMetrica(chave, criticos, atencao, pctFora) {
+  if (chave === 'temperatura') {
+    if (criticos > 20 || pctFora > 25) {
+      return 'CRITICO: temperatura frequentemente fora da faixa. Avaliar troca ou revisao do chiller/sistema de resfriamento.';
+    }
+    if (criticos > 5 || pctFora > 15) {
+      return 'ATENCAO: variacoes de temperatura acima do tipico. Agendar inspecao preventiva do chiller.';
+    }
+    if (criticos > 0 || atencao > 10) {
+      return 'MONITORAR: pequenas variacoes de temperatura. Observar nas proximas semanas.';
+    }
+    return 'OK: temperatura dentro da faixa tipica.';
+  }
+
+  if (chave === 'pressao') {
+    if (criticos > 20 || pctFora > 25) {
+      return 'CRITICO: pressao do helio frequentemente fora da faixa. Avaliar inspecao do sistema de helio e compressor.';
+    }
+    if (criticos > 5 || pctFora > 15) {
+      return 'ATENCAO: variacoes de pressao acima do tipico. Agendar inspecao preventiva do compressor.';
+    }
+    if (criticos > 0 || atencao > 10) {
+      return 'MONITORAR: pequenas variacoes de pressao. Observar nas proximas semanas.';
+    }
+    return 'OK: pressao dentro da faixa tipica.';
+  }
+
+  if (chave === 'helio') {
+    if (criticos > 10 || pctFora > 20) {
+      return 'CRITICO: nivel de helio variando/caindo. Avaliar quench rate e vazamentos.';
+    }
+    if (criticos > 0 || pctFora > 10) {
+      return 'ATENCAO: variacoes de helio. Verificar historico de recargas e tendencia.';
+    }
+    return 'OK: nivel de helio estavel.';
+  }
+
+  return 'MONITORAR: variacoes acima do padrao.';
+}
+
+/**
+ * Breakdown acionavel por metrica (helio, pressao, temperatura).
+ * Para cada metrica:
+ *  - media / min / max
+ *  - quantos eventos criticos e de atencao
+ *  - % de leituras fora da faixa tipica (p5-p95) — relevante pra
+ *    responder "tenho MUITOS problemas de temperatura?"
+ *  - recomendacao traduzida (OK / MONITORAR / ATENCAO / CRITICO) com
+ *    acao sugerida (troca de chiller, inspecao do compressor, etc).
+ */
+export function analiseAcionavelPorMetrica(snapshots, estatisticas, eventos) {
+  const resumo = {};
+
+  for (const chave of ['helio', 'pressao', 'temperatura']) {
+    const stats = estatisticas[chave];
+    if (!stats) continue;
+
+    const eventosMetrica = eventos.filter((e) => e.chave === chave);
+    const criticos = eventosMetrica.filter((e) => e.severidade === 'critico').length;
+    const atencao  = eventosMetrica.filter((e) => e.severidade === 'atencao').length;
+
+    const campo   = CAMPO_SNAPSHOT[chave];
+    const direcao = DIRECAO_RANGE[chave];
+
+    let foraRange = 0;
+    let totalComValor = 0;
+    for (const s of snapshots) {
+      const v = s[campo];
+      if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+      totalComValor++;
+      let fora = false;
+      if (direcao === 'baixoRuim') {
+        fora = v < stats.p5;
+      } else if (direcao === 'altoRuim') {
+        fora = v > stats.p95;
+      } else {
+        fora = v < stats.p5 || v > stats.p95;
+      }
+      if (fora) foraRange++;
+    }
+    const pctForaRange = totalComValor > 0
+      ? Math.round((foraRange / totalComValor) * 100)
+      : 0;
+
+    resumo[chave] = {
+      label: stats.label,
+      unit: stats.unit,
+      media: stats.media,
+      min: stats.min,
+      max: stats.max,
+      criticos,
+      atencao,
+      pctForaRange,
+      recomendacao: _recomendacaoPorMetrica(chave, criticos, atencao, pctForaRange),
+    };
+  }
+
+  return resumo;
+}
+
+/**
+ * Comparativo com o parque: dado as estatisticas deste equipamento e as
+ * estatisticas de outros equipamentos (mesmo tipo, mesmo periodo), devolve:
+ *  - media do parque por metrica
+ *  - diferenca (equipamento vs media do parque, com sinal)
+ *  - posicao do equipamento no ranking (1 = mais quente / mais pressao / mais helio)
+ *  - totalParque = quantos equipamentos foram comparados (incluindo ele)
+ *
+ * `estatisticasOutros` e um array de { equipamentoId, nome, estatisticas }.
+ * `equipamentoAtual.id` precisa estar presente em um dos itens pra calcular
+ * a posicao do ranking.
+ */
+export function compararComFleet({ equipamentoAtual, estatisticasEquipamento, estatisticasOutros }) {
+  if (!estatisticasOutros || estatisticasOutros.length === 0) {
+    return null;
+  }
+
+  const comparativo = {};
+  const todos = estatisticasOutros;  // ja inclui o equipamento atual
+
+  for (const chave of ['helio', 'pressao', 'temperatura']) {
+    const medias = todos
+      .map((x) => x.estatisticas?.[chave]?.media)
+      .filter((v) => typeof v === 'number' && Number.isFinite(v));
+    if (medias.length < 2) continue;  // comparativo so faz sentido com pelo menos outro equipamento
+
+    const mediaParque = round(medias.reduce((a, b) => a + b, 0) / medias.length);
+    const equipMedia = estatisticasEquipamento?.[chave]?.media;
+    if (equipMedia == null) continue;
+
+    // Ranking decrescente — posicao 1 = valor mais alto. Pra temperatura/pressao
+    // alto e tipicamente "pior". Pra helio alto e melhor. O leitor interpreta
+    // sabendo qual metrica esta olhando (os cards mostram "mais X do parque").
+    const ordenados = [...todos]
+      .filter((x) => typeof x.estatisticas?.[chave]?.media === 'number')
+      .sort((a, b) => b.estatisticas[chave].media - a.estatisticas[chave].media);
+    const posicao = ordenados.findIndex((x) => x.equipamentoId === equipamentoAtual.id) + 1;
+
+    comparativo[chave] = {
+      label: estatisticasEquipamento[chave].label,
+      unit: estatisticasEquipamento[chave].unit,
+      equipMedia,
+      mediaParque,
+      diferenca: round(equipMedia - mediaParque),
+      posicao: posicao > 0 ? posicao : null,
+      totalParque: ordenados.length,
+    };
+  }
+
+  return Object.keys(comparativo).length > 0 ? comparativo : null;
+}
+
 /**
  * Pacote completo de analise pronto pra consumo dos geradores de PDF.
  */
@@ -293,6 +458,7 @@ export function analisarSaude(snapshots) {
   const estatisticas = calcularEstatisticas(snapshots);
   const eventos = detectarEventos(snapshots, estatisticas);
   const diarios = agregarPorDia(snapshots, eventos);
+  const porMetrica = analiseAcionavelPorMetrica(snapshots, estatisticas, eventos);
 
   // Veredito agregado pra usar no PDF resumido.
   const criticos = eventos.filter((e) => e.severidade === 'critico').length;
@@ -308,5 +474,5 @@ export function analisarSaude(snapshots) {
     veredito = 'Operacao dentro do esperado. Nenhum evento fora do padrao detectado.';
   }
 
-  return { estatisticas, eventos, diarios, veredito };
+  return { estatisticas, eventos, diarios, veredito, porMetrica };
 }

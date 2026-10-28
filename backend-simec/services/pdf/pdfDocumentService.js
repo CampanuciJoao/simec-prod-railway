@@ -2028,6 +2028,78 @@ function _saudeContextoEMetricas(doc, payload, estatisticas) {
   drawInfoGrid(doc, _saudeKpiItems(estatisticas), 2);
 }
 
+// Breakdown por metrica em formato de linhas da tabela, uma por metrica.
+// Mostra media, eventos critico/atencao, % tempo fora do range e a
+// recomendacao traduzida (OK/MONITORAR/ATENCAO/CRITICO + acao).
+function _saudeAnalisePorMetrica(doc, porMetrica) {
+  drawSectionTitle(doc, 'Analise por metrica');
+
+  const linhas = [];
+  for (const chave of ['pressao', 'temperatura', 'helio']) {
+    const m = porMetrica[chave];
+    if (!m) continue;
+    linhas.push([
+      m.label,
+      `${m.media}${m.unit}`,
+      `${m.criticos} / ${m.atencao}`,
+      `${m.pctForaRange}%`,
+      m.recomendacao,
+    ]);
+  }
+
+  if (linhas.length === 0) {
+    drawParagraph(doc, 'Sem metricas suficientes pra analise detalhada.');
+    return;
+  }
+
+  drawTable(doc, {
+    headers: ['Metrica', 'Media', 'Criticos / Atencao', '% fora do tipico', 'Recomendacao'],
+    columnWidths: [70, 55, 85, 70, 210],
+    rows: linhas,
+    emptyMessage: 'Sem dados.',
+  });
+}
+
+// Comparativo com o parque — mostra media deste equipamento vs media
+// dos pares (mesmo tipo, mesmo periodo), com diferenca e ranking.
+// Ex: "temperatura 14.76 °C — parque 10.20 °C (+4.56) — 2 de 5".
+function _saudeComparativoFleet(doc, comparativo) {
+  drawSectionTitle(doc, 'Comparativo com o parque');
+
+  const linhas = [];
+  for (const chave of ['pressao', 'temperatura', 'helio']) {
+    const c = comparativo[chave];
+    if (!c) continue;
+    const sinal = c.diferenca > 0 ? '+' : '';
+    const ranking = c.posicao
+      ? `${c.posicao} de ${c.totalParque}`
+      : `n/a`;
+    linhas.push([
+      c.label,
+      `${c.equipMedia}${c.unit}`,
+      `${c.mediaParque}${c.unit}`,
+      `${sinal}${c.diferenca}${c.unit}`,
+      ranking,
+    ]);
+  }
+
+  if (linhas.length === 0) {
+    drawParagraph(doc, 'Sem equipamentos pares no mesmo periodo pra comparar.');
+    return;
+  }
+
+  drawTable(doc, {
+    headers: ['Metrica', 'Este equipamento', 'Media do parque', 'Diferenca', 'Posicao'],
+    columnWidths: [80, 100, 100, 90, 80],
+    rows: linhas,
+    emptyMessage: 'Sem dados.',
+  });
+  drawParagraph(
+    doc,
+    'Posicao em ranking decrescente: 1 = valor mais alto. Para temperatura e pressao, posicoes baixas sugerem equipamento sob mais stress que os pares.',
+  );
+}
+
 function _saudeGraficos(doc, snapshots, locale, timeZone) {
   if (snapshots.length < 2) return;
 
@@ -2161,7 +2233,7 @@ export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
   const { analisarSaude } = await import('../gehc/saudeAnalytics.js');
   const analise = snapshots.length
     ? analisarSaude(snapshots)
-    : { estatisticas: { total: 0 }, eventos: [], diarios: [], veredito: 'Sem leituras no periodo selecionado.' };
+    : { estatisticas: { total: 0 }, eventos: [], diarios: [], veredito: 'Sem leituras no periodo selecionado.', porMetrica: {} };
 
   const doc = createDocument('RELATORIO DE SAUDE DO ATIVO - COMPLETO', options);
   drawEntidadeInfoBlock(doc, options?.tenantInfo);
@@ -2170,6 +2242,21 @@ export async function gerarPdfSaudeCompletoBuffer(payload, options = {}) {
 
   drawSectionTitle(doc, 'Avaliacao do periodo');
   drawParagraph(doc, analise.veredito);
+
+  // Breakdown por metrica com recomendacao acionavel (OK / MONITORAR /
+  // ATENCAO / CRITICO). Responde "tenho muitos problemas com pressao ou
+  // temperatura?" sem precisar interpretar os 85 eventos agregados.
+  if (analise.porMetrica && Object.keys(analise.porMetrica).length > 0) {
+    _saudeAnalisePorMetrica(doc, analise.porMetrica);
+  }
+
+  // Comparativo com o parque — quando o payload tras estatisticasOutros
+  // (equipamentos do mesmo tipo no mesmo tenant/periodo). Permite ao
+  // operador ver que ESTE equipamento esta mais quente/pressao alta
+  // do que os pares.
+  if (payload?.comparativoFleet) {
+    _saudeComparativoFleet(doc, payload.comparativoFleet);
+  }
 
   // GRAFICOS PRIMEIRO — leitura visual rapida da tendencia das metricas.
   // Depois vem as tabelas (resumo diario + eventos cronologicos), que

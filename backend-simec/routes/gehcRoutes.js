@@ -24,6 +24,7 @@ import {
   gerarPdfSaudeCompletoBuffer,
 } from '../services/pdf/pdfDocumentService.js';
 import { RM_FILTER } from '../services/equipamento/equipamentoModalidade.js';
+import { calcularEstatisticas, compararComFleet } from '../services/gehc/saudeAnalytics.js';
 
 const router = express.Router();
 
@@ -744,7 +745,9 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
       prisma.equipamento.findFirst({
         where: { id: equipamentoId, tenantId },
         select: {
+          id: true,
           modelo: true,
+          tipo: true,
           tag: true,
           apelido: true,
           unidade: { select: { nomeSistema: true } },
@@ -761,6 +764,69 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
       }),
     ]);
 
+    // Comparativo com o parque — busca outros equipamentos do mesmo
+    // tipo no mesmo tenant (ex: todos os "Ressonancia Magnetica") e
+    // calcula estatisticas de cada um no mesmo periodo. So entra no
+    // PDF se existir pelo menos UM par (senao a tabela nao faz sentido).
+    //
+    // Custo controlado: `select` enxuto + limite de 20 pares (parques
+    // reais tipicamente tem 3-10 do mesmo tipo). Em caso de erro, PDF
+    // segue sem a secao de comparativo.
+    let comparativoFleet = null;
+    try {
+      if (equipamento?.tipo) {
+        const pares = await prisma.equipamento.findMany({
+          where: {
+            tenantId,
+            tipo: equipamento.tipo,
+            gehcAssetId: { not: null },
+            id: { not: equipamento.id },
+          },
+          select: { id: true, modelo: true, apelido: true, tag: true },
+          take: 20,
+        });
+
+        if (pares.length > 0) {
+          const paresComSnapshots = await Promise.all(
+            pares.map(async (p) => {
+              const snaps = await prisma.gehcSaudeSnapshot.findMany({
+                where: {
+                  tenantId,
+                  equipamentoId: p.id,
+                  ...(inicio || fim
+                    ? { capturedAt: {
+                        ...(inicio && { gte: new Date(inicio) }),
+                        ...(fim && { lte: new Date(fim + 'T23:59:59.999Z') }),
+                      } }
+                    : {}),
+                },
+                select: {
+                  heliumLevelPct: true, heliumPressurePsi: true, coolantTempC: true,
+                },
+              });
+              return {
+                equipamentoId: p.id,
+                nome: p.apelido || p.modelo || p.tag,
+                estatisticas: calcularEstatisticas(snaps),
+              };
+            })
+          );
+
+          const estatisticasEquipamento = calcularEstatisticas(snapshots);
+          comparativoFleet = compararComFleet({
+            equipamentoAtual: { id: equipamento.id },
+            estatisticasEquipamento,
+            estatisticasOutros: [
+              { equipamentoId: equipamento.id, nome: equipamento.apelido || equipamento.modelo, estatisticas: estatisticasEquipamento },
+              ...paresComSnapshots,
+            ],
+          });
+        }
+      }
+    } catch (fleetErr) {
+      console.warn('[GEHC_PDF_SAUDE] Comparativo fleet falhou:', fleetErr.message);
+    }
+
     const payload = {
       equipamento: {
         modelo:   equipamento?.modelo,
@@ -771,6 +837,7 @@ router.get('/equipamento/:equipamentoId/historico/export-pdf', async (req, res) 
       inicio: inicio || null,
       fim:    fim    || null,
       snapshots,
+      comparativoFleet,
     };
     const opts = { locale: 'pt-BR', timeZone: 'America/Sao_Paulo' };
 
