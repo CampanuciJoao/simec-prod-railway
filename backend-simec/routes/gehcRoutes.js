@@ -576,7 +576,9 @@ router.get('/equipamento/:equipamentoId/resumo', async (req, res) => {
 
 
 // ─── GET /api/gehc/equipamento/:equipamentoId/historico/grafico ───────────────
-// Dados agregados para graficos: helio (media diaria) e pressao (media 6h)
+// Dados agregados para graficos: helio (media diaria), pressao e
+// temperatura (media 6h cada). Temperatura e crucial pra identificar
+// stress termico (chiller falhando) — tanto quanto pressao.
 router.get('/equipamento/:equipamentoId/historico/grafico', async (req, res) => {
   const tenantId = req.tenantContext;
   const { equipamentoId } = req.params;
@@ -585,49 +587,47 @@ router.get('/equipamento/:equipamentoId/historico/grafico', async (req, res) => 
   const dataInicio = inicio ? new Date(inicio) : new Date(Date.now() - 2 * 365 * 24 * 60 * 60 * 1000);
   const dataFim    = fim    ? new Date(fim + 'T23:59:59.999Z') : new Date();
 
+  // Agrega valores por chave de bucket (dia ou janela de 6h) e devolve
+  // media/min/max/n. Chamada varias vezes com buckets diferentes pra
+  // cada metrica mantem o endpoint enxuto sem duplicar logica.
+  const agregarPorBucket = (snapshots, campo, bucketFn, casasDecimais) => {
+    const mapa = new Map();
+    for (const s of snapshots) {
+      const v = s[campo];
+      if (v === null || v === undefined) continue;
+      const chave = bucketFn(s.capturedAt);
+      if (!mapa.has(chave)) mapa.set(chave, []);
+      mapa.get(chave).push(v);
+    }
+    return [...mapa.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([bucket, vals]) => ({
+        bucket,
+        avg: +( vals.reduce((a, b) => a + b, 0) / vals.length ).toFixed(casasDecimais),
+        min: +( Math.min(...vals) ).toFixed(casasDecimais),
+        max: +( Math.max(...vals) ).toFixed(casasDecimais),
+        n:   vals.length,
+      }));
+  };
+
+  const bucketDiario = (date) => date.toISOString().split('T')[0] + 'T00:00:00.000Z';
+  const bucket6h    = (date) => {
+    const ts = date.getTime();
+    return new Date(Math.floor(ts / (6 * 3600 * 1000)) * (6 * 3600 * 1000)).toISOString();
+  };
+
   try {
     const snapshots = await prisma.gehcSaudeSnapshot.findMany({
       where: { tenantId, equipamentoId, capturedAt: { gte: dataInicio, lte: dataFim } },
       orderBy: { capturedAt: 'asc' },
-      select: { capturedAt: true, heliumLevelPct: true, heliumPressurePsi: true },
+      select: { capturedAt: true, heliumLevelPct: true, heliumPressurePsi: true, coolantTempC: true },
     });
 
-    // Helio: media diaria
-    const helioMap = new Map();
-    for (const s of snapshots) {
-      if (s.heliumLevelPct === null) continue;
-      const day = s.capturedAt.toISOString().split('T')[0];
-      if (!helioMap.has(day)) helioMap.set(day, []);
-      helioMap.get(day).push(s.heliumLevelPct);
-    }
-    const helio = [...helioMap.entries()].map(([day, vals]) => ({
-      bucket: day + 'T00:00:00.000Z',
-      avg:    +( vals.reduce((a, b) => a + b, 0) / vals.length ).toFixed(2),
-      min:    +( Math.min(...vals) ).toFixed(2),
-      max:    +( Math.max(...vals) ).toFixed(2),
-      n:      vals.length,
-    }));
+    const helio       = agregarPorBucket(snapshots, 'heliumLevelPct',    bucketDiario, 2);
+    const pressao     = agregarPorBucket(snapshots, 'heliumPressurePsi', bucket6h,     3);
+    const temperatura = agregarPorBucket(snapshots, 'coolantTempC',      bucket6h,     2);
 
-    // Pressao: media a cada 6h
-    const pressaoMap = new Map();
-    for (const s of snapshots) {
-      if (s.heliumPressurePsi === null) continue;
-      const ts     = s.capturedAt.getTime();
-      const bucket = new Date(Math.floor(ts / (6 * 3600 * 1000)) * (6 * 3600 * 1000)).toISOString();
-      if (!pressaoMap.has(bucket)) pressaoMap.set(bucket, []);
-      pressaoMap.get(bucket).push(s.heliumPressurePsi);
-    }
-    const pressao = [...pressaoMap.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([bucket, vals]) => ({
-        bucket,
-        avg: +( vals.reduce((a, b) => a + b, 0) / vals.length ).toFixed(3),
-        min: +( Math.min(...vals) ).toFixed(3),
-        max: +( Math.max(...vals) ).toFixed(3),
-        n:   vals.length,
-      }));
-
-    res.json({ helio, pressao });
+    res.json({ helio, pressao, temperatura });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
