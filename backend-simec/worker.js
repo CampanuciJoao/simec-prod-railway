@@ -7,6 +7,8 @@ import { dispararPendenciasTelegramTodos } from './services/telegram/telegramAle
 import { gerarAlertasRecomendacaoDoTenant } from './services/alertas/recomendacao/alertasRecomendacaoService.js';
 import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
 import { monitorarSaudeGehc } from './services/gehc/gehcMonitor.js';
+import { watchdogSaudeGehc } from './services/gehc/gehcWatchdogService.js';
+import { getRedisConnection } from './services/queueService.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
@@ -183,6 +185,15 @@ const alertasWorker = new Worker(
         }
         return { ok: true, tenants: resultados.length, resultados };
       });
+    }
+
+    if (job?.name === 'gehc-watchdog-saude') {
+      // Nao usa withHeartbeat — e um job rapido (so leitura + eventual
+      // reagendamento). Mantem leve pra nao atrapalhar os processos
+      // GEHC que ele vigia.
+      const redisConnection = getRedisConnection();
+      const r = await watchdogSaudeGehc({ redisConnection });
+      return { ok: true, ...r };
     }
 
     if (job?.name === 'gehc-sync-dados') {

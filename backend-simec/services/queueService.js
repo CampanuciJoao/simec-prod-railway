@@ -76,6 +76,13 @@ function getAlertasQueue() {
 // Exporta os counts da fila pra o snapshot de saúde (sem efeito colateral).
 // Retorna { waiting, active, completed, failed, delayed, paused } ou null
 // se a fila não estiver pronta.
+// Expoe a connection do Redis usada pela queue — permite que servicos
+// como o watchdog guardem estado leve (chave/valor com TTL) sem abrir
+// um pool proprio e sem reagir ao mesmo problema de connection down.
+export function getRedisConnection() {
+  return getConnection();
+}
+
 export async function coletarQueueCounts() {
   try {
     const queue = getAlertasQueue();
@@ -426,6 +433,31 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job IA (ia-auditar-licoes) agendado semanalmente.');
 
+    // Watchdog da integracao GEHC: vigia independente dos crons GEHC.
+    // Roda a cada 30min, detecta se o cron de saude parou (ex: worker
+    // reiniciou e perdeu os repeatables) e tenta reagendar sozinho antes
+    // de criar alerta ALTA + Telegram. Essencial porque, sem watchdog,
+    // o cron parado so e descoberto por inspecao manual (ja ocorreu
+    // episodio de 8 dias sem sincronizar em out/2026).
+    const repeatables12 = await queue.getRepeatableJobs();
+    for (const job of repeatables12) {
+      if (job.name === 'gehc-watchdog-saude') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+
+    await queue.add(
+      'gehc-watchdog-saude',
+      {},
+      {
+        repeat: { every: 30 * 60 * 1000 }, // 30min
+        removeOnComplete: 20,
+        removeOnFail: 10,
+      }
+    );
+
+    console.log('[QUEUE] Job GEHC (gehc-watchdog-saude) agendado a cada 30min.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {
@@ -454,6 +486,7 @@ export async function diagnosticoJobsGehc() {
     'gehc-discovery-diario',
     'gehc-capturar-pdfs',
     'gehc-extrair-pdfs',
+    'gehc-watchdog-saude',
   ]);
 
   const repeatables = await queue.getRepeatableJobs();
@@ -504,6 +537,7 @@ export async function reagendarJobsGehc() {
     'gehc-discovery-diario',
     'gehc-capturar-pdfs',
     'gehc-extrair-pdfs',
+    'gehc-watchdog-saude',
   ];
 
   // Remove tudo existente
@@ -540,6 +574,11 @@ export async function reagendarJobsGehc() {
   await queue.add('gehc-extrair-pdfs', {}, {
     repeat: { cron: '0 5 * * *' },
     removeOnComplete: 10,
+    removeOnFail: 10,
+  });
+  await queue.add('gehc-watchdog-saude', {}, {
+    repeat: { every: 30 * 60 * 1000 },
+    removeOnComplete: 20,
     removeOnFail: 10,
   });
 
