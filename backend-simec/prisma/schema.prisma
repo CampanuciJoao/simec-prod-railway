@@ -1982,8 +1982,12 @@ model FoxessSnapshot {
   runningState         Int?    @map("running_state")
   // Falha atual se houver
   currentFault         String? @map("current_fault")
+  // Temperaturas — uteis pra identificar estresse termico. Inversor
+  // operando acima de 60-70C sugere problema de ventilacao/local.
+  ambientTempC         Float?  @map("ambient_temp_c")
+  inverterTempC        Float?  @map("inverter_temp_c")
 
-  // Detalhe por bateria quando ha mais de uma (array de { sn, soc, power })
+  // Detalhe por bateria quando ha mais de uma (array de { sn, soc, soh, tempC, powerKw })
   bateriasJson Json?   @map("baterias_json")
   // Payload bruto (debug / schema evolution)
   rawJson      String? @map("raw_json") @db.Text

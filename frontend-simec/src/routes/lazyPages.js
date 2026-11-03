@@ -14,6 +14,9 @@ export const DashboardPage = React.lazy(() =>
   import('@/pages/dashboard/DashboardPage')
 );
 export const BIPage = React.lazy(() => import('@/pages/bi/BIPage'));
+export const MonitoramentoPage = React.lazy(() =>
+  import('@/pages/monitoramento/MonitoramentoPage')
+);
 export const HelpCenterPage = React.lazy(() =>
   import('@/pages/help/HelpCenterPage')
 );

@@ -12,6 +12,7 @@ import {
   faLifeRing,
   faBuildingShield,
   faFileInvoiceDollar,
+  faHeartPulse,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const sidebarConfig = [
@@ -55,6 +56,11 @@ export const sidebarConfig = [
     label: 'Indicadores BI',
     path: '/bi',
     icon: faChartBar,
+  },
+  {
+    label: 'Monitoramento',
+    path: '/monitoramento',
+    icon: faHeartPulse,
   },
   {
     label: 'Orçamentos',

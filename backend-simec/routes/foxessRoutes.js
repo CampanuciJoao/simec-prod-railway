@@ -158,7 +158,9 @@ router.get('/sites/:id/status', async (req, res) => {
       select: {
         capturedAt: true, soc: true, batChargePower: true, batDischargePower: true,
         feedinPower: true, gridConsumptionPower: true, epsPower: true,
-        runningState: true, currentFault: true, bateriasJson: true,
+        runningState: true, currentFault: true,
+        ambientTempC: true, inverterTempC: true,
+        bateriasJson: true,
       },
     });
 

@@ -104,6 +104,8 @@ async function coletarSite(site) {
       epsPower: v.epsPower ?? null,
       runningState: typeof v.runningState === 'number' ? v.runningState : null,
       currentFault: typeof v.currentFault === 'string' && v.currentFault.trim() ? v.currentFault : null,
+      ambientTempC: typeof v.ambientTemperation === 'number' ? v.ambientTemperation : null,
+      inverterTempC: typeof v.invTemperation === 'number' ? v.invTemperation : null,
       bateriasJson: bateriasJson.length > 0 ? bateriasJson : null,
       rawJson: JSON.stringify(resultado || []).slice(0, 10000),
     },
