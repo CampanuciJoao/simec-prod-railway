@@ -14,46 +14,76 @@ import { queryRealTime, toVariablesMap } from './foxessClient.js';
 import { decryptApiKey } from './foxessCrypto.js';
 import { processarEventosFoxess } from './foxessAlertRepository.js';
 
-// Variaveis que a FoxESS retorna que nos interessam. Omitir `variables`
-// na chamada traria tudo — pedimos explicitamente so o que usamos pra
-// payload menor e menos chance de bater num campo que a FoxESS renomeie.
+// Variaveis que a FoxESS devolve que nos interessam. O H3 PRO (unico
+// modelo validado ate agora) NAO expoe 'SoC' generico — expoe 'SoC_1'
+// e 'SoC_2' (uma por bateria). Pedimos as 2 e consolidamos pelo menor
+// (pior caso pra alerta).
+//
+// Outras variaveis uteis descobertas no diagnostico (scripts/foxessListarVariaveis):
+//   SOH_1, SOH_2            -> saude fisica das baterias (0-100%)
+//   batTemperature_1/_2     -> temperatura de cada bateria
+//   invBatPower_1/_2        -> potencia por bateria (negativo = carga, positivo = descarga)
+//   ambientTemperation      -> temp ambiente do inversor
+//   invTemperation          -> temp interna do inversor
+//   remainCapacity_1/_2     -> capacidade restante em Ah
 const VARIAVEIS = [
-  'SoC',
+  'SoC_1', 'SoC_2',
+  'SOH_1', 'SOH_2',
+  'batTemperature_1', 'batTemperature_2',
+  'invBatPower_1', 'invBatPower_2',
   'batChargePower',
   'batDischargePower',
   'feedinPower',
   'gridConsumptionPower',
   'epsPower',
   'runningState',
+  'currentFault',
+  'ambientTemperation',
+  'invTemperation',
 ];
 
-// Running state do FoxESS: 163 = on-grid, 164 = off-grid/EPS, 165 = fault.
-// Snapshot sem runningState tratamos como on-grid (nao gera queda).
 const RUNNING_STATE_OFFGRID = 164;
+
+// SoC agregado = minimo entre as baterias. Conservador: um banco com
+// 1 bateria em 10% e outra em 80% ainda e um banco em risco — alerta
+// pela pior.
+function socAgregado(v) {
+  const s1 = typeof v.SoC_1 === 'number' ? v.SoC_1 : null;
+  const s2 = typeof v.SoC_2 === 'number' ? v.SoC_2 : null;
+  if (s1 == null && s2 == null) return null;
+  if (s1 == null) return s2;
+  if (s2 == null) return s1;
+  return Math.min(s1, s2);
+}
 
 async function coletarSite(site) {
   const apiKey = decryptApiKey(site.apiKeyCrypt);
-  const snsAlvo = [site.inverterSn, ...(site.bateriaSns || [])];
 
+  // Consulta so o SN do inversor — H3 PRO devolve dados das baterias na
+  // mesma resposta (SoC_1/_2, batTemperature_1/_2 etc). Chamar com SNs
+  // das baterias separados desperdica calls do rate limit e nao traz
+  // informacao nova.
   const resultado = await queryRealTime({
     apiBase: site.apiBase,
     apiKey,
-    sns: snsAlvo,
+    sns: [site.inverterSn],
     variables: VARIAVEIS,
   });
 
-  // Extrai variaveis do inversor (SN principal). As baterias (quando SN
-  // separado) retornam seus proprios SoC — guardamos no bateriasJson.
-  const porSn = new Map((resultado || []).map((d) => [d?.deviceSN, toVariablesMap(d)]));
-  const inversor = porSn.get(site.inverterSn) || {};
+  const device = (resultado || []).find((d) => d?.deviceSN === site.inverterSn) || (resultado || [])[0];
+  const v = toVariablesMap(device);
 
-  const bateriasJson = (site.bateriaSns || []).map((sn) => {
-    const v = porSn.get(sn) || {};
+  // Monta detalhes por bateria a partir das variaveis _1/_2 do inversor.
+  // Ordem segue site.bateriaSns — primeira entrada recebe os dados _1,
+  // segunda os _2.
+  const bateriasJson = (site.bateriaSns || []).map((sn, idx) => {
+    const suf = idx === 0 ? '_1' : '_2';
     return {
       sn,
-      soc: v.SoC ?? null,
-      chargePower: v.batChargePower ?? null,
-      dischargePower: v.batDischargePower ?? null,
+      soc:       v[`SoC${suf}`]             ?? null,
+      soh:       v[`SOH${suf}`]             ?? null,
+      tempC:     v[`batTemperature${suf}`]  ?? null,
+      powerKw:   v[`invBatPower${suf}`]     ?? null,
     };
   });
 
@@ -61,15 +91,16 @@ async function coletarSite(site) {
     data: {
       tenantId: site.tenantId,
       siteId: site.id,
-      soc: inversor.SoC ?? null,
-      batChargePower: inversor.batChargePower ?? null,
-      batDischargePower: inversor.batDischargePower ?? null,
-      feedinPower: inversor.feedinPower ?? null,
-      gridConsumptionPower: inversor.gridConsumptionPower ?? null,
-      epsPower: inversor.epsPower ?? null,
-      runningState: typeof inversor.runningState === 'number' ? inversor.runningState : null,
+      soc: socAgregado(v),
+      batChargePower: v.batChargePower ?? null,
+      batDischargePower: v.batDischargePower ?? null,
+      feedinPower: v.feedinPower ?? null,
+      gridConsumptionPower: v.gridConsumptionPower ?? null,
+      epsPower: v.epsPower ?? null,
+      runningState: typeof v.runningState === 'number' ? v.runningState : null,
+      currentFault: typeof v.currentFault === 'string' && v.currentFault.trim() ? v.currentFault : null,
       bateriasJson: bateriasJson.length > 0 ? bateriasJson : null,
-      rawJson: JSON.stringify(resultado || []).slice(0, 10000), // teto defensivo
+      rawJson: JSON.stringify(resultado || []).slice(0, 10000),
     },
   });
 
