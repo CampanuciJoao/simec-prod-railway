@@ -63,11 +63,16 @@ async function coletarSite(site) {
   // mesma resposta (SoC_1/_2, batTemperature_1/_2 etc). Chamar com SNs
   // das baterias separados desperdica calls do rate limit e nao traz
   // informacao nova.
+  // OBS: nao passamos `variables` — pedir variaveis especificas no H3 PRO
+  // (ex: SoC_1, SoC_2) devolve null em todas, enquanto a chamada sem filtro
+  // retorna as 90+ variaveis normalmente. Comportamento confirmado via
+  // scripts/foxessListarVariaveis.mjs. Payload maior mas tudo bem — so
+  // extraimos o que nos interessa abaixo.
   const resultado = await queryRealTime({
     apiBase: site.apiBase,
     apiKey,
     sns: [site.inverterSn],
-    variables: VARIAVEIS,
+    // variables: VARIAVEIS,  // DESABILITADO — ver comentario acima
   });
 
   const device = (resultado || []).find((d) => d?.deviceSN === site.inverterSn) || (resultado || [])[0];
