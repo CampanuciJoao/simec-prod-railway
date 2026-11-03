@@ -37,7 +37,7 @@ import { AlertListItem } from '@/components/dashboard';
 import DashboardCard from '@/components/dashboard/DashboardCard';
 import BarChart from '@/components/charts/BarChart';
 import DonutChart from '@/components/charts/DonutChart';
-import { getGehcStatus } from '@/services/api/gehcApi';
+import SaudeRMsList from '@/components/monitoramento/SaudeRMsList';
 import { formatarDataHora } from '@/utils/timeUtils';
 
 const ResponsiveGrid = WidthProvider(Responsive);
@@ -228,183 +228,6 @@ function OcorrenciaPendenteItem({ ocorrencia }) {
         {gravUpper}
       </span>
     </Link>
-  );
-}
-
-// ─── Saúde das RMs GE ─────────────────────────────────────────────────────────
-
-/**
- * Gauge box visual — He / PSI / COMP / TEMP em quadrados coloridos
- * por estado. Substitui a leitura inline de texto plano.
- */
-function GaugeBox({ label, value, tone = 'ok' }) {
-  const tones = {
-    ok:    { border: 'var(--border-default)',     bg: 'var(--bg-surface)',           color: 'var(--text-primary)' },
-    good:  { border: 'var(--color-success-soft)', bg: 'var(--color-success-surface)', color: 'var(--color-success)' },
-    warn:  { border: 'var(--color-warning-soft)', bg: 'var(--color-warning-surface)', color: 'var(--color-warning)' },
-    crit:  { border: 'var(--color-danger)',       bg: 'var(--color-danger-surface)', color: 'var(--color-danger)' },
-    // 'muted' = sem leitura disponivel. Cinza neutro pra deixar claro
-    // que o slot existe mas o sensor nao reportou (ou equip offline).
-    muted: { border: 'var(--border-soft)',        bg: 'var(--bg-surface-soft)',      color: 'var(--text-muted)' },
-  };
-  const t = tones[tone] || tones.ok;
-  return (
-    <div
-      style={{
-        backgroundColor: t.bg,
-        border: `1px solid ${t.border}`,
-        borderRadius: 6,
-        padding: '5px 7px',
-        minWidth: 0,
-      }}
-    >
-      <div
-        className="truncate"
-        style={{
-          fontSize: 10.5,
-          fontWeight: 600,
-          color: 'var(--text-muted)',
-          letterSpacing: '0',
-          textTransform: 'none',
-        }}
-      >
-        {label}
-      </div>
-      <div
-        className="stat-value"
-        style={{
-          fontSize: 14,
-          fontWeight: 700,
-          color: t.color,
-          marginTop: 1,
-          lineHeight: 1.1,
-          letterSpacing: '-0.01em',
-        }}
-      >
-        {value}
-      </div>
-    </div>
-  );
-}
-
-function SaudeRMs() {
-  const [snapshots, setSnapshots] = useState([]);
-  const [configurado, setConfigurado] = useState(true);
-
-  useEffect(() => {
-    getGehcStatus()
-      .then((res) => {
-        setConfigurado(res.credenciais?.configurado ?? false);
-        setSnapshots(res.ultimosSnapshots ?? []);
-      })
-      .catch(() => {});
-  }, []);
-
-  if (!configurado) {
-    return (
-      <InlineEmptyState message="Integração GE não configurada.">
-        <Link to="/gerenciamento/integracoes" className="text-xs underline" style={{ color: 'var(--brand-primary)' }}>
-          Configurar agora
-        </Link>
-      </InlineEmptyState>
-    );
-  }
-
-  if (!snapshots.length) {
-    return <InlineEmptyState message="Nenhuma captura de saúde ainda. Execute o monitor na tela de integrações." />;
-  }
-
-  return (
-    <div className="space-y-2">
-      {snapshots.map((s, i) => (
-        <div
-          key={i}
-          className="rounded-lg border px-3 py-2"
-          style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
-        >
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-            {s.equipamentoId ? (
-              <Link
-                to={`/equipamentos/detalhes/${s.equipamentoId}`}
-                className="text-[13.5px] font-semibold truncate min-w-0 hover:underline"
-                style={{ color: 'var(--text-primary)' }}
-              >
-                {s.equipamento}
-              </Link>
-            ) : (
-              <p className="text-[13.5px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{s.equipamento}</p>
-            )}
-            <div className="flex items-center gap-2 shrink-0">
-              {s.equipmentOnline !== null && s.equipmentOnline !== undefined && (
-                <span
-                  style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    letterSpacing: '0.16em',
-                    textTransform: 'uppercase',
-                    padding: '2px 6px',
-                    borderRadius: 3,
-                    backgroundColor: s.equipmentOnline ? 'var(--color-success-surface)' : 'var(--color-danger-surface)',
-                    color: s.equipmentOnline ? 'var(--color-success)' : 'var(--color-danger)',
-                    border: `1px solid ${s.equipmentOnline ? 'var(--color-success-soft)' : 'var(--color-danger-soft)'}`,
-                  }}
-                >
-                  {s.equipmentOnline ? '● Online' : '○ Offline'}
-                </span>
-              )}
-              <p
-                style={{
-                  fontFamily: 'var(--font-mono)',
-                  fontSize: 10,
-                  letterSpacing: '0.04em',
-                  color: 'var(--text-muted)',
-                }}
-              >
-                {formatarDataHora(s.capturedAt)}
-              </p>
-            </div>
-          </div>
-
-          {/* Sempre renderiza os 4 gauges — mesmo offline. Sem leitura
-              vira "—" em tom neutro pra deixar claro que o slot existe
-              mas o sensor nao reportou. Antes a UI escondia gauges null
-              e ficava ambiguo: "esse equipamento nao tem o sensor?" ou
-              "captura falhou?". Agora sempre 4 slots visiveis. */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
-            <GaugeBox
-              label="Hélio"
-              value={s.heliumLevelPct != null ? `${s.heliumLevelPct}%` : '—'}
-              tone={
-                s.heliumLevelPct == null ? 'muted'
-                : s.heliumLevelPct < 30 ? 'crit'
-                : s.heliumLevelPct < 70 ? 'warn'
-                : 'good'
-              }
-            />
-            <GaugeBox
-              label="Pressão"
-              value={s.heliumPressurePsi != null ? `${s.heliumPressurePsi} PSI` : '—'}
-              tone={s.heliumPressurePsi == null ? 'muted' : 'ok'}
-            />
-            <GaugeBox
-              label="Compressor"
-              value={s.compressorStatus || '—'}
-              tone={
-                !s.compressorStatus ? 'muted'
-                : s.compressorStatus === 'ON' ? 'good'
-                : 'crit'
-              }
-            />
-            <GaugeBox
-              label="Temperatura"
-              value={s.coolantTempC != null ? `${s.coolantTempC}°C` : '—'}
-              tone={s.coolantTempC == null ? 'muted' : 'ok'}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 
@@ -639,18 +462,18 @@ function DashboardPage() {
             )}
           </DashboardCard>
 
-          {/* Saúde das RMs GE */}
+          {/* Saúde das RMs GE — reusa componente compartilhado com /monitoramento */}
           <DashboardCard
             key="fila"
             title="Saúde das RMs GE"
             description="Último snapshot de hélio, pressão e compressor."
             headerRight={
-              <Link to="/gerenciamento/integracoes" style={{ color: 'var(--brand-primary)' }} className="text-xs">
-                <FontAwesomeIcon icon={faHeartPulse} className="mr-1" />Ver integrações
+              <Link to="/monitoramento" style={{ color: 'var(--brand-primary)' }} className="text-xs">
+                <FontAwesomeIcon icon={faHeartPulse} className="mr-1" />Ver monitoramento
               </Link>
             }
           >
-            <SaudeRMs />
+            <SaudeRMsList compact />
           </DashboardCard>
 
           {/* Leitura do parque */}
