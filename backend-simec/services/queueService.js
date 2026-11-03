@@ -458,6 +458,27 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-watchdog-saude) agendado a cada 30min.');
 
+    // Poller FoxESS: 60s. Respeita o limite da API (1440 calls/dia por
+    // inversor). Watchdog FoxESS: 15min. Mesma arquitetura 2-niveis do
+    // watchdog GEHC — recovery silencioso ate 3h; depois alerta ALTA.
+    const repeatables13 = await queue.getRepeatableJobs();
+    for (const job of repeatables13) {
+      if (job.name === 'foxess-poll' || job.name === 'foxess-watchdog') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+    await queue.add('foxess-poll', {}, {
+      repeat: { every: 60 * 1000 },
+      removeOnComplete: 100,
+      removeOnFail: 20,
+    });
+    await queue.add('foxess-watchdog', {}, {
+      repeat: { every: 15 * 60 * 1000 },
+      removeOnComplete: 20,
+      removeOnFail: 10,
+    });
+    console.log('[QUEUE] Jobs FoxESS (foxess-poll 60s + foxess-watchdog 15min) agendados.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {
@@ -590,6 +611,74 @@ export async function reagendarJobsGehc() {
   });
 
   return { ok: true, removidos, recriados: NOMES_GEHC.length, capturaImediataAgendada: true };
+}
+
+// Reagenda crons FoxESS (poll + watchdog). Mesmo padrao do reagendar GEHC —
+// usado pelo watchdog FoxESS quando detecta que a coleta parou.
+export async function reagendarJobsFoxess() {
+  const queue = getAlertasQueue();
+  if (!queue) {
+    return { ok: false, motivo: queueUnavailableReason || 'queue_indisponivel' };
+  }
+
+  const NOMES_FOXESS = ['foxess-poll', 'foxess-watchdog'];
+  const repeatables = await queue.getRepeatableJobs();
+  let removidos = 0;
+  for (const j of repeatables) {
+    if (NOMES_FOXESS.includes(j.name)) {
+      await queue.removeRepeatableByKey(j.key);
+      removidos++;
+    }
+  }
+
+  await queue.add('foxess-poll', {}, {
+    repeat: { every: 60 * 1000 },
+    removeOnComplete: 100,
+    removeOnFail: 20,
+  });
+  await queue.add('foxess-watchdog', {}, {
+    repeat: { every: 15 * 60 * 1000 },
+    removeOnComplete: 20,
+    removeOnFail: 10,
+  });
+
+  // Captura imediata
+  await queue.add('foxess-poll', {}, {
+    jobId: `foxess-poll-manual-${Date.now()}`,
+    removeOnComplete: 5,
+    removeOnFail: 5,
+  });
+
+  return { ok: true, removidos, recriados: NOMES_FOXESS.length, capturaImediataAgendada: true };
+}
+
+// Diagnostico FoxESS — mesmo padrao do diagnostico GEHC. Usado por
+// endpoint admin / UI de monitoramento pra ver se os crons estao vivos.
+export async function diagnosticoJobsFoxess() {
+  const queue = getAlertasQueue();
+  if (!queue) {
+    return { queueDisponivel: false, motivo: queueUnavailableReason || 'queue_indisponivel' };
+  }
+
+  const NOMES_FOXESS = new Set(['foxess-poll', 'foxess-watchdog']);
+  const repeatables = await queue.getRepeatableJobs();
+  const registrados = repeatables.filter((j) => NOMES_FOXESS.has(j.name)).map((j) => ({
+    name: j.name, next: j.next, every: j.every,
+  }));
+
+  const ultimoSnapshot = await prisma.foxessSnapshot.findFirst({
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  }).catch(() => null);
+
+  return {
+    queueDisponivel: true,
+    jobsRegistrados: registrados,
+    ultimoSnapshot: ultimoSnapshot?.capturedAt || null,
+    minutosDesdeUltimoSnapshot: ultimoSnapshot
+      ? Math.round((Date.now() - ultimoSnapshot.capturedAt.getTime()) / 60000)
+      : null,
+  };
 }
 
 export async function encerrarQueueDeAlertas() {

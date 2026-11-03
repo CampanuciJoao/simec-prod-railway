@@ -73,6 +73,9 @@ model Tenant {
   impersonacoes             Impersonacao[]               @relation("ImpersonacaoTenantAlvo")
   logsAuditoriaImpersonadas LogAuditoria[]               @relation("LogAuditoriaActedAs")
   llmCallLogs               LlmCallLog[]
+  foxessSites               FoxessSite[]
+  foxessSnapshots           FoxessSnapshot[]
+  foxessQuedas              FoxessQueda[]
 
   @@map("tenants")
 }
@@ -116,6 +119,7 @@ model Unidade {
   segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
   contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
   orcamentos        Orcamento[]
+  foxessSite        FoxessSite?
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -474,9 +478,9 @@ model Alerta {
   tipoCategoria String? @map("tipo_categoria")
   tipoEvento    String? @map("tipo_evento")
 
-  link            String?
-  emailEnviado    Boolean @default(false)
-  telegramEnviado Boolean @default(false)
+  link              String?
+  emailEnviado      Boolean   @default(false)
+  telegramEnviado   Boolean   @default(false)
   // Timestamp do ultimo envio Telegram bem-sucedido. Usado pelo drainer
   // pra decidir re-notificacao de alertas persistentes (default: 24h
   // apos telegramEnviadoEm, alertas GEHC_SAUDE ALTA/MEDIA sao reenviados).
@@ -1914,4 +1918,108 @@ model TesteQualidade {
   @@index([tenantId, resultado, proximoVencimento])
   @@index([tenantId, deletadoEm])
   @@map("testes_qualidade")
+}
+
+// ─── FoxESS — Site cadastrado por unidade ─────────────────────────────────────
+// Site = instalacao fisica (inversor + baterias) de uma unidade. Modelo
+// 1 site por unidade pra permitir cadastrar outras unidades no futuro sem
+// mexer no schema. API key fica criptografada (AES-256) via foxessCrypto.
+model FoxessSite {
+  id             String   @id @default(uuid())
+  tenantId       String
+  unidadeId      String   @map("unidade_id")
+  // Nome livre pra identificar no admin (ex: "Sede Cerdil - H3 PRO").
+  nome           String
+  // Credencial criptografada (AES-256-GCM). Nunca armazenar em texto puro
+  // nem logar — mesmo em erros. foxessCrypto.decrypt() so no runtime.
+  apiKeyCrypt    String   @map("api_key_crypt") @db.Text
+  // Base da API (ex: https://www.foxesscloud.com). Guardado em coluna
+  // porque conta regional pode usar dominio diferente (foxessc loud.us,
+  // developer-eu.foxesscloud.com etc).
+  apiBase        String   @default("https://www.foxesscloud.com") @map("api_base")
+  // Serial do inversor (necessario em /op/v1/device/real/query).
+  inverterSn     String   @map("inverter_sn")
+  // Seriais das baterias (array). Pode ser 1+ baterias por inversor.
+  bateriaSns     String[] @map("bateria_sns")
+  // Dados cadastrais opcionais pra exibicao
+  modeloInversor String?  @map("modelo_inversor")
+  capacidadeKwh  Float?   @map("capacidade_kwh")
+  autonomiaHoras Float?   @map("autonomia_horas")
+  ativo          Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade   Unidade          @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+  snapshots FoxessSnapshot[]
+  quedas    FoxessQueda[]
+
+  @@unique([tenantId, unidadeId])
+  @@index([tenantId, ativo])
+  @@map("foxess_sites")
+}
+
+// ─── FoxESS — Snapshot de telemetria ──────────────────────────────────────────
+// Um snapshot por ciclo de polling (padrao 60s). Armazena tudo que a API
+// devolve e for relevante — gastos de storage sao baixos (snapshots sao
+// pequenos, retencao 1 ano).
+model FoxessSnapshot {
+  id         String   @id @default(uuid())
+  tenantId   String
+  siteId     String   @map("site_id")
+  capturedAt DateTime @default(now()) @map("captured_at")
+
+  // Bateria (agregada ou primeira — detalhe por SN fica em bateriasJson)
+  soc                  Float?  @map("soc") // % 0-100
+  batChargePower       Float?  @map("bat_charge_power") // kW (positivo = carregando)
+  batDischargePower    Float?  @map("bat_discharge_power") // kW (positivo = descarregando)
+  // Fluxo da rede
+  feedinPower          Float?  @map("feedin_power") // kW (exportando pra rede)
+  gridConsumptionPower Float?  @map("grid_consumption_power") // kW (consumindo da rede)
+  // EPS (modo bateria/off-grid)
+  epsPower             Float?  @map("eps_power") // kW entregue pelo EPS
+  // Estado operacional: 163 = on-grid, 164 = off-grid/EPS, 165 = fault
+  runningState         Int?    @map("running_state")
+  // Falha atual se houver
+  currentFault         String? @map("current_fault")
+
+  // Detalhe por bateria quando ha mais de uma (array de { sn, soc, power })
+  bateriasJson Json?   @map("baterias_json")
+  // Payload bruto (debug / schema evolution)
+  rawJson      String? @map("raw_json") @db.Text
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  site   FoxessSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId, capturedAt(sort: Desc)])
+  @@index([tenantId, capturedAt(sort: Desc)])
+  @@map("foxess_snapshots")
+}
+
+// ─── FoxESS — Evento de queda de energia ──────────────────────────────────────
+// Agregado derivado dos snapshots: quando runningState vira 164 (off-grid)
+// por >N minutos, abre uma queda. Fecha quando volta pra 163. Tabela separada
+// pra facilitar listagem de "ja tivemos N quedas no mes" sem agregar milhoes
+// de snapshots.
+model FoxessQueda {
+  id         String    @id @default(uuid())
+  tenantId   String
+  siteId     String    @map("site_id")
+  inicioEm   DateTime  @map("inicio_em")
+  fimEm      DateTime? @map("fim_em")
+  duracaoMin Int?      @map("duracao_min")
+  socInicial Float?    @map("soc_inicial")
+  socMinimo  Float?    @map("soc_minimo")
+  socFinal   Float?    @map("soc_final")
+  // Resumo gerado quando a queda fecha (texto humano pra UI/Telegram).
+  resumo     String?   @db.Text
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  site   FoxessSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, siteId, inicioEm(sort: Desc)])
+  @@index([tenantId, fimEm])
+  @@map("foxess_quedas")
 }
