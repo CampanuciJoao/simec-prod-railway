@@ -91,7 +91,7 @@ function compor(status) {
   };
 }
 
-function StatusCard({ plant, composto, quedaAtiva }) {
+function StatusCard({ plant, composto, quedaAtiva, inverters = [], snapshotsPorInverter = [] }) {
   const estado = composto?.runningState != null
     ? RUNNING_STATE_LABELS[composto.runningState] || { label: `Estado ${composto.runningState}`, cor: 'var(--text-muted)', icon: faBolt }
     : plant?.temBateria
@@ -101,6 +101,8 @@ function StatusCard({ plant, composto, quedaAtiva }) {
   const minsEmQueda = quedaAtiva
     ? Math.round((Date.now() - new Date(quedaAtiva.inicioEm).getTime()) / 60000)
     : null;
+
+  const inversoresAtivos = inverters.filter((i) => i.ativo);
 
   return (
     <Card className="p-5">
@@ -156,45 +158,56 @@ function StatusCard({ plant, composto, quedaAtiva }) {
           Falha reportada: {composto.currentFault}
         </div>
       )}
-    </Card>
-  );
-}
-StatusCard.propTypes = { plant: PropTypes.object, composto: PropTypes.object, quedaAtiva: PropTypes.object };
 
-function InverterCard({ inverter, snapshot }) {
-  return (
-    <Card className="p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-            Inversor
+      {/* Lista compacta de inversores da planta (integrada no mesmo card) */}
+      {inversoresAtivos.length > 0 && (
+        <div className="mt-4 border-t pt-3" style={{ borderColor: 'var(--border-soft)' }}>
+          <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Inversor{inversoresAtivos.length > 1 ? 'es' : ''} ({inversoresAtivos.length})
           </p>
-          <p className="text-sm font-semibold">
-            {PROVIDER_LABELS[inverter.provider] || inverter.provider}
-            {inverter.modeloInversor ? ` · ${inverter.modeloInversor}` : ''}
-          </p>
-          <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>SN {inverter.inverterSn}</p>
+          <div className="space-y-2">
+            {inversoresAtivos.map((inv) => {
+              const snap = snapshotsPorInverter.find((x) => x.inverterId === inv.id)?.snapshot;
+              return (
+                <div
+                  key={inv.id}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-lg px-3 py-2"
+                  style={{ backgroundColor: 'var(--bg-surface-subtle)' }}
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    <FontAwesomeIcon icon={faMicrochip} style={{ color: 'var(--brand-primary)' }} />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {PROVIDER_LABELS[inv.provider] || inv.provider}
+                        {inv.modeloInversor ? ` · ${inv.modeloInversor}` : ''}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>SN {inv.inverterSn}</p>
+                    </div>
+                  </div>
+                  <div className="flex shrink-0 gap-4 text-xs">
+                    <div>
+                      <p style={{ color: 'var(--text-muted)' }}>Potência</p>
+                      <p className="font-semibold">{snap?.powerKw != null ? `${fmt(snap.powerKw, 2)} kW` : '—'}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'var(--text-muted)' }}>Hoje</p>
+                      <p className="font-semibold">{snap?.generationKwhDay != null ? `${fmt(snap.generationKwhDay, 1)} kWh` : '—'}</p>
+                    </div>
+                    <div>
+                      <p style={{ color: 'var(--text-muted)' }}>Temp</p>
+                      <p className="font-semibold">{snap?.inverterTempC != null ? `${fmt(snap.inverterTempC, 1)}°C` : '—'}</p>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <FontAwesomeIcon icon={faMicrochip} style={{ color: 'var(--brand-primary)' }} />
-      </div>
-      <div className="grid grid-cols-3 gap-2 text-xs">
-        <div>
-          <p style={{ color: 'var(--text-muted)' }}>Potência</p>
-          <p className="font-semibold">{snapshot?.powerKw != null ? `${fmt(snapshot.powerKw, 2)} kW` : '—'}</p>
-        </div>
-        <div>
-          <p style={{ color: 'var(--text-muted)' }}>Hoje</p>
-          <p className="font-semibold">{snapshot?.generationKwhDay != null ? `${fmt(snapshot.generationKwhDay, 1)} kWh` : '—'}</p>
-        </div>
-        <div>
-          <p style={{ color: 'var(--text-muted)' }}>Temp</p>
-          <p className="font-semibold">{snapshot?.inverterTempC != null ? `${fmt(snapshot.inverterTempC, 1)}°C` : '—'}</p>
-        </div>
-      </div>
+      )}
     </Card>
   );
 }
-InverterCard.propTypes = { inverter: PropTypes.object.isRequired, snapshot: PropTypes.object };
+StatusCard.propTypes = { plant: PropTypes.object, composto: PropTypes.object, quedaAtiva: PropTypes.object, inverters: PropTypes.array, snapshotsPorInverter: PropTypes.array };
 
 function BateriaCard({ bateria, idx }) {
   const soc = bateria?.soc;
@@ -442,19 +455,17 @@ function TabEnergia() {
         <LoadingState message="Carregando painel..." />
       ) : (
         <>
-          <StatusCard plant={plant} composto={composto} quedaAtiva={status?.quedaAtiva} />
+          <StatusCard
+            plant={plant}
+            composto={composto}
+            quedaAtiva={status?.quedaAtiva}
+            inverters={inverters}
+            snapshotsPorInverter={snapshotsPorInverter}
+          />
           {composto && <FluxoCard composto={composto} />}
           {plant?.temBateria && bateriasInfo.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-2">
               {bateriasInfo.map((b, idx) => <BateriaCard key={idx} bateria={b} idx={idx} />)}
-            </div>
-          )}
-          {inverters.length > 0 && (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {inverters.filter((i) => i.ativo).map((inv) => {
-                const snap = snapshotsPorInverter.find((x) => x.inverterId === inv.id)?.snapshot;
-                return <InverterCard key={inv.id} inverter={inv} snapshot={snap} />;
-              })}
             </div>
           )}
           <GraficoSoc snapshots={historico?.snapshots} plant={plant} />
