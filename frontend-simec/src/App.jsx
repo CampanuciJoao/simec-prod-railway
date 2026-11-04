@@ -23,34 +23,54 @@ function useSungrowOAuthInterceptor() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (!code) return;
-    // Snapshot ANTES de limpar a URL. O redirect_uri que a Sungrow
-    // usou (= o que esta registrado no portal) e a URL atual sem
-    // query string — padrao OAuth2 exige que seja identico no
-    // token exchange.
     const redirectUri = `${window.location.origin}${window.location.pathname}`;
+    console.log('[SUNGROW_INTERCEPTOR] detectou code na URL', {
+      codeLen: code.length,
+      redirectUri,
+      href: window.location.href,
+      temOpener: Boolean(window.opener),
+    });
     (async () => {
+      let respostaStatus = 'nao-chamado';
+      let respostaBody = '';
       try {
         const qs = new URLSearchParams({ code, redirectUri }).toString();
-        await fetch(`/api/solar/sungrow/callback?${qs}`, {
-          method: 'GET',
-          credentials: 'include',
-        });
+        const url = `/api/solar/sungrow/callback?${qs}`;
+        console.log('[SUNGROW_INTERCEPTOR] chamando backend:', url);
+        const r = await fetch(url, { method: 'GET' });
+        respostaStatus = r.status;
+        try { respostaBody = (await r.text()).slice(0, 500); } catch {}
+        console.log('[SUNGROW_INTERCEPTOR] resposta backend:', respostaStatus, respostaBody.slice(0, 200));
       } catch (err) {
-        console.error('[SUNGROW_INTERCEPTOR] falha:', err);
+        respostaStatus = 'fetch-error';
+        respostaBody = String(err?.message || err);
+        console.error('[SUNGROW_INTERCEPTOR] fetch falhou:', err);
       } finally {
-        // Limpa ?code= da URL pra nao reprocessar em reloads
+        // Guarda resultado em sessionStorage pra visibilidade — se o
+        // popup fechar rapido demais o usuario perder console.log.
+        try {
+          sessionStorage.setItem('sungrow-last-oauth', JSON.stringify({
+            at: new Date().toISOString(),
+            status: respostaStatus,
+            body: respostaBody.slice(0, 200),
+          }));
+        } catch {}
         try {
           const limpa = window.location.pathname + window.location.hash;
           window.history.replaceState({}, '', limpa || '/');
         } catch {}
-        // Se estamos em popup, avisa a aba pai e fecha
-        try {
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({ sungrowAuth: 'ok' }, '*');
-            setTimeout(() => { try { window.close(); } catch {} }, 300);
-          }
-        } catch {}
-        setProcessando(false);
+        // Pausa 1.5s pra dar tempo de o admin ver os logs no DevTools
+        // antes de fechar o popup. Se nao for popup (window.opener null),
+        // nao fecha nada — so some o spinner.
+        setTimeout(() => {
+          try {
+            if (window.opener && !window.opener.closed) {
+              window.opener.postMessage({ sungrowAuth: respostaStatus === 200 ? 'ok' : 'erro' }, '*');
+              setTimeout(() => { try { window.close(); } catch {} }, 300);
+            }
+          } catch {}
+          setProcessando(false);
+        }, 1500);
       }
     })();
   }, []);

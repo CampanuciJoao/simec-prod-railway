@@ -101,6 +101,17 @@ async function tentarAutoPopularMetadados(inverterId) {
 router.get('/sungrow/callback', async (req, res) => {
   const { code, error, error_description, redirectUri: redirectUriQuery } = req.query;
 
+  // Entry log — dispara ANTES de qualquer validacao, pra sabermos que
+  // a rota foi chamada mesmo quando a resposta termina em 400.
+  console.log('[SUNGROW_CALLBACK_HIT]', {
+    temCode: Boolean(code),
+    codeLen: code ? String(code).length : 0,
+    error: error || null,
+    redirectUriQuery: redirectUriQuery || null,
+    fromIp: req.ip,
+    userAgent: (req.get('user-agent') || '').slice(0, 80),
+  });
+
   const htmlResposta = (titulo, mensagem, sucesso = false) => `
     <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
     <title>${titulo}</title>
