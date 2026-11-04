@@ -286,27 +286,30 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
           value={form.inverterSn}
           onChange={(e) => setForm((f) => ({ ...f, inverterSn: e.target.value }))}
         />
+        <Input
+          label="Nome / apelido"
+          placeholder="Opcional"
+          value={form.nome}
+          onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
+        />
         <div className="grid grid-cols-2 gap-3">
           <Input
-            label="Nome / apelido"
-            placeholder="Opcional"
-            value={form.nome}
-            onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
-          />
-          <Input
             label="Modelo"
-            placeholder="Ex: H3 PRO, MAX 50KTL3-LV"
+            placeholder="Preenchido automaticamente"
+            hint="Opcional — o SIMEC puxa da API após salvar"
             value={form.modeloInversor}
             onChange={(e) => setForm((f) => ({ ...f, modeloInversor: e.target.value }))}
           />
+          <Input
+            label="Capacidade (kW)"
+            type="number"
+            step="0.1"
+            placeholder="Preenchido automaticamente"
+            hint="Opcional — o SIMEC puxa da API após salvar"
+            value={form.capacidadeKw}
+            onChange={(e) => setForm((f) => ({ ...f, capacidadeKw: e.target.value }))}
+          />
         </div>
-        <Input
-          label="Capacidade (kW)"
-          type="number"
-          step="0.1"
-          value={form.capacidadeKw}
-          onChange={(e) => setForm((f) => ({ ...f, capacidadeKw: e.target.value }))}
-        />
 
         {/* Credencial */}
         {providerSelecionado && (

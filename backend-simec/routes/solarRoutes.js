@@ -25,6 +25,64 @@ import * as sungrowAdapter from '../services/solar/adapters/sungrowAdapter.js';
 
 const router = express.Router();
 
+// Tenta puxar modelo + capacidade do inverter diretamente da API do
+// fabricante (chamando adapter.validarCredencial) e persistir no banco
+// se os campos estiverem vazios. Usada depois de criar inverter OU
+// depois de OAuth Sungrow completar. Falha silenciosa — se o adapter
+// nao conseguir retornar dados agora, o inverter fica com os campos
+// vazios ate o admin editar manualmente.
+async function tentarAutoPopularMetadados(inverterId) {
+  try {
+    const inv = await prisma.solarInverter.findUnique({
+      where: { id: inverterId },
+      select: {
+        id: true, provider: true, apiBase: true, inverterSn: true,
+        modeloInversor: true, capacidadeKw: true, credentialCrypt: true,
+        plantId: true, tenantId: true,
+      },
+    });
+    if (!inv) return;
+
+    // Se ambos ja preenchidos, nao precisa ir pra API.
+    if (inv.modeloInversor && inv.capacidadeKw != null) return;
+
+    const adapter = getAdapter(inv.provider);
+    const credential = decryptCredential(inv.credentialCrypt);
+    if (!credential) return;
+
+    const r = await adapter.validarCredencial(credential, inv.apiBase);
+    if (!r?.ok || !Array.isArray(r.devices)) return;
+
+    const match = r.devices.find((d) => String(d.sn).trim() === String(inv.inverterSn).trim());
+    if (!match) return;
+
+    const patch = {};
+    if (!inv.modeloInversor && match.modelo) patch.modeloInversor = match.modelo;
+    if (inv.capacidadeKw == null && match.capacidadeKw != null) patch.capacidadeKw = match.capacidadeKw;
+    if (Object.keys(patch).length === 0) return;
+
+    await prisma.solarInverter.update({ where: { id: inv.id }, data: patch });
+
+    // Bonus: se a planta nao tem capacidade_kwp e a API retornou stationKwp,
+    // sugere no log (nao sobrescreve automaticamente — admin decide se
+    // a station da API bate com o conceito de planta no SIMEC).
+    if (match.stationKwp != null) {
+      const plant = await prisma.solarPlant.findUnique({
+        where: { id: inv.plantId },
+        select: { capacidadeKwp: true },
+      });
+      if (plant && plant.capacidadeKwp == null) {
+        await prisma.solarPlant.update({
+          where: { id: inv.plantId },
+          data: { capacidadeKwp: match.stationKwp },
+        });
+      }
+    }
+  } catch (err) {
+    console.warn(`[SOLAR_AUTOFILL] Falha ao auto-popular metadados do inverter ${inverterId}:`, err.message);
+  }
+}
+
 // ─── OAuth callback (publico, SEM proteger — Sungrow redireciona aqui) ──────
 //
 // Fluxo: user clica "Autorizar Sungrow" > nova aba abre authorize URL do
@@ -103,6 +161,11 @@ router.get('/sungrow/oauth/callback', async (req, res) => {
       where: { id: inverter.id },
       data: { credentialCrypt: encryptCredential(novaCredencial) },
     });
+
+    // Agora que tem access_token, puxa modelo + capacidade da API Sungrow
+    // (best-effort). Sem isso o admin teria que digitar manualmente mesmo
+    // depois do OAuth.
+    tentarAutoPopularMetadados(inverter.id).catch(() => {});
 
     return res.send(htmlResposta(
       'Autorizado com sucesso',
@@ -234,6 +297,12 @@ router.post('/plants/:plantId/inverters', admin, async (req, res) => {
       },
       select: { id: true, provider: true, inverterSn: true, apiBase: true, ativo: true },
     });
+
+    // Best-effort: puxa modelo + capacidade da API em background. Nao
+    // bloqueia a resposta — admin ve o inverter criado imediatamente,
+    // e os campos auto-populam no proximo reload da lista.
+    tentarAutoPopularMetadados(inverter.id).catch(() => {});
+
     res.json(inverter);
   } catch (err) {
     res.status(500).json({ error: err.message });
