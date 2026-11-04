@@ -370,25 +370,49 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
                     </div>
                   ))}
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <Button type="button" size="sm" variant="secondary" onClick={validar} disabled={validando}>
-                    {validando ? 'Validando...' : 'Testar credencial'}
-                  </Button>
-                  {resultadoValidacao?.ok && (
-                    <span className="text-xs" style={{ color: 'var(--color-success)' }}>
-                      <FontAwesomeIcon icon={faCheck} /> {resultadoValidacao.devices?.length || 0} device(s) encontrado(s)
-                    </span>
-                  )}
-                  {resultadoValidacao?.ok === false && (
-                    <span className="text-xs" style={{ color: 'var(--color-danger)' }}>
-                      <FontAwesomeIcon icon={faXmark} /> {resultadoValidacao.erro}
-                    </span>
-                  )}
-                </div>
-                {resultadoValidacao?.devices?.length > 0 && (
-                  <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    SNs visíveis na conta: {resultadoValidacao.devices.map((d) => d.sn).join(', ')}
+                {/* Sungrow no cadastro novo nao permite testar pre-OAuth.
+                    Mostra banner explicativo no lugar do botao Testar. */}
+                {providerSelecionado.id === 'sungrow' && !isEdit ? (
+                  <div
+                    className="mt-2 rounded-lg px-3 py-2 text-xs"
+                    style={{
+                      backgroundColor: 'var(--brand-primary-soft)',
+                      color: 'var(--text-secondary)',
+                      borderLeft: '3px solid var(--brand-primary)',
+                    }}
+                  >
+                    <strong>Sungrow usa OAuth 2.0</strong> — não dá para testar a credencial antes de autorizar.
+                    Clique em <strong>Salvar</strong> abaixo e depois no botão <strong>⚠ Autorizar</strong> que
+                    aparecerá na lista do inversor.
                   </div>
+                ) : (
+                  <>
+                    <div className="mt-2 flex items-center gap-2">
+                      <Button type="button" size="sm" variant="secondary" onClick={validar} disabled={validando}>
+                        {validando ? 'Validando...' : 'Testar credencial'}
+                      </Button>
+                      {resultadoValidacao?.ok && (
+                        <span className="text-xs" style={{ color: 'var(--color-success)' }}>
+                          <FontAwesomeIcon icon={faCheck} /> {resultadoValidacao.devices?.length || 0} device(s) encontrado(s)
+                        </span>
+                      )}
+                      {resultadoValidacao?.precisaAutorizar && (
+                        <span className="text-xs" style={{ color: 'var(--color-warning)' }}>
+                          Credencial salva — falta autorizar via OAuth na lista.
+                        </span>
+                      )}
+                      {resultadoValidacao?.ok === false && !resultadoValidacao?.precisaAutorizar && (
+                        <span className="text-xs" style={{ color: 'var(--color-danger)' }}>
+                          <FontAwesomeIcon icon={faXmark} /> {resultadoValidacao.erro}
+                        </span>
+                      )}
+                    </div>
+                    {resultadoValidacao?.devices?.length > 0 && (
+                      <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        SNs visíveis na conta: {resultadoValidacao.devices.map((d) => d.sn).join(', ')}
+                      </div>
+                    )}
+                  </>
                 )}
               </>
             )}

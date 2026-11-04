@@ -459,6 +459,14 @@ router.post('/validar-credencial', admin, async (req, res) => {
   try {
     const adapter = getAdapter(provider);
     const r = await adapter.validarCredencial(credential, apiBase || adapter.defaultApiBase);
+
+    // precisaAutorizar=true nao e erro — e o fluxo OAuth pedindo o
+    // proximo passo. Devolve 200 com flag pra UI tratar como info
+    // em vez de pintar de vermelho.
+    if (r.precisaAutorizar) {
+      return res.json({ ok: false, precisaAutorizar: true, mensagem: r.erro });
+    }
+
     if (!r.ok) return res.status(400).json({ error: r.erro || 'Credencial invalida' });
     res.json({ ok: true, devices: r.devices || [] });
   } catch (err) {
