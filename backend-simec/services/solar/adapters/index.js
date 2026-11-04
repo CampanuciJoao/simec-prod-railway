@@ -35,10 +35,12 @@
 
 import * as foxessAdapter from './foxessAdapter.js';
 import * as growattAdapter from './growattAdapter.js';
+import * as sungrowAdapter from './sungrowAdapter.js';
 
 const ADAPTERS = {
   foxess: foxessAdapter,
   growatt: growattAdapter,
+  sungrow: sungrowAdapter,
 };
 
 export function getAdapter(provider) {
