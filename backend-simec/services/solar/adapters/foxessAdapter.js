@@ -62,6 +62,17 @@ async function callFoxess({ apiBase, apiKey, path, method = 'POST', body = null 
   return json.result;
 }
 
+// Extrai a potencia nominal em kW do nome do deviceType da FoxESS.
+// Padrao observado: "H3-Pro-30.0" (30kW), "H3-15.0" (15kW), "F1-6.0" (6kW).
+// Nao garantido pra todos os modelos — devolve null quando nao reconhece.
+function extrairCapacidadeKwDoTipo(deviceType) {
+  if (!deviceType) return null;
+  const match = String(deviceType).match(/-(\d+(?:\.\d+)?)(?:$|-)/);
+  if (!match) return null;
+  const n = parseFloat(match[1]);
+  return Number.isFinite(n) && n > 0 && n < 1000 ? n : null;
+}
+
 export async function validarCredencial(credential, apiBase) {
   try {
     const result = await callFoxess({
@@ -74,11 +85,13 @@ export async function validarCredencial(credential, apiBase) {
     return {
       ok: true,
       devices: (result?.data || []).map((d) => ({
-        sn:     d.deviceSN,
-        tipo:   d.deviceType,
-        modelo: d.productType,
-        estacao: d.stationName,
-        online: d.status === 1,
+        sn:            d.deviceSN,
+        tipo:          d.deviceType,
+        modelo:        d.productType || d.deviceType,
+        capacidadeKw:  extrairCapacidadeKwDoTipo(d.deviceType),
+        estacao:       d.stationName,
+        stationKwp:    null,  // FoxESS nao expoe na listagem — fica em branco
+        online:        d.status === 1,
       })),
     };
   } catch (err) {

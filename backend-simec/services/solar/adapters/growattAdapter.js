@@ -80,9 +80,12 @@ export async function validarCredencial(credential, apiBase) {
     const plantas = data?.plants || [];
 
     // Pra cada planta, pega devices. Limita a 5 plantas na validacao pra
-    // nao estourar tempo em contas muito grandes.
+    // nao estourar tempo em contas muito grandes. Inclui peak_power da
+    // planta (stationKwp) e nominal_power do device (capacidadeKw) pra
+    // auto-fill na UI.
     const devices = [];
     for (const p of plantas.slice(0, 5)) {
+      const stationKwp = p.peak_power != null ? parseFloat(p.peak_power) : null;
       try {
         const dev = await callGrowatt({
           apiBase: apiBase || defaultApiBase,
@@ -91,12 +94,17 @@ export async function validarCredencial(credential, apiBase) {
           method: 'GET',
         });
         for (const d of (dev?.devices || [])) {
+          const capKw = d.nominal_power != null
+            ? parseFloat(d.nominal_power) / 1000  // Growatt expoe em W
+            : (d.rated_power != null ? parseFloat(d.rated_power) / 1000 : null);
           devices.push({
-            sn:     d.device_sn,
-            tipo:   d.type,
-            modelo: d.model || d.device_model || d.type,
-            estacao: p.name,
-            online: d.status === 1 || d.status === '1',
+            sn:           d.device_sn,
+            tipo:         d.type,
+            modelo:       d.model || d.device_model || d.type,
+            capacidadeKw: Number.isFinite(capKw) ? capKw : null,
+            estacao:      p.name,
+            stationKwp:   Number.isFinite(stationKwp) ? stationKwp : null,
+            online:       d.status === 1 || d.status === '1',
           });
         }
       } catch (err) {

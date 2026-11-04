@@ -199,6 +199,27 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
       });
       setResultadoValidacao(r);
       addToast(`Credencial válida — ${r.devices?.length || 0} device(s) encontrado(s).`, 'success');
+
+      // Auto-preenchimento: se o SN ja foi digitado, procura o device
+      // correspondente e preenche modelo + capacidadeKw automaticamente
+      // (so se campos estiverem vazios — nao sobrescreve o que o admin
+      // ja preencheu manualmente). Evita re-digitar informacao que a
+      // API ja devolve.
+      if (form.inverterSn && Array.isArray(r.devices)) {
+        const match = r.devices.find((d) => String(d.sn).trim() === String(form.inverterSn).trim());
+        if (match) {
+          setForm((f) => ({
+            ...f,
+            modeloInversor: f.modeloInversor || match.modelo || '',
+            capacidadeKw:   f.capacidadeKw === '' && match.capacidadeKw != null
+              ? String(match.capacidadeKw)
+              : f.capacidadeKw,
+          }));
+          if (match.modelo || match.capacidadeKw != null) {
+            addToast(`Dados do inversor "${match.sn}" preenchidos automaticamente.`, 'info');
+          }
+        }
+      }
     } catch (err) {
       const msg = err?.response?.data?.error || err?.message || 'Credencial inválida.';
       setResultadoValidacao({ ok: false, erro: msg });

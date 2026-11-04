@@ -115,12 +115,23 @@ export async function validarCredencial(credential, apiBase) {
     });
 
     const stations = data?.pageList || data?.list || [];
+    const toNum = (x) => {
+      if (x == null) return null;
+      const n = typeof x === 'number' ? x : parseFloat(x);
+      return Number.isFinite(n) ? n : null;
+    };
 
     // Pra cada station, busca devices rapido (limita a 5 pra nao demorar).
+    // Inclui install_capacity (kWp da estacao) e nominal_power (kW do inversor)
+    // pra auto-preenchimento na UI.
     const devices = [];
     for (const s of stations.slice(0, 5)) {
       const stationId = s.ps_id || s.psId || s.id;
       if (!stationId) continue;
+      // install_capacity vem em kWp; alguns tenants expoem em W — se >10000, divide
+      let stationKwp = toNum(s.install_capacity ?? s.installedCapacity ?? s.ps_capacity);
+      if (stationKwp != null && stationKwp > 10000) stationKwp = stationKwp / 1000;
+
       try {
         const devData = await callSungrow({
           apiBase: apiBase || defaultApiBase,
@@ -129,12 +140,17 @@ export async function validarCredencial(credential, apiBase) {
           body: { ps_id: stationId, device_type_list: [1] }, // 1 = inverter
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
+          // nominal_power em Sungrow geralmente em W — normaliza pra kW
+          let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
+          if (capKw != null && capKw > 1000) capKw = capKw / 1000;
           devices.push({
-            sn: d.device_sn || d.deviceSn,
-            tipo: 'inverter',
-            modelo: d.device_model_name || d.device_type_name || d.deviceModel,
-            estacao: s.ps_name || s.psName || s.name,
-            online: d.dev_status === 1 || d.dev_status === '1',
+            sn:           d.device_sn || d.deviceSn,
+            tipo:         'inverter',
+            modelo:       d.device_model_name || d.device_type_name || d.deviceModel,
+            capacidadeKw: capKw,
+            estacao:      s.ps_name || s.psName || s.name,
+            stationKwp,
+            online:       d.dev_status === 1 || d.dev_status === '1',
           });
         }
       } catch { /* ignora station individual */ }
