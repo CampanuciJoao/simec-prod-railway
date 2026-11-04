@@ -152,11 +152,23 @@ router.get('/sungrow/callback', async (req, res) => {
 
     const credential = decryptCredential(inverter.credentialCrypt) || {};
 
+    // IMPORTANTE: o redirect_uri precisa ser EXATAMENTE o mesmo que foi
+    // passado na authorize URL (e registrado no portal Sungrow). Senao
+    // a Sungrow rejeita a troca do code por token.
+    const redirectUri = 'https://simec.cerdil.com.br/api/solar/sungrow/callback';
+    console.log('[SUNGROW_OAUTH_CALLBACK] trocando code por token', {
+      inverterId,
+      codeLen: String(code).length,
+      apiBase: inverter.apiBase,
+      temAppkey: Boolean(credential.appkey),
+      temSecret: Boolean(credential.secretKey),
+    });
     const { accessToken, refreshToken, expiresIn } = await sungrowAdapter.exchangeCodeForToken({
       apiBase: inverter.apiBase,
       appkey: credential.appkey,
       secretKey: credential.secretKey,
       code: String(code),
+      redirectUri,
       rsaPublicKey: credential.rsaPublicKey,
     });
 

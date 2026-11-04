@@ -115,9 +115,19 @@ export function getAuthorizeUrl({ credential, redirectUri }) {
   return `${base}?${params.toString()}`;
 }
 
-export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code }) {
+export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, redirectUri }) {
   // Endpoint segundo a doc de Developer Portal (Fluxo OAuth 2.0 iSolarCloud)
+  //
+  // Importante: o body DEVE incluir redirect_uri (mesmo valor passado
+  // na authorize URL). Sem isso a Sungrow devolve erro ou resposta
+  // vazia sem explicar. Padrao OAuth2 (RFC 6749 sec. 4.1.3).
   const url = `${apiBase.replace(/\/$/, '')}/openapi/apiManage/token`;
+  const body = {
+    appkey,
+    code,
+    grant_type: 'authorization_code',
+    redirect_uri: redirectUri,
+  };
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -125,23 +135,51 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code })
       'x-access-key': secretKey,
       'User-Agent': USER_AGENT,
     },
-    body: JSON.stringify({ appkey, code, grant_type: 'authorization_code' }),
+    body: JSON.stringify(body),
   });
   const text = await res.text();
-  let json; try { json = JSON.parse(text); } catch { throw new Error(`Sungrow token: resposta nao-JSON: ${text.slice(0,200)}`); }
+  let json;
+  try { json = JSON.parse(text); } catch {
+    console.error('[SUNGROW_TOKEN_EXCHANGE] resposta nao-JSON:', text.slice(0, 500));
+    throw new Error(`Sungrow token: resposta nao-JSON: ${text.slice(0,200)}`);
+  }
+
+  // Log verboso pra diagnostico — mascarando tokens.
+  const resumoDebug = {
+    httpStatus: res.status,
+    result_code: json.result_code,
+    result_msg: json.result_msg,
+    req_serial_num: json.req_serial_num,
+    temAccessToken: Boolean(json.access_token || json.result_data?.access_token),
+    temRefreshToken: Boolean(json.refresh_token || json.result_data?.refresh_token),
+  };
+  console.log('[SUNGROW_TOKEN_EXCHANGE] resposta:', resumoDebug);
+
   if (json.result_code && String(json.result_code) !== '1') {
     throw new Error(`Sungrow token exchange falhou: result_code=${json.result_code} msg=${json.result_msg || text.slice(0, 200)}`);
   }
+
   const data = json.result_data || json;
+  const accessToken = data.access_token || data.accessToken;
+  if (!accessToken) {
+    // Nao houve result_code de erro, mas tambem nao veio token — algo
+    // deu errado silenciosamente. Loga a resposta pra caso aconteca.
+    console.error('[SUNGROW_TOKEN_EXCHANGE] resposta sem access_token:', text.slice(0, 500));
+    throw new Error(`Sungrow nao retornou access_token. Resposta: ${text.slice(0, 200)}`);
+  }
   return {
-    accessToken: data.access_token || data.accessToken,
+    accessToken,
     refreshToken: data.refresh_token || data.refreshToken,
     expiresIn: Number(data.expires_in || data.expiresIn || 86400),
   };
 }
 
 export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshToken }) {
+  // Per pysolarcloud (bugjam) o body do refresh e so appkey + refresh_token
+  // (sem grant_type). Pode ser que a Sungrow aceite ambos, mas vamos
+  // seguir a implementacao de referencia pra reduzir chance de erro.
   const url = `${apiBase.replace(/\/$/, '')}/openapi/apiManage/refreshToken`;
+  const body = { appkey, refresh_token: refreshToken };
   const res = await fetch(url, {
     method: 'POST',
     headers: {
@@ -149,16 +187,23 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
       'x-access-key': secretKey,
       'User-Agent': USER_AGENT,
     },
-    body: JSON.stringify({ appkey, refresh_token: refreshToken, grant_type: 'refresh_token' }),
+    body: JSON.stringify(body),
   });
   const text = await res.text();
-  let json; try { json = JSON.parse(text); } catch { throw new Error(`Sungrow refresh: resposta nao-JSON: ${text.slice(0,200)}`); }
+  let json;
+  try { json = JSON.parse(text); } catch {
+    throw new Error(`Sungrow refresh: resposta nao-JSON: ${text.slice(0,200)}`);
+  }
   if (json.result_code && String(json.result_code) !== '1') {
     throw new Error(`Sungrow refresh falhou: result_code=${json.result_code} msg=${json.result_msg || text.slice(0, 200)}`);
   }
   const data = json.result_data || json;
+  const accessToken = data.access_token || data.accessToken;
+  if (!accessToken) {
+    throw new Error(`Sungrow refresh sem access_token. Resposta: ${text.slice(0, 200)}`);
+  }
   return {
-    accessToken: data.access_token || data.accessToken,
+    accessToken,
     refreshToken: data.refresh_token || data.refreshToken || refreshToken,
     expiresIn: Number(data.expires_in || data.expiresIn || 86400),
   };
