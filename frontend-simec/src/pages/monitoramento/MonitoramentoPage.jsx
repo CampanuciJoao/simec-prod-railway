@@ -3,7 +3,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHeartPulse, faBoltLightning } from '@fortawesome/free-solid-svg-icons';
 
 import { PageLayout, PageHeader, ResponsiveTabs } from '@/components/ui';
-import { useFoxessPainel } from '@/hooks/monitoramento/useFoxessPainel';
 
 import TabEnergia from '@/components/monitoramento/TabEnergia';
 import TabSaudeGehc from '@/components/monitoramento/TabSaudeGehc';
@@ -15,7 +14,6 @@ const TABS = [
 
 function MonitoramentoPage() {
   const [aba, setAba] = useState('saude');
-  const painel = useFoxessPainel(); // carrega sites na montagem independente da aba ativa
 
   return (
     <PageLayout padded>
@@ -23,14 +21,14 @@ function MonitoramentoPage() {
         <PageHeader
           icon={faHeartPulse}
           title="Monitoramento"
-          subtitle="Saúde dos equipamentos e sistema de energia de respaldo"
+          subtitle="Saúde dos equipamentos e sistema de energia solar/backup"
         />
 
         <ResponsiveTabs tabs={TABS} activeTab={aba} onChange={setAba} />
 
         <div>
           {aba === 'saude' && <TabSaudeGehc />}
-          {aba === 'energia' && <TabEnergia painel={painel} />}
+          {aba === 'energia' && <TabEnergia />}
         </div>
       </div>
     </PageLayout>

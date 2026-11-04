@@ -9,8 +9,8 @@ import { executarCleanupCompleto } from './services/cleanup/cleanupService.js';
 import { monitorarSaudeGehc } from './services/gehc/gehcMonitor.js';
 import { watchdogSaudeGehc } from './services/gehc/gehcWatchdogService.js';
 import { getRedisConnection } from './services/queueService.js';
-import { coletarTodosSitesFoxess } from './services/foxess/foxessPoller.js';
-import { watchdogFoxess } from './services/foxess/foxessWatchdogService.js';
+import { coletarTodosInvertersSolar } from './services/solar/solarPoller.js';
+import { watchdogSolar } from './services/solar/solarWatchdogService.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
@@ -198,17 +198,16 @@ const alertasWorker = new Worker(
       return { ok: true, ...r };
     }
 
-    if (job?.name === 'foxess-poll') {
-      // Polling de 60s dos sites FoxESS ativos. Erros por site sao
-      // isolados dentro do poller. Nao usa withHeartbeat — e rapido
-      // (1 request HTTP por site + 1 insert) e cron a cada 60s.
-      const r = await coletarTodosSitesFoxess();
+    if (job?.name === 'solar-poll') {
+      // Polling de 60s de TODOS os inverters ativos (multi-provider:
+      // FoxESS, Growatt, Sungrow, etc). Erros por inverter sao isolados.
+      const r = await coletarTodosInvertersSolar();
       return { ok: true, ...r };
     }
 
-    if (job?.name === 'foxess-watchdog') {
+    if (job?.name === 'solar-watchdog') {
       const redisConnection = getRedisConnection();
-      const r = await watchdogFoxess({ redisConnection });
+      const r = await watchdogSolar({ redisConnection });
       return { ok: true, ...r };
     }
 

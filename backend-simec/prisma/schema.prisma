@@ -73,9 +73,11 @@ model Tenant {
   impersonacoes             Impersonacao[]               @relation("ImpersonacaoTenantAlvo")
   logsAuditoriaImpersonadas LogAuditoria[]               @relation("LogAuditoriaActedAs")
   llmCallLogs               LlmCallLog[]
-  foxessSites               FoxessSite[]
-  foxessSnapshots           FoxessSnapshot[]
-  foxessQuedas              FoxessQueda[]
+  solarPlants               SolarPlant[]
+  solarInverters            SolarInverter[]
+  solarBatteries            SolarBattery[]
+  solarSnapshots            SolarSnapshot[]
+  solarOutages              SolarOutage[]
 
   @@map("tenants")
 }
@@ -119,7 +121,7 @@ model Unidade {
   segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
   contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
   orcamentos        Orcamento[]
-  foxessSite        FoxessSite?
+  solarPlants       SolarPlant[]
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -1920,110 +1922,194 @@ model TesteQualidade {
   @@map("testes_qualidade")
 }
 
-// ─── FoxESS — Site cadastrado por unidade ─────────────────────────────────────
-// Site = instalacao fisica (inversor + baterias) de uma unidade. Modelo
-// 1 site por unidade pra permitir cadastrar outras unidades no futuro sem
-// mexer no schema. API key fica criptografada (AES-256) via foxessCrypto.
-model FoxessSite {
+// ─── Energia Solar — Planta (modelo genérico multi-fabricante) ────────────────
+//
+// Representa uma usina solar fisica. Uma planta pode ter N inversores
+// (de fabricantes diferentes — ex: 1 Growatt + 1 Sungrow na mesma usina)
+// e opcionalmente N baterias (sistemas hibridos tipo FoxESS).
+//
+// unidadeId = unidade BENEFICIARIA administrativa (quem recebe o credito/
+// paga a conta). localFisico descreve ONDE a planta esta instalada
+// fisicamente quando diferente da unidade (ex: usina em terreno remoto
+// cujo credito vai pra Sede).
+model SolarPlant {
   id             String   @id @default(uuid())
   tenantId       String
   unidadeId      String   @map("unidade_id")
-  // Nome livre pra identificar no admin (ex: "Sede Cerdil - H3 PRO").
   nome           String
-  // Credencial criptografada (AES-256-GCM). Nunca armazenar em texto puro
-  // nem logar — mesmo em erros. foxessCrypto.decrypt() so no runtime.
-  apiKeyCrypt    String   @map("api_key_crypt") @db.Text
-  // Base da API (ex: https://www.foxesscloud.com). Guardado em coluna
-  // porque conta regional pode usar dominio diferente (foxessc loud.us,
-  // developer-eu.foxesscloud.com etc).
-  apiBase        String   @default("https://www.foxesscloud.com") @map("api_base")
-  // Serial do inversor (necessario em /op/v1/device/real/query).
-  inverterSn     String   @map("inverter_sn")
-  // Seriais das baterias (array). Pode ser 1+ baterias por inversor.
-  bateriaSns     String[] @map("bateria_sns")
-  // Dados cadastrais opcionais pra exibicao
-  modeloInversor String?  @map("modelo_inversor")
-  capacidadeKwh  Float?   @map("capacidade_kwh")
+  // Endereco descritivo quando a planta nao fica na propria unidade
+  // beneficiaria (ex: "Fazenda Rancho Terra - Zona Rural Dourados").
+  // Null = instalada dentro da unidade.
+  localFisico    String?  @map("local_fisico")
+  // Capacidade nominal da usina em kWp (pico). Usado pra calcular
+  // performance ratio e produzir alerta quando geracao < X% do esperado.
+  capacidadeKwp  Float?   @map("capacidade_kwp")
+  // Tarifa de energia da unidade beneficiaria em R$/kWh. Usado pra
+  // calcular "R$ economizados no mes". Default R$ 0.85 (media MS).
+  tarifaKwh      Float?   @map("tarifa_kwh")
+  // Indica se a planta tem bateria (habilita monitoramento SoC + alertas
+  // de queda de energia). false = planta so de geracao.
+  temBateria     Boolean  @default(false) @map("tem_bateria")
+  // Horas tipicas de autonomia (so plantas com bateria). Usado pra
+  // mostrar "autonomia restante" no painel.
   autonomiaHoras Float?   @map("autonomia_horas")
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
-  tenant    Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  unidade   Unidade          @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
-  snapshots FoxessSnapshot[]
-  quedas    FoxessQueda[]
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade   Unidade         @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+  inverters SolarInverter[]
+  baterias  SolarBattery[]
+  snapshots SolarSnapshot[]
+  quedas    SolarOutage[]
 
-  @@unique([tenantId, unidadeId])
+  // Sem UNIQUE(tenantId, unidadeId) — uma unidade pode ter N plantas
+  // (ex: 1 planta na sede + 1 planta em terreno remoto, ambas creditam
+  // a mesma unidade beneficiaria).
+  @@index([tenantId, unidadeId])
   @@index([tenantId, ativo])
-  @@map("foxess_sites")
+  @@map("solar_plants")
 }
 
-// ─── FoxESS — Snapshot de telemetria ──────────────────────────────────────────
-// Um snapshot por ciclo de polling (padrao 60s). Armazena tudo que a API
-// devolve e for relevante — gastos de storage sao baixos (snapshots sao
-// pequenos, retencao 1 ano).
-model FoxessSnapshot {
+// ─── Energia Solar — Inversor (um por fabricante dentro de uma planta) ────────
+//
+// Cada inversor fisico tem suas proprias credenciais da API do fabricante.
+// Mesma planta pode ter inversores de fabricantes diferentes (comum em
+// instalacoes grandes com strings separadas).
+//
+// `provider` define qual adapter em codigo processa este inversor:
+//   - "foxess"   -> cliente HTTP MD5-signature + OpenAPI FoxESS
+//   - "growatt"  -> cliente HTTP token + ShineServer OpenAPI V1
+//   - "sungrow"  -> cliente HTTP RSA-signature + iSolarCloud OpenAPI
+//   - novos providers: 1 arquivo adapter por fabricante
+model SolarInverter {
+  id              String   @id @default(uuid())
+  plantId         String   @map("plant_id")
+  tenantId        String
+  // Identificador do adapter em codigo. Enum validada no backend.
+  provider        String
+  nome            String?
+  inverterSn      String   @map("inverter_sn")
+  modeloInversor  String?  @map("modelo_inversor")
+  capacidadeKw    Float?   @map("capacidade_kw")
+  // Credencial(ais) do fabricante, criptografada(s) AES-256-GCM. Para
+  // providers que exigem mais de 1 campo (ex: Sungrow = API Key + Access
+  // Key + RSA Key), guardamos tudo serializado em JSON criptografado.
+  // Formato: '<iv_hex>:<authTag_hex>:<ciphertext_hex_do_JSON>'.
+  credentialCrypt String   @map("credential_crypt") @db.Text
+  // Base URL da API (ex: https://www.foxesscloud.com,
+  // https://openapi.growatt.com, https://gateway.isolarcloud.eu).
+  apiBase         String   @map("api_base")
+  ativo           Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  plant     SolarPlant      @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  snapshots SolarSnapshot[]
+
+  @@index([tenantId, plantId])
+  @@index([tenantId, provider, ativo])
+  @@map("solar_inverters")
+}
+
+// ─── Energia Solar — Bateria (opcional, sistemas hibridos) ────────────────────
+model SolarBattery {
+  id            String   @id @default(uuid())
+  plantId       String   @map("plant_id")
+  tenantId      String
+  sn            String
+  capacidadeKwh Float?   @map("capacidade_kwh")
+  // Provider que reporta o estado da bateria (normalmente igual ao do
+  // inversor hibrido que a controla — ex: FoxESS gerencia as EP).
+  provider      String
+  ativo         Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  plant  SolarPlant @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, plantId])
+  @@map("solar_batteries")
+}
+
+// ─── Energia Solar — Snapshot de telemetria ───────────────────────────────────
+//
+// Um snapshot por ciclo de polling (padrao 60s), por inversor. Campos
+// cobrem tanto plantas so de geracao (powerKw, generationKwhDay, etc)
+// quanto plantas hibridas com bateria (soc, batChargePower, etc).
+// Null em campos nao reportados pelo provider/modelo.
+model SolarSnapshot {
   id         String   @id @default(uuid())
   tenantId   String
-  siteId     String   @map("site_id")
+  plantId    String   @map("plant_id")
+  // Null quando o snapshot representa dados agregados da planta inteira
+  // (ex: alguns providers so reportam no nivel da estacao). Preenchido
+  // quando e um snapshot por inversor especifico.
+  inverterId String?  @map("inverter_id")
   capturedAt DateTime @default(now()) @map("captured_at")
 
-  // Bateria (agregada ou primeira — detalhe por SN fica em bateriasJson)
-  soc                  Float?  @map("soc") // % 0-100
-  batChargePower       Float?  @map("bat_charge_power") // kW (positivo = carregando)
-  batDischargePower    Float?  @map("bat_discharge_power") // kW (positivo = descarregando)
-  // Fluxo da rede
-  feedinPower          Float?  @map("feedin_power") // kW (exportando pra rede)
-  gridConsumptionPower Float?  @map("grid_consumption_power") // kW (consumindo da rede)
-  // EPS (modo bateria/off-grid)
-  epsPower             Float?  @map("eps_power") // kW entregue pelo EPS
-  // Estado operacional: 163 = on-grid, 164 = off-grid/EPS, 165 = fault
-  runningState         Int?    @map("running_state")
-  // Falha atual se houver
-  currentFault         String? @map("current_fault")
-  // Temperaturas — uteis pra identificar estresse termico. Inversor
-  // operando acima de 60-70C sugere problema de ventilacao/local.
-  ambientTempC         Float?  @map("ambient_temp_c")
-  inverterTempC        Float?  @map("inverter_temp_c")
+  // Geracao (todas plantas solares)
+  powerKw            Float? @map("power_kw") // potencia instantanea agora
+  generationKwhDay   Float? @map("generation_kwh_day") // kWh gerados hoje
+  generationKwhMonth Float? @map("generation_kwh_month") // kWh gerados no mes
+  generationKwhTotal Float? @map("generation_kwh_total") // kWh gerados acumulado
 
-  // Detalhe por bateria quando ha mais de uma (array de { sn, soc, soh, tempC, powerKw })
-  bateriasJson Json?   @map("baterias_json")
-  // Payload bruto (debug / schema evolution)
-  rawJson      String? @map("raw_json") @db.Text
+  // Grid (plantas hibridas e algumas de geracao)
+  feedinPower          Float? @map("feedin_power") // kW exportando pra rede
+  gridConsumptionPower Float? @map("grid_consumption_power") // kW consumindo da rede
 
-  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  site   FoxessSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  // Bateria (so plantas hibridas)
+  soc               Float? @map("soc") // % agregado (menor entre baterias — conservador)
+  batChargePower    Float? @map("bat_charge_power") // kW
+  batDischargePower Float? @map("bat_discharge_power") // kW
+  epsPower          Float? @map("eps_power") // kW entregue pelo EPS
+  // Estado operacional (FoxESS: 163=on-grid, 164=off-grid/EPS, 165=fault.
+  // Outros providers podem usar outra convencao — adapter normaliza.)
+  runningState      Int?   @map("running_state")
 
-  @@index([tenantId, siteId, capturedAt(sort: Desc)])
+  // Diagnostico
+  currentFault  String? @map("current_fault")
+  ambientTempC  Float?  @map("ambient_temp_c")
+  inverterTempC Float?  @map("inverter_temp_c")
+  // Detalhe por bateria/string quando houver (array de JSON).
+  detalhesJson  Json?   @map("detalhes_json")
+  // Payload bruto do provider (debug + evolucao de schema).
+  rawJson       String? @map("raw_json") @db.Text
+
+  tenant   Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plant    SolarPlant     @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  inverter SolarInverter? @relation(fields: [inverterId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, plantId, capturedAt(sort: Desc)])
+  @@index([tenantId, inverterId, capturedAt(sort: Desc)])
   @@index([tenantId, capturedAt(sort: Desc)])
-  @@map("foxess_snapshots")
+  @@map("solar_snapshots")
 }
 
-// ─── FoxESS — Evento de queda de energia ──────────────────────────────────────
-// Agregado derivado dos snapshots: quando runningState vira 164 (off-grid)
-// por >N minutos, abre uma queda. Fecha quando volta pra 163. Tabela separada
-// pra facilitar listagem de "ja tivemos N quedas no mes" sem agregar milhoes
-// de snapshots.
-model FoxessQueda {
+// ─── Energia Solar — Evento de queda de energia ───────────────────────────────
+// So aplicavel pra plantas com bateria. Agregado a partir de snapshots
+// em runningState=off-grid por 2min+. Fecha quando volta on-grid.
+model SolarOutage {
   id         String    @id @default(uuid())
   tenantId   String
-  siteId     String    @map("site_id")
+  plantId    String    @map("plant_id")
   inicioEm   DateTime  @map("inicio_em")
   fimEm      DateTime? @map("fim_em")
   duracaoMin Int?      @map("duracao_min")
   socInicial Float?    @map("soc_inicial")
   socMinimo  Float?    @map("soc_minimo")
   socFinal   Float?    @map("soc_final")
-  // Resumo gerado quando a queda fecha (texto humano pra UI/Telegram).
   resumo     String?   @db.Text
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
   tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  site   FoxessSite @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  plant  SolarPlant @relation(fields: [plantId], references: [id], onDelete: Cascade)
 
-  @@index([tenantId, siteId, inicioEm(sort: Desc)])
+  @@index([tenantId, plantId, inicioEm(sort: Desc)])
   @@index([tenantId, fimEm])
-  @@map("foxess_quedas")
+  @@map("solar_outages")
 }

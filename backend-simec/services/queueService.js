@@ -458,26 +458,26 @@ export async function iniciarJobsDeAlertas() {
 
     console.log('[QUEUE] Job GEHC (gehc-watchdog-saude) agendado a cada 30min.');
 
-    // Poller FoxESS: 60s. Respeita o limite da API (1440 calls/dia por
-    // inversor). Watchdog FoxESS: 15min. Mesma arquitetura 2-niveis do
-    // watchdog GEHC — recovery silencioso ate 3h; depois alerta ALTA.
+    // Poller Solar generico (FoxESS + Growatt + Sungrow): 60s. Respeita
+    // rate limits dos providers. Watchdog: 15min. Remove tambem os jobs
+    // antigos foxess-* se existirem (compat refactor 2026-11).
     const repeatables13 = await queue.getRepeatableJobs();
     for (const job of repeatables13) {
-      if (job.name === 'foxess-poll' || job.name === 'foxess-watchdog') {
+      if (['solar-poll', 'solar-watchdog', 'foxess-poll', 'foxess-watchdog'].includes(job.name)) {
         await queue.removeRepeatableByKey(job.key);
       }
     }
-    await queue.add('foxess-poll', {}, {
+    await queue.add('solar-poll', {}, {
       repeat: { every: 60 * 1000 },
       removeOnComplete: 100,
       removeOnFail: 20,
     });
-    await queue.add('foxess-watchdog', {}, {
+    await queue.add('solar-watchdog', {}, {
       repeat: { every: 15 * 60 * 1000 },
       removeOnComplete: 20,
       removeOnFail: 10,
     });
-    console.log('[QUEUE] Jobs FoxESS (foxess-poll 60s + foxess-watchdog 15min) agendados.');
+    console.log('[QUEUE] Jobs Solar (solar-poll 60s + solar-watchdog 15min) agendados.');
 
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
@@ -613,60 +613,59 @@ export async function reagendarJobsGehc() {
   return { ok: true, removidos, recriados: NOMES_GEHC.length, capturaImediataAgendada: true };
 }
 
-// Reagenda crons FoxESS (poll + watchdog). Mesmo padrao do reagendar GEHC —
-// usado pelo watchdog FoxESS quando detecta que a coleta parou.
-export async function reagendarJobsFoxess() {
+// Reagenda crons Solar (poll + watchdog). Mesmo padrao do reagendar GEHC —
+// usado pelo watchdog Solar quando detecta que a coleta parou.
+export async function reagendarJobsSolar() {
   const queue = getAlertasQueue();
   if (!queue) {
     return { ok: false, motivo: queueUnavailableReason || 'queue_indisponivel' };
   }
 
-  const NOMES_FOXESS = ['foxess-poll', 'foxess-watchdog'];
+  const NOMES_SOLAR = ['solar-poll', 'solar-watchdog'];
   const repeatables = await queue.getRepeatableJobs();
   let removidos = 0;
   for (const j of repeatables) {
-    if (NOMES_FOXESS.includes(j.name)) {
+    // Remove tambem nomes antigos foxess-* por garantia (post-refactor 2026-11).
+    if (NOMES_SOLAR.includes(j.name) || ['foxess-poll', 'foxess-watchdog'].includes(j.name)) {
       await queue.removeRepeatableByKey(j.key);
       removidos++;
     }
   }
 
-  await queue.add('foxess-poll', {}, {
+  await queue.add('solar-poll', {}, {
     repeat: { every: 60 * 1000 },
     removeOnComplete: 100,
     removeOnFail: 20,
   });
-  await queue.add('foxess-watchdog', {}, {
+  await queue.add('solar-watchdog', {}, {
     repeat: { every: 15 * 60 * 1000 },
     removeOnComplete: 20,
     removeOnFail: 10,
   });
-
-  // Captura imediata
-  await queue.add('foxess-poll', {}, {
-    jobId: `foxess-poll-manual-${Date.now()}`,
+  await queue.add('solar-poll', {}, {
+    jobId: `solar-poll-manual-${Date.now()}`,
     removeOnComplete: 5,
     removeOnFail: 5,
   });
 
-  return { ok: true, removidos, recriados: NOMES_FOXESS.length, capturaImediataAgendada: true };
+  return { ok: true, removidos, recriados: NOMES_SOLAR.length, capturaImediataAgendada: true };
 }
 
-// Diagnostico FoxESS — mesmo padrao do diagnostico GEHC. Usado por
-// endpoint admin / UI de monitoramento pra ver se os crons estao vivos.
-export async function diagnosticoJobsFoxess() {
+// Diagnostico Solar — usado por endpoint admin / UI pra ver se os
+// crons estao vivos.
+export async function diagnosticoJobsSolar() {
   const queue = getAlertasQueue();
   if (!queue) {
     return { queueDisponivel: false, motivo: queueUnavailableReason || 'queue_indisponivel' };
   }
 
-  const NOMES_FOXESS = new Set(['foxess-poll', 'foxess-watchdog']);
+  const NOMES_SOLAR = new Set(['solar-poll', 'solar-watchdog']);
   const repeatables = await queue.getRepeatableJobs();
-  const registrados = repeatables.filter((j) => NOMES_FOXESS.has(j.name)).map((j) => ({
+  const registrados = repeatables.filter((j) => NOMES_SOLAR.has(j.name)).map((j) => ({
     name: j.name, next: j.next, every: j.every,
   }));
 
-  const ultimoSnapshot = await prisma.foxessSnapshot.findFirst({
+  const ultimoSnapshot = await prisma.solarSnapshot.findFirst({
     orderBy: { capturedAt: 'desc' },
     select: { capturedAt: true },
   }).catch(() => null);
