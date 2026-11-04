@@ -10,7 +10,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
-  Card, Button, Input, Select, Drawer, LoadingState, InlineEmptyState,
+  Card, Button, Input, SelectMenu, Drawer, LoadingState, InlineEmptyState,
   ModalConfirmacao,
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
@@ -71,11 +71,11 @@ function PlantaModal({ open, onClose, plant, unidades, onSalvar }) {
     <Drawer open={open} onClose={onClose} title={plant ? 'Editar planta solar' : 'Nova planta solar'}>
       <div className="px-5 py-4">
       <form onSubmit={salvar} className="space-y-3">
-        <Select
+        <SelectMenu
           label="Unidade beneficiária"
           required
           value={form.unidadeId}
-          onChange={(e) => setForm((f) => ({ ...f, unidadeId: e.target.value }))}
+          onChange={(v) => setForm((f) => ({ ...f, unidadeId: v }))}
           placeholder="Selecione"
           options={unidades.map((u) => ({ value: u.id, label: u.nomeSistema }))}
         />
@@ -263,20 +263,20 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
     <Drawer open={open} onClose={onClose} title={isEdit ? 'Editar inversor' : 'Novo inversor'}>
       <div className="px-5 py-4">
       <form onSubmit={salvar} className="space-y-3">
-        <Select
+        <SelectMenu
           label="Fabricante"
           required
           value={provider}
-          onChange={(e) => { setProvider(e.target.value); setResultadoValidacao(null); }}
+          onChange={(v) => { setProvider(v); setResultadoValidacao(null); }}
           disabled={isEdit}
           placeholder="Selecione o fabricante"
           options={providers.map((p) => ({ value: p.id, label: p.label }))}
         />
         {providerSelecionado?.apiBaseOptions && (
-          <Select
+          <SelectMenu
             label="Região / endpoint"
             value={form.apiBase}
-            onChange={(e) => setForm((f) => ({ ...f, apiBase: e.target.value }))}
+            onChange={(v) => setForm((f) => ({ ...f, apiBase: v }))}
             options={providerSelecionado.apiBaseOptions}
           />
         )}

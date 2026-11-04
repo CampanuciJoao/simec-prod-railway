@@ -16,7 +16,7 @@ import {
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 
-import { Card, InlineEmptyState, LoadingState, Select } from '@/components/ui';
+import { Card, InlineEmptyState, LoadingState, SelectMenu } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useSolarPainel } from '@/hooks/monitoramento/useSolarPainel';
 
@@ -430,10 +430,10 @@ function TabEnergia() {
     <div className="space-y-4">
       {plants.length > 1 && (
         <div className="max-w-md">
-          <Select
+          <SelectMenu
             label="Planta solar"
             value={plantSelecionadaId || ''}
-            onChange={(e) => setPlantSelecionadaId(e.target.value)}
+            onChange={(v) => setPlantSelecionadaId(v)}
             options={plants.map((p) => ({
               value: p.id,
               label: `${p.unidade?.nomeSistema || ''} - ${p.nome}`,

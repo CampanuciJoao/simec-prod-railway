@@ -34,6 +34,7 @@ export {
   Input,
   Pagination,
   Select,
+  SelectMenu,
   Textarea,
   TimeInput,
 } from './primitives';

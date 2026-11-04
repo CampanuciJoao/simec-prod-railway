@@ -9,6 +9,7 @@ export { default as FileDropZone } from './FileDropZone';
 export { default as FormFieldShell } from './FormFieldShell';
 export { default as Input } from './Input';
 export { default as Select } from './Select';
+export { default as SelectMenu } from './SelectMenu';
 export { default as Textarea } from './Textarea';
 export { default as TimeInput } from './TimeInput';
 export { default as Pagination } from './Pagination';
