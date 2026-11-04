@@ -292,24 +292,41 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
           value={form.nome}
           onChange={(e) => setForm((f) => ({ ...f, nome: e.target.value }))}
         />
-        <div className="grid grid-cols-2 gap-3">
-          <Input
-            label="Modelo"
-            placeholder="Preenchido automaticamente"
-            hint="Opcional — o SIMEC puxa da API após salvar"
-            value={form.modeloInversor}
-            onChange={(e) => setForm((f) => ({ ...f, modeloInversor: e.target.value }))}
-          />
-          <Input
-            label="Capacidade (kW)"
-            type="number"
-            step="0.1"
-            placeholder="Preenchido automaticamente"
-            hint="Opcional — o SIMEC puxa da API após salvar"
-            value={form.capacidadeKw}
-            onChange={(e) => setForm((f) => ({ ...f, capacidadeKw: e.target.value }))}
-          />
-        </div>
+
+        {/* Modelo + Capacidade so aparecem no modo EDICAO (admin pode
+            sobrescrever o auto-fill). No cadastro novo eles sao
+            invisiveis — o backend puxa da API em background assim que
+            a credencial permite consultar devices. */}
+        {isEdit && (
+          <div className="grid grid-cols-2 gap-3">
+            <Input
+              label="Modelo"
+              placeholder="(auto-preenchido pela API)"
+              hint="Deixe em branco pra re-puxar da API"
+              value={form.modeloInversor}
+              onChange={(e) => setForm((f) => ({ ...f, modeloInversor: e.target.value }))}
+            />
+            <Input
+              label="Capacidade (kW)"
+              type="number"
+              step="0.1"
+              placeholder="(auto-preenchido)"
+              hint="Deixe em branco pra re-puxar da API"
+              value={form.capacidadeKw}
+              onChange={(e) => setForm((f) => ({ ...f, capacidadeKw: e.target.value }))}
+            />
+          </div>
+        )}
+        {!isEdit && (
+          <div
+            className="rounded-lg px-3 py-2 text-xs"
+            style={{ backgroundColor: 'var(--bg-surface-subtle)', color: 'var(--text-muted)' }}
+          >
+            <strong>Modelo e capacidade</strong> são preenchidos automaticamente pela API do fabricante assim que você salvar
+            {providerSelecionado?.id === 'sungrow' ? ' e autorizar (OAuth)' : ''}.
+            Se quiser sobrescrever depois, edite o inversor.
+          </div>
+        )}
 
         {/* Credencial */}
         {providerSelecionado && (
