@@ -64,45 +64,72 @@ export const apiBaseOptions = [
 
 const USER_AGENT = 'SIMEC-SolarAdapter/1.0';
 
-function buildHeaders(credential) {
+function buildHeaders(credential, sysCode) {
   return {
     'x-access-key': credential.secretKey,
     'appkey': credential.appkey,
-    'sys_code': '901',
+    'sys_code': sysCode,
     'Content-Type': 'application/json;charset=UTF-8',
     'lang': '_pt_BR',
     'User-Agent': USER_AGENT,
   };
 }
 
+async function fazerRequest({ url, headers, body }) {
+  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
+  const text = await res.text();
+  let json = null;
+  try { json = JSON.parse(text); } catch { /* keep text */ }
+  return { httpOk: res.ok, httpStatus: res.status, text, json };
+}
+
 async function callSungrow({ apiBase, credential, path, body = {} }) {
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
   const fullBody = { appkey: credential.appkey, ...body };
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: buildHeaders(credential),
-    body: JSON.stringify(fullBody),
-  });
+  // Tenta sys_code '901' primeiro (OEM/custom integrations). Se vier
+  // er_invalid_appkey ou similar, retry com '900' (standard). Isso cobre
+  // a maioria dos tipos de app sem exigir configuracao do admin — a
+  // Sungrow nao expoe claramente qual sys_code vai com cada tier de app.
+  const sysCodesPraTentar = ['901', '900'];
+  let ultimaRespostaErro = null;
 
-  const text = await res.text();
-  if (!res.ok) {
-    throw new Error(`Sungrow HTTP ${res.status} em ${path}: ${text.slice(0, 200)}`);
+  for (const sysCode of sysCodesPraTentar) {
+    const resp = await fazerRequest({
+      url,
+      headers: buildHeaders(credential, sysCode),
+      body: fullBody,
+    });
+
+    if (!resp.httpOk) {
+      ultimaRespostaErro = `HTTP ${resp.httpStatus} (sys_code=${sysCode}): ${resp.text.slice(0, 200)}`;
+      continue;
+    }
+
+    if (!resp.json) {
+      ultimaRespostaErro = `resposta nao-JSON (sys_code=${sysCode}): ${resp.text.slice(0, 200)}`;
+      continue;
+    }
+
+    // Sucesso: result_code '1' (ou 1 int). Alguns tenants retornam 0.
+    if (!resp.json.result_code || String(resp.json.result_code) === '1' || String(resp.json.result_code) === '0') {
+      return resp.json.result_data || resp.json;
+    }
+
+    const msg = `result_code=${resp.json.result_code} msg=${resp.json.result_msg || 'sem msg'}`;
+
+    // Se o erro e relacionado a sys_code/appkey, tenta a proxima variacao.
+    const errStr = String(resp.json.result_code || '') + ' ' + String(resp.json.result_msg || '');
+    if (/sys_code|invalid.?appkey|E00000|E009/i.test(errStr)) {
+      ultimaRespostaErro = msg;
+      continue;
+    }
+
+    // Erro legitimo da aplicacao (nao auth) — propaga imediatamente.
+    throw new Error(`Sungrow erro em ${path}: ${msg}`);
   }
 
-  let json;
-  try {
-    json = JSON.parse(text);
-  } catch {
-    throw new Error(`Sungrow resposta nao-JSON em ${path}: ${text.slice(0, 200)}`);
-  }
-
-  // iSolarCloud: result_code === '1' = sucesso. Outros valores = erro.
-  if (json?.result_code && String(json.result_code) !== '1') {
-    throw new Error(`Sungrow erro em ${path}: result_code=${json.result_code} msg=${json.result_msg || 'sem msg'}`);
-  }
-
-  return json.result_data || json;
+  throw new Error(`Sungrow erro em ${path} apos tentar sys_code [${sysCodesPraTentar.join(', ')}]: ${ultimaRespostaErro}`);
 }
 
 export async function validarCredencial(credential, apiBase) {
