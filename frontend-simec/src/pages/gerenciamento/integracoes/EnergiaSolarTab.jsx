@@ -18,6 +18,7 @@ import {
   getSolarPlants, getSolarProviders, salvarSolarPlant, desativarSolarPlant,
   adicionarInverter, editarInverter, removerInverter,
   adicionarBateria, removerBateria, validarCredencialSolar,
+  sungrowAuthorizeUrl, sungrowAuthStatus,
 } from '@/services/api/solarApi';
 
 // ─── Modal de nova/editar planta (dados basicos) ────────────────────────────
@@ -386,6 +387,92 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
   );
 }
 
+// ─── Badge Sungrow — status OAuth + botao Autorizar quando precisa ─────────
+function SungrowAuthBadge({ inverter }) {
+  const { addToast } = useToast();
+  const [status, setStatus] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [autorizando, setAutorizando] = useState(false);
+
+  const carregar = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await sungrowAuthStatus(inverter.id);
+      setStatus(r);
+    } catch {
+      setStatus(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [inverter.id]);
+
+  useEffect(() => { carregar(); }, [carregar]);
+
+  // Recarrega quando a aba ganhar foco (user volta do Sungrow autorizando)
+  useEffect(() => {
+    const onFocus = () => carregar();
+    window.addEventListener('focus', onFocus);
+    // Postmessage do popup OAuth tambem dispara reload
+    const onMsg = (e) => { if (e?.data?.sungrowAuth === 'ok') carregar(); };
+    window.addEventListener('message', onMsg);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('message', onMsg);
+    };
+  }, [carregar]);
+
+  const autorizar = async () => {
+    setAutorizando(true);
+    try {
+      const { authorizeUrl } = await sungrowAuthorizeUrl(inverter.id);
+      // Abre em popup — Sungrow redireciona pro backend callback que faz
+      // postMessage de volta pra essa janela.
+      const w = window.open(authorizeUrl, 'sungrow-auth', 'width=600,height=720,menubar=no,toolbar=no');
+      if (!w) {
+        addToast('Popup bloqueado. Libere popups de simec.cerdil.com.br.', 'error');
+      }
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message, 'error');
+    } finally {
+      setAutorizando(false);
+    }
+  };
+
+  if (loading) return <span className="text-[10px]" style={{ color: 'var(--text-muted)' }}>...</span>;
+  if (!status) return null;
+
+  if (!status.autorizado) {
+    return (
+      <button
+        type="button"
+        onClick={autorizar}
+        disabled={autorizando}
+        className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
+        style={{ backgroundColor: 'var(--color-warning-surface)', color: 'var(--color-warning)', border: '1px solid var(--color-warning-soft)' }}
+        title="Clique para autorizar via OAuth 2.0 da Sungrow"
+      >
+        {autorizando ? 'abrindo...' : '⚠ autorizar'}
+      </button>
+    );
+  }
+
+  if (status.precisaRenovar) {
+    return (
+      <button type="button" onClick={autorizar} className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
+              style={{ backgroundColor: 'var(--color-warning-surface)', color: 'var(--color-warning)' }}>
+        token expirado - re-autorizar
+      </button>
+    );
+  }
+
+  return (
+    <span className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
+          style={{ backgroundColor: 'var(--color-success-surface)', color: 'var(--color-success)' }}>
+      ✓ autorizado
+    </span>
+  );
+}
+
 // ─── Card de uma planta ─────────────────────────────────────────────────────
 function PlantaCard({ plant, providers, onEditar, onRemover, onAddInverter, onEditInverter, onRemoverInverter, onAddBateria, onRemoverBateria }) {
   const providerLabel = (id) => providers.find((p) => p.id === id)?.label || id;
@@ -438,14 +525,17 @@ function PlantaCard({ plant, providers, onEditar, onRemover, onAddInverter, onEd
             {plant.inverters.map((inv) => (
               <div key={inv.id} className="flex items-center justify-between rounded border px-2 py-1 text-xs"
                    style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-subtle)' }}>
-                <span>
-                  <FontAwesomeIcon icon={faMicrochip} className="mr-1" style={{ color: 'var(--brand-primary)' }} />
-                  <strong>{providerLabel(inv.provider)}</strong>
-                  {inv.modeloInversor ? ` · ${inv.modeloInversor}` : ''}
-                  <span style={{ color: 'var(--text-muted)' }}> · SN {inv.inverterSn}</span>
+                <span className="flex items-center gap-2">
+                  <FontAwesomeIcon icon={faMicrochip} style={{ color: 'var(--brand-primary)' }} />
+                  <span>
+                    <strong>{providerLabel(inv.provider)}</strong>
+                    {inv.modeloInversor ? ` · ${inv.modeloInversor}` : ''}
+                    <span style={{ color: 'var(--text-muted)' }}> · SN {inv.inverterSn}</span>
+                  </span>
                   {!inv.ativo && (
-                    <span className="ml-2 text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>inativo</span>
+                    <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--text-muted)' }}>inativo</span>
                   )}
+                  {inv.provider === 'sungrow' && <SungrowAuthBadge inverter={inv} />}
                 </span>
                 <div className="flex gap-1">
                   <button type="button" onClick={() => onEditInverter(plant, inv)} title="Editar">

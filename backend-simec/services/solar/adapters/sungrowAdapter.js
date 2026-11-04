@@ -1,30 +1,32 @@
-// Sungrow adapter — iSolarCloud OpenAPI.
+// Sungrow adapter — iSolarCloud OpenAPI com OAuth 2.0.
 //
-// Auth model (descoberto via libs pysolarcloud/sungrow-isolarcloud):
-//   - 3 credenciais: Appkey (publica), Secret Key (shared secret),
-//     RSA Public Key (da Sungrow — usada se E2E encryption ligada)
-//   - Headers em CADA request:
-//       x-access-key : Secret Key
-//       appkey       : Appkey
-//       sys_code     : '901' (fixo pra integracoes OEM/custom), as vezes '900'
-//       Content-Type : application/json;charset=UTF-8
-//       lang         : '_en_US' (ou '_pt_BR' quando suportado)
-//   - Body JSON com appkey + outros parametros do endpoint
+// O Free plan da Sungrow exige OAuth 2.0 (nao aceita chamadas diretas
+// com appkey). Fluxo:
 //
-// E2E encryption via RSA eh opcional — por default mandamos requests
-// nao-encriptadas (mais simples, Sungrow aceita). Se for necessario
-// ligar E2E depois, basta usar o rsaPublicKey pra encriptar uma AES
-// key e enviar no header 'x-random-secret-key'. Mantemos como extensao
-// futura; a implementacao inicial segue sem encriptacao.
+//   1. Admin cadastra o inverter com appkey + secret_key pela UI
+//   2. UI mostra badge "Precisa autorizar" + botao "Autorizar Sungrow"
+//   3. Backend gera authorize URL (POST /inverters/:id/sungrow/authorize)
+//      embedando o inverterId em um state assinado JWT
+//   4. User abre essa URL numa nova aba, autoriza na Sungrow
+//   5. Sungrow redireciona pra /api/solar/sungrow/oauth/callback?code=X&state=Y
+//   6. Callback valida state, extrai inverterId, exchange code -> tokens,
+//      salva tokens em credentialCrypt do inverter
+//   7. fetchSnapshot agora usa access_token nos requests; se 401, usa
+//      refresh_token pra renovar e tenta de novo
 //
-// Endpoints principais (sao `POST` com body JSON):
-//   POST /openapi/getPowerStationList    lista das estacoes do app/org
-//   POST /openapi/getDeviceList          devices (inversores) de uma estacao
-//   POST /openapi/getDeviceRealTimeData  telemetria em tempo real
+// Shape de credential (apos OAuth completo):
+//   {
+//     appkey:        'F5C...',
+//     secretKey:     'zve...',
+//     rsaPublicKey:  '...' (opcional),
+//     accessToken:   'eyJ...',
+//     refreshToken:  'eyJ...',
+//     expiresAt:     1730765432000  (ms)
+//   }
 //
-// Taxa de atualizacao: Sungrow atualiza dados a cada ~5min no cloud
-// — chamadas mais frequentes retornam o mesmo payload. Nosso poll de 60s
-// e redundante aqui, mas nao causa problema (apenas dados repetidos).
+// Pre-OAuth (credential acabou de ser salva, user ainda nao autorizou):
+//   { appkey, secretKey, rsaPublicKey } — fetchSnapshot vai levantar erro
+//   AUTHORIZATION_REQUIRED, que a UI usa pra mostrar o badge.
 
 export const id = 'sungrow';
 export const label = 'Sungrow';
@@ -35,14 +37,14 @@ export const credentialFields = [
     label: 'Appkey',
     type: 'text',
     required: true,
-    help: 'Copie do Developer Portal > sua Application > Appkey.',
+    help: 'Developer Portal > sua Application > Appkey.',
   },
   {
     name: 'secretKey',
     label: 'Secret Key',
     type: 'password',
     required: true,
-    help: 'Copie do Developer Portal > sua Application > Secret key.',
+    help: 'Developer Portal > sua Application > Secret key.',
   },
   {
     name: 'rsaPublicKey',
@@ -62,77 +64,140 @@ export const apiBaseOptions = [
   { value: 'https://cngateway.isolarcloud.com',  label: 'China (cngateway.isolarcloud.com)' },
 ];
 
+// Flag para a UI saber que este provider exige fluxo OAuth separado
+// depois de salvar a credencial (nao e plug-and-play como FoxESS/Growatt).
+export const requerOAuth = true;
+
 const USER_AGENT = 'SIMEC-SolarAdapter/1.0';
 
-function buildHeaders(credential, sysCode) {
+// ─── OAuth URLs ──────────────────────────────────────────────────────────────
+
+function authorizeBaseUrl(apiBase) {
+  // Sungrow usa https://openapi.isolarcloud.com/openapi/authorizeHtml pro UI
+  // de autorizacao (independente da regiao do gateway de API).
+  return 'https://openapi.isolarcloud.com/openapi/authorizeHtml';
+}
+
+export function getAuthorizeUrl({ apiBase, appkey, redirectUri, state }) {
+  const base = authorizeBaseUrl(apiBase);
+  const params = new URLSearchParams({
+    response_type: 'code',
+    app_key: appkey,
+    redirect_uri: redirectUri,
+    state,
+  });
+  return `${base}?${params.toString()}`;
+}
+
+export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, rsaPublicKey }) {
+  const url = `${apiBase.replace(/\/$/, '')}/openapi/apiManage/token`;
+  const body = { appkey, code, grant_type: 'authorization_code' };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8',
+      'x-access-key': secretKey,
+      'sys_code': '901',
+      'User-Agent': USER_AGENT,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  const json = JSON.parse(text);
+  if (json.result_code && String(json.result_code) !== '1') {
+    throw new Error(`Sungrow token exchange falhou: ${json.result_msg || text.slice(0, 200)}`);
+  }
+  const data = json.result_data || json;
+  return {
+    accessToken: data.access_token || data.accessToken,
+    refreshToken: data.refresh_token || data.refreshToken,
+    expiresIn: Number(data.expires_in || data.expiresIn || 86400),
+  };
+}
+
+export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshToken }) {
+  const url = `${apiBase.replace(/\/$/, '')}/openapi/apiManage/refreshToken`;
+  const body = { appkey, refresh_token: refreshToken, grant_type: 'refresh_token' };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json;charset=UTF-8',
+      'x-access-key': secretKey,
+      'sys_code': '901',
+      'User-Agent': USER_AGENT,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  const json = JSON.parse(text);
+  if (json.result_code && String(json.result_code) !== '1') {
+    throw new Error(`Sungrow refresh token falhou: ${json.result_msg || text.slice(0, 200)}`);
+  }
+  const data = json.result_data || json;
+  return {
+    accessToken: data.access_token || data.accessToken,
+    refreshToken: data.refresh_token || data.refreshToken || refreshToken,
+    expiresIn: Number(data.expires_in || data.expiresIn || 86400),
+  };
+}
+
+// ─── Chamadas API com access_token ───────────────────────────────────────────
+
+function headersComToken(credential) {
   return {
     'x-access-key': credential.secretKey,
     'appkey': credential.appkey,
-    'sys_code': sysCode,
+    'sys_code': '901',
     'Content-Type': 'application/json;charset=UTF-8',
     'lang': '_pt_BR',
     'User-Agent': USER_AGENT,
   };
 }
 
-async function fazerRequest({ url, headers, body }) {
-  const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text); } catch { /* keep text */ }
-  return { httpOk: res.ok, httpStatus: res.status, text, json };
-}
-
+// Nucleo HTTP — detecta "token expirado" e sinaliza pra o caller tentar refresh.
 async function callSungrow({ apiBase, credential, path, body = {} }) {
+  if (!credential.accessToken) {
+    throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
+  }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  const fullBody = { appkey: credential.appkey, ...body };
-
-  // Tenta sys_code '901' primeiro (OEM/custom integrations). Se vier
-  // er_invalid_appkey ou similar, retry com '900' (standard). Isso cobre
-  // a maioria dos tipos de app sem exigir configuracao do admin — a
-  // Sungrow nao expoe claramente qual sys_code vai com cada tier de app.
-  const sysCodesPraTentar = ['901', '900'];
-  let ultimaRespostaErro = null;
-
-  for (const sysCode of sysCodesPraTentar) {
-    const resp = await fazerRequest({
-      url,
-      headers: buildHeaders(credential, sysCode),
-      body: fullBody,
-    });
-
-    if (!resp.httpOk) {
-      ultimaRespostaErro = `HTTP ${resp.httpStatus} (sys_code=${sysCode}): ${resp.text.slice(0, 200)}`;
-      continue;
-    }
-
-    if (!resp.json) {
-      ultimaRespostaErro = `resposta nao-JSON (sys_code=${sysCode}): ${resp.text.slice(0, 200)}`;
-      continue;
-    }
-
-    // Sucesso: result_code '1' (ou 1 int). Alguns tenants retornam 0.
-    if (!resp.json.result_code || String(resp.json.result_code) === '1' || String(resp.json.result_code) === '0') {
-      return resp.json.result_data || resp.json;
-    }
-
-    const msg = `result_code=${resp.json.result_code} msg=${resp.json.result_msg || 'sem msg'}`;
-
-    // Se o erro e relacionado a sys_code/appkey, tenta a proxima variacao.
-    const errStr = String(resp.json.result_code || '') + ' ' + String(resp.json.result_msg || '');
-    if (/sys_code|invalid.?appkey|E00000|E009/i.test(errStr)) {
-      ultimaRespostaErro = msg;
-      continue;
-    }
-
-    // Erro legitimo da aplicacao (nao auth) — propaga imediatamente.
-    throw new Error(`Sungrow erro em ${path}: ${msg}`);
+  const fullBody = { appkey: credential.appkey, token: credential.accessToken, ...body };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: headersComToken(credential),
+    body: JSON.stringify(fullBody),
+  });
+  const text = await res.text();
+  let json;
+  try { json = JSON.parse(text); } catch {
+    throw new Error(`Sungrow resposta nao-JSON em ${path}: ${text.slice(0, 200)}`);
   }
 
-  throw new Error(`Sungrow erro em ${path} apos tentar sys_code [${sysCodesPraTentar.join(', ')}]: ${ultimaRespostaErro}`);
+  if (json.result_code && String(json.result_code) !== '1' && String(json.result_code) !== '0') {
+    const errStr = String(json.result_code) + ' ' + String(json.result_msg || '');
+    // Token expirado — caller precisa chamar refresh
+    if (/E00002|invalid.?token|token.?expir|E009/i.test(errStr)) {
+      const e = new Error(`Sungrow token invalido/expirado: ${json.result_msg || json.result_code}`);
+      e.code = 'TOKEN_EXPIRED';
+      throw e;
+    }
+    throw new Error(`Sungrow erro em ${path}: result_code=${json.result_code} msg=${json.result_msg || 'sem msg'}`);
+  }
+
+  return json.result_data || json;
 }
 
+// ─── validarCredencial / fetchSnapshot (interface padrao) ────────────────────
+
 export async function validarCredencial(credential, apiBase) {
+  // Sem OAuth ainda: sinaliza que precisa autorizar (nao e erro de fato).
+  if (!credential.accessToken) {
+    return {
+      ok: false,
+      precisaAutorizar: true,
+      erro: 'Credencial salva, mas ainda precisa autorizar via OAuth. Clique em "Autorizar Sungrow" para completar.',
+    };
+  }
+
   try {
     const data = await callSungrow({
       apiBase: apiBase || defaultApiBase,
@@ -140,7 +205,6 @@ export async function validarCredencial(credential, apiBase) {
       path: '/openapi/getPowerStationList',
       body: { curPage: 1, size: 20 },
     });
-
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
       if (x == null) return null;
@@ -148,36 +212,30 @@ export async function validarCredencial(credential, apiBase) {
       return Number.isFinite(n) ? n : null;
     };
 
-    // Pra cada station, busca devices rapido (limita a 5 pra nao demorar).
-    // Inclui install_capacity (kWp da estacao) e nominal_power (kW do inversor)
-    // pra auto-preenchimento na UI.
     const devices = [];
     for (const s of stations.slice(0, 5)) {
       const stationId = s.ps_id || s.psId || s.id;
       if (!stationId) continue;
-      // install_capacity vem em kWp; alguns tenants expoem em W — se >10000, divide
       let stationKwp = toNum(s.install_capacity ?? s.installedCapacity ?? s.ps_capacity);
       if (stationKwp != null && stationKwp > 10000) stationKwp = stationKwp / 1000;
-
       try {
         const devData = await callSungrow({
           apiBase: apiBase || defaultApiBase,
           credential,
           path: '/openapi/getDeviceList',
-          body: { ps_id: stationId, device_type_list: [1] }, // 1 = inverter
+          body: { ps_id: stationId, device_type_list: [1] },
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
-          // nominal_power em Sungrow geralmente em W — normaliza pra kW
           let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
           if (capKw != null && capKw > 1000) capKw = capKw / 1000;
           devices.push({
-            sn:           d.device_sn || d.deviceSn,
-            tipo:         'inverter',
-            modelo:       d.device_model_name || d.device_type_name || d.deviceModel,
+            sn: d.device_sn || d.deviceSn,
+            tipo: 'inverter',
+            modelo: d.device_model_name || d.device_type_name || d.deviceModel,
             capacidadeKw: capKw,
-            estacao:      s.ps_name || s.psName || s.name,
+            estacao: s.ps_name || s.psName || s.name,
             stationKwp,
-            online:       d.dev_status === 1 || d.dev_status === '1',
+            online: d.dev_status === 1 || d.dev_status === '1',
           });
         }
       } catch { /* ignora station individual */ }
@@ -190,10 +248,12 @@ export async function validarCredencial(credential, apiBase) {
 }
 
 export async function fetchSnapshot(inverter) {
-  // Real-time data requer passar o SN e o tipo de dispositivo.
-  // device_type=1 = inverter string, 11 = hybrid inverter.
-  // Pra plantas so de geracao assumimos 1; se nao der certo, pode
-  // cair pra 11. Backlog: deixar config por planta.
+  if (!inverter.credential?.accessToken) {
+    const err = new Error('AUTHORIZATION_REQUIRED');
+    err.code = 'AUTHORIZATION_REQUIRED';
+    throw err;
+  }
+
   let data = null;
   try {
     data = await callSungrow({
@@ -202,12 +262,17 @@ export async function fetchSnapshot(inverter) {
       path: '/openapi/getDeviceRealTimeData',
       body: {
         device_type: 1,
-        point_id_list: [],   // vazio = retorna todos os points disponiveis
+        point_id_list: [],
         sn_list: [inverter.inverterSn],
       },
     });
   } catch (err) {
-    // Tenta com device_type=11 (hybrid) se o SN nao for reconhecido como type 1
+    if (err.code === 'TOKEN_EXPIRED') {
+      // Propaga pro poller cuidar do refresh (poller acessa o banco pra
+      // persistir o novo token). Adapter em si nao persiste.
+      throw err;
+    }
+    // Tenta device_type=11 (hybrid)
     try {
       data = await callSungrow({
         apiBase: inverter.apiBase,
@@ -220,12 +285,11 @@ export async function fetchSnapshot(inverter) {
         },
       });
     } catch (errH) {
-      throw new Error(`Sungrow: nenhum device_type reconheceu SN ${inverter.inverterSn}. Tentou 1 (string) e 11 (hybrid). Erro: ${errH.message}`);
+      if (errH.code === 'TOKEN_EXPIRED') throw errH;
+      throw new Error(`Sungrow: nenhum device_type reconheceu SN ${inverter.inverterSn}. Erro: ${errH.message}`);
     }
   }
 
-  // Normaliza o shape — Sungrow devolve `device_point_list` com items {point_id, point_name, value}
-  // ou `device_point` dependendo da versao da API. Flatten pra um map plano.
   const pointList = data?.device_point_list?.[0]?.device_point
                  || data?.device_point_list?.[0]?.point_list
                  || data?.device_point_list
@@ -239,13 +303,6 @@ export async function fetchSnapshot(inverter) {
     }
   }
 
-  // Mapeamento de point_codes mais comuns (pode variar por modelo):
-  //   p24   -> active power (kW)
-  //   p83022 -> daily yield (kWh)
-  //   p83025 -> monthly yield (kWh)
-  //   p83004 -> total yield (kWh)
-  //   p13   -> inverter temp (C)
-  //   p30   -> device status (1=run, 2=stop, 3=fault)
   const n = (x) => (typeof x === 'number' ? x : (x != null ? parseFloat(x) : null));
 
   return {
@@ -253,15 +310,12 @@ export async function fetchSnapshot(inverter) {
     feedinPower: null, gridConsumptionPower: null, epsPower: null,
     runningState: null,
     currentFault: v.p30 === 3 ? 'FAULT' : null,
-
     powerKw: n(v.p24 ?? v.p83032),
     generationKwhDay:   n(v.p83022),
     generationKwhMonth: n(v.p83025),
     generationKwhTotal: n(v.p83004),
-
     ambientTempC: null,
     inverterTempC: n(v.p13 ?? v.p12),
-
     detalhes: null,
     rawPayload: data,
   };

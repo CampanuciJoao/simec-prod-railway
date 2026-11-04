@@ -43,3 +43,10 @@ export const removerBateria = (bateriaId) =>
 // ─── Validar credencial (teste sem salvar) ───────────────────────────────────
 export const validarCredencialSolar = (payload) =>
   api.post('/solar/validar-credencial', payload).then((r) => r.data);
+
+// ─── Sungrow OAuth ──────────────────────────────────────────────────────────
+export const sungrowAuthorizeUrl = (inverterId) =>
+  api.post(`/solar/inverters/${inverterId}/sungrow/authorize-url`).then((r) => r.data);
+
+export const sungrowAuthStatus = (inverterId) =>
+  api.get(`/solar/inverters/${inverterId}/sungrow/auth-status`).then((r) => r.data);

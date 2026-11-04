@@ -12,22 +12,72 @@
 
 import prisma from '../prismaService.js';
 import { getAdapter } from './adapters/index.js';
-import { decryptCredential } from './solarCrypto.js';
+import { decryptCredential, encryptCredential } from './solarCrypto.js';
 import { processarEventosSolar } from './solarAlertRepository.js';
+import * as sungrowAdapter from './adapters/sungrowAdapter.js';
+
+// Se o Sungrow adapter sinalizar TOKEN_EXPIRED, tentamos renovar via
+// refresh_token e persistir o novo credential no banco. Depois disso o
+// caller repete a chamada original com o novo accessToken.
+async function tryRefreshSungrowToken(inverter, credential) {
+  if (inverter.provider !== 'sungrow' || !credential.refreshToken) return null;
+  try {
+    const { accessToken, refreshToken, expiresIn } = await sungrowAdapter.refreshAccessToken({
+      apiBase: inverter.apiBase,
+      appkey: credential.appkey,
+      secretKey: credential.secretKey,
+      refreshToken: credential.refreshToken,
+    });
+    const novoCredential = {
+      ...credential,
+      accessToken,
+      refreshToken,
+      expiresAt: Date.now() + expiresIn * 1000,
+    };
+    await prisma.solarInverter.update({
+      where: { id: inverter.id },
+      data: { credentialCrypt: encryptCredential(novoCredential) },
+    });
+    return novoCredential;
+  } catch (err) {
+    console.warn(`[SOLAR_POLLER] Refresh token Sungrow falhou pro inverter ${inverter.id}:`, err.message);
+    return null;
+  }
+}
 
 async function coletarInverter(inverter) {
   const adapter = getAdapter(inverter.provider);
-  const credential = decryptCredential(inverter.credentialCrypt);
+  let credential = decryptCredential(inverter.credentialCrypt);
   if (!credential) {
     throw new Error(`Credencial vazia/invalida para inverter ${inverter.id}`);
   }
 
-  const dados = await adapter.fetchSnapshot({
-    inverterSn: inverter.inverterSn,
-    apiBase: inverter.apiBase,
-    credential,
-    modeloInversor: inverter.modeloInversor,
-  });
+  let dados;
+  try {
+    dados = await adapter.fetchSnapshot({
+      inverterSn: inverter.inverterSn,
+      apiBase: inverter.apiBase,
+      credential,
+      modeloInversor: inverter.modeloInversor,
+    });
+  } catch (err) {
+    // Sungrow: access_token expirou. Tenta refresh + retry 1 vez.
+    if (err?.code === 'TOKEN_EXPIRED') {
+      const novoCred = await tryRefreshSungrowToken(inverter, credential);
+      if (!novoCred) {
+        throw new Error(`Sungrow: refresh token falhou e precisa re-autorizar (inverter ${inverter.id})`);
+      }
+      credential = novoCred;
+      dados = await adapter.fetchSnapshot({
+        inverterSn: inverter.inverterSn,
+        apiBase: inverter.apiBase,
+        credential,
+        modeloInversor: inverter.modeloInversor,
+      });
+    } else {
+      throw err;
+    }
+  }
 
   const snapshot = await prisma.solarSnapshot.create({
     data: {
