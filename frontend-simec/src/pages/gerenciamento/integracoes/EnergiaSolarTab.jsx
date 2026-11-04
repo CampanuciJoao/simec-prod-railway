@@ -11,6 +11,7 @@ import {
 
 import {
   Card, Button, Input, Select, Drawer, LoadingState, InlineEmptyState,
+  ModalConfirmacao,
 } from '@/components/ui';
 import { useToast } from '@/contexts/ToastContext';
 import { getUnidades } from '@/services/api/unidadesApi';
@@ -632,6 +633,65 @@ function PlantaCard({ plant, providers, onEditar, onRemover, onAddInverter, onEd
 }
 
 // ─── Container principal ────────────────────────────────────────────────────
+// ─── Drawer pra adicionar bateria ────────────────────────────────────────────
+function BateriaModal({ open, onClose, plant, onSalvar }) {
+  const [sn, setSn] = useState('');
+  const [capacidadeKwh, setCapacidadeKwh] = useState('');
+  const [salvando, setSalvando] = useState(false);
+
+  useEffect(() => {
+    if (open) { setSn(''); setCapacidadeKwh(''); }
+  }, [open]);
+
+  const salvar = async (e) => {
+    e?.preventDefault?.();
+    if (!sn) return;
+    const provider = plant?.inverters?.[0]?.provider || 'foxess';
+    setSalvando(true);
+    try {
+      await onSalvar({
+        sn,
+        provider,
+        capacidadeKwh: capacidadeKwh === '' ? null : Number(capacidadeKwh),
+      });
+      onClose();
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <Drawer open={open} onClose={onClose} title="Nova bateria">
+      <div className="px-5 py-4">
+        <form onSubmit={salvar} className="space-y-3">
+          <Input
+            label="Número de série"
+            required
+            placeholder="Ex: 60EP711063UP054"
+            value={sn}
+            onChange={(e) => setSn(e.target.value)}
+          />
+          <Input
+            label="Capacidade (kWh)"
+            type="number"
+            step="0.1"
+            placeholder="Opcional"
+            hint="Preencha se souber; serve apenas pra exibicao"
+            value={capacidadeKwh}
+            onChange={(e) => setCapacidadeKwh(e.target.value)}
+          />
+          <div className="flex justify-end gap-2 pt-2">
+            <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button type="submit" disabled={salvando || !sn}>
+              {salvando ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </div>
+        </form>
+      </div>
+    </Drawer>
+  );
+}
+
 function EnergiaSolarTab() {
   const { addToast } = useToast();
   const [plants, setPlants] = useState([]);
@@ -644,6 +704,13 @@ function EnergiaSolarTab() {
   const [inverterModalOpen, setInverterModalOpen] = useState(false);
   const [inverterEditando, setInverterEditando] = useState(null);
   const [plantIdInverter, setPlantIdInverter] = useState(null);
+
+  const [bateriaModalOpen, setBateriaModalOpen] = useState(false);
+  const [plantParaBateria, setPlantParaBateria] = useState(null);
+
+  // Estado generico pra confirmar remocoes (planta / inverter / bateria)
+  const [confirmacao, setConfirmacao] = useState(null);
+  // { title, message, confirmText, onConfirm }
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -678,15 +745,24 @@ function EnergiaSolarTab() {
     }
   };
 
-  const desativarPlanta = async (plant) => {
-    if (!window.confirm(`Desativar "${plant.nome}"? O monitoramento para, mas os dados históricos permanecem.`)) return;
-    try {
-      await desativarSolarPlant(plant.id);
-      addToast('Planta desativada.', 'success');
-      await carregar();
-    } catch (err) {
-      addToast(err?.response?.data?.error || err?.message, 'error');
-    }
+  const desativarPlanta = (plant) => {
+    setConfirmacao({
+      title: 'Desativar planta solar',
+      message: `Desativar "${plant.nome}"? O monitoramento para, mas os dados históricos permanecem no banco.`,
+      confirmText: 'Desativar',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await desativarSolarPlant(plant.id);
+          addToast('Planta desativada.', 'success');
+          await carregar();
+        } catch (err) {
+          addToast(err?.response?.data?.error || err?.message, 'error');
+        } finally {
+          setConfirmacao(null);
+        }
+      },
+    });
   };
 
   const abrirNovoInverter = (plant) => {
@@ -715,24 +791,34 @@ function EnergiaSolarTab() {
     }
   };
 
-  const removerInvertr = async (inv) => {
-    if (!window.confirm(`Remover inversor SN ${inv.inverterSn}?`)) return;
-    try {
-      await removerInverter(inv.id);
-      addToast('Inversor removido.', 'success');
-      await carregar();
-    } catch (err) {
-      addToast(err?.response?.data?.error || err?.message, 'error');
-    }
+  const removerInvertr = (inv) => {
+    setConfirmacao({
+      title: 'Remover inversor',
+      message: `Remover inversor SN ${inv.inverterSn}? Os snapshots coletados por ele permanecem no histórico, mas a coleta para imediatamente.`,
+      confirmText: 'Remover',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await removerInverter(inv.id);
+          addToast('Inversor removido.', 'success');
+          await carregar();
+        } catch (err) {
+          addToast(err?.response?.data?.error || err?.message, 'error');
+        } finally {
+          setConfirmacao(null);
+        }
+      },
+    });
   };
 
-  const adicBateria = async (plant) => {
-    const sn = window.prompt('Serial number da bateria:');
-    if (!sn) return;
-    const provider = plant.inverters?.[0]?.provider || 'foxess';
-    const cap = window.prompt('Capacidade em kWh (opcional):');
+  const adicBateria = (plant) => {
+    setPlantParaBateria(plant);
+    setBateriaModalOpen(true);
+  };
+
+  const salvarBateria = async (payload) => {
     try {
-      await adicionarBateria(plant.id, { sn, provider, capacidadeKwh: cap ? Number(cap) : null });
+      await adicionarBateria(plantParaBateria.id, payload);
       addToast('Bateria adicionada.', 'success');
       await carregar();
     } catch (err) {
@@ -740,15 +826,24 @@ function EnergiaSolarTab() {
     }
   };
 
-  const remBateria = async (bateria) => {
-    if (!window.confirm(`Remover bateria SN ${bateria.sn}?`)) return;
-    try {
-      await removerBateria(bateria.id);
-      addToast('Bateria removida.', 'success');
-      await carregar();
-    } catch (err) {
-      addToast(err?.response?.data?.error || err?.message, 'error');
-    }
+  const remBateria = (bateria) => {
+    setConfirmacao({
+      title: 'Remover bateria',
+      message: `Remover bateria SN ${bateria.sn}?`,
+      confirmText: 'Remover',
+      isDestructive: true,
+      onConfirm: async () => {
+        try {
+          await removerBateria(bateria.id);
+          addToast('Bateria removida.', 'success');
+          await carregar();
+        } catch (err) {
+          addToast(err?.response?.data?.error || err?.message, 'error');
+        } finally {
+          setConfirmacao(null);
+        }
+      },
+    });
   };
 
   if (loading) return <LoadingState message="Carregando..." />;
@@ -809,6 +904,21 @@ function EnergiaSolarTab() {
         inverter={inverterEditando}
         providers={providers}
         onSalvar={salvarInverter}
+      />
+      <BateriaModal
+        open={bateriaModalOpen}
+        onClose={() => setBateriaModalOpen(false)}
+        plant={plantParaBateria}
+        onSalvar={salvarBateria}
+      />
+      <ModalConfirmacao
+        isOpen={!!confirmacao}
+        onClose={() => setConfirmacao(null)}
+        onConfirm={confirmacao?.onConfirm || (() => {})}
+        title={confirmacao?.title || 'Confirmar'}
+        message={confirmacao?.message || ''}
+        confirmText={confirmacao?.confirmText || 'Confirmar'}
+        isDestructive={confirmacao?.isDestructive || false}
       />
     </div>
   );
