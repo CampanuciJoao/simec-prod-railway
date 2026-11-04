@@ -99,7 +99,7 @@ async function tentarAutoPopularMetadados(inverterId) {
 // que chegar. Se dois admins autorizarem simultaneamente, pode haver
 // race condition; nao e um caso real agora com 2-3 inverters/tenant.
 router.get('/sungrow/callback', async (req, res) => {
-  const { code, error, error_description } = req.query;
+  const { code, error, error_description, redirectUri: redirectUriQuery } = req.query;
 
   const htmlResposta = (titulo, mensagem, sucesso = false) => `
     <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
@@ -153,13 +153,22 @@ router.get('/sungrow/callback', async (req, res) => {
     const credential = decryptCredential(inverter.credentialCrypt) || {};
 
     // IMPORTANTE: o redirect_uri precisa ser EXATAMENTE o mesmo que foi
-    // passado na authorize URL (e registrado no portal Sungrow). Senao
-    // a Sungrow rejeita a troca do code por token.
-    const redirectUri = 'https://simec.cerdil.com.br/api/solar/sungrow/callback';
+    // registrado no Developer Portal Sungrow e usado no redirecionamento
+    // real. Se a Sungrow redireciona pro bare dominio (simec.cerdil.com.br/)
+    // em vez do path /api/solar/sungrow/callback, o SPA intercepta e
+    // repassa o code pro callback junto com o redirectUri que a Sungrow
+    // de fato usou (= a URL raiz).
+    //
+    // Fallback: se nao veio redirectUri na query, assume que a Sungrow
+    // chamou direto esse endpoint, entao usa o path do callback.
+    const redirectUri = redirectUriQuery
+      || `${req.protocol}://${req.get('host')}${req.baseUrl}${req.path}`;
     console.log('[SUNGROW_OAUTH_CALLBACK] trocando code por token', {
       inverterId,
       codeLen: String(code).length,
       apiBase: inverter.apiBase,
+      redirectUri,
+      viaInterceptor: Boolean(redirectUriQuery),
       temAppkey: Boolean(credential.appkey),
       temSecret: Boolean(credential.secretKey),
     });
