@@ -19,7 +19,10 @@ const CATEGORIA_FLAG = {
 // RECOMENDACAO) sao "prestes a vencer" — informativas, com janela de dias/
 // semanas antes do prazo. Segurar ate as 9h evita spam de 00:00 quando
 // vencimentos cruzam a janela na virada do dia.
-const CATEGORIAS_URGENTES_24_7 = new Set(['GEHC_SAUDE', 'OS_CORRETIVA']);
+// Categorias que notificam Telegram 24/7, mesmo fora do horario comercial
+// do tenant. Queda de energia na unidade pode derrubar servidor/CPD em
+// qualquer hora — precisa alerta imediato independente do horario.
+const CATEGORIAS_URGENTES_24_7 = new Set(['GEHC_SAUDE', 'OS_CORRETIVA', 'FOXESS_ENERGIA']);
 
 const HORA_INICIO_COMERCIAL = 9;   // 09:00 no timezone do tenant
 const HORA_FIM_COMERCIAL    = 20;  // 20:00 (inclusivo — dispara ate 19:59)
@@ -98,8 +101,10 @@ async function processarTenant(tenantId) {
   const noHorarioComercial = estaEmHorarioComercial(tenant?.timezone);
 
   // Condicao 1: alertas nunca notificados (telegramEnviado=false).
-  // Condicao 2: alertas GEHC_SAUDE persistentes (ALTA/MEDIA) que foram
-  //             notificados ha mais de 24h — re-notifica.
+  // Condicao 2: alertas urgentes 24/7 persistentes (ALTA/MEDIA) que foram
+  //             notificados ha mais de 24h — re-notifica. GEHC_SAUDE e
+  //             FOXESS_ENERGIA entram aqui — operador precisa continuar
+  //             sabendo enquanto o problema persistir.
   const limiteReenvio = new Date(Date.now() - REALERTA_INTERVALO_MS);
   const whereAlertas = {
     tenantId,
@@ -107,7 +112,7 @@ async function processarTenant(tenantId) {
       { telegramEnviado: false },
       {
         telegramEnviado: true,
-        tipoCategoria: 'GEHC_SAUDE',
+        tipoCategoria: { in: [...CATEGORIAS_URGENTES_24_7] },
         prioridade: { in: ['Alta', 'Media'] },
         telegramEnviadoEm: { lt: limiteReenvio },
       },
@@ -116,7 +121,7 @@ async function processarTenant(tenantId) {
   if (!noHorarioComercial) {
     // Fora do horario comercial: so puxa alertas urgentes. Os nao-
     // urgentes ficam retidos e serao processados na proxima rodada
-    // dentro do horario comercial. GEHC_SAUDE e' urgente 24/7.
+    // dentro do horario comercial.
     whereAlertas.tipoCategoria = { in: [...CATEGORIAS_URGENTES_24_7] };
   }
 
