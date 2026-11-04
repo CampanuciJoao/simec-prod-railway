@@ -16,12 +16,12 @@
 //   GET /api/solar/plants/:id/quedas                lista de quedas de energia
 
 import express from 'express';
-import crypto from 'crypto';
 import prisma from '../services/prismaService.js';
 import { proteger, admin } from '../middleware/authMiddleware.js';
 import { encryptCredential, decryptCredential } from '../services/solar/solarCrypto.js';
 import { getAdapter, listAdapters } from '../services/solar/adapters/index.js';
 import * as sungrowAdapter from '../services/solar/adapters/sungrowAdapter.js';
+import { getRedisConnection } from '../services/queueService.js';
 
 const router = express.Router();
 
@@ -83,14 +83,23 @@ async function tentarAutoPopularMetadados(inverterId) {
   }
 }
 
-// ─── OAuth callback (publico, SEM proteger — Sungrow redireciona aqui) ──────
+// ─── OAuth callback Sungrow (publico, SEM proteger) ────────────────────────
 //
-// Fluxo: user clica "Autorizar Sungrow" > nova aba abre authorize URL do
-// Sungrow > user autoriza > Sungrow redireciona pra esta rota com
-// ?code=X&state=Y. Validamos state (JWT assinado embedando inverterId),
-// trocamos code por tokens, salvamos no credentialCrypt do inverter.
-router.get('/sungrow/oauth/callback', async (req, res) => {
-  const { code, state, error, error_description } = req.query;
+// Path EXATO: /api/solar/sungrow/callback (sem /oauth/). Tem que bater
+// com o Redirect URI registrado no Developer Portal Sungrow.
+//
+// Sungrow NAO devolve 'state' no callback — devolve apenas 'code'. Entao
+// o pareamento com o inverter precisa ser feito antes do redirect: a UI
+// chama /sungrow/authorize-url que salva (inverterId -> code) em cache
+// no Redis com TTL de 10min. Quando callback chega, pegamos o inverterId
+// pendente mais recente (unico por sessao do admin).
+//
+// Pra simplificar — como admin autoriza um inverter por vez — o cache
+// e uma fila simples onde o ultimo authorize-url inserido vence o code
+// que chegar. Se dois admins autorizarem simultaneamente, pode haver
+// race condition; nao e um caso real agora com 2-3 inverters/tenant.
+router.get('/sungrow/callback', async (req, res) => {
+  const { code, error, error_description } = req.query;
 
   const htmlResposta = (titulo, mensagem, sucesso = false) => `
     <!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
@@ -117,25 +126,26 @@ router.get('/sungrow/oauth/callback', async (req, res) => {
       false
     ));
   }
-  if (!code || !state) {
-    return res.status(400).send(htmlResposta('Parametros ausentes', 'code ou state nao vieram na URL.', false));
+  if (!code) {
+    return res.status(400).send(htmlResposta('Parametro ausente', 'code nao veio na URL.', false));
   }
 
   try {
-    // Valida + extrai inverterId do state (HMAC assinado com o proprio
-    // SOLAR_TOKEN_SECRET / FOXESS_TOKEN_SECRET). Formato: <payload_hex>.<hmac_hex>
-    const [payloadHex, hmacHex] = String(state).split('.');
-    if (!payloadHex || !hmacHex) throw new Error('state malformado');
-    const secret = process.env.SOLAR_TOKEN_SECRET || process.env.FOXESS_TOKEN_SECRET || process.env.GEHC_TOKEN_SECRET || '';
-    const expected = crypto.createHmac('sha256', secret).update(payloadHex).digest('hex');
-    if (expected !== hmacHex) throw new Error('state nao bate com HMAC');
-    const payload = JSON.parse(Buffer.from(payloadHex, 'hex').toString('utf8'));
-    if (!payload.inverterId || Date.now() > payload.expires) {
-      throw new Error('state expirado');
+    // Sungrow NAO devolve state no callback. O pareamento code <-> inverter
+    // e feito via Redis: a rota authorize-url salva o inverterId pendente
+    // com TTL 10min. Pegamos o mais recente (unica autorizacao por vez por
+    // tenant — ok pra escala atual).
+    const redisConnection = getRedisConnection();
+    if (!redisConnection) throw new Error('Redis indisponivel');
+
+    const inverterId = await redisConnection.get('sungrow:pending-authorize');
+    if (!inverterId) {
+      throw new Error('Nenhuma autorizacao pendente. Clique "Autorizar" no SIMEC novamente e tente de novo.');
     }
+    await redisConnection.del('sungrow:pending-authorize');
 
     const inverter = await prisma.solarInverter.findFirst({
-      where: { id: payload.inverterId, provider: 'sungrow' },
+      where: { id: inverterId, provider: 'sungrow' },
       select: { id: true, apiBase: true, credentialCrypt: true, tenantId: true },
     });
     if (!inverter) throw new Error('inverter nao encontrado');
@@ -382,9 +392,13 @@ router.delete('/baterias/:id', admin, async (req, res) => {
 });
 
 // ─── Sungrow OAuth: gera authorize URL ──────────────────────────────────────
-// Admin clica "Autorizar Sungrow" > frontend chama esta rota > backend
-// retorna URL que o frontend abre em nova aba. State e HMAC assinado
-// embedando inverterId + timestamp expiracao (10min).
+// Sungrow usa fluxo proprio (nao OAuth2 standard): precisa de cloudId +
+// applicationId na URL (nao de state). Como Sungrow nao devolve state no
+// callback, salvamos o inverterId pendente no Redis com TTL 10min — o
+// callback consome essa chave pra saber qual inverter atualizar.
+//
+// Redirect URI tem que bater EXATO com o registrado no portal Sungrow:
+//   https://simec.cerdil.com.br/api/solar/sungrow/callback
 router.post('/inverters/:id/sungrow/authorize-url', admin, async (req, res) => {
   const tenantId = req.tenantContext;
   try {
@@ -398,26 +412,29 @@ router.post('/inverters/:id/sungrow/authorize-url', admin, async (req, res) => {
     if (!credential?.appkey) {
       return res.status(400).json({ error: 'Credencial do inverter nao tem appkey. Reconfigure.' });
     }
+    if (!credential.applicationId || !credential.cloudId) {
+      return res.status(400).json({
+        error: 'Credencial Sungrow incompleta: faltam applicationId e cloudId. Edite o inversor e preencha esses 2 campos (que aparecem na "Authorization URL" do Developer Portal).',
+      });
+    }
 
-    // State HMAC-assinado com o secret da aplicacao. Expira em 10min.
-    const payload = { inverterId: inverter.id, expires: Date.now() + 10 * 60 * 1000 };
-    const payloadHex = Buffer.from(JSON.stringify(payload), 'utf8').toString('hex');
-    const secret = process.env.SOLAR_TOKEN_SECRET || process.env.FOXESS_TOKEN_SECRET || process.env.GEHC_TOKEN_SECRET || '';
-    const hmac = crypto.createHmac('sha256', secret).update(payloadHex).digest('hex');
-    const state = `${payloadHex}.${hmac}`;
+    // Salva inverterId no Redis com TTL 10min pro callback poder parear
+    const redisConnection = getRedisConnection();
+    if (!redisConnection) {
+      return res.status(500).json({ error: 'Redis indisponivel' });
+    }
+    await redisConnection.set('sungrow:pending-authorize', inverter.id, 'EX', 600);
 
-    // Redirect URI: tem que ser EXATO o que foi registrado na Sungrow.
-    // Pra evitar typo e divergencia staging/prod, derivamos do host atual
-    // do request (se Railway staging bate, usa staging; se prod, usa prod).
-    const host = req.get('host');
-    const proto = req.get('x-forwarded-proto') || req.protocol || 'https';
-    const redirectUri = `${proto}://${host}/api/solar/sungrow/oauth/callback`;
+    // Redirect URI deve ser EXATO o registrado no portal. Hardcoded aqui
+    // porque o Developer Portal exige igualdade estrita e o host dos
+    // deploys muda (staging vs prod). Simec cerdil.com.br roteia /api/*
+    // pro backend via reverse proxy Railway/Cloudflare — por isso o
+    // dominio e sempre o do frontend.
+    const redirectUri = 'https://simec.cerdil.com.br/api/solar/sungrow/callback';
 
     const authorizeUrl = sungrowAdapter.getAuthorizeUrl({
-      apiBase: inverter.apiBase,
-      appkey: credential.appkey,
+      credential,
       redirectUri,
-      state,
     });
 
     res.json({ authorizeUrl, redirectUri, expiresInMinutes: 10 });

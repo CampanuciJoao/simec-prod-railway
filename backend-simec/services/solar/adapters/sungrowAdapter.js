@@ -47,6 +47,20 @@ export const credentialFields = [
     help: 'Developer Portal > sua Application > Secret key.',
   },
   {
+    name: 'applicationId',
+    label: 'Application ID',
+    type: 'text',
+    required: true,
+    help: 'Numero que aparece na Authorization URL do portal (ex: applicationId=4709).',
+  },
+  {
+    name: 'cloudId',
+    label: 'Cloud ID',
+    type: 'text',
+    required: true,
+    help: 'Numero que aparece na Authorization URL (ex: cloudId=2). Identifica a regiao da conta Sungrow.',
+  },
+  {
     name: 'rsaPublicKey',
     label: 'RSA Public Key (opcional)',
     type: 'text',
@@ -71,20 +85,25 @@ export const requerOAuth = true;
 const USER_AGENT = 'SIMEC-SolarAdapter/1.0';
 
 // ─── OAuth URLs ──────────────────────────────────────────────────────────────
+//
+// A Sungrow NAO usa OAuth2 padrao — ela expoe a URL de autorizacao no
+// proprio Developer Portal, e o formato e:
+//   https://web3.isolarcloud.com.hk/#/authorized-app
+//     ?cloudId=<cloudId>
+//     &applicationId=<applicationId>
+//     &redirectUrl=<redirectUri URL-encoded>
+//
+// Observe: sem `state`, `response_type`, `app_key`, `client_id` etc.
+// A Sungrow tem seu proprio esquema pre-OAuth2. State e feito de fora
+// (aqui no backend) e mantido em memoria/Redis — Sungrow nao devolve
+// state pra gente no callback.
 
-function authorizeBaseUrl(apiBase) {
-  // Sungrow usa https://openapi.isolarcloud.com/openapi/authorizeHtml pro UI
-  // de autorizacao (independente da regiao do gateway de API).
-  return 'https://openapi.isolarcloud.com/openapi/authorizeHtml';
-}
-
-export function getAuthorizeUrl({ apiBase, appkey, redirectUri, state }) {
-  const base = authorizeBaseUrl(apiBase);
+export function getAuthorizeUrl({ credential, redirectUri }) {
+  const base = 'https://web3.isolarcloud.com.hk/#/authorized-app';
   const params = new URLSearchParams({
-    response_type: 'code',
-    app_key: appkey,
-    redirect_uri: redirectUri,
-    state,
+    cloudId: String(credential.cloudId || ''),
+    applicationId: String(credential.applicationId || ''),
+    redirectUrl: redirectUri,
   });
   return `${base}?${params.toString()}`;
 }
