@@ -69,13 +69,20 @@ export const credentialFields = [
   },
 ];
 
-export const defaultApiBase = 'https://gateway.isolarcloud.com';
+// URLs oficiais Sungrow (doc 2026):
+//   China:          https://gateway.isolarcloud.com/
+//   International:  https://gateway.isolarcloud.com.hk/  <- BR usa este
+//   Europa:         https://gateway.isolarcloud.eu/
+//   Australia:      https://augateway.isolarcloud.com/
+//   India:          https://gateway.isolarcloud.in/
+export const defaultApiBase = 'https://gateway.isolarcloud.com.hk';
 
 export const apiBaseOptions = [
-  { value: 'https://gateway.isolarcloud.com',    label: 'Global (gateway.isolarcloud.com)' },
+  { value: 'https://gateway.isolarcloud.com.hk', label: 'International / Brasil (gateway.isolarcloud.com.hk)' },
+  { value: 'https://gateway.isolarcloud.com',    label: 'China (gateway.isolarcloud.com)' },
   { value: 'https://gateway.isolarcloud.eu',     label: 'Europa (gateway.isolarcloud.eu)' },
   { value: 'https://augateway.isolarcloud.com',  label: 'Oceania (augateway.isolarcloud.com)' },
-  { value: 'https://cngateway.isolarcloud.com',  label: 'China (cngateway.isolarcloud.com)' },
+  { value: 'https://gateway.isolarcloud.in',     label: 'India (gateway.isolarcloud.in)' },
 ];
 
 // Flag para a UI saber que este provider exige fluxo OAuth separado
@@ -108,23 +115,22 @@ export function getAuthorizeUrl({ credential, redirectUri }) {
   return `${base}?${params.toString()}`;
 }
 
-export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, rsaPublicKey }) {
+export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code }) {
+  // Endpoint segundo a doc de Developer Portal (Fluxo OAuth 2.0 iSolarCloud)
   const url = `${apiBase.replace(/\/$/, '')}/openapi/apiManage/token`;
-  const body = { appkey, code, grant_type: 'authorization_code' };
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
-      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ appkey, code, grant_type: 'authorization_code' }),
   });
   const text = await res.text();
-  const json = JSON.parse(text);
+  let json; try { json = JSON.parse(text); } catch { throw new Error(`Sungrow token: resposta nao-JSON: ${text.slice(0,200)}`); }
   if (json.result_code && String(json.result_code) !== '1') {
-    throw new Error(`Sungrow token exchange falhou: ${json.result_msg || text.slice(0, 200)}`);
+    throw new Error(`Sungrow token exchange falhou: result_code=${json.result_code} msg=${json.result_msg || text.slice(0, 200)}`);
   }
   const data = json.result_data || json;
   return {
@@ -136,21 +142,19 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, r
 
 export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshToken }) {
   const url = `${apiBase.replace(/\/$/, '')}/openapi/apiManage/refreshToken`;
-  const body = { appkey, refresh_token: refreshToken, grant_type: 'refresh_token' };
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
-      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ appkey, refresh_token: refreshToken, grant_type: 'refresh_token' }),
   });
   const text = await res.text();
-  const json = JSON.parse(text);
+  let json; try { json = JSON.parse(text); } catch { throw new Error(`Sungrow refresh: resposta nao-JSON: ${text.slice(0,200)}`); }
   if (json.result_code && String(json.result_code) !== '1') {
-    throw new Error(`Sungrow refresh token falhou: ${json.result_msg || text.slice(0, 200)}`);
+    throw new Error(`Sungrow refresh falhou: result_code=${json.result_code} msg=${json.result_msg || text.slice(0, 200)}`);
   }
   const data = json.result_data || json;
   return {
@@ -162,13 +166,15 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 
 // ─── Chamadas API com access_token ───────────────────────────────────────────
 
+// Headers pra chamadas de dados (apos OAuth) seguindo doc Sungrow 2026:
+//   Content-Type: application/json;charset=UTF-8
+//   x-access-key: <secretKey>
+//   Authorization: Bearer <access_token>   <- token vai AQUI, nao no body
 function headersComToken(credential) {
   return {
-    'x-access-key': credential.secretKey,
-    'appkey': credential.appkey,
-    'sys_code': '901',
     'Content-Type': 'application/json;charset=UTF-8',
-    'lang': '_pt_BR',
+    'x-access-key': credential.secretKey,
+    'Authorization': `Bearer ${credential.accessToken}`,
     'User-Agent': USER_AGENT,
   };
 }
@@ -179,7 +185,8 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  const fullBody = { appkey: credential.appkey, token: credential.accessToken, ...body };
+  // Body: appkey + lang + params do endpoint (SEM token — token vai no header)
+  const fullBody = { appkey: credential.appkey, lang: '_pt_BR', ...body };
   const res = await fetch(url, {
     method: 'POST',
     headers: headersComToken(credential),
@@ -193,8 +200,7 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
 
   if (json.result_code && String(json.result_code) !== '1' && String(json.result_code) !== '0') {
     const errStr = String(json.result_code) + ' ' + String(json.result_msg || '');
-    // Token expirado — caller precisa chamar refresh
-    if (/E00002|invalid.?token|token.?expir|E009/i.test(errStr)) {
+    if (/E00002|invalid.?token|token.?expir|E009|unauthor/i.test(errStr)) {
       const e = new Error(`Sungrow token invalido/expirado: ${json.result_msg || json.result_code}`);
       e.code = 'TOKEN_EXPIRED';
       throw e;
