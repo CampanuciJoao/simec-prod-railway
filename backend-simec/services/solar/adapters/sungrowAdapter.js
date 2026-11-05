@@ -272,8 +272,12 @@ export async function validarCredencial(credential, apiBase) {
     const data = await callSungrow({
       apiBase: apiBase || defaultApiBase,
       credential,
-      path: '/openapi/getPowerStationList',
-      body: { curPage: 1, size: 20 },
+      // Doc oficial: /openapi/platform/queryPowerStationList (e NAO
+      // /openapi/getPowerStationList — esse 404a silencioso e a
+      // Sungrow retorna er_missing_parameter:token confundindo o
+      // diagnostico).
+      path: '/openapi/platform/queryPowerStationList',
+      body: { page: 1, size: 20, valid_flag: '1,3' },
     });
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
@@ -292,8 +296,9 @@ export async function validarCredencial(credential, apiBase) {
         const devData = await callSungrow({
           apiBase: apiBase || defaultApiBase,
           credential,
-          path: '/openapi/getDeviceList',
-          body: { ps_id: stationId, device_type_list: [1] },
+          // Doc oficial: /openapi/platform/getDeviceListByPsId
+          path: '/openapi/platform/getDeviceListByPsId',
+          body: { ps_id: stationId, device_type_list: [1], page: 1, size: 50 },
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
           let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
@@ -317,6 +322,36 @@ export async function validarCredencial(credential, apiBase) {
   }
 }
 
+// Pontos de inversor PV (device_type=1) que queremos no snapshot.
+// IDs conforme Apendice 12.1 da doc oficial Sungrow (sem o prefixo 'p').
+const POINTS_INVERTER_PV = [
+  '24',   // Total Active Power (W)
+  '1',    // Yield Today (Wh)
+  '2',    // Total Yield (Wh)
+  '87',   // Yield This Month (Wh)
+  '88',   // Yield This Year (Wh)
+  '4',    // Internal Air Temperature (C)
+  '29',   // Operating status
+  '27',   // Grid Frequency (Hz)
+];
+
+// Pontos de inversor hibrido/ESS (device_type=14) — Apendice 12.3.
+const POINTS_INVERTER_ESS = [
+  '13011', // Active Power (W)
+  '13112', // Daily PV Yield (Wh)
+  '13134', // Total PV Yield (Wh)
+  '13141', // Battery SOC
+  '13142', // Battery SOH
+  '13143', // Battery Temperature (C)
+  '13126', // Battery Charging Power (W)
+  '13150', // Battery Discharging Power (W)
+  '13121', // Feed-in Power (W)
+  '13149', // Purchased Power (W)
+  '13119', // Load Power (W)
+  '13019', // Internal Air Temperature (C)
+  '13146', // Operating status
+];
+
 export async function fetchSnapshot(inverter) {
   if (!inverter.credential?.accessToken) {
     const err = new Error('AUTHORIZATION_REQUIRED');
@@ -324,16 +359,22 @@ export async function fetchSnapshot(inverter) {
     throw err;
   }
 
+  // Sungrow rejeita SN com whitespace. Trim defensivo.
+  const sn = String(inverter.inverterSn || '').trim();
+
   let data = null;
+  let deviceType = 1;
   try {
     data = await callSungrow({
       apiBase: inverter.apiBase,
       credential: inverter.credential,
-      path: '/openapi/getDeviceRealTimeData',
+      // Doc oficial: /openapi/platform/getDeviceRealTimeData
+      // (sem /platform/ a API retorna er_missing_parameter:token).
+      path: '/openapi/platform/getDeviceRealTimeData',
       body: {
         device_type: 1,
-        point_id_list: [],
-        sn_list: [inverter.inverterSn],
+        point_id_list: POINTS_INVERTER_PV,
+        sn_list: [sn],
       },
     });
   } catch (err) {
@@ -342,51 +383,79 @@ export async function fetchSnapshot(inverter) {
       // persistir o novo token). Adapter em si nao persiste.
       throw err;
     }
-    // Tenta device_type=11 (hybrid)
+    // Tenta device_type=14 (hybrid/ESS) com point_id_list proprio
     try {
+      deviceType = 14;
       data = await callSungrow({
         apiBase: inverter.apiBase,
         credential: inverter.credential,
-        path: '/openapi/getDeviceRealTimeData',
+        path: '/openapi/platform/getDeviceRealTimeData',
         body: {
-          device_type: 11,
-          point_id_list: [],
-          sn_list: [inverter.inverterSn],
+          device_type: 14,
+          point_id_list: POINTS_INVERTER_ESS,
+          sn_list: [sn],
         },
       });
     } catch (errH) {
       if (errH.code === 'TOKEN_EXPIRED') throw errH;
-      throw new Error(`Sungrow: nenhum device_type reconheceu SN ${inverter.inverterSn}. Erro: ${errH.message}`);
+      throw new Error(`Sungrow: nenhum device_type reconheceu SN ${sn}. Erro: ${errH.message}`);
     }
   }
 
-  const pointList = data?.device_point_list?.[0]?.device_point
-                 || data?.device_point_list?.[0]?.point_list
-                 || data?.device_point_list
-                 || [];
-  const v = {};
-  for (const p of pointList) {
-    const key = p.point_code || p.point_id || p.pointCode;
-    if (key != null) {
-      const num = typeof p.value === 'number' ? p.value : parseFloat(p.value);
-      v[key] = Number.isFinite(num) ? num : p.value;
-    }
+  // Resposta oficial Sungrow: device_point_list[].device_point e um
+  // OBJETO (nao array) com chaves tipo p24, p1, etc. Exemplo:
+  //   { device_point: { ps_key: "...", device_sn: "...", p24: "4500.0", p1: "320.0" } }
+  const v = data?.device_point_list?.[0]?.device_point || {};
+  const n = (x) => {
+    if (x == null) return null;
+    const num = typeof x === 'number' ? x : parseFloat(x);
+    return Number.isFinite(num) ? num : null;
+  };
+  // Doc: "Unidades sempre na menor unidade: Wh, W, A, V" — converter W→kW, Wh→kWh.
+  const wToKw = (x) => { const r = n(x); return r == null ? null : r / 1000; };
+
+  if (deviceType === 1) {
+    // Inversor PV puro (sem bateria)
+    return {
+      soc: null,
+      batChargePower: null, batDischargePower: null,
+      feedinPower: null, gridConsumptionPower: null, epsPower: null,
+      runningState: n(v.p29),
+      currentFault: null,
+      powerKw: wToKw(v.p24),
+      generationKwhDay:   wToKw(v.p1),
+      generationKwhMonth: wToKw(v.p87),
+      generationKwhTotal: wToKw(v.p2),
+      ambientTempC: null,
+      inverterTempC: n(v.p4),
+      detalhes: null,
+      rawPayload: data,
+    };
   }
 
-  const n = (x) => (typeof x === 'number' ? x : (x != null ? parseFloat(x) : null));
-
+  // device_type=14 — Hibrido/ESS (com bateria)
   return {
-    soc: null, batChargePower: null, batDischargePower: null,
-    feedinPower: null, gridConsumptionPower: null, epsPower: null,
-    runningState: null,
-    currentFault: v.p30 === 3 ? 'FAULT' : null,
-    powerKw: n(v.p24 ?? v.p83032),
-    generationKwhDay:   n(v.p83022),
-    generationKwhMonth: n(v.p83025),
-    generationKwhTotal: n(v.p83004),
+    soc: n(v.p13141),
+    batChargePower: wToKw(v.p13126),
+    batDischargePower: wToKw(v.p13150),
+    feedinPower: wToKw(v.p13121),
+    gridConsumptionPower: wToKw(v.p13149),
+    epsPower: null,
+    runningState: n(v.p13146),
+    currentFault: null,
+    powerKw: wToKw(v.p13011),
+    generationKwhDay:   wToKw(v.p13112),
+    generationKwhMonth: null,
+    generationKwhTotal: wToKw(v.p13134),
     ambientTempC: null,
-    inverterTempC: n(v.p13 ?? v.p12),
-    detalhes: null,
+    inverterTempC: n(v.p13019),
+    detalhes: [{
+      tipo: 'bateria',
+      soc: n(v.p13141),
+      soh: n(v.p13142),
+      tempC: n(v.p13143),
+      powerKw: wToKw(v.p13126) ?? wToKw(v.p13150),
+    }],
     rawPayload: data,
   };
 }
