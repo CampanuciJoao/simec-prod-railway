@@ -459,3 +459,46 @@ export async function fetchSnapshot(inverter) {
     rawPayload: data,
   };
 }
+
+// ─── fetchFalhas — getFaultAlarmInfo (Apendice 10 da doc oficial) ───────────
+//
+// Retorna falhas abertas (process_status=8) nas ultimas 24h. Cada falha vem
+// com fault_code unico (ex "66296.202408.5516fd3031855") que usamos como
+// chave de dedupe no SolarFalha.codigoExterno. fault_type_code mapeia pro
+// Apendice 9 (60001 Grid Overvoltage, 60002 Grid Undervoltage, etc).
+
+export async function fetchFalhas(inverter) {
+  if (!inverter.credential?.accessToken) {
+    const err = new Error('AUTHORIZATION_REQUIRED');
+    err.code = 'AUTHORIZATION_REQUIRED';
+    throw err;
+  }
+
+  // Doc Sungrow: sem datas = mes corrente. process_status=8 = abertas.
+  const data = await callSungrow({
+    apiBase: inverter.apiBase,
+    credential: inverter.credential,
+    path: '/openapi/platform/getFaultAlarmInfo',
+    body: {
+      process_status: '8',
+      fault_type: '1,2,3,4',
+      page: '1',
+      size: '50',
+    },
+  });
+
+  const lista = data?.pageList || data?.list || [];
+  return lista
+    .filter((f) => f.fault_code)
+    .map((f) => ({
+      codigoExterno: String(f.fault_code),
+      codigoTipo: f.fault_type_code != null ? String(f.fault_type_code) : null,
+      nome: f.fault_name || f.fault_desc || 'Falha sem nome',
+      descricao: f.fault_desc || null,
+      nivel: Number(f.fault_type) || 2,
+      codigoReason: f.fault_reason || null,
+      reportadaEm: f.create_time ? new Date(f.create_time) : new Date(),
+      rawPayload: f,
+    }));
+}
+

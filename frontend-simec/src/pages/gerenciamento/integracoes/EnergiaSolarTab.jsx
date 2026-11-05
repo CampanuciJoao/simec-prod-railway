@@ -27,6 +27,7 @@ function PlantaModal({ open, onClose, plant, unidades, onSalvar }) {
   const [form, setForm] = useState({
     unidadeId: '', nome: '', localFisico: '',
     capacidadeKwp: '', tarifaKwh: '', temBateria: false, autonomiaHoras: '',
+    alertaOfflineMinutos: '',
   });
   const [salvando, setSalvando] = useState(false);
 
@@ -40,9 +41,10 @@ function PlantaModal({ open, onClose, plant, unidades, onSalvar }) {
         tarifaKwh: plant.tarifaKwh ?? '',
         temBateria: !!plant.temBateria,
         autonomiaHoras: plant.autonomiaHoras ?? '',
+        alertaOfflineMinutos: plant.alertaOfflineMinutos ?? '',
       });
     } else {
-      setForm({ unidadeId: '', nome: '', localFisico: '', capacidadeKwp: '', tarifaKwh: '', temBateria: false, autonomiaHoras: '' });
+      setForm({ unidadeId: '', nome: '', localFisico: '', capacidadeKwp: '', tarifaKwh: '', temBateria: false, autonomiaHoras: '', alertaOfflineMinutos: '' });
     }
   }, [plant, open]);
 
@@ -60,6 +62,7 @@ function PlantaModal({ open, onClose, plant, unidades, onSalvar }) {
         tarifaKwh: form.tarifaKwh === '' ? null : Number(form.tarifaKwh),
         temBateria: form.temBateria,
         autonomiaHoras: form.autonomiaHoras === '' ? null : Number(form.autonomiaHoras),
+        alertaOfflineMinutos: form.alertaOfflineMinutos === '' ? null : Number(form.alertaOfflineMinutos),
       });
       onClose();
     } finally {
@@ -125,6 +128,16 @@ function PlantaModal({ open, onClose, plant, unidades, onSalvar }) {
             onChange={(e) => setForm((f) => ({ ...f, autonomiaHoras: e.target.value }))}
           />
         )}
+        <Input
+          label="Alerta offline (minutos)"
+          type="number"
+          min="15"
+          max="720"
+          placeholder="60"
+          hint="Minutos sem leitura antes de disparar alerta (Telegram). Deixe vazio para usar o padrão de 60min."
+          value={form.alertaOfflineMinutos}
+          onChange={(e) => setForm((f) => ({ ...f, alertaOfflineMinutos: e.target.value }))}
+        />
         <div className="flex justify-end gap-2 pt-2">
           <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
           <Button type="submit" disabled={salvando || !form.unidadeId || !form.nome}>

@@ -2,13 +2,13 @@
 // cada planta com N inverters (multi-provider). Dados em tempo real
 // atualizam a cada 30s pelo hook useSolarPainel.
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faBatteryFull, faBatteryHalf, faBatteryQuarter, faBolt, faBoltLightning,
   faPlugCircleCheck, faPlugCircleXmark, faTemperatureHigh, faTriangleExclamation,
-  faSolarPanel, faMicrochip,
+  faSolarPanel, faMicrochip, faCoins, faChartLine, faCircleCheck,
 } from '@fortawesome/free-solid-svg-icons';
 import {
   Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement,
@@ -19,6 +19,7 @@ import { Line } from 'react-chartjs-2';
 import { Card, InlineEmptyState, LoadingState, SelectMenu } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useSolarPainel } from '@/hooks/monitoramento/useSolarPainel';
+import { getSolarAgregadoMesAtual, getSolarFalhas } from '@/services/api/solarApi';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
@@ -431,6 +432,159 @@ function HistoricoQuedas({ quedas }) {
 }
 HistoricoQuedas.propTypes = { quedas: PropTypes.array };
 
+// Card "Este mês" (Fase 3) — resumo mensal: kWh gerado, economia e comparativo
+function CardEsteMes({ plantId }) {
+  const [dados, setDados] = React.useState(null);
+  const [carregando, setCarregando] = React.useState(true);
+  useEffect(() => {
+    if (!plantId) return;
+    let ativo = true;
+    setCarregando(true);
+    getSolarAgregadoMesAtual(plantId)
+      .then((d) => { if (ativo) setDados(d); })
+      .catch(() => {})
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [plantId]);
+
+  if (carregando) return null;
+  const kwh = dados?.kwhGerado;
+  const brl = dados?.valorEconomizadoBrl;
+  const variacao = dados?.variacaoKwhMesAnterior;
+  const mesNome = new Date(Date.UTC(dados?.ano || 2026, (dados?.mes || 1) - 1, 1))
+    .toLocaleString('pt-BR', { month: 'long' });
+  const corVar = variacao == null ? 'var(--text-muted)' : variacao >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
+  const sinal = variacao == null ? '' : variacao >= 0 ? '+' : '';
+  return (
+    <Card className="p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <FontAwesomeIcon icon={faChartLine} style={{ color: 'var(--brand-primary)' }} />
+        <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          Este mês ({mesNome})
+        </p>
+      </div>
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div>
+          <p className="text-xs uppercase" style={{ color: 'var(--text-muted)' }}>Energia gerada</p>
+          <p className="mt-1 text-2xl font-bold">{kwh != null ? `${fmt(kwh, 1)} kWh` : '—'}</p>
+          {variacao != null && (
+            <p className="mt-1 text-xs" style={{ color: corVar }}>
+              {sinal}{(variacao * 100).toFixed(1)}% vs mês anterior
+            </p>
+          )}
+        </div>
+        <div>
+          <p className="text-xs uppercase" style={{ color: 'var(--text-muted)' }}>Economia estimada</p>
+          <p className="mt-1 text-2xl font-bold" style={{ color: 'var(--color-success)' }}>
+            {brl != null ? `R$ ${brl.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '—'}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            <FontAwesomeIcon icon={faCoins} className="mr-1" />
+            Baseada na tarifa da unidade
+          </p>
+        </div>
+        <div>
+          <p className="text-xs uppercase" style={{ color: 'var(--text-muted)' }}>Dias com geração</p>
+          <p className="mt-1 text-2xl font-bold">
+            {dados?.diasComGeracao != null ? dados.diasComGeracao : '—'}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+            {dados?.falhasTotal != null ? `${dados.falhasTotal} falhas no mês` : ''}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+CardEsteMes.propTypes = { plantId: PropTypes.string };
+
+const NIVEIS_FALHA = {
+  1: { label: 'Crítica', cor: 'var(--color-danger)', icon: faTriangleExclamation },
+  2: { label: 'Alarme',  cor: 'var(--color-warning)', icon: faTriangleExclamation },
+  3: { label: 'Aviso',   cor: 'var(--color-info)', icon: faTriangleExclamation },
+  4: { label: 'Sugestão', cor: 'var(--text-muted)', icon: faTriangleExclamation },
+};
+
+// Lista de falhas ativas + historico recente (Fase 1).
+function CardFalhas({ plantId }) {
+  const [falhas, setFalhas] = useState([]);
+  const [carregando, setCarregando] = useState(true);
+  useEffect(() => {
+    if (!plantId) return;
+    let ativo = true;
+    setCarregando(true);
+    getSolarFalhas(plantId, { status: 'todas', limite: 30 })
+      .then((d) => { if (ativo) setFalhas(d || []); })
+      .catch(() => {})
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [plantId]);
+
+  if (carregando) return null;
+  const ativas = falhas.filter((f) => !f.resolvidaEm);
+  const resolvidas = falhas.filter((f) => f.resolvidaEm);
+
+  return (
+    <Card className="p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <FontAwesomeIcon icon={faTriangleExclamation} style={{ color: ativas.length > 0 ? 'var(--color-warning)' : 'var(--color-success)' }} />
+        <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          Falhas do inversor ({ativas.length} ativa{ativas.length !== 1 ? 's' : ''})
+        </p>
+      </div>
+      {falhas.length === 0 ? (
+        <InlineEmptyState message="Nenhuma falha registrada." />
+      ) : (
+        <>
+          {ativas.length > 0 && (
+            <div className="space-y-2 mb-3">
+              {ativas.map((f) => {
+                const n = NIVEIS_FALHA[f.nivel] || NIVEIS_FALHA[2];
+                return (
+                  <div key={f.id} className="flex items-start gap-3 rounded-lg px-3 py-2"
+                       style={{ backgroundColor: 'var(--bg-surface-subtle)', borderLeft: `3px solid ${n.cor}` }}>
+                    <FontAwesomeIcon icon={n.icon} style={{ color: n.cor }} className="mt-1" />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold">{f.nome}</p>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {n.label} · {formatarDataHora(f.reportadaEm)}
+                        {f.inverter?.inverterSn ? ` · SN ${f.inverter.inverterSn}` : ''}
+                      </p>
+                      {f.descricao && (
+                        <p className="mt-1 text-xs" style={{ color: 'var(--text-muted)' }}>{f.descricao}</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          {resolvidas.length > 0 && (
+            <details>
+              <summary className="cursor-pointer text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                Histórico ({resolvidas.length} resolvida{resolvidas.length !== 1 ? 's' : ''})
+              </summary>
+              <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
+                {resolvidas.map((f) => (
+                  <div key={f.id} className="flex items-center gap-2 px-3 py-1.5 text-xs rounded"
+                       style={{ backgroundColor: 'var(--bg-surface-subtle)' }}>
+                    <FontAwesomeIcon icon={faCircleCheck} style={{ color: 'var(--color-success)' }} />
+                    <span className="flex-1 truncate">{f.nome}</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      {formatarDataHora(f.reportadaEm)} → {formatarDataHora(f.resolvidaEm)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+CardFalhas.propTypes = { plantId: PropTypes.string };
+
 function TabEnergia() {
   const painel = useSolarPainel();
   const { plants, plantSelecionadaId, setPlantSelecionadaId, status, historico, quedas, loadingPlants, loadingPainel, erro } = painel;
@@ -491,6 +645,7 @@ function TabEnergia() {
             inverters={inverters}
             snapshotsPorInverter={snapshotsPorInverter}
           />
+          {plant?.id && <CardEsteMes plantId={plant.id} />}
           {composto && <FluxoCard composto={composto} />}
           {plant?.temBateria && bateriasInfo.length > 0 && (
             <div className="grid gap-3 sm:grid-cols-2">
@@ -498,6 +653,7 @@ function TabEnergia() {
             </div>
           )}
           <GraficoSoc snapshots={historico?.snapshots} plant={plant} />
+          {plant?.id && <CardFalhas plantId={plant.id} />}
           <HistoricoQuedas quedas={quedas} />
         </>
       )}

@@ -28,6 +28,22 @@
 //         generationKwhMonth, generationKwhTotal, detalhes: [{...}]
 //       }
 //       Null em campos que o fabricante/modelo nao reporta.
+//
+//     fetchFalhas?(inverter): Promise<Array<FalhaNormalizada>>  (opcional)
+//       Lista falhas ativas reportadas pela API do fabricante. Usada
+//       pelo cron solar-falhas (10min). Shape:
+//         {
+//           codigoExterno: string,      // chave de dedupe (ex Sungrow fault_code)
+//           codigoTipo?: string,        // Fault type (ex "60005")
+//           nome: string,               // "Grid Overvoltage"
+//           descricao?: string,         // detalhes legiveis
+//           nivel: 1|2|3|4,             // 1 fault | 2 alarm | 3 warn | 4 suggestion
+//           codigoReason?: string,      // codigo real do equipamento
+//           reportadaEm: Date,
+//           rawPayload?: object
+//         }
+//       Adapter que nao suporta: retorna [] (poller trata como "sem falhas
+//       novas"). NAO sinaliza erro — apenas ausencia.
 //   }
 //
 // Pra adicionar um novo fabricante no futuro: criar arquivo <nome>Adapter.js

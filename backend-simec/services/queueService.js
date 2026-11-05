@@ -459,11 +459,18 @@ export async function iniciarJobsDeAlertas() {
     console.log('[QUEUE] Job GEHC (gehc-watchdog-saude) agendado a cada 30min.');
 
     // Poller Solar generico (FoxESS + Growatt + Sungrow): 60s. Respeita
-    // rate limits dos providers. Watchdog: 15min. Remove tambem os jobs
-    // antigos foxess-* se existirem (compat refactor 2026-11).
+    // rate limits dos providers. Watchdog: 15min. Falhas: 10min (Fase 1).
+    // Agregado diario: diariamente 02:30 UTC (Fase 3). Insights: diariamente
+    // 06:00 UTC (Fase 5). Remove tambem os jobs antigos foxess-* se
+    // existirem (compat refactor 2026-11).
+    const NOMES_SOLAR_JOBS = [
+      'solar-poll', 'solar-watchdog', 'solar-falhas', 'solar-agregados-diario',
+      'solar-agregados-mensal', 'solar-insights',
+      'foxess-poll', 'foxess-watchdog',
+    ];
     const repeatables13 = await queue.getRepeatableJobs();
     for (const job of repeatables13) {
-      if (['solar-poll', 'solar-watchdog', 'foxess-poll', 'foxess-watchdog'].includes(job.name)) {
+      if (NOMES_SOLAR_JOBS.includes(job.name)) {
         await queue.removeRepeatableByKey(job.key);
       }
     }
@@ -477,7 +484,31 @@ export async function iniciarJobsDeAlertas() {
       removeOnComplete: 20,
       removeOnFail: 10,
     });
-    console.log('[QUEUE] Jobs Solar (solar-poll 60s + solar-watchdog 15min) agendados.');
+    await queue.add('solar-falhas', {}, {
+      repeat: { every: 10 * 60 * 1000 },
+      removeOnComplete: 20,
+      removeOnFail: 10,
+    });
+    // Agregado diario: fecha o dia D-1. Roda 02:30 UTC (~23:30 BRT) depois
+    // que a geracao do dia parou e as APIs ja consolidaram.
+    await queue.add('solar-agregados-diario', {}, {
+      repeat: { pattern: '30 2 * * *' },
+      removeOnComplete: 10,
+      removeOnFail: 5,
+    });
+    // Agregado mensal: fecha o mes anterior. Roda 03:00 UTC do dia 1.
+    await queue.add('solar-agregados-mensal', {}, {
+      repeat: { pattern: '0 3 1 * *' },
+      removeOnComplete: 5,
+      removeOnFail: 5,
+    });
+    // Insights/alertas inteligentes: roda 06:00 UTC apos agregacao fechar.
+    await queue.add('solar-insights', {}, {
+      repeat: { pattern: '0 6 * * *' },
+      removeOnComplete: 10,
+      removeOnFail: 5,
+    });
+    console.log('[QUEUE] Jobs Solar: poll 60s + watchdog 15min + falhas 10min + agregados diario/mensal + insights diario.');
 
     await logQueueState('QUEUE_AFTER_INIT');
     return true;

@@ -270,7 +270,7 @@ router.post('/plants', admin, async (req, res) => {
   const tenantId = req.tenantContext;
   const {
     id, unidadeId, nome, localFisico, capacidadeKwp, tarifaKwh,
-    temBateria, autonomiaHoras,
+    temBateria, autonomiaHoras, alertaOfflineMinutos,
   } = req.body || {};
 
   if (!unidadeId || !nome) {
@@ -291,6 +291,7 @@ router.post('/plants', admin, async (req, res) => {
       tarifaKwh: tarifaKwh != null ? Number(tarifaKwh) : null,
       temBateria: !!temBateria,
       autonomiaHoras: autonomiaHoras != null ? Number(autonomiaHoras) : null,
+      alertaOfflineMinutos: alertaOfflineMinutos != null ? Number(alertaOfflineMinutos) : null,
       ativo: true,
     };
 
@@ -613,6 +614,101 @@ router.get('/plants/:id/quedas', async (req, res) => {
     res.json(quedas);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Falhas da planta (ativas + historico) ──────────────────────────────────
+// Fase 1. Query params:
+//   status: "ativas" (default) | "resolvidas" | "todas"
+//   limite: default 50, max 200
+router.get('/plants/:id/falhas', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const { status = 'ativas', limite } = req.query;
+  const take = Math.min(Number(limite) || 50, 200);
+  const where = { tenantId, plantId: req.params.id };
+  if (status === 'ativas') where.resolvidaEm = null;
+  else if (status === 'resolvidas') where.resolvidaEm = { not: null };
+  try {
+    const falhas = await prisma.solarFalha.findMany({
+      where,
+      orderBy: { reportadaEm: 'desc' },
+      take,
+      include: { inverter: { select: { inverterSn: true, modeloInversor: true, provider: true } } },
+    });
+    res.json(falhas);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Agregado mensal: lista historico de meses ──────────────────────────────
+// Query params: limite (default 12, max 36)
+router.get('/plants/:id/agregados-mensais', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const take = Math.min(Number(req.query.limite) || 12, 36);
+  try {
+    const agregados = await prisma.solarAgregadoMensal.findMany({
+      where: { tenantId, plantId: req.params.id },
+      orderBy: [{ ano: 'desc' }, { mes: 'desc' }],
+      take,
+    });
+    res.json(agregados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Agregado diario: lista historico de dias no mes ────────────────────────
+// Query params: ano, mes (obrigatorios)
+router.get('/plants/:id/agregados-diarios', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const ano = Number(req.query.ano);
+  const mes = Number(req.query.mes);
+  if (!ano || !mes || mes < 1 || mes > 12) {
+    return res.status(400).json({ error: 'ano e mes (1-12) obrigatorios' });
+  }
+  const inicio = new Date(Date.UTC(ano, mes - 1, 1));
+  const fim = new Date(Date.UTC(ano, mes, 1));
+  try {
+    const agregados = await prisma.solarAgregadoDiario.findMany({
+      where: { tenantId, plantId: req.params.id, dia: { gte: inicio, lt: fim } },
+      orderBy: { dia: 'asc' },
+    });
+    res.json(agregados);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Agregado "este mes" (resumo pro card) ──────────────────────────────────
+router.get('/plants/:id/agregado-mes-atual', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const hoje = new Date();
+  const ano = hoje.getUTCFullYear();
+  const mes = hoje.getUTCMonth() + 1;
+  try {
+    const mesAtual = await prisma.solarAgregadoMensal.findUnique({
+      where: { tenantId_plantId_ano_mes: { tenantId, plantId: req.params.id, ano, mes } },
+    });
+    res.json(mesAtual || { ano, mes, kwhGerado: 0, valorEconomizadoBrl: 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PDF de relatorio mensal ────────────────────────────────────────────────
+// Fase 4. Gera PDF com capa + resumo + grafico + falhas + quedas + comparativo.
+router.get('/plants/:id/relatorio-pdf', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const ano = Number(req.query.ano);
+  const mes = Number(req.query.mes);
+  if (!ano || !mes) return res.status(400).json({ error: 'ano e mes obrigatorios' });
+  try {
+    const { gerarRelatorioSolarPdf } = await import('../services/solar/solarRelatorioPdfService.js');
+    await gerarRelatorioSolarPdf({ res, tenantId, plantId: req.params.id, ano, mes });
+  } catch (err) {
+    console.error('[SOLAR_RELATORIO_PDF]', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 });
 

@@ -2,9 +2,13 @@
 // dos crons solar-poll. Detecta quando a coleta para e tenta recuperar
 // sozinho antes de alertar.
 //
-// 2 niveis:
+// 3 niveis (Fase 2 — threshold curto configuravel):
+//   - 1h sem snapshot: alerta MEDIA + Telegram (SOLAR_OFFLINE_CURTO)
 //   - 90min-3h sem snapshot: reagenda silencioso (cooldown 1h)
-//   - 3h+ sem snapshot: reagenda + alerta ALTA + Telegram
+//   - 3h+ sem snapshot: reagenda + alerta ALTA + Telegram (FOXESS_MONITORAMENTO_PARADO)
+//
+// O limiar curto (1h) e configuravel por planta via
+// SolarPlant.alertaOfflineMinutos (default DEFAULT_OFFLINE_CURTO_MIN).
 
 import prisma from '../prismaService.js';
 import { reagendarJobsSolar } from '../queueService.js';
@@ -12,6 +16,7 @@ import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/a
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
 
+const DEFAULT_OFFLINE_CURTO_MIN = 60;
 const WATCHDOG_LENTO_MS       = 90 * 60 * 1000;
 const WATCHDOG_MORTO_MS       = 3  * 60 * 60 * 1000;
 const COOLDOWN_RECOVERY_MS    = 60 * 60 * 1000;
@@ -34,6 +39,58 @@ function classificar(idadeMs) {
   if (idadeMs < WATCHDOG_LENTO_MS) return 'ok';
   if (idadeMs < WATCHDOG_MORTO_MS) return 'lento';
   return 'morto';
+}
+
+// Alerta MEDIA quando passa do threshold curto configuravel (default 1h).
+// Independente do alerta ALTA de 3h+ — podem coexistir.
+async function verificarOfflineCurto(plant) {
+  const alertaId = buildAlertId(plant.tenantId, ALERT_CATEGORIAS.FOXESS_ENERGIA, plant.id, 'offline-curto');
+  const limiteMin = plant.alertaOfflineMinutos ?? DEFAULT_OFFLINE_CURTO_MIN;
+  const limiteMs = limiteMin * 60 * 1000;
+  const ultimo = await prisma.solarSnapshot.findFirst({
+    where: { tenantId: plant.tenantId, plantId: plant.id },
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  });
+  const idadeMs = ultimo ? Date.now() - ultimo.capturedAt.getTime() : Infinity;
+
+  // Nao atingiu o threshold curto, ou ja passou do morto (vai cair no alerta ALTA)
+  if (idadeMs < limiteMs || idadeMs >= WATCHDOG_MORTO_MS) {
+    const { count } = await prisma.alerta.deleteMany({
+      where: { tenantId: plant.tenantId, id: alertaId },
+    });
+    if (count > 0) await publicarContagemAlertasParaTenant({ tenantId: plant.tenantId }).catch(() => {});
+    return 'normalizado';
+  }
+
+  const minutos = Math.round(idadeMs / 60000);
+  const subtitulo = `Planta ${plant.nome}: sem novos dados ha ~${minutos} min. Threshold configurado: ${limiteMin} min.`;
+
+  const existente = await prisma.alerta.findUnique({
+    where: { tenantId_id: { tenantId: plant.tenantId, id: alertaId } },
+    select: { id: true, subtitulo: true },
+  });
+  if (existente?.subtitulo === subtitulo) return 'inalterado';
+  if (existente) {
+    await prisma.alerta.update({
+      where: { tenantId_id: { tenantId: plant.tenantId, id: alertaId } },
+      data: { subtitulo, data: new Date() },
+    });
+    return 'atualizado';
+  }
+  await prisma.alerta.create({
+    data: {
+      id: alertaId, tenantId: plant.tenantId,
+      titulo: `Planta ${plant.nome}: offline ha mais de ${limiteMin} min`,
+      subtitulo, data: new Date(),
+      prioridade: ALERT_PRIORIDADES.MEDIA,
+      tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
+      tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
+      tipoEvento: ALERT_EVENTOS.SOLAR_OFFLINE_CURTO,
+    },
+  });
+  await publicarContagemAlertasParaTenant({ tenantId: plant.tenantId }).catch(() => {});
+  return 'criado';
 }
 
 async function verificarEMarcarMonitoramentoParado(plant) {
@@ -91,7 +148,7 @@ async function verificarEMarcarMonitoramentoParado(plant) {
 export async function watchdogSolar({ redisConnection } = {}) {
   const plants = await prisma.solarPlant.findMany({
     where: { ativo: true },
-    select: { id: true, tenantId: true, nome: true },
+    select: { id: true, tenantId: true, nome: true, alertaOfflineMinutos: true },
   });
   if (plants.length === 0) return { ok: true, acao: 'sem_plantas', plants: [] };
 
@@ -110,6 +167,12 @@ export async function watchdogSolar({ redisConnection } = {}) {
     resultados.push({ plantId: p.id, estado, minutosDesdeUltimoSnapshot: idadeMs === Infinity ? null : Math.round(idadeMs / 60000) });
     if (estado !== 'ok') precisaReagendar = true;
     if (estado === 'morto') plantsMortos++;
+  }
+
+  // Alerta curto (1h default, por planta) sempre roda — independente de
+  // reagendamento. Permite notificar operacao em menos de 90min.
+  for (const p of plants) {
+    await verificarOfflineCurto(p).catch(() => {});
   }
 
   if (!precisaReagendar) {

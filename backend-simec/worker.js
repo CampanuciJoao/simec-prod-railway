@@ -11,6 +11,9 @@ import { watchdogSaudeGehc } from './services/gehc/gehcWatchdogService.js';
 import { getRedisConnection } from './services/queueService.js';
 import { coletarTodosInvertersSolar } from './services/solar/solarPoller.js';
 import { watchdogSolar } from './services/solar/solarWatchdogService.js';
+import { processarFalhasSolar } from './services/solar/solarFalhasService.js';
+import { fecharDiaAnterior, fecharMesAnterior } from './services/solar/solarAgregadosService.js';
+import { processarInsightsSolar } from './services/solar/solarInsightsService.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
@@ -208,6 +211,31 @@ const alertasWorker = new Worker(
     if (job?.name === 'solar-watchdog') {
       const redisConnection = getRedisConnection();
       const r = await watchdogSolar({ redisConnection });
+      return { ok: true, ...r };
+    }
+
+    if (job?.name === 'solar-falhas') {
+      // Fase 1 — catalogo de falhas. A cada 10min varre falhas abertas
+      // nos inversores (Sungrow via getFaultAlarmInfo, outros via fallback).
+      const r = await processarFalhasSolar();
+      return { ok: true, ...r };
+    }
+
+    if (job?.name === 'solar-agregados-diario') {
+      // Fase 3 — fecha o dia D-1 pra cada planta ativa.
+      const r = await fecharDiaAnterior();
+      return { ok: true, ...r };
+    }
+
+    if (job?.name === 'solar-agregados-mensal') {
+      // Fase 3 — fecha o mes anterior no dia 1 (rode apos agregados-diario).
+      const r = await fecharMesAnterior();
+      return { ok: true, ...r };
+    }
+
+    if (job?.name === 'solar-insights') {
+      // Fase 5 — alertas inteligentes (geracao baixa vs baseline, etc).
+      const r = await processarInsightsSolar();
       return { ok: true, ...r };
     }
 

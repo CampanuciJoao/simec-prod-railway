@@ -78,6 +78,9 @@ model Tenant {
   solarBatteries            SolarBattery[]
   solarSnapshots            SolarSnapshot[]
   solarOutages              SolarOutage[]
+  solarFalhas               SolarFalha[]
+  solarAgregadosDiarios     SolarAgregadoDiario[]
+  solarAgregadosMensais     SolarAgregadoMensal[]
 
   @@map("tenants")
 }
@@ -1953,6 +1956,11 @@ model SolarPlant {
   // Horas tipicas de autonomia (so plantas com bateria). Usado pra
   // mostrar "autonomia restante" no painel.
   autonomiaHoras Float?   @map("autonomia_horas")
+  // Minutos sem snapshot antes do watchdog alertar MEDIA. Default 60
+  // (1h). Tier ALTA (3h) e fixo. Configurar null mantem o default do
+  // codigo. Usar numero maior em plantas com conectividade intermitente
+  // conhecida (ex: zona rural com 3G).
+  alertaOfflineMinutos Int? @map("alerta_offline_minutos")
   ativo          Boolean  @default(true)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -1963,6 +1971,9 @@ model SolarPlant {
   baterias  SolarBattery[]
   snapshots SolarSnapshot[]
   quedas    SolarOutage[]
+  falhas    SolarFalha[]
+  agregadosDiarios  SolarAgregadoDiario[]
+  agregadosMensais  SolarAgregadoMensal[]
 
   // Sem UNIQUE(tenantId, unidadeId) — uma unidade pode ter N plantas
   // (ex: 1 planta na sede + 1 planta em terreno remoto, ambas creditam
@@ -2008,6 +2019,7 @@ model SolarInverter {
   plant     SolarPlant      @relation(fields: [plantId], references: [id], onDelete: Cascade)
   tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   snapshots SolarSnapshot[]
+  falhas    SolarFalha[]
 
   @@index([tenantId, plantId])
   @@index([tenantId, provider, ativo])
@@ -2112,4 +2124,137 @@ model SolarOutage {
   @@index([tenantId, plantId, inicioEm(sort: Desc)])
   @@index([tenantId, fimEm])
   @@map("solar_outages")
+}
+
+// ─── Energia Solar — Falhas catalogadas (cross-fabricante) ────────────────────
+//
+// Captura falhas reportadas pela API do fabricante (ex: Sungrow
+// getFaultAlarmInfo, FoxESS currentFault, Growatt device status). Cada
+// falha e deduplicada por codigoExterno (fault_code unico retornado pela
+// API — ex: "66296.202408.5516fd3031855" da Sungrow). Se a mesma falha
+// voltar a aparecer, atualizamos updatedAt e nada mais; se parar de
+// aparecer na API, marcamos resolvidaEm = now.
+//
+// Diferente de SolarOutage (que e sobre queda de energia na UNIDADE,
+// visivel pra operacao), SolarFalha e sobre problemas tecnicos no
+// INVERSOR reportados pela API — nivel de manutencao preditiva/corretiva.
+//
+// nivel segue a doc Sungrow: 1=fault, 2=alarm, 3=warn, 4=suggestion.
+// Adapters de outros fabricantes normalizam pra esse enum.
+model SolarFalha {
+  id             String   @id @default(uuid())
+  tenantId       String
+  plantId        String   @map("plant_id")
+  inverterId     String   @map("inverter_id")
+  provider       String   // "sungrow" | "foxess" | "growatt"
+  // Codigo unico da falha segundo a API do fabricante. Usado como chave
+  // de deduplicacao. Ex Sungrow: "66296.202408.5516fd3031855".
+  codigoExterno  String   @map("codigo_externo")
+  // Codigo normalizado do tipo de falha (ex: fault_type_code=60005 =
+  // "Grid Power Outage" na Sungrow). Null quando nao mapeavel.
+  codigoTipo     String?  @map("codigo_tipo")
+  nome           String   // Nome legivel: "Grid Overvoltage", etc
+  descricao      String?  @db.Text
+  // 1=fault | 2=alarm | 3=warn | 4=suggestion (convencao Sungrow)
+  nivel          Int
+  // Codigo real do dispositivo (fault_reason). Multiplos separados por "|".
+  codigoReason   String?  @map("codigo_reason")
+  reportadaEm    DateTime @map("reportada_em")
+  resolvidaEm    DateTime? @map("resolvida_em")
+  // Quando o adapter ultimo viu essa falha ativa (pra heuristica de
+  // resolucao automatica: se nao viu por 2h = considera resolvida).
+  ultimaConfirmacaoEm DateTime @map("ultima_confirmacao_em")
+  rawPayload     Json?    @map("raw_payload")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plant    SolarPlant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  inverter SolarInverter @relation(fields: [inverterId], references: [id], onDelete: Cascade)
+
+  // Dedupe forte: mesmo codigo + mesmo inversor = mesma falha
+  @@unique([tenantId, inverterId, codigoExterno])
+  @@index([tenantId, plantId, reportadaEm(sort: Desc)])
+  @@index([tenantId, resolvidaEm])
+  @@index([tenantId, nivel])
+  @@map("solar_falhas")
+}
+
+// ─── Energia Solar — Agregado diario por planta ───────────────────────────────
+//
+// Fechamento do dia D-1 calculado a 02:30 UTC (equivale ~23:30 BRT, apos
+// a geracao do dia parar). Base para o SolarAgregadoMensal e para o PDF
+// de relatorio mensal.
+//
+// kwhGerado = diferenca entre primeiro e ultimo snapshot do dia no campo
+// generationKwhTotal (contador acumulado). Fallback: max(generationKwhDay).
+// valorEconomizadoBrl = kwhGerado * (plant.tarifaKwh ?? default).
+// horasOffline = soma de duracoes de SolarOutage com inicioEm no dia.
+// falhasAbertas / resolvidas = count de SolarFalha com reportadaEm ou
+// resolvidaEm no dia.
+model SolarAgregadoDiario {
+  id              String   @id @default(uuid())
+  tenantId        String
+  plantId         String   @map("plant_id")
+  // Data representando o dia (00:00 UTC). Unicidade por planta + dia.
+  dia             DateTime @db.Date
+  kwhGerado       Float?   @map("kwh_gerado")
+  kwhConsumidoRede Float?  @map("kwh_consumido_rede")
+  kwhExportadoRede Float?  @map("kwh_exportado_rede")
+  valorEconomizadoBrl Float? @map("valor_economizado_brl")
+  horasOffline    Float?   @map("horas_offline")
+  falhasAbertas   Int      @default(0) @map("falhas_abertas")
+  falhasResolvidas Int     @default(0) @map("falhas_resolvidas")
+  picosKw         Float?   @map("picos_kw") // potencia maxima do dia
+  tempMaxC        Float?   @map("temp_max_c") // temperatura inversor max
+  // Performance Ratio aproximado (so calcula se capacidadeKwp conhecida):
+  // kwhGerado / (capacidadeKwp * horas de sol estimado 5h). 0.0-1.5.
+  prAprox         Float?   @map("pr_aprox")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plant  SolarPlant @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, plantId, dia])
+  @@index([tenantId, plantId, dia(sort: Desc)])
+  @@map("solar_agregados_diarios")
+}
+
+// ─── Energia Solar — Agregado mensal por planta ───────────────────────────────
+//
+// Fechamento do mes. Atualizado diariamente conforme SolarAgregadoDiario
+// vai fechando (somando o dia novo ao mes corrente). Mes anterior fica
+// imutavel apos dia 1 do mes seguinte.
+//
+// Usado no card "Este mes" do monitoramento e como fonte unica do PDF
+// de relatorio mensal (um registro = uma pagina de relatorio).
+model SolarAgregadoMensal {
+  id               String   @id @default(uuid())
+  tenantId         String
+  plantId          String   @map("plant_id")
+  ano              Int
+  mes              Int      // 1-12
+  kwhGerado        Float?   @map("kwh_gerado")
+  kwhConsumidoRede Float?   @map("kwh_consumido_rede")
+  kwhExportadoRede Float?   @map("kwh_exportado_rede")
+  valorEconomizadoBrl Float? @map("valor_economizado_brl")
+  horasOffline     Float?   @map("horas_offline")
+  falhasTotal      Int      @default(0) @map("falhas_total")
+  quedasTotal      Int      @default(0) @map("quedas_total")
+  diasComGeracao   Int?     @map("dias_com_geracao")
+  picosKw          Float?   @map("picos_kw")
+  prAproxMedio     Float?   @map("pr_aprox_medio")
+  // Comparativo com mes anterior (preenchido na virada do mes):
+  // 0.15 = +15%; -0.08 = -8%.
+  variacaoKwhMesAnterior Float? @map("variacao_kwh_mes_anterior")
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plant  SolarPlant @relation(fields: [plantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, plantId, ano, mes])
+  @@index([tenantId, plantId, ano(sort: Desc), mes(sort: Desc)])
+  @@map("solar_agregados_mensais")
 }

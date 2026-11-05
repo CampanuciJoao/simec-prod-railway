@@ -12,6 +12,7 @@ import {
   RelatoriosFiltersSection,
   RelatoriosActiveFiltersBar,
   RelatorioResultado,
+  RelatorioSolarMensalSection,
 } from '@/components/relatorios';
 
 // UI
@@ -86,6 +87,8 @@ function RelatoriosPage() {
                 />
               </PageSection>
             )}
+
+            <RelatorioSolarMensalSection />
           </>
         )}
 
