@@ -43,29 +43,33 @@ function getMigrationNames() {
 }
 
 // Recovery do erro P3009 pra migrations especificas que sabemos como
-// desfazer. Cada entrada: nome da migration + SQL que limpa o estado
-// parcial (tabelas criadas, colunas adicionadas etc) ANTES de reaplicar.
-// Depois do recovery o Prisma vai aplicar o SQL corrigido no proximo
-// migrate deploy.
+// desfazer. Cada entrada: nome da migration + ARRAY de statements SQL
+// (um por entrada — Prisma usa prepared statements e rejeita 'multiple
+// commands into a prepared statement'). O array roda inteiro dentro de
+// uma transacao do Prisma — tudo ou nada. Depois do recovery, o SQL
+// corrigido da migration e aplicado no proximo migrate deploy.
 const RECOVERY_SQL_POR_MIGRATION = {
-  '20261105000001_solar_falhas_e_agregados': `
-    BEGIN;
-    DROP TABLE IF EXISTS "solar_agregados_mensais" CASCADE;
-    DROP TABLE IF EXISTS "solar_agregados_diarios" CASCADE;
-    DROP TABLE IF EXISTS "solar_falhas" CASCADE;
-    ALTER TABLE "solar_plants" DROP COLUMN IF EXISTS "alerta_offline_minutos";
-    DELETE FROM "_prisma_migrations"
-      WHERE migration_name = '20261105000001_solar_falhas_e_agregados';
-    COMMIT;
-  `,
+  '20261105000001_solar_falhas_e_agregados': [
+    'DROP TABLE IF EXISTS "solar_agregados_mensais" CASCADE',
+    'DROP TABLE IF EXISTS "solar_agregados_diarios" CASCADE',
+    'DROP TABLE IF EXISTS "solar_falhas" CASCADE',
+    'ALTER TABLE "solar_plants" DROP COLUMN IF EXISTS "alerta_offline_minutos"',
+    `DELETE FROM "_prisma_migrations"
+       WHERE migration_name = '20261105000001_solar_falhas_e_agregados'`,
+  ],
 };
 
-async function executarRecoverySql(sql) {
+async function executarRecoverySql(statements) {
   // Lazy import pra nao pagar o custo quando nao precisa de recovery.
   const { PrismaClient } = await import('@prisma/client');
   const client = new PrismaClient();
   try {
-    await client.$executeRawUnsafe(sql);
+    // $transaction com array de executeRawUnsafe = tudo ou nada. Prisma
+    // nao aceita BEGIN/COMMIT embutido no SQL (prepared statements),
+    // mas trata a lista como transacao automaticamente.
+    await client.$transaction(
+      statements.map((sql) => client.$executeRawUnsafe(sql))
+    );
   } finally {
     await client.$disconnect();
   }
@@ -112,12 +116,12 @@ if (firstOutput.includes('P3009')) {
       console.log(`[migrate] Migration falhada detectada via DB: ${migrationFalhada}`);
     }
   }
-  const sql = migrationFalhada ? RECOVERY_SQL_POR_MIGRATION[migrationFalhada] : null;
+  const statements = migrationFalhada ? RECOVERY_SQL_POR_MIGRATION[migrationFalhada] : null;
 
-  if (sql) {
-    console.log(`[migrate] P3009 detectado para ${migrationFalhada}. Executando recovery SQL...`);
+  if (statements) {
+    console.log(`[migrate] P3009 detectado para ${migrationFalhada}. Executando recovery SQL (${statements.length} statements)...`);
     try {
-      await executarRecoverySql(sql);
+      await executarRecoverySql(statements);
       console.log('[migrate] Recovery concluido. Reaplicando migrate deploy...');
       const retry = run('npx prisma migrate deploy');
       if (retry.status === 0) {
