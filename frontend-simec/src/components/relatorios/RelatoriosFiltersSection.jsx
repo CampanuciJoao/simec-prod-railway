@@ -9,22 +9,15 @@ import {
   Input,
   PageSection,
   ResponsiveGrid,
-  Select,
+  SelectMenu,
 } from '@/components/ui';
 
-function Field({ label, children }) {
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-slate-700">{label}</label>
-      {children}
-    </div>
-  );
+// Wrapper pra compatibilizar o SelectMenu (que recebe o valor direto)
+// com o handleFiltroChange da pagina (que espera um evento com target).
+// Sinteza o shape minimo que o handler precisa (target.name, target.value).
+function fakeEvent(name, value) {
+  return { target: { name, value } };
 }
-
-Field.propTypes = {
-  label: PropTypes.string.isRequired,
-  children: PropTypes.node.isRequired,
-};
 
 function RelatoriosFiltersSection({
   filtros,
@@ -56,6 +49,8 @@ function RelatoriosFiltersSection({
   const mostraDatas = isManutencoes || isSolar;
   const mostraUnidade = !isSolar;    // solar usa "planta" em vez de "unidade"
 
+  const pick = (name) => (v) => onChange(fakeEvent(name, v));
+
   return (
     <PageSection
       title="Filtros do relatório"
@@ -67,198 +62,165 @@ function RelatoriosFiltersSection({
     >
       <form onSubmit={onSubmit} className="space-y-6">
         <ResponsiveGrid cols={{ base: 1, md: 2, xl: 4 }}>
-          <Field label="Tipo de relatório">
-            <Select
-              name="tipoRelatorio"
-              value={filtros.tipoRelatorio}
-              onChange={onChange}
-            >
-              {tipoRelatorioOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          <SelectMenu
+            label="Tipo de relatório"
+            value={filtros.tipoRelatorio}
+            onChange={pick('tipoRelatorio')}
+            options={tipoRelatorioOptions}
+          />
 
           {mostraUnidade && (
-            <Field label="Unidade">
-              <Select
-                name="unidadeId"
-                value={filtros.unidadeId}
-                onChange={onChange}
-              >
-                <option value="">Todas</option>
-                {unidadesOptions.map((u) => (
-                  <option key={u.value} value={u.value}>
-                    {u.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Unidade"
+              value={filtros.unidadeId}
+              onChange={pick('unidadeId')}
+              placeholder="Todas"
+              options={unidadesOptions}
+            />
           )}
 
           {isSolar && (
-            <Field label="Planta solar">
-              <Select
-                name="plantaId"
-                value={filtros.plantaId || ''}
-                onChange={onChange}
-              >
-                <option value="">Selecione</option>
-                {plantasSolarOptions.map((p) => (
-                  <option key={p.value} value={p.value}>{p.label}</option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Planta solar"
+              value={filtros.plantaId || ''}
+              onChange={pick('plantaId')}
+              placeholder="Selecione"
+              options={plantasSolarOptions}
+            />
           )}
 
           {isSolarFalhas && filtros.plantaId && (
-            <Field label="Inversor (opcional)">
-              <Select
-                name="inverterId"
-                value={filtros.inverterId || ''}
-                onChange={onChange}
-              >
-                <option value="">Todos da planta</option>
-                {invertersOptions.map((i) => (
-                  <option key={i.value} value={i.value}>{i.label}</option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Inversor (opcional)"
+              value={filtros.inverterId || ''}
+              onChange={pick('inverterId')}
+              placeholder="Todos da planta"
+              options={invertersOptions}
+            />
           )}
 
           {mostraFabricante && (
-            <Field label="Fabricante">
-              <Select
-                name="fabricante"
-                value={filtros.fabricante}
-                onChange={onChange}
-              >
-                <option value="">Todos</option>
-                {fabricantesOptions.map((f) => (
-                  <option key={f.value} value={f.value}>
-                    {f.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Fabricante"
+              value={filtros.fabricante}
+              onChange={pick('fabricante')}
+              placeholder="Todos"
+              options={fabricantesOptions}
+            />
           )}
 
           {mostraTipo && (
-            <Field label="Tipo">
-              <Select
-                name="tipo"
-                value={filtros.tipo || ''}
-                onChange={onChange}
-              >
-                <option value="">Todos</option>
-                {tiposOptions.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Tipo"
+              value={filtros.tipo || ''}
+              onChange={pick('tipo')}
+              placeholder="Todos"
+              options={tiposOptions}
+            />
           )}
 
           {/* Status operacional — so pro inventario. Reusa o campo
               `status` do filtros; o hook limpa esse valor ao trocar
               o tipo de relatorio pra evitar vazamento entre dominios. */}
           {isInventario && (
-            <Field label="Status">
-              <Select
-                name="status"
-                value={filtros.status || ''}
-                onChange={onChange}
-              >
-                {statusEquipamentoOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Status"
+              value={filtros.status || ''}
+              onChange={pick('status')}
+              options={statusEquipamentoOptions}
+            />
           )}
 
-          {mostraDatas ? (
-            <Field label="Data início">
+          {mostraDatas && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider"
+                     style={{ color: 'var(--text-muted)' }}>
+                Data início
+              </label>
               <DateInput
                 name="dataInicio"
                 value={filtros.dataInicio}
                 onChange={onChange}
               />
-            </Field>
-          ) : null}
+            </div>
+          )}
 
           {mostraDatas && (
-            <Field label="Data fim">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider"
+                     style={{ color: 'var(--text-muted)' }}>
+                Data fim
+              </label>
               <DateInput
                 name="dataFim"
                 value={filtros.dataFim}
                 onChange={onChange}
                 min={filtros.dataInicio || undefined}
               />
-            </Field>
+            </div>
           )}
 
           {/* Filtros exclusivos do relatorio de Seguros */}
           {isSeguros && (
-            <Field label="Escopo">
-              <Select
-                name="escopoSeguro"
-                value={filtros.escopoSeguro || ''}
-                onChange={onChange}
-              >
-                {escopoSeguroOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Escopo"
+              value={filtros.escopoSeguro || ''}
+              onChange={pick('escopoSeguro')}
+              options={escopoSeguroOptions}
+            />
           )}
 
           {isSeguros && (
-            <Field label="Status da apólice">
-              <Select
-                name="status"
-                value={filtros.status || ''}
-                onChange={onChange}
-              >
-                {statusSeguroOptions.map((o) => (
-                  <option key={o.value} value={o.value}>{o.label}</option>
-                ))}
-              </Select>
-            </Field>
+            <SelectMenu
+              label="Status da apólice"
+              value={filtros.status || ''}
+              onChange={pick('status')}
+              options={statusSeguroOptions}
+            />
           )}
 
           {isSeguros && (
-            <Field label="Seguradora (opcional)">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider"
+                     style={{ color: 'var(--text-muted)' }}>
+                Seguradora (opcional)
+              </label>
               <Input
                 name="seguradora"
                 value={filtros.seguradora || ''}
                 onChange={onChange}
                 placeholder="Ex.: Porto Seguro"
               />
-            </Field>
+            </div>
           )}
 
           {isSeguros && (
-            <Field label="Vencimento a partir de (opcional)">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider"
+                     style={{ color: 'var(--text-muted)' }}>
+                Vencimento a partir de (opcional)
+              </label>
               <DateInput
                 name="vencimentoInicio"
                 value={filtros.vencimentoInicio || ''}
                 onChange={onChange}
               />
-            </Field>
+            </div>
           )}
 
           {isSeguros && (
-            <Field label="Vencimento até (opcional)">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider"
+                     style={{ color: 'var(--text-muted)' }}>
+                Vencimento até (opcional)
+              </label>
               <DateInput
                 name="vencimentoFim"
                 value={filtros.vencimentoFim || ''}
                 onChange={onChange}
                 min={filtros.vencimentoInicio || undefined}
               />
-            </Field>
+            </div>
           )}
         </ResponsiveGrid>
 
