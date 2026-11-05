@@ -47,7 +47,7 @@ CREATE INDEX "solar_falhas_tenantId_nivel_idx"
     ON "solar_falhas"("tenantId", "nivel");
 
 ALTER TABLE "solar_falhas" ADD CONSTRAINT "solar_falhas_tenantId_fkey"
-    FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "solar_falhas" ADD CONSTRAINT "solar_falhas_plant_id_fkey"
     FOREIGN KEY ("plant_id") REFERENCES "solar_plants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "solar_falhas" ADD CONSTRAINT "solar_falhas_inverter_id_fkey"
@@ -83,7 +83,7 @@ CREATE INDEX "solar_agregados_diarios_tenantId_plant_id_dia_idx"
     ON "solar_agregados_diarios"("tenantId", "plant_id", "dia" DESC);
 
 ALTER TABLE "solar_agregados_diarios" ADD CONSTRAINT "solar_agregados_diarios_tenantId_fkey"
-    FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "solar_agregados_diarios" ADD CONSTRAINT "solar_agregados_diarios_plant_id_fkey"
     FOREIGN KEY ("plant_id") REFERENCES "solar_plants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -119,6 +119,6 @@ CREATE INDEX "solar_agregados_mensais_tenantId_plant_id_ano_mes_idx"
     ON "solar_agregados_mensais"("tenantId", "plant_id", "ano" DESC, "mes" DESC);
 
 ALTER TABLE "solar_agregados_mensais" ADD CONSTRAINT "solar_agregados_mensais_tenantId_fkey"
-    FOREIGN KEY ("tenantId") REFERENCES "Tenant"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+    FOREIGN KEY ("tenantId") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ALTER TABLE "solar_agregados_mensais" ADD CONSTRAINT "solar_agregados_mensais_plant_id_fkey"
     FOREIGN KEY ("plant_id") REFERENCES "solar_plants"("id") ON DELETE CASCADE ON UPDATE CASCADE;

@@ -42,14 +42,73 @@ function getMigrationNames() {
     .sort();
 }
 
+// Recovery do erro P3009 pra migrations especificas que sabemos como
+// desfazer. Cada entrada: nome da migration + SQL que limpa o estado
+// parcial (tabelas criadas, colunas adicionadas etc) ANTES de reaplicar.
+// Depois do recovery o Prisma vai aplicar o SQL corrigido no proximo
+// migrate deploy.
+const RECOVERY_SQL_POR_MIGRATION = {
+  '20261105000001_solar_falhas_e_agregados': `
+    BEGIN;
+    DROP TABLE IF EXISTS "solar_agregados_mensais" CASCADE;
+    DROP TABLE IF EXISTS "solar_agregados_diarios" CASCADE;
+    DROP TABLE IF EXISTS "solar_falhas" CASCADE;
+    ALTER TABLE "solar_plants" DROP COLUMN IF EXISTS "alerta_offline_minutos";
+    DELETE FROM "_prisma_migrations"
+      WHERE migration_name = '20261105000001_solar_falhas_e_agregados';
+    COMMIT;
+  `,
+};
+
+async function executarRecoverySql(sql) {
+  // Lazy import pra nao pagar o custo quando nao precisa de recovery.
+  const { PrismaClient } = await import('@prisma/client');
+  const client = new PrismaClient();
+  try {
+    await client.$executeRawUnsafe(sql);
+  } finally {
+    await client.$disconnect();
+  }
+}
+
 console.log('[migrate] Iniciando prisma migrate deploy...');
 
-const first = run('npx prisma migrate deploy');
-const firstOutput = (first.stdout ?? '') + (first.stderr ?? '');
+let first = run('npx prisma migrate deploy');
+let firstOutput = (first.stdout ?? '') + (first.stderr ?? '');
 
 if (first.status === 0) {
   console.log('[migrate] Deploy concluido com sucesso.');
   process.exit(0);
+}
+
+// P3009 = migration anterior ficou com finished_at NULL (crashou no meio).
+// Tenta recovery para migrations conhecidas, depois re-aplica.
+if (firstOutput.includes('P3009')) {
+  const matchFalha = firstOutput.match(/The `([^`]+)` migration started at [^ ]+ UTC failed/);
+  const migrationFalhada = matchFalha?.[1];
+  const sql = migrationFalhada ? RECOVERY_SQL_POR_MIGRATION[migrationFalhada] : null;
+
+  if (sql) {
+    console.log(`[migrate] P3009 detectado para ${migrationFalhada}. Executando recovery SQL...`);
+    try {
+      await executarRecoverySql(sql);
+      console.log('[migrate] Recovery concluido. Reaplicando migrate deploy...');
+      const retry = run('npx prisma migrate deploy');
+      if (retry.status === 0) {
+        console.log('[migrate] Deploy concluido com sucesso apos recovery.');
+        process.exit(0);
+      }
+      console.error('[migrate] Deploy falhou mesmo apos recovery.');
+      process.exit(retry.status ?? 1);
+    } catch (err) {
+      console.error('[migrate] Recovery falhou:', err?.message || err);
+      process.exit(1);
+    }
+  } else {
+    console.error(`[migrate] P3009 sem recovery conhecido para: ${migrationFalhada || '<sem nome>'}`);
+    console.error('[migrate] Rode manualmente: npx prisma migrate resolve --rolled-back <nome>');
+    process.exit(1);
+  }
 }
 
 if (!firstOutput.includes('P3005')) {
