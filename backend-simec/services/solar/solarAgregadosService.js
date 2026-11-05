@@ -41,7 +41,7 @@ function diaAnterior(d = new Date()) {
   return t;
 }
 
-async function calcularAgregadoDoDia({ tenantId, plant, dia }) {
+export async function calcularAgregadoDoDia({ tenantId, plant, dia }) {
   const { inicio, fim } = inicioFimDoDia(dia);
   const snapshots = await prisma.solarSnapshot.findMany({
     where: { tenantId, plantId: plant.id, capturedAt: { gte: inicio, lt: fim } },
@@ -208,6 +208,78 @@ export async function fecharDiaAnterior() {
   }
 
   return { dia: dia.toISOString().slice(0, 10), total: plants.length, resultados };
+}
+
+// Calcula o resumo do mes AO VIVO combinando:
+//   - SolarAgregadoDiario pra dias ja fechados (precisos, batch)
+//   - SolarSnapshot em tempo real pra o dia de hoje (ou qualquer dia
+//     do mes ainda sem agregado)
+//
+// Usado pelo endpoint /agregado-mes-atual pra o card "Este mes" nao
+// esperar o cron de 02:30 UTC fechar os dias — o valor atualiza a cada
+// snapshot novo que chega (~1min).
+export async function calcularResumoMesVivo({ tenantId, plantId, ano, mes }) {
+  const plant = await prisma.solarPlant.findFirst({
+    where: { id: plantId, tenantId },
+    select: { id: true, tenantId: true, tarifaKwh: true, capacidadeKwp: true },
+  });
+  if (!plant) return null;
+
+  const inicioMes = new Date(Date.UTC(ano, mes - 1, 1));
+  const fimMes = new Date(Date.UTC(ano, mes, 1));
+  const hoje = new Date();
+  hoje.setUTCHours(0, 0, 0, 0);
+
+  const diarios = await prisma.solarAgregadoDiario.findMany({
+    where: { tenantId, plantId, dia: { gte: inicioMes, lt: fimMes } },
+    select: {
+      dia: true, kwhGerado: true, kwhConsumidoRede: true,
+      kwhExportadoRede: true, valorEconomizadoBrl: true,
+      horasOffline: true, falhasAbertas: true, picosKw: true,
+    },
+  });
+  const diasFechados = new Set(diarios.map((d) => d.dia.toISOString().slice(0, 10)));
+
+  // Calcula dias faltantes (dias do mes que ainda nao foram agregados
+  // pelo cron) — tipicamente so o dia de hoje, mas se o cron ficou
+  // atrasado pode ser mais.
+  const diasFaltantes = [];
+  for (let t = new Date(inicioMes); t < fimMes && t <= new Date(); t.setUTCDate(t.getUTCDate() + 1)) {
+    const key = t.toISOString().slice(0, 10);
+    if (!diasFechados.has(key)) {
+      diasFaltantes.push(new Date(t));
+    }
+  }
+
+  const agregadosVivos = [];
+  for (const dia of diasFaltantes) {
+    try {
+      const a = await calcularAgregadoDoDia({ tenantId, plant, dia });
+      agregadosVivos.push(a);
+    } catch {
+      // ignora falhas pontuais pra nao quebrar o card
+    }
+  }
+
+  const todos = [...diarios, ...agregadosVivos];
+  const soma = (campo) => todos.reduce((acc, d) => acc + (d[campo] || 0), 0);
+  const picos = todos.map((d) => d.picosKw).filter((v) => v != null);
+
+  return {
+    ano,
+    mes,
+    kwhGerado: soma('kwhGerado'),
+    kwhConsumidoRede: soma('kwhConsumidoRede'),
+    kwhExportadoRede: soma('kwhExportadoRede'),
+    valorEconomizadoBrl: soma('valorEconomizadoBrl'),
+    horasOffline: soma('horasOffline'),
+    falhasTotal: todos.reduce((acc, d) => acc + (d.falhasAbertas || 0), 0),
+    picosKw: picos.length ? Math.max(...picos) : null,
+    diasComGeracao: todos.filter((d) => (d.kwhGerado || 0) > 0).length,
+    // Flag pra UI saber que o valor e parcial (inclui snapshots em
+    // andamento, nao so dias fechados)
+    aoVivo: diasFaltantes.length > 0,
+  };
 }
 
 export async function fecharMesAnterior() {

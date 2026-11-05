@@ -681,17 +681,38 @@ router.get('/plants/:id/agregados-diarios', async (req, res) => {
 });
 
 // ─── Agregado "este mes" (resumo pro card) ──────────────────────────────────
+// Calculo AO VIVO: combina SolarAgregadoDiario (dias fechados pelo cron)
+// com snapshots do(s) dia(s) ainda nao agregado(s) — tipicamente hoje. Com
+// isso o card atualiza a cada ~1min sem esperar o cron de 02:30 UTC.
 router.get('/plants/:id/agregado-mes-atual', async (req, res) => {
   const tenantId = req.tenantContext;
   const hoje = new Date();
   const ano = hoje.getUTCFullYear();
   const mes = hoje.getUTCMonth() + 1;
   try {
-    const mesAtual = await prisma.solarAgregadoMensal.findUnique({
-      where: { tenantId_plantId_ano_mes: { tenantId, plantId: req.params.id, ano, mes } },
+    const { calcularResumoMesVivo } = await import('../services/solar/solarAgregadosService.js');
+    const resumo = await calcularResumoMesVivo({
+      tenantId, plantId: req.params.id, ano, mes,
     });
-    res.json(mesAtual || { ano, mes, kwhGerado: 0, valorEconomizadoBrl: 0 });
+    if (!resumo) return res.status(404).json({ error: 'Planta nao encontrada' });
+
+    // Enriquece com variacao vs mes anterior (consulta SolarAgregadoMensal
+    // — essa SIM precisa estar pronta porque e mes passado).
+    const mesAnteriorAno = mes === 1 ? ano - 1 : ano;
+    const mesAnteriorMes = mes === 1 ? 12 : mes - 1;
+    const anterior = await prisma.solarAgregadoMensal.findUnique({
+      where: { tenantId_plantId_ano_mes: {
+        tenantId, plantId: req.params.id, ano: mesAnteriorAno, mes: mesAnteriorMes,
+      } },
+      select: { kwhGerado: true },
+    });
+    const variacaoKwhMesAnterior = anterior?.kwhGerado && anterior.kwhGerado > 0
+      ? (resumo.kwhGerado - anterior.kwhGerado) / anterior.kwhGerado
+      : null;
+
+    res.json({ ...resumo, variacaoKwhMesAnterior });
   } catch (err) {
+    console.error('[AGREGADO_MES_ATUAL]', err);
     res.status(500).json({ error: err.message });
   }
 });
