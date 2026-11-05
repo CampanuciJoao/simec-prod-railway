@@ -98,7 +98,14 @@ async function tentarAutoPopularMetadados(inverterId) {
 // e uma fila simples onde o ultimo authorize-url inserido vence o code
 // que chegar. Se dois admins autorizarem simultaneamente, pode haver
 // race condition; nao e um caso real agora com 2-3 inverters/tenant.
-router.get('/sungrow/callback', async (req, res) => {
+//
+// IMPORTANTE: esse handler e exportado separadamente (sungrowCallbackPublic)
+// e montado em server.js ANTES do app.use(proteger) global — o middleware
+// de autenticacao bloqueia tudo que vem depois dele, entao o callback
+// precisa estar fora dessa linha. O router default abaixo so cuida das
+// rotas protegidas (admin + operador).
+export const sungrowCallbackPublic = express.Router();
+sungrowCallbackPublic.get('/sungrow/callback', async (req, res) => {
   const { code, error, error_description, redirectUri: redirectUriQuery } = req.query;
 
   // Entry log — dispara ANTES de qualquer validacao, pra sabermos que
@@ -221,6 +228,11 @@ router.get('/sungrow/callback', async (req, res) => {
 });
 
 router.use(proteger);
+
+// Rotas protegidas: tudo que vem depois exige token + tenant. O OAuth
+// callback acima nao chega aqui (esta em sungrowCallbackPublic). Mesmo
+// assim deixamos o router.use(proteger) explicito como salvaguarda caso
+// alguem monte esse router em outro lugar sem o proteger global do server.
 
 // ─── Providers disponiveis (metadata do form na UI) ─────────────────────────
 router.get('/providers', (_req, res) => {

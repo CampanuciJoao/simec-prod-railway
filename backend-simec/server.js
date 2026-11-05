@@ -31,7 +31,7 @@ import orcamentosRoutes from './routes/orcamentosRoutes.js';
 import osCorretivaRoutes from './routes/osCorretivaRoutes.js';
 import gehcRoutes from './routes/gehcRoutes.js';
 import gehcAprendizadoRoutes from './routes/gehcAprendizadoRoutes.js';
-import solarRoutes from './routes/solarRoutes.js';
+import solarRoutes, { sungrowCallbackPublic } from './routes/solarRoutes.js';
 import alertConfigRoutes from './routes/alertConfigRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
 import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
@@ -164,6 +164,9 @@ app.use('/api/agent', agentRoutes);
 app.use('/api/telegram/webhook', telegramWebhookRoute);
 // LGPD: documentos legais (publicos) + aceites (proteger interno na rota)
 app.use('/api/lgpd', lgpdRoutes);
+// Sungrow OAuth callback: publico por natureza (iSolarCloud redireciona o
+// browser pra ca sem auth). O handler valida inverterId via Redis state.
+app.use('/api/solar', sungrowCallbackPublic);
 
 app.use(proteger);
 
