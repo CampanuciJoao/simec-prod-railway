@@ -268,7 +268,9 @@ function SaudeRMsList({ onLoad, compact = false }) {
             </div>
           </div>
 
-          <div className={compact ? 'grid grid-cols-2 gap-1.5 sm:grid-cols-4' : 'grid gap-2 lg:grid-cols-[1fr_280px]'}>
+          {compact ? (
+            // Dashboard: so os KPIs em grid de 4 colunas (comportamento
+            // original, sem sparkline).
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
               <GaugeBox
                 label="Hélio"
@@ -279,29 +281,59 @@ function SaudeRMsList({ onLoad, compact = false }) {
                   : s.heliumLevelPct < 70 ? 'warn'
                   : 'good'
                 }
-                compact={compact}
+                compact
               />
               <GaugeBox
                 label="Pressão"
                 value={s.heliumPressurePsi != null ? `${s.heliumPressurePsi} PSI` : '—'}
                 tone={s.heliumPressurePsi == null ? 'muted' : 'ok'}
-                compact={compact}
+                compact
               />
               <GaugeBox
                 label="Compressor"
                 value={s.compressorStatus || '—'}
                 tone={!s.compressorStatus ? 'muted' : s.compressorStatus === 'ON' ? 'good' : 'crit'}
-                compact={compact}
+                compact
               />
               <GaugeBox
                 label="Temperatura"
                 value={s.coolantTempC != null ? `${s.coolantTempC}°C` : '—'}
                 tone={s.coolantTempC == null ? 'muted' : 'ok'}
-                compact={compact}
+                compact
               />
             </div>
+          ) : (
+            // Aba Monitoramento > Saude: KPIs + sparkline ao lado em lg+,
+            // empilhado em telas menores.
+            <div className="grid gap-2 lg:grid-cols-[1fr_280px]">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                <GaugeBox
+                  label="Hélio"
+                  value={s.heliumLevelPct != null ? `${s.heliumLevelPct}%` : '—'}
+                  tone={
+                    s.heliumLevelPct == null ? 'muted'
+                    : s.heliumLevelPct < 30 ? 'crit'
+                    : s.heliumLevelPct < 70 ? 'warn'
+                    : 'good'
+                  }
+                />
+                <GaugeBox
+                  label="Pressão"
+                  value={s.heliumPressurePsi != null ? `${s.heliumPressurePsi} PSI` : '—'}
+                  tone={s.heliumPressurePsi == null ? 'muted' : 'ok'}
+                />
+                <GaugeBox
+                  label="Compressor"
+                  value={s.compressorStatus || '—'}
+                  tone={!s.compressorStatus ? 'muted' : s.compressorStatus === 'ON' ? 'good' : 'crit'}
+                />
+                <GaugeBox
+                  label="Temperatura"
+                  value={s.coolantTempC != null ? `${s.coolantTempC}°C` : '—'}
+                  tone={s.coolantTempC == null ? 'muted' : 'ok'}
+                />
+              </div>
 
-            {!compact && (
               <div
                 className="flex flex-col justify-center rounded-md border px-2 py-1"
                 style={{
@@ -324,8 +356,8 @@ function SaudeRMsList({ onLoad, compact = false }) {
                 </div>
                 <SparklineRm equipamentoId={s.equipamentoId} />
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       ))}
     </div>
