@@ -40,7 +40,12 @@ function useSungrowOAuthInterceptor() {
         // /api/* la cai no fallback do SPA (index.html) e nunca chega
         // no backend. Por isso usamos VITE_API_URL (ja aponta pro
         // backend sem o sufixo /api).
-        const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
+        // .trim() protege contra \n/\r/espacos que podem vir no env var
+        // do Railway (acontece quando o valor foi colado com quebra de
+        // linha). Sem trim o regex nao matcha o /api final e a gente
+        // acaba com /api\n/api/ na URL, que o browser normaliza pra
+        // /api/api/ — 401 garantido.
+        const apiBase = (import.meta.env.VITE_API_URL || '').trim().replace(/\/api\/?$/, '');
         const qs = new URLSearchParams({ code, redirectUri }).toString();
         const url = `${apiBase}/api/solar/sungrow/callback?${qs}`;
         console.log('[SUNGROW_INTERCEPTOR] chamando backend:', url);
