@@ -71,6 +71,24 @@ async function executarRecoverySql(sql) {
   }
 }
 
+// Consulta _prisma_migrations pra achar qual migration esta com
+// finished_at NULL (= failed). Usado quando o output do Prisma nao
+// explicita o nome da migration que falhou.
+async function obterMigrationFalhada() {
+  const { PrismaClient } = await import('@prisma/client');
+  const client = new PrismaClient();
+  try {
+    const rows = await client.$queryRawUnsafe(
+      'SELECT migration_name FROM "_prisma_migrations" WHERE finished_at IS NULL ORDER BY started_at DESC LIMIT 1'
+    );
+    return rows?.[0]?.migration_name || null;
+  } catch {
+    return null;
+  } finally {
+    await client.$disconnect();
+  }
+}
+
 console.log('[migrate] Iniciando prisma migrate deploy...');
 
 let first = run('npx prisma migrate deploy');
@@ -84,8 +102,16 @@ if (first.status === 0) {
 // P3009 = migration anterior ficou com finished_at NULL (crashou no meio).
 // Tenta recovery para migrations conhecidas, depois re-aplica.
 if (firstOutput.includes('P3009')) {
+  // Primeiro tenta pegar o nome do stdout; se Prisma nao informou,
+  // consulta _prisma_migrations direto no banco.
   const matchFalha = firstOutput.match(/The `([^`]+)` migration started at [^ ]+ UTC failed/);
-  const migrationFalhada = matchFalha?.[1];
+  let migrationFalhada = matchFalha?.[1];
+  if (!migrationFalhada) {
+    migrationFalhada = await obterMigrationFalhada();
+    if (migrationFalhada) {
+      console.log(`[migrate] Migration falhada detectada via DB: ${migrationFalhada}`);
+    }
+  }
   const sql = migrationFalhada ? RECOVERY_SQL_POR_MIGRATION[migrationFalhada] : null;
 
   if (sql) {
