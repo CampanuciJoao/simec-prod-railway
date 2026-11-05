@@ -34,8 +34,15 @@ function useSungrowOAuthInterceptor() {
       let respostaStatus = 'nao-chamado';
       let respostaBody = '';
       try {
+        // IMPORTANTE: fetch tem que ir pro backend direto (simec-backend-
+        // production.up.railway.app), nao pro simec.cerdil.com.br. O
+        // dominio do frontend serve so arquivos estaticos — qualquer
+        // /api/* la cai no fallback do SPA (index.html) e nunca chega
+        // no backend. Por isso usamos VITE_API_URL (ja aponta pro
+        // backend sem o sufixo /api).
+        const apiBase = (import.meta.env.VITE_API_URL || '').replace(/\/api\/?$/, '');
         const qs = new URLSearchParams({ code, redirectUri }).toString();
-        const url = `/api/solar/sungrow/callback?${qs}`;
+        const url = `${apiBase}/api/solar/sungrow/callback?${qs}`;
         console.log('[SUNGROW_INTERCEPTOR] chamando backend:', url);
         const r = await fetch(url, { method: 'GET' });
         respostaStatus = r.status;
