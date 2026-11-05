@@ -22,10 +22,32 @@ import { useSolarPainel } from '@/hooks/monitoramento/useSolarPainel';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
+// Mapeamento de running_state compativel com FoxESS (163/164/165) e
+// Sungrow (Apendice 12.1 da doc oficial). Sungrow usa codigos
+// diferentes (0 grid-connected, 8 standby, etc) — unificamos aqui.
 const RUNNING_STATE_LABELS = {
-  163: { label: 'Ligado à rede',    cor: 'var(--color-success)',  icon: faPlugCircleCheck },
-  164: { label: 'Em bateria (EPS)', cor: 'var(--color-warning)',  icon: faPlugCircleXmark },
-  165: { label: 'Falha',            cor: 'var(--color-danger)',   icon: faTriangleExclamation },
+  0:     { label: 'Ligado à rede',    cor: 'var(--color-success)', icon: faPlugCircleCheck },
+  64:    { label: 'Ligado à rede',    cor: 'var(--color-success)', icon: faPlugCircleCheck },
+  128:   { label: 'Operando (derated)', cor: 'var(--color-success)', icon: faPlugCircleCheck },
+  163:   { label: 'Ligado à rede',    cor: 'var(--color-success)', icon: faPlugCircleCheck },
+  164:   { label: 'Em bateria (EPS)', cor: 'var(--color-warning)', icon: faPlugCircleXmark },
+  165:   { label: 'Falha',            cor: 'var(--color-danger)',  icon: faTriangleExclamation },
+  256:   { label: 'Falha operacional', cor: 'var(--color-danger)',  icon: faTriangleExclamation },
+  1:     { label: 'Desligado',        cor: 'var(--text-muted)',    icon: faBolt },
+  2:     { label: 'Aguardando',       cor: 'var(--text-muted)',    icon: faBolt },
+  4:     { label: 'Parada de emergência', cor: 'var(--color-danger)', icon: faTriangleExclamation },
+  8:     { label: 'Standby',          cor: 'var(--text-muted)',    icon: faBolt },
+  32:    { label: 'Iniciando',        cor: 'var(--color-warning)', icon: faBolt },
+  1024:  { label: 'Modo manutenção',  cor: 'var(--color-warning)', icon: faBolt },
+  2048:  { label: 'Modo forçado',     cor: 'var(--color-warning)', icon: faBolt },
+  4096:  { label: 'Off-grid',         cor: 'var(--color-warning)', icon: faPlugCircleXmark },
+  5120:  { label: 'Standby',          cor: 'var(--text-muted)',    icon: faBolt },
+  5376:  { label: 'Parada de emergência', cor: 'var(--color-danger)', icon: faTriangleExclamation },
+  5632:  { label: 'Iniciando',        cor: 'var(--color-warning)', icon: faBolt },
+  21760: { label: 'Desligado por falha', cor: 'var(--color-danger)', icon: faTriangleExclamation },
+  32768: { label: 'Desligado',        cor: 'var(--text-muted)',    icon: faBolt },
+  33024: { label: 'Operando (derated)', cor: 'var(--color-success)', icon: faPlugCircleCheck },
+  37120: { label: 'Operando (com alerta)', cor: 'var(--color-warning)', icon: faTriangleExclamation },
 };
 
 const PROVIDER_LABELS = {
@@ -324,12 +346,19 @@ function GraficoSoc({ snapshots, plant }) {
       x: { ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 10 } },
       y: {
         ...(plant?.temBateria ? { min: 0, max: 100 } : {}),
-        ticks: { callback: (v) => `${v}${unidade}` },
+        ticks: {
+          // toFixed(2) evita artefatos de float tipo "2.4000000000000004"
+          callback: (v) => `${Number(v).toFixed(2)}${unidade}`,
+        },
       },
     },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: (ctx) => `${label}: ${ctx.parsed.y}${unidade}` } },
+      tooltip: {
+        callbacks: {
+          label: (ctx) => `${label}: ${Number(ctx.parsed.y).toFixed(2)}${unidade}`,
+        },
+      },
     },
   };
   return (
