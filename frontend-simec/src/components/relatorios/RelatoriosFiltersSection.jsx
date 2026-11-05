@@ -35,6 +35,8 @@ function RelatoriosFiltersSection({
   escopoSeguroOptions = [],
   statusSeguroOptions = [],
   statusEquipamentoOptions = [],
+  plantasSolarOptions = [],
+  invertersOptions = [],
   onChange,
   onSubmit,
   loading = false,
@@ -43,12 +45,16 @@ function RelatoriosFiltersSection({
   const isInventario = filtros.tipoRelatorio === 'inventarioEquipamentos';
   const isOrcamentoCq = filtros.tipoRelatorio === 'orcamentoCq';
   const isSeguros = filtros.tipoRelatorio === 'inventarioSeguros';
+  const isSolarProducao = filtros.tipoRelatorio === 'solarProducao';
+  const isSolarFalhas = filtros.tipoRelatorio === 'solarFalhas';
+  const isSolar = isSolarProducao || isSolarFalhas;
 
   // Cada tipo mostra seu proprio conjunto de filtros — evita poluir a UI
   // com campos que nao se aplicam ao relatorio escolhido.
-  const mostraFabricante = !isOrcamentoCq && !isSeguros;
+  const mostraFabricante = !isOrcamentoCq && !isSeguros && !isSolar;
   const mostraTipo = isInventario;
-  const mostraDatas = isManutencoes;
+  const mostraDatas = isManutencoes || isSolar;
+  const mostraUnidade = !isSolar;    // solar usa "planta" em vez de "unidade"
 
   return (
     <PageSection
@@ -75,20 +81,52 @@ function RelatoriosFiltersSection({
             </Select>
           </Field>
 
-          <Field label="Unidade">
-            <Select
-              name="unidadeId"
-              value={filtros.unidadeId}
-              onChange={onChange}
-            >
-              <option value="">Todas</option>
-              {unidadesOptions.map((u) => (
-                <option key={u.value} value={u.value}>
-                  {u.label}
-                </option>
-              ))}
-            </Select>
-          </Field>
+          {mostraUnidade && (
+            <Field label="Unidade">
+              <Select
+                name="unidadeId"
+                value={filtros.unidadeId}
+                onChange={onChange}
+              >
+                <option value="">Todas</option>
+                {unidadesOptions.map((u) => (
+                  <option key={u.value} value={u.value}>
+                    {u.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {isSolar && (
+            <Field label="Planta solar">
+              <Select
+                name="plantaId"
+                value={filtros.plantaId || ''}
+                onChange={onChange}
+              >
+                <option value="">Selecione</option>
+                {plantasSolarOptions.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
+
+          {isSolarFalhas && filtros.plantaId && (
+            <Field label="Inversor (opcional)">
+              <Select
+                name="inverterId"
+                value={filtros.inverterId || ''}
+                onChange={onChange}
+              >
+                <option value="">Todos da planta</option>
+                {invertersOptions.map((i) => (
+                  <option key={i.value} value={i.value}>{i.label}</option>
+                ))}
+              </Select>
+            </Field>
+          )}
 
           {mostraFabricante && (
             <Field label="Fabricante">
@@ -244,6 +282,8 @@ RelatoriosFiltersSection.propTypes = {
   escopoSeguroOptions: PropTypes.array,
   statusSeguroOptions: PropTypes.array,
   statusEquipamentoOptions: PropTypes.array,
+  plantasSolarOptions: PropTypes.array,
+  invertersOptions: PropTypes.array,
   onChange: PropTypes.func.isRequired,
   onSubmit: PropTypes.func.isRequired,
   loading: PropTypes.bool,

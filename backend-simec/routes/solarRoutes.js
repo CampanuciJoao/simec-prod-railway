@@ -717,8 +717,7 @@ router.get('/plants/:id/agregado-mes-atual', async (req, res) => {
   }
 });
 
-// ─── PDF de relatorio mensal ────────────────────────────────────────────────
-// Fase 4. Gera PDF com capa + resumo + grafico + falhas + quedas + comparativo.
+// ─── PDF de relatorio mensal (legado — mantido pra compat) ───────────────────
 router.get('/plants/:id/relatorio-pdf', async (req, res) => {
   const tenantId = req.tenantContext;
   const ano = Number(req.query.ano);
@@ -729,6 +728,45 @@ router.get('/plants/:id/relatorio-pdf', async (req, res) => {
     await gerarRelatorioSolarPdf({ res, tenantId, plantId: req.params.id, ano, mes });
   } catch (err) {
     console.error('[SOLAR_RELATORIO_PDF]', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PDF de relatorio de producao (periodo livre) ────────────────────────────
+// Query: dataInicio, dataFim (YYYY-MM-DD)
+router.get('/plants/:id/relatorio-producao-pdf', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const { dataInicio, dataFim } = req.query;
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ error: 'dataInicio e dataFim obrigatorios (YYYY-MM-DD)' });
+  }
+  try {
+    const { gerarRelatorioProducaoPdf } = await import('../services/solar/solarRelatorioPdfService.js');
+    await gerarRelatorioProducaoPdf({
+      res, tenantId, plantId: req.params.id, dataInicio, dataFim,
+    });
+  } catch (err) {
+    console.error('[SOLAR_RELATORIO_PRODUCAO_PDF]', err);
+    if (!res.headersSent) res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── PDF de relatorio de falhas de inversor (periodo livre) ──────────────────
+// Query: dataInicio, dataFim (YYYY-MM-DD), inverterId (opcional pra 1 inv so)
+router.get('/plants/:id/relatorio-falhas-pdf', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const { dataInicio, dataFim, inverterId } = req.query;
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ error: 'dataInicio e dataFim obrigatorios (YYYY-MM-DD)' });
+  }
+  try {
+    const { gerarRelatorioFalhasPdf } = await import('../services/solar/solarRelatorioPdfService.js');
+    await gerarRelatorioFalhasPdf({
+      res, tenantId, plantId: req.params.id, dataInicio, dataFim,
+      inverterId: inverterId || null,
+    });
+  } catch (err) {
+    console.error('[SOLAR_RELATORIO_FALHAS_PDF]', err);
     if (!res.headersSent) res.status(500).json({ error: err.message });
   }
 });

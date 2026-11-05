@@ -12,7 +12,6 @@ import {
   RelatoriosFiltersSection,
   RelatoriosActiveFiltersBar,
   RelatorioResultado,
-  RelatorioSolarMensalSection,
 } from '@/components/relatorios';
 
 // UI
@@ -61,6 +60,8 @@ function RelatoriosPage() {
               escopoSeguroOptions={page.escopoSeguroOptions}
               statusSeguroOptions={page.statusSeguroOptions}
               statusEquipamentoOptions={page.statusEquipamentoOptions}
+              plantasSolarOptions={page.plantasSolarOptions}
+              invertersOptions={page.invertersOptions}
               onChange={page.handleFiltroChange}
               onSubmit={page.handleGerarRelatorio}
               loading={page.loading}
@@ -87,8 +88,6 @@ function RelatoriosPage() {
                 />
               </PageSection>
             )}
-
-            <RelatorioSolarMensalSection />
           </>
         )}
 

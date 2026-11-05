@@ -6,7 +6,12 @@ import {
 } from '../../services/api';
 import { useToast } from '../../contexts/ToastContext';
 import { exportarRelatorioPDF, exportarOrcamentoCqPDF } from '@/services/api/pdfApi';
+import {
+  getSolarPlants, baixarSolarProducaoPdf, baixarSolarFalhasPdf,
+} from '@/services/api/solarApi';
 import { getErrorMessage } from '../../utils/getErrorMessage';
+
+const TIPOS_SOLAR = new Set(['solarProducao', 'solarFalhas']);
 
 export function useRelatoriosPage() {
   const { addToast } = useToast();
@@ -25,11 +30,15 @@ export function useRelatoriosPage() {
     seguradora: '',
     vencimentoInicio: '',
     vencimentoFim: '',
+    // Filtros dos relatorios solares
+    plantaId: '',
+    inverterId: '',
   });
 
   const [unidadesDisponiveis, setUnidadesDisponiveis] = useState([]);
   const [fabricantesUnicos, setFabricantesUnicos] = useState([]);
   const [tiposUnicos, setTiposUnicos] = useState([]);
+  const [plantasSolar, setPlantasSolar] = useState([]);
   const [loading, setLoading] = useState(false);
   const [loadingFiltros, setLoadingFiltros] = useState(true);
   const [resultadoRelatorio, setResultadoRelatorio] = useState(null);
@@ -41,7 +50,7 @@ export function useRelatoriosPage() {
       setError('');
 
       try {
-        const [unidadesData, equipamentosData] = await Promise.all([
+        const [unidadesData, equipamentosData, plantsData] = await Promise.all([
           getUnidades(),
           getEquipamentos({
             page: 1,
@@ -49,7 +58,9 @@ export function useRelatoriosPage() {
             sortBy: 'modelo',
             sortDirection: 'asc',
           }),
+          getSolarPlants().catch(() => []),
         ]);
+        setPlantasSolar(plantsData || []);
 
         setUnidadesDisponiveis(
           (unidadesData || []).sort((a, b) =>
@@ -105,6 +116,36 @@ export function useRelatoriosPage() {
 
   const handleGerarRelatorio = async (e) => {
     e.preventDefault();
+
+    // Relatorios solares: baixam PDF direto em vez de retornar JSON pra
+    // renderizar tabela. O resultado e um arquivo, nao um dataset.
+    if (TIPOS_SOLAR.has(filtros.tipoRelatorio)) {
+      if (!filtros.plantaId) { addToast('Selecione uma planta solar.', 'error'); return; }
+      if (!filtros.dataInicio || !filtros.dataFim) {
+        addToast('Selecione data início e data fim.', 'error'); return;
+      }
+      setLoading(true);
+      try {
+        if (filtros.tipoRelatorio === 'solarProducao') {
+          await baixarSolarProducaoPdf(filtros.plantaId, {
+            dataInicio: filtros.dataInicio, dataFim: filtros.dataFim,
+          });
+        } else {
+          await baixarSolarFalhasPdf(filtros.plantaId, {
+            dataInicio: filtros.dataInicio, dataFim: filtros.dataFim,
+            inverterId: filtros.inverterId || undefined,
+          });
+        }
+        addToast('Relatório gerado.', 'success');
+      } catch (err) {
+        const message = getErrorMessage(err, 'Falha ao gerar o relatório solar.');
+        setError(message);
+        addToast(message, 'error');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
 
     if (
       ['manutencoesRealizadas'].includes(filtros.tipoRelatorio) &&
@@ -179,24 +220,37 @@ export function useRelatoriosPage() {
 
   const tipoRelatorioOptions = useMemo(
     () => [
-      {
-        value: 'inventarioEquipamentos',
-        label: 'Inventário de Equipamentos',
-      },
-      {
-        value: 'manutencoesRealizadas',
-        label: 'Manutenções Realizadas',
-      },
-      {
-        value: 'orcamentoCq',
-        label: 'Inventário Controle de Qualidade',
-      },
-      {
-        value: 'inventarioSeguros',
-        label: 'Relatório de Seguros',
-      },
+      { value: 'inventarioEquipamentos', label: 'Inventário de Equipamentos' },
+      { value: 'manutencoesRealizadas',  label: 'Manutenções Realizadas' },
+      { value: 'orcamentoCq',            label: 'Inventário Controle de Qualidade' },
+      { value: 'inventarioSeguros',      label: 'Relatório de Seguros' },
+      { value: 'solarProducao',          label: 'Energia Solar — Produção' },
+      { value: 'solarFalhas',            label: 'Energia Solar — Falhas de Inversor' },
     ],
     []
+  );
+
+  const plantasSolarOptions = useMemo(
+    () => (plantasSolar || []).map((p) => ({
+      value: p.id,
+      label: `${p.unidade?.nomeSistema || ''} — ${p.nome}`,
+    })),
+    [plantasSolar]
+  );
+
+  // Inversores da planta selecionada (pro filtro opcional do relatorio
+  // de falhas — quando o usuario quer focar num inversor so).
+  const invertersDaPlantaSelecionada = useMemo(() => {
+    const p = (plantasSolar || []).find((x) => x.id === filtros.plantaId);
+    return p?.inverters || [];
+  }, [plantasSolar, filtros.plantaId]);
+
+  const invertersOptions = useMemo(
+    () => invertersDaPlantaSelecionada.map((i) => ({
+      value: i.id,
+      label: `${i.provider} · SN ${i.inverterSn}${i.modeloInversor ? ' · ' + i.modeloInversor : ''}`,
+    })),
+    [invertersDaPlantaSelecionada]
   );
 
   const escopoSeguroOptions = useMemo(
@@ -269,6 +323,8 @@ export function useRelatoriosPage() {
                 manutencoesRealizadas: 'Manutenções',
                 orcamentoCq: 'Inventário CQ',
                 inventarioSeguros: 'Seguros',
+                solarProducao: 'Solar — Produção',
+                solarFalhas: 'Solar — Falhas',
               }[filtros.tipoRelatorio] || filtros.tipoRelatorio
             }`,
             value: filtros.tipoRelatorio,
@@ -380,6 +436,8 @@ export function useRelatoriosPage() {
       seguradora: '',
       vencimentoInicio: '',
       vencimentoFim: '',
+      plantaId: '',
+      inverterId: '',
     });
   };
 
@@ -397,6 +455,8 @@ export function useRelatoriosPage() {
     escopoSeguroOptions,
     statusSeguroOptions,
     statusEquipamentoOptions,
+    plantasSolarOptions,
+    invertersOptions,
     metricas,
     activeFilters,
     clearFilter,
