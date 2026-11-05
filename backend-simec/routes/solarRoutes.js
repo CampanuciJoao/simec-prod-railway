@@ -717,6 +717,17 @@ router.get('/plants/:id/agregado-mes-atual', async (req, res) => {
   }
 });
 
+// ─── Helper padrao SIMEC pra enviar PDF (ASCII + UTF-8) ─────────────────────
+function enviarPdf(res, buffer, fileName) {
+  res.setHeader('Content-Type', 'application/pdf');
+  const asciiName = fileName.replace(/[^\x20-\x7e]/g, '_');
+  res.setHeader(
+    'Content-Disposition',
+    `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+  );
+  return res.status(200).send(buffer);
+}
+
 // ─── PDF de relatorio mensal (legado — mantido pra compat) ───────────────────
 router.get('/plants/:id/relatorio-pdf', async (req, res) => {
   const tenantId = req.tenantContext;
@@ -725,10 +736,13 @@ router.get('/plants/:id/relatorio-pdf', async (req, res) => {
   if (!ano || !mes) return res.status(400).json({ error: 'ano e mes obrigatorios' });
   try {
     const { gerarRelatorioSolarPdf } = await import('../services/solar/solarRelatorioPdfService.js');
-    await gerarRelatorioSolarPdf({ res, tenantId, plantId: req.params.id, ano, mes });
+    const { buffer, fileName } = await gerarRelatorioSolarPdf({
+      tenantId, plantId: req.params.id, ano, mes,
+    });
+    return enviarPdf(res, buffer, fileName);
   } catch (err) {
     console.error('[SOLAR_RELATORIO_PDF]', err);
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -742,12 +756,13 @@ router.get('/plants/:id/relatorio-producao-pdf', async (req, res) => {
   }
   try {
     const { gerarRelatorioProducaoPdf } = await import('../services/solar/solarRelatorioPdfService.js');
-    await gerarRelatorioProducaoPdf({
-      res, tenantId, plantId: req.params.id, dataInicio, dataFim,
+    const { buffer, fileName } = await gerarRelatorioProducaoPdf({
+      tenantId, plantId: req.params.id, dataInicio, dataFim,
     });
+    return enviarPdf(res, buffer, fileName);
   } catch (err) {
     console.error('[SOLAR_RELATORIO_PRODUCAO_PDF]', err);
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 
@@ -761,13 +776,14 @@ router.get('/plants/:id/relatorio-falhas-pdf', async (req, res) => {
   }
   try {
     const { gerarRelatorioFalhasPdf } = await import('../services/solar/solarRelatorioPdfService.js');
-    await gerarRelatorioFalhasPdf({
-      res, tenantId, plantId: req.params.id, dataInicio, dataFim,
+    const { buffer, fileName } = await gerarRelatorioFalhasPdf({
+      tenantId, plantId: req.params.id, dataInicio, dataFim,
       inverterId: inverterId || null,
     });
+    return enviarPdf(res, buffer, fileName);
   } catch (err) {
     console.error('[SOLAR_RELATORIO_FALHAS_PDF]', err);
-    if (!res.headersSent) res.status(500).json({ error: err.message });
+    return res.status(err.status || 500).json({ error: err.message });
   }
 });
 

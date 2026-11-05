@@ -53,7 +53,7 @@ function formatDateTime(value, locale = 'pt-BR', timeZone = 'UTC') {
   }).format(parsed);
 }
 
-function safeText(value, fallback = 'N/A') {
+export function safeText(value, fallback = 'N/A') {
   if (value === null || value === undefined || value === '') {
     return fallback;
   }
@@ -61,14 +61,14 @@ function safeText(value, fallback = 'N/A') {
   return String(value);
 }
 
-function getMaxY(doc) {
+export function getMaxY(doc) {
   return doc.page.height - doc.page.margins.bottom - 24;
 }
 
 // Prepara informações da entidade exibida no bloco "Dados da Empresa":
 // Unidade quando há unidadeId disponível (CNPJ + endereço fiscal),
 // senão fallback no Tenant (só nome + contatos da conta). Idempotente.
-async function injectTenantInfo(payload, options = {}) {
+export async function injectTenantInfo(payload, options = {}) {
   if (options.tenantInfo) return options;
 
   const unidadeId =
@@ -172,7 +172,7 @@ function drawFooter(doc, { showSignature = true } = {}) {
   doc.y = doc.page.margins.top;
 }
 
-function createDocument(title, options = {}) {
+export function createDocument(title, options = {}) {
   const doc = new PDFDocument({
     size: 'A4',
     // top: 134 = HEADER_TOP_OFFSET (24) + bandH (52) + separadora (38) +
@@ -192,7 +192,7 @@ function createDocument(title, options = {}) {
   return doc;
 }
 
-function finalizeDocument(doc, options = {}) {
+export function finalizeDocument(doc, options = {}) {
   drawFooter(doc, options);
 
   return new Promise((resolve, reject) => {
@@ -212,7 +212,7 @@ function ensureSpace(doc, neededHeight = 32) {
   doc.addPage();
 }
 
-function drawGroupHeader(doc, title, rightText = null) {
+export function drawGroupHeader(doc, title, rightText = null) {
   ensureSpace(doc, 80);
 
   const x = doc.page.margins.left;
@@ -243,7 +243,7 @@ function drawGroupHeader(doc, title, rightText = null) {
 // abaixo tem altura minima conhecida (ex: tabela com header + 1 row),
 // passar { minContentBelow: N } pra garantir que o titulo nao fique
 // orfa no fim da pagina enquanto o conteudo vai pra proxima.
-function drawSectionTitle(doc, title, opts = {}) {
+export function drawSectionTitle(doc, title, opts = {}) {
   const minContentBelow = Math.max(0, Number(opts?.minContentBelow) || 0);
   ensureSpace(doc, 60 + minContentBelow);
   doc.moveDown(0.8);
@@ -310,7 +310,7 @@ function drawInfoGrid(doc, items = [], columns = 2) {
   doc.y = maxBottom + 12;
 }
 
-function drawParagraph(doc, text) {
+export function drawParagraph(doc, text) {
   ensureSpace(doc, 40);
   doc
     .font('Helvetica')
@@ -323,7 +323,7 @@ function drawParagraph(doc, text) {
   doc.moveDown(0.8);
 }
 
-function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum registro encontrado.', fontSize = 9, headerFontSize = 8 }) {
+export function drawTable(doc, { headers, rows, columnWidths, emptyMessage = 'Nenhum registro encontrado.', fontSize = 9, headerFontSize = 8 }) {
   const tableX = doc.page.margins.left;
   const headerHeight = 24;
   const paddingX = 6;
@@ -552,7 +552,7 @@ function buildHistoricoRows(eventos = [], locale, timeZone) {
 }
 
 // ── Cards visuais de KPI (2 colunas, N linhas) ─────────────────────────────
-function drawKpiCards(doc, cards) {
+export function drawKpiCards(doc, cards) {
   const ml = doc.page.margins.left;
   const totalW = doc.page.width - ml - doc.page.margins.right;
   const cardW = (totalW - 10) / 2;
