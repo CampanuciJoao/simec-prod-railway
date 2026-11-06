@@ -45,11 +45,28 @@ const agendamentoCampos = z.object({
     .regex(localTimeRegex, 'A hora final deve estar no formato HH:mm.'),
 });
 
+// Lista dos tipos de servico predial — espelha o enum TipoServicoPredial
+// do Prisma. Mantida junto porque o validator precisa aceitar o mesmo
+// conjunto.
+export const TIPOS_SERVICO_PREDIAL = [
+  'LimpezaCaixaDagua',
+  'Dedetizacao',
+  'ExtintorRecarga',
+  'ExtintorTesteHidrostatico',
+  'BebedouroTrocaFiltro',
+  'BebedouroHigienizacao',
+  'SpdaParaRaios',
+  'Avcb',
+  'AlvaraSanitario',
+];
+
 export const manutencaoSchema = z
   .object({
-    equipamentoId: z
-      .string({ required_error: 'O equipamento e obrigatorio.' })
-      .min(1, 'O equipamento e obrigatorio.'),
+    categoria: z.enum(['Equipamento', 'Predial']).optional().default('Equipamento'),
+    // Obrigatorios condicionais — validados no superRefine
+    equipamentoId: z.string().trim().nullable().optional(),
+    tipoServicoPredial: z.enum(TIPOS_SERVICO_PREDIAL).nullable().optional(),
+    unidadePredialId: z.string().trim().nullable().optional(),
     tipo: z.enum(['Preventiva', 'Corretiva', 'Calibracao', 'Inspecao'], {
       errorMap: () => ({ message: 'Tipo de manutencao invalido.' }),
     }),
@@ -87,6 +104,34 @@ export const manutencaoSchema = z
       .optional(),
   })
   .superRefine((data, ctx) => {
+    // Validacao condicional por categoria.
+    //   Equipamento -> exige equipamentoId
+    //   Predial     -> exige unidadePredialId + tipoServicoPredial
+    if (data.categoria === 'Predial') {
+      if (!data.unidadePredialId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['unidadePredialId'],
+          message: 'Selecione a unidade pra manutencao predial.',
+        });
+      }
+      if (!data.tipoServicoPredial) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['tipoServicoPredial'],
+          message: 'Selecione o tipo de servico predial.',
+        });
+      }
+    } else {
+      if (!data.equipamentoId) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['equipamentoId'],
+          message: 'O equipamento e obrigatorio.',
+        });
+      }
+    }
+
     const temInicio = !!data.agendamentoDataInicioLocal && !!data.agendamentoHoraInicioLocal;
     const temFim = !!data.agendamentoDataFimLocal && !!data.agendamentoHoraFimLocal;
     const temAgendamento = temInicio || temFim;

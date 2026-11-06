@@ -57,6 +57,29 @@ const RECOVERY_SQL_POR_MIGRATION = {
     `DELETE FROM "_prisma_migrations"
        WHERE migration_name = '20261105000001_solar_falhas_e_agregados'`,
   ],
+  '20261106000001_manutencao_predial': [
+    `ALTER TABLE "manutencoes"
+      DROP CONSTRAINT IF EXISTS "manutencoes_unidade_predial_fkey"`,
+    'DROP INDEX IF EXISTS "manutencoes_tenantId_categoria_idx"',
+    'ALTER TABLE "manutencoes" DROP COLUMN IF EXISTS "categoria"',
+    'ALTER TABLE "manutencoes" DROP COLUMN IF EXISTS "tipo_servico_predial"',
+    'ALTER TABLE "manutencoes" DROP COLUMN IF EXISTS "unidade_predial_id"',
+    // Restaura NOT NULL em equipamento_id (safe — ja era NOT NULL antes)
+    `DO $do$
+       BEGIN
+         IF EXISTS (SELECT 1 FROM information_schema.columns
+                    WHERE table_name = 'manutencoes'
+                      AND column_name = 'equipamento_id'
+                      AND is_nullable = 'YES') THEN
+           ALTER TABLE "manutencoes" ALTER COLUMN "equipamento_id" SET NOT NULL;
+         END IF;
+       END
+     $do$`,
+    'DROP TYPE IF EXISTS "TipoServicoPredial"',
+    'DROP TYPE IF EXISTS "CategoriaManutencao"',
+    `DELETE FROM "_prisma_migrations"
+       WHERE migration_name = '20261106000001_manutencao_predial'`,
+  ],
 };
 
 async function executarRecoverySql(statements) {

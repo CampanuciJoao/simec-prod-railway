@@ -125,6 +125,7 @@ model Unidade {
   contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
   orcamentos        Orcamento[]
   solarPlants       SolarPlant[]
+  manutencoesPrediais Manutencao[] @relation("ManutencoesPrediaisPorUnidade")
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -314,12 +315,20 @@ model Manutencao {
   dataFimReal    DateTime? @map("data_fim_real")
   dataConclusao  DateTime? @map("data_conclusao")
   custoTotal     Float?    @map("custo_total")
-  equipamentoId  String    @map("equipamento_id")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  // Equipamento-Manutencao: categoria=Equipamento exige equipamentoId;
+  // Predial exige tipoServicoPredial + unidadeId.
+  categoria              CategoriaManutencao @default(Equipamento)
+  tipoServicoPredial     TipoServicoPredial? @map("tipo_servico_predial")
+  // unidadePredialId so e preenchido quando categoria=Predial.
+  // Manutencao de equipamento pega a unidade via relacao com Equipamento.
+  unidadePredialId       String?             @map("unidade_predial_id")
+  equipamentoId          String?             @map("equipamento_id")
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
 
   tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  equipamento    Equipamento        @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  equipamento    Equipamento?       @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
+  unidadePredial Unidade?           @relation("ManutencoesPrediaisPorUnidade", fields: [tenantId, unidadePredialId], references: [tenantId, id], onDelete: SetNull)
   anexos         Anexo[]
   notasAndamento NotaAndamento[]
   eventos        ManutencaoEvento[]
@@ -766,6 +775,38 @@ enum TipoManutencao {
   Corretiva
   Calibracao
   Inspecao
+}
+
+// Separa manutencao de equipamento (radiologico, veicular) de rotinas
+// prediais (caixa d'agua, extintor, dedetizacao, bebedouro). Rotinas
+// prediais usam o mesmo modelo Manutencao pra reaproveitar agendamento,
+// OS, confirmacao, PDF e alertas de vencimento.
+enum CategoriaManutencao {
+  Equipamento
+  Predial
+}
+
+// Tipos de servico predial com periodicidade regulatoria conhecida.
+// A lista reflete exigencias da VISA/ANVISA/Bombeiros para clinicas:
+//   LimpezaCaixaDagua        6 em 6 meses (Portaria MS 2914)
+//   Dedetizacao              6 em 6 meses (RDC 52 ANVISA — estabelecimentos saude)
+//   ExtintorRecarga          12 em 12 meses (NBR 12962, nivel 2)
+//   ExtintorTesteHidrostatico 5 em 5 anos (NBR 12962, nivel 3)
+//   BebedouroTrocaFiltro     6 em 6 meses ou 2000L (Lei RJ 6688)
+//   BebedouroHigienizacao    6 em 6 meses (pratica VISA)
+//   SpdaParaRaios            anual + evento atmosferico (NBR 5419)
+//   Avcb                     renovacao conforme CBM-MS
+//   AlvaraSanitario          anual (ANVISA + VISA municipal)
+enum TipoServicoPredial {
+  LimpezaCaixaDagua
+  Dedetizacao
+  ExtintorRecarga
+  ExtintorTesteHidrostatico
+  BebedouroTrocaFiltro
+  BebedouroHigienizacao
+  SpdaParaRaios
+  Avcb
+  AlvaraSanitario
 }
 
 enum StatusManutencao {
