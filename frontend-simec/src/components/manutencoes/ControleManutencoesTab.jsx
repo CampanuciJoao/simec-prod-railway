@@ -11,7 +11,7 @@ import PropTypes from 'prop-types';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faCircleCheck, faCircleExclamation, faTriangleExclamation,
-  faHistory, faWrench, faBuilding, faClock,
+  faHistory, faWrench, faBuilding, faClock, faChevronRight,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { Card, LoadingState, InlineEmptyState } from '@/components/ui';
@@ -159,27 +159,47 @@ function resumoDoGrupo(rotinas) {
   return r;
 }
 
-function BlocoUnidade({ unidade, rotinas, onAbrirHistorico }) {
+// Cada unidade vira um bloco colapsavel (details nativo). Default = fechado
+// quando ha mais de uma unidade (dashboard enxuto); quando so ha 1, abre
+// pra nao exigir click extra. Se qualquer rotina esta vencida ou proxima,
+// tambem abre por default pra o usuario ver o problema sem precisar clicar.
+function BlocoUnidade({ unidade, rotinas, onAbrirHistorico, forcarAberto = false }) {
   const r = resumoDoGrupo(rotinas);
+  const temAtencao = (r.vencido || 0) > 0 || (r.proximo || 0) > 0;
+  const abrirPorDefault = forcarAberto || temAtencao;
+
   return (
-    <div className="rounded-xl border p-4"
-      style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-          {unidade}
-          <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+    <details
+      className="group rounded-xl border"
+      open={abrirPorDefault}
+      style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
+    >
+      <summary
+        className="flex cursor-pointer select-none flex-wrap items-center justify-between gap-2 px-4 py-3"
+        style={{ listStyle: 'none' }}
+      >
+        <div className="flex items-center gap-2">
+          <FontAwesomeIcon
+            icon={faChevronRight}
+            className="text-xs transition-transform group-open:rotate-90"
+            style={{ color: 'var(--text-muted)' }}
+          />
+          <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+            {unidade}
+          </h4>
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
             style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary)' }}>
             {rotinas.length}
           </span>
-        </h4>
+        </div>
         <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
           {r.vencido > 0 && <span style={{ color: 'var(--color-danger)' }}>{r.vencido} vencido(s)</span>}
           {r.proximo > 0 && <span style={{ color: 'var(--color-warning)' }}>{r.proximo} próximo(s)</span>}
           {r.em_dia > 0 && <span style={{ color: 'var(--color-success)' }}>{r.em_dia} em dia</span>}
           {r.sem_historico > 0 && <span>{r.sem_historico} sem hist.</span>}
         </div>
-      </div>
-      <div className="space-y-2">
+      </summary>
+      <div className="space-y-2 px-4 pb-4 pt-0">
         {rotinas.map((item) => (
           <LinhaRotina
             key={item.equipamentoId || item.rotinaId}
@@ -188,13 +208,14 @@ function BlocoUnidade({ unidade, rotinas, onAbrirHistorico }) {
           />
         ))}
       </div>
-    </div>
+    </details>
   );
 }
 BlocoUnidade.propTypes = {
   unidade: PropTypes.string.isRequired,
   rotinas: PropTypes.array.isRequired,
   onAbrirHistorico: PropTypes.func.isRequired,
+  forcarAberto: PropTypes.bool,
 };
 
 function Secao({ titulo, icon, items, onAbrirHistorico, resumo }) {
@@ -228,6 +249,7 @@ function Secao({ titulo, icon, items, onAbrirHistorico, resumo }) {
               unidade={unidade}
               rotinas={rotinas}
               onAbrirHistorico={onAbrirHistorico}
+              forcarAberto={grupos.length === 1}
             />
           ))}
         </div>
