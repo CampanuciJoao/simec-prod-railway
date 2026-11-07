@@ -88,8 +88,8 @@ function LinhaRotina({ item, onAbrirHistorico }) {
     ? (item.nome || item.modelo || item.tag || '—')
     : (TIPOS_SERVICO_PREDIAL_LABELS[item.tipoServicoPredial] || item.tipoServicoPredial);
   const sub = ehEquipamento
-    ? `${item.tag ? `TAG ${item.tag} · ` : ''}${item.tipoEquipamento || ''}`
-    : `Unidade: ${item.unidadeNome}`;
+    ? `${item.tag ? `TAG ${item.tag} · ` : ''}${item.tipoEquipamento || ''} · ${freqLabel(item.frequenciaMeses)}`
+    : `${freqLabel(item.frequenciaMeses)}`;
 
   const proxima = item.proximaPrevistaEm
     ? new Date(item.proximaPrevistaEm).toLocaleDateString('pt-BR')
@@ -113,7 +113,7 @@ function LinhaRotina({ item, onAbrirHistorico }) {
           {nome}
         </p>
         <p className="truncate text-[11px]" style={{ color: 'var(--text-muted)' }}>
-          {sub} · {freqLabel(item.frequenciaMeses)}
+          {sub}
         </p>
       </div>
 
@@ -138,7 +138,67 @@ function LinhaRotina({ item, onAbrirHistorico }) {
 }
 LinhaRotina.propTypes = { item: PropTypes.object.isRequired, onAbrirHistorico: PropTypes.func.isRequired };
 
+// Agrupa itens por unidadeNome, ordenando os grupos alfabeticamente.
+// Dentro de cada grupo mantemos a ordem original (ja vem ordenada do
+// backend por tipoServicoPredial ou modelo).
+function agruparPorUnidade(items) {
+  const mapa = new Map();
+  for (const it of items) {
+    const chave = it.unidadeNome || '—';
+    if (!mapa.has(chave)) mapa.set(chave, []);
+    mapa.get(chave).push(it);
+  }
+  return [...mapa.entries()]
+    .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+    .map(([unidade, rotinas]) => ({ unidade, rotinas }));
+}
+
+function resumoDoGrupo(rotinas) {
+  const r = { em_dia: 0, proximo: 0, vencido: 0, sem_historico: 0 };
+  for (const it of rotinas) r[it.status] = (r[it.status] || 0) + 1;
+  return r;
+}
+
+function BlocoUnidade({ unidade, rotinas, onAbrirHistorico }) {
+  const r = resumoDoGrupo(rotinas);
+  return (
+    <div className="rounded-xl border p-4"
+      style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h4 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+          {unidade}
+          <span className="ml-2 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+            style={{ backgroundColor: 'var(--brand-primary-soft)', color: 'var(--brand-primary)' }}>
+            {rotinas.length}
+          </span>
+        </h4>
+        <div className="flex items-center gap-3 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          {r.vencido > 0 && <span style={{ color: 'var(--color-danger)' }}>{r.vencido} vencido(s)</span>}
+          {r.proximo > 0 && <span style={{ color: 'var(--color-warning)' }}>{r.proximo} próximo(s)</span>}
+          {r.em_dia > 0 && <span style={{ color: 'var(--color-success)' }}>{r.em_dia} em dia</span>}
+          {r.sem_historico > 0 && <span>{r.sem_historico} sem hist.</span>}
+        </div>
+      </div>
+      <div className="space-y-2">
+        {rotinas.map((item) => (
+          <LinhaRotina
+            key={item.equipamentoId || item.rotinaId}
+            item={item}
+            onAbrirHistorico={onAbrirHistorico}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+BlocoUnidade.propTypes = {
+  unidade: PropTypes.string.isRequired,
+  rotinas: PropTypes.array.isRequired,
+  onAbrirHistorico: PropTypes.func.isRequired,
+};
+
 function Secao({ titulo, icon, items, onAbrirHistorico, resumo }) {
+  const grupos = agruparPorUnidade(items);
   return (
     <Card className="p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -161,11 +221,12 @@ function Secao({ titulo, icon, items, onAbrirHistorico, resumo }) {
       {items.length === 0 ? (
         <InlineEmptyState message="Nenhuma rotina cadastrada." />
       ) : (
-        <div className="space-y-2">
-          {items.map((item) => (
-            <LinhaRotina
-              key={item.equipamentoId || item.rotinaId}
-              item={item}
+        <div className="space-y-3">
+          {grupos.map(({ unidade, rotinas }) => (
+            <BlocoUnidade
+              key={unidade}
+              unidade={unidade}
+              rotinas={rotinas}
               onAbrirHistorico={onAbrirHistorico}
             />
           ))}
