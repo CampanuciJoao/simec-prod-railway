@@ -794,12 +794,15 @@ enum CategoriaManutencao {
 //                      coberto na mesma OS a cada 5 anos
 //   Bebedouro          troca de filtro + higienizacao juntas, 6 em 6 meses
 //   SpdaParaRaios      anual + apos evento atmosferico (NBR 5419)
+//   ArtElevador        anual (ART emitida pelo tecnico responsavel do
+//                      contrato de manutencao, registro no CREA)
 enum TipoServicoPredial {
   LimpezaCaixaDagua
   Dedetizacao
   Extintor
   Bebedouro
   SpdaParaRaios
+  ArtElevador
 }
 
 enum StatusManutencao {

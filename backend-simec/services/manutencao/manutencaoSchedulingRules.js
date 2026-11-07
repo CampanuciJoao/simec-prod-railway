@@ -96,6 +96,7 @@ const PREFIXO_PREDIAL = {
   Extintor:          'EXT',
   Bebedouro:         'BEB',
   SpdaParaRaios:     'SPD',
+  ArtElevador:       'ART',
 };
 
 export function gerarNumeroOSPredial({

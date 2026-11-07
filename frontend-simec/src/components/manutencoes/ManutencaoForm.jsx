@@ -76,6 +76,7 @@ function ManutencaoForm({
     { value: 'Extintor',          label: 'Extintor — recarga anual (NBR 12962)' },
     { value: 'Bebedouro',         label: 'Bebedouro — troca de filtro + higienização (6/6 meses)' },
     { value: 'SpdaParaRaios',     label: 'SPDA / para-raios (anual)' },
+    { value: 'ArtElevador',       label: 'ART do elevador (anual — CREA)' },
   ];
 
   const categoriaOptions = [

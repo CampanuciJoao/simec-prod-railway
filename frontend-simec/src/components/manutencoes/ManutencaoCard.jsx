@@ -35,6 +35,7 @@ const TIPOS_SERVICO_PREDIAL_LABELS = {
   Extintor:          'Extintor',
   Bebedouro:         'Bebedouro',
   SpdaParaRaios:     'SPDA / para-raios',
+  ArtElevador:       'ART do elevador',
 };
 
 const STATUS_BORDER = {

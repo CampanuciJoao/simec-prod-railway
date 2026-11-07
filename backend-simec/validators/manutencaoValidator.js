@@ -54,6 +54,7 @@ export const TIPOS_SERVICO_PREDIAL = [
   'Extintor',
   'Bebedouro',
   'SpdaParaRaios',
+  'ArtElevador',
 ];
 
 export const manutencaoSchema = z
