@@ -3,38 +3,36 @@
 --   BebedouroTrocaFiltro + BebedouroHigienizacao -> Bebedouro (consolidado)
 --   Avcb + AlvaraSanitario removidos (nao sao servicos de manutencao recorrente)
 --
--- Como Postgres nao permite DROP VALUE em enum, a estrategia e:
---   1. Converter manutencoes existentes dos valores antigos pros novos
---   2. Renomear enum antigo, criar novo com so os 5 valores
---   3. Converter coluna + dropar enum antigo
+-- Ordem importa: antes de referenciar o novo valor no cast, a coluna
+-- precisa estar em TEXT (nao no enum antigo). Caso contrario o cast
+-- 'Extintor'::"TipoServicoPredial" falha porque o enum ATUAL nao tem
+-- esse valor.
 
--- Migra registros existentes (idempotente — se nao ha, nao faz nada)
+-- 1. Coluna vai temporariamente pra TEXT
+ALTER TABLE "manutencoes"
+  ALTER COLUMN "tipo_servico_predial" TYPE text
+  USING "tipo_servico_predial"::text;
+
+-- 2. Normaliza valores antigos pros novos (idempotente — se nao ha dados,
+--    estes UPDATE sao no-op)
 UPDATE "manutencoes"
-  SET "tipo_servico_predial" = 'Extintor'::"TipoServicoPredial"
-  WHERE "tipo_servico_predial" IN (
-    'ExtintorRecarga'::"TipoServicoPredial",
-    'ExtintorTesteHidrostatico'::"TipoServicoPredial"
-  );
+  SET "tipo_servico_predial" = 'Extintor'
+  WHERE "tipo_servico_predial" IN ('ExtintorRecarga', 'ExtintorTesteHidrostatico');
 
 UPDATE "manutencoes"
-  SET "tipo_servico_predial" = 'Bebedouro'::"TipoServicoPredial"
-  WHERE "tipo_servico_predial" IN (
-    'BebedouroTrocaFiltro'::"TipoServicoPredial",
-    'BebedouroHigienizacao'::"TipoServicoPredial"
-  );
+  SET "tipo_servico_predial" = 'Bebedouro'
+  WHERE "tipo_servico_predial" IN ('BebedouroTrocaFiltro', 'BebedouroHigienizacao');
 
 -- Registros com Avcb ou AlvaraSanitario viram NULL (manutencao predial
 -- generica) — admin pode reclassificar ou cancelar depois.
 UPDATE "manutencoes"
   SET "tipo_servico_predial" = NULL
-  WHERE "tipo_servico_predial" IN (
-    'Avcb'::"TipoServicoPredial",
-    'AlvaraSanitario'::"TipoServicoPredial"
-  );
+  WHERE "tipo_servico_predial" IN ('Avcb', 'AlvaraSanitario');
 
--- Ping-pong de enum (Postgres nao suporta DROP VALUE)
-ALTER TYPE "TipoServicoPredial" RENAME TO "TipoServicoPredial_old";
+-- 3. Dropa o enum antigo (coluna ja esta em TEXT, nao depende mais dele)
+DROP TYPE "TipoServicoPredial";
 
+-- 4. Cria enum novo com os 5 valores consolidados
 CREATE TYPE "TipoServicoPredial" AS ENUM (
   'LimpezaCaixaDagua',
   'Dedetizacao',
@@ -43,10 +41,17 @@ CREATE TYPE "TipoServicoPredial" AS ENUM (
   'SpdaParaRaios'
 );
 
--- Como ja normalizamos os valores acima, o cast via text funciona pra
--- os sobreviventes. ExtintorRecarga etc nao existem mais na coluna.
+-- 5. Converte coluna de volta pra enum. Qualquer valor nao-canonico vira
+--    NULL (via USING que retorna NULL se o cast falhar — impossivel aqui
+--    pq ja normalizamos na etapa 2).
 ALTER TABLE "manutencoes"
   ALTER COLUMN "tipo_servico_predial" TYPE "TipoServicoPredial"
-    USING ("tipo_servico_predial"::text::"TipoServicoPredial");
-
-DROP TYPE "TipoServicoPredial_old";
+  USING (
+    CASE
+      WHEN "tipo_servico_predial" IN (
+        'LimpezaCaixaDagua', 'Dedetizacao', 'Extintor', 'Bebedouro', 'SpdaParaRaios'
+      )
+      THEN "tipo_servico_predial"::"TipoServicoPredial"
+      ELSE NULL
+    END
+  );
