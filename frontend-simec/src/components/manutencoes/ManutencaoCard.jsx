@@ -26,19 +26,15 @@ function getTipoLabel(tipo) {
   return tipo ? String(tipo).replace(/([A-Z])/g, ' $1').trim() : '-';
 }
 
-// Rotulos amigaveis para os 9 tipos de servico predial (espelha
+// Rotulos amigaveis para os 5 tipos de servico predial (espelha
 // TipoServicoPredial do Prisma). Usado em cards e listagens pra
 // substituir o nome do equipamento quando categoria === 'Predial'.
 const TIPOS_SERVICO_PREDIAL_LABELS = {
-  LimpezaCaixaDagua:        'Limpeza de caixa d’água',
-  Dedetizacao:              'Dedetização',
-  ExtintorRecarga:          'Extintor — recarga anual',
-  ExtintorTesteHidrostatico:'Extintor — teste hidrostático',
-  BebedouroTrocaFiltro:     'Bebedouro — troca de filtro',
-  BebedouroHigienizacao:    'Bebedouro — higienização',
-  SpdaParaRaios:            'SPDA / para-raios',
-  Avcb:                     'AVCB',
-  AlvaraSanitario:          'Alvará sanitário',
+  LimpezaCaixaDagua: 'Limpeza de caixa d’água',
+  Dedetizacao:       'Dedetização',
+  Extintor:          'Extintor',
+  Bebedouro:         'Bebedouro',
+  SpdaParaRaios:     'SPDA / para-raios',
 };
 
 const STATUS_BORDER = {

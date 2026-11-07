@@ -787,26 +787,19 @@ enum CategoriaManutencao {
 }
 
 // Tipos de servico predial com periodicidade regulatoria conhecida.
-// A lista reflete exigencias da VISA/ANVISA/Bombeiros para clinicas:
-//   LimpezaCaixaDagua        6 em 6 meses (Portaria MS 2914)
-//   Dedetizacao              6 em 6 meses (RDC 52 ANVISA — estabelecimentos saude)
-//   ExtintorRecarga          12 em 12 meses (NBR 12962, nivel 2)
-//   ExtintorTesteHidrostatico 5 em 5 anos (NBR 12962, nivel 3)
-//   BebedouroTrocaFiltro     6 em 6 meses ou 2000L (Lei RJ 6688)
-//   BebedouroHigienizacao    6 em 6 meses (pratica VISA)
-//   SpdaParaRaios            anual + evento atmosferico (NBR 5419)
-//   Avcb                     renovacao conforme CBM-MS
-//   AlvaraSanitario          anual (ANVISA + VISA municipal)
+// Lista consolidada apos feedback operacional:
+//   LimpezaCaixaDagua  6 em 6 meses (Portaria MS 2914)
+//   Dedetizacao        6 em 6 meses (RDC 52 ANVISA — estabelecimentos saude)
+//   Extintor           recarga anual (NBR 12962) — teste hidrostatico fica
+//                      coberto na mesma OS a cada 5 anos
+//   Bebedouro          troca de filtro + higienizacao juntas, 6 em 6 meses
+//   SpdaParaRaios      anual + apos evento atmosferico (NBR 5419)
 enum TipoServicoPredial {
   LimpezaCaixaDagua
   Dedetizacao
-  ExtintorRecarga
-  ExtintorTesteHidrostatico
-  BebedouroTrocaFiltro
-  BebedouroHigienizacao
+  Extintor
+  Bebedouro
   SpdaParaRaios
-  Avcb
-  AlvaraSanitario
 }
 
 enum StatusManutencao {

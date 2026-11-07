@@ -51,13 +51,9 @@ const agendamentoCampos = z.object({
 export const TIPOS_SERVICO_PREDIAL = [
   'LimpezaCaixaDagua',
   'Dedetizacao',
-  'ExtintorRecarga',
-  'ExtintorTesteHidrostatico',
-  'BebedouroTrocaFiltro',
-  'BebedouroHigienizacao',
+  'Extintor',
+  'Bebedouro',
   'SpdaParaRaios',
-  'Avcb',
-  'AlvaraSanitario',
 ];
 
 export const manutencaoSchema = z

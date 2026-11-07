@@ -91,15 +91,11 @@ export function gerarNumeroOS({
 // Prefixo 3 letras pra cada tipo de servico predial. Usado no numero
 // da OS (ex: PCXA-0001 pra limpeza de caixa d'agua preventiva).
 const PREFIXO_PREDIAL = {
-  LimpezaCaixaDagua:        'CXA',
-  Dedetizacao:              'DED',
-  ExtintorRecarga:          'EXT',
-  ExtintorTesteHidrostatico:'EXH',
-  BebedouroTrocaFiltro:     'BTF',
-  BebedouroHigienizacao:    'BHI',
-  SpdaParaRaios:            'SPD',
-  Avcb:                     'AVC',
-  AlvaraSanitario:          'ALV',
+  LimpezaCaixaDagua: 'CXA',
+  Dedetizacao:       'DED',
+  Extintor:          'EXT',
+  Bebedouro:         'BEB',
+  SpdaParaRaios:     'SPD',
 };
 
 export function gerarNumeroOSPredial({

@@ -71,15 +71,11 @@ function ManutencaoForm({
   // com periodicidade sugerida. Label mostrado no dropdown ja da a dica
   // de recorrencia sem precisar abrir manual.
   const tiposServicoPredialOptions = [
-    { value: 'LimpezaCaixaDagua',        label: 'Limpeza de caixa d’água (6/6 meses)' },
-    { value: 'Dedetizacao',              label: 'Dedetização / desinsetiçação (6/6 meses)' },
-    { value: 'ExtintorRecarga',          label: 'Extintor — recarga anual (12/12 meses)' },
-    { value: 'ExtintorTesteHidrostatico',label: 'Extintor — teste hidrostático (5/5 anos)' },
-    { value: 'BebedouroTrocaFiltro',     label: 'Bebedouro — troca de filtro (6/6 meses)' },
-    { value: 'BebedouroHigienizacao',    label: 'Bebedouro — higienização (6/6 meses)' },
-    { value: 'SpdaParaRaios',            label: 'SPDA / para-raios (anual)' },
-    { value: 'Avcb',                     label: 'AVCB (renovação Bombeiros)' },
-    { value: 'AlvaraSanitario',          label: 'Alvará sanitário (anual)' },
+    { value: 'LimpezaCaixaDagua', label: 'Limpeza de caixa d’água (6/6 meses)' },
+    { value: 'Dedetizacao',       label: 'Dedetização / desinsetiçação (6/6 meses)' },
+    { value: 'Extintor',          label: 'Extintor — recarga anual (NBR 12962)' },
+    { value: 'Bebedouro',         label: 'Bebedouro — troca de filtro + higienização (6/6 meses)' },
+    { value: 'SpdaParaRaios',     label: 'SPDA / para-raios (anual)' },
   ];
 
   const categoriaOptions = [

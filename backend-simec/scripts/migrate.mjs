@@ -57,6 +57,26 @@ const RECOVERY_SQL_POR_MIGRATION = {
     `DELETE FROM "_prisma_migrations"
        WHERE migration_name = '20261105000001_solar_falhas_e_agregados'`,
   ],
+  '20261107000001_simplificar_tipos_prediais': [
+    // Caso fique "meio no caminho" com o enum antigo renomeado:
+    // restaura o nome, dropando o novo se existir. Se a migration nem
+    // chegou a renomear, isso e no-op.
+    `DO $do$
+       BEGIN
+         IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoServicoPredial_old') THEN
+           ALTER TABLE "manutencoes" ALTER COLUMN "tipo_servico_predial" TYPE text;
+           IF EXISTS (SELECT 1 FROM pg_type WHERE typname = 'TipoServicoPredial') THEN
+             DROP TYPE "TipoServicoPredial";
+           END IF;
+           ALTER TYPE "TipoServicoPredial_old" RENAME TO "TipoServicoPredial";
+           ALTER TABLE "manutencoes" ALTER COLUMN "tipo_servico_predial" TYPE "TipoServicoPredial"
+             USING "tipo_servico_predial"::"TipoServicoPredial";
+         END IF;
+       END
+     $do$`,
+    `DELETE FROM "_prisma_migrations"
+       WHERE migration_name = '20261107000001_simplificar_tipos_prediais'`,
+  ],
   '20261106000001_manutencao_predial': [
     `ALTER TABLE "manutencoes"
       DROP CONSTRAINT IF EXISTS "manutencoes_unidade_predial_fkey"`,
