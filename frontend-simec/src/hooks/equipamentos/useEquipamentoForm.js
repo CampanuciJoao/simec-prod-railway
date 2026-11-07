@@ -20,6 +20,7 @@ const ESTADO_INICIAL = {
   aeTitle: '',
   telefoneSuporte: '',
   observacoes: '',
+  frequenciaPreventivaMeses: null,
 };
 
 export function useEquipamentoForm({ initialData, isEditing }) {

@@ -9,3 +9,5 @@ export { default as ImportarLotePreventivasPanel } from './ImportarLotePreventiv
 export { default as ManutencaoCard } from './ManutencaoCard';
 export { default as ManutencoesTab } from './ManutencoesTab';
 export { default as OcorrenciasTab } from './OcorrenciasTab';
+export { default as ControleManutencoesTab } from './ControleManutencoesTab';
+export { default as ControleHistoricoModal } from './ControleHistoricoModal';

@@ -60,6 +60,9 @@ export const equipamentoSchema = z.object({
   anoFabricacao: optionalTextSchema,
   aeTitle: aeTitleSchema,
   telefoneSuporte: optionalTextSchema,
+  // Periodicidade da preventiva padrao em meses (3/6/12/24).
+  // Null = equipamento sem rotina cadastrada no Controle de Manutencoes.
+  frequenciaPreventivaMeses: z.number().int().positive().nullable().optional(),
 });
 
 export const equipamentoUpdateSchema = equipamentoSchema.partial();

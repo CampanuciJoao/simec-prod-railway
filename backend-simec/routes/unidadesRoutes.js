@@ -91,6 +91,28 @@ router.post('/', validate(unidadeSchema), async (req, res) => {
       },
     });
 
+    // Auto-seed das 6 rotinas prediais com periodicidades regulatorias
+    // padrao. Admin pode desativar/alterar depois. Falha silenciosa pra
+    // nao bloquear a criacao da unidade se der colisao em caso de retry.
+    try {
+      const DEFAULTS_ROTINAS_PREDIAIS = [
+        { tipoServicoPredial: 'LimpezaCaixaDagua', frequenciaMeses: 6 },
+        { tipoServicoPredial: 'Dedetizacao',       frequenciaMeses: 6 },
+        { tipoServicoPredial: 'Extintor',          frequenciaMeses: 12 },
+        { tipoServicoPredial: 'Bebedouro',         frequenciaMeses: 6 },
+        { tipoServicoPredial: 'SpdaParaRaios',     frequenciaMeses: 12 },
+        { tipoServicoPredial: 'ArtElevador',       frequenciaMeses: 12 },
+      ];
+      await prisma.rotinaPredial.createMany({
+        data: DEFAULTS_ROTINAS_PREDIAIS.map((r) => ({
+          tenantId, unidadeId: novaUnidade.id, ativa: true, ...r,
+        })),
+        skipDuplicates: true,
+      });
+    } catch (seedErr) {
+      console.warn('[ROTINAS_PREDIAIS_SEED] Falha ao criar rotinas default:', seedErr.message);
+    }
+
     await registrarLog({
       tenantId,
       usuarioId: req.usuario.id,

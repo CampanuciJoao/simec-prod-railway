@@ -217,6 +217,26 @@ function EquipamentoForm({
           />
         </ResponsiveGrid>
 
+        <ResponsiveGrid preset="form">
+          <Select
+            label="Frequência de preventiva"
+            value={formData.frequenciaPreventivaMeses ?? ''}
+            onChange={(e) => handleChange(
+              'frequenciaPreventivaMeses',
+              e.target.value === '' ? null : Number(e.target.value),
+            )}
+            options={[
+              { value: '',   label: 'Sem rotina preventiva' },
+              { value: '3',  label: 'Trimestral (3 meses)' },
+              { value: '4',  label: 'Quadrimestral (4 meses)' },
+              { value: '6',  label: 'Semestral (6 meses)' },
+              { value: '12', label: 'Anual (12 meses)' },
+              { value: '24', label: 'Bienal (24 meses)' },
+            ]}
+            hint="Define o cronograma do Controle de Manutenções — deixe em branco se não aplica."
+          />
+        </ResponsiveGrid>
+
         <Textarea
           label="Observações"
           value={formData.observacoes}

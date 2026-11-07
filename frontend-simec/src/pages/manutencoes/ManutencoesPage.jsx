@@ -18,6 +18,7 @@ import {
   ImportarLotePreventivasPanel,
   ManutencoesTab,
   OcorrenciasTab,
+  ControleManutencoesTab,
   ModalConfirmacaoManutencao,
 } from '@/components/manutencoes';
 
@@ -33,6 +34,7 @@ import {
 const TAB_IDS = {
   MANUTENCOES: 'manutencoes',
   OCORRENCIAS: 'ocorrencias',
+  CONTROLE:    'controle',
 };
 
 const VALID_TABS = new Set(Object.values(TAB_IDS));
@@ -60,6 +62,9 @@ function ManutencoesPage() {
 
   const [importOpen, setImportOpen] = useState(false);
 
+  // Aba Controle nao tem acao propria no header (e so visualizacao),
+  // entao mantemos as actions da aba Manutencoes como fallback — ainda
+  // util pra agendar enquanto o usuario esta olhando o dashboard.
   const headerActions =
     activeTab === TAB_IDS.OCORRENCIAS ? (
       <Button
@@ -102,6 +107,10 @@ function ManutencoesPage() {
       id: TAB_IDS.OCORRENCIAS,
       label: 'Ocorrências',
       badge: tabOcorrencias.metricas?.total ?? 0,
+    },
+    {
+      id: TAB_IDS.CONTROLE,
+      label: 'Controle',
     },
   ];
 
@@ -208,13 +217,19 @@ function ManutencoesPage() {
             onChange={handleTabChange}
           />
 
-          {activeTab === TAB_IDS.OCORRENCIAS ? (
+          {activeTab === TAB_IDS.OCORRENCIAS && (
             <OcorrenciasTab
               tab={tabOcorrencias}
               isAdmin={isAdmin}
               onDeleteOs={(o) => tabOcorrencias.deleteModal.openModal(o)}
             />
-          ) : (
+          )}
+
+          {activeTab === TAB_IDS.CONTROLE && (
+            <ControleManutencoesTab />
+          )}
+
+          {activeTab === TAB_IDS.MANUTENCOES && (
             <ManutencoesTab
               tab={tabManutencoes}
               isAdmin={isAdmin}

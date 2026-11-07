@@ -30,6 +30,10 @@ import {
 
 import { buscarManutencaoPorId, deletarManutencao } from '../services/manutencao/manutencaoRepository.js';
 import { adaptarManutencaoResponse } from '../services/manutencaoResponseAdapter.js';
+import {
+  obterControleManutencoes,
+  obterHistoricoControleManutencoes,
+} from '../services/manutencao/controleManutencoesService.js';
 import { registrarLog } from '../services/logService.js';
 
 const router = express.Router();
@@ -98,6 +102,39 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('[MANUTENCAO_LIST_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar manutenÃ§Ãµes.' });
+  }
+});
+
+// ─── Controle de Manutencoes (dashboard) ───────────────────────────────────
+// Lista equipamentos com freq preventiva + rotinas prediais ativas,
+// calculando ultima realizada + proxima prevista + status (em_dia/
+// proximo/vencido/sem_historico). Usado pela aba "Controle".
+router.get('/controle', async (req, res) => {
+  try {
+    const data = await obterControleManutencoes({ tenantId: req.tenantContext });
+    return res.json(data);
+  } catch (error) {
+    console.error('[MANUTENCAO_CONTROLE_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar controle de manutencoes.' });
+  }
+});
+
+// Historico recente de uma rotina (preventivas de 1 equipamento OU
+// servico predial de 1 unidade). Usado pelo modal com download de PDF.
+router.get('/controle/historico', async (req, res) => {
+  const { equipamentoId, unidadePredialId, tipoServicoPredial, limite } = req.query;
+  try {
+    const data = await obterHistoricoControleManutencoes({
+      tenantId: req.tenantContext,
+      equipamentoId: equipamentoId || null,
+      unidadePredialId: unidadePredialId || null,
+      tipoServicoPredial: tipoServicoPredial || null,
+      limite: limite ? Number(limite) : 10,
+    });
+    return res.json(data);
+  } catch (error) {
+    console.error('[MANUTENCAO_CONTROLE_HIST_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao buscar historico de controle.' });
   }
 });
 

@@ -81,6 +81,7 @@ model Tenant {
   solarFalhas               SolarFalha[]
   solarAgregadosDiarios     SolarAgregadoDiario[]
   solarAgregadosMensais     SolarAgregadoMensal[]
+  rotinasPrediais           RotinaPredial[]
 
   @@map("tenants")
 }
@@ -126,6 +127,7 @@ model Unidade {
   orcamentos        Orcamento[]
   solarPlants       SolarPlant[]
   manutencoesPrediais Manutencao[] @relation("ManutencoesPrediaisPorUnidade")
+  rotinasPrediais   RotinaPredial[]
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -197,6 +199,10 @@ model Equipamento {
   telefoneSuporte  String?           @map("telefone_suporte")
   observacoes      String?
   unidadeId        String
+  // Frequencia da preventiva padrao em meses (3=trimestral, 6=semestral,
+  // 12=anual). Null = equipamento sem rotina preventiva cadastrada (nao
+  // entra no Controle de Manutencoes).
+  frequenciaPreventivaMeses Int?     @map("frequencia_preventiva_meses")
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
 
@@ -2294,4 +2300,35 @@ model SolarAgregadoMensal {
   @@unique([tenantId, plantId, ano, mes])
   @@index([tenantId, plantId, ano(sort: Desc), mes(sort: Desc)])
   @@map("solar_agregados_mensais")
+}
+
+// ─── Controle de Manutencoes ─────────────────────────────────────────────────
+//
+// Rotina predial recorrente por unidade. Cadastra qual unidade monitora
+// qual tipo de servico predial com qual frequencia. Criada automaticamente
+// (seed) com periodicidade regulatoria padrao quando uma Unidade e
+// cadastrada; admin pode editar freq ou desativar.
+//
+// O dashboard de Controle de Manutencoes usa RotinaPredial + Equipamento.
+// frequenciaPreventivaMeses como base e calcula status:
+//   - em_dia      : proxima > 30 dias
+//   - proximo     : proxima <= 30 dias
+//   - vencido     : proxima <= 0 dias (ja passou)
+//   - sem_historico: nenhuma manutencao concluida registrada ainda
+model RotinaPredial {
+  id                 String             @id @default(uuid())
+  tenantId           String
+  unidadeId          String             @map("unidade_id")
+  tipoServicoPredial TipoServicoPredial @map("tipo_servico_predial")
+  frequenciaMeses    Int                @map("frequencia_meses")
+  ativa              Boolean            @default(true)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  tenant  Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade Unidade @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+
+  @@unique([tenantId, unidadeId, tipoServicoPredial])
+  @@index([tenantId, ativa])
+  @@map("rotinas_prediais")
 }

@@ -57,6 +57,12 @@ const RECOVERY_SQL_POR_MIGRATION = {
     `DELETE FROM "_prisma_migrations"
        WHERE migration_name = '20261105000001_solar_falhas_e_agregados'`,
   ],
+  '20261107000003_controle_manutencoes': [
+    'DROP TABLE IF EXISTS "rotinas_prediais" CASCADE',
+    'ALTER TABLE "equipamentos" DROP COLUMN IF EXISTS "frequencia_preventiva_meses"',
+    `DELETE FROM "_prisma_migrations"
+       WHERE migration_name = '20261107000003_controle_manutencoes'`,
+  ],
   '20261107000001_simplificar_tipos_prediais': [
     // Caso fique "meio no caminho" com o enum antigo renomeado:
     // restaura o nome, dropando o novo se existir. Se a migration nem
