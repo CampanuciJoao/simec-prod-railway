@@ -30,6 +30,7 @@ function ManutencaoForm({
     equipamentosFiltrados,
     unidades,
     isCorretiva,
+    isPredial,
     intervaloValido,
     fieldErrors,
     isValid,
@@ -66,13 +67,43 @@ function ManutencaoForm({
       label: equipamentoLabel(equipamento),
     }));
 
+  // Catalogo dos 9 tipos de servico predial regulados (VISA/ANVISA/CBM)
+  // com periodicidade sugerida. Label mostrado no dropdown ja da a dica
+  // de recorrencia sem precisar abrir manual.
+  const tiposServicoPredialOptions = [
+    { value: 'LimpezaCaixaDagua',        label: 'Limpeza de caixa d’água (6/6 meses)' },
+    { value: 'Dedetizacao',              label: 'Dedetização / desinsetiçação (6/6 meses)' },
+    { value: 'ExtintorRecarga',          label: 'Extintor — recarga anual (12/12 meses)' },
+    { value: 'ExtintorTesteHidrostatico',label: 'Extintor — teste hidrostático (5/5 anos)' },
+    { value: 'BebedouroTrocaFiltro',     label: 'Bebedouro — troca de filtro (6/6 meses)' },
+    { value: 'BebedouroHigienizacao',    label: 'Bebedouro — higienização (6/6 meses)' },
+    { value: 'SpdaParaRaios',            label: 'SPDA / para-raios (anual)' },
+    { value: 'Avcb',                     label: 'AVCB (renovação Bombeiros)' },
+    { value: 'AlvaraSanitario',          label: 'Alvará sanitário (anual)' },
+  ];
+
+  const categoriaOptions = [
+    { value: 'Equipamento', label: 'Equipamento' },
+    { value: 'Predial',     label: 'Predial (rotinas regulatórias)' },
+  ];
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <FormSection
-        title="Equipamento e classificação"
-        description="Selecione a unidade, o equipamento e o tipo de manutenção."
+        title={isPredial ? 'Rotina predial e classificação' : 'Equipamento e classificação'}
+        description={isPredial
+          ? 'Selecione a unidade, o tipo de serviço predial e o tipo de manutenção.'
+          : 'Selecione a unidade, o equipamento e o tipo de manutenção.'}
       >
         <ResponsiveGrid preset="form">
+          <Select
+            label="Categoria"
+            value={formData.categoria}
+            onChange={(event) => handleChange('categoria', event.target.value)}
+            options={categoriaOptions}
+            required
+          />
+
           <Select
             label="Unidade"
             value={formData.unidadeId}
@@ -81,16 +112,29 @@ function ManutencaoForm({
             required
           />
 
-          <Select
-            label="Equipamento"
-            value={formData.equipamentoId}
-            onChange={(event) =>
-              handleChange('equipamentoId', event.target.value)
-            }
-            options={equipamentosOptions}
-            disabled={!formData.unidadeId}
-            required
-          />
+          {isPredial ? (
+            <Select
+              label="Tipo de serviço predial"
+              value={formData.tipoServicoPredial}
+              onChange={(event) =>
+                handleChange('tipoServicoPredial', event.target.value)
+              }
+              options={tiposServicoPredialOptions}
+              disabled={!formData.unidadeId}
+              required
+            />
+          ) : (
+            <Select
+              label="Equipamento"
+              value={formData.equipamentoId}
+              onChange={(event) =>
+                handleChange('equipamentoId', event.target.value)
+              }
+              options={equipamentosOptions}
+              disabled={!formData.unidadeId}
+              required
+            />
+          )}
 
           <Select
             label="Tipo"
@@ -105,16 +149,16 @@ function ManutencaoForm({
           />
 
           <Input
-            label="Técnico responsável"
+            label={isPredial ? 'Empresa prestadora' : 'Técnico responsável'}
             value={formData.tecnicoResponsavel}
             onChange={(event) =>
               handleChange('tecnicoResponsavel', event.target.value)
             }
-            placeholder="Nome do técnico ou empresa"
+            placeholder={isPredial ? 'Nome da empresa prestadora' : 'Nome do técnico ou empresa'}
           />
         </ResponsiveGrid>
 
-        {formData.unidadeId && equipamentosOptions.length === 0 ? (
+        {!isPredial && formData.unidadeId && equipamentosOptions.length === 0 ? (
           <div
             className="mt-4 rounded-xl border px-4 py-3 text-sm"
             style={{

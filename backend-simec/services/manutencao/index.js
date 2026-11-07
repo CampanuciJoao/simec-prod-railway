@@ -8,6 +8,7 @@ import {
 
 import {
   buscarContextoOperacional,
+  buscarContextoOperacionalPredial,
   buscarManutencaoPorId,
   buscarManutencaoResumo,
   listarManutencoes,
@@ -26,6 +27,7 @@ import {
   montarMensagemErroAgendamento,
   validarAgendamento,
   gerarNumeroOS,
+  gerarNumeroOSPredial,
   montarPayloadPersistencia,
 } from './manutencaoSchedulingRules.js';
 
@@ -192,10 +194,18 @@ export async function criarManutencaoService({
   }
 
   const dadosValidados = validacaoPayload.data;
-  const contexto = await buscarContextoOperacional({
-    tenantId,
-    equipamentoId: dadosValidados.equipamentoId,
-  });
+  const ehPredial = dadosValidados.categoria === 'Predial';
+
+  // Contexto operacional: equipamento (fluxo padrao) ou unidade (predial).
+  // Timezone vem do equipamento.unidade em ambos os casos pra alinhar com
+  // o agendamento do operador.
+  const contexto = ehPredial
+    ? await buscarContextoOperacionalPredial({
+        tenantId, unidadeId: dadosValidados.unidadePredialId,
+      })
+    : await buscarContextoOperacional({
+        tenantId, equipamentoId: dadosValidados.equipamentoId,
+      });
 
   if (!contexto.ok) {
     return contexto;
@@ -217,7 +227,10 @@ export async function criarManutencaoService({
     };
   }
 
-  if (!agendamento.semAgendamento) {
+  // Conflito de agendamento so se aplica a manutencao DE EQUIPAMENTO
+  // (nao faz sentido pra servico predial — 2 dedetizacoes no mesmo dia
+  // em unidades diferentes nao conflitam; mesmo em mesma unidade e OK).
+  if (!ehPredial && !agendamento.semAgendamento) {
     const conflito = await existeConflitoAgendamento({
       tenantId,
       equipamentoId: dadosValidados.equipamentoId,
@@ -237,11 +250,17 @@ export async function criarManutencaoService({
 
   const totalTenant = await contarManutencoesDoTenant(tenantId);
 
-  const numeroOS = gerarNumeroOS({
-    tipo: dadosValidados.tipo,
-    tag: contexto.equipamento.tag,
-    sequencia: totalTenant + 1,
-  });
+  const numeroOS = ehPredial
+    ? gerarNumeroOSPredial({
+        tipo: dadosValidados.tipo,
+        tipoServicoPredial: dadosValidados.tipoServicoPredial,
+        sequencia: totalTenant + 1,
+      })
+    : gerarNumeroOS({
+        tipo: dadosValidados.tipo,
+        tag: contexto.equipamento.tag,
+        sequencia: totalTenant + 1,
+      });
 
   // Corretiva sem agendamento nasce como Pendente (triagem)
   const statusInicial = agendamento.semAgendamento && dadosValidados.tipo === 'Corretiva'
@@ -253,32 +272,62 @@ export async function criarManutencaoService({
     agendamento,
     tenantId,
     equipamentoId: dadosValidados.equipamentoId,
+    unidadePredialId: dadosValidados.unidadePredialId,
     numeroOS,
   });
 
   const nova = await criarManutencao(payload);
 
-  // Atualiza status do equipamento se informado na abertura da OS
-  const statusEquipamentoAnterior = contexto.equipamento.status;
-  const STATUS_VALIDOS = ['Operante', 'Inoperante', 'UsoLimitado', 'EmManutencao'];
-  if (statusEquipamento && STATUS_VALIDOS.includes(statusEquipamento) && statusEquipamento !== statusEquipamentoAnterior) {
-    await prisma.equipamento.update({
-      where: { tenantId_id: { tenantId, id: nova.equipamentoId } },
-      data: { status: statusEquipamento },
+  // Pos-criacao: fluxo de equipamento (status + historico) so roda pra
+  // manutencao com equipamento. Predial salta pra limpeza de alertas.
+  if (!ehPredial) {
+    // Atualiza status do equipamento se informado na abertura da OS
+    const statusEquipamentoAnterior = contexto.equipamento.status;
+    const STATUS_VALIDOS = ['Operante', 'Inoperante', 'UsoLimitado', 'EmManutencao'];
+    if (statusEquipamento && STATUS_VALIDOS.includes(statusEquipamento) && statusEquipamento !== statusEquipamentoAnterior) {
+      await prisma.equipamento.update({
+        where: { tenantId_id: { tenantId, id: nova.equipamentoId } },
+        data: { status: statusEquipamento },
+      });
+    }
+
+    await registrarEventoManutencao({
+      tenantId,
+      manutencaoId: nova.id,
+      autorId: usuarioId,
+      tipo: 'STATUS_BASE_EQUIPAMENTO',
+      descricao: `Status base do equipamento registrado para a OS ${numeroOS}.`,
+      metadata: {
+        statusAnterior: statusEquipamentoAnterior,
+        origem: 'criacao_os',
+      },
+    });
+
+    await registrarEventoHistoricoAtivo({
+      tenantId,
+      equipamentoId: nova.equipamentoId,
+      tipoEvento: 'manutencao_registrada',
+      categoria: 'manutencao',
+      subcategoria: nova.tipo,
+      titulo: `OS ${numeroOS} registrada`,
+      descricao: descricaoHistoricoManutencao({
+        manutencao: nova,
+        contexto,
+      }),
+      origem: 'usuario',
+      status: nova.status,
+      impactaAnalise: nova.tipo === 'Corretiva',
+      referenciaId: nova.id,
+      referenciaTipo: 'manutencao',
+      metadata: {
+        numeroOS,
+        tipo: nova.tipo,
+        status: nova.status,
+        numeroChamado: nova.numeroChamado || null,
+      },
+      dataEvento: nova.dataHoraAgendamentoInicio || nova.createdAt,
     });
   }
-
-  await registrarEventoManutencao({
-    tenantId,
-    manutencaoId: nova.id,
-    autorId: usuarioId,
-    tipo: 'STATUS_BASE_EQUIPAMENTO',
-    descricao: `Status base do equipamento registrado para a OS ${numeroOS}.`,
-    metadata: {
-      statusAnterior: statusEquipamentoAnterior,
-      origem: 'criacao_os',
-    },
-  });
 
   await registrarLog({
     tenantId,
@@ -286,32 +335,9 @@ export async function criarManutencaoService({
     acao: 'CRIAÇÃO',
     entidade: 'Manutenção',
     entidadeId: nova.id,
-    detalhes: `OS ${numeroOS} criada.`,
-  });
-
-  await registrarEventoHistoricoAtivo({
-    tenantId,
-    equipamentoId: nova.equipamentoId,
-    tipoEvento: 'manutencao_registrada',
-    categoria: 'manutencao',
-    subcategoria: nova.tipo,
-    titulo: `OS ${numeroOS} registrada`,
-    descricao: descricaoHistoricoManutencao({
-      manutencao: nova,
-      contexto,
-    }),
-    origem: 'usuario',
-    status: nova.status,
-    impactaAnalise: nova.tipo === 'Corretiva',
-    referenciaId: nova.id,
-    referenciaTipo: 'manutencao',
-    metadata: {
-      numeroOS,
-      tipo: nova.tipo,
-      status: nova.status,
-      numeroChamado: nova.numeroChamado || null,
-    },
-    dataEvento: nova.dataHoraAgendamentoInicio || nova.createdAt,
+    detalhes: ehPredial
+      ? `OS ${numeroOS} criada (rotina predial: ${dadosValidados.tipoServicoPredial}).`
+      : `OS ${numeroOS} criada.`,
   });
 
   await limparAlertasOperacionaisDaOS({

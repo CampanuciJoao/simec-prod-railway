@@ -67,11 +67,26 @@ export function useSalvarManutencaoPage() {
         setSubmitting(true);
         setSubmitError('');
 
+        // Mapeia formData pra payload esperado pelo backend. Predial usa
+        // unidadePredialId (nao equipamentoId); Equipamento mantem o padrao.
+        const payload = formData.categoria === 'Predial'
+          ? {
+              ...formData,
+              unidadePredialId: formData.unidadeId,
+              equipamentoId: undefined,
+              unidadeId: undefined,
+            }
+          : {
+              ...formData,
+              tipoServicoPredial: undefined,
+              unidadePredialId: undefined,
+            };
+
         if (isEditing) {
-          await updateManutencao(manutencaoId, formData);
+          await updateManutencao(manutencaoId, payload);
           addToast('Manutencao atualizada com sucesso!', 'success');
         } else {
-          await addManutencao(formData);
+          await addManutencao(payload);
           addToast('Manutencao agendada com sucesso!', 'success');
         }
 

@@ -26,6 +26,21 @@ function getTipoLabel(tipo) {
   return tipo ? String(tipo).replace(/([A-Z])/g, ' $1').trim() : '-';
 }
 
+// Rotulos amigaveis para os 9 tipos de servico predial (espelha
+// TipoServicoPredial do Prisma). Usado em cards e listagens pra
+// substituir o nome do equipamento quando categoria === 'Predial'.
+const TIPOS_SERVICO_PREDIAL_LABELS = {
+  LimpezaCaixaDagua:        'Limpeza de caixa d’água',
+  Dedetizacao:              'Dedetização',
+  ExtintorRecarga:          'Extintor — recarga anual',
+  ExtintorTesteHidrostatico:'Extintor — teste hidrostático',
+  BebedouroTrocaFiltro:     'Bebedouro — troca de filtro',
+  BebedouroHigienizacao:    'Bebedouro — higienização',
+  SpdaParaRaios:            'SPDA / para-raios',
+  Avcb:                     'AVCB',
+  AlvaraSanitario:          'Alvará sanitário',
+};
+
 const STATUS_BORDER = {
   Concluida:             'var(--color-success)',
   Cancelada:             'var(--text-muted)',
@@ -124,14 +139,22 @@ function ManutencaoCard({ manutencao, isAdmin = false, onDelete }) {
           <div className="mt-5 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
             <InfoCard
               icon={faWrench}
-              label="Equipamento"
-              value={manutencao.equipamento?.apelido || manutencao.equipamento?.modelo || '---'}
+              label={manutencao.categoria === 'Predial' ? 'Rotina predial' : 'Equipamento'}
+              value={
+                manutencao.categoria === 'Predial'
+                  ? (TIPOS_SERVICO_PREDIAL_LABELS[manutencao.tipoServicoPredial] || manutencao.tipoServicoPredial || 'Serviço predial')
+                  : (manutencao.equipamento?.apelido || manutencao.equipamento?.modelo || '---')
+              }
             />
 
             <InfoCard
               icon={faHospital}
               label="Unidade"
-              value={manutencao.equipamento?.unidade?.nomeSistema || '---'}
+              value={
+                manutencao.categoria === 'Predial'
+                  ? (manutencao.unidadePredial?.nomeSistema || '---')
+                  : (manutencao.equipamento?.unidade?.nomeSistema || '---')
+              }
             />
 
             <InfoCard

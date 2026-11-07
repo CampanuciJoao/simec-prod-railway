@@ -12,6 +12,16 @@ function getEquipamentoComUnidadeInclude() {
         unidade: true,
       },
     },
+    // Rotina predial — unidade preenchida direto (sem equipamento).
+    // Incluimos select enxuto pra lista/detalhes mostrarem o nome.
+    unidadePredial: {
+      select: {
+        id: true,
+        nomeSistema: true,
+        nomeFantasia: true,
+        timezone: true,
+      },
+    },
   };
 }
 
@@ -66,6 +76,9 @@ function getManutencaoResumoSelect() {
     tenantId: true,
     numeroOS: true,
     equipamentoId: true,
+    categoria: true,
+    tipoServicoPredial: true,
+    unidadePredialId: true,
     tipo: true,
     status: true,
     dataHoraAgendamentoInicio: true,
@@ -162,6 +175,36 @@ export async function buscarContextoOperacional({
     equipamento,
     timezone,
   };
+}
+
+// Variante do contexto operacional pra manutencao predial — nao tem
+// equipamento, usa unidade diretamente pra resolver timezone.
+export async function buscarContextoOperacionalPredial({
+  tenantId,
+  unidadeId,
+}) {
+  const [tenant, unidade] = await Promise.all([
+    buscarTenantAtivo(tenantId),
+    prisma.unidade.findFirst({
+      where: { id: unidadeId, tenantId },
+      select: { id: true, timezone: true, nomeSistema: true, nomeFantasia: true },
+    }),
+  ]);
+
+  if (!tenant) {
+    return { ok: false, status: 403, message: 'Tenant não encontrado ou inativo.' };
+  }
+
+  if (!unidade) {
+    return { ok: false, status: 404, message: 'Unidade não encontrada para este tenant.' };
+  }
+
+  const timezone = resolveOperationalTimezone({
+    tenantTimezone: tenant.timezone,
+    unidadeTimezone: unidade.timezone,
+  });
+
+  return { ok: true, tenant, unidade, timezone };
 }
 
 export async function buscarManutencaoPorId({

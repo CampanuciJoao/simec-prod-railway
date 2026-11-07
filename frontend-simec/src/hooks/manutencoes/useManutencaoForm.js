@@ -1,8 +1,10 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 
 const ESTADO_INICIAL = {
+  categoria: 'Equipamento',   // Equipamento | Predial
   unidadeId: '',
   equipamentoId: '',
+  tipoServicoPredial: '',     // so quando categoria === 'Predial'
   tipo: 'Preventiva',
   descricaoProblemaServico: '',
   agendamentoDataInicioLocal: '',
@@ -35,15 +37,19 @@ export function useManutencaoForm({
       return;
     }
 
+    const categoriaInicial = initialData.categoria || 'Equipamento';
     const unidadeIdInicial =
       initialData.unidadeId ||
+      initialData.unidadePredialId ||
       initialData.equipamento?.unidadeId ||
       initialData.equipamento?.unidade?.id ||
       '';
 
     setFormData({
+      categoria: categoriaInicial,
       unidadeId: unidadeIdInicial,
       equipamentoId: initialData.equipamentoId || '',
+      tipoServicoPredial: initialData.tipoServicoPredial || '',
       tipo: initialData.tipo || 'Preventiva',
       descricaoProblemaServico: initialData.descricaoProblemaServico || '',
       agendamentoDataInicioLocal:
@@ -72,6 +78,16 @@ export function useManutencaoForm({
           ...prev,
           unidadeId: value,
           equipamentoId: '',
+        };
+      }
+
+      // Trocar categoria limpa campos irrelevantes pra evitar envio sujo
+      if (field === 'categoria') {
+        return {
+          ...prev,
+          categoria: value,
+          equipamentoId: '',
+          tipoServicoPredial: '',
         };
       }
 
@@ -166,6 +182,8 @@ export function useManutencaoForm({
     intervaloValido,
   ]);
 
+  const isPredial = formData.categoria === 'Predial';
+
   const isValid = useMemo(() => {
     const descricaoValida = isCorretiva
       ? Boolean(formData.descricaoProblemaServico?.trim())
@@ -175,9 +193,13 @@ export function useManutencaoForm({
       ? Boolean(formData.numeroChamado?.trim())
       : true;
 
+    // Predial exige unidade + tipoServicoPredial; Equipamento exige equipamentoId
+    const alvoValido = isPredial
+      ? Boolean(formData.unidadeId && formData.tipoServicoPredial)
+      : Boolean(formData.unidadeId && formData.equipamentoId);
+
     return Boolean(
-      formData.unidadeId &&
-        formData.equipamentoId &&
+      alvoValido &&
         formData.tipo &&
         formData.agendamentoDataInicioLocal &&
         formData.agendamentoHoraInicioLocal &&
@@ -187,7 +209,7 @@ export function useManutencaoForm({
         chamadoValido &&
         intervaloValido
     );
-  }, [formData, isCorretiva, intervaloValido]);
+  }, [formData, isCorretiva, isPredial, intervaloValido]);
 
   return {
     formData,
@@ -196,6 +218,7 @@ export function useManutencaoForm({
     unidades,
     unidadeSelecionada,
     isCorretiva,
+    isPredial,
     intervaloValido,
     fieldErrors,
     isValid,

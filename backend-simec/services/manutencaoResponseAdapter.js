@@ -30,7 +30,10 @@ export function adaptarManutencaoResponse(manutencao) {
     agendamentoLocal: montarAgendamentoLocal(manutencao),
     agendamentoUtc: montarAgendamentoUtc(manutencao),
     formulario: {
-      equipamentoId: manutencao.equipamentoId,
+      categoria: manutencao.categoria || 'Equipamento',
+      equipamentoId: manutencao.equipamentoId || '',
+      unidadePredialId: manutencao.unidadePredialId || '',
+      tipoServicoPredial: manutencao.tipoServicoPredial || '',
       tipo: manutencao.tipo,
       descricaoProblemaServico: manutencao.descricaoProblemaServico || '',
       agendamentoDataInicioLocal: manutencao.agendamentoDataInicioLocal || '',

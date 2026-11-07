@@ -88,6 +88,30 @@ export function gerarNumeroOS({
   return `${String(tipo).substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
 }
 
+// Prefixo 3 letras pra cada tipo de servico predial. Usado no numero
+// da OS (ex: PCXA-0001 pra limpeza de caixa d'agua preventiva).
+const PREFIXO_PREDIAL = {
+  LimpezaCaixaDagua:        'CXA',
+  Dedetizacao:              'DED',
+  ExtintorRecarga:          'EXT',
+  ExtintorTesteHidrostatico:'EXH',
+  BebedouroTrocaFiltro:     'BTF',
+  BebedouroHigienizacao:    'BHI',
+  SpdaParaRaios:            'SPD',
+  Avcb:                     'AVC',
+  AlvaraSanitario:          'ALV',
+};
+
+export function gerarNumeroOSPredial({
+  tipo,
+  tipoServicoPredial,
+  sequencia,
+}) {
+  const osNumber = String(sequencia).padStart(4, '0');
+  const tagPrefix = PREFIXO_PREDIAL[tipoServicoPredial] || 'PRE';
+  return `${String(tipo).substring(0, 1).toUpperCase()}${tagPrefix}-${osNumber}`;
+}
+
 function montarDescricaoPadrao(tipo, descricaoInformada) {
   const descricao = String(descricaoInformada || '').trim();
 
@@ -104,22 +128,35 @@ export function montarPayloadPersistencia({
   agendamento,
   tenantId,
   equipamentoId,
+  unidadePredialId,
   numeroOS,
   numeroOSExistente = null,
 }) {
+  const categoria = dados.categoria === 'Predial' ? 'Predial' : 'Equipamento';
+
+  // Monta campos de relacao condicionais por categoria. Predial nao
+  // tem equipamento associado; Equipamento mantem o padrao atual.
+  const relacoesCategoria = categoria === 'Predial'
+    ? {
+        categoria: 'Predial',
+        tipoServicoPredial: dados.tipoServicoPredial || null,
+        unidadePredial: unidadePredialId
+          ? { connect: { tenantId_id: { tenantId, id: unidadePredialId } } }
+          : undefined,
+      }
+    : {
+        categoria: 'Equipamento',
+        equipamento: {
+          connect: { tenantId_id: { tenantId, id: equipamentoId } },
+        },
+      };
+
   return {
     tenant: {
       connect: { id: tenantId },
     },
 
-    equipamento: {
-      connect: {
-        tenantId_id: {
-          tenantId,
-          id: equipamentoId,
-        },
-      },
-    },
+    ...relacoesCategoria,
 
     numeroOS: numeroOS || numeroOSExistente,
     tipo: dados.tipo,
