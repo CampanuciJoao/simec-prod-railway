@@ -586,6 +586,14 @@ function DiagnosticoInverterButton({ inverter }) {
                         <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                           {c.at} · HTTP {c.httpStatus} · {c.path}
                         </div>
+                        {c.headersEnviados && (
+                          <>
+                            <div className="mt-1 text-[10px] font-semibold">Headers:</div>
+                            <pre className="max-h-32 overflow-auto rounded bg-black/40 p-1 text-[10px]">
+                              {JSON.stringify(c.headersEnviados, null, 2)}
+                            </pre>
+                          </>
+                        )}
                         <div className="mt-1 text-[10px] font-semibold">Body:</div>
                         <pre className="max-h-32 overflow-auto rounded bg-black/40 p-1 text-[10px]">
                           {JSON.stringify(c.bodyEnviado, null, 2)}

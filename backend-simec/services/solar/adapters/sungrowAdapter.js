@@ -284,20 +284,32 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
   // Body contem APENAS os campos documentados do endpoint. appkey vai no
   // header 'appkey', accessToken vai no header Authorization Bearer.
   const fullBody = { ...body };
+  const headers = headersComToken(credential);
   const res = await fetch(url, {
     method: 'POST',
-    headers: headersComToken(credential),
+    headers,
     body: JSON.stringify(fullBody),
   });
   const text = await res.text();
-  // Grava no ring de debug antes do parse/validacao (inclusive 500/non-JSON).
-  // Mascara appkey/token apenas quando presentes (evita dar impressao que
-  // eles foram enviados quando nao foram).
+  // Grava no ring de debug antes do parse/validacao.
+  // Mascara mostrando primeiros 6 chars pra conferencia manual que o valor
+  // enviado bate com o que esta no portal (sem expor o segredo inteiro).
+  const mascarar = (v, visivel = 6) =>
+    !v ? '<vazio>' : (v.length > visivel ? v.slice(0, visivel) + '…(' + v.length + ' chars)' : v);
+  const headersLog = {
+    ...headers,
+    'x-access-key':  mascarar(headers['x-access-key']),
+    'appkey':        mascarar(headers['appkey']),
+    'Authorization': headers['Authorization']
+      ? 'Bearer ' + mascarar((headers['Authorization'] || '').replace('Bearer ', ''))
+      : undefined,
+  };
   const bodyLog = { ...fullBody };
-  if (bodyLog.token)  bodyLog.token  = '<mask>';
-  if (bodyLog.appkey) bodyLog.appkey = '<mask>';
+  if (bodyLog.token)  bodyLog.token  = mascarar(bodyLog.token);
+  if (bodyLog.appkey) bodyLog.appkey = mascarar(bodyLog.appkey);
   pushDebug({
     path,
+    headersEnviados: headersLog,
     bodyEnviado: bodyLog,
     httpStatus: res.status,
     respostaCrua: text.slice(0, 2000),
