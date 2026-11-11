@@ -240,7 +240,22 @@ export async function fetchSnapshot(inverter) {
       erros.push(`${rota.nome}: resposta vazia`);
       data = null;
     } catch (err) {
-      erros.push(`${rota.nome}: ${(err.message || '').slice(0, 100)}`);
+      const msg = String(err.message || '');
+      erros.push(`${rota.nome}: ${msg.slice(0, 100)}`);
+      // Rate limit — parar imediatamente de iterar. Continuar so queima
+      // mais quota e deixa a Growatt bloqueada por mais tempo. A rota
+      // atual provavelmente e a certa (ela retornou erro de aplicacao,
+      // nao 404 — significa que existe pro device).
+      if (/error_frequently_access|10012|rate.?limit|too.?many/i.test(msg)) {
+        throw new Error(
+          `Growatt: rate limit atingido em ${rota.nome}. ` +
+          'A rota existe pra este SN — provavelmente eh a correta. ' +
+          'Aguarde ~1min e tente de novo. Se persistir, o poller de 60s ' +
+          'esta disparando concomitante ao diagnostico manual.'
+        );
+      }
+      // HTTP 404 explicito = rota nao existe pra esse tipo de device; tenta a proxima.
+      // Qualquer outro erro: tambem segue (pode ser flaky).
     }
   }
 
