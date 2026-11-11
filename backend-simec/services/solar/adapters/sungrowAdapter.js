@@ -286,15 +286,16 @@ export async function validarCredencial(credential, apiBase) {
   }
 
   try {
+    // Sem filtro valid_flag — lista TODAS as plantas visiveis pelo token
+    // (estados 0, 1, 2, 3 = pendente, normal, offline, atencao). Isso
+    // revela quando a conta iSolarCloud autenticada tem plantas em
+    // estados que nao sao "normal" — comum em instalacoes novas ou
+    // recem-aprovadas.
     const data = await callSungrow({
       apiBase: apiBase || defaultApiBase,
       credential,
-      // Doc oficial: /openapi/platform/queryPowerStationList (e NAO
-      // /openapi/getPowerStationList — esse 404a silencioso e a
-      // Sungrow retorna er_missing_parameter:token confundindo o
-      // diagnostico).
       path: '/openapi/platform/queryPowerStationList',
-      body: { page: 1, size: 20, valid_flag: '1,3' },
+      body: { page: 1, size: 100 },
     });
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
@@ -303,8 +304,18 @@ export async function validarCredencial(credential, apiBase) {
       return Number.isFinite(n) ? n : null;
     };
 
+    // Debug: log numero de stations e nomes (ajuda a entender quando
+    // vem vazio apesar do token OK).
+    console.log(`[SUNGROW_VALIDAR] ${stations.length} station(s) visivel(eis) pelo token.`,
+      stations.slice(0, 5).map((s) => ({
+        ps_id: s.ps_id || s.psId,
+        name: s.ps_name || s.psName || s.name,
+        valid_flag: s.valid_flag || s.validFlag,
+      }))
+    );
+
     const devices = [];
-    for (const s of stations.slice(0, 5)) {
+    for (const s of stations.slice(0, 10)) {
       const stationId = s.ps_id || s.psId || s.id;
       if (!stationId) continue;
       let stationKwp = toNum(s.install_capacity ?? s.installedCapacity ?? s.ps_capacity);
@@ -313,9 +324,12 @@ export async function validarCredencial(credential, apiBase) {
         const devData = await callSungrow({
           apiBase: apiBase || defaultApiBase,
           credential,
-          // Doc oficial: /openapi/platform/getDeviceListByPsId
           path: '/openapi/platform/getDeviceListByPsId',
-          body: { ps_id: stationId, device_type_list: [1], page: 1, size: 50 },
+          // device_type_list vazio = todos os tipos (inversor, bateria, meter).
+          // Filtrar so [1] = inversor geral exclui modelos hibridos (type 14)
+          // e string inverters de alguns modelos — melhor pegar tudo e deixar
+          // o SN cadastrado filtrar.
+          body: { ps_id: stationId, page: 1, size: 100 },
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
           let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
@@ -333,7 +347,25 @@ export async function validarCredencial(credential, apiBase) {
       } catch { /* ignora station individual */ }
     }
 
-    return { ok: true, devices };
+    // Enriquece o retorno com a lista de stations (ajuda diagnostico quando
+    // ha stations mas nenhum device dentro — ou nenhuma station).
+    const stationsResumo = stations.map((s) => ({
+      ps_id: s.ps_id || s.psId,
+      nome: s.ps_name || s.psName || s.name,
+    }));
+
+    if (devices.length === 0) {
+      return {
+        ok: false,
+        erro: stations.length === 0
+          ? 'Token valido mas nenhuma planta encontrada. A conta iSolarCloud usada no OAuth nao tem plantas vinculadas. Refaca o OAuth logando com a conta Sungrow que gerencia essas plantas.'
+          : `Encontrei ${stations.length} planta(s) mas nenhum device/inversor dentro. Verifique no portal iSolarCloud se os inversores estao vinculados a essas plantas.`,
+        stations: stationsResumo,
+        devices: [],
+      };
+    }
+
+    return { ok: true, devices, stations: stationsResumo };
   } catch (err) {
     return { ok: false, erro: err.message };
   }

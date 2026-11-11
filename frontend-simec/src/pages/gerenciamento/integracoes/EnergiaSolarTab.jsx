@@ -516,36 +516,49 @@ function DiagnosticoInverterButton({ inverter }) {
                 <div className="font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
                   Visao da conta (o que o token enxerga)
                 </div>
-                {resultado.visaoDaConta?.ok ? (
-                  <div className="mt-1 rounded border p-2" style={{ borderColor: 'var(--border-soft)' }}>
-                    <div>Total de devices visiveis: <strong>{resultado.visaoDaConta.totalDevicesVisiveis}</strong></div>
-                    {resultado.visaoDaConta.devicesSn?.length > 0 && (
-                      <div className="mt-2">
-                        <div className="mb-1 text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>
-                          Primeiros devices:
-                        </div>
-                        <ul className="list-disc pl-4">
-                          {resultado.visaoDaConta.devicesSn.map((d, i) => (
-                            <li key={i} className="break-all">
-                              <strong>SN {d.sn}</strong>
-                              {d.estacao ? ` · ${d.estacao}` : ''}
-                              {d.capacidadeKw ? ` · ${d.capacidadeKw} kW` : ''}
-                            </li>
-                          ))}
-                        </ul>
-                        <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                          Compare com o SN cadastrado: <strong>{resultado.inverterSnCadastrado}</strong>
-                        </div>
+                <div className="mt-1 rounded border p-2" style={{ borderColor: 'var(--border-soft)' }}>
+                  <div>
+                    Plantas visiveis: <strong>{resultado.visaoDaConta?.totalPlantasVisiveis ?? 0}</strong>
+                    {' · '}
+                    Devices visiveis: <strong>{resultado.visaoDaConta?.totalDevicesVisiveis ?? 0}</strong>
+                  </div>
+                  {resultado.visaoDaConta?.plantas?.length > 0 && (
+                    <div className="mt-2">
+                      <div className="mb-1 text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>
+                        Plantas:
                       </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="mt-1 rounded border border-orange-500/40 bg-orange-500/10 p-2">
-                    {resultado.visaoDaConta?.precisaAutorizar
-                      ? 'Precisa autorizar (OAuth).'
-                      : resultado.visaoDaConta?.erro || 'Erro desconhecido'}
-                  </div>
-                )}
+                      <ul className="list-disc pl-4">
+                        {resultado.visaoDaConta.plantas.map((p, i) => (
+                          <li key={i} className="break-all">{p.nome || '(sem nome)'} · ps_id {p.ps_id}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  {resultado.visaoDaConta?.devicesSn?.length > 0 && (
+                    <div className="mt-2">
+                      <div className="mb-1 text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>
+                        Devices:
+                      </div>
+                      <ul className="list-disc pl-4">
+                        {resultado.visaoDaConta.devicesSn.map((d, i) => (
+                          <li key={i} className="break-all">
+                            <strong>SN {d.sn}</strong>
+                            {d.estacao ? ` · ${d.estacao}` : ''}
+                            {d.capacidadeKw ? ` · ${d.capacidadeKw} kW` : ''}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        Compare com o SN cadastrado: <strong>{resultado.inverterSnCadastrado}</strong>
+                      </div>
+                    </div>
+                  )}
+                  {resultado.visaoDaConta?.erro && (
+                    <div className="mt-2 text-[11px]" style={{ color: 'var(--color-warning)' }}>
+                      {resultado.visaoDaConta.erro}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
