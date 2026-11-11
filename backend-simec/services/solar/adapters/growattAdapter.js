@@ -196,25 +196,22 @@ export async function validarCredencial(credential, apiBase) {
 }
 
 // Rotas Growatt V1 por tipo de device. Ordem importa: tenta as mais
-// comuns primeiro. SN comecando com GB/QM e tipicamente datalogger
-// (collector) e NAO tem telemetria direta — precisa dos devices filhos.
+// comuns primeiro. Doc oficial Growatt (secao 4.3.8) define
+// /v1/device/inverter/last_new_data como GET com device_sn na query string.
+// Os endpoints POST (secao 4.3.9) sao os de BATCH (invs_data).
 const ROTAS_LAST_DATA = [
-  { nome: 'inverter', path: '/v1/device/inverter/last_new_data' },  // TLX, MAX legacy
-  { nome: 'min',      path: '/v1/device/min/last_new_data' },        // MIN G2/G3
-  { nome: 'max',      path: '/v1/device/max/last_new_data' },        // MAX C&I
-  { nome: 'mix',      path: '/v1/device/mix/last_new_data' },        // MIX hybrid
-  { nome: 'sph',      path: '/v1/device/sph/last_new_data' },        // SPH storage
-  { nome: 'spa',      path: '/v1/device/spa/last_new_data' },        // SPA
-  { nome: 'storage',  path: '/v1/storage/storage_last_data' },       // S/SPX
-  { nome: 'tlx',      path: '/v1/device/tlx/last_new_data' },        // TLX novo
+  { nome: 'inverter', path: '/v1/device/inverter/last_new_data', method: 'GET' },  // TLX, MAX legacy
+  { nome: 'min',      path: '/v1/device/min/last_new_data',      method: 'GET' },  // MIN G2/G3
+  { nome: 'max',      path: '/v1/device/max/last_new_data',      method: 'GET' },  // MAX C&I
+  { nome: 'mix',      path: '/v1/device/mix/last_new_data',      method: 'GET' },  // MIX hybrid
+  { nome: 'sph',      path: '/v1/device/sph/last_new_data',      method: 'GET' },  // SPH storage
+  { nome: 'spa',      path: '/v1/device/spa/last_new_data',      method: 'GET' },  // SPA
+  { nome: 'storage',  path: '/v1/storage/storage_last_data',     method: 'POST' }, // S/SPX (sec 4.3.13)
+  { nome: 'tlx',      path: '/v1/device/tlx/last_new_data',      method: 'GET' },  // TLX novo
 ];
 
 export async function fetchSnapshot(inverter) {
-  // Se o SN comeca com GB/QM/N (datalogger Growatt), nao existe telemetria
-  // direta nesse SN. Precisa cadastrar o SN do device filho (inverter)
-  // visivel via /v1/device/list ou equivalente.
   const sn = String(inverter.inverterSn || '').trim();
-  const pareceDatalogger = /^(GB|QM|NACS|XGD)/i.test(sn);
 
   let data = null;
   let tipoTentado = null;
@@ -222,12 +219,16 @@ export async function fetchSnapshot(inverter) {
 
   for (const rota of ROTAS_LAST_DATA) {
     try {
+      // GET: device_sn vai na query string. POST: no body (form-encoded).
+      const path = rota.method === 'GET'
+        ? `${rota.path}?device_sn=${encodeURIComponent(sn)}`
+        : rota.path;
       data = await callGrowatt({
         apiBase: inverter.apiBase,
         token: inverter.credential.apiToken,
-        path: rota.path,
-        method: 'POST',
-        body: { device_sn: sn },
+        path,
+        method: rota.method,
+        body: rota.method === 'POST' ? { device_sn: sn } : null,
       });
       // Considera sucesso util se trouxe algum campo de potencia/energia.
       const temDados = data && (data.ppv != null || data.pac != null ||
@@ -244,14 +245,8 @@ export async function fetchSnapshot(inverter) {
   }
 
   if (!data) {
-    const dica = pareceDatalogger
-      ? ` (O SN ${sn} parece ser DATALOGGER/COLLECTOR, nao inverter. ` +
-        'No portal Growatt, dentro da planta, procure o SN REAL do inverter — ' +
-        'normalmente comeca com T, M, SP, HPS e tem 10 chars.)'
-      : '';
     throw new Error(
-      `Growatt: nenhuma rota reconheceu SN ${sn}.${dica} ` +
-      `Tentou: ${erros.join(' | ')}`
+      `Growatt: nenhuma rota reconheceu SN ${sn}. Tentou: ${erros.join(' | ')}`
     );
   }
 
