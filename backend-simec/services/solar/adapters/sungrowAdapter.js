@@ -133,6 +133,8 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, r
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
+      'appkey': appkey,
+      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
     body: JSON.stringify(body),
@@ -213,6 +215,8 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
+      'appkey': appkey,
+      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
     body: JSON.stringify(body),
@@ -246,7 +250,14 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 function headersComToken(credential) {
   return {
     'Content-Type': 'application/json;charset=UTF-8',
+    // Sungrow OpenAPI v2 em modo Plaintext (plano Free): o APPKEY e um
+    // HEADER separado ('appkey'), NAO campo do body. Esse padrao e o que
+    // funcionava antes do refactor — confirmado via git show do adapter
+    // original (commit 5fdb250).
     'x-access-key': credential.secretKey,
+    'appkey': credential.appkey,
+    'sys_code': '901',
+    'lang': '_pt_BR',
     'Authorization': `Bearer ${credential.accessToken}`,
     'User-Agent': USER_AGENT,
   };
@@ -270,18 +281,9 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  // Padrao Sungrow v2: appkey + token (accessToken) vao no body em todas
-  // as chamadas, alem dos campos especificos do endpoint. A doc oficial
-  // nao lista esses 2 campos nos exemplos porque assume que ja estao
-  // presentes como parte do envelope de autenticacao. Sem eles a API
-  // responde er_invalid_appkey (E00000).
-  // NOTA: nao incluir 'lang' — alguns endpoints derrubam se lang nao for
-  // uma string reconhecida; omitir e mais seguro.
-  const fullBody = {
-    appkey: credential.appkey,
-    token: credential.accessToken,
-    ...body,
-  };
+  // Body contem APENAS os campos documentados do endpoint. appkey vai no
+  // header 'appkey', accessToken vai no header Authorization Bearer.
+  const fullBody = { ...body };
   const res = await fetch(url, {
     method: 'POST',
     headers: headersComToken(credential),
