@@ -247,20 +247,19 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 //   Content-Type: application/json;charset=UTF-8
 //   x-access-key: <secretKey>
 //   Authorization: Bearer <access_token>   <- token vai AQUI, nao no body
-function headersComToken(credential) {
-  return {
+function headersComToken(credential, { incluirBearer = true } = {}) {
+  const h = {
     'Content-Type': 'application/json;charset=UTF-8',
-    // Sungrow OpenAPI v2 em modo Plaintext (plano Free): o APPKEY e um
-    // HEADER separado ('appkey'), NAO campo do body. Esse padrao e o que
-    // funcionava antes do refactor — confirmado via git show do adapter
-    // original (commit 5fdb250).
     'x-access-key': credential.secretKey,
     'appkey': credential.appkey,
     'sys_code': '901',
     'lang': '_pt_BR',
-    'Authorization': `Bearer ${credential.accessToken}`,
     'User-Agent': USER_AGENT,
   };
+  if (incluirBearer && credential.accessToken) {
+    h['Authorization'] = `Bearer ${credential.accessToken}`;
+  }
+  return h;
 }
 
 // Buffer em memoria das ultimas chamadas, pra depuracao via endpoint.
@@ -276,21 +275,37 @@ export function getUltimasChamadasSungrow() {
 }
 
 // Nucleo HTTP — detecta "token expirado" e sinaliza pra o caller tentar refresh.
+// Tambem tenta fallback SEM Bearer quando a Sungrow retorna er_invalid_appkey —
+// a versao antiga do adapter (commit 5fdb250, que funcionava) nao enviava
+// Authorization: Bearer; a adicao desse header pode estar confundindo o
+// validator de Plaintext mode. O fallback detecta esse caso e reenvia.
 async function callSungrow({ apiBase, credential, path, body = {} }) {
   if (!credential.accessToken) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  // Body contem APENAS os campos documentados do endpoint. appkey vai no
-  // header 'appkey', accessToken vai no header Authorization Bearer.
   const fullBody = { ...body };
-  const headers = headersComToken(credential);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(fullBody),
-  });
-  const text = await res.text();
+
+  const tentar = async (incluirBearer) => {
+    const headers = headersComToken(credential, { incluirBearer });
+    const res = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(fullBody),
+    });
+    const text = await res.text();
+    return { res, text, headers };
+  };
+
+  let { res, text, headers } = await tentar(true);
+
+  // Fallback: er_invalid_appkey com Bearer -> re-tenta sem Bearer.
+  if (/er_invalid_appkey/i.test(text)) {
+    const r2 = await tentar(false);
+    if (!/er_invalid_appkey/i.test(r2.text)) {
+      ({ res, text, headers } = r2);
+    }
+  }
   // Grava no ring de debug antes do parse/validacao.
   // Mascara mostrando primeiros 6 chars pra conferencia manual que o valor
   // enviado bate com o que esta no portal (sem expor o segredo inteiro).
