@@ -252,20 +252,46 @@ function headersComToken(credential) {
   };
 }
 
+// Buffer em memoria das ultimas chamadas, pra depuracao via endpoint.
+// 20 ultimas requisicoes, com body/response mascarados. NAO persiste.
+const DEBUG_RING = [];
+const DEBUG_MAX = 20;
+function pushDebug(entry) {
+  DEBUG_RING.push({ ...entry, at: new Date().toISOString() });
+  if (DEBUG_RING.length > DEBUG_MAX) DEBUG_RING.shift();
+}
+export function getUltimasChamadasSungrow() {
+  return DEBUG_RING.slice().reverse();
+}
+
 // Nucleo HTTP — detecta "token expirado" e sinaliza pra o caller tentar refresh.
 async function callSungrow({ apiBase, credential, path, body = {} }) {
   if (!credential.accessToken) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  // Body: appkey + lang + params do endpoint (SEM token — token vai no header)
-  const fullBody = { appkey: credential.appkey, lang: '_pt_BR', ...body };
+  // Sungrow v2 passou a exigir o token TAMBEM no body (nao apenas no header
+  // Authorization). Alguns endpoints devolvem 200+empty quando o token so
+  // esta no header. Enviar em ambos nao quebra nada e cobre as duas versoes.
+  const fullBody = {
+    appkey: credential.appkey,
+    token: credential.accessToken,
+    lang: '_pt_BR',
+    ...body,
+  };
   const res = await fetch(url, {
     method: 'POST',
     headers: headersComToken(credential),
     body: JSON.stringify(fullBody),
   });
   const text = await res.text();
+  // Grava no ring de debug antes do parse/validacao (inclusive 500/non-JSON).
+  pushDebug({
+    path,
+    bodyEnviado: { ...fullBody, token: '<mask>', appkey: '<mask>' },
+    httpStatus: res.status,
+    respostaCrua: text.slice(0, 2000),
+  });
   let json;
   try { json = JSON.parse(text); } catch {
     throw new Error(`Sungrow resposta nao-JSON em ${path}: ${text.slice(0, 200)}`);

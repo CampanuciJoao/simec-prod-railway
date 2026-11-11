@@ -574,6 +574,31 @@ function DiagnosticoInverterButton({ inverter }) {
               <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
                 API base: {resultado.apiBase}
               </div>
+
+              {resultado.ultimasChamadas && resultado.ultimasChamadas.length > 0 && (
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-[10px] uppercase font-semibold" style={{ color: 'var(--text-muted)' }}>
+                    Ultimas {resultado.ultimasChamadas.length} chamadas cruas (HTTP {'->'}  Sungrow)
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {resultado.ultimasChamadas.map((c, i) => (
+                      <div key={i} className="rounded border p-2" style={{ borderColor: 'var(--border-soft)' }}>
+                        <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                          {c.at} · HTTP {c.httpStatus} · {c.path}
+                        </div>
+                        <div className="mt-1 text-[10px] font-semibold">Body:</div>
+                        <pre className="max-h-32 overflow-auto rounded bg-black/40 p-1 text-[10px]">
+                          {JSON.stringify(c.bodyEnviado, null, 2)}
+                        </pre>
+                        <div className="mt-1 text-[10px] font-semibold">Resposta:</div>
+                        <pre className="max-h-48 overflow-auto rounded bg-black/40 p-1 text-[10px]">
+                          {c.respostaCrua}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </div>
           </div>
         </div>

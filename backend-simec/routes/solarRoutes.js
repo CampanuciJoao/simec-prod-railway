@@ -698,6 +698,16 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       coleta = { ok: false, codigo: err.code || null, erro: err.message };
     }
 
+    // Pra Sungrow, inclui o buffer de ultimas chamadas HTTP cruas da
+    // sessao do backend — permite ver EXATAMENTE o que a Sungrow devolveu
+    // sem depender de log do Railway.
+    let ultimasChamadas = null;
+    if (inverter.provider === 'sungrow') {
+      try {
+        ultimasChamadas = sungrowAdapter.getUltimasChamadasSungrow?.() || null;
+      } catch {}
+    }
+
     res.json({
       inverterId: inverter.id,
       provider: inverter.provider,
@@ -705,6 +715,7 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       apiBase: inverter.apiBase || adapter.defaultApiBase,
       visaoDaConta: visao,
       coletaDoSn: coleta,
+      ultimasChamadas,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
