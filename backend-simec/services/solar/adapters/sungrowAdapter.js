@@ -133,6 +133,7 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, r
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
+      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
     body: JSON.stringify(body),
@@ -213,6 +214,7 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
+      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
     body: JSON.stringify(body),
@@ -248,6 +250,10 @@ function headersComToken(credential) {
     'Content-Type': 'application/json;charset=UTF-8',
     'x-access-key': credential.secretKey,
     'Authorization': `Bearer ${credential.accessToken}`,
+    // Sungrow OpenAPI v2 exige sys_code pra identificar sistema cliente.
+    // 901 e o codigo padrao para integradores terceiros. Sem isso todas
+    // as chamadas retornam er_unknown_exception com result_code=000.
+    'sys_code': '901',
     'User-Agent': USER_AGENT,
   };
 }
@@ -276,7 +282,9 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
   const fullBody = {
     appkey: credential.appkey,
     token: credential.accessToken,
-    lang: '_pt_BR',
+    // lang: _en_US e aceito universalmente pela Sungrow. _pt_BR as vezes
+    // derruba o handler de internationalizacao e vira er_unknown_exception.
+    lang: '_en_US',
     ...body,
   };
   const res = await fetch(url, {
