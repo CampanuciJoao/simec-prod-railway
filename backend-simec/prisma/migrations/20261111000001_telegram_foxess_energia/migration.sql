@@ -8,10 +8,13 @@ ALTER TABLE "telegram_notificacoes"
   ADD COLUMN IF NOT EXISTS "recebeAlertasFoxessEnergia" BOOLEAN NOT NULL DEFAULT true;
 
 -- Backfill: ressuscita alertas solar que foram "enviados" sem destinatario
--- real (telegramEnviadoEm e NULL, o que acontece quando o service marcou
+-- real (telegram_enviado_em e NULL, o que acontece quando o service marcou
 -- como enviado mesmo sem ter chamado enviarMensagem).
+-- OBS: a coluna categoria no banco e tipo_categoria (snake, tem @map),
+-- mas telegramEnviado/telegram_enviado_em seguem o camelCase do schema
+-- (telegramEnviado sem @map, telegram_enviado_em com @map).
 UPDATE "alertas"
    SET "telegramEnviado" = false
- WHERE "tipoCategoria"   = 'FOXESS_ENERGIA'
-   AND "telegramEnviado" = true
-   AND "telegramEnviadoEm" IS NULL;
+ WHERE "tipo_categoria"      = 'FOXESS_ENERGIA'
+   AND "telegramEnviado"     = true
+   AND "telegram_enviado_em" IS NULL;
