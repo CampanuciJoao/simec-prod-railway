@@ -21,6 +21,7 @@ import { decryptCredential } from './solarCrypto.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
+import { linkMonitoramentoSolar } from './solarAlertRepository.js';
 
 const JANELA_SEM_CONFIRMACAO_MS = 2 * 60 * 60 * 1000;
 
@@ -58,6 +59,7 @@ async function emitirAlertaFalha({ falha, plant, tenantId }) {
       tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoEvento: nivelParaEvento(falha.nivel),
+      link: linkMonitoramentoSolar(plant.id),
     },
   });
 }
@@ -79,6 +81,7 @@ async function emitirAlertaResolvido({ falha, plant, tenantId }) {
       tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoEvento: ALERT_EVENTOS.SOLAR_FALHA_RESOLVIDA,
+      link: linkMonitoramentoSolar(plant.id),
     },
   }).catch(() => { /* ignora se ja existe */ });
 }

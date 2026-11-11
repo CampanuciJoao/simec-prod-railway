@@ -34,14 +34,23 @@ async function infoPlanta(inverter) {
   };
 }
 
-async function upsertAlerta({ tenantId, id, titulo, subtitulo, prioridade, tipoEvento }) {
+// Deep-link padrao de alerta solar — abre a aba Energia do monitoramento
+// ja com a planta correta selecionada.
+export function linkMonitoramentoSolar(plantId) {
+  return plantId
+    ? `/monitoramento?tab=energia&plantId=${plantId}`
+    : '/monitoramento?tab=energia';
+}
+
+async function upsertAlerta({ tenantId, id, titulo, subtitulo, prioridade, tipoEvento, link }) {
   const existente = await prisma.alerta.findUnique({
     where: { tenantId_id: { tenantId, id } },
-    select: { id: true, subtitulo: true, prioridade: true },
+    select: { id: true, subtitulo: true, prioridade: true, link: true },
   });
 
   if (existente) {
-    if (existente.subtitulo === subtitulo && existente.prioridade === prioridade) {
+    const linkMudou = link && existente.link !== link;
+    if (existente.subtitulo === subtitulo && existente.prioridade === prioridade && !linkMudou) {
       return 'inalterado';
     }
     const patch = { subtitulo, data: new Date() };
@@ -49,6 +58,7 @@ async function upsertAlerta({ tenantId, id, titulo, subtitulo, prioridade, tipoE
       patch.prioridade = prioridade;
       patch.telegramEnviadoEm = null; // escalonamento re-notifica imediato
     }
+    if (linkMudou) patch.link = link;
     await prisma.alerta.update({ where: { tenantId_id: { tenantId, id } }, data: patch });
     return 'atualizado';
   }
@@ -60,6 +70,7 @@ async function upsertAlerta({ tenantId, id, titulo, subtitulo, prioridade, tipoE
       tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoEvento,
+      link: link || null,
     },
   });
   return 'criado';
@@ -118,6 +129,7 @@ export async function processarEventosSolar({ inverter, snapshot }) {
           subtitulo: `${plant.plantNome} em bateria. SoC atual ${soc != null ? soc.toFixed(0) + '%' : 'desconhecido'}.`,
           prioridade: ALERT_PRIORIDADES.MEDIA,
           tipoEvento: ALERT_EVENTOS.FOXESS_QUEDA_ENERGIA,
+          link: linkMonitoramentoSolar(plantId),
         });
         houveMudanca = true;
       }
@@ -136,6 +148,7 @@ export async function processarEventosSolar({ inverter, snapshot }) {
         subtitulo: `${plant.plantNome} em bateria ha ${minsEmQueda}min. SoC ${soc != null ? soc.toFixed(0) + '%' : '?'}.`,
         prioridade: ALERT_PRIORIDADES.MEDIA,
         tipoEvento: ALERT_EVENTOS.FOXESS_QUEDA_ENERGIA,
+        link: linkMonitoramentoSolar(plantId),
       });
 
       if (soc != null) {
@@ -147,6 +160,7 @@ export async function processarEventosSolar({ inverter, snapshot }) {
             subtitulo: `${plant.plantNome}: risco de desligamento em breve.`,
             prioridade: ALERT_PRIORIDADES.ALTA,
             tipoEvento: ALERT_EVENTOS.FOXESS_SOC_CRITICO,
+            link: linkMonitoramentoSolar(plantId),
           });
           houveMudanca = true;
         } else if (soc <= SOC_ALERTA_ALTA) {
@@ -157,6 +171,7 @@ export async function processarEventosSolar({ inverter, snapshot }) {
             subtitulo: `${plant.plantNome}: autonomia reduzida.`,
             prioridade: ALERT_PRIORIDADES.ALTA,
             tipoEvento: ALERT_EVENTOS.FOXESS_SOC_BAIXO,
+            link: linkMonitoramentoSolar(plantId),
           });
           houveMudanca = true;
         }
@@ -188,6 +203,7 @@ export async function processarEventosSolar({ inverter, snapshot }) {
         subtitulo: resumo,
         prioridade: ALERT_PRIORIDADES.MEDIA,
         tipoEvento: ALERT_EVENTOS.FOXESS_ENERGIA_RESTABELECIDA,
+        link: linkMonitoramentoSolar(plantId),
       });
       houveMudanca = true;
     }

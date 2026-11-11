@@ -21,6 +21,7 @@ import prisma from '../prismaService.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
+import { linkMonitoramentoSolar } from './solarAlertRepository.js';
 
 const BAIXA_GERACAO_RATIO = 0.5;
 const PICO_ABAIXO_RATIO   = 0.7;
@@ -40,7 +41,7 @@ function diaX(offset = 0) {
   return d;
 }
 
-async function criarAlertaSePrecisa({ tenantId, id, titulo, subtitulo, prioridade, tipoEvento }) {
+async function criarAlertaSePrecisa({ tenantId, id, titulo, subtitulo, prioridade, tipoEvento, plantId }) {
   const existe = await prisma.alerta.findUnique({
     where: { tenantId_id: { tenantId, id } }, select: { id: true },
   });
@@ -50,6 +51,7 @@ async function criarAlertaSePrecisa({ tenantId, id, titulo, subtitulo, prioridad
       id, tenantId, titulo, subtitulo, data: new Date(),
       prioridade, tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA, tipoEvento,
+      link: linkMonitoramentoSolar(plantId),
     },
   });
   return true;
@@ -85,6 +87,7 @@ async function regraGeracaoBaixa({ tenantId, plant }) {
     subtitulo: `Media dos ultimos ${DIAS_BASELINE} dias com geracao: ${Math.round(media)} kWh. Possivel sujeira em paineis, sombreamento novo ou perda de string.`,
     prioridade: ALERT_PRIORIDADES.MEDIA,
     tipoEvento: ALERT_EVENTOS.SOLAR_GERACAO_BAIXA,
+    plantId: plant.id,
   });
 }
 
@@ -108,6 +111,7 @@ async function regraPicoAbaixoCapacidade({ tenantId, plant }) {
     subtitulo: `Pico medio ${picoMedio.toFixed(1)} kW vs capacidade ${plant.capacidadeKwp} kWp (${Math.round(picoMedio/plant.capacidadeKwp*100)}%). Degradacao de painel, sujeira ou inversor parcialmente offline.`,
     prioridade: ALERT_PRIORIDADES.MEDIA,
     tipoEvento: ALERT_EVENTOS.SOLAR_PICO_ABAIXO_CAPACIDADE,
+    plantId: plant.id,
   });
 }
 
@@ -131,6 +135,7 @@ async function regraTemperaturaAlta({ tenantId, plant }) {
     subtitulo: `${acima}/${comTemp.length} leituras acima do limite. Verificar ventilacao, local da instalacao ou carga continua.`,
     prioridade: ALERT_PRIORIDADES.MEDIA,
     tipoEvento: ALERT_EVENTOS.SOLAR_TEMPERATURA_ALTA,
+    plantId: plant.id,
   });
 }
 
@@ -158,6 +163,7 @@ async function regraInversorDerated({ tenantId, plant }) {
     subtitulo: `Modo derated indica que o inversor reduziu potencia por temperatura, tensao de rede ou limite de inject. Investigar causa raiz.`,
     prioridade: ALERT_PRIORIDADES.MEDIA,
     tipoEvento: ALERT_EVENTOS.SOLAR_INVERSOR_DERATED,
+    plantId: plant.id,
   });
 }
 
@@ -184,6 +190,7 @@ async function regraSocMedioBaixo({ tenantId, plant }) {
     subtitulo: `Bateria operando consistentemente abaixo de ${SOC_MEDIO_LIMITE}%. Possivel sub-dimensionamento ou demanda alem do projeto.`,
     prioridade: ALERT_PRIORIDADES.MEDIA,
     tipoEvento: ALERT_EVENTOS.SOLAR_SOC_MEDIO_BAIXO,
+    plantId: plant.id,
   });
 }
 

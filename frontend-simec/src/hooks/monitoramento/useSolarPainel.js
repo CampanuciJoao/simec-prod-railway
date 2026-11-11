@@ -2,6 +2,7 @@
 // por tenant, cada planta com N inversores. Polling 30s pra manter vivo.
 
 import { useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   getSolarPlants,
   getSolarPlantStatus,
@@ -15,9 +16,14 @@ const REFRESH_MS = 30_000;
 
 export function useSolarPainel() {
   const { addToast } = useToast();
+  const [searchParams] = useSearchParams();
 
   const [plants, setPlants] = useState([]);
-  const [plantSelecionadaId, setPlantSelecionadaId] = useState(null);
+  // Se a URL trouxer ?plantId=X (ex: deep-link vindo de um alerta),
+  // inicializa com essa selecao em vez de esperar o fetch.
+  const [plantSelecionadaId, setPlantSelecionadaId] = useState(
+    () => searchParams.get('plantId') || null,
+  );
   const [status, setStatus] = useState(null);
   const [historico, setHistorico] = useState(null);
   const [quedas, setQuedas] = useState([]);
@@ -34,8 +40,12 @@ export function useSolarPainel() {
         if (cancelled) return;
         const ativas = (lista || []).filter((p) => p.ativo);
         setPlants(ativas);
-        if (ativas.length > 0 && !plantSelecionadaId) {
-          setPlantSelecionadaId(ativas[0].id);
+        if (ativas.length > 0) {
+          // Se ja veio selecao da URL e ela e valida, mantem.
+          // Senao, cai na primeira ativa.
+          const atual = plantSelecionadaId;
+          const idValido = atual && ativas.some((p) => p.id === atual);
+          if (!idValido) setPlantSelecionadaId(ativas[0].id);
         }
       } catch (err) {
         if (cancelled) return;

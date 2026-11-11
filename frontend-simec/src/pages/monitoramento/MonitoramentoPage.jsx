@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faHeartPulse, faBoltLightning } from '@fortawesome/free-solid-svg-icons';
 
@@ -12,8 +13,23 @@ const TABS = [
   { id: 'energia', label: 'Energia',                 icon: <FontAwesomeIcon icon={faBoltLightning} /> },
 ];
 
+const ABAS_VALIDAS = new Set(TABS.map((t) => t.id));
+
 function MonitoramentoPage() {
-  const [aba, setAba] = useState('saude');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const rawTab = searchParams.get('tab');
+  const aba = ABAS_VALIDAS.has(rawTab) ? rawTab : 'saude';
+
+  const handleTabChange = (next) => {
+    const params = new URLSearchParams(searchParams);
+    if (next === 'saude') {
+      params.delete('tab');
+      params.delete('plantId');
+    } else {
+      params.set('tab', next);
+    }
+    setSearchParams(params, { replace: false });
+  };
 
   return (
     <PageLayout padded>
@@ -24,7 +40,7 @@ function MonitoramentoPage() {
           subtitle="Saúde dos equipamentos e sistema de energia solar/backup"
         />
 
-        <ResponsiveTabs tabs={TABS} activeTab={aba} onChange={setAba} />
+        <ResponsiveTabs tabs={TABS} activeTab={aba} onChange={handleTabChange} />
 
         <div>
           {aba === 'saude' && <TabSaudeGehc />}

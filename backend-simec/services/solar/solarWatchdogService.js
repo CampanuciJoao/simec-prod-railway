@@ -15,6 +15,7 @@ import { reagendarJobsSolar } from '../queueService.js';
 import { ALERT_CATEGORIAS, ALERT_EVENTOS, ALERT_PRIORIDADES } from '../alertas/alertTypes.js';
 import { buildAlertId } from '../alertas/alertIdBuilder.js';
 import { publicarContagemAlertasParaTenant } from '../alertas/alertasRealtimePublisher.js';
+import { linkMonitoramentoSolar } from './solarAlertRepository.js';
 
 const DEFAULT_OFFLINE_CURTO_MIN = 60;
 const WATCHDOG_LENTO_MS       = 90 * 60 * 1000;
@@ -87,6 +88,7 @@ async function verificarOfflineCurto(plant) {
       tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoEvento: ALERT_EVENTOS.SOLAR_OFFLINE_CURTO,
+      link: linkMonitoramentoSolar(plant.id),
     },
   });
   await publicarContagemAlertasParaTenant({ tenantId: plant.tenantId }).catch(() => {});
@@ -139,6 +141,7 @@ async function verificarEMarcarMonitoramentoParado(plant) {
       tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoEvento: ALERT_EVENTOS.FOXESS_MONITORAMENTO_PARADO,
+      link: linkMonitoramentoSolar(plant.id),
     },
   });
   await publicarContagemAlertasParaTenant({ tenantId: plant.tenantId }).catch(() => {});
