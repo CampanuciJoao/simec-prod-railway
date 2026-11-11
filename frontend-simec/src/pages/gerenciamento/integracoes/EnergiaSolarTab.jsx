@@ -615,16 +615,23 @@ function SungrowAuthBadge({ inverter }) {
 
   if (!status.autorizado) {
     return (
-      <button
-        type="button"
-        onClick={autorizar}
-        disabled={autorizando}
-        className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
-        style={{ backgroundColor: 'var(--color-warning-surface)', color: 'var(--color-warning)', border: '1px solid var(--color-warning-soft)' }}
-        title="Clique para autorizar via OAuth 2.0 da Sungrow"
-      >
-        {autorizando ? 'abrindo...' : '⚠ autorizar'}
-      </button>
+      <span className="flex flex-col items-start gap-1">
+        <button
+          type="button"
+          onClick={autorizar}
+          disabled={autorizando}
+          className="rounded px-2 py-0.5 text-[10px] font-bold uppercase"
+          style={{ backgroundColor: 'var(--color-warning-surface)', color: 'var(--color-warning)', border: '1px solid var(--color-warning-soft)' }}
+          title={status.lastAuthError || 'Clique para autorizar via OAuth 2.0 da Sungrow'}
+        >
+          {autorizando ? 'abrindo...' : '⚠ autorizar'}
+        </button>
+        {status.lastAuthError && (
+          <span className="text-[10px]" style={{ color: 'var(--color-danger)' }} title={status.lastAuthError}>
+            Ultima tentativa falhou: {String(status.lastAuthError).slice(0, 80)}{String(status.lastAuthError).length > 80 ? '...' : ''}
+          </span>
+        )}
+      </span>
     );
   }
 

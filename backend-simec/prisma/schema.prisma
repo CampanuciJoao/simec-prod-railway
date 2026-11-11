@@ -2057,6 +2057,11 @@ model SolarInverter {
   // https://openapi.growatt.com, https://gateway.isolarcloud.eu).
   apiBase         String   @map("api_base")
   ativo           Boolean  @default(true)
+  // Diagnostico OAuth (Sungrow) — ultima tentativa de autorizacao
+  // (authorize-url ou callback). Permite a UI mostrar porque a autorizacao
+  // nao concluiu sem precisar de log do Railway.
+  lastAuthAttemptAt   DateTime? @map("last_auth_attempt_at")
+  lastAuthError       String?   @map("last_auth_error") @db.Text
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

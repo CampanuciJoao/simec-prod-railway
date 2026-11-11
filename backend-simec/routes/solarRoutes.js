@@ -148,19 +148,41 @@ sungrowCallbackPublic.get('/sungrow/callback', async (req, res) => {
     return res.status(400).send(htmlResposta('Parametro ausente', 'code nao veio na URL.', false));
   }
 
+  let inverterIdParaErro = null;
   try {
     // Sungrow NAO devolve state no callback. O pareamento code <-> inverter
-    // e feito via Redis: a rota authorize-url salva o inverterId pendente
-    // com TTL 10min. Pegamos o mais recente (unica autorizacao por vez por
-    // tenant — ok pra escala atual).
+    // e feito via Redis em duas camadas:
+    //   1. Chaves per-inverter `sungrow:pending:<id>` guardam o timestamp
+    //      de cada authorize-url iniciado. TTL 30min.
+    //   2. Chave global `sungrow:pending-authorize` mantem o ultimo
+    //      authorize-url (fallback). TTL 30min.
+    // O callback pega a chave per-inverter mais recente; se nao achar
+    // nenhuma, cai no global.
     const redisConnection = getRedisConnection();
     if (!redisConnection) throw new Error('Redis indisponivel');
 
-    const inverterId = await redisConnection.get('sungrow:pending-authorize');
-    if (!inverterId) {
-      throw new Error('Nenhuma autorizacao pendente. Clique "Autorizar" no SIMEC novamente e tente de novo.');
+    const keys = await redisConnection.keys('sungrow:pending:*');
+    let inverterId = null;
+    if (keys.length > 0) {
+      const timestamps = await Promise.all(keys.map(async (k) => {
+        const v = await redisConnection.get(k);
+        return { key: k, ts: Number(v) || 0 };
+      }));
+      timestamps.sort((a, b) => b.ts - a.ts);
+      const vencedora = timestamps[0];
+      inverterId = vencedora.key.replace('sungrow:pending:', '');
+      // Limpa todas as chaves per-inverter — uma vez que tratamos este code,
+      // qualquer autorizacao pendente anterior deve ser reiniciada.
+      await Promise.all(keys.map((k) => redisConnection.del(k)));
+    } else {
+      inverterId = await redisConnection.get('sungrow:pending-authorize');
     }
     await redisConnection.del('sungrow:pending-authorize');
+
+    if (!inverterId) {
+      throw new Error('Nenhuma autorizacao pendente. Clique "Autorizar" no SIMEC novamente e tente de novo (a janela de 30 min expirou).');
+    }
+    inverterIdParaErro = inverterId;
 
     const inverter = await prisma.solarInverter.findFirst({
       where: { id: inverterId, provider: 'sungrow' },
@@ -208,7 +230,11 @@ sungrowCallbackPublic.get('/sungrow/callback', async (req, res) => {
 
     await prisma.solarInverter.update({
       where: { id: inverter.id },
-      data: { credentialCrypt: encryptCredential(novaCredencial) },
+      data: {
+        credentialCrypt: encryptCredential(novaCredencial),
+        lastAuthAttemptAt: new Date(),
+        lastAuthError: null,
+      },
     });
 
     // Agora que tem access_token, puxa modelo + capacidade da API Sungrow
@@ -223,6 +249,16 @@ sungrowCallbackPublic.get('/sungrow/callback', async (req, res) => {
     ));
   } catch (err) {
     console.error('[SUNGROW_OAUTH_CALLBACK]', err);
+    // Persiste o erro no inversor pra UI mostrar sem depender de log.
+    if (inverterIdParaErro) {
+      await prisma.solarInverter.update({
+        where: { id: inverterIdParaErro },
+        data: {
+          lastAuthAttemptAt: new Date(),
+          lastAuthError: String(err.message || err).slice(0, 2000),
+        },
+      }).catch(() => {});
+    }
     return res.status(400).send(htmlResposta('Falha na autorizacao', err.message, false));
   }
 });
@@ -463,12 +499,27 @@ router.post('/inverters/:id/sungrow/authorize-url', admin, async (req, res) => {
       });
     }
 
-    // Salva inverterId no Redis com TTL 10min pro callback poder parear
+    // Salva inverterId no Redis com TTL 30min pro callback poder parear.
+    // Chave global `sungrow:pending-authorize` continua sendo escrita pra
+    // compatibilidade; chave per-inverter `sungrow:pending:<id>` guarda o
+    // timestamp pra desempatar quando ha varias autorizacoes pendentes
+    // (ex: 2 inverters Sungrow sendo autorizados no mesmo tenant).
     const redisConnection = getRedisConnection();
     if (!redisConnection) {
       return res.status(500).json({ error: 'Redis indisponivel' });
     }
-    await redisConnection.set('sungrow:pending-authorize', inverter.id, 'EX', 600);
+    const agora = Date.now();
+    await redisConnection.set('sungrow:pending-authorize', inverter.id, 'EX', 1800);
+    await redisConnection.set(`sungrow:pending:${inverter.id}`, String(agora), 'EX', 1800);
+
+    // Marca inicio da tentativa pra diagnostico.
+    await prisma.solarInverter.update({
+      where: { id: inverter.id },
+      data: {
+        lastAuthAttemptAt: new Date(),
+        lastAuthError: null,
+      },
+    }).catch(() => {});
 
     // Redirect URI deve ser EXATO o registrado no portal. Hardcoded aqui
     // porque o Developer Portal exige igualdade estrita e o host dos
@@ -496,7 +547,10 @@ router.get('/inverters/:id/sungrow/auth-status', async (req, res) => {
   try {
     const inverter = await prisma.solarInverter.findFirst({
       where: { id: req.params.id, tenantId, provider: 'sungrow' },
-      select: { id: true, credentialCrypt: true },
+      select: {
+        id: true, credentialCrypt: true,
+        lastAuthAttemptAt: true, lastAuthError: true,
+      },
     });
     if (!inverter) return res.status(404).json({ error: 'Inverter nao encontrado' });
     const cred = decryptCredential(inverter.credentialCrypt) || {};
@@ -506,6 +560,8 @@ router.get('/inverters/:id/sungrow/auth-status', async (req, res) => {
       autorizado,
       expiresAt,
       precisaRenovar: autorizado && expiresAt && expiresAt < Date.now(),
+      lastAuthAttemptAt: inverter.lastAuthAttemptAt,
+      lastAuthError: inverter.lastAuthError,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
