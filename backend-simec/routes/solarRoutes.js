@@ -702,10 +702,27 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
     // sessao do backend — permite ver EXATAMENTE o que a Sungrow devolveu
     // sem depender de log do Railway.
     let ultimasChamadas = null;
+    let curlTeste = null;
     if (inverter.provider === 'sungrow') {
       try {
         ultimasChamadas = sungrowAdapter.getUltimasChamadasSungrow?.() || null;
       } catch {}
+
+      // Monta cURL pronto pro admin rodar no terminal fora do SIMEC.
+      // Isola rapido se o problema esta no SIMEC ou na Application.
+      if (credential?.appkey && credential?.secretKey) {
+        const base = inverter.apiBase || adapter.defaultApiBase;
+        const url = `${base}/openapi/platform/queryPowerStationList`;
+        curlTeste =
+          `curl -X POST "${url}" ` +
+          `-H "Content-Type: application/json;charset=UTF-8" ` +
+          `-H "x-access-key: ${credential.secretKey}" ` +
+          `-H "appkey: ${credential.appkey}" ` +
+          `-H "sys_code: 901" ` +
+          `-H "lang: _pt_BR" ` +
+          (credential.accessToken ? `-H "Authorization: Bearer ${credential.accessToken}" ` : '') +
+          `-d "{\\"ps_type\\":\\"1,3,4,5,6,7,8,12\\",\\"valid_flag\\":\\"1,3\\",\\"page\\":1,\\"size\\":100}"`;
+      }
     }
 
     res.json({
@@ -716,6 +733,7 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       visaoDaConta: visao,
       coletaDoSn: coleta,
       ultimasChamadas,
+      curlTeste,
     });
   } catch (err) {
     res.status(500).json({ error: err.message });

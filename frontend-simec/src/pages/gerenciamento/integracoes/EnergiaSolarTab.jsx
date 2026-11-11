@@ -575,6 +575,28 @@ function DiagnosticoInverterButton({ inverter }) {
                 API base: {resultado.apiBase}
               </div>
 
+              {resultado.curlTeste && (
+                <div className="mt-3 rounded border border-blue-500/40 bg-blue-500/10 p-2">
+                  <div className="mb-1 text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+                    Teste fora do SIMEC (cURL)
+                  </div>
+                  <div className="text-[10px] mb-2" style={{ color: 'var(--text-muted)' }}>
+                    Cole no terminal (git-bash, PowerShell ou cmd). Se der o mesmo erro, confirma que o problema esta na Application no portal Sungrow.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => { navigator.clipboard.writeText(resultado.curlTeste); }}
+                    className="rounded border px-2 py-1 text-[10px] font-semibold"
+                    style={{ borderColor: 'var(--border-soft)' }}
+                  >
+                    Copiar cURL
+                  </button>
+                  <pre className="mt-2 max-h-32 overflow-auto rounded bg-black/40 p-2 text-[10px] break-all whitespace-pre-wrap">
+                    {resultado.curlTeste}
+                  </pre>
+                </div>
+              )}
+
               {resultado.ultimasChamadas && resultado.ultimasChamadas.length > 0 && (
                 <details className="mt-3">
                   <summary className="cursor-pointer text-[10px] uppercase font-semibold" style={{ color: 'var(--text-muted)' }}>
