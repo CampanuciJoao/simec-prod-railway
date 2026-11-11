@@ -668,7 +668,12 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
         plantas: (r.stations || []).slice(0, 10),
         totalDevicesVisiveis: r.devices?.length ?? 0,
         devicesSn: (r.devices || []).slice(0, 10).map((d) => ({
-          sn: d.sn, estacao: d.estacao, capacidadeKw: d.capacidadeKw, modelo: d.modelo,
+          sn: d.sn,
+          dataloggerSn: d.dataloggerSn,
+          tipo: d.tipo,
+          estacao: d.estacao,
+          capacidadeKw: d.capacidadeKw,
+          modelo: d.modelo,
         })),
         erro: r.erro || null,
       };

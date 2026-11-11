@@ -553,8 +553,11 @@ function DiagnosticoInverterButton({ inverter }) {
                         {resultado.visaoDaConta.devicesSn.map((d, i) => (
                           <li key={i} className="break-all">
                             <strong>SN {d.sn}</strong>
+                            {d.tipo ? ` · tipo ${d.tipo}` : ''}
+                            {d.dataloggerSn && d.dataloggerSn !== d.sn ? ` · datalogger ${d.dataloggerSn}` : ''}
                             {d.estacao ? ` · ${d.estacao}` : ''}
                             {d.capacidadeKw ? ` · ${d.capacidadeKw} kW` : ''}
+                            {d.modelo ? ` · ${d.modelo}` : ''}
                           </li>
                         ))}
                       </ul>

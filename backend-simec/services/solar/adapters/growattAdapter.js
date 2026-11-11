@@ -159,13 +159,14 @@ export async function validarCredencial(credential, apiBase) {
             ? parseFloat(d.nominal_power) / 1000  // Growatt expoe em W
             : (d.rated_power != null ? parseFloat(d.rated_power) / 1000 : null);
           devices.push({
-            sn:           d.device_sn,
-            tipo:         d.type,
-            modelo:       d.model || d.device_model || d.type,
-            capacidadeKw: Number.isFinite(capKw) ? capKw : null,
-            estacao:      p.name,
-            stationKwp:   Number.isFinite(stationKwp) ? stationKwp : null,
-            online:       d.status === 1 || d.status === '1',
+            sn:            d.device_sn,
+            dataloggerSn:  d.datalogger_sn,
+            tipo:          d.type,  // ← crucial: identifica rota correta no fetchSnapshot
+            modelo:        d.model || d.device_model || d.type,
+            capacidadeKw:  Number.isFinite(capKw) ? capKw : null,
+            estacao:       p.name,
+            stationKwp:    Number.isFinite(stationKwp) ? stationKwp : null,
+            online:        d.status === 1 || d.status === '1',
           });
         }
       } catch {
@@ -182,41 +183,76 @@ export async function validarCredencial(credential, apiBase) {
       };
     }
 
-    return { ok: true, devices };
+    // Exposicao de stations pra ficar consistente com a API do diagnostico
+    // (que espera { stations, devices }). Permite UI distinguir planta vs device.
+    const stations = plantas.map((p) => ({
+      ps_id: p.plant_id,
+      nome:  p.name,
+    }));
+    return { ok: true, devices, stations };
   } catch (err) {
     return { ok: false, erro: err.message };
   }
 }
 
+// Rotas Growatt V1 por tipo de device. Ordem importa: tenta as mais
+// comuns primeiro. SN comecando com GB/QM e tipicamente datalogger
+// (collector) e NAO tem telemetria direta — precisa dos devices filhos.
+const ROTAS_LAST_DATA = [
+  { nome: 'inverter', path: '/v1/device/inverter/last_new_data' },  // TLX, MAX legacy
+  { nome: 'min',      path: '/v1/device/min/last_new_data' },        // MIN G2/G3
+  { nome: 'max',      path: '/v1/device/max/last_new_data' },        // MAX C&I
+  { nome: 'mix',      path: '/v1/device/mix/last_new_data' },        // MIX hybrid
+  { nome: 'sph',      path: '/v1/device/sph/last_new_data' },        // SPH storage
+  { nome: 'spa',      path: '/v1/device/spa/last_new_data' },        // SPA
+  { nome: 'storage',  path: '/v1/storage/storage_last_data' },       // S/SPX
+  { nome: 'tlx',      path: '/v1/device/tlx/last_new_data' },        // TLX novo
+];
+
 export async function fetchSnapshot(inverter) {
-  // Pega telemetria mais recente do inversor.
-  // Endpoint depende do tipo de device. "inverter" cobre MAX/MAC/TLX.
-  // Se o device for MIN (G2-G3) ou MIX/SPH, usa rotas especificas.
-  // Por ora, tentamos a rota generica inverter e caimos nas especificas se falhar.
+  // Se o SN comeca com GB/QM/N (datalogger Growatt), nao existe telemetria
+  // direta nesse SN. Precisa cadastrar o SN do device filho (inverter)
+  // visivel via /v1/device/list ou equivalente.
+  const sn = String(inverter.inverterSn || '').trim();
+  const pareceDatalogger = /^(GB|QM|NACS|XGD)/i.test(sn);
+
   let data = null;
-  let tipoTentado = 'inverter';
-  try {
-    data = await callGrowatt({
-      apiBase: inverter.apiBase,
-      token: inverter.credential.apiToken,
-      path: '/v1/device/inverter/last_new_data',
-      method: 'POST',
-      body: { device_sn: inverter.inverterSn },
-    });
-  } catch (errInv) {
-    // Tenta MIN (modelos residenciais mais recentes)
+  let tipoTentado = null;
+  const erros = [];
+
+  for (const rota of ROTAS_LAST_DATA) {
     try {
-      tipoTentado = 'min';
       data = await callGrowatt({
         apiBase: inverter.apiBase,
         token: inverter.credential.apiToken,
-        path: '/v1/device/min/last_new_data',
+        path: rota.path,
         method: 'POST',
-        body: { device_sn: inverter.inverterSn },
+        body: { device_sn: sn },
       });
-    } catch (errMin) {
-      throw new Error(`Growatt: nenhuma rota reconheceu SN ${inverter.inverterSn}. Tentou inverter e min. Ultimo erro: ${errMin.message}`);
+      // Considera sucesso util se trouxe algum campo de potencia/energia.
+      const temDados = data && (data.ppv != null || data.pac != null ||
+        data.eToday != null || data.eacToday != null);
+      if (temDados) {
+        tipoTentado = rota.nome;
+        break;
+      }
+      erros.push(`${rota.nome}: resposta vazia`);
+      data = null;
+    } catch (err) {
+      erros.push(`${rota.nome}: ${(err.message || '').slice(0, 100)}`);
     }
+  }
+
+  if (!data) {
+    const dica = pareceDatalogger
+      ? ` (O SN ${sn} parece ser DATALOGGER/COLLECTOR, nao inverter. ` +
+        'No portal Growatt, dentro da planta, procure o SN REAL do inverter — ' +
+        'normalmente comeca com T, M, SP, HPS e tem 10 chars.)'
+      : '';
+    throw new Error(
+      `Growatt: nenhuma rota reconheceu SN ${sn}.${dica} ` +
+      `Tentou: ${erros.join(' | ')}`
+    );
   }
 
   // Normaliza campos. Growatt expoe nomes diferentes por tipo:
