@@ -306,7 +306,9 @@ export async function validarCredencial(credential, apiBase) {
       apiBase: apiBase || defaultApiBase,
       credential,
       path: '/openapi/platform/queryPowerStationList',
-      body: { page: 1, size: 100 },
+      // Sungrow v2 usa curPage (nao page). Com page a API as vezes retorna
+      // array vazio sem erro visivel.
+      body: { curPage: 1, size: 100 },
     });
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
@@ -340,7 +342,7 @@ export async function validarCredencial(credential, apiBase) {
           // Filtrar so [1] = inversor geral exclui modelos hibridos (type 14)
           // e string inverters de alguns modelos — melhor pegar tudo e deixar
           // o SN cadastrado filtrar.
-          body: { ps_id: stationId, page: 1, size: 100 },
+          body: { ps_id: stationId, curPage: 1, size: 100 },
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
           let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
@@ -383,33 +385,33 @@ export async function validarCredencial(credential, apiBase) {
 }
 
 // Pontos de inversor PV (device_type=1) que queremos no snapshot.
-// IDs conforme Apendice 12.1 da doc oficial Sungrow (sem o prefixo 'p').
+// IDs conforme Apendice 12.1 da doc oficial Sungrow — v2 exige prefixo 'p'.
 const POINTS_INVERTER_PV = [
-  '24',   // Total Active Power (W)
-  '1',    // Yield Today (Wh)
-  '2',    // Total Yield (Wh)
-  '87',   // Yield This Month (Wh)
-  '88',   // Yield This Year (Wh)
-  '4',    // Internal Air Temperature (C)
-  '29',   // Operating status
-  '27',   // Grid Frequency (Hz)
+  'p24',   // Total Active Power (W)
+  'p1',    // Yield Today (Wh)
+  'p2',    // Total Yield (Wh)
+  'p87',   // Yield This Month (Wh)
+  'p88',   // Yield This Year (Wh)
+  'p4',    // Internal Air Temperature (C)
+  'p29',   // Operating status
+  'p27',   // Grid Frequency (Hz)
 ];
 
 // Pontos de inversor hibrido/ESS (device_type=14) — Apendice 12.3.
 const POINTS_INVERTER_ESS = [
-  '13011', // Active Power (W)
-  '13112', // Daily PV Yield (Wh)
-  '13134', // Total PV Yield (Wh)
-  '13141', // Battery SOC
-  '13142', // Battery SOH
-  '13143', // Battery Temperature (C)
-  '13126', // Battery Charging Power (W)
-  '13150', // Battery Discharging Power (W)
-  '13121', // Feed-in Power (W)
-  '13149', // Purchased Power (W)
-  '13119', // Load Power (W)
-  '13019', // Internal Air Temperature (C)
-  '13146', // Operating status
+  'p13011', // Active Power (W)
+  'p13112', // Daily PV Yield (Wh)
+  'p13134', // Total PV Yield (Wh)
+  'p13141', // Battery SOC
+  'p13142', // Battery SOH
+  'p13143', // Battery Temperature (C)
+  'p13126', // Battery Charging Power (W)
+  'p13150', // Battery Discharging Power (W)
+  'p13121', // Feed-in Power (W)
+  'p13149', // Purchased Power (W)
+  'p13119', // Load Power (W)
+  'p13019', // Internal Air Temperature (C)
+  'p13146', // Operating status
 ];
 
 export async function fetchSnapshot(inverter) {
@@ -481,8 +483,9 @@ export async function fetchSnapshot(inverter) {
   // Doc: "Unidades sempre na menor unidade: Wh, W, A, V" — converter W→kW, Wh→kWh.
   const wToKw = (x) => { const r = n(x); return r == null ? null : r / 1000; };
 
-  if (deviceType === 1) {
-    // Inversor PV puro (sem bateria)
+  if (deviceType === 1 || deviceType === 11) {
+    // Inversor PV puro (sem bateria) — device_type 1 (generico) ou
+    // 11 (String Inverter C&I) compartilham o mesmo mapa de pontos.
     return {
       soc: null,
       batChargePower: null, batDischargePower: null,
