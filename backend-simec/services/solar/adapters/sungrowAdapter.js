@@ -248,11 +248,10 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 function headersComToken(credential) {
   return {
     'Content-Type': 'application/json;charset=UTF-8',
-    // IMPORTANTE: em chamadas DE DADOS (apos OAuth), x-access-key leva o
-    // APPKEY (identifica a Application). O secretKey so e usado no fluxo
-    // OAuth (exchange/refresh) — depois disso o pareamento e feito via
-    // appkey + Bearer accessToken. Confundir os dois gera er_invalid_appkey.
-    'x-access-key': credential.appkey,
+    // Padrao Sungrow OpenAPI v2 (confirmado em pysolarcloud e outras
+    // implementacoes de referencia): x-access-key = SECRETKEY, appkey/token
+    // no body do request. O Bearer accessToken autoriza a chamada.
+    'x-access-key': credential.secretKey,
     'Authorization': `Bearer ${credential.accessToken}`,
     'sys_code': '901',
     'User-Agent': USER_AGENT,
@@ -277,11 +276,18 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  // IMPORTANTE: body contem apenas os campos documentados por endpoint
-  // (ver doc oficial Sungrow v2). NAO incluir appkey/token/lang — campos
-  // extras provocam er_unknown_exception. O accessToken vai apenas no
-  // header Authorization Bearer; o secretKey no header x-access-key.
-  const fullBody = { ...body };
+  // Padrao Sungrow v2: appkey + token (accessToken) vao no body em todas
+  // as chamadas, alem dos campos especificos do endpoint. A doc oficial
+  // nao lista esses 2 campos nos exemplos porque assume que ja estao
+  // presentes como parte do envelope de autenticacao. Sem eles a API
+  // responde er_invalid_appkey (E00000).
+  // NOTA: nao incluir 'lang' — alguns endpoints derrubam se lang nao for
+  // uma string reconhecida; omitir e mais seguro.
+  const fullBody = {
+    appkey: credential.appkey,
+    token: credential.accessToken,
+    ...body,
+  };
   const res = await fetch(url, {
     method: 'POST',
     headers: headersComToken(credential),
@@ -289,9 +295,14 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
   });
   const text = await res.text();
   // Grava no ring de debug antes do parse/validacao (inclusive 500/non-JSON).
+  // Mascara appkey/token apenas quando presentes (evita dar impressao que
+  // eles foram enviados quando nao foram).
+  const bodyLog = { ...fullBody };
+  if (bodyLog.token)  bodyLog.token  = '<mask>';
+  if (bodyLog.appkey) bodyLog.appkey = '<mask>';
   pushDebug({
     path,
-    bodyEnviado: { ...fullBody, token: '<mask>', appkey: '<mask>' },
+    bodyEnviado: bodyLog,
     httpStatus: res.status,
     respostaCrua: text.slice(0, 2000),
   });
