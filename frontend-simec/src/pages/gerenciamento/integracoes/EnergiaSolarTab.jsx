@@ -578,6 +578,33 @@ function DiagnosticoInverterButton({ inverter }) {
                 API base: {resultado.apiBase}
               </div>
 
+              {resultado.ultimoSnapshot && (
+                <div className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/5 p-2">
+                  <div className="text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+                    Ultimo snapshot salvo no banco ({new Date(resultado.ultimoSnapshot.capturedAt).toLocaleString('pt-BR')})
+                  </div>
+                  <div className="mt-1 text-[11px]">
+                    Potencia: {resultado.ultimoSnapshot.powerKw ?? '—'} kW ·
+                    Hoje: {resultado.ultimoSnapshot.generationKwhDay ?? '—'} kWh ·
+                    Mes: {resultado.ultimoSnapshot.generationKwhMonth ?? '—'} kWh ·
+                    Temp: {resultado.ultimoSnapshot.inverterTempC ?? '—'} °C
+                  </div>
+                  {resultado.ultimoSnapshot.rawJson && (
+                    <details className="mt-2">
+                      <summary className="cursor-pointer text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>
+                        Raw JSON do fabricante
+                      </summary>
+                      <pre className="mt-1 max-h-64 overflow-auto rounded bg-black/40 p-2 text-[10px]">
+                        {(() => {
+                          try { return JSON.stringify(JSON.parse(resultado.ultimoSnapshot.rawJson), null, 2); }
+                          catch { return resultado.ultimoSnapshot.rawJson; }
+                        })()}
+                      </pre>
+                    </details>
+                  )}
+                </div>
+              )}
+
               {resultado.curlTeste && (
                 <div className="mt-3 rounded border border-blue-500/40 bg-blue-500/10 p-2">
                   <div className="mb-1 text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>

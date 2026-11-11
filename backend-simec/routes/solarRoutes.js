@@ -729,6 +729,17 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       }
     }
 
+    // Ultimo snapshot bem-sucedido no banco — mostra o rawJson sem
+    // bater na API de novo (util quando ela esta em rate limit).
+    const ultimoSnapshot = await prisma.solarSnapshot.findFirst({
+      where: { inverterId: inverter.id },
+      orderBy: { capturedAt: 'desc' },
+      select: {
+        capturedAt: true, powerKw: true, generationKwhDay: true,
+        generationKwhMonth: true, inverterTempC: true, rawJson: true,
+      },
+    });
+
     res.json({
       inverterId: inverter.id,
       provider: inverter.provider,
@@ -736,6 +747,7 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       apiBase: inverter.apiBase || adapter.defaultApiBase,
       visaoDaConta: visao,
       coletaDoSn: coleta,
+      ultimoSnapshot,
       ultimasChamadas,
       curlTeste,
     });
