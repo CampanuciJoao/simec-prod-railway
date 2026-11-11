@@ -722,6 +722,54 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
   }
 });
 
+// ─── Gera comando curl para testar Sungrow fora do SIMEC (admin) ────────────
+// Se o curl der o MESMO er_invalid_appkey, o problema esta na Application
+// no portal Sungrow (nao no SIMEC). Se o curl funcionar, o problema esta
+// em algum middleware do SIMEC que corrompe o envelope.
+router.get('/inverters/:id/sungrow/curl-test', admin, async (req, res) => {
+  const tenantId = req.tenantContext;
+  try {
+    const inverter = await prisma.solarInverter.findFirst({
+      where: { id: req.params.id, tenantId, provider: 'sungrow' },
+      select: { id: true, apiBase: true, credentialCrypt: true },
+    });
+    if (!inverter) return res.status(404).json({ error: 'Inverter nao encontrado' });
+    const cred = decryptCredential(inverter.credentialCrypt) || {};
+    if (!cred.appkey || !cred.secretKey) {
+      return res.status(400).json({ error: 'Credencial sem appkey/secretKey' });
+    }
+
+    const base = inverter.apiBase || 'https://gateway.isolarcloud.com.hk';
+    const url = `${base}/openapi/platform/queryPowerStationList`;
+
+    // Comando pra rodar no cmd/powershell/bash — testa a mesma chamada
+    // que o SIMEC faz, sem passar pelo codigo do SIMEC.
+    const curlCmd =
+      `curl -X POST "${url}" ` +
+      `-H "Content-Type: application/json;charset=UTF-8" ` +
+      `-H "x-access-key: ${cred.secretKey}" ` +
+      `-H "appkey: ${cred.appkey}" ` +
+      `-H "sys_code: 901" ` +
+      `-H "lang: _pt_BR" ` +
+      (cred.accessToken ? `-H "Authorization: Bearer ${cred.accessToken}" ` : '') +
+      `-d "{\\"ps_type\\":\\"1,3,4,5,6,7,8,12\\",\\"valid_flag\\":\\"1,3\\",\\"page\\":1,\\"size\\":100}"`;
+
+    res.json({
+      instrucoes:
+        'Copie o campo curlCmd e cole num terminal (cmd, powershell, bash, git-bash). ' +
+        'A Sungrow deve responder identico ao que o SIMEC recebe. Se responder, o problema esta no SIMEC. ' +
+        'Se der o mesmo er_invalid_appkey, o problema esta na Application no portal Sungrow.',
+      appkeyEmUso: cred.appkey.slice(0, 8) + '...',
+      secretEmUso: cred.secretKey.slice(0, 6) + '...',
+      temAccessToken: Boolean(cred.accessToken),
+      url,
+      curlCmd,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Status atual da planta (snapshot mais recente agregado) ────────────────
 router.get('/plants/:id/status', async (req, res) => {
   const tenantId = req.tenantContext;
