@@ -332,9 +332,16 @@ export async function validarCredencial(credential, apiBase) {
       apiBase: apiBase || defaultApiBase,
       credential,
       path: '/openapi/platform/queryPowerStationList',
-      // Sungrow v2 usa curPage (nao page). Com page a API as vezes retorna
-      // array vazio sem erro visivel.
-      body: { curPage: 1, size: 100 },
+      // Doc oficial Sungrow: page (nao curPage). ps_type lista todos tipos
+      // (1=Utility, 3=Distributed PV, 4=Residential, 5=Residential ESS,
+      // 6=Village, 7=Distributed ESS, 8=Poverty, 9=Wind, 12=C&I ESS).
+      // valid_flag: "1,3" = Normal + Connected (padrao doc).
+      body: {
+        ps_type: '1,3,4,5,6,7,8,12',
+        valid_flag: '1,3',
+        page: 1,
+        size: 100,
+      },
     });
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
@@ -368,7 +375,8 @@ export async function validarCredencial(credential, apiBase) {
           // Filtrar so [1] = inversor geral exclui modelos hibridos (type 14)
           // e string inverters de alguns modelos — melhor pegar tudo e deixar
           // o SN cadastrado filtrar.
-          body: { ps_id: stationId, curPage: 1, size: 100 },
+          // Doc oficial Sungrow getDeviceListByPsId: page (nao curPage).
+          body: { ps_id: stationId, page: 1, size: 100 },
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
           let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
@@ -410,34 +418,35 @@ export async function validarCredencial(credential, apiBase) {
   }
 }
 
-// Pontos de inversor PV (device_type=1) que queremos no snapshot.
-// IDs conforme Apendice 12.1 da doc oficial Sungrow — v2 exige prefixo 'p'.
+// Pontos de inversor PV (device_type=1). IDs sem prefixo no REQUEST.
+// A resposta devolve com 'p' prefixado (p24, p1 ...) mas o pedido usa
+// a forma crua ("24", "1"). Conforme doc oficial Sungrow Appendix 10.
 const POINTS_INVERTER_PV = [
-  'p24',   // Total Active Power (W)
-  'p1',    // Yield Today (Wh)
-  'p2',    // Total Yield (Wh)
-  'p87',   // Yield This Month (Wh)
-  'p88',   // Yield This Year (Wh)
-  'p4',    // Internal Air Temperature (C)
-  'p29',   // Operating status
-  'p27',   // Grid Frequency (Hz)
+  '24',   // Total Active Power (W)
+  '1',    // Yield Today (Wh)
+  '2',    // Total Yield (Wh)
+  '87',   // Yield This Month (Wh)
+  '88',   // Yield This Year (Wh)
+  '4',    // Internal Air Temperature (C)
+  '29',   // Operating status
+  '27',   // Grid Frequency (Hz)
 ];
 
-// Pontos de inversor hibrido/ESS (device_type=14) — Apendice 12.3.
+// Pontos de inversor hibrido/ESS (device_type=14) — Apendice 10 ESS.
 const POINTS_INVERTER_ESS = [
-  'p13011', // Active Power (W)
-  'p13112', // Daily PV Yield (Wh)
-  'p13134', // Total PV Yield (Wh)
-  'p13141', // Battery SOC
-  'p13142', // Battery SOH
-  'p13143', // Battery Temperature (C)
-  'p13126', // Battery Charging Power (W)
-  'p13150', // Battery Discharging Power (W)
-  'p13121', // Feed-in Power (W)
-  'p13149', // Purchased Power (W)
-  'p13119', // Load Power (W)
-  'p13019', // Internal Air Temperature (C)
-  'p13146', // Operating status
+  '13011', // Active Power (W)
+  '13112', // Daily PV Yield (Wh)
+  '13134', // Total PV Yield (Wh)
+  '13141', // Battery SOC
+  '13142', // Battery SOH
+  '13143', // Battery Temperature (C)
+  '13126', // Battery Charging Power (W)
+  '13150', // Battery Discharging Power (W)
+  '13121', // Feed-in Power (W)
+  '13149', // Purchased Power (W)
+  '13119', // Load Power (W)
+  '13019', // Internal Air Temperature (C)
+  '13146', // Operating status
 ];
 
 export async function fetchSnapshot(inverter) {
