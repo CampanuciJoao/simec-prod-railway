@@ -184,10 +184,21 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, r
     console.error('[SUNGROW_TOKEN_EXCHANGE] resposta sem access_token:', text.slice(0, 500));
     throw new Error(`Sungrow nao retornou access_token. Resposta: ${text.slice(0, 200)}`);
   }
+  // Log dos campos de expiracao — Sungrow tem historico de devolver 0 ou
+  // formato nao-padrao, o que faria o SIMEC marcar o token como expirado
+  // imediatamente apos obter.
+  const rawExpiresIn = data.expires_in ?? data.expiresIn ?? data.expire_in;
+  const expiresIn = Number(rawExpiresIn);
+  console.log('[SUNGROW_TOKEN_EXCHANGE] expiresIn recebido:', {
+    raw: rawExpiresIn,
+    numerico: expiresIn,
+    valido: Number.isFinite(expiresIn) && expiresIn > 0,
+  });
   return {
     accessToken,
     refreshToken: data.refresh_token || data.refreshToken,
-    expiresIn: Number(data.expires_in || data.expiresIn || 86400),
+    // Se Sungrow devolver vazio/0, assume 24h (default do OAuth deles).
+    expiresIn: Number.isFinite(expiresIn) && expiresIn > 0 ? expiresIn : 86400,
   };
 }
 
