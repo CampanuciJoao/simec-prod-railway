@@ -7,12 +7,13 @@ import { Button, Card } from '@/components/ui';
 import TelegramStatusIcon from './TelegramStatusIcon';
 
 const COLUNAS = [
-  { key: 'recebeAlertasContrato',     label: 'Contratos' },
-  { key: 'recebeAlertasManutencao',   label: 'Manutenções' },
-  { key: 'recebeAlertasSeguro',       label: 'Seguros' },
-  { key: 'recebeAlertasGehc',         label: 'GEHC' },
-  { key: 'recebeAlertasOsCorretiva',  label: 'OS Corretiva' },
-  { key: 'recebeAlertasRecomendacao', label: 'Recomendações' },
+  { key: 'recebeAlertasContrato',      label: 'Contratos' },
+  { key: 'recebeAlertasManutencao',    label: 'Manutenções' },
+  { key: 'recebeAlertasSeguro',        label: 'Seguros' },
+  { key: 'recebeAlertasGehc',          label: 'GEHC' },
+  { key: 'recebeAlertasOsCorretiva',   label: 'OS Corretiva' },
+  { key: 'recebeAlertasRecomendacao',  label: 'Recomendações' },
+  { key: 'recebeAlertasFoxessEnergia', label: 'Energia Solar' },
 ];
 
 function TelegramTable({ destinatarios, onEdit, onDelete }) {

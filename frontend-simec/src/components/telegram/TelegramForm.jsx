@@ -16,6 +16,7 @@ const ESTADO_INICIAL = {
   recebeAlertasOsCorretiva:  false,
   recebeAlertasRecomendacao: false,
   recebeAlertasControleQualidade: true,
+  recebeAlertasFoxessEnergia: true,
 };
 
 const TOGGLES = [
@@ -26,6 +27,7 @@ const TOGGLES = [
   { key: 'recebeAlertasOsCorretiva',       label: 'OS Corretiva',              desc: 'Visitas e ordens de serviço corretivo.' },
   { key: 'recebeAlertasRecomendacao',      label: 'Recomendações',             desc: 'Sugestões geradas automaticamente pelo sistema.' },
   { key: 'recebeAlertasControleQualidade', label: 'Controle de Qualidade',     desc: 'Vencimentos e reprovações de testes regulatórios (RDC 611/2022).' },
+  { key: 'recebeAlertasFoxessEnergia',     label: 'Energia Solar',             desc: 'Queda de energia, bateria baixa, falhas do inversor e retorno da rede.' },
 ];
 
 function ToggleField({ checked, onChange, label, description }) {
@@ -86,6 +88,7 @@ function TelegramForm({ initialData = null, onSubmit, onCancel, isSubmitting = f
         recebeAlertasOsCorretiva:  Boolean(formData.recebeAlertasOsCorretiva),
         recebeAlertasRecomendacao: Boolean(formData.recebeAlertasRecomendacao),
         recebeAlertasControleQualidade: Boolean(formData.recebeAlertasControleQualidade),
+        recebeAlertasFoxessEnergia: Boolean(formData.recebeAlertasFoxessEnergia),
       };
       if (!isEditing) payload.chatId = String(formData.chatId).trim();
       await onSubmit(payload);

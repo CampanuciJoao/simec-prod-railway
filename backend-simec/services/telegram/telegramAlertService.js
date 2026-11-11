@@ -9,6 +9,7 @@ const CATEGORIA_FLAG = {
   OS_CORRETIVA:       'recebeAlertasOsCorretiva',
   RECOMENDACAO:       'recebeAlertasRecomendacao',
   CONTROLE_QUALIDADE: 'recebeAlertasControleQualidade',
+  FOXESS_ENERGIA:     'recebeAlertasFoxessEnergia',
 };
 
 // Categorias que podem acordar o usuario fora do horario comercial.
@@ -179,7 +180,7 @@ async function processarTenant(tenantId) {
           { telegramEnviado: false },
           {
             telegramEnviado: true,
-            tipoCategoria: 'GEHC_SAUDE',
+            tipoCategoria: { in: [...CATEGORIAS_URGENTES_24_7] },
             prioridade: { in: ['Alta', 'Media'] },
             telegramEnviadoEm: { lt: limiteReenvio },
           },
