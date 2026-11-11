@@ -248,11 +248,12 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 function headersComToken(credential) {
   return {
     'Content-Type': 'application/json;charset=UTF-8',
-    'x-access-key': credential.secretKey,
+    // IMPORTANTE: em chamadas DE DADOS (apos OAuth), x-access-key leva o
+    // APPKEY (identifica a Application). O secretKey so e usado no fluxo
+    // OAuth (exchange/refresh) — depois disso o pareamento e feito via
+    // appkey + Bearer accessToken. Confundir os dois gera er_invalid_appkey.
+    'x-access-key': credential.appkey,
     'Authorization': `Bearer ${credential.accessToken}`,
-    // Sungrow OpenAPI v2 exige sys_code pra identificar sistema cliente.
-    // 901 e o codigo padrao para integradores terceiros. Sem isso todas
-    // as chamadas retornam er_unknown_exception com result_code=000.
     'sys_code': '901',
     'User-Agent': USER_AGENT,
   };
