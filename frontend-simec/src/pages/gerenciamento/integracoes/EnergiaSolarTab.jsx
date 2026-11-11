@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faTrash, faPen, faMicrochip, faBolt, faSolarPanel,
-  faCheck, faXmark, faShieldHalved,
+  faCheck, faXmark, faShieldHalved, faStethoscope,
 } from '@fortawesome/free-solid-svg-icons';
 
 import {
@@ -19,7 +19,7 @@ import {
   getSolarPlants, getSolarProviders, salvarSolarPlant, desativarSolarPlant,
   adicionarInverter, editarInverter, removerInverter,
   adicionarBateria, removerBateria, validarCredencialSolar,
-  sungrowAuthorizeUrl, sungrowAuthStatus,
+  sungrowAuthorizeUrl, sungrowAuthStatus, diagnosticarInversor,
 } from '@/services/api/solarApi';
 
 // ─── Modal de nova/editar planta (dados basicos) ────────────────────────────
@@ -445,6 +445,120 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
   );
 }
 
+// ─── Botao de diagnostico — mostra por que a coleta nao esta trazendo dados ──
+function DiagnosticoInverterButton({ inverter }) {
+  const { addToast } = useToast();
+  const [aberto, setAberto] = useState(false);
+  const [carregando, setCarregando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const executar = async () => {
+    setCarregando(true);
+    setResultado(null);
+    try {
+      const r = await diagnosticarInversor(inverter.id);
+      setResultado(r);
+      setAberto(true);
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message || 'Falha no diagnostico', 'error');
+    } finally {
+      setCarregando(false);
+    }
+  };
+
+  return (
+    <>
+      <button
+        type="button"
+        onClick={executar}
+        title="Diagnosticar coleta"
+        disabled={carregando}
+      >
+        <FontAwesomeIcon icon={faStethoscope} style={{ color: 'var(--brand-primary)' }} />
+      </button>
+      {aberto && resultado && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setAberto(false)}
+        >
+          <div
+            className="max-h-[80vh] w-full max-w-2xl overflow-y-auto rounded-lg p-4"
+            style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border-soft)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">Diagnostico — {inverter.provider} · SN {inverter.inverterSn}</h3>
+              <button type="button" onClick={() => setAberto(false)}>
+                <FontAwesomeIcon icon={faXmark} />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div>
+                <div className="font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Coleta do SN cadastrado
+                </div>
+                {resultado.coletaDoSn?.ok ? (
+                  <div className="mt-1 rounded border border-green-500/40 bg-green-500/10 p-2">
+                    <div>Potencia: {resultado.coletaDoSn.powerKw ?? '—'} kW</div>
+                    <div>Hoje: {resultado.coletaDoSn.generationKwhDay ?? '—'} kWh</div>
+                    <div>Temp: {resultado.coletaDoSn.inverterTempC ?? '—'} °C</div>
+                  </div>
+                ) : (
+                  <div className="mt-1 rounded border border-red-500/40 bg-red-500/10 p-2">
+                    <div className="font-semibold">Falhou: {resultado.coletaDoSn?.codigo || 'erro'}</div>
+                    <div className="mt-1 break-words">{resultado.coletaDoSn?.erro}</div>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  Visao da conta (o que o token enxerga)
+                </div>
+                {resultado.visaoDaConta?.ok ? (
+                  <div className="mt-1 rounded border p-2" style={{ borderColor: 'var(--border-soft)' }}>
+                    <div>Total de devices visiveis: <strong>{resultado.visaoDaConta.totalDevicesVisiveis}</strong></div>
+                    {resultado.visaoDaConta.devicesSn?.length > 0 && (
+                      <div className="mt-2">
+                        <div className="mb-1 text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>
+                          Primeiros devices:
+                        </div>
+                        <ul className="list-disc pl-4">
+                          {resultado.visaoDaConta.devicesSn.map((d, i) => (
+                            <li key={i} className="break-all">
+                              <strong>SN {d.sn}</strong>
+                              {d.estacao ? ` · ${d.estacao}` : ''}
+                              {d.capacidadeKw ? ` · ${d.capacidadeKw} kW` : ''}
+                            </li>
+                          ))}
+                        </ul>
+                        <div className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                          Compare com o SN cadastrado: <strong>{resultado.inverterSnCadastrado}</strong>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-1 rounded border border-orange-500/40 bg-orange-500/10 p-2">
+                    {resultado.visaoDaConta?.precisaAutorizar
+                      ? 'Precisa autorizar (OAuth).'
+                      : resultado.visaoDaConta?.erro || 'Erro desconhecido'}
+                  </div>
+                )}
+              </div>
+
+              <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                API base: {resultado.apiBase}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ─── Badge Sungrow — status OAuth + botao Autorizar quando precisa ─────────
 function SungrowAuthBadge({ inverter }) {
   const { addToast } = useToast();
@@ -596,6 +710,7 @@ function PlantaCard({ plant, providers, onEditar, onRemover, onAddInverter, onEd
                   {inv.provider === 'sungrow' && <SungrowAuthBadge inverter={inv} />}
                 </span>
                 <div className="flex gap-1">
+                  <DiagnosticoInverterButton inverter={inv} />
                   <button type="button" onClick={() => onEditInverter(plant, inv)} title="Editar">
                     <FontAwesomeIcon icon={faPen} />
                   </button>

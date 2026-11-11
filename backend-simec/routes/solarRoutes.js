@@ -536,6 +536,81 @@ router.post('/validar-credencial', admin, async (req, res) => {
   }
 });
 
+// ─── Diagnostico de um inverter (admin) ─────────────────────────────────────
+// Chama adapter.fetchSnapshot direto e devolve o payload cru (ou o erro).
+// Objetivo: entender rapido por que o poller nao traz dados sem precisar
+// abrir log do Railway (ex: SN errado, token expirado, conta sem plantas).
+router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
+  const tenantId = req.tenantContext;
+  try {
+    const inverter = await prisma.solarInverter.findFirst({
+      where: { id: req.params.id, tenantId },
+      select: {
+        id: true, provider: true, inverterSn: true, apiBase: true,
+        modeloInversor: true, credentialCrypt: true, plantId: true,
+      },
+    });
+    if (!inverter) return res.status(404).json({ error: 'Inverter nao encontrado' });
+
+    const credential = decryptCredential(inverter.credentialCrypt);
+    if (!credential) {
+      return res.json({ ok: false, etapa: 'decrypt', erro: 'Credencial vazia ou invalida.' });
+    }
+
+    const adapter = getAdapter(inverter.provider);
+
+    // 1. Tenta listar plantas/devices visiveis pelo token (contexto da conta).
+    let visao = null;
+    try {
+      const r = await adapter.validarCredencial(credential, inverter.apiBase || adapter.defaultApiBase);
+      visao = {
+        ok: r.ok,
+        precisaAutorizar: r.precisaAutorizar || false,
+        totalDevicesVisiveis: r.devices?.length ?? 0,
+        devicesSn: (r.devices || []).slice(0, 10).map((d) => ({
+          sn: d.sn, estacao: d.estacao, capacidadeKw: d.capacidadeKw, modelo: d.modelo,
+        })),
+        erro: r.erro || null,
+      };
+    } catch (err) {
+      visao = { ok: false, erro: err.message };
+    }
+
+    // 2. Tenta fetchSnapshot com o SN cadastrado — este e o teste que o
+    //    poller faz a cada 60s, o erro aqui e literalmente o motivo
+    //    pelo qual os cards estao vazios.
+    let coleta = null;
+    try {
+      const snap = await adapter.fetchSnapshot({
+        inverterSn: inverter.inverterSn,
+        apiBase: inverter.apiBase,
+        credential,
+        modeloInversor: inverter.modeloInversor,
+      });
+      coleta = {
+        ok: true,
+        powerKw: snap.powerKw,
+        generationKwhDay: snap.generationKwhDay,
+        inverterTempC: snap.inverterTempC,
+        temRawPayload: Boolean(snap.rawPayload),
+      };
+    } catch (err) {
+      coleta = { ok: false, codigo: err.code || null, erro: err.message };
+    }
+
+    res.json({
+      inverterId: inverter.id,
+      provider: inverter.provider,
+      inverterSnCadastrado: inverter.inverterSn,
+      apiBase: inverter.apiBase || adapter.defaultApiBase,
+      visaoDaConta: visao,
+      coletaDoSn: coleta,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Status atual da planta (snapshot mais recente agregado) ────────────────
 router.get('/plants/:id/status', async (req, res) => {
   const tenantId = req.tenantContext;

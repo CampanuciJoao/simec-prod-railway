@@ -51,6 +51,12 @@ export const sungrowAuthorizeUrl = (inverterId) =>
 export const sungrowAuthStatus = (inverterId) =>
   api.get(`/solar/inverters/${inverterId}/sungrow/auth-status`).then((r) => r.data);
 
+// ─── Diagnostico de coleta (admin) ──────────────────────────────────────────
+// Chama fetchSnapshot direto e devolve o payload cru + visao da conta.
+// Objetivo: entender por que os cards estao vazios sem olhar log do Railway.
+export const diagnosticarInversor = (inverterId) =>
+  api.get(`/solar/inverters/${inverterId}/diagnostico`).then((r) => r.data);
+
 // ─── Falhas (Fase 1) ────────────────────────────────────────────────────────
 export const getSolarFalhas = (plantId, { status = 'ativas', limite = 50 } = {}) =>
   api.get(`/solar/plants/${plantId}/falhas`, { params: { status, limite } }).then((r) => r.data);
