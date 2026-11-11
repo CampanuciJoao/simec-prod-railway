@@ -247,19 +247,13 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 //   Content-Type: application/json;charset=UTF-8
 //   x-access-key: <secretKey>
 //   Authorization: Bearer <access_token>   <- token vai AQUI, nao no body
-function headersComToken(credential, { incluirBearer = true } = {}) {
-  const h = {
+function headersComToken(credential) {
+  return {
     'Content-Type': 'application/json;charset=UTF-8',
     'x-access-key': credential.secretKey,
-    'appkey': credential.appkey,
     'sys_code': '901',
-    'lang': '_pt_BR',
     'User-Agent': USER_AGENT,
   };
-  if (incluirBearer && credential.accessToken) {
-    h['Authorization'] = `Bearer ${credential.accessToken}`;
-  }
-  return h;
 }
 
 // Buffer em memoria das ultimas chamadas, pra depuracao via endpoint.
@@ -274,50 +268,43 @@ export function getUltimasChamadasSungrow() {
   return DEBUG_RING.slice().reverse();
 }
 
-// Nucleo HTTP — detecta "token expirado" e sinaliza pra o caller tentar refresh.
-// Tambem tenta fallback SEM Bearer quando a Sungrow retorna er_invalid_appkey —
-// a versao antiga do adapter (commit 5fdb250, que funcionava) nao enviava
-// Authorization: Bearer; a adicao desse header pode estar confundindo o
-// validator de Plaintext mode. O fallback detecta esse caso e reenvia.
+// Nucleo HTTP — segue o padrao OFICIAL da doc Sungrow OAuth 2.0:
+//
+//   Headers:
+//     Content-Type: application/json
+//     x-access-key: <secretKey>
+//     sys_code: 901
+//   Body:
+//     appkey: <appkey>
+//     token: "Bearer " + <access_token>     <-- com prefixo Bearer
+//     ...campos do endpoint
+//
+// NAO usar: Authorization header, appkey como header, lang.
 async function callSungrow({ apiBase, credential, path, body = {} }) {
   if (!credential.accessToken) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  const fullBody = { ...body };
-
-  const tentar = async (incluirBearer) => {
-    const headers = headersComToken(credential, { incluirBearer });
-    const res = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(fullBody),
-    });
-    const text = await res.text();
-    return { res, text, headers };
+  const fullBody = {
+    appkey: credential.appkey,
+    token: `Bearer ${credential.accessToken}`,
+    ...body,
   };
 
-  let { res, text, headers } = await tentar(true);
+  const headers = headersComToken(credential);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(fullBody),
+  });
+  const text = await res.text();
 
-  // Fallback: er_invalid_appkey com Bearer -> re-tenta sem Bearer.
-  if (/er_invalid_appkey/i.test(text)) {
-    const r2 = await tentar(false);
-    if (!/er_invalid_appkey/i.test(r2.text)) {
-      ({ res, text, headers } = r2);
-    }
-  }
   // Grava no ring de debug antes do parse/validacao.
-  // Mascara mostrando primeiros 6 chars pra conferencia manual que o valor
-  // enviado bate com o que esta no portal (sem expor o segredo inteiro).
   const mascarar = (v, visivel = 6) =>
     !v ? '<vazio>' : (v.length > visivel ? v.slice(0, visivel) + '…(' + v.length + ' chars)' : v);
   const headersLog = {
     ...headers,
-    'x-access-key':  mascarar(headers['x-access-key']),
-    'appkey':        mascarar(headers['appkey']),
-    'Authorization': headers['Authorization']
-      ? 'Bearer ' + mascarar((headers['Authorization'] || '').replace('Bearer ', ''))
-      : undefined,
+    'x-access-key': mascarar(headers['x-access-key']),
   };
   const bodyLog = { ...fullBody };
   if (bodyLog.token)  bodyLog.token  = mascarar(bodyLog.token);
@@ -368,17 +355,10 @@ export async function validarCredencial(credential, apiBase) {
     const data = await callSungrow({
       apiBase: apiBase || defaultApiBase,
       credential,
-      path: '/openapi/platform/queryPowerStationList',
-      // Doc oficial Sungrow: page (nao curPage). ps_type lista todos tipos
-      // (1=Utility, 3=Distributed PV, 4=Residential, 5=Residential ESS,
-      // 6=Village, 7=Distributed ESS, 8=Poverty, 9=Wind, 12=C&I ESS).
-      // valid_flag: "1,3" = Normal + Connected (padrao doc).
-      body: {
-        ps_type: '1,3,4,5,6,7,8,12',
-        valid_flag: '1,3',
-        page: 1,
-        size: 100,
-      },
+      // Endpoint oficial do fluxo OAuth 2.0: /openapi/getPowerStationList
+      // (nao /platform/queryPowerStationList — esse e do fluxo user/pw).
+      path: '/openapi/getPowerStationList',
+      body: {},
     });
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
@@ -407,7 +387,7 @@ export async function validarCredencial(credential, apiBase) {
         const devData = await callSungrow({
           apiBase: apiBase || defaultApiBase,
           credential,
-          path: '/openapi/platform/getDeviceListByPsId',
+          path: '/openapi/getDeviceList',
           // device_type_list vazio = todos os tipos (inversor, bateria, meter).
           // Filtrar so [1] = inversor geral exclui modelos hibridos (type 14)
           // e string inverters de alguns modelos — melhor pegar tudo e deixar
@@ -516,7 +496,7 @@ export async function fetchSnapshot(inverter) {
       const resp = await callSungrow({
         apiBase: inverter.apiBase,
         credential: inverter.credential,
-        path: '/openapi/platform/getDeviceRealTimeData',
+        path: '/openapi/getDeviceRealTimeData',
         body: {
           // Doc oficial Sungrow: device_type STRING (nao integer).
           device_type: String(t.deviceType),
@@ -622,7 +602,7 @@ export async function fetchFalhas(inverter) {
   const data = await callSungrow({
     apiBase: inverter.apiBase,
     credential: inverter.credential,
-    path: '/openapi/platform/getFaultAlarmInfo',
+    path: '/openapi/getDeviceFaultAlarmList',
     body: {
       process_status: '8',
       fault_type: '1,2,3,4',

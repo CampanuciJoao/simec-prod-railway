@@ -717,16 +717,15 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       // Isola rapido se o problema esta no SIMEC ou na Application.
       if (credential?.appkey && credential?.secretKey) {
         const base = inverter.apiBase || adapter.defaultApiBase;
-        const url = `${base}/openapi/platform/queryPowerStationList`;
+        // Padrao OFICIAL da doc Sungrow OAuth 2.0:
+        // Headers: x-access-key + sys_code. Body: appkey + token "Bearer ..."
+        const url = `${base}/openapi/getPowerStationList`;
         curlTeste =
           `curl -X POST "${url}" ` +
-          `-H "Content-Type: application/json;charset=UTF-8" ` +
+          `-H "Content-Type: application/json" ` +
           `-H "x-access-key: ${credential.secretKey}" ` +
-          `-H "appkey: ${credential.appkey}" ` +
           `-H "sys_code: 901" ` +
-          `-H "lang: _pt_BR" ` +
-          (credential.accessToken ? `-H "Authorization: Bearer ${credential.accessToken}" ` : '') +
-          `-d "{\\"ps_type\\":\\"1,3,4,5,6,7,8,12\\",\\"valid_flag\\":\\"1,3\\",\\"page\\":1,\\"size\\":100}"`;
+          `-d "{\\"appkey\\":\\"${credential.appkey}\\",\\"token\\":\\"Bearer ${credential.accessToken || ''}\\"}"`;
       }
     }
 
