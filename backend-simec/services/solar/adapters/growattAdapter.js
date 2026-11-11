@@ -265,25 +265,42 @@ export async function fetchSnapshot(inverter) {
     );
   }
 
-  // Normaliza campos. Growatt expoe nomes diferentes por tipo:
-  //   inverter: ppv (power atual kW), eToday, eMonth, eTotal, temperature
-  //   min:      pac, eacToday, eacMonth, eacTotal, temperature
+  // Normaliza campos. Growatt tem MUITOS nomes diferentes dependendo do
+  // modelo/firmware — a doc oficial as vezes nao bate com o payload real.
+  // Estrategia: tentar lista de fallback, usar primeiro valor valido.
+  // Confirmado via diagnostico em inverter MAX/MID-X/M (GBDDA14008):
+  //   ppv: 0 W (potencia DC atual)
+  //   pac: 0 W (potencia AC atual)
+  //   powerToday: 100 Wh (geracao do dia — em Wh, nao kWh)
+  //   powerTotal: 433656.5 kWh (geracao total acumulada — em kWh ja)
+  //   temperature: 46.6 C (temperatura interna)
   const n = (x) => (typeof x === 'number' ? x : (x != null ? parseFloat(x) : null));
-  const normalizado = tipoTentado === 'min'
-    ? {
-        powerKw: n(data?.pac) != null ? n(data.pac) / 1000 : null, // pac vem em W
-        generationKwhDay:   n(data?.eacToday ?? data?.eToday),
-        generationKwhMonth: n(data?.eacMonth ?? data?.eMonth),
-        generationKwhTotal: n(data?.eacTotal ?? data?.eTotal),
-        inverterTempC:      n(data?.temperature1 ?? data?.temperature),
-      }
-    : {
-        powerKw: n(data?.ppv),
-        generationKwhDay:   n(data?.eToday),
-        generationKwhMonth: n(data?.eMonth),
-        generationKwhTotal: n(data?.eTotal),
-        inverterTempC:      n(data?.temperature),
-      };
+  const primeiroValido = (...vals) => {
+    for (const v of vals) {
+      const nn = n(v);
+      if (nn != null && Number.isFinite(nn)) return nn;
+    }
+    return null;
+  };
+  // Potencia atual: ppv (DC) ou pac (AC), ambos em W. Prefere ppv.
+  const powerW = primeiroValido(data?.ppv, data?.pac);
+  // Hoje: Growatt usa varios nomes. powerToday/eToday/eacToday em Wh;
+  // today_energy/eacTodayKwh em kWh. Lista ordenada por frequencia observada.
+  const hojeWh  = primeiroValido(data?.powerToday, data?.eToday, data?.eacToday);
+  const hojeKwh = primeiroValido(data?.today_energy, data?.eacTodayKwh);
+  // Total: powerTotal ja vem em kWh; eTotal/total_energy tambem.
+  const totalKwh = primeiroValido(data?.powerTotal, data?.eTotal, data?.total_energy, data?.eacTotal);
+  // Mes: pode vir ou nao; fallback null.
+  const mesWh  = primeiroValido(data?.powerMonth, data?.eMonth, data?.eacMonth);
+  const mesKwh = primeiroValido(data?.month_energy);
+
+  const normalizado = {
+    powerKw:            powerW != null ? powerW / 1000 : null,
+    generationKwhDay:   hojeKwh != null ? hojeKwh : (hojeWh != null ? hojeWh / 1000 : null),
+    generationKwhMonth: mesKwh  != null ? mesKwh  : (mesWh  != null ? mesWh  / 1000 : null),
+    generationKwhTotal: totalKwh,  // ja em kWh
+    inverterTempC:      primeiroValido(data?.temperature, data?.temperature1),
+  };
 
   return {
     // Bateria / grid (Growatt puro geracao nao tem bateria — null)
