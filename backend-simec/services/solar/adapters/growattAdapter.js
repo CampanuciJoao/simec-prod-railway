@@ -66,31 +66,92 @@ async function callGrowatt({ apiBase, token, path, method = 'GET', body = null }
   return json.data || json;
 }
 
+// Growatt V1 tem dois modelos de conta:
+//
+//   1. Conta direta (shineserver): o token ja identifica o user; `/plant/list`
+//      aceita chamada sem `C_user_id` ou com `C_user_id=0`. A doc antiga de 2016
+//      marca o parametro como obrigatorio, mas na pratica o OpenAPI V1 moderno
+//      aceita sem (retorna as plantas do proprio token).
+//   2. Conta business/revendedor: o token enxerga N c_users. Nesses casos a
+//      chamada sem `C_user_id` devolve lista vazia; e preciso primeiro listar
+//      `user/c_user_list` e depois iterar `plant/list?C_user_id=<id>`.
+//
+// Pra funcionar nos dois casos, tentamos sem C_user_id; se a lista vier vazia
+// (mas sem erro), caimos pro fluxo business. Isso tambem explica o sintoma
+// "cadastrei o token e nenhum dado veio" — o portal gerou token business e o
+// adapter antigo chamava direto.
+async function listarTodasPlantas({ apiBase, token }) {
+  const chamada = (path) => callGrowatt({ apiBase, token, path, method: 'GET' });
+
+  let plantas = [];
+  let avisoBusiness = null;
+
+  try {
+    const direto = await chamada('/v1/plant/list?page=1&perpage=100');
+    plantas = direto?.plants || [];
+  } catch (err) {
+    avisoBusiness = err.message;
+  }
+
+  if (plantas.length > 0) return { plantas, modelo: 'direto' };
+
+  try {
+    const u = await chamada('/v1/user/c_user_list?page=1&perpage=100');
+    const cUsers = u?.c_user || u?.c_users || [];
+    if (cUsers.length === 0) {
+      return {
+        plantas: [],
+        modelo: 'desconhecido',
+        aviso: avisoBusiness || 'Token valido mas sem plantas nem c_users associados.',
+      };
+    }
+    for (const cu of cUsers) {
+      try {
+        const cUserId = cu.c_user_id;
+        const p = await chamada(`/v1/plant/list?C_user_id=${cUserId}&page=1&perpage=100`);
+        plantas.push(...(p?.plants || []));
+      } catch {
+        // segue listando os outros c_users
+      }
+    }
+    return { plantas, modelo: 'business' };
+  } catch (err) {
+    return {
+      plantas: [],
+      modelo: 'desconhecido',
+      aviso: `Direto falhou (${avisoBusiness || 'vazio'}); c_user_list tambem falhou: ${err.message}`,
+    };
+  }
+}
+
 export async function validarCredencial(credential, apiBase) {
   try {
-    // /plant/list — rota leve que confirma token valido e lista plantas.
-    const data = await callGrowatt({
+    const { plantas, modelo, aviso } = await listarTodasPlantas({
       apiBase: apiBase || defaultApiBase,
       token: credential.apiToken,
-      path: '/v1/plant/list',
-      method: 'GET',
     });
 
-    // Resposta: { plants: [{plant_id, name, create_date, ...}, ...], count }
-    const plantas = data?.plants || [];
+    if (plantas.length === 0) {
+      return {
+        ok: false,
+        erro:
+          `Token aceito, mas nenhuma planta encontrada no portal Growatt. ` +
+          (aviso ? `Detalhe: ${aviso}. ` : '') +
+          'Verifique em openapi.growatt.com se o token tem permissao de leitura ' +
+          'e se a conta esta associada a alguma planta ativa.',
+      };
+    }
 
-    // Pra cada planta, pega devices. Limita a 5 plantas na validacao pra
-    // nao estourar tempo em contas muito grandes. Inclui peak_power da
-    // planta (stationKwp) e nominal_power do device (capacidadeKw) pra
-    // auto-fill na UI.
+    // Pra cada planta, pega devices. Limita a 10 plantas na validacao pra
+    // nao estourar tempo em contas muito grandes.
     const devices = [];
-    for (const p of plantas.slice(0, 5)) {
+    for (const p of plantas.slice(0, 10)) {
       const stationKwp = p.peak_power != null ? parseFloat(p.peak_power) : null;
       try {
         const dev = await callGrowatt({
           apiBase: apiBase || defaultApiBase,
           token: credential.apiToken,
-          path: `/v1/device/list?plant_id=${p.plant_id}`,
+          path: `/v1/device/list?plant_id=${p.plant_id}&page=1&perpage=50`,
           method: 'GET',
         });
         for (const d of (dev?.devices || [])) {
@@ -107,9 +168,18 @@ export async function validarCredencial(credential, apiBase) {
             online:       d.status === 1 || d.status === '1',
           });
         }
-      } catch (err) {
+      } catch {
         // Ignora erro em planta especifica — segue listando as outras.
       }
+    }
+
+    if (devices.length === 0) {
+      return {
+        ok: false,
+        erro:
+          `Encontrei ${plantas.length} planta(s) (modelo ${modelo}) mas nenhum device/inversor dentro delas. ` +
+          'Verifique em openapi.growatt.com se o token enxerga os inversores das plantas.',
+      };
     }
 
     return { ok: true, devices };
