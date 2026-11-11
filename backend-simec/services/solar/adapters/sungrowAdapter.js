@@ -276,17 +276,11 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
-  // Sungrow v2 passou a exigir o token TAMBEM no body (nao apenas no header
-  // Authorization). Alguns endpoints devolvem 200+empty quando o token so
-  // esta no header. Enviar em ambos nao quebra nada e cobre as duas versoes.
-  const fullBody = {
-    appkey: credential.appkey,
-    token: credential.accessToken,
-    // lang: _en_US e aceito universalmente pela Sungrow. _pt_BR as vezes
-    // derruba o handler de internationalizacao e vira er_unknown_exception.
-    lang: '_en_US',
-    ...body,
-  };
+  // IMPORTANTE: body contem apenas os campos documentados por endpoint
+  // (ver doc oficial Sungrow v2). NAO incluir appkey/token/lang — campos
+  // extras provocam er_unknown_exception. O accessToken vai apenas no
+  // header Authorization Bearer; o secretKey no header x-access-key.
+  const fullBody = { ...body };
   const res = await fetch(url, {
     method: 'POST',
     headers: headersComToken(credential),
@@ -383,8 +377,9 @@ export async function validarCredencial(credential, apiBase) {
           // Filtrar so [1] = inversor geral exclui modelos hibridos (type 14)
           // e string inverters de alguns modelos — melhor pegar tudo e deixar
           // o SN cadastrado filtrar.
-          // Doc oficial Sungrow getDeviceListByPsId: page (nao curPage).
-          body: { ps_id: stationId, page: 1, size: 100 },
+          // Doc oficial Sungrow getDeviceListByPsId: ps_id STRING, page/size
+          // integer. Sem appkey/token/lang no body (vai no header).
+          body: { ps_id: String(stationId), page: 1, size: 100 },
         });
         for (const d of (devData?.pageList || devData?.list || [])) {
           let capKw = toNum(d.nominal_power ?? d.inverter_capacity ?? d.rated_power);
@@ -488,7 +483,8 @@ export async function fetchSnapshot(inverter) {
         credential: inverter.credential,
         path: '/openapi/platform/getDeviceRealTimeData',
         body: {
-          device_type: t.deviceType,
+          // Doc oficial Sungrow: device_type STRING (nao integer).
+          device_type: String(t.deviceType),
           point_id_list: t.points,
           sn_list: [sn],
         },
