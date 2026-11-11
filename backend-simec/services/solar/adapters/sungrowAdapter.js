@@ -663,6 +663,7 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
   const plantas = stations?.pageList || [];
   let psKey = null;
   let deviceType = 1;
+  const resumoBusca = [];
   for (const p of plantas) {
     const psId = p.ps_id || p.psId;
     if (!psId) continue;
@@ -671,9 +672,14 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
         apiBase: inverter.apiBase,
         credential: inverter.credential,
         path: '/openapi/platform/getDeviceListByPsId',
-        body: { ps_id: String(psId), page: 1, size: 100 },
+        // size: 500 cobre contas com muitos devices. device_type_list vazio
+        // (sem o campo) = TODOS os tipos (inverter, ESS, meter, battery...).
+        body: { ps_id: String(psId), page: 1, size: 500, is_virtual_unit: '0' },
       });
-      const match = (devs?.pageList || []).find(
+      const lista = devs?.pageList || [];
+      const snsVistos = lista.map((d) => d.device_sn || d.deviceSn).filter(Boolean);
+      resumoBusca.push(`ps_id ${psId}: ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
+      const match = lista.find(
         (d) => (d.device_sn || d.deviceSn) === inverter.inverterSn,
       );
       if (match) {
@@ -681,9 +687,16 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
         deviceType = Number(match.device_type || match.deviceType) || 1;
         break;
       }
-    } catch { /* tenta prox */ }
+    } catch (err) {
+      resumoBusca.push(`ps_id ${psId}: erro ${err.message.slice(0, 80)}`);
+    }
   }
-  if (!psKey) throw new Error(`Sungrow: nao achei ps_key pra SN ${inverter.inverterSn}`);
+  if (!psKey) {
+    throw new Error(
+      `Sungrow: nao achei ps_key pra SN ${inverter.inverterSn}. ` +
+      `Busca em ${plantas.length} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}`
+    );
+  }
 
   // 2. Itera em janelas de 100 dias (limite Sungrow). data_point p1 = Yield Today.
   // Pra ESS (device_type 14), usa p13112 (Daily PV Yield).

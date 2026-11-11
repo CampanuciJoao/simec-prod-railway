@@ -341,20 +341,31 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
   // 1. Descobre plant_id listando plantas e achando a que contem esse SN.
   const { plantas } = await listarTodasPlantas({ apiBase, token });
   let plantId = null;
+  const resumoBusca = [];
   for (const p of plantas) {
     try {
       const dev = await callGrowatt({
         apiBase, token,
-        path: `/v1/device/list?plant_id=${p.plant_id}&page=1&perpage=50`,
+        path: `/v1/device/list?plant_id=${p.plant_id}&page=1&perpage=100`,
         method: 'GET',
       });
-      if ((dev?.devices || []).some((d) => d.device_sn === inverter.inverterSn)) {
+      const lista = dev?.devices || [];
+      const snsVistos = lista.map((d) => d.device_sn).filter(Boolean);
+      resumoBusca.push(`plant_id ${p.plant_id} (${p.name}): ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
+      if (lista.some((d) => d.device_sn === inverter.inverterSn)) {
         plantId = p.plant_id;
         break;
       }
-    } catch { /* tenta prox */ }
+    } catch (err) {
+      resumoBusca.push(`plant_id ${p.plant_id}: erro ${(err.message || '').slice(0, 80)}`);
+    }
   }
-  if (!plantId) throw new Error(`Growatt: nao achei plant_id contendo SN ${inverter.inverterSn}`);
+  if (!plantId) {
+    throw new Error(
+      `Growatt: nao achei plant_id contendo SN ${inverter.inverterSn}. ` +
+      `Busca em ${plantas.length} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}`
+    );
+  }
 
   // 2. Chama /v1/plant/energy. API aceita janela grande — tentamos 1 chamada
   //    com start/end completos. Se falhar, divide em meses.
