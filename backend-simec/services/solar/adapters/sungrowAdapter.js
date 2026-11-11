@@ -247,10 +247,16 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 //   Content-Type: application/json;charset=UTF-8
 //   x-access-key: <secretKey>
 //   Authorization: Bearer <access_token>   <- token vai AQUI, nao no body
+// Headers OFICIAIS Sungrow OpenAPI v2 (doc 1.4):
+//   Content-Type: application/json;charset=UTF-8
+//   x-access-key: <secretKey>
+//   Authorization: Bearer <access_token>   ← obrigatorio
+//   sys_code: 901                          ← aceito, nem sempre obrigatorio
 function headersComToken(credential) {
   return {
     'Content-Type': 'application/json;charset=UTF-8',
     'x-access-key': credential.secretKey,
+    'Authorization': `Bearer ${credential.accessToken}`,
     'sys_code': '901',
     'User-Agent': USER_AGENT,
   };
@@ -285,9 +291,12 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
   }
   const url = `${apiBase.replace(/\/$/, '')}${path}`;
+  // Body OFICIAL Sungrow (doc 1.5): appkey obrigatorio, lang opcional,
+  // + campos especificos do endpoint. Token vai no header Authorization,
+  // NAO no body.
   const fullBody = {
     appkey: credential.appkey,
-    token: `Bearer ${credential.accessToken}`,
+    lang: '_pt_BR',
     ...body,
   };
 
@@ -355,10 +364,15 @@ export async function validarCredencial(credential, apiBase) {
     const data = await callSungrow({
       apiBase: apiBase || defaultApiBase,
       credential,
-      // Endpoint oficial do fluxo OAuth 2.0: /openapi/getPowerStationList
-      // (nao /platform/queryPowerStationList — esse e do fluxo user/pw).
-      path: '/openapi/getPowerStationList',
-      body: {},
+      // Endpoint oficial doc 3.1. page/size obrigatorios conforme spec.
+      // valid_flag 1,3 = normal + conectada (plantas operacionais).
+      path: '/openapi/platform/queryPowerStationList',
+      body: {
+        ps_type: '1,3,4,5,6,7,8,12',
+        valid_flag: '1,3',
+        page: 1,
+        size: 100,
+      },
     });
     const stations = data?.pageList || data?.list || [];
     const toNum = (x) => {
@@ -387,7 +401,7 @@ export async function validarCredencial(credential, apiBase) {
         const devData = await callSungrow({
           apiBase: apiBase || defaultApiBase,
           credential,
-          path: '/openapi/getDeviceList',
+          path: '/openapi/platform/getDeviceListByPsId',
           // device_type_list vazio = todos os tipos (inversor, bateria, meter).
           // Filtrar so [1] = inversor geral exclui modelos hibridos (type 14)
           // e string inverters de alguns modelos — melhor pegar tudo e deixar
@@ -496,7 +510,7 @@ export async function fetchSnapshot(inverter) {
       const resp = await callSungrow({
         apiBase: inverter.apiBase,
         credential: inverter.credential,
-        path: '/openapi/getDeviceRealTimeData',
+        path: '/openapi/platform/getDeviceRealTimeData',
         body: {
           // Doc oficial Sungrow: device_type STRING (nao integer).
           device_type: String(t.deviceType),
@@ -602,7 +616,7 @@ export async function fetchFalhas(inverter) {
   const data = await callSungrow({
     apiBase: inverter.apiBase,
     credential: inverter.credential,
-    path: '/openapi/getDeviceFaultAlarmList',
+    path: '/openapi/platform/getFaultAlarmInfo',
     body: {
       process_status: '8',
       fault_type: '1,2,3,4',
