@@ -133,7 +133,6 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, r
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
-      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
     body: JSON.stringify(body),
@@ -214,7 +213,6 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
     headers: {
       'Content-Type': 'application/json;charset=UTF-8',
       'x-access-key': secretKey,
-      'sys_code': '901',
       'User-Agent': USER_AGENT,
     },
     body: JSON.stringify(body),
@@ -248,12 +246,8 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 function headersComToken(credential) {
   return {
     'Content-Type': 'application/json;charset=UTF-8',
-    // Padrao Sungrow OpenAPI v2 (confirmado em pysolarcloud e outras
-    // implementacoes de referencia): x-access-key = SECRETKEY, appkey/token
-    // no body do request. O Bearer accessToken autoriza a chamada.
     'x-access-key': credential.secretKey,
     'Authorization': `Bearer ${credential.accessToken}`,
-    'sys_code': '901',
     'User-Agent': USER_AGENT,
   };
 }
