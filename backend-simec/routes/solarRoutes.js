@@ -806,6 +806,29 @@ router.get('/inverters/:id/sungrow/curl-test', admin, async (req, res) => {
   }
 });
 
+// ─── Backfill de historico diario (admin) ───────────────────────────────────
+// POST /api/solar/inverters/:id/backfill?diasAtras=365
+// Puxa geracao diaria dos ultimos N dias via API do fabricante e grava
+// em solar_agregados_diarios. Idempotente (soma se ja ha linha pro dia).
+router.post('/inverters/:id/backfill', admin, async (req, res) => {
+  const tenantId = req.tenantContext;
+  const diasAtras = Math.min(Math.max(parseInt(req.query.diasAtras || '365', 10), 1), 1825); // ate 5 anos
+  try {
+    const inv = await prisma.solarInverter.findFirst({
+      where: { id: req.params.id, tenantId },
+      select: { id: true },
+    });
+    if (!inv) return res.status(404).json({ error: 'Inverter nao encontrado' });
+
+    const { backfillInversor } = await import('../services/solar/solarBackfillService.js');
+    const r = await backfillInversor(req.params.id, diasAtras);
+    if (!r.ok) return res.status(400).json(r);
+    res.json(r);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Status atual da planta (snapshot mais recente agregado) ────────────────
 router.get('/plants/:id/status', async (req, res) => {
   const tenantId = req.tenantContext;

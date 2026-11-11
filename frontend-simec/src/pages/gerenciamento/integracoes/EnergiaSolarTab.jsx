@@ -19,7 +19,7 @@ import {
   getSolarPlants, getSolarProviders, salvarSolarPlant, desativarSolarPlant,
   adicionarInverter, editarInverter, removerInverter,
   adicionarBateria, removerBateria, validarCredencialSolar,
-  sungrowAuthorizeUrl, sungrowAuthStatus, diagnosticarInversor,
+  sungrowAuthorizeUrl, sungrowAuthStatus, diagnosticarInversor, backfillInversor,
 } from '@/services/api/solarApi';
 
 // ─── Modal de nova/editar planta (dados basicos) ────────────────────────────
@@ -451,6 +451,8 @@ function DiagnosticoInverterButton({ inverter }) {
   const [aberto, setAberto] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const [resultado, setResultado] = useState(null);
+  const [backfillando, setBackfillando] = useState(false);
+  const [backfillResult, setBackfillResult] = useState(null);
 
   const executar = async () => {
     setCarregando(true);
@@ -463,6 +465,29 @@ function DiagnosticoInverterButton({ inverter }) {
       addToast(err?.response?.data?.error || err.message || 'Falha no diagnostico', 'error');
     } finally {
       setCarregando(false);
+    }
+  };
+
+  const executarBackfill = async (dias) => {
+    if (!window.confirm(
+      `Puxar historico dos ultimos ${dias} dias? Pode demorar varios minutos ` +
+      'e consome quota da API do fabricante.'
+    )) return;
+    setBackfillando(true);
+    setBackfillResult(null);
+    try {
+      const r = await backfillInversor(inverter.id, dias);
+      setBackfillResult(r);
+      addToast(
+        `Backfill concluido: ${r.diasInseridos} dias novos, ${r.diasAtualizados} atualizados.`,
+        'success',
+      );
+    } catch (err) {
+      const msg = err?.response?.data?.erro || err?.response?.data?.error || err.message;
+      setBackfillResult({ ok: false, erro: msg });
+      addToast(`Backfill falhou: ${msg}`, 'error');
+    } finally {
+      setBackfillando(false);
     }
   };
 
@@ -626,6 +651,41 @@ function DiagnosticoInverterButton({ inverter }) {
                   </pre>
                 </div>
               )}
+
+              <div className="mt-3 rounded border border-green-500/40 bg-green-500/5 p-2">
+                <div className="mb-1 text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+                  Backfill historico diario
+                </div>
+                <div className="mb-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  Puxa geracao diaria da API do fabricante e grava em solar_agregados_diarios.
+                  Pode demorar varios minutos por janela de 30-100 dias.
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  {[30, 90, 180, 365].map((dias) => (
+                    <button
+                      key={dias}
+                      type="button"
+                      disabled={backfillando}
+                      onClick={() => executarBackfill(dias)}
+                      className="rounded border px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
+                      style={{ borderColor: 'var(--border-soft)' }}
+                    >
+                      {backfillando ? 'rodando...' : `Backfill ${dias}d`}
+                    </button>
+                  ))}
+                </div>
+                {backfillResult && backfillResult.ok && (
+                  <div className="mt-2 text-[11px]" style={{ color: 'var(--color-success)' }}>
+                    ✓ {backfillResult.diasInseridos} dias novos, {backfillResult.diasAtualizados} atualizados, {backfillResult.totalDias} dias retornados pela API.
+                    Periodo: {backfillResult.periodo?.inicio} a {backfillResult.periodo?.fim}.
+                  </div>
+                )}
+                {backfillResult && !backfillResult.ok && (
+                  <div className="mt-2 text-[11px]" style={{ color: 'var(--color-danger)' }}>
+                    ✗ {backfillResult.erro}
+                  </div>
+                )}
+              </div>
 
               {resultado.ultimasChamadas && resultado.ultimasChamadas.length > 0 && (
                 <details className="mt-3">

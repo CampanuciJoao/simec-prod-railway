@@ -230,6 +230,11 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
     throw new Error(`Sungrow refresh falhou: result_code=${json.result_code} msg=${json.result_msg || text.slice(0, 200)}`);
   }
   const data = json.result_data || json;
+  // Doc 2.2: mesmo na falha o envelope vem result_code=1; o erro real esta
+  // em result_data.code (2 sem autorizacao, -2 refresh expirado, 5 invalido).
+  if (data.code != null && String(data.code) !== '1') {
+    throw new Error(`Sungrow refresh falhou: result_data.code=${data.code} (refresh_token expirado/invalido — re-autorize o OAuth)`);
+  }
   const accessToken = data.access_token || data.accessToken;
   if (!accessToken) {
     throw new Error(`Sungrow refresh sem access_token. Resposta: ${text.slice(0, 200)}`);
@@ -243,10 +248,6 @@ export async function refreshAccessToken({ apiBase, appkey, secretKey, refreshTo
 
 // ─── Chamadas API com access_token ───────────────────────────────────────────
 
-// Headers pra chamadas de dados (apos OAuth) seguindo doc Sungrow 2026:
-//   Content-Type: application/json;charset=UTF-8
-//   x-access-key: <secretKey>
-//   Authorization: Bearer <access_token>   <- token vai AQUI, nao no body
 // Headers OFICIAIS Sungrow OpenAPI v2 (doc 1.4):
 //   Content-Type: application/json;charset=UTF-8
 //   x-access-key: <secretKey>
@@ -274,18 +275,11 @@ export function getUltimasChamadasSungrow() {
   return DEBUG_RING.slice().reverse();
 }
 
-// Nucleo HTTP — segue o padrao OFICIAL da doc Sungrow OAuth 2.0:
-//
-//   Headers:
-//     Content-Type: application/json
-//     x-access-key: <secretKey>
-//     sys_code: 901
-//   Body:
-//     appkey: <appkey>
-//     token: "Bearer " + <access_token>     <-- com prefixo Bearer
-//     ...campos do endpoint
-//
-// NAO usar: Authorization header, appkey como header, lang.
+// Nucleo HTTP — fluxo OAuth 2.0 (validado contra a API real em 2026-11-11):
+//   endpoints /openapi/platform/*, token no header Authorization: Bearer.
+// O formato token-no-body + /openapi/getPowerStationList e do fluxo
+// user/password (/openapi/login) e devolve er_unknown_exception com
+// token OAuth.
 async function callSungrow({ apiBase, credential, path, body = {} }) {
   if (!credential.accessToken) {
     throw new Error('AUTHORIZATION_REQUIRED: credencial Sungrow precisa de autorizacao OAuth. Clique em "Autorizar Sungrow" no cadastro do inversor.');
@@ -330,9 +324,17 @@ async function callSungrow({ apiBase, credential, path, body = {} }) {
     throw new Error(`Sungrow resposta nao-JSON em ${path}: ${text.slice(0, 200)}`);
   }
 
+  // Formato OAuth do gateway: { error: "invalid_token", error_description }
+  if (json.error) {
+    const e = new Error(`Sungrow token invalido/expirado: ${json.error_description || json.error}`);
+    e.code = 'TOKEN_EXPIRED';
+    throw e;
+  }
+
   if (json.result_code && String(json.result_code) !== '1' && String(json.result_code) !== '0') {
     const errStr = String(json.result_code) + ' ' + String(json.result_msg || '');
-    if (/E00002|invalid.?token|token.?expir|E009|unauthor/i.test(errStr)) {
+    // E00003 = er_token_login_invalid (Apendice 2) — access_token expirado.
+    if (/E00003|token_login_invalid|invalid.?token|token.?expir|unauthor/i.test(errStr)) {
       const e = new Error(`Sungrow token invalido/expirado: ${json.result_msg || json.result_code}`);
       e.code = 'TOKEN_EXPIRED';
       throw e;
@@ -491,13 +493,12 @@ export async function fetchSnapshot(inverter) {
   // Sungrow rejeita SN com whitespace. Trim defensivo.
   const sn = String(inverter.inverterSn || '').trim();
 
-  // Sungrow tem varios device_types: 1 (inversor generico), 11 (string
-  // inverter — comum em C&I 40-100kW), 14 (hibrido/ESS), 22 (combiner).
-  // Tenta cada um ate achar payload com pontos preenchidos. Sucesso HTTP
-  // sem dados = device_type errado, nao autorizacao.
+  // Apendice 1: 1 = inversor (inclui string C&I tipo SG110CX), 14 =
+  // hibrido/ESS. (11 e Plant, nao inversor.) Tenta cada um ate achar
+  // payload com pontos preenchidos. Sucesso HTTP sem dados = device_type
+  // errado, nao autorizacao.
   const TENTATIVAS = [
-    { deviceType: 1,  points: POINTS_INVERTER_PV,  label: 'PV generico' },
-    { deviceType: 11, points: POINTS_INVERTER_PV,  label: 'String inverter' },
+    { deviceType: 1,  points: POINTS_INVERTER_PV,  label: 'Inversor PV' },
     { deviceType: 14, points: POINTS_INVERTER_ESS, label: 'Hibrido/ESS' },
   ];
 
@@ -551,9 +552,8 @@ export async function fetchSnapshot(inverter) {
   // Doc: "Unidades sempre na menor unidade: Wh, W, A, V" — converter W→kW, Wh→kWh.
   const wToKw = (x) => { const r = n(x); return r == null ? null : r / 1000; };
 
-  if (deviceType === 1 || deviceType === 11) {
-    // Inversor PV puro (sem bateria) — device_type 1 (generico) ou
-    // 11 (String Inverter C&I) compartilham o mesmo mapa de pontos.
+  if (deviceType === 1) {
+    // Inversor PV puro (sem bateria).
     return {
       soc: null,
       batChargePower: null, batDischargePower: null,
@@ -640,3 +640,97 @@ export async function fetchFalhas(inverter) {
     }));
 }
 
+
+/**
+ * Historico diario — Sungrow getDevicePointDayMonthYearDataList (doc 3.6).
+ * Limites: ate 100 dias por chamada, <= 50 dispositivos.
+ *
+ * Request: query_type="day", data_type="2" (pico/total do dia),
+ *          data_point="p1" (Yield Today Wh), ps_key_list, start_time/end_time yyyyMMdd.
+ * Response: result_data.{ps_key}.p1: [{ "2": "value", time_stamp: "yyyyMMdd" }]
+ *
+ * Precisa do ps_key do device (nao so SN). Primeira chamada descobre
+ * ps_key iterando queryPowerStationList + getDeviceListByPsId.
+ */
+export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
+  // 1. Descobre ps_id e ps_key do device via listagem.
+  const stations = await callSungrow({
+    apiBase: inverter.apiBase,
+    credential: inverter.credential,
+    path: '/openapi/platform/queryPowerStationList',
+    body: { ps_type: '1,3,4,5,6,7,8,12', valid_flag: '1,3', page: 1, size: 100 },
+  });
+  const plantas = stations?.pageList || [];
+  let psKey = null;
+  let deviceType = 1;
+  for (const p of plantas) {
+    const psId = p.ps_id || p.psId;
+    if (!psId) continue;
+    try {
+      const devs = await callSungrow({
+        apiBase: inverter.apiBase,
+        credential: inverter.credential,
+        path: '/openapi/platform/getDeviceListByPsId',
+        body: { ps_id: String(psId), page: 1, size: 100 },
+      });
+      const match = (devs?.pageList || []).find(
+        (d) => (d.device_sn || d.deviceSn) === inverter.inverterSn,
+      );
+      if (match) {
+        psKey = match.ps_key || match.psKey;
+        deviceType = Number(match.device_type || match.deviceType) || 1;
+        break;
+      }
+    } catch { /* tenta prox */ }
+  }
+  if (!psKey) throw new Error(`Sungrow: nao achei ps_key pra SN ${inverter.inverterSn}`);
+
+  // 2. Itera em janelas de 100 dias (limite Sungrow). data_point p1 = Yield Today.
+  // Pra ESS (device_type 14), usa p13112 (Daily PV Yield).
+  const dataPoint = deviceType === 14 ? 'p13112' : 'p1';
+  const fmt = (d) => {
+    const y = d.getUTCFullYear();
+    const m = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    return `${y}${m}${dd}`;
+  };
+  const todas = [];
+  const cursor = new Date(inicio);
+  while (cursor < fim) {
+    const janelaFim = new Date(cursor);
+    janelaFim.setUTCDate(janelaFim.getUTCDate() + 99);
+    const end = janelaFim < fim ? janelaFim : fim;
+    try {
+      const r = await callSungrow({
+        apiBase: inverter.apiBase,
+        credential: inverter.credential,
+        path: '/openapi/platform/getDevicePointDayMonthYearDataList',
+        body: {
+          query_type: 'day',
+          data_type: '2',
+          ps_key_list: [psKey],
+          data_point: dataPoint,
+          start_time: fmt(cursor),
+          end_time: fmt(end),
+          order: 1,
+          is_get_point_dict: '0',
+        },
+      });
+      const serie = r?.[psKey]?.[dataPoint] || [];
+      for (const ponto of serie) {
+        // ponto.time_stamp = "yyyymmdd"; ponto["2"] = valor em Wh
+        const ts = String(ponto.time_stamp || '');
+        if (ts.length !== 8) continue;
+        const dia = new Date(
+          Date.UTC(Number(ts.slice(0, 4)), Number(ts.slice(4, 6)) - 1, Number(ts.slice(6, 8))),
+        );
+        const wh = parseFloat(ponto['2'] ?? ponto[2]);
+        if (Number.isFinite(wh)) {
+          todas.push({ data: dia, kwhGerado: wh / 1000 });
+        }
+      }
+    } catch { /* pula janela com erro */ }
+    cursor.setUTCDate(cursor.getUTCDate() + 100);
+  }
+  return todas;
+}

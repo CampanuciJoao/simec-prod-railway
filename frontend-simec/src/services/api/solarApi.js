@@ -57,6 +57,13 @@ export const sungrowAuthStatus = (inverterId) =>
 export const diagnosticarInversor = (inverterId) =>
   api.get(`/solar/inverters/${inverterId}/diagnostico`).then((r) => r.data);
 
+// ─── Backfill historico (admin) ─────────────────────────────────────────────
+// Puxa geracao diaria dos ultimos N dias (default 365) e grava em
+// solar_agregados_diarios. Pode demorar varios minutos pra API lenta.
+export const backfillInversor = (inverterId, diasAtras = 365) =>
+  api.post(`/solar/inverters/${inverterId}/backfill?diasAtras=${diasAtras}`, {})
+    .then((r) => r.data);
+
 // ─── Falhas (Fase 1) ────────────────────────────────────────────────────────
 export const getSolarFalhas = (plantId, { status = 'ativas', limite = 50 } = {}) =>
   api.get(`/solar/plants/${plantId}/falhas`, { params: { status, limite } }).then((r) => r.data);

@@ -177,3 +177,52 @@ export async function fetchSnapshot(inverter) {
     rawPayload: result,
   };
 }
+
+/**
+ * Historico diario — FoxESS /op/v0/device/report/query.
+ * Retorna geracao por dia dentro de UM mes (year+month obrigatorios).
+ * variable: "generation" — geracao diaria em kWh.
+ *
+ * Itera mes a mes do intervalo. Resposta:
+ * [{ variable, unit, values: [{ index: 1..31, value }] }]
+ */
+export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
+  const sn = inverter.inverterSn;
+  const todas = [];
+
+  // Itera por mes (FoxESS exige year+month, nao range livre)
+  const cursor = new Date(inicio.getUTCFullYear(), inicio.getUTCMonth(), 1);
+  const fimMes = new Date(fim.getUTCFullYear(), fim.getUTCMonth(), 1);
+  while (cursor <= fimMes) {
+    const year = cursor.getUTCFullYear();
+    const month = cursor.getUTCMonth() + 1; // 1-12
+    try {
+      const r = await callFoxess({
+        apiBase: inverter.apiBase,
+        apiKey: inverter.credential.apiKey,
+        path: '/op/v0/device/report/query',
+        method: 'POST',
+        body: {
+          sn,
+          year,
+          month,
+          dimension: 'day',
+          variables: ['generation'],
+        },
+      });
+      const serie = Array.isArray(r) ? r : [r];
+      for (const v of serie) {
+        if (v?.variable !== 'generation') continue;
+        for (const ponto of (v.values || [])) {
+          const idx = Number(ponto?.index);
+          const val = typeof ponto?.value === 'number' ? ponto.value : parseFloat(ponto?.value);
+          if (!idx || !Number.isFinite(val)) continue;
+          const dia = new Date(Date.UTC(year, month - 1, idx));
+          todas.push({ data: dia, kwhGerado: val });
+        }
+      }
+    } catch { /* pula mes com erro */ }
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+  }
+  return todas;
+}

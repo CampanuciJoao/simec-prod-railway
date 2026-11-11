@@ -326,3 +326,74 @@ export async function fetchSnapshot(inverter) {
     rawPayload: data,
   };
 }
+
+/**
+ * Historico diario — Growatt /v1/plant/energy (seccao 4.2.6 da doc).
+ * Precisa do plant_id (nao do device_sn). Primeira chamada descobre
+ * o plant_id iterando /v1/device/list ate achar o device cadastrado.
+ *
+ * Response Growatt: { energys: [{ date: "YYYY-MM-DD", energy: kWh }, ...] }
+ */
+export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
+  const token = inverter.credential.apiToken;
+  const apiBase = inverter.apiBase || defaultApiBase;
+
+  // 1. Descobre plant_id listando plantas e achando a que contem esse SN.
+  const { plantas } = await listarTodasPlantas({ apiBase, token });
+  let plantId = null;
+  for (const p of plantas) {
+    try {
+      const dev = await callGrowatt({
+        apiBase, token,
+        path: `/v1/device/list?plant_id=${p.plant_id}&page=1&perpage=50`,
+        method: 'GET',
+      });
+      if ((dev?.devices || []).some((d) => d.device_sn === inverter.inverterSn)) {
+        plantId = p.plant_id;
+        break;
+      }
+    } catch { /* tenta prox */ }
+  }
+  if (!plantId) throw new Error(`Growatt: nao achei plant_id contendo SN ${inverter.inverterSn}`);
+
+  // 2. Chama /v1/plant/energy. API aceita janela grande — tentamos 1 chamada
+  //    com start/end completos. Se falhar, divide em meses.
+  const fmt = (d) => d.toISOString().slice(0, 10);
+  const todas = [];
+  try {
+    const r = await callGrowatt({
+      apiBase, token,
+      path: `/v1/plant/energy?plant_id=${plantId}&start_date=${fmt(inicio)}&end_date=${fmt(fim)}&time_unit=day&page=1&perpage=400`,
+      method: 'GET',
+    });
+    for (const e of (r?.energys || [])) {
+      const kwh = typeof e.energy === 'number' ? e.energy : parseFloat(e.energy);
+      if (Number.isFinite(kwh)) {
+        todas.push({ data: new Date(e.date + 'T00:00:00Z'), kwhGerado: kwh });
+      }
+    }
+  } catch (err) {
+    // Fallback: divide em meses (max 31 dias cada) se a chamada unica falhou.
+    const cursor = new Date(inicio);
+    while (cursor < fim) {
+      const proximo = new Date(cursor);
+      proximo.setUTCDate(proximo.getUTCDate() + 30);
+      const end = proximo < fim ? proximo : fim;
+      try {
+        const r = await callGrowatt({
+          apiBase, token,
+          path: `/v1/plant/energy?plant_id=${plantId}&start_date=${fmt(cursor)}&end_date=${fmt(end)}&time_unit=day&page=1&perpage=50`,
+          method: 'GET',
+        });
+        for (const e of (r?.energys || [])) {
+          const kwh = typeof e.energy === 'number' ? e.energy : parseFloat(e.energy);
+          if (Number.isFinite(kwh)) {
+            todas.push({ data: new Date(e.date + 'T00:00:00Z'), kwhGerado: kwh });
+          }
+        }
+      } catch { /* pula janela com erro */ }
+      cursor.setUTCDate(cursor.getUTCDate() + 30);
+    }
+  }
+  return todas;
+}
