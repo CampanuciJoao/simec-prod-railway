@@ -503,6 +503,16 @@ function DiagnosticoInverterButton({ inverter }) {
                     <div>Potencia: {resultado.coletaDoSn.powerKw ?? '—'} kW</div>
                     <div>Hoje: {resultado.coletaDoSn.generationKwhDay ?? '—'} kWh</div>
                     <div>Temp: {resultado.coletaDoSn.inverterTempC ?? '—'} °C</div>
+                    {resultado.coletaDoSn.rawPayload && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>
+                          Payload bruto da API
+                        </summary>
+                        <pre className="mt-1 max-h-48 overflow-auto rounded bg-black/40 p-2 text-[10px]">
+                          {JSON.stringify(resultado.coletaDoSn.rawPayload, null, 2)}
+                        </pre>
+                      </details>
+                    )}
                   </div>
                 ) : (
                   <div className="mt-1 rounded border border-red-500/40 bg-red-500/10 p-2">

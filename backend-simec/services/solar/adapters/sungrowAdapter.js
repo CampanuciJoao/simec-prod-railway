@@ -422,44 +422,51 @@ export async function fetchSnapshot(inverter) {
   // Sungrow rejeita SN com whitespace. Trim defensivo.
   const sn = String(inverter.inverterSn || '').trim();
 
+  // Sungrow tem varios device_types: 1 (inversor generico), 11 (string
+  // inverter — comum em C&I 40-100kW), 14 (hibrido/ESS), 22 (combiner).
+  // Tenta cada um ate achar payload com pontos preenchidos. Sucesso HTTP
+  // sem dados = device_type errado, nao autorizacao.
+  const TENTATIVAS = [
+    { deviceType: 1,  points: POINTS_INVERTER_PV,  label: 'PV generico' },
+    { deviceType: 11, points: POINTS_INVERTER_PV,  label: 'String inverter' },
+    { deviceType: 14, points: POINTS_INVERTER_ESS, label: 'Hibrido/ESS' },
+  ];
+
   let data = null;
   let deviceType = 1;
-  try {
-    data = await callSungrow({
-      apiBase: inverter.apiBase,
-      credential: inverter.credential,
-      // Doc oficial: /openapi/platform/getDeviceRealTimeData
-      // (sem /platform/ a API retorna er_missing_parameter:token).
-      path: '/openapi/platform/getDeviceRealTimeData',
-      body: {
-        device_type: 1,
-        point_id_list: POINTS_INVERTER_PV,
-        sn_list: [sn],
-      },
-    });
-  } catch (err) {
-    if (err.code === 'TOKEN_EXPIRED') {
-      // Propaga pro poller cuidar do refresh (poller acessa o banco pra
-      // persistir o novo token). Adapter em si nao persiste.
-      throw err;
-    }
-    // Tenta device_type=14 (hybrid/ESS) com point_id_list proprio
+  let errosTentativas = [];
+
+  for (const t of TENTATIVAS) {
     try {
-      deviceType = 14;
-      data = await callSungrow({
+      const resp = await callSungrow({
         apiBase: inverter.apiBase,
         credential: inverter.credential,
         path: '/openapi/platform/getDeviceRealTimeData',
         body: {
-          device_type: 14,
-          point_id_list: POINTS_INVERTER_ESS,
+          device_type: t.deviceType,
+          point_id_list: t.points,
           sn_list: [sn],
         },
       });
-    } catch (errH) {
-      if (errH.code === 'TOKEN_EXPIRED') throw errH;
-      throw new Error(`Sungrow: nenhum device_type reconheceu SN ${sn}. Erro: ${errH.message}`);
+      // Considera "sucesso util" se trouxe device_point com pelo menos um
+      // ponto numerico (p24, p1, p13011, etc). Sem isso, Sungrow devolve
+      // array vazio e nao adianta parar aqui.
+      const dp = resp?.device_point_list?.[0]?.device_point;
+      const temPontosReais = dp && Object.keys(dp).some((k) => /^p\d+$/.test(k) && dp[k] != null && dp[k] !== '');
+      if (temPontosReais) {
+        data = resp;
+        deviceType = t.deviceType;
+        break;
+      }
+      errosTentativas.push(`device_type=${t.deviceType} (${t.label}): sem pontos`);
+    } catch (err) {
+      if (err.code === 'TOKEN_EXPIRED') throw err;
+      errosTentativas.push(`device_type=${t.deviceType} (${t.label}): ${err.message}`);
     }
+  }
+
+  if (!data) {
+    throw new Error(`Sungrow: nenhum device_type reconheceu SN ${sn}. Tentativas: ${errosTentativas.join(' | ')}`);
   }
 
   // Resposta oficial Sungrow: device_point_list[].device_point e um

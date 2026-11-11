@@ -692,7 +692,7 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
         powerKw: snap.powerKw,
         generationKwhDay: snap.generationKwhDay,
         inverterTempC: snap.inverterTempC,
-        temRawPayload: Boolean(snap.rawPayload),
+        rawPayload: snap.rawPayload || null,
       };
     } catch (err) {
       coleta = { ok: false, codigo: err.code || null, erro: err.message };
