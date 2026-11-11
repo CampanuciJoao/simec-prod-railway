@@ -156,7 +156,24 @@ export async function exchangeCodeForToken({ apiBase, appkey, secretKey, code, r
   console.log('[SUNGROW_TOKEN_EXCHANGE] resposta:', resumoDebug);
 
   if (json.result_code && String(json.result_code) !== '1') {
-    throw new Error(`Sungrow token exchange falhou: result_code=${json.result_code} msg=${json.result_msg || text.slice(0, 200)}`);
+    const rc = String(json.result_code);
+    const msg = json.result_msg || text.slice(0, 200);
+    // result_code=3 (Unauthorized) e o mais comum: significa que a
+    // Sungrow rejeitou appkey, secret_key ou redirect_uri. Nao e erro
+    // no OAuth em si — e config errada no cadastro do inverter ou no
+    // Developer Portal.
+    if (rc === '3' || /unauthor/i.test(msg)) {
+      throw new Error(
+        `Sungrow token exchange falhou: result_code=${rc} msg=${msg}. ` +
+        'Causas comuns (verifique no cadastro do inverter): ' +
+        '(1) Secret Key digitado errado (sensivel a maiusculas/minusculas); ' +
+        '(2) Redirect URI no Developer Portal Sungrow diferente de ' +
+        'https://simec.cerdil.com.br/api/solar/sungrow/callback (precisa ser identico); ' +
+        '(3) Application revogada ou nao publicada no portal; ' +
+        '(4) Appkey nao corresponde a Application dessa conta iSolarCloud.'
+      );
+    }
+    throw new Error(`Sungrow token exchange falhou: result_code=${rc} msg=${msg}`);
   }
 
   const data = json.result_data || json;

@@ -237,6 +237,48 @@ sungrowCallbackPublic.get('/sungrow/callback', async (req, res) => {
       },
     });
 
+    // Propagacao: a autorizacao Sungrow e por conta iSolarCloud (appkey),
+    // nao por inverter. Se o mesmo tenant tem outros inverters Sungrow com
+    // o mesmo appkey, eles compartilham o accessToken — espelha os novos
+    // tokens em todos eles pra evitar OAuth redundante.
+    try {
+      const outros = await prisma.solarInverter.findMany({
+        where: {
+          tenantId: inverter.tenantId,
+          provider: 'sungrow',
+          id: { not: inverter.id },
+        },
+        select: { id: true, credentialCrypt: true },
+      });
+      let propagadosCount = 0;
+      for (const o of outros) {
+        const credO = decryptCredential(o.credentialCrypt) || {};
+        if (credO.appkey && credO.appkey === credential.appkey) {
+          const novaO = {
+            ...credO,
+            accessToken,
+            refreshToken,
+            expiresAt: Date.now() + expiresIn * 1000,
+          };
+          await prisma.solarInverter.update({
+            where: { id: o.id },
+            data: {
+              credentialCrypt: encryptCredential(novaO),
+              lastAuthAttemptAt: new Date(),
+              lastAuthError: null,
+            },
+          });
+          propagadosCount++;
+          tentarAutoPopularMetadados(o.id).catch(() => {});
+        }
+      }
+      if (propagadosCount > 0) {
+        console.log(`[SUNGROW_OAUTH_CALLBACK] token propagado para ${propagadosCount} inverter(es) com mesmo appkey.`);
+      }
+    } catch (propErr) {
+      console.warn('[SUNGROW_OAUTH_CALLBACK] propagacao falhou (continuo):', propErr.message);
+    }
+
     // Agora que tem access_token, puxa modelo + capacidade da API Sungrow
     // (best-effort). Sem isso o admin teria que digitar manualmente mesmo
     // depois do OAuth.
