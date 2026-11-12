@@ -20,6 +20,7 @@ import {
   adicionarInverter, editarInverter, removerInverter,
   adicionarBateria, removerBateria, validarCredencialSolar,
   sungrowAuthorizeUrl, sungrowAuthStatus, diagnosticarInversor, backfillInversor,
+  purgarAgregadosPlanta,
 } from '@/services/api/solarApi';
 
 // ─── Modal de nova/editar planta (dados basicos) ────────────────────────────
@@ -446,7 +447,7 @@ function InverterModal({ open, onClose, inverter, providers, onSalvar }) {
 }
 
 // ─── Botao de diagnostico — mostra por que a coleta nao esta trazendo dados ──
-function DiagnosticoInverterButton({ inverter }) {
+function DiagnosticoInverterButton({ inverter, plantId }) {
   const { addToast } = useToast();
   const [aberto, setAberto] = useState(false);
   const [carregando, setCarregando] = useState(false);
@@ -488,6 +489,26 @@ function DiagnosticoInverterButton({ inverter }) {
       addToast(`Backfill falhou: ${msg}`, 'error');
     } finally {
       setBackfillando(false);
+    }
+  };
+
+  const executarPurga = async () => {
+    if (!plantId) return;
+    if (!window.confirm(
+      'APAGAR TODOS os agregados diarios e mensais DESTA PLANTA. ' +
+      'Use pra corrigir backfill anterior que somou duplicado. ' +
+      'Depois rode o backfill de novo. Continuar?'
+    )) return;
+    try {
+      const r = await purgarAgregadosPlanta(plantId);
+      addToast(
+        `Purga concluida: ${r.diariosDeletados} diarios + ${r.mensaisDeletados} mensais apagados.`,
+        'success',
+      );
+      // Re-roda o diagnostico pra atualizar o bloco de dados persistidos.
+      executar();
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message, 'error');
     }
   };
 
@@ -649,6 +670,45 @@ function DiagnosticoInverterButton({ inverter }) {
                   <pre className="mt-2 max-h-32 overflow-auto rounded bg-black/40 p-2 text-[10px] break-all whitespace-pre-wrap">
                     {resultado.curlTeste}
                   </pre>
+                </div>
+              )}
+
+              {resultado.dadosPersistidos && (
+                <div className="mt-3 rounded border p-2" style={{ borderColor: 'var(--border-soft)' }}>
+                  <div className="mb-1 text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+                    Dados persistidos no banco (planta)
+                  </div>
+                  <div className="text-[11px] space-y-0.5">
+                    <div>
+                      Snapshots individuais deste inverter:{' '}
+                      <strong>{resultado.dadosPersistidos.snapshotsIndividuaisDoInverter}</strong>
+                    </div>
+                    <div>
+                      Agregados diarios da planta:{' '}
+                      <strong>{resultado.dadosPersistidos.agregadosDiariosDaPlanta}</strong>
+                      {resultado.dadosPersistidos.diaMaisAntigo && (
+                        <> — de {new Date(resultado.dadosPersistidos.diaMaisAntigo).toLocaleDateString('pt-BR')} a {new Date(resultado.dadosPersistidos.diaMaisRecente).toLocaleDateString('pt-BR')}</>
+                      )}
+                    </div>
+                    {resultado.dadosPersistidos.kwhGeradoSomaPeriodo != null && (
+                      <div>
+                        kWh gerado total (soma de todos dias):{' '}
+                        <strong>{resultado.dadosPersistidos.kwhGeradoSomaPeriodo.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</strong>
+                        {' · '}
+                        min/max/dia: {resultado.dadosPersistidos.kwhGeradoMin ?? '—'}/{resultado.dadosPersistidos.kwhGeradoMax ?? '—'}
+                      </div>
+                    )}
+                  </div>
+                  {plantId && resultado.dadosPersistidos.agregadosDiariosDaPlanta > 0 && (
+                    <button
+                      type="button"
+                      onClick={executarPurga}
+                      className="mt-2 rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold"
+                      style={{ color: 'var(--color-danger)' }}
+                    >
+                      ⚠ Purgar agregados desta planta
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -885,7 +945,7 @@ function PlantaCard({ plant, providers, onEditar, onRemover, onAddInverter, onEd
                   {inv.provider === 'sungrow' && <SungrowAuthBadge inverter={inv} />}
                 </span>
                 <div className="flex gap-1">
-                  <DiagnosticoInverterButton inverter={inv} />
+                  <DiagnosticoInverterButton inverter={inv} plantId={plant.id} />
                   <button type="button" onClick={() => onEditInverter(plant, inv)} title="Editar">
                     <FontAwesomeIcon icon={faPen} />
                   </button>

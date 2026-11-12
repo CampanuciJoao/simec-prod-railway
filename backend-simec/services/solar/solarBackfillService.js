@@ -72,6 +72,12 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
     return { ok: false, erro: 'adapter nao retornou array' };
   }
 
+  // Estrategia correta: SOBRESCREVER por (plantId, dia).
+  // A versao anterior SOMAVA se existisse — o que inflacionava valores a
+  // cada click do admin (nao era idempotente de verdade). Pra plantas com
+  // multiplos inverters, backfill de cada um vai sobrescrever o outro —
+  // portanto rode SEMPRE o inverter com MAIOR capacidade/representatividade
+  // por ultimo, ou faça backfill de apenas UM inverter por planta.
   let diasInseridos = 0;
   let diasAtualizados = 0;
   for (const d of dados) {
@@ -79,8 +85,6 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
     const dia = new Date(d.data);
     dia.setUTCHours(0, 0, 0, 0);
 
-    // Upsert com SOMA: se outro inverter da mesma planta ja contribuiu
-    // pro mesmo dia, somamos. Senao, cria novo registro.
     const existente = await prisma.solarAgregadoDiario.findFirst({
       where: {
         tenantId: inverter.tenantId,
@@ -92,10 +96,7 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
     if (existente) {
       await prisma.solarAgregadoDiario.update({
         where: { id: existente.id },
-        data: {
-          // Soma conservadora: se ja tem valor, adiciona; se null, substitui.
-          kwhGerado: (existente.kwhGerado || 0) + d.kwhGerado,
-        },
+        data: { kwhGerado: d.kwhGerado }, // SOBRESCREVE (idempotente de verdade)
       });
       diasAtualizados++;
     } else {
@@ -120,5 +121,24 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
       inicio: inicio.toISOString().slice(0, 10),
       fim: fim.toISOString().slice(0, 10),
     },
+  };
+}
+
+/**
+ * Apaga todos os agregados diarios de uma PLANTA (inclusive mes e insights
+ * derivados — regera no proximo backfill). Usado pra limpar dados sujos
+ * de execucoes previas do backfill que somavam ao inves de sobrescrever.
+ */
+export async function purgarAgregadosDaPlanta(plantId, tenantId) {
+  const diarios = await prisma.solarAgregadoDiario.deleteMany({
+    where: { tenantId, plantId },
+  });
+  const mensais = await prisma.solarAgregadoMensal.deleteMany({
+    where: { tenantId, plantId },
+  });
+  return {
+    ok: true,
+    diariosDeletados: diarios.count,
+    mensaisDeletados: mensais.count,
   };
 }

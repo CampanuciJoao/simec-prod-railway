@@ -64,6 +64,9 @@ export const backfillInversor = (inverterId, diasAtras = 365) =>
   api.post(`/solar/inverters/${inverterId}/backfill?diasAtras=${diasAtras}`, {})
     .then((r) => r.data);
 
+export const purgarAgregadosPlanta = (plantId) =>
+  api.delete(`/solar/plants/${plantId}/agregados`).then((r) => r.data);
+
 // ─── Falhas (Fase 1) ────────────────────────────────────────────────────────
 export const getSolarFalhas = (plantId, { status = 'ativas', limite = 50 } = {}) =>
   api.get(`/solar/plants/${plantId}/falhas`, { params: { status, limite } }).then((r) => r.data);

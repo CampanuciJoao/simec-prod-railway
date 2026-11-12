@@ -742,6 +742,28 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       },
     });
 
+    // Stats dos dados persistidos pra ver se backfill/poller realmente
+    // gravou o que prometeu.
+    const [snapshotsCount, agregadosStats] = await Promise.all([
+      prisma.solarSnapshot.count({ where: { inverterId: inverter.id } }),
+      prisma.solarAgregadoDiario.aggregate({
+        where: { tenantId: inverter.tenantId, plantId: inverter.plantId },
+        _count: { _all: true },
+        _min: { dia: true, kwhGerado: true },
+        _max: { dia: true, kwhGerado: true },
+        _sum: { kwhGerado: true },
+      }),
+    ]);
+    const dadosPersistidos = {
+      snapshotsIndividuaisDoInverter: snapshotsCount,
+      agregadosDiariosDaPlanta: agregadosStats._count._all,
+      diaMaisAntigo: agregadosStats._min.dia,
+      diaMaisRecente: agregadosStats._max.dia,
+      kwhGeradoMin: agregadosStats._min.kwhGerado,
+      kwhGeradoMax: agregadosStats._max.kwhGerado,
+      kwhGeradoSomaPeriodo: agregadosStats._sum.kwhGerado,
+    };
+
     res.json({
       inverterId: inverter.id,
       provider: inverter.provider,
@@ -750,6 +772,7 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
       visaoDaConta: visao,
       coletaDoSn: coleta,
       ultimoSnapshot,
+      dadosPersistidos,
       ultimasChamadas,
       curlTeste,
     });
@@ -801,6 +824,27 @@ router.get('/inverters/:id/sungrow/curl-test', admin, async (req, res) => {
       url,
       curlCmd,
     });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Purgar agregados diarios de uma planta (admin) ────────────────────────
+// DELETE /api/solar/plants/:id/agregados
+// Apaga solar_agregados_diarios + solar_agregados_mensais da planta. Usado
+// pra limpar dados sujos (ex: backfill rodou multiplas vezes somando).
+router.delete('/plants/:id/agregados', admin, async (req, res) => {
+  const tenantId = req.tenantContext;
+  try {
+    const plant = await prisma.solarPlant.findFirst({
+      where: { id: req.params.id, tenantId },
+      select: { id: true },
+    });
+    if (!plant) return res.status(404).json({ error: 'Planta nao encontrada' });
+
+    const { purgarAgregadosDaPlanta } = await import('../services/solar/solarBackfillService.js');
+    const r = await purgarAgregadosDaPlanta(plant.id, tenantId);
+    res.json(r);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
