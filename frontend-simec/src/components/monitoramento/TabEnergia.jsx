@@ -19,7 +19,7 @@ import { Line } from 'react-chartjs-2';
 import { Card, InlineEmptyState, LoadingState, SelectMenu } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useSolarPainel } from '@/hooks/monitoramento/useSolarPainel';
-import { getSolarAgregadoMesAtual, getSolarFalhas } from '@/services/api/solarApi';
+import { getSolarAgregadoMesAtual, getSolarFalhas, getSolarPlantHistoricoAnual } from '@/services/api/solarApi';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
@@ -505,6 +505,85 @@ const NIVEIS_FALHA = {
   4: { label: 'Sugestão', cor: 'var(--text-muted)', icon: faTriangleExclamation },
 };
 
+// Historico anual — kWh por mes dos ultimos N meses. Usa os agregados
+// gravados pelo backfill (/plants/:id/historico-anual).
+function HistoricoAnual({ plantId }) {
+  const [dados, setDados] = useState(null);
+  const [carregando, setCarregando] = useState(true);
+
+  useEffect(() => {
+    if (!plantId) return;
+    let cancel = false;
+    setCarregando(true);
+    getSolarPlantHistoricoAnual(plantId, 12)
+      .then((r) => { if (!cancel) setDados(r); })
+      .catch(() => { if (!cancel) setDados(null); })
+      .finally(() => { if (!cancel) setCarregando(false); });
+    return () => { cancel = true; };
+  }, [plantId]);
+
+  if (carregando) return <LoadingState message="Carregando histórico anual..." />;
+  if (!dados || !dados.serie?.length) {
+    return (
+      <Card title="Histórico anual (geração por mês)" icon={faChartLine}>
+        <InlineEmptyState message="Sem histórico. Rode o backfill nos inversores (botão 🩺 → Backfill 365d na tela de integrações)." />
+      </Card>
+    );
+  }
+
+  const nomesMes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+  const labels = dados.serie.map((s) => `${nomesMes[s.mesNumero - 1]}/${String(s.ano).slice(2)}`);
+  const kwhPorMes = dados.serie.map((s) => s.kwh);
+
+  const chartData = {
+    labels,
+    datasets: [
+      {
+        label: 'Geração (kWh)',
+        data: kwhPorMes,
+        borderColor: '#f59e0b',
+        backgroundColor: 'rgba(245,158,11,0.3)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 3,
+      },
+    ],
+  };
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, ticks: { callback: (v) => `${v.toLocaleString('pt-BR')} kWh` } },
+    },
+  };
+
+  return (
+    <Card title="Histórico anual (geração por mês)" icon={faChartLine}>
+      <div className="mb-3 flex flex-wrap gap-4 text-sm">
+        <div>
+          <div className="text-xs text-gray-500 uppercase">Total 12 meses</div>
+          <div className="font-bold">{dados.totalKwh.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500 uppercase">Economia estimada</div>
+          <div className="font-bold" style={{ color: 'var(--color-success)' }}>
+            R$ {dados.totalEconomiaBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+          </div>
+        </div>
+        <div>
+          <div className="text-xs text-gray-500 uppercase">Tarifa ref.</div>
+          <div className="font-bold">R$ {dados.tarifaKwh.toFixed(2)}/kWh</div>
+        </div>
+      </div>
+      <div style={{ height: 240 }}>
+        <Line data={chartData} options={chartOptions} />
+      </div>
+    </Card>
+  );
+}
+HistoricoAnual.propTypes = { plantId: PropTypes.string };
+
 // Lista de falhas ativas + historico recente (Fase 1).
 function CardFalhas({ plantId }) {
   const [falhas, setFalhas] = useState([]);
@@ -653,6 +732,7 @@ function TabEnergia() {
             </div>
           )}
           <GraficoSoc snapshots={historico?.snapshots} plant={plant} />
+          {plant?.id && <HistoricoAnual plantId={plant.id} />}
           {plant?.id && <CardFalhas plantId={plant.id} />}
           <HistoricoQuedas quedas={quedas} />
         </>

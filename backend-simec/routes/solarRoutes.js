@@ -886,6 +886,75 @@ router.post('/inverters/:id/backfill', admin, async (req, res) => {
   }
 });
 
+// ─── Historico anual da planta (soma mensal dos ultimos N meses) ───────────
+// GET /api/solar/plants/:id/historico-anual?meses=12
+// Agrega solar_agregados_diarios por mes/ano e devolve array ordenado
+// pro grafico de histórico. Usa os dados do backfill.
+router.get('/plants/:id/historico-anual', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const meses = Math.min(Math.max(parseInt(req.query.meses || '12', 10), 1), 60);
+  try {
+    const plant = await prisma.solarPlant.findFirst({
+      where: { tenantId, id: req.params.id },
+      select: { id: true, tarifaKwh: true, capacidadeKwp: true },
+    });
+    if (!plant) return res.status(404).json({ error: 'Planta nao encontrada' });
+
+    // Soma por (ano, mes) nos ultimos N meses.
+    const fim = new Date();
+    fim.setUTCHours(0, 0, 0, 0);
+    const inicio = new Date(Date.UTC(fim.getUTCFullYear(), fim.getUTCMonth() - meses + 1, 1));
+
+    const linhas = await prisma.$queryRaw`
+      SELECT
+        date_trunc('month', dia) AS mes,
+        SUM(kwh_gerado)::float    AS kwh,
+        COUNT(*)::int             AS dias_com_geracao
+      FROM solar_agregados_diarios
+      WHERE "tenantId" = ${tenantId}
+        AND plant_id = ${plant.id}
+        AND dia >= ${inicio}
+        AND kwh_gerado IS NOT NULL
+        AND kwh_gerado > 0
+      GROUP BY mes
+      ORDER BY mes ASC
+    `;
+
+    // Preenche meses sem dados com 0 pra o grafico ficar continuo
+    const tarifa = Number(plant.tarifaKwh || 0.64);
+    const serie = [];
+    const cursor = new Date(inicio);
+    while (cursor <= fim) {
+      const chave = cursor.toISOString().slice(0, 7); // YYYY-MM
+      const linha = linhas.find((l) => new Date(l.mes).toISOString().slice(0, 7) === chave);
+      serie.push({
+        mes: chave,
+        ano: cursor.getUTCFullYear(),
+        mesNumero: cursor.getUTCMonth() + 1,
+        kwh: linha ? Number(linha.kwh.toFixed(2)) : 0,
+        diasComGeracao: linha ? linha.dias_com_geracao : 0,
+        economiaBrl: linha ? Number((linha.kwh * tarifa).toFixed(2)) : 0,
+      });
+      cursor.setUTCMonth(cursor.getUTCMonth() + 1);
+    }
+
+    const totalKwh = serie.reduce((a, b) => a + b.kwh, 0);
+    res.json({
+      periodo: {
+        inicio: inicio.toISOString().slice(0, 10),
+        fim: fim.toISOString().slice(0, 10),
+        meses,
+      },
+      serie,
+      totalKwh: Number(totalKwh.toFixed(2)),
+      totalEconomiaBrl: Number((totalKwh * tarifa).toFixed(2)),
+      tarifaKwh: tarifa,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Status atual da planta (snapshot mais recente agregado) ────────────────
 router.get('/plants/:id/status', async (req, res) => {
   const tenantId = req.tenantContext;
