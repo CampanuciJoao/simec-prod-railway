@@ -267,13 +267,17 @@ export async function fetchSnapshot(inverter) {
 
   // Normaliza campos. Growatt tem MUITOS nomes diferentes dependendo do
   // modelo/firmware — a doc oficial as vezes nao bate com o payload real.
-  // Estrategia: tentar lista de fallback, usar primeiro valor valido.
-  // Confirmado via diagnostico em inverter MAX/MID-X/M (GBDDA14008):
-  //   ppv: 0 W (potencia DC atual)
-  //   pac: 0 W (potencia AC atual)
-  //   powerToday: 100 Wh (geracao do dia — em Wh, nao kWh)
-  //   powerTotal: 433656.5 kWh (geracao total acumulada — em kWh ja)
-  //   temperature: 46.6 C (temperatura interna)
+  //
+  // UNIDADES CONFIRMADAS (MAX/MID-X/M GBDDA14008, via comparacao com portal
+  // openapi.growatt.com em 12/11/2026):
+  //   ppv/pac:    W (potencia DC/AC atual)
+  //   powerToday/eToday/eacToday: kWh (yield today) — NAO Wh como comentario
+  //                               anterior dizia. Valor confirmado: portal
+  //                               mostrava 214.2 kWh e API retornava 214.1,
+  //                               bate 1:1 (SIMEC estava dividindo por 1000
+  //                               e mostrando 0.2 kWh — bug grave).
+  //   powerTotal/eTotal:          kWh (total acumulado)
+  //   temperature:                °C
   const n = (x) => (typeof x === 'number' ? x : (x != null ? parseFloat(x) : null));
   const primeiroValido = (...vals) => {
     for (const v of vals) {
@@ -282,23 +286,37 @@ export async function fetchSnapshot(inverter) {
     }
     return null;
   };
+  // Heuristica anti-Wh: se um modelo antigo retornar "gerado hoje" em Wh,
+  // o valor sera absurdamente alto pra ser kWh/dia (ex: 214000 pra um dia).
+  // Teto fisico: 10 kWh por kWp capacidade. Sem capacidade, usa 50000 como
+  // limite de sanidade (~50 MWh/dia e impossivel pra 1 inverter residencial
+  // ou comercial — se vier maior, assume Wh).
+  const kwhOuWh = (valor) => {
+    if (valor == null) return null;
+    return valor > 50000 ? valor / 1000 : valor;
+  };
+
   // Potencia atual: ppv (DC) ou pac (AC), ambos em W. Prefere ppv.
   const powerW = primeiroValido(data?.ppv, data?.pac);
-  // Hoje: Growatt usa varios nomes. powerToday/eToday/eacToday em Wh;
-  // today_energy/eacTodayKwh em kWh. Lista ordenada por frequencia observada.
-  const hojeWh  = primeiroValido(data?.powerToday, data?.eToday, data?.eacToday);
-  const hojeKwh = primeiroValido(data?.today_energy, data?.eacTodayKwh);
-  // Total: powerTotal ja vem em kWh; eTotal/total_energy tambem.
-  const totalKwh = primeiroValido(data?.powerTotal, data?.eTotal, data?.total_energy, data?.eacTotal);
-  // Mes: pode vir ou nao; fallback null.
-  const mesWh  = primeiroValido(data?.powerMonth, data?.eMonth, data?.eacMonth);
-  const mesKwh = primeiroValido(data?.month_energy);
+  // Hoje: todos esses campos vem em kWh conforme doc oficial Growatt V1.
+  const hojeRaw = primeiroValido(
+    data?.powerToday, data?.eToday, data?.eacToday,
+    data?.today_energy, data?.eacTodayKwh,
+  );
+  // Mes: idem — kWh por padrao.
+  const mesRaw = primeiroValido(
+    data?.powerMonth, data?.eMonth, data?.eacMonth, data?.month_energy,
+  );
+  // Total: kWh.
+  const totalKwh = primeiroValido(
+    data?.powerTotal, data?.eTotal, data?.total_energy, data?.eacTotal,
+  );
 
   const normalizado = {
     powerKw:            powerW != null ? powerW / 1000 : null,
-    generationKwhDay:   hojeKwh != null ? hojeKwh : (hojeWh != null ? hojeWh / 1000 : null),
-    generationKwhMonth: mesKwh  != null ? mesKwh  : (mesWh  != null ? mesWh  / 1000 : null),
-    generationKwhTotal: totalKwh,  // ja em kWh
+    generationKwhDay:   kwhOuWh(hojeRaw),
+    generationKwhMonth: kwhOuWh(mesRaw),
+    generationKwhTotal: kwhOuWh(totalKwh),
     inverterTempC:      primeiroValido(data?.temperature, data?.temperature1),
   };
 
@@ -366,6 +384,10 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
 
   const resumoBusca = [];
   let totalPlantasListadas = 0;
+  // Colecao de TODAS plant_ids que contem o SN. O portal Growatt as vezes
+  // tem multiplas plantas com o mesmo device (ex: planta antiga + nova, ou
+  // conta business + end-user). Tenta cada uma ate achar dados.
+  const plantIdsCandidatos = plantId ? [plantId] : [];
   if (!plantId) {
     const { plantas } = await listarTodasPlantas({ apiBase, token });
     totalPlantasListadas = plantas.length;
@@ -380,13 +402,15 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
         const snsVistos = lista.map((d) => d.device_sn).filter(Boolean);
         resumoBusca.push(`plant_id ${p.plant_id} (${p.name}): ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
         if (lista.some((d) => d.device_sn === sn)) {
-          plantId = p.plant_id;
-          PLANT_ID_CACHE.set(chaveCache, { plantId, at: Date.now() });
-          break;
+          plantIdsCandidatos.push(p.plant_id);
         }
       } catch (err) {
         resumoBusca.push(`plant_id ${p.plant_id}: erro ${(err.message || '').slice(0, 80)}`);
       }
+    }
+    if (plantIdsCandidatos.length > 0) {
+      plantId = plantIdsCandidatos[0];
+      PLANT_ID_CACHE.set(chaveCache, { plantId, at: Date.now() });
     }
   }
   if (!plantId) {
@@ -407,43 +431,57 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
     );
   }
 
-  // 2. Chama /v1/plant/energy. API aceita janela grande — tentamos 1 chamada
-  //    com start/end completos. Se falhar, divide em meses.
+  // 2. Chama /v1/plant/energy em janelas de 60 dias. A API da Growatt
+  //    aceita tecnicamente ranges grandes com time_unit=day, mas retorna
+  //    array vazio silenciosamente se o range for > ~180 dias. A unica
+  //    forma segura e dividir sempre em janelas pequenas.
+  //    Tambem: alguns devices aparecem em multiplas plantas no portal
+  //    (ex: planta antiga + nova, ou duplicata). Se a planta primaria
+  //    nao retorna dados, tenta as outras.
   const fmt = (d) => d.toISOString().slice(0, 10);
-  const todas = [];
-  try {
-    const r = await callGrowatt({
-      apiBase, token,
-      path: `/v1/plant/energy?plant_id=${plantId}&start_date=${fmt(inicio)}&end_date=${fmt(fim)}&time_unit=day&page=1&perpage=400`,
-      method: 'GET',
-    });
-    for (const e of (r?.energys || [])) {
-      const kwh = typeof e.energy === 'number' ? e.energy : parseFloat(e.energy);
-      if (Number.isFinite(kwh)) {
-        todas.push({ data: new Date(e.date + 'T00:00:00Z'), kwhGerado: kwh });
-      }
-    }
-  } catch (err) {
-    // Fallback: divide em meses (max 31 dias cada) se a chamada unica falhou.
+  const JANELA_DIAS = 60;
+  const SLEEP_MS = 300; // espacamento entre chamadas pra nao bater rate limit
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+  const puxarDePlanta = async (pid) => {
+    const dados = [];
     const cursor = new Date(inicio);
     while (cursor < fim) {
       const proximo = new Date(cursor);
-      proximo.setUTCDate(proximo.getUTCDate() + 30);
+      proximo.setUTCDate(proximo.getUTCDate() + JANELA_DIAS);
       const end = proximo < fim ? proximo : fim;
       try {
         const r = await callGrowatt({
           apiBase, token,
-          path: `/v1/plant/energy?plant_id=${plantId}&start_date=${fmt(cursor)}&end_date=${fmt(end)}&time_unit=day&page=1&perpage=50`,
+          path: `/v1/plant/energy?plant_id=${pid}&start_date=${fmt(cursor)}&end_date=${fmt(end)}&time_unit=day&page=1&perpage=200`,
           method: 'GET',
         });
         for (const e of (r?.energys || [])) {
           const kwh = typeof e.energy === 'number' ? e.energy : parseFloat(e.energy);
           if (Number.isFinite(kwh)) {
-            todas.push({ data: new Date(e.date + 'T00:00:00Z'), kwhGerado: kwh });
+            dados.push({ data: new Date(e.date + 'T00:00:00Z'), kwhGerado: kwh });
           }
         }
-      } catch { /* pula janela com erro */ }
-      cursor.setUTCDate(cursor.getUTCDate() + 30);
+      } catch { /* pula janela com erro (rate limit em 1 janela nao mata tudo) */ }
+      cursor.setUTCDate(cursor.getUTCDate() + JANELA_DIAS);
+      await sleep(SLEEP_MS);
+    }
+    return dados;
+  };
+
+  // Tenta primeiro a planta primaria (cacheada / primeiro match). Se
+  // retornar vazio, tenta as outras candidatas que tambem contem o SN.
+  let todas = await puxarDePlanta(plantId);
+  if (todas.length === 0 && plantIdsCandidatos.length > 1) {
+    for (const pid of plantIdsCandidatos) {
+      if (pid === plantId) continue;
+      const tentativa = await puxarDePlanta(pid);
+      if (tentativa.length > 0) {
+        // Essa planta tem dados — atualiza cache pra usar daqui em diante
+        PLANT_ID_CACHE.set(chaveCache, { plantId: pid, at: Date.now() });
+        todas = tentativa;
+        break;
+      }
     }
   }
   return todas;
