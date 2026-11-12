@@ -663,6 +663,8 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
   const plantas = stations?.pageList || [];
   let psKey = null;
   let deviceType = 1;
+  let deviceMatchado = null;
+  let psIdDoMatch = null;
   const resumoBusca = [];
   for (const p of plantas) {
     const psId = p.ps_id || p.psId;
@@ -679,12 +681,24 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
       const lista = devs?.pageList || [];
       const snsVistos = lista.map((d) => d.device_sn || d.deviceSn).filter(Boolean);
       resumoBusca.push(`ps_id ${psId}: ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
-      const match = lista.find(
-        (d) => (d.device_sn || d.deviceSn) === inverter.inverterSn,
-      );
+      // Match case-insensitive e tolerante a espacos — o portal as vezes
+      // retorna com casing diferente do cadastrado.
+      const alvoSn = String(inverter.inverterSn).trim().toUpperCase();
+      const match = lista.find((d) => {
+        const sn = String(d.device_sn || d.deviceSn || '').trim().toUpperCase();
+        return sn === alvoSn;
+      });
       if (match) {
-        psKey = match.ps_key || match.psKey;
+        deviceMatchado = match;
+        psIdDoMatch = psId;
+        psKey = match.ps_key || match.psKey || null;
         deviceType = Number(match.device_type || match.deviceType) || 1;
+        // Se ps_key veio preenchido, usa. Senao tenta construir a partir
+        // dos campos do device (formato oficial: ps_id_device_type_uuid).
+        if (!psKey) {
+          const uuid = match.uuid || match.channel_id || match.point_id;
+          if (uuid) psKey = `${psId}_${deviceType}_${uuid}`;
+        }
         break;
       }
     } catch (err) {
@@ -692,9 +706,13 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
     }
   }
   if (!psKey) {
+    // Diagnostico detalhado: se achou o device, mostra o payload pra entender
+    // qual campo esta faltando. Se nao achou, mostra o resumo de SNs vistos.
+    const detalhe = deviceMatchado
+      ? `achou device no ps_id ${psIdDoMatch} mas ps_key vazio. Campos disponiveis: ${JSON.stringify(deviceMatchado)}`
+      : `nao achou device em nenhuma planta. Busca: ${resumoBusca.join(' | ') || 'nenhuma listada'}`;
     throw new Error(
-      `Sungrow: nao achei ps_key pra SN ${inverter.inverterSn}. ` +
-      `Busca em ${plantas.length} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}`
+      `Sungrow: nao achei ps_key pra SN ${inverter.inverterSn}. ${detalhe}`
     );
   }
 
