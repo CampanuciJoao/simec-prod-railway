@@ -451,7 +451,13 @@ function CardEsteMes({ plantId }) {
   const kwh = dados?.kwhGerado;
   const brl = dados?.valorEconomizadoBrl;
   const variacao = dados?.variacaoKwhMesAnterior;
-  const mesNome = new Date(Date.UTC(dados?.ano || 2026, (dados?.mes || 1) - 1, 1))
+  // Nome do mes vem da data CORRENTE do cliente — o backend pode responder
+  // rapido com dado parcial e as vezes mandar mes anterior em caso de edge
+  // (ex: deploy tocando em algum cache). O user quer ver o mes atual.
+  const agora = new Date();
+  const mesExibicao = dados?.mes ?? (agora.getMonth() + 1);
+  const anoExibicao = dados?.ano ?? agora.getFullYear();
+  const mesNome = new Date(Date.UTC(anoExibicao, mesExibicao - 1, 1))
     .toLocaleString('pt-BR', { month: 'long' });
   const corVar = variacao == null ? 'var(--text-muted)' : variacao >= 0 ? 'var(--color-success)' : 'var(--color-danger)';
   const sinal = variacao == null ? '' : variacao >= 0 ? '+' : '';

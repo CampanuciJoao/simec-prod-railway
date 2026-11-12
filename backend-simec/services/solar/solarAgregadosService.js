@@ -117,7 +117,11 @@ export async function calcularAgregadoDoDia({ tenantId, plant, dia }) {
     }
   }
 
-  const tarifa = plant.tarifaKwh ?? TARIFA_DEFAULT_BRL_KWH;
+  // Usa a tarifa cadastrada APENAS se > 0. Zero ou null caem no default.
+  // Antes era `??` que mantinha zero explicito, zerando toda a economia.
+  const tarifa = plant.tarifaKwh && plant.tarifaKwh > 0
+    ? plant.tarifaKwh
+    : TARIFA_DEFAULT_BRL_KWH;
   const valorEconomizadoBrl = kwhGerado * tarifa;
 
   const picos = snapshots.map((s) => s.powerKw).filter((v) => v != null);
