@@ -361,9 +361,20 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
     }
   }
   if (!plantId) {
+    // Detecta caso tipico de rate limit do portal Growatt: Free Plan tem
+    // quota diaria bem baixa e, quando esgota, todos endpoints devolvem
+    // error_code=10012 (error_frequently_access). Da pra reconhecer no
+    // resumo de busca pra dar mensagem acionavel.
+    const bateuRateLimit = resumoBusca.some((s) => s.includes('10012') || s.includes('frequently_access'))
+      || plantas.length === 0;
+    const dica = bateuRateLimit
+      ? ' Portal Growatt bloqueou por rate limit (codigo 10012 = error_frequently_access). ' +
+        'A Free Plan tem quota diaria baixa. Espere 1-2h e tente de novo, ' +
+        'ou entre em contato com a Growatt pra upgrade de quota.'
+      : '';
     throw new Error(
       `Growatt: nao achei plant_id contendo SN ${inverter.inverterSn}. ` +
-      `Busca em ${plantas.length} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}`
+      `Busca em ${plantas.length} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}.${dica}`
     );
   }
 

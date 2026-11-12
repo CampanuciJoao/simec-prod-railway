@@ -661,10 +661,11 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
     body: { ps_type: '1,3,4,5,6,7,8,12', valid_flag: '1,3', page: 1, size: 100 },
   });
   const plantas = stations?.pageList || [];
-  let psKey = null;
+  let psKey = null;         // ps_key do device cadastrado (pra identificar deviceType)
   let deviceType = 1;
   let deviceMatchado = null;
   let psIdDoMatch = null;
+  const psKeysDaPlanta = []; // todos ps_keys de inverters da mesma planta
   const resumoBusca = [];
   for (const p of plantas) {
     const psId = p.ps_id || p.psId;
@@ -674,15 +675,11 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
         apiBase: inverter.apiBase,
         credential: inverter.credential,
         path: '/openapi/platform/getDeviceListByPsId',
-        // size: 500 cobre contas com muitos devices. device_type_list vazio
-        // (sem o campo) = TODOS os tipos (inverter, ESS, meter, battery...).
         body: { ps_id: String(psId), page: 1, size: 500, is_virtual_unit: '0' },
       });
       const lista = devs?.pageList || [];
       const snsVistos = lista.map((d) => d.device_sn || d.deviceSn).filter(Boolean);
       resumoBusca.push(`ps_id ${psId}: ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
-      // Match case-insensitive e tolerante a espacos — o portal as vezes
-      // retorna com casing diferente do cadastrado.
       const alvoSn = String(inverter.inverterSn).trim().toUpperCase();
       const match = lista.find((d) => {
         const sn = String(d.device_sn || d.deviceSn || '').trim().toUpperCase();
@@ -693,11 +690,24 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
         psIdDoMatch = psId;
         psKey = match.ps_key || match.psKey || null;
         deviceType = Number(match.device_type || match.deviceType) || 1;
-        // Se ps_key veio preenchido, usa. Senao tenta construir a partir
-        // dos campos do device (formato oficial: ps_id_device_type_uuid).
         if (!psKey) {
           const uuid = match.uuid || match.channel_id || match.point_id;
           if (uuid) psKey = `${psId}_${deviceType}_${uuid}`;
+        }
+        // Coleta ps_keys de TODOS os devices de geracao (inverter + ESS)
+        // da mesma planta, pra o backfill somar producao de todos. Portal
+        // Sungrow mostra agregado da planta inteira — o SIMEC passa a fazer
+        // o mesmo em vez de so o device cadastrado.
+        for (const d of lista) {
+          const dt = Number(d.device_type || d.deviceType) || 1;
+          // 1=inverter, 14=ESS. Ignora meter/battery/combiner que nao geram.
+          if (dt !== 1 && dt !== 14) continue;
+          let key = d.ps_key || d.psKey || null;
+          if (!key) {
+            const uuid = d.uuid || d.channel_id || d.point_id;
+            if (uuid) key = `${psId}_${dt}_${uuid}`;
+          }
+          if (key) psKeysDaPlanta.push({ psKey: key, deviceType: dt, sn: d.device_sn || d.deviceSn });
         }
         break;
       }
@@ -706,8 +716,6 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
     }
   }
   if (!psKey) {
-    // Diagnostico detalhado: se achou o device, mostra o payload pra entender
-    // qual campo esta faltando. Se nao achou, mostra o resumo de SNs vistos.
     const detalhe = deviceMatchado
       ? `achou device no ps_id ${psIdDoMatch} mas ps_key vazio. Campos disponiveis: ${JSON.stringify(deviceMatchado)}`
       : `nao achou device em nenhuma planta. Busca: ${resumoBusca.join(' | ') || 'nenhuma listada'}`;
@@ -715,53 +723,76 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
       `Sungrow: nao achei ps_key pra SN ${inverter.inverterSn}. ${detalhe}`
     );
   }
+  // Garantia defensiva — ps_key do cadastrado sempre entra, mesmo se o
+  // loop de irmaos nao incluiu (raro).
+  if (!psKeysDaPlanta.some((k) => k.psKey === psKey)) {
+    psKeysDaPlanta.push({ psKey, deviceType, sn: inverter.inverterSn });
+  }
 
-  // 2. Itera em janelas de 100 dias (limite Sungrow). data_point p1 = Yield Today.
-  // Pra ESS (device_type 14), usa p13112 (Daily PV Yield).
-  const dataPoint = deviceType === 14 ? 'p13112' : 'p1';
+  // 2. Itera em janelas de 100 dias (limite Sungrow) e, para cada janela,
+  // pede o historico de TODOS os ps_keys da planta de uma vez (um unico
+  // round-trip, barato). Somamos por dia pra consolidar producao de todos
+  // inverters da planta — que e o que o portal mostra.
+  // data_point p1 = Yield Today (inverter), p13112 = Daily PV Yield (ESS).
   const fmt = (d) => {
     const y = d.getUTCFullYear();
     const m = String(d.getUTCMonth() + 1).padStart(2, '0');
     const dd = String(d.getUTCDate()).padStart(2, '0');
     return `${y}${m}${dd}`;
   };
-  const todas = [];
+  // Agrupa ps_keys por data_point (inverter vs ESS exigem data_points
+  // diferentes — duas chamadas por janela).
+  const gruposPorDataPoint = {
+    p1:     psKeysDaPlanta.filter((k) => k.deviceType !== 14).map((k) => k.psKey),
+    p13112: psKeysDaPlanta.filter((k) => k.deviceType === 14).map((k) => k.psKey),
+  };
+  // Acumula por dia (YYYY-MM-DD) somando todos devices.
+  const porDia = new Map();
   const cursor = new Date(inicio);
   while (cursor < fim) {
     const janelaFim = new Date(cursor);
     janelaFim.setUTCDate(janelaFim.getUTCDate() + 99);
     const end = janelaFim < fim ? janelaFim : fim;
-    try {
-      const r = await callSungrow({
-        apiBase: inverter.apiBase,
-        credential: inverter.credential,
-        path: '/openapi/platform/getDevicePointDayMonthYearDataList',
-        body: {
-          query_type: 'day',
-          data_type: '2',
-          ps_key_list: [psKey],
-          data_point: dataPoint,
-          start_time: fmt(cursor),
-          end_time: fmt(end),
-          order: 1,
-          is_get_point_dict: '0',
-        },
-      });
-      const serie = r?.[psKey]?.[dataPoint] || [];
-      for (const ponto of serie) {
-        // ponto.time_stamp = "yyyymmdd"; ponto["2"] = valor em Wh
-        const ts = String(ponto.time_stamp || '');
-        if (ts.length !== 8) continue;
-        const dia = new Date(
-          Date.UTC(Number(ts.slice(0, 4)), Number(ts.slice(4, 6)) - 1, Number(ts.slice(6, 8))),
-        );
-        const wh = parseFloat(ponto['2'] ?? ponto[2]);
-        if (Number.isFinite(wh)) {
-          todas.push({ data: dia, kwhGerado: wh / 1000 });
+    for (const dp of ['p1', 'p13112']) {
+      const keys = gruposPorDataPoint[dp];
+      if (!keys.length) continue;
+      try {
+        const r = await callSungrow({
+          apiBase: inverter.apiBase,
+          credential: inverter.credential,
+          path: '/openapi/platform/getDevicePointDayMonthYearDataList',
+          body: {
+            query_type: 'day',
+            data_type: '2',
+            ps_key_list: keys,
+            data_point: dp,
+            start_time: fmt(cursor),
+            end_time: fmt(end),
+            order: 1,
+            is_get_point_dict: '0',
+          },
+        });
+        // Resposta: { <psKey>: { <dataPoint>: [ { time_stamp, "2": valor_Wh } ] } }
+        for (const key of keys) {
+          const serie = r?.[key]?.[dp] || [];
+          for (const ponto of serie) {
+            const ts = String(ponto.time_stamp || '');
+            if (ts.length !== 8) continue;
+            const wh = parseFloat(ponto['2'] ?? ponto[2]);
+            if (!Number.isFinite(wh)) continue;
+            const diaKey = `${ts.slice(0, 4)}-${ts.slice(4, 6)}-${ts.slice(6, 8)}`;
+            porDia.set(diaKey, (porDia.get(diaKey) || 0) + wh / 1000);
+          }
         }
-      }
-    } catch { /* pula janela com erro */ }
+      } catch { /* pula janela com erro */ }
+    }
     cursor.setUTCDate(cursor.getUTCDate() + 100);
   }
+  // Converte pra array ordenado por data, formato do contrato comum.
+  const todas = [];
+  for (const [diaKey, kwhGerado] of porDia.entries()) {
+    todas.push({ data: new Date(diaKey + 'T00:00:00Z'), kwhGerado });
+  }
+  todas.sort((a, b) => a.data.getTime() - b.data.getTime());
   return todas;
 }
