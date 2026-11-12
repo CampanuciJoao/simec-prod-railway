@@ -21,6 +21,8 @@ import {
   adicionarBateria, removerBateria, validarCredencialSolar,
   sungrowAuthorizeUrl, sungrowAuthStatus, diagnosticarInversor, backfillInversor,
   purgarAgregadosPlanta,
+  getSolarSnapshotsStats,
+  purgarSnapshotsCorrompidos,
 } from '@/services/api/solarApi';
 
 // ─── Modal de nova/editar planta (dados basicos) ────────────────────────────
@@ -454,6 +456,8 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
   const [resultado, setResultado] = useState(null);
   const [backfillando, setBackfillando] = useState(false);
   const [backfillResult, setBackfillResult] = useState(null);
+  const [snapshotsStats, setSnapshotsStats] = useState(null);
+  const [snapshotsLoading, setSnapshotsLoading] = useState(false);
 
   const executar = async () => {
     setCarregando(true);
@@ -507,6 +511,38 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
       );
       // Re-roda o diagnostico pra atualizar o bloco de dados persistidos.
       executar();
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message, 'error');
+    }
+  };
+
+  const carregarSnapshotsStats = async () => {
+    if (!plantId) return;
+    setSnapshotsLoading(true);
+    try {
+      const r = await getSolarSnapshotsStats(plantId, 30);
+      setSnapshotsStats(r);
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message, 'error');
+    } finally {
+      setSnapshotsLoading(false);
+    }
+  };
+
+  const executarPurgaSnapshots = async () => {
+    if (!plantId) return;
+    if (!window.confirm(
+      'APAGAR snapshots corrompidos (acima do teto fisico de 10 kWh/kWp/dia) ' +
+      'dos ultimos 60 dias desta planta. Isso limpa o card "Este mes" que mostra ' +
+      'valores absurdos por causa de outliers no contador acumulado. Continuar?'
+    )) return;
+    try {
+      const r = await purgarSnapshotsCorrompidos(plantId, 60);
+      addToast(
+        `${r.snapshotsRemovidos} snapshots corrompidos apagados (teto ${r.tetoKwhDia.toFixed(0)} kWh/dia).`,
+        'success',
+      );
+      carregarSnapshotsStats();
     } catch (err) {
       addToast(err?.response?.data?.error || err.message, 'error');
     }
@@ -725,6 +761,65 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
                     >
                       ⚠ Purgar agregados desta planta
                     </button>
+                  )}
+                </div>
+              )}
+
+              {plantId && (
+                <div className="mt-3 rounded border border-yellow-500/40 bg-yellow-500/5 p-2">
+                  <div className="mb-1 text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
+                    Snapshots crus — diagnostico do card "Este mes"
+                  </div>
+                  <div className="mb-2 text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Se o card "Este mes" mostra valor absurdo (ex: 790.000 kWh), provavelmente ha snapshots com contador corrompido. Veja aqui antes de purgar.
+                  </div>
+                  <div className="flex flex-wrap gap-1">
+                    <button
+                      type="button"
+                      onClick={carregarSnapshotsStats}
+                      disabled={snapshotsLoading}
+                      className="rounded border px-2 py-1 text-[10px] font-semibold"
+                      style={{ borderColor: 'var(--border-soft)' }}
+                    >
+                      {snapshotsLoading ? 'carregando...' : 'Ver stats dos snapshots (30d)'}
+                    </button>
+                    {snapshotsStats && snapshotsStats.porInverter?.some((p) => p.generationKwhTotal.deltaExcedeTeto || p.generationKwhDay.maxExcedeTeto) && (
+                      <button
+                        type="button"
+                        onClick={executarPurgaSnapshots}
+                        className="rounded border border-red-500/40 bg-red-500/10 px-2 py-1 text-[10px] font-semibold"
+                        style={{ color: 'var(--color-danger)' }}
+                      >
+                        ⚠ Purgar snapshots corrompidos
+                      </button>
+                    )}
+                  </div>
+                  {snapshotsStats && (
+                    <div className="mt-2 space-y-2">
+                      <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                        Teto fisico plausivel: <strong>{snapshotsStats.tetoDiaPlausivelKwh?.toFixed(0) ?? 'n/a'} kWh/dia</strong> (capacidade {snapshotsStats.plant.capacidadeKwp} kWp × 10)
+                      </div>
+                      {snapshotsStats.porInverter.map((inv) => (
+                        <div key={inv.inverterId} className="rounded border p-2 text-[10px]" style={{ borderColor: 'var(--border-soft)' }}>
+                          <div className="font-semibold">Inverter {inv.inverterId.slice(0, 8)}... — {inv.totalSnapshots} snapshots</div>
+                          <div>
+                            generationKwhDay: min {inv.generationKwhDay.min?.toFixed(1) ?? '—'} / max{' '}
+                            <span style={{ color: inv.generationKwhDay.maxExcedeTeto ? 'var(--color-danger)' : 'inherit' }}>
+                              {inv.generationKwhDay.max?.toFixed(1) ?? '—'}
+                            </span>
+                            {inv.generationKwhDay.maxExcedeTeto && ' ⚠ ACIMA DO TETO'}
+                          </div>
+                          <div>
+                            generationKwhTotal (lifetime): min {inv.generationKwhTotal.min?.toFixed(0) ?? '—'} / max {inv.generationKwhTotal.max?.toFixed(0) ?? '—'} / delta{' '}
+                            <span style={{ color: inv.generationKwhTotal.deltaExcedeTeto ? 'var(--color-danger)' : 'inherit' }}>
+                              {inv.generationKwhTotal.delta?.toFixed(0) ?? '—'}
+                            </span>
+                            {inv.generationKwhTotal.deltaExcedeTeto && ' ⚠ DELTA ACIMA DO TETO'}
+                          </div>
+                          <div>Max potencia: {inv.maxPowerKw?.toFixed(2) ?? '—'} kW</div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}

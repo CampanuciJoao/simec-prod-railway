@@ -25,6 +25,10 @@ import prisma from '../prismaService.js';
 
 const TARIFA_DEFAULT_BRL_KWH = 0.64; // UC alta tensao MS fora ponta
 const HORAS_SOL_TIPICAS = 5.0;       // estimativa media Brasil CS
+// Teto de sanidade: um inverter nao gera mais que ~10 kWh por kWp num dia
+// (o maximo teorico fisico fica em torno de 6-7, com margem de seguranca).
+// Qualquer leitura acima disso e outlier/parse corrompido e deve ser descartada.
+const MAX_KWH_POR_KWP_DIA = 10;
 
 function inicioFimDoDia(dia) {
   const inicio = new Date(dia);
@@ -61,14 +65,44 @@ export async function calcularAgregadoDoDia({ tenantId, plant, dia }) {
     };
   }
 
-  // kWh gerado: preferencia pro contador acumulado (mais robusto)
-  let kwhGerado = null;
-  const totais = snapshots.map((s) => s.generationKwhTotal).filter((v) => v != null);
-  if (totais.length >= 2) {
-    kwhGerado = Math.max(0, Math.max(...totais) - Math.min(...totais));
+  // kWh gerado — estrategia blindada contra outliers:
+  // 1a escolha: max(generationKwhDay) desde que dentro do teto fisico.
+  //   generationKwhDay e o "gerado hoje" reportado pelo inverter, zera
+  //   a cada dia — baixo risco de inflacao.
+  // 2a escolha: delta de generationKwhTotal (contador lifetime), desde que
+  //   TAMBEM dentro do teto fisico. Serve de fallback quando o inverter nao
+  //   reporta generationKwhDay (alguns provedores).
+  // Teto: capacidadeKwp * MAX_KWH_POR_KWP_DIA por dia. Se nao ha capacidade
+  // cadastrada, usa Infinity (comportamento antigo).
+  const capacidadeKwp = plant.capacidadeKwp;
+  const maxPlausivelDia = capacidadeKwp && capacidadeKwp > 0
+    ? capacidadeKwp * MAX_KWH_POR_KWP_DIA
+    : Infinity;
+
+  let kwhGerado = 0;
+  const dias = snapshots
+    .map((s) => s.generationKwhDay)
+    .filter((v) => v != null && Number.isFinite(v) && v >= 0 && v <= maxPlausivelDia);
+  if (dias.length) {
+    kwhGerado = Math.max(...dias);
   } else {
-    const dias = snapshots.map((s) => s.generationKwhDay).filter((v) => v != null);
-    kwhGerado = dias.length ? Math.max(...dias) : 0;
+    const totais = snapshots
+      .map((s) => s.generationKwhTotal)
+      .filter((v) => v != null && Number.isFinite(v) && v > 0);
+    if (totais.length >= 2) {
+      const delta = Math.max(...totais) - Math.min(...totais);
+      if (delta >= 0 && delta <= maxPlausivelDia) kwhGerado = delta;
+      // Se delta fora do teto, assume parse corrompido e deixa em 0.
+      // O WARN ajuda a identificar o inverter problematico nos logs.
+      else if (delta > maxPlausivelDia) {
+        console.warn(
+          `[SOLAR_AGG] delta generationKwhTotal fora do teto fisico `
+          + `(plantId=${plant.id} dia=${inicio.toISOString().slice(0, 10)} `
+          + `delta=${delta.toFixed(0)}kWh teto=${maxPlausivelDia.toFixed(0)}kWh). `
+          + `Ignorado, kwhGerado=0.`,
+        );
+      }
+    }
   }
 
   // Integral trapezoidal pra consumo/exportacao (kW * horas)

@@ -955,6 +955,124 @@ router.get('/plants/:id/historico-anual', async (req, res) => {
   }
 });
 
+// ─── Diagnostico de snapshots (admin) ──────────────────────────────────────
+// GET /api/solar/plants/:id/snapshots-stats?dias=30
+// Retorna estatisticas dos snapshots brutos pra identificar outliers que
+// envenenam o calculo ao vivo do card "Este mes".
+router.get('/plants/:id/snapshots-stats', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const dias = Math.min(Math.max(parseInt(req.query.dias || '30', 10), 1), 365);
+  try {
+    const plant = await prisma.solarPlant.findFirst({
+      where: { tenantId, id: req.params.id },
+      select: { id: true, nome: true, capacidadeKwp: true },
+    });
+    if (!plant) return res.status(404).json({ error: 'Planta nao encontrada' });
+
+    const inicio = new Date();
+    inicio.setUTCHours(0, 0, 0, 0);
+    inicio.setUTCDate(inicio.getUTCDate() - dias);
+
+    const stats = await prisma.$queryRaw`
+      SELECT
+        inverter_id,
+        COUNT(*)::int                                   AS total_snapshots,
+        MIN(captured_at)                                AS primeiro,
+        MAX(captured_at)                                AS ultimo,
+        MIN(generation_kwh_total)::float                AS min_total,
+        MAX(generation_kwh_total)::float                AS max_total,
+        (MAX(generation_kwh_total) - MIN(generation_kwh_total))::float AS delta_total,
+        MIN(generation_kwh_day)::float                  AS min_day,
+        MAX(generation_kwh_day)::float                  AS max_day,
+        MAX(power_kw)::float                            AS max_power_kw,
+        COUNT(generation_kwh_total)::int                AS com_total,
+        COUNT(generation_kwh_day)::int                  AS com_day
+      FROM solar_snapshots
+      WHERE "tenantId" = ${tenantId}
+        AND plant_id = ${plant.id}
+        AND captured_at >= ${inicio}
+      GROUP BY inverter_id
+    `;
+
+    const tetoDiaPlausivel = plant.capacidadeKwp
+      ? plant.capacidadeKwp * 10
+      : null;
+
+    res.json({
+      plant: { id: plant.id, nome: plant.nome, capacidadeKwp: plant.capacidadeKwp },
+      periodoDias: dias,
+      tetoDiaPlausivelKwh: tetoDiaPlausivel,
+      porInverter: stats.map((s) => ({
+        inverterId: s.inverter_id,
+        totalSnapshots: s.total_snapshots,
+        primeiro: s.primeiro,
+        ultimo: s.ultimo,
+        generationKwhTotal: {
+          min: s.min_total, max: s.max_total, delta: s.delta_total,
+          snapshotsComValor: s.com_total,
+          deltaExcedeTeto: tetoDiaPlausivel != null && s.delta_total > tetoDiaPlausivel,
+        },
+        generationKwhDay: {
+          min: s.min_day, max: s.max_day, snapshotsComValor: s.com_day,
+          maxExcedeTeto: tetoDiaPlausivel != null && s.max_day > tetoDiaPlausivel,
+        },
+        maxPowerKw: s.max_power_kw,
+      })),
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Purga snapshots envenenados (admin) ────────────────────────────────────
+// DELETE /api/solar/plants/:id/snapshots-corrompidos?dias=60
+// Apaga snapshots com generationKwhTotal ou generationKwhDay acima do teto
+// fisico (capacidadeKwp * 10). Objetivo: limpar o card "Este mes" de lixo.
+router.delete('/plants/:id/snapshots-corrompidos', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const dias = Math.min(Math.max(parseInt(req.query.dias || '60', 10), 1), 365);
+  try {
+    const plant = await prisma.solarPlant.findFirst({
+      where: { tenantId, id: req.params.id },
+      select: { id: true, nome: true, capacidadeKwp: true },
+    });
+    if (!plant) return res.status(404).json({ error: 'Planta nao encontrada' });
+    if (!plant.capacidadeKwp || plant.capacidadeKwp <= 0) {
+      return res.status(400).json({
+        error: 'Planta sem capacidadeKwp cadastrada — nao da pra calcular teto fisico',
+      });
+    }
+
+    const inicio = new Date();
+    inicio.setUTCHours(0, 0, 0, 0);
+    inicio.setUTCDate(inicio.getUTCDate() - dias);
+
+    const teto = plant.capacidadeKwp * 10;
+
+    const resultado = await prisma.solarSnapshot.deleteMany({
+      where: {
+        tenantId,
+        plantId: plant.id,
+        capturedAt: { gte: inicio },
+        OR: [
+          { generationKwhTotal: { gt: teto * 1000 } }, // outliers grosseiros
+          { generationKwhDay: { gt: teto } },
+        ],
+      },
+    });
+
+    res.json({
+      ok: true,
+      plantId: plant.id,
+      tetoKwhDia: teto,
+      snapshotsRemovidos: resultado.count,
+      observacao: 'Fix de calculo ao vivo passa a ignorar outliers automaticamente, mas limpar o lixo acelera o retorno ao normal.',
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Status atual da planta (snapshot mais recente agregado) ────────────────
 router.get('/plants/:id/status', async (req, res) => {
   const tenantId = req.tenantContext;

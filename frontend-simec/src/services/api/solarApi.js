@@ -67,6 +67,13 @@ export const backfillInversor = (inverterId, diasAtras = 365) =>
 export const purgarAgregadosPlanta = (plantId) =>
   api.delete(`/solar/plants/${plantId}/agregados`).then((r) => r.data);
 
+// ─── Snapshots stats (admin — diagnostico do card "Este mes") ───────────────
+export const getSolarSnapshotsStats = (plantId, dias = 30) =>
+  api.get(`/solar/plants/${plantId}/snapshots-stats?dias=${dias}`).then((r) => r.data);
+
+export const purgarSnapshotsCorrompidos = (plantId, dias = 60) =>
+  api.delete(`/solar/plants/${plantId}/snapshots-corrompidos?dias=${dias}`).then((r) => r.data);
+
 // ─── Historico anual (ultimos 12 meses por padrao) ──────────────────────────
 export const getSolarPlantHistoricoAnual = (plantId, meses = 12) =>
   api.get(`/solar/plants/${plantId}/historico-anual?meses=${meses}`).then((r) => r.data);
