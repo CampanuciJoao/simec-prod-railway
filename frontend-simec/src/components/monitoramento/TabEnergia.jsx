@@ -19,7 +19,11 @@ import { Line } from 'react-chartjs-2';
 import { Card, InlineEmptyState, LoadingState, SelectMenu } from '@/components/ui';
 import { formatarDataHora } from '@/utils/timeUtils';
 import { useSolarPainel } from '@/hooks/monitoramento/useSolarPainel';
-import { getSolarAgregadoMesAtual, getSolarFalhas, getSolarPlantHistoricoAnual } from '@/services/api/solarApi';
+import {
+  getSolarAgregadoMesAtual, getSolarFalhas, getSolarPlantHistoricoAnual,
+  baixarSolarProducaoPdf,
+} from '@/services/api/solarApi';
+import { useToast } from '@/hooks/useToast';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
@@ -514,25 +518,44 @@ const NIVEIS_FALHA = {
 // Historico anual — kWh por mes dos ultimos N meses. Usa os agregados
 // gravados pelo backfill (/plants/:id/historico-anual).
 function HistoricoAnual({ plantId }) {
+  const { addToast } = useToast();
   const [dados, setDados] = useState(null);
   const [carregando, setCarregando] = useState(true);
+  const [meses, setMeses] = useState(12);
+  const [baixandoPdf, setBaixandoPdf] = useState(false);
 
   useEffect(() => {
     if (!plantId) return;
     let cancel = false;
     setCarregando(true);
-    getSolarPlantHistoricoAnual(plantId, 12)
+    getSolarPlantHistoricoAnual(plantId, meses)
       .then((r) => { if (!cancel) setDados(r); })
       .catch(() => { if (!cancel) setDados(null); })
       .finally(() => { if (!cancel) setCarregando(false); });
     return () => { cancel = true; };
-  }, [plantId]);
+  }, [plantId, meses]);
 
-  if (carregando) return <LoadingState message="Carregando histórico anual..." />;
+  const baixarPdf = async () => {
+    if (!dados?.periodo) return;
+    setBaixandoPdf(true);
+    try {
+      await baixarSolarProducaoPdf(plantId, {
+        dataInicio: dados.periodo.inicio,
+        dataFim: dados.periodo.fim,
+      });
+      addToast('PDF gerado com sucesso.', 'success');
+    } catch (err) {
+      addToast(err?.response?.data?.error || err.message || 'Falha ao gerar PDF.', 'error');
+    } finally {
+      setBaixandoPdf(false);
+    }
+  };
+
+  if (carregando) return <LoadingState message="Carregando histórico..." />;
   if (!dados || !dados.serie?.length) {
     return (
-      <Card title="Histórico anual (geração por mês)" icon={faChartLine}>
-        <InlineEmptyState message="Sem histórico. Rode o backfill nos inversores (botão 🩺 → Backfill 365d na tela de integrações)." />
+      <Card title={`Histórico (${meses === 24 ? '24 meses' : '12 meses'})`} icon={faChartLine}>
+        <InlineEmptyState message="Sem histórico. Rode o backfill nos inversores (botão 🩺 → Backfill 2 anos na tela de integrações)." />
       </Card>
     );
   }
@@ -565,21 +588,50 @@ function HistoricoAnual({ plantId }) {
   };
 
   return (
-    <Card title="Histórico anual (geração por mês)" icon={faChartLine}>
-      <div className="mb-3 flex flex-wrap gap-4 text-sm">
-        <div>
-          <div className="text-xs text-gray-500 uppercase">Total 12 meses</div>
-          <div className="font-bold">{dados.totalKwh.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</div>
-        </div>
-        <div>
-          <div className="text-xs text-gray-500 uppercase">Economia estimada</div>
-          <div className="font-bold" style={{ color: 'var(--color-success)' }}>
-            R$ {dados.totalEconomiaBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+    <Card title={`Histórico (${meses === 24 ? '24 meses' : '12 meses'})`} icon={faChartLine}>
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+        <div className="flex flex-wrap gap-4 text-sm">
+          <div>
+            <div className="text-xs text-gray-500 uppercase">Total {meses}m</div>
+            <div className="font-bold">{dados.totalKwh.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 uppercase">Economia estimada</div>
+            <div className="font-bold" style={{ color: 'var(--color-success)' }}>
+              R$ {dados.totalEconomiaBrl.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-gray-500 uppercase">Tarifa ref.</div>
+            <div className="font-bold">R$ {dados.tarifaKwh.toFixed(2)}/kWh</div>
           </div>
         </div>
-        <div>
-          <div className="text-xs text-gray-500 uppercase">Tarifa ref.</div>
-          <div className="font-bold">R$ {dados.tarifaKwh.toFixed(2)}/kWh</div>
+        <div className="flex gap-1">
+          {[12, 24].map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setMeses(m)}
+              className="rounded border px-2 py-1 text-[10px] font-semibold"
+              style={{
+                borderColor: meses === m ? 'var(--brand-primary)' : 'var(--border-soft)',
+                backgroundColor: meses === m ? 'var(--brand-primary)' : 'transparent',
+                color: meses === m ? '#fff' : 'inherit',
+              }}
+            >
+              {m === 24 ? '24m' : '12m'}
+            </button>
+          ))}
+          <button
+            type="button"
+            onClick={baixarPdf}
+            disabled={baixandoPdf}
+            className="rounded border px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
+            style={{ borderColor: 'var(--border-soft)' }}
+            title="Baixar PDF do historico"
+          >
+            {baixandoPdf ? 'gerando...' : '📄 PDF'}
+          </button>
         </div>
       </div>
       <div style={{ height: 240 }}>

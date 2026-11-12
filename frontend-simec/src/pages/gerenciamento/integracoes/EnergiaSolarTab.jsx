@@ -833,7 +833,7 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
                   Pode demorar varios minutos por janela de 30-100 dias.
                 </div>
                 <div className="flex flex-wrap gap-1">
-                  {[30, 90, 180, 365].map((dias) => (
+                  {[30, 90, 180, 365, 730].map((dias) => (
                     <button
                       key={dias}
                       type="button"
@@ -842,7 +842,7 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
                       className="rounded border px-2 py-1 text-[10px] font-semibold disabled:opacity-50"
                       style={{ borderColor: 'var(--border-soft)' }}
                     >
-                      {backfillando ? 'rodando...' : `Backfill ${dias}d`}
+                      {backfillando ? 'rodando...' : `Backfill ${dias === 730 ? '2 anos' : `${dias}d`}`}
                     </button>
                   ))}
                 </div>
