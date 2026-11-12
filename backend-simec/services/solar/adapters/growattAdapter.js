@@ -334,30 +334,59 @@ export async function fetchSnapshot(inverter) {
  *
  * Response Growatt: { energys: [{ date: "YYYY-MM-DD", energy: kWh }, ...] }
  */
+// Cache in-memory do plant_id descoberto por SN. Reduz pressao sobre o
+// rate limit da Free Plan — descobrir plant_id custa 1 list + N device/list,
+// o backfill em si so precisa de 1 plant/energy. Chave: SN + token hash.
+// TTL: 1h (plant_id nao muda entre runs). Se o processo reiniciar perde,
+// mas e aceitavel.
+const PLANT_ID_CACHE = new Map();
+const PLANT_ID_CACHE_TTL_MS = 60 * 60 * 1000;
+
+function cacheKey(sn, token) {
+  // Hash simples do token pra nao guardar em memoria. 8 bytes ja bastam
+  // pra chave unica desta sessao.
+  let h = 0;
+  for (let i = 0; i < token.length; i++) h = ((h << 5) - h + token.charCodeAt(i)) | 0;
+  return `${sn}|${h >>> 0}`;
+}
+
 export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
   const token = inverter.credential.apiToken;
   const apiBase = inverter.apiBase || defaultApiBase;
+  const sn = inverter.inverterSn;
 
-  // 1. Descobre plant_id listando plantas e achando a que contem esse SN.
-  const { plantas } = await listarTodasPlantas({ apiBase, token });
+  // 1. Descobre plant_id. Primeiro checa cache in-memory — se bate, pula
+  //    completamente a fase de descoberta e vai direto pro backfill.
   let plantId = null;
+  const chaveCache = cacheKey(sn, token);
+  const cached = PLANT_ID_CACHE.get(chaveCache);
+  if (cached && (Date.now() - cached.at) < PLANT_ID_CACHE_TTL_MS) {
+    plantId = cached.plantId;
+  }
+
   const resumoBusca = [];
-  for (const p of plantas) {
-    try {
-      const dev = await callGrowatt({
-        apiBase, token,
-        path: `/v1/device/list?plant_id=${p.plant_id}&page=1&perpage=100`,
-        method: 'GET',
-      });
-      const lista = dev?.devices || [];
-      const snsVistos = lista.map((d) => d.device_sn).filter(Boolean);
-      resumoBusca.push(`plant_id ${p.plant_id} (${p.name}): ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
-      if (lista.some((d) => d.device_sn === inverter.inverterSn)) {
-        plantId = p.plant_id;
-        break;
+  let totalPlantasListadas = 0;
+  if (!plantId) {
+    const { plantas } = await listarTodasPlantas({ apiBase, token });
+    totalPlantasListadas = plantas.length;
+    for (const p of plantas) {
+      try {
+        const dev = await callGrowatt({
+          apiBase, token,
+          path: `/v1/device/list?plant_id=${p.plant_id}&page=1&perpage=100`,
+          method: 'GET',
+        });
+        const lista = dev?.devices || [];
+        const snsVistos = lista.map((d) => d.device_sn).filter(Boolean);
+        resumoBusca.push(`plant_id ${p.plant_id} (${p.name}): ${lista.length} devices [${snsVistos.slice(0, 5).join(', ')}]`);
+        if (lista.some((d) => d.device_sn === sn)) {
+          plantId = p.plant_id;
+          PLANT_ID_CACHE.set(chaveCache, { plantId, at: Date.now() });
+          break;
+        }
+      } catch (err) {
+        resumoBusca.push(`plant_id ${p.plant_id}: erro ${(err.message || '').slice(0, 80)}`);
       }
-    } catch (err) {
-      resumoBusca.push(`plant_id ${p.plant_id}: erro ${(err.message || '').slice(0, 80)}`);
     }
   }
   if (!plantId) {
@@ -366,7 +395,7 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
     // error_code=10012 (error_frequently_access). Da pra reconhecer no
     // resumo de busca pra dar mensagem acionavel.
     const bateuRateLimit = resumoBusca.some((s) => s.includes('10012') || s.includes('frequently_access'))
-      || plantas.length === 0;
+      || totalPlantasListadas === 0;
     const dica = bateuRateLimit
       ? ' Portal Growatt bloqueou por rate limit (codigo 10012 = error_frequently_access). ' +
         'A Free Plan tem quota diaria baixa. Espere 1-2h e tente de novo, ' +
@@ -374,7 +403,7 @@ export async function fetchHistoricalDaily({ inverter, inicio, fim }) {
       : '';
     throw new Error(
       `Growatt: nao achei plant_id contendo SN ${inverter.inverterSn}. ` +
-      `Busca em ${plantas.length} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}.${dica}`
+      `Busca em ${totalPlantasListadas} planta(s): ${resumoBusca.join(' | ') || 'nenhuma listada'}.${dica}`
     );
   }
 
