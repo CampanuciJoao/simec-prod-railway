@@ -1,21 +1,28 @@
 const PRIORIDADE_EMOJI = { Alta: '🔴', Media: '🟡', Baixa: '🔵' };
 
 const CATEGORIA_EMOJI = {
-  MANUTENCAO:   '🔧',
-  CONTRATO:     '📋',
-  SEGURO:       '🛡️',
-  GEHC_SAUDE:   '🏥',
-  OS_CORRETIVA: '🔩',
-  RECOMENDACAO: '💡',
+  MANUTENCAO:        '🔧',
+  CONTRATO:          '📋',
+  SEGURO:            '🛡️',
+  GEHC_SAUDE:        '🏥',
+  OS_CORRETIVA:      '🔩',
+  RECOMENDACAO:      '💡',
+  CONTROLE_QUALIDADE:'🧪',
+  // Enum do backend mantido como FOXESS_ENERGIA por compatibilidade com
+  // dados antigos, mas o rotulo visivel ao usuario e "Energia Solar"
+  // (cobre Sungrow, Growatt e FoxESS).
+  FOXESS_ENERGIA:    '☀️',
 };
 
 const CATEGORIA_LABEL = {
-  MANUTENCAO:   'Manutenção',
-  CONTRATO:     'Contrato',
-  SEGURO:       'Seguro',
-  GEHC_SAUDE:   'Saúde GEHC',
-  OS_CORRETIVA: 'OS Corretiva',
-  RECOMENDACAO: 'Recomendação',
+  MANUTENCAO:        'Manutenção',
+  CONTRATO:          'Contrato',
+  SEGURO:            'Seguro',
+  GEHC_SAUDE:        'Saúde GEHC',
+  OS_CORRETIVA:      'OS Corretiva',
+  RECOMENDACAO:      'Recomendação',
+  CONTROLE_QUALIDADE:'Controle de Qualidade',
+  FOXESS_ENERGIA:    'Energia Solar',
 };
 
 export function telegramConfigurado() {
