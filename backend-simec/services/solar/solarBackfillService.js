@@ -57,19 +57,87 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
     tenantId: inverter.tenantId,
   };
 
-  let dados;
-  try {
-    dados = await adapter.fetchHistoricalDaily({
-      inverter: inverterComCred,
-      inicio,
-      fim,
-    });
-  } catch (err) {
-    return { ok: false, erro: `fetchHistoricalDaily falhou: ${err.message}` };
+  // BACKFILL INCREMENTAL — essencial pra Sungrow/Growatt Free Plan, que
+  // tem quota diaria baixa de chamadas na API. Puxa APENAS dias que ainda
+  // nao estao em solar_agregados_diarios_inverter (dia + inverter). Dias
+  // ja preenchidos (mesmo com valor 0, dia realmente sem geracao) sao
+  // pulados. Pra re-puxar do zero, usar o endpoint de purga antes.
+  const diasExistentes = await prisma.solarAgregadoDiarioInverter.findMany({
+    where: {
+      inverterId: inverter.id,
+      dia: { gte: inicio, lt: fim },
+      kwhGerado: { not: null },
+    },
+    select: { dia: true },
+  });
+  const existentesSet = new Set(
+    diasExistentes.map((d) => d.dia.toISOString().slice(0, 10)),
+  );
+
+  // Monta a lista de dias faltantes e agrupa em janelas contiguas pra
+  // economizar chamadas do adapter (uma chamada por janela ao inves de
+  // uma por dia).
+  const diasFaltantes = [];
+  for (let d = new Date(inicio); d < fim; d.setUTCDate(d.getUTCDate() + 1)) {
+    const key = d.toISOString().slice(0, 10);
+    if (!existentesSet.has(key)) diasFaltantes.push(new Date(d));
   }
 
-  if (!Array.isArray(dados)) {
-    return { ok: false, erro: 'adapter nao retornou array' };
+  if (diasFaltantes.length === 0) {
+    return {
+      ok: true,
+      pulado: 'todos dias ja preenchidos',
+      diasAfetados: 0,
+      diasJaExistentes: existentesSet.size,
+      totalDias: 0,
+      periodo: {
+        inicio: inicio.toISOString().slice(0, 10),
+        fim: fim.toISOString().slice(0, 10),
+      },
+    };
+  }
+
+  // Agrupa dias faltantes em janelas contiguas (dia D e D+1 ficam junto).
+  const janelas = [];
+  let jIni = diasFaltantes[0];
+  let jFim = diasFaltantes[0];
+  for (let i = 1; i < diasFaltantes.length; i++) {
+    const delta = (diasFaltantes[i].getTime() - jFim.getTime()) / 86400000;
+    if (delta === 1) {
+      jFim = diasFaltantes[i];
+    } else {
+      janelas.push({ inicio: jIni, fim: jFim });
+      jIni = diasFaltantes[i];
+      jFim = diasFaltantes[i];
+    }
+  }
+  janelas.push({ inicio: jIni, fim: jFim });
+
+  // Chama adapter apenas para as janelas faltantes. fim e exclusivo no
+  // range interno do adapter, entao somamos 1 dia pra cobrir o ultimo
+  // dia faltante.
+  const dados = [];
+  const errosJanela = [];
+  for (const j of janelas) {
+    const fimExclusivo = new Date(j.fim);
+    fimExclusivo.setUTCDate(fimExclusivo.getUTCDate() + 1);
+    try {
+      const d = await adapter.fetchHistoricalDaily({
+        inverter: inverterComCred,
+        inicio: j.inicio,
+        fim: fimExclusivo,
+      });
+      if (Array.isArray(d)) dados.push(...d);
+    } catch (err) {
+      errosJanela.push(`${j.inicio.toISOString().slice(0, 10)}..${j.fim.toISOString().slice(0, 10)}: ${err.message}`);
+    }
+  }
+  // Se todas janelas falharam, propaga o erro (caso tipico: rate limit).
+  if (dados.length === 0 && errosJanela.length > 0) {
+    return {
+      ok: false,
+      erro: `fetchHistoricalDaily falhou em todas ${janelas.length} janelas: ${errosJanela.join(' | ')}`,
+    };
   }
 
   // Escreve POR inverter via upsert (unique em inverterId+dia). Idempotente
@@ -112,6 +180,9 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
     ok: true,
     diasAfetados: diasAfetados.size,
     totalDias: dados.length,
+    diasJaExistentes: existentesSet.size,
+    janelasConsultadas: janelas.length,
+    errosJanela: errosJanela.length ? errosJanela : undefined,
     periodo: {
       inicio: inicio.toISOString().slice(0, 10),
       fim: fim.toISOString().slice(0, 10),

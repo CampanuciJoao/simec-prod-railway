@@ -483,10 +483,10 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
     try {
       const r = await backfillInversor(inverter.id, dias);
       setBackfillResult(r);
-      addToast(
-        `Backfill concluido: ${r.diasInseridos} dias novos, ${r.diasAtualizados} atualizados.`,
-        'success',
-      );
+      const msg = r.pulado
+        ? `Nada a fazer: ${r.diasJaExistentes} dias ja preenchidos.`
+        : `Backfill concluido: ${r.diasAfetados} dias novos, ${r.diasJaExistentes} ja existiam.`;
+      addToast(msg, 'success');
     } catch (err) {
       const msg = err?.response?.data?.erro || err?.response?.data?.error || err.message;
       setBackfillResult({ ok: false, erro: msg });
@@ -848,8 +848,19 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
                 </div>
                 {backfillResult && backfillResult.ok && (
                   <div className="mt-2 text-[11px]" style={{ color: 'var(--color-success)' }}>
-                    ✓ {backfillResult.diasInseridos} dias novos, {backfillResult.diasAtualizados} atualizados, {backfillResult.totalDias} dias retornados pela API.
-                    Periodo: {backfillResult.periodo?.inicio} a {backfillResult.periodo?.fim}.
+                    {backfillResult.pulado
+                      ? `✓ Nada a fazer: ${backfillResult.diasJaExistentes} dias ja estao no SIMEC. Pra re-puxar do zero, use "Purgar agregados" antes.`
+                      : (
+                        <>
+                          ✓ {backfillResult.diasAfetados} dias gravados · {backfillResult.diasJaExistentes} ja existiam (pulados pra economizar API) · {backfillResult.janelasConsultadas} janela(s) consultada(s).
+                          Periodo total: {backfillResult.periodo?.inicio} a {backfillResult.periodo?.fim}.
+                        </>
+                      )}
+                    {backfillResult.errosJanela && (
+                      <div className="mt-1" style={{ color: 'var(--color-warning)' }}>
+                        ⚠ {backfillResult.errosJanela.length} janela(s) falharam: {backfillResult.errosJanela.slice(0, 2).join(' | ')}
+                      </div>
+                    )}
                   </div>
                 )}
                 {backfillResult && !backfillResult.ok && (
