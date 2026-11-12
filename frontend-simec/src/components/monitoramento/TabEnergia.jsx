@@ -23,7 +23,7 @@ import {
   getSolarAgregadoMesAtual, getSolarFalhas, getSolarPlantHistoricoAnual,
   baixarSolarProducaoPdf,
 } from '@/services/api/solarApi';
-import { useToast } from '@/hooks/useToast';
+import { useToast } from '@/contexts/ToastContext';
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend, Filler);
 
