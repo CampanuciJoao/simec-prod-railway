@@ -80,6 +80,7 @@ model Tenant {
   solarOutages              SolarOutage[]
   solarFalhas               SolarFalha[]
   solarAgregadosDiarios     SolarAgregadoDiario[]
+  solarAgregadosDiariosInv  SolarAgregadoDiarioInverter[]
   solarAgregadosMensais     SolarAgregadoMensal[]
   rotinasPrediais           RotinaPredial[]
 
@@ -2016,8 +2017,9 @@ model SolarPlant {
   snapshots SolarSnapshot[]
   quedas    SolarOutage[]
   falhas    SolarFalha[]
-  agregadosDiarios  SolarAgregadoDiario[]
-  agregadosMensais  SolarAgregadoMensal[]
+  agregadosDiarios     SolarAgregadoDiario[]
+  agregadosDiariosInv  SolarAgregadoDiarioInverter[]
+  agregadosMensais     SolarAgregadoMensal[]
 
   // Sem UNIQUE(tenantId, unidadeId) — uma unidade pode ter N plantas
   // (ex: 1 planta na sede + 1 planta em terreno remoto, ambas creditam
@@ -2066,9 +2068,10 @@ model SolarInverter {
   updatedAt       DateTime @updatedAt
 
   plant     SolarPlant      @relation(fields: [plantId], references: [id], onDelete: Cascade)
-  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  snapshots SolarSnapshot[]
-  falhas    SolarFalha[]
+  tenant           Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  snapshots        SolarSnapshot[]
+  falhas           SolarFalha[]
+  agregadosDiarios SolarAgregadoDiarioInverter[]
 
   @@index([tenantId, plantId])
   @@index([tenantId, provider, ativo])
@@ -2241,6 +2244,25 @@ model SolarFalha {
 // horasOffline = soma de duracoes de SolarOutage com inicioEm no dia.
 // falhasAbertas / resolvidas = count de SolarFalha com reportadaEm ou
 // resolvidaEm no dia.
+model SolarAgregadoDiarioInverter {
+  id         String   @id @default(uuid())
+  tenantId   String
+  plantId    String   @map("plant_id")
+  inverterId String   @map("inverter_id")
+  dia        DateTime @db.Date
+  kwhGerado  Float?   @map("kwh_gerado")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plant    SolarPlant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  inverter SolarInverter @relation(fields: [inverterId], references: [id], onDelete: Cascade)
+
+  @@unique([inverterId, dia])
+  @@index([tenantId, plantId, dia])
+  @@map("solar_agregados_diarios_inverter")
+}
+
 model SolarAgregadoDiario {
   id              String   @id @default(uuid())
   tenantId        String

@@ -676,28 +676,45 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
               {resultado.dadosPersistidos && (
                 <div className="mt-3 rounded border p-2" style={{ borderColor: 'var(--border-soft)' }}>
                   <div className="mb-1 text-[10px] font-semibold uppercase" style={{ color: 'var(--text-muted)' }}>
-                    Dados persistidos no banco (planta)
+                    Dados persistidos no banco
                   </div>
                   <div className="text-[11px] space-y-0.5">
                     <div>
                       Snapshots individuais deste inverter:{' '}
                       <strong>{resultado.dadosPersistidos.snapshotsIndividuaisDoInverter}</strong>
                     </div>
-                    <div>
-                      Agregados diarios da planta:{' '}
-                      <strong>{resultado.dadosPersistidos.agregadosDiariosDaPlanta}</strong>
-                      {resultado.dadosPersistidos.diaMaisAntigo && (
-                        <> — de {new Date(resultado.dadosPersistidos.diaMaisAntigo).toLocaleDateString('pt-BR')} a {new Date(resultado.dadosPersistidos.diaMaisRecente).toLocaleDateString('pt-BR')}</>
+                    <div className="mt-1">
+                      <div className="text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>Nivel INVERTER (backfill popula aqui)</div>
+                      <div>
+                        Dias registrados: <strong>{resultado.dadosPersistidos.agregadosDoInverter}</strong>
+                        {resultado.dadosPersistidos.diaMaisAntigoInverter && (
+                          <> — de {new Date(resultado.dadosPersistidos.diaMaisAntigoInverter).toLocaleDateString('pt-BR')} a {new Date(resultado.dadosPersistidos.diaMaisRecenteInverter).toLocaleDateString('pt-BR')}</>
+                        )}
+                      </div>
+                      {resultado.dadosPersistidos.kwhSomaDoInverter != null && (
+                        <div>
+                          Soma kWh deste inverter:{' '}
+                          <strong>{resultado.dadosPersistidos.kwhSomaDoInverter.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</strong>
+                        </div>
                       )}
                     </div>
-                    {resultado.dadosPersistidos.kwhGeradoSomaPeriodo != null && (
+                    <div className="mt-1">
+                      <div className="text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>Nivel PLANTA (soma dos inverters)</div>
                       <div>
-                        kWh gerado total (soma de todos dias):{' '}
-                        <strong>{resultado.dadosPersistidos.kwhGeradoSomaPeriodo.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</strong>
-                        {' · '}
-                        min/max/dia: {resultado.dadosPersistidos.kwhGeradoMin ?? '—'}/{resultado.dadosPersistidos.kwhGeradoMax ?? '—'}
+                        Dias registrados: <strong>{resultado.dadosPersistidos.agregadosDiariosDaPlanta}</strong>
+                        {resultado.dadosPersistidos.diaMaisAntigo && (
+                          <> — de {new Date(resultado.dadosPersistidos.diaMaisAntigo).toLocaleDateString('pt-BR')} a {new Date(resultado.dadosPersistidos.diaMaisRecente).toLocaleDateString('pt-BR')}</>
+                        )}
                       </div>
-                    )}
+                      {resultado.dadosPersistidos.kwhGeradoSomaPeriodo != null && (
+                        <div>
+                          Soma kWh da planta:{' '}
+                          <strong>{resultado.dadosPersistidos.kwhGeradoSomaPeriodo.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} kWh</strong>
+                          {' · '}
+                          min/max/dia: {resultado.dadosPersistidos.kwhGeradoMin ?? '—'}/{resultado.dadosPersistidos.kwhGeradoMax ?? '—'}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   {plantId && resultado.dadosPersistidos.agregadosDiariosDaPlanta > 0 && (
                     <button

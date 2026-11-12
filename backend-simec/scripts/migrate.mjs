@@ -57,6 +57,11 @@ const RECOVERY_SQL_POR_MIGRATION = {
     `DELETE FROM "_prisma_migrations"
        WHERE migration_name = '20261105000001_solar_falhas_e_agregados'`,
   ],
+  '20261112000001_solar_agregado_diario_inverter': [
+    'DROP TABLE IF EXISTS "solar_agregados_diarios_inverter" CASCADE',
+    `DELETE FROM "_prisma_migrations"
+       WHERE migration_name = '20261112000001_solar_agregado_diario_inverter'`,
+  ],
   '20261111000002_solar_last_auth': [
     'ALTER TABLE "solar_inverters" DROP COLUMN IF EXISTS "last_auth_attempt_at"',
     'ALTER TABLE "solar_inverters" DROP COLUMN IF EXISTS "last_auth_error"',

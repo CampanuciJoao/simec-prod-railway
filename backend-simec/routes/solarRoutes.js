@@ -744,8 +744,15 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
 
     // Stats dos dados persistidos pra ver se backfill/poller realmente
     // gravou o que prometeu.
-    const [snapshotsCount, agregadosStats] = await Promise.all([
+    const [snapshotsCount, agregadosInverter, agregadosPlanta] = await Promise.all([
       prisma.solarSnapshot.count({ where: { inverterId: inverter.id } }),
+      prisma.solarAgregadoDiarioInverter.aggregate({
+        where: { inverterId: inverter.id },
+        _count: { _all: true },
+        _min: { dia: true, kwhGerado: true },
+        _max: { dia: true, kwhGerado: true },
+        _sum: { kwhGerado: true },
+      }),
       prisma.solarAgregadoDiario.aggregate({
         where: { tenantId: inverter.tenantId, plantId: inverter.plantId },
         _count: { _all: true },
@@ -756,12 +763,18 @@ router.get('/inverters/:id/diagnostico', admin, async (req, res) => {
     ]);
     const dadosPersistidos = {
       snapshotsIndividuaisDoInverter: snapshotsCount,
-      agregadosDiariosDaPlanta: agregadosStats._count._all,
-      diaMaisAntigo: agregadosStats._min.dia,
-      diaMaisRecente: agregadosStats._max.dia,
-      kwhGeradoMin: agregadosStats._min.kwhGerado,
-      kwhGeradoMax: agregadosStats._max.kwhGerado,
-      kwhGeradoSomaPeriodo: agregadosStats._sum.kwhGerado,
+      // Nivel INVERTER (nova tabela — o que o backfill agora popula)
+      agregadosDoInverter: agregadosInverter._count._all,
+      diaMaisAntigoInverter: agregadosInverter._min.dia,
+      diaMaisRecenteInverter: agregadosInverter._max.dia,
+      kwhSomaDoInverter: agregadosInverter._sum.kwhGerado,
+      // Nivel PLANTA (derivado — soma de todos inverters da planta)
+      agregadosDiariosDaPlanta: agregadosPlanta._count._all,
+      diaMaisAntigo: agregadosPlanta._min.dia,
+      diaMaisRecente: agregadosPlanta._max.dia,
+      kwhGeradoMin: agregadosPlanta._min.kwhGerado,
+      kwhGeradoMax: agregadosPlanta._max.kwhGerado,
+      kwhGeradoSomaPeriodo: agregadosPlanta._sum.kwhGerado,
     };
 
     res.json({

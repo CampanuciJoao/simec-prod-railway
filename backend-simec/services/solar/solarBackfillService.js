@@ -72,50 +72,45 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
     return { ok: false, erro: 'adapter nao retornou array' };
   }
 
-  // Estrategia correta: SOBRESCREVER por (plantId, dia).
-  // A versao anterior SOMAVA se existisse — o que inflacionava valores a
-  // cada click do admin (nao era idempotente de verdade). Pra plantas com
-  // multiplos inverters, backfill de cada um vai sobrescrever o outro —
-  // portanto rode SEMPRE o inverter com MAIOR capacidade/representatividade
-  // por ultimo, ou faça backfill de apenas UM inverter por planta.
+  // Escreve POR inverter via upsert (unique em inverterId+dia). Idempotente
+  // de verdade: rodar N vezes nao infla numeros. Plantas com multiplos
+  // inverters nao se sobrescrevem porque cada um tem sua linha propria.
   let diasInseridos = 0;
   let diasAtualizados = 0;
+  const diasAfetados = new Set();
   for (const d of dados) {
     if (!d?.data || d.kwhGerado == null || !Number.isFinite(d.kwhGerado)) continue;
     const dia = new Date(d.data);
     dia.setUTCHours(0, 0, 0, 0);
+    diasAfetados.add(dia.toISOString().slice(0, 10));
 
-    const existente = await prisma.solarAgregadoDiario.findFirst({
-      where: {
+    const r = await prisma.solarAgregadoDiarioInverter.upsert({
+      where: { inverterId_dia: { inverterId: inverter.id, dia } },
+      create: {
         tenantId: inverter.tenantId,
         plantId: inverter.plantId,
+        inverterId: inverter.id,
         dia,
+        kwhGerado: d.kwhGerado,
       },
+      update: { kwhGerado: d.kwhGerado }, // SOBRESCREVE idempotente
     });
-
-    if (existente) {
-      await prisma.solarAgregadoDiario.update({
-        where: { id: existente.id },
-        data: { kwhGerado: d.kwhGerado }, // SOBRESCREVE (idempotente de verdade)
-      });
-      diasAtualizados++;
-    } else {
-      await prisma.solarAgregadoDiario.create({
-        data: {
-          tenantId: inverter.tenantId,
-          plantId: inverter.plantId,
-          dia,
-          kwhGerado: d.kwhGerado,
-        },
-      });
-      diasInseridos++;
-    }
+    // Nao da pra saber facilmente se foi insert ou update do upsert do Prisma
+    // sem outra query, entao usamos diasAfetados pra totais.
+    if (r) diasAfetados.add(dia.toISOString().slice(0, 10));
   }
+
+  // Apos backfill do inverter, recalcula agregados da planta (soma dos
+  // inverters para cada dia afetado).
+  await recalcularAgregadosDaPlanta(
+    inverter.plantId,
+    inverter.tenantId,
+    Array.from(diasAfetados).map((s) => new Date(s + 'T00:00:00Z')),
+  );
 
   return {
     ok: true,
-    diasInseridos,
-    diasAtualizados,
+    diasAfetados: diasAfetados.size,
     totalDias: dados.length,
     periodo: {
       inicio: inicio.toISOString().slice(0, 10),
@@ -125,11 +120,48 @@ export async function backfillInversor(inverterId, diasAtras = 365) {
 }
 
 /**
+ * Recalcula solar_agregados_diarios (nivel PLANTA) somando os
+ * solar_agregados_diarios_inverter (nivel INVERTER) de cada dia dado.
+ * Idempotente: pode rodar N vezes, sempre reflete o estado atual.
+ */
+export async function recalcularAgregadosDaPlanta(plantId, tenantId, dias) {
+  if (!dias || dias.length === 0) return { diasRecalculados: 0 };
+  let recalculados = 0;
+  for (const dia of dias) {
+    dia.setUTCHours(0, 0, 0, 0);
+    const soma = await prisma.solarAgregadoDiarioInverter.aggregate({
+      where: { tenantId, plantId, dia },
+      _sum: { kwhGerado: true },
+    });
+    const kwhGerado = soma._sum.kwhGerado ?? 0;
+
+    const existente = await prisma.solarAgregadoDiario.findFirst({
+      where: { tenantId, plantId, dia },
+    });
+    if (existente) {
+      await prisma.solarAgregadoDiario.update({
+        where: { id: existente.id },
+        data: { kwhGerado },
+      });
+    } else {
+      await prisma.solarAgregadoDiario.create({
+        data: { tenantId, plantId, dia, kwhGerado },
+      });
+    }
+    recalculados++;
+  }
+  return { diasRecalculados: recalculados };
+}
+
+/**
  * Apaga todos os agregados diarios de uma PLANTA (inclusive mes e insights
  * derivados — regera no proximo backfill). Usado pra limpar dados sujos
  * de execucoes previas do backfill que somavam ao inves de sobrescrever.
  */
 export async function purgarAgregadosDaPlanta(plantId, tenantId) {
+  const porInverter = await prisma.solarAgregadoDiarioInverter.deleteMany({
+    where: { tenantId, plantId },
+  });
   const diarios = await prisma.solarAgregadoDiario.deleteMany({
     where: { tenantId, plantId },
   });
@@ -138,6 +170,7 @@ export async function purgarAgregadosDaPlanta(plantId, tenantId) {
   });
   return {
     ok: true,
+    porInverterDeletados: porInverter.count,
     diariosDeletados: diarios.count,
     mensaisDeletados: mensais.count,
   };
