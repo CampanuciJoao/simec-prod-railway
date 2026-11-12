@@ -24,6 +24,13 @@ const COOLDOWN_RECOVERY_MS    = 60 * 60 * 1000;
 const REDIS_KEY_LAST_RECOVERY = 'watchdog:solar:last_recovery';
 const REDIS_TTL_SECONDS       = 24 * 60 * 60;
 
+// Watchdog POR INVERSOR (todos fabricantes)
+// - Offline = sem snapshot ha mais de INVERTER_OFFLINE_MIN_MS (30 min)
+// - Threshold Telegram: INVERTER_OFFLINE_TELEGRAM_MS (4h)
+//   abaixo disso, alerta fica so no SIMEC (telegramEnviado=true pula drainer).
+const INVERTER_OFFLINE_MIN_MS      = 30 * 60 * 1000;
+const INVERTER_OFFLINE_TELEGRAM_MS = 4 * 60 * 60 * 1000;
+
 async function getUltimaTentativa(redis) {
   if (!redis) return null;
   try { const v = await redis.get(REDIS_KEY_LAST_RECOVERY); return v ? Number(v) : null; }
@@ -148,12 +155,160 @@ async function verificarEMarcarMonitoramentoParado(plant) {
   return 'criado';
 }
 
+// Watchdog por INVERSOR individual. Cria alertas separados por inversor
+// (SN no titulo) com o mesmo mecanismo de opt-in Telegram ja existente
+// (categoria FOXESS_ENERGIA, categoria urgente 24/7). Regras:
+//   - Offline <4h: alerta interno (telegramEnviado=true na criacao -> drainer pula)
+//   - Offline >=4h: escala (telegramEnviado=false -> drainer envia)
+//   - Volta online com downtime <4h: cria RESTABELECIDO interno
+//   - Volta online com downtime >=4h: cria RESTABELECIDO com Telegram
+// Somente inverters com snapshots individuais (inverterId preenchido)
+// sao tratados aqui. Para providers que so reportam por planta, o
+// watchdog por PLANTA continua cobrindo.
+async function verificarOfflinePorInverter(plant, inverter) {
+  const alertaIdOffline = buildAlertId(
+    plant.tenantId, ALERT_CATEGORIAS.FOXESS_ENERGIA, inverter.id, 'inverter-offline',
+  );
+  const alertaIdOnline = buildAlertId(
+    plant.tenantId, ALERT_CATEGORIAS.FOXESS_ENERGIA, inverter.id, 'inverter-online',
+  );
+
+  const ultimo = await prisma.solarSnapshot.findFirst({
+    where: { tenantId: plant.tenantId, inverterId: inverter.id },
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  });
+  // Se o inverter nunca gerou snapshot individual (provider so reporta por
+  // planta), nao faz sentido monitorar aqui — deixa pro watchdog-planta.
+  if (!ultimo) return 'sem_snapshots_individuais';
+
+  const idadeMs = Date.now() - ultimo.capturedAt.getTime();
+  const alertaOfflineExistente = await prisma.alerta.findUnique({
+    where: { tenantId_id: { tenantId: plant.tenantId, id: alertaIdOffline } },
+    select: { id: true, createdAt: true, telegramEnviado: true, prioridade: true },
+  });
+
+  const label = [inverter.provider, inverter.inverterSn].filter(Boolean).join(' ');
+
+  // ── Caso 1: INVERSOR ONLINE ────────────────────────────────────────────
+  if (idadeMs < INVERTER_OFFLINE_MIN_MS) {
+    if (!alertaOfflineExistente) return 'online_ok';
+
+    // Tem alerta OFFLINE pendente — calcula downtime, emite RESTABELECIDO,
+    // deleta OFFLINE.
+    const duracaoMs = Date.now() - alertaOfflineExistente.createdAt.getTime();
+    const foiTelegram = duracaoMs >= INVERTER_OFFLINE_TELEGRAM_MS;
+    const horas = (duracaoMs / 3600000).toFixed(1);
+
+    await prisma.alerta.upsert({
+      where: { tenantId_id: { tenantId: plant.tenantId, id: alertaIdOnline } },
+      create: {
+        id: alertaIdOnline,
+        tenantId: plant.tenantId,
+        titulo: `Inversor normalizado — ${label}`,
+        subtitulo: `Inversor ${label} da planta ${plant.nome} voltou a reportar apos ~${horas}h offline.`,
+        data: new Date(),
+        prioridade: foiTelegram ? ALERT_PRIORIDADES.MEDIA : ALERT_PRIORIDADES.BAIXA,
+        tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
+        tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
+        tipoEvento: ALERT_EVENTOS.SOLAR_INVERSOR_ONLINE_RESTABELECIDO,
+        telegramEnviado: !foiTelegram, // interno se downtime <4h
+        link: linkMonitoramentoSolar(plant.id),
+      },
+      update: {
+        subtitulo: `Inversor ${label} da planta ${plant.nome} voltou a reportar apos ~${horas}h offline.`,
+        data: new Date(),
+      },
+    });
+
+    await prisma.alerta
+      .delete({ where: { tenantId_id: { tenantId: plant.tenantId, id: alertaIdOffline } } })
+      .catch(() => {});
+
+    await publicarContagemAlertasParaTenant({ tenantId: plant.tenantId }).catch(() => {});
+    return foiTelegram ? 'normalizado_telegram' : 'normalizado_interno';
+  }
+
+  // ── Caso 2: INVERSOR OFFLINE ───────────────────────────────────────────
+  const minutos = Math.round(idadeMs / 60000);
+  const horas = (idadeMs / 3600000).toFixed(1);
+  const vaiTelegram = idadeMs >= INVERTER_OFFLINE_TELEGRAM_MS;
+
+  const subtitulo = vaiTelegram
+    ? `Inversor ${label} da planta ${plant.nome} offline ha ~${horas}h.`
+    : `Inversor ${label} da planta ${plant.nome} sem reportar ha ~${minutos} min.`;
+
+  if (alertaOfflineExistente) {
+    // Alerta existente: atualiza subtitulo/prioridade. Se cruzou o limiar
+    // de 4h E ainda nao foi enviado por Telegram, reseta telegramEnviado
+    // para o drainer entregar agora.
+    const data = {
+      subtitulo,
+      data: new Date(),
+      prioridade: vaiTelegram ? ALERT_PRIORIDADES.ALTA : ALERT_PRIORIDADES.BAIXA,
+    };
+    if (vaiTelegram && alertaOfflineExistente.telegramEnviado) {
+      // telegramEnviado=true foi set na criacao (<4h = interno). Agora
+      // atingiu 4h — reseta pro drainer enviar. telegramEnviadoEm fica
+      // null, entao a logica de re-notificacao 24h nao dispara aqui.
+      data.telegramEnviado = false;
+      data.telegramEnviadoEm = null;
+    }
+    await prisma.alerta.update({
+      where: { tenantId_id: { tenantId: plant.tenantId, id: alertaIdOffline } },
+      data,
+    });
+    return vaiTelegram
+      ? (alertaOfflineExistente.telegramEnviado ? 'escalou_telegram' : 'offline_atualizado_telegram')
+      : 'offline_atualizado';
+  }
+
+  // Primeira deteccao do offline — cria alerta.
+  await prisma.alerta.create({
+    data: {
+      id: alertaIdOffline,
+      tenantId: plant.tenantId,
+      titulo: `Inversor offline — ${label}`,
+      subtitulo,
+      data: new Date(),
+      prioridade: vaiTelegram ? ALERT_PRIORIDADES.ALTA : ALERT_PRIORIDADES.BAIXA,
+      tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
+      tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA,
+      tipoEvento: ALERT_EVENTOS.SOLAR_INVERSOR_OFFLINE,
+      telegramEnviado: !vaiTelegram, // <4h fica interno; >=4h vai pra Telegram
+      link: linkMonitoramentoSolar(plant.id),
+    },
+  });
+  await publicarContagemAlertasParaTenant({ tenantId: plant.tenantId }).catch(() => {});
+  return vaiTelegram ? 'criado_telegram' : 'criado_interno';
+}
+
 export async function watchdogSolar({ redisConnection } = {}) {
   const plants = await prisma.solarPlant.findMany({
     where: { ativo: true },
-    select: { id: true, tenantId: true, nome: true, alertaOfflineMinutos: true },
+    select: {
+      id: true, tenantId: true, nome: true, alertaOfflineMinutos: true,
+      inverters: {
+        where: { ativo: true },
+        select: { id: true, provider: true, inverterSn: true },
+      },
+    },
   });
   if (plants.length === 0) return { ok: true, acao: 'sem_plantas', plants: [] };
+
+  // Watchdog POR INVERSOR — roda sempre, independente do estado da planta.
+  // Cada inverter com snapshots individuais tem seu proprio ciclo de
+  // offline/online com threshold de 4h pra escalar pra Telegram.
+  const resultadosPorInverter = [];
+  for (const plant of plants) {
+    for (const inv of (plant.inverters || [])) {
+      const r = await verificarOfflinePorInverter(plant, inv).catch((err) => {
+        console.error(`[SOLAR_WATCHDOG] inverter ${inv.id}:`, err.message);
+        return 'erro';
+      });
+      resultadosPorInverter.push({ inverterId: inv.id, sn: inv.inverterSn, resultado: r });
+    }
+  }
 
   const resultados = [];
   let precisaReagendar = false;
@@ -182,7 +337,7 @@ export async function watchdogSolar({ redisConnection } = {}) {
     for (const p of plants) {
       await verificarEMarcarMonitoramentoParado(p).catch(() => {});
     }
-    return { ok: true, acao: 'tudo_normal', resultados };
+    return { ok: true, acao: 'tudo_normal', resultados, resultadosPorInverter };
   }
 
   const ultimaTentativa = await getUltimaTentativa(redisConnection);
@@ -213,5 +368,6 @@ export async function watchdogSolar({ redisConnection } = {}) {
     acaoReagendamento,
     plantsMortos,
     resultados,
+    resultadosPorInverter,
   };
 }

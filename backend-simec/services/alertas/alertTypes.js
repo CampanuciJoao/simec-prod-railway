@@ -63,6 +63,13 @@ export const ALERT_EVENTOS = {
   SOLAR_FALHA_AVISO: 'SOLAR_FALHA_AVISO',     // warn nivel 3
   SOLAR_FALHA_RESOLVIDA: 'SOLAR_FALHA_RESOLVIDA',
   SOLAR_OFFLINE_CURTO: 'SOLAR_OFFLINE_CURTO', // 1h (Fase 2)
+  // Watchdog POR INVERTER (todos fabricantes).
+  //   - Offline <4h → alerta interno (telegramEnviado=true na criacao)
+  //   - Offline >=4h → alerta Telegram (escala pela mesma categoria urgente 24/7)
+  //   - Restabelecido com downtime <4h → interno
+  //   - Restabelecido com downtime >=4h → Telegram
+  SOLAR_INVERSOR_OFFLINE: 'SOLAR_INVERSOR_OFFLINE',
+  SOLAR_INVERSOR_ONLINE_RESTABELECIDO: 'SOLAR_INVERSOR_ONLINE_RESTABELECIDO',
   // Fase 5 — alertas inteligentes
   SOLAR_GERACAO_BAIXA: 'SOLAR_GERACAO_BAIXA',           // vs baseline 14d
   SOLAR_PICO_ABAIXO_CAPACIDADE: 'SOLAR_PICO_ABAIXO_CAPACIDADE',
