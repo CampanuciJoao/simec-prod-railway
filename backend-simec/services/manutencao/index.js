@@ -592,10 +592,19 @@ export async function concluirManutencaoComAcaoService({
     };
   }
 
-  const contexto = await buscarContextoOperacional({
-    tenantId,
-    equipamentoId: manutencaoAtual.equipamentoId,
-  });
+  // Contexto operacional depende da categoria: Predial usa unidade pra
+  // resolver timezone (nao tem equipamento). Sem esse branch, concluir OS
+  // predial retornava 404 'Equipamento nao encontrado'.
+  const ehPredial = manutencaoAtual.categoria === 'Predial';
+  const contexto = ehPredial
+    ? await buscarContextoOperacionalPredial({
+        tenantId,
+        unidadeId: manutencaoAtual.unidadePredialId,
+      })
+    : await buscarContextoOperacional({
+        tenantId,
+        equipamentoId: manutencaoAtual.equipamentoId,
+      });
 
   if (!contexto.ok) {
     return contexto;
@@ -705,7 +714,9 @@ export async function concluirManutencaoComAcaoService({
       data: workflow.updateData,
     });
 
-    if (workflow.equipamentoStatus) {
+    // Status de equipamento so se aplica a manutencao de equipamento.
+    // Predial (categoria=Predial) nao tem equipamentoId, entao pula.
+    if (workflow.equipamentoStatus && manutencaoAtual.equipamentoId) {
       await tx.equipamento.update({
         where: {
           tenantId_id: {
@@ -746,32 +757,35 @@ export async function concluirManutencaoComAcaoService({
       });
     }
 
-    await registrarEventoHistoricoAtivo({
-      db: tx,
-      tenantId,
-      equipamentoId: manutencaoAtual.equipamentoId,
-      tipoEvento: `manutencao_${acao}`,
-      categoria: 'manutencao',
-      subcategoria: manutencaoAtual.tipo,
-      titulo: workflow.historicoTitulo || `OS ${manutencaoAtual.numeroOS} atualizada`,
-      descricao: workflow.historicoDescricao || null,
-      origem: 'usuario',
-      status: workflow.updateData.status || manutencaoAtual.status,
-      impactaAnalise: false,
-      referenciaId: manutencaoId,
-      referenciaTipo: 'manutencao',
-      metadata: {
-        numeroOS: manutencaoAtual.numeroOS,
-        acao,
-        tipo: manutencaoAtual.tipo,
-        manutencaoRealizada,
-        equipamentoOperante,
-      },
-      dataEvento:
-        workflow.updateData.dataConclusao ||
-        workflow.updateData.dataHoraAgendamentoFim ||
-        new Date(),
-    });
+    // Historico ativo e atrelado a equipamento. Predial nao tem — pula.
+    if (manutencaoAtual.equipamentoId) {
+      await registrarEventoHistoricoAtivo({
+        db: tx,
+        tenantId,
+        equipamentoId: manutencaoAtual.equipamentoId,
+        tipoEvento: `manutencao_${acao}`,
+        categoria: 'manutencao',
+        subcategoria: manutencaoAtual.tipo,
+        titulo: workflow.historicoTitulo || `OS ${manutencaoAtual.numeroOS} atualizada`,
+        descricao: workflow.historicoDescricao || null,
+        origem: 'usuario',
+        status: workflow.updateData.status || manutencaoAtual.status,
+        impactaAnalise: false,
+        referenciaId: manutencaoId,
+        referenciaTipo: 'manutencao',
+        metadata: {
+          numeroOS: manutencaoAtual.numeroOS,
+          acao,
+          tipo: manutencaoAtual.tipo,
+          manutencaoRealizada,
+          equipamentoOperante,
+        },
+        dataEvento:
+          workflow.updateData.dataConclusao ||
+          workflow.updateData.dataHoraAgendamentoFim ||
+          new Date(),
+      });
+    }
 
   });
 
