@@ -23,6 +23,7 @@ import {
   excluirTesteCq,
   atualizarPendenciaCq,
 } from '@/services/api';
+import { useToast } from '@/contexts/ToastContext';
 
 import ProgramaCard from './ProgramaCard';
 import RegistrarTesteForm from './RegistrarTesteForm';
@@ -68,6 +69,7 @@ const STATUS_HEADER = {
 };
 
 function ControleQualidadeEquipamentoTab({ equipamento }) {
+  const { addToast } = useToast();
   const [grupos, setGrupos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -98,7 +100,7 @@ function ControleQualidadeEquipamentoTab({ equipamento }) {
       await atualizarPendenciaCq(testeId, indice, { resolvido: !atual });
       carregar();
     } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao atualizar pendência.');
+      addToast(e?.response?.data?.message || 'Erro ao atualizar pendência.', 'error');
     }
   };
 
@@ -111,7 +113,7 @@ function ControleQualidadeEquipamentoTab({ equipamento }) {
       setExcluirModal({ open: false, teste: null, motivo: '' });
       carregar();
     } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao excluir.');
+      addToast(e?.response?.data?.message || 'Erro ao excluir.', 'error');
     }
   };
 

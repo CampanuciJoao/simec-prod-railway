@@ -203,7 +203,7 @@ export async function obterHistoricoControleManutencoes({
     return [];
   }
 
-  return prisma.manutencao.findMany({
+  const registros = await prisma.manutencao.findMany({
     where,
     orderBy: { dataConclusao: 'desc' },
     take: Math.min(Math.max(limite, 1), 50),
@@ -216,6 +216,14 @@ export async function obterHistoricoControleManutencoes({
       numeroChamado: true,
       descricaoProblemaServico: true,
       custoTotal: true,
+      _count: { select: { anexos: true } },
     },
   });
+
+  // Achata _count.anexos em anexosCount — a UI usa pra mostrar o
+  // paperclip no card do historico (predial ou equipamento).
+  return registros.map(({ _count, ...resto }) => ({
+    ...resto,
+    anexosCount: _count?.anexos ?? 0,
+  }));
 }

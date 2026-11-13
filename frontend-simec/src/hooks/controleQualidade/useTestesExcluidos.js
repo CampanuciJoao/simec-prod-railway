@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listarTestesCq, restaurarTesteCq } from '@/services/api';
+import { useToast } from '@/contexts/ToastContext';
 
 export function useTestesExcluidos() {
+  const { addToast } = useToast();
   const [testes, setTestes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -22,18 +24,20 @@ export function useTestesExcluidos() {
 
   useEffect(() => { carregar(); }, [carregar]);
 
+  // Restaura sem confirmar — a confirmacao fica no componente consumidor
+  // via ModalConfirmacao (padrao do sistema). Nunca usar window.confirm.
   const restaurar = useCallback(async (t) => {
-    if (!confirm(`Restaurar teste ${t.tipoTeste?.codigo}?`)) return;
     setRestaurandoId(t.id);
     try {
       await restaurarTesteCq(t.id);
       await carregar();
+      addToast(`Teste ${t.tipoTeste?.codigo || ''} restaurado.`, 'success');
     } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao restaurar.');
+      addToast(e?.response?.data?.message || 'Erro ao restaurar.', 'error');
     } finally {
       setRestaurandoId(null);
     }
-  }, [carregar]);
+  }, [carregar, addToast]);
 
   return {
     testes,

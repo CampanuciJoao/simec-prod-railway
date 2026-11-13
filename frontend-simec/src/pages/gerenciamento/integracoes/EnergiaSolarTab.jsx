@@ -2,7 +2,7 @@
 // CRUD generico de plantas solares e inverters (multi-provider).
 // Admin unico que configura — operador consulta em /monitoramento.
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import {
   faPlus, faTrash, faPen, faMicrochip, faBolt, faSolarPanel,
@@ -458,6 +458,19 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
   const [backfillResult, setBackfillResult] = useState(null);
   const [snapshotsStats, setSnapshotsStats] = useState(null);
   const [snapshotsLoading, setSnapshotsLoading] = useState(false);
+  // Modal unico de confirmacao (substitui window.confirm) — guarda
+  // titulo/mensagem/acao da operacao destrutiva ou de alto custo em andamento.
+  const [confirmacao, setConfirmacao] = useState(null);
+
+  const pedirConfirmacao = ({ titulo, mensagem, confirmLabel, acao, destrutivo = false }) => {
+    setConfirmacao({ titulo, mensagem, confirmLabel, acao, destrutivo });
+  };
+  const fecharConfirmacao = () => setConfirmacao(null);
+  const executarConfirmacao = async () => {
+    const acao = confirmacao?.acao;
+    setConfirmacao(null);
+    if (typeof acao === 'function') await acao();
+  };
 
   const executar = async () => {
     setCarregando(true);
@@ -473,11 +486,7 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
     }
   };
 
-  const executarBackfill = async (dias) => {
-    if (!window.confirm(
-      `Puxar historico dos ultimos ${dias} dias? Pode demorar varios minutos ` +
-      'e consome quota da API do fabricante.'
-    )) return;
+  const rodarBackfill = async (dias) => {
     setBackfillando(true);
     setBackfillResult(null);
     try {
@@ -496,24 +505,42 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
     }
   };
 
-  const executarPurga = async () => {
-    if (!plantId) return;
-    if (!window.confirm(
-      'APAGAR TODOS os agregados diarios e mensais DESTA PLANTA. ' +
-      'Use pra corrigir backfill anterior que somou duplicado. ' +
-      'Depois rode o backfill de novo. Continuar?'
-    )) return;
+  const executarBackfill = (dias) => {
+    pedirConfirmacao({
+      titulo: 'Puxar histórico do fabricante',
+      mensagem:
+        `Puxar histórico dos últimos ${dias} dias? Pode demorar vários minutos ` +
+        'e consome quota da API do fabricante.',
+      confirmLabel: 'Puxar histórico',
+      acao: () => rodarBackfill(dias),
+    });
+  };
+
+  const rodarPurgaAgregados = async () => {
     try {
       const r = await purgarAgregadosPlanta(plantId);
       addToast(
         `Purga concluida: ${r.diariosDeletados} diarios + ${r.mensaisDeletados} mensais apagados.`,
         'success',
       );
-      // Re-roda o diagnostico pra atualizar o bloco de dados persistidos.
       executar();
     } catch (err) {
       addToast(err?.response?.data?.error || err.message, 'error');
     }
+  };
+
+  const executarPurga = () => {
+    if (!plantId) return;
+    pedirConfirmacao({
+      titulo: 'Apagar agregados desta planta',
+      mensagem:
+        'Isso vai APAGAR TODOS os agregados diários e mensais desta planta. ' +
+        'Use para corrigir backfill anterior que somou duplicado. ' +
+        'Depois rode o backfill de novo.',
+      confirmLabel: 'Apagar agregados',
+      destrutivo: true,
+      acao: rodarPurgaAgregados,
+    });
   };
 
   const carregarSnapshotsStats = async () => {
@@ -529,13 +556,7 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
     }
   };
 
-  const executarPurgaSnapshots = async () => {
-    if (!plantId) return;
-    if (!window.confirm(
-      'APAGAR snapshots corrompidos (acima do teto fisico de 10 kWh/kWp/dia) ' +
-      'dos ultimos 60 dias desta planta. Isso limpa o card "Este mes" que mostra ' +
-      'valores absurdos por causa de outliers no contador acumulado. Continuar?'
-    )) return;
+  const rodarPurgaSnapshots = async () => {
     try {
       const r = await purgarSnapshotsCorrompidos(plantId, 60);
       addToast(
@@ -546,6 +567,20 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
     } catch (err) {
       addToast(err?.response?.data?.error || err.message, 'error');
     }
+  };
+
+  const executarPurgaSnapshots = () => {
+    if (!plantId) return;
+    pedirConfirmacao({
+      titulo: 'Apagar snapshots corrompidos',
+      mensagem:
+        'Isso vai APAGAR snapshots acima do teto físico (10 kWh/kWp/dia) ' +
+        'dos últimos 60 dias desta planta. Limpa o card "Este mês" que mostra ' +
+        'valores absurdos por outliers no contador acumulado.',
+      confirmLabel: 'Apagar snapshots',
+      destrutivo: true,
+      acao: rodarPurgaSnapshots,
+    });
   };
 
   return (
@@ -906,6 +941,17 @@ function DiagnosticoInverterButton({ inverter, plantId }) {
           </div>
         </div>
       )}
+
+      <ModalConfirmacao
+        isOpen={!!confirmacao}
+        onClose={fecharConfirmacao}
+        onConfirm={executarConfirmacao}
+        title={confirmacao?.titulo || 'Confirmar ação'}
+        message={confirmacao?.mensagem || ''}
+        confirmText={confirmacao?.confirmLabel || 'Confirmar'}
+        cancelText="Cancelar"
+        isDestructive={!!confirmacao?.destrutivo}
+      />
     </>
   );
 }

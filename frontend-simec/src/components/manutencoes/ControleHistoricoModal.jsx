@@ -3,11 +3,11 @@
 
 import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
+import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faCheck, faSpinner } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faCheck, faSpinner, faArrowRight, faPaperclip } from '@fortawesome/free-solid-svg-icons';
 
 import { Drawer, InlineEmptyState, Button } from '@/components/ui';
-import { formatarDataHora } from '@/utils/timeUtils';
 import { buscarHistoricoControle } from '@/hooks/manutencoes/useControleManutencoes';
 import { exportarOSManutencaoPDF } from '@/services/api/pdfApi';
 
@@ -21,6 +21,7 @@ const TIPOS_SERVICO_PREDIAL_LABELS = {
 };
 
 export default function ControleHistoricoModal({ item, onClose }) {
+  const navigate = useNavigate();
   const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [baixandoId, setBaixandoId] = useState(null);
@@ -92,34 +93,56 @@ export default function ControleHistoricoModal({ item, onClose }) {
             <InlineEmptyState message="Nenhuma manutenção concluída ainda." />
           ) : (
             <div className="space-y-2">
-              {historico.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex items-center gap-3 rounded-md border px-3 py-2"
-                  style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
-                >
-                  <FontAwesomeIcon icon={faCheck} style={{ color: 'var(--color-success)' }} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                      OS {m.numeroOS}
-                    </p>
-                    <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                      Concluída em {m.dataConclusao ? new Date(m.dataConclusao).toLocaleDateString('pt-BR') : '—'}
-                      {m.tecnicoResponsavel ? ` · ${m.tecnicoResponsavel}` : ''}
-                    </p>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    disabled={baixandoId === m.id}
-                    onClick={() => baixarPdf(m.id)}
+              {historico.map((m) => {
+                const qtdAnexos = Number(m.anexosCount ?? (Array.isArray(m.anexos) ? m.anexos.length : 0));
+                return (
+                  <div
+                    key={m.id}
+                    className="flex flex-col gap-2 rounded-md border px-3 py-2 sm:flex-row sm:items-center"
+                    style={{ borderColor: 'var(--border-soft)', backgroundColor: 'var(--bg-surface-soft)' }}
                   >
-                    <FontAwesomeIcon icon={baixandoId === m.id ? faSpinner : faDownload} spin={baixandoId === m.id} />
-                    PDF
-                  </Button>
-                </div>
-              ))}
+                    <FontAwesomeIcon icon={faCheck} style={{ color: 'var(--color-success)' }} />
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        OS {m.numeroOS}
+                      </p>
+                      <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                        Concluída em {m.dataConclusao ? new Date(m.dataConclusao).toLocaleDateString('pt-BR') : '—'}
+                        {m.tecnicoResponsavel ? ` · ${m.tecnicoResponsavel}` : ''}
+                        {qtdAnexos > 0 ? (
+                          <>
+                            {' · '}
+                            <FontAwesomeIcon icon={faPaperclip} className="mr-0.5" />
+                            {qtdAnexos} anexo{qtdAnexos === 1 ? '' : 's'}
+                          </>
+                        ) : null}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 sm:shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={baixandoId === m.id}
+                        onClick={() => baixarPdf(m.id)}
+                      >
+                        <FontAwesomeIcon icon={baixandoId === m.id ? faSpinner : faDownload} spin={baixandoId === m.id} />
+                        PDF
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => { onClose?.(); navigate(`/manutencoes/detalhes/${m.id}`); }}
+                        title="Abrir OS para anexar imagens/PDFs"
+                      >
+                        <FontAwesomeIcon icon={faArrowRight} />
+                        Abrir OS
+                      </Button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

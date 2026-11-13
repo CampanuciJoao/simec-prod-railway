@@ -24,6 +24,7 @@ import {
   Button,
   InlineEmptyState,
   LoadingState,
+  ModalConfirmacao,
   PageSection,
 } from '@/components/ui';
 import { useAuth } from '@/contexts/AuthContext';
@@ -172,6 +173,7 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
   const [resetting, setReset] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const [errors, setErrors]   = useState([]);
+  const [confirmResetOpen, setConfirmResetOpen] = useState(false);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -241,8 +243,9 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
     }
   };
 
-  const restaurar = async () => {
-    if (!window.confirm(`Restaurar os limites padrão de ${catalog.titulo}? Os valores atuais serão substituídos pelos defaults do sistema.`)) return;
+  const restaurar = () => setConfirmResetOpen(true);
+  const confirmarRestaurar = async () => {
+    setConfirmResetOpen(false);
     setReset(true);
     setErrors([]);
     setFeedback(null);
@@ -441,6 +444,17 @@ function ModuloAlertaCard({ moduleId, isAdmin, onAuditoria }) {
           </div>
         ))}
       </div>
+
+      <ModalConfirmacao
+        isOpen={confirmResetOpen}
+        onClose={() => setConfirmResetOpen(false)}
+        onConfirm={confirmarRestaurar}
+        title="Restaurar limites padrão"
+        message={`Restaurar os limites padrão de ${catalog.titulo}? Os valores atuais serão substituídos pelos defaults do sistema.`}
+        confirmText="Restaurar padrões"
+        cancelText="Cancelar"
+        isDestructive
+      />
     </div>
   );
 }

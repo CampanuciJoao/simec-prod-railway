@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getTiposTeste, updateTipoTeste } from '@/services/api';
+import { useToast } from '@/contexts/ToastContext';
 
 export function useCatalogoTipos() {
+  const { addToast } = useToast();
   const [tipos, setTipos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -37,12 +39,13 @@ export function useCatalogoTipos() {
     try {
       await updateTipoTeste(tipo.id, dirty);
       await carregar();
+      addToast('Catalogo atualizado.', 'success');
     } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao salvar.');
+      addToast(e?.response?.data?.message || 'Erro ao salvar.', 'error');
     } finally {
       setSalvandoId(null);
     }
-  }, [edits, carregar]);
+  }, [edits, carregar, addToast]);
 
   return {
     tipos,

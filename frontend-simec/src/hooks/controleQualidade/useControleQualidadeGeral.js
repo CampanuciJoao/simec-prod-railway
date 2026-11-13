@@ -150,9 +150,9 @@ export function useControleQualidadeGeral() {
       setExcluirModal({ open: false, teste: null, motivo: '' });
       carregar();
     } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao excluir teste.');
+      addToast(e?.response?.data?.message || 'Erro ao excluir teste.', 'error');
     }
-  }, [excluirModal, carregar]);
+  }, [excluirModal, carregar, addToast]);
 
   const handleExportarPdf = useCallback(async () => {
     if (!pdfModal.unidadeId) return;
@@ -164,10 +164,10 @@ export function useControleQualidadeGeral() {
       });
       setPdfModal({ open: false, unidadeId: '', responsavel: '', exportando: false });
     } catch (e) {
-      alert(e?.response?.data?.message || 'Erro ao gerar PDF.');
+      addToast(e?.response?.data?.message || 'Erro ao gerar PDF.', 'error');
       setPdfModal((s) => ({ ...s, exportando: false }));
     }
-  }, [pdfModal]);
+  }, [pdfModal, addToast]);
 
   const setFiltro = useCallback((campo, valor) => {
     setFiltros((f) => ({ ...f, [campo]: valor }));

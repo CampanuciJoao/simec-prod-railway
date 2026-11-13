@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faRotateLeft } from '@fortawesome/free-solid-svg-icons';
 
@@ -7,6 +7,7 @@ import {
   PageState,
   Button,
   Badge,
+  ModalConfirmacao,
 } from '@/components/ui';
 import { useTestesExcluidos } from '@/hooks/controleQualidade';
 
@@ -17,6 +18,7 @@ function fmt(d) {
 
 function ExcluidosTab() {
   const { testes, loading, error, restaurandoId, restaurar } = useTestesExcluidos();
+  const [testeParaRestaurar, setTesteParaRestaurar] = useState(null);
 
   if (loading) return <PageSection><PageState loading /></PageSection>;
   if (error) return <PageSection><PageState error={error} /></PageSection>;
@@ -69,7 +71,7 @@ function ExcluidosTab() {
                   <Button
                     variant="secondary"
                     size="sm"
-                    onClick={() => restaurar(t)}
+                    onClick={() => setTesteParaRestaurar(t)}
                     disabled={restaurandoId === t.id}
                   >
                     <FontAwesomeIcon icon={faRotateLeft} />
@@ -81,6 +83,20 @@ function ExcluidosTab() {
           </tbody>
         </table>
       </div>
+
+      <ModalConfirmacao
+        isOpen={!!testeParaRestaurar}
+        onClose={() => setTesteParaRestaurar(null)}
+        onConfirm={async () => {
+          const t = testeParaRestaurar;
+          setTesteParaRestaurar(null);
+          if (t) await restaurar(t);
+        }}
+        title="Restaurar teste"
+        message={`Restaurar o teste ${testeParaRestaurar?.tipoTeste?.codigo || ''}? Ele volta para a aba de testes ativos.`}
+        confirmText="Restaurar"
+        cancelText="Cancelar"
+      />
     </PageSection>
   );
 }
