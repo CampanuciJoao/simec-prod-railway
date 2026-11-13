@@ -56,14 +56,21 @@ export function useTabManutencoes() {
   const osc = useOsCorretiva({ tipoFixo: 'Corretiva' });
   const deleteModal = useModal();
 
-  // Status filtrados que se aplicam a OsCorretiva-Corretiva. Quando o
-  // usuário escolhe um status só de Manutenção (Pendente / Agendada /
-  // EmAndamento / AguardandoConfirmacao), a lista de OsCorretiva é
-  // suprimida localmente — caso contrário ela traria tudo (filtro zerado)
-  // e poluiria a aba com itens fora do recorte.
+  // Status filtrados que se aplicam a OsCorretiva-Corretiva. OsCorretiva tem
+  // estados proprios (Aberta / EmAndamento / AguardandoTerceiro / Concluida
+  // / Cancelada). Mantemos OsCorretiva visivel sempre que o filtro de status
+  // tiver equivalente nela — inclusive 'EmAndamento', que existe nos dois
+  // fluxos. Suprime apenas filtros que nao fazem sentido (Pendente / Agendada
+  // / AguardandoConfirmacao sao exclusivos de Manutencao).
   const oscStatusAplicavel = useMemo(() => {
     const s = manut.filtros?.status;
-    return !s || s === 'aguardando' || s === 'Concluida' || s === 'Cancelada';
+    return (
+      !s
+      || s === 'aguardando'
+      || s === 'EmAndamento'
+      || s === 'Concluida'
+      || s === 'Cancelada'
+    );
   }, [manut.filtros?.status]);
 
   // Tipo filtrado tambem suprime OsCorretiva quando NAO eh 'Corretiva'.
@@ -112,17 +119,25 @@ export function useTabManutencoes() {
   }, [manut.manutencoes, osc.osCorretivas, oscIncluido]);
 
   // ─── KPIs combinados ─────────────────────────────────────────────────────
+  // IMPORTANTE: qualquer status de OsCorretiva que "demanda acao" entra em
+  // Agendadas — Aberta, EmAndamento e AguardandoTerceiro. Antes so entrava
+  // AguardandoTerceiro, entao OSs abertas ou em visita sumiam dos cards
+  // (apareciam so no Total) com filtro Tipo=Corretiva.
   const metricas = useMemo(() => ({
     total: (manut.metricas?.total ?? 0) + (osc.metricas?.total ?? 0),
     agendadas:
-      (manut.metricas?.aguardando ?? 0) // status: Pendente+Agendada+EmAndamento+AguardandoConfirmacao
-      + (osc.metricas?.aguardandoTerceiro ?? 0), // visita marcada
-    // "Em andamento" exclusivo para Manutencao — OsCorretiva-Corretiva fica
-    // representada em "Agendadas" por estar em AguardandoTerceiro.
-    emAndamento: manut.metricas?.emAndamento ?? 0,
+      (manut.metricas?.aguardando ?? 0) // Pendente+Agendada+EmAndamento+AguardandoConfirmacao
+      + (osc.metricas?.abertas ?? 0) // OS criada, aguarda triagem/visita
+      + (osc.metricas?.aguardandoTerceiro ?? 0) // visita marcada
+      + (osc.metricas?.emAndamento ?? 0), // tecnico em visita
+    // "Em andamento" soma Manutencao + OsCorretiva no mesmo status real.
+    emAndamento:
+      (manut.metricas?.emAndamento ?? 0)
+      + (osc.metricas?.emAndamento ?? 0),
     // Manutencoes finalizadas pelo executor aguardando o admin confirmar.
     // Exposto como KPI proprio porque "some" dentro de "Agendadas" e o
-    // admin perdia muito tempo achando essas pendencias.
+    // admin perdia muito tempo achando essas pendencias. OsCorretiva nao
+    // tem esse estado — o fluxo dela vai direto para Concluida.
     aguardandoConfirmacao: manut.metricas?.aguardandoConfirmacao ?? 0,
     concluidas: (manut.metricas?.concluidas ?? 0) + (osc.metricas?.concluidas ?? 0),
     canceladas: (manut.metricas?.canceladas ?? 0) + (osc.metricas?.canceladas ?? 0),
@@ -149,7 +164,11 @@ export function useTabManutencoes() {
       label: u.nomeSistema,
     }));
 
-    const STATUS_COM_EQUIVALENCIA = new Set(['aguardando', 'Concluida', 'Cancelada']);
+    // Status que existem em AMBOS os fluxos (Manutencao + OsCorretiva).
+    // Quando o usuario escolhe um desses no dropdown de status, propaga
+    // o filtro pra OsCorretiva tambem — senao ela some mesmo tendo itens
+    // no estado correspondente.
+    const STATUS_COM_EQUIVALENCIA = new Set(['aguardando', 'EmAndamento', 'Concluida', 'Cancelada']);
 
     return [
       {
@@ -241,7 +260,7 @@ export function useTabManutencoes() {
     const sO = osc.filtros?.status || '';
     if (!sM && !sO) return 'total';
     if (sM === 'aguardando' && sO === 'aguardando') return 'agendadas';
-    if (sM === 'EmAndamento' && !sO) return 'emAndamento';
+    if (sM === 'EmAndamento' && sO === 'EmAndamento') return 'emAndamento';
     if (sM === 'AguardandoConfirmacao' && !sO) return 'aguardandoConfirmacao';
     if (sM === 'Concluida' && sO === 'Concluida') return 'concluidas';
     if (sM === 'Cancelada' && sO === 'Cancelada') return 'canceladas';
@@ -257,10 +276,13 @@ export function useTabManutencoes() {
       concluidas: 'Concluida',
       canceladas: 'Cancelada',
     };
+    // OsCorretiva nao tem AguardandoConfirmacao — nesses casos mantem o
+    // filtro de OS vazio pra nao esconder nada; o usuario clicando no card
+    // ja sabe que esse estado nao existe em corretiva.
     const mapaOsc = {
       total: '',
       agendadas: 'aguardando',
-      emAndamento: '',
+      emAndamento: 'EmAndamento',
       aguardandoConfirmacao: '',
       concluidas: 'Concluida',
       canceladas: 'Cancelada',
