@@ -45,7 +45,28 @@ async function tryRefreshSungrowToken(inverter, credential) {
   }
 }
 
+// Doc Sungrow iSolarCloud Secao 3.4: getDeviceRealTimeData atualiza a
+// cada ~5 min e NAO pode ser chamado em intervalo menor. Chamadas mais
+// frequentes caem em E901 (too frequent) ou E999 (hourly limit) e o
+// snapshot fica congelado. Usamos 4.5 min pra ter margem.
+const SUNGROW_MIN_INTERVAL_MS = 4.5 * 60 * 1000;
+
+async function devePularPorRateLimit(inverter) {
+  if (inverter.provider !== 'sungrow') return false;
+  const ultimo = await prisma.solarSnapshot.findFirst({
+    where: { tenantId: inverter.tenantId, inverterId: inverter.id },
+    orderBy: { capturedAt: 'desc' },
+    select: { capturedAt: true },
+  });
+  if (!ultimo) return false;
+  const idadeMs = Date.now() - new Date(ultimo.capturedAt).getTime();
+  return idadeMs < SUNGROW_MIN_INTERVAL_MS;
+}
+
 async function coletarInverter(inverter) {
+  if (await devePularPorRateLimit(inverter)) {
+    return { inverterId: inverter.id, skipped: 'rate_limit' };
+  }
   const adapter = getAdapter(inverter.provider);
   let credential = decryptCredential(inverter.credentialCrypt);
   if (!credential) {
@@ -121,6 +142,11 @@ export async function coletarTodosInvertersSolar() {
     if (!inv.plant?.ativo) continue;
     try {
       const r = await coletarInverter(inv);
+      // Pulou por rate-limit (Sungrow ~5min): nao e erro, nao conta como ok tb.
+      if (r.skipped) {
+        resultados.push({ ...r, ok: false });
+        continue;
+      }
       resultados.push({ ...r, ok: true });
     } catch (err) {
       console.error(`[SOLAR_POLLER] Falha no inverter ${inv.id} (${inv.provider} SN ${inv.inverterSn}):`, err.message);

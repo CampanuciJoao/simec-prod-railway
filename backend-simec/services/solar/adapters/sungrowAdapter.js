@@ -454,18 +454,13 @@ export async function validarCredencial(credential, apiBase) {
 
 // Pontos de inversor PV (device_type=1). IDs sem prefixo no REQUEST.
 // A resposta devolve com 'p' prefixado (p24, p1 ...) mas o pedido usa
-// a forma crua ("24", "1"). Conforme doc oficial Sungrow Appendix 10.
-//
-// POTENCIA ATIVA CA — ha ambiguidade na doc Sungrow entre modelos:
-//   p24  pode ser DC total ou AC total dependendo do firmware
-//   p83  = Total Active Power (CA) no SG110CX e congeneres C&I
-//   p82  = Reactive Power
-//   p85  = Power Factor
-// Pedimos os 3 candidatos e a normalizacao escolhe o primeiro valido que
-// bate com faixa fisica razoavel (ver resolvePotenciaAtivaCaKw).
+// a forma crua ("24", "1"). Conforme doc oficial Sungrow Secao 12.1 do
+// iSolarCloud OpenAPI: p24 = Total Active Power (W) = potencia CA do
+// inversor, p1 = Yield Today (Wh), p2 = Total Yield (Wh), p14 = Total
+// DC Power (W), p43 = Apparent Power (VA), p27 = Grid Frequency (Hz),
+// p29 = Operating status, p4 = Internal Air Temperature (C).
 const POINTS_INVERTER_PV = [
-  '24',   // Candidato 1 — Total Active Power (CA ou DC, depende do modelo)
-  '83',   // Candidato 2 — Total Active Power CA (preferido em SG110CX)
+  '24',   // Total Active Power CA (W)
   '1',    // Yield Today (Wh)
   '2',    // Total Yield (Wh)
   '87',   // Yield This Month (Wh)
@@ -566,16 +561,8 @@ export async function fetchSnapshot(inverter) {
     // Escolhe potencia ativa CA: prefere p83 (doc mais nova C&I), fallback
     // p24. Alguns modelos (SG110CX) retornam DC em p24 e CA em p83 — sem
     // esse branch, o SIMEC mostrava ~7x a potencia real medida pelo portal.
-    const p24kw = wToKw(v.p24);
-    const p83kw = wToKw(v.p83);
-    const powerKw = p83kw != null ? p83kw : p24kw;
-    // Log diagnostico: toda coleta imprime os candidatos usados. Fica
-    // "verboso" mas ajuda a mapear comportamento por modelo de inversor
-    // (SG110CX vs residencial). Reduzir pra warn quando a preferencia
-    // estiver confirmada por campo.
-    console.log(
-      `[SUNGROW_POWER] SN=${sn} p24=${p24kw ?? 'null'}kW p83=${p83kw ?? 'null'}kW -> usando ${p83kw != null ? 'p83' : 'p24'} = ${powerKw ?? 'null'}kW`
-    );
+    // p24 = Total Active Power CA conforme doc oficial Sungrow Secao 12.1.
+    const powerKw = wToKw(v.p24);
     return {
       soc: null,
       batChargePower: null, batDischargePower: null,
