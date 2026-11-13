@@ -240,17 +240,18 @@ async function verificarOfflinePorInverter(plant, inverter) {
 
   if (alertaOfflineExistente) {
     // Alerta existente: atualiza subtitulo/prioridade. Se cruzou o limiar
-    // de 4h E ainda nao foi enviado por Telegram, reseta telegramEnviado
-    // para o drainer entregar agora.
+    // de 4h E o alerta ainda estava interno (prioridade BAIXA), reseta
+    // telegramEnviado pro drainer entregar agora. Checar pela prioridade
+    // anterior evita loop de re-envio: apos o primeiro escalonamento, a
+    // prioridade vira ALTA e as proximas runs so atualizam subtitulo.
     const data = {
       subtitulo,
       data: new Date(),
       prioridade: vaiTelegram ? ALERT_PRIORIDADES.ALTA : ALERT_PRIORIDADES.BAIXA,
     };
-    if (vaiTelegram && alertaOfflineExistente.telegramEnviado) {
-      // telegramEnviado=true foi set na criacao (<4h = interno). Agora
-      // atingiu 4h — reseta pro drainer enviar. telegramEnviadoEm fica
-      // null, entao a logica de re-notificacao 24h nao dispara aqui.
+    const transicaoParaTelegram = vaiTelegram
+      && alertaOfflineExistente.prioridade === ALERT_PRIORIDADES.BAIXA;
+    if (transicaoParaTelegram) {
       data.telegramEnviado = false;
       data.telegramEnviadoEm = null;
     }
@@ -259,7 +260,7 @@ async function verificarOfflinePorInverter(plant, inverter) {
       data,
     });
     return vaiTelegram
-      ? (alertaOfflineExistente.telegramEnviado ? 'escalou_telegram' : 'offline_atualizado_telegram')
+      ? (transicaoParaTelegram ? 'escalou_telegram' : 'offline_atualizado_telegram')
       : 'offline_atualizado';
   }
 
