@@ -23,6 +23,8 @@ function buildQueryParams({
     search: searchTerm || undefined,
     status: filtros.status || undefined,
     tipo: filtros.tipo || undefined,
+    categoria: filtros.categoria || undefined,
+    tipoServicoPredial: filtros.tipoServicoPredial || undefined,
     unidadeId: filtros.unidadeId || undefined,
     sortBy: sortConfig.key || 'dataHoraAgendamentoInicio',
     sortDirection:
@@ -62,6 +64,8 @@ export function useManutencoes() {
   const [filtros, setFiltros] = useSessionState('manutencoes:filtros', {
     status: '',
     tipo: '',
+    categoria: '',
+    tipoServicoPredial: '',
     unidadeId: '',
   });
 

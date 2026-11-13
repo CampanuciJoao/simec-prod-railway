@@ -14,6 +14,20 @@ import { useManutencoes } from '@/hooks/manutencoes/useManutencoes';
 import { useOsCorretiva } from '@/hooks/osCorretiva/useOsCorretiva';
 import { useModal } from '@/hooks/shared/useModal';
 
+const CATEGORIA_LABELS = {
+  Equipamento: 'Equipamento',
+  Predial: 'Predial (rotinas)',
+};
+
+const TIPO_SERVICO_PREDIAL_LABELS = {
+  LimpezaCaixaDagua: 'Limpeza Caixa d’Água',
+  Dedetizacao: 'Dedetização',
+  Extintor: 'Extintor',
+  Bebedouro: 'Bebedouro',
+  SpdaParaRaios: 'SPDA (para-raios)',
+  ArtElevador: 'ART Elevador',
+};
+
 // 'aguardando' eh pseudo-status que agrupa Pendente + Agendada +
 // EmAndamento + AguardandoConfirmacao — todos os estados onde a
 // manutencao ainda demanda alguma acao do usuario. Label "Agendada"
@@ -83,8 +97,17 @@ export function useTabManutencoes() {
     return !t || t === 'Corretiva';
   }, [manut.filtros?.tipo]);
 
-  // Combinado: so mostra OsCorretiva se AMBOS status e tipo permitem.
-  const oscIncluido = oscStatusAplicavel && oscTipoAplicavel;
+  // OsCorretiva so existe pra equipamento (sem categoria=Predial). Se o
+  // usuario filtrou Predial ou escolheu um tipo de servico predial,
+  // suprime OC.
+  const oscCategoriaAplicavel = useMemo(() => {
+    const cat = manut.filtros?.categoria;
+    const tsp = manut.filtros?.tipoServicoPredial;
+    return !tsp && (!cat || cat === 'Equipamento');
+  }, [manut.filtros?.categoria, manut.filtros?.tipoServicoPredial]);
+
+  // Combinado: so mostra OsCorretiva se status + tipo + categoria permitem.
+  const oscIncluido = oscStatusAplicavel && oscTipoAplicavel && oscCategoriaAplicavel;
 
   // ─── Items unificados ────────────────────────────────────────────────────
   // Ordenacao em 2 niveis (mesmo padrao da aba Ocorrencias):
@@ -159,6 +182,14 @@ export function useTabManutencoes() {
       (item) => ({ value: item, label: formatarLabel(item) })
     );
 
+    const categoriaOptions = Object.entries(CATEGORIA_LABELS).map(
+      ([value, label]) => ({ value, label })
+    );
+
+    const tipoServicoPredialOptions = Object.entries(TIPO_SERVICO_PREDIAL_LABELS).map(
+      ([value, label]) => ({ value, label })
+    );
+
     const unidadeOptions = (manut.unidadesDisponiveis || []).map((u) => ({
       value: u.id,
       label: u.nomeSistema,
@@ -195,6 +226,37 @@ export function useTabManutencoes() {
           manut.controles.handleFilterChange('tipo', value),
       },
       {
+        id: 'categoria',
+        label: 'Categoria',
+        value: manut.filtros.categoria,
+        defaultLabel: 'Todas as categorias',
+        options: categoriaOptions,
+        onChange: (value) => {
+          manut.controles.handleFilterChange('categoria', value);
+          // Mudou pra Equipamento: limpa filtro de servico predial (so faz
+          // sentido em categoria=Predial). Mudou pra "Todas": idem — nao
+          // faz sentido manter servico selecionado sem escopo.
+          if (value !== 'Predial') {
+            manut.controles.handleFilterChange('tipoServicoPredial', '');
+          }
+        },
+      },
+      {
+        id: 'tipoServicoPredial',
+        label: 'Serviço predial',
+        value: manut.filtros.tipoServicoPredial,
+        defaultLabel: 'Todos os serviços',
+        options: tipoServicoPredialOptions,
+        onChange: (value) => {
+          manut.controles.handleFilterChange('tipoServicoPredial', value);
+          // Escolheu um servico predial: implica categoria=Predial pra
+          // que o filtro faca sentido e suprima OsCorretiva/equipamento.
+          if (value) {
+            manut.controles.handleFilterChange('categoria', 'Predial');
+          }
+        },
+      },
+      {
         id: 'unidade',
         label: 'Unidade',
         value: manut.filtros.unidadeId,
@@ -207,13 +269,23 @@ export function useTabManutencoes() {
   }, [manut.filtros, manut.controles, manut.unidadesDisponiveis, osc]);
 
   const activeFilters = useMemo(() => {
-    const { status, tipo, unidadeId } = manut.filtros;
+    const { status, tipo, categoria, tipoServicoPredial, unidadeId } = manut.filtros;
     const unidade = (manut.unidadesDisponiveis || []).find(
       (item) => item.id === unidadeId
     );
     return [
       status && { key: 'status', label: `Status: ${formatarLabel(status)}`, value: status },
       tipo && { key: 'tipo', label: `Tipo: ${formatarLabel(tipo)}`, value: tipo },
+      categoria && {
+        key: 'categoria',
+        label: `Categoria: ${CATEGORIA_LABELS[categoria] || categoria}`,
+        value: categoria,
+      },
+      tipoServicoPredial && {
+        key: 'tipoServicoPredial',
+        label: `Servico predial: ${TIPO_SERVICO_PREDIAL_LABELS[tipoServicoPredial] || tipoServicoPredial}`,
+        value: tipoServicoPredial,
+      },
       unidadeId && {
         key: 'unidade',
         label: `Unidade: ${unidade?.nomeSistema || unidadeId}`,
@@ -248,7 +320,7 @@ export function useTabManutencoes() {
 
   const clearAllFilters = useCallback(() => {
     manut.controles.handleSearchChange({ target: { value: '' } });
-    ['status', 'tipo', 'unidadeId'].forEach((f) =>
+    ['status', 'tipo', 'categoria', 'tipoServicoPredial', 'unidadeId'].forEach((f) =>
       manut.controles.handleFilterChange(f, '')
     );
     osc.handleFilterChange('status', '');

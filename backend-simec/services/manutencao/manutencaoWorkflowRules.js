@@ -47,7 +47,11 @@ export function validarStatusParaAcao({
   }
 
   if (acao === 'concluir') {
-    const permitidos = ['EmAndamento', 'AguardandoConfirmacao'];
+    // Agendada tambem e permitido pra cobrir registro retroativo — servico
+    // ja executado mas registrado depois (ex: predial feito ontem, lancado
+    // hoje). Sem isso o usuario ficava refem do worker que promove
+    // Agendada -> EmAndamento -> AguardandoConfirmacao por tempo.
+    const permitidos = ['Agendada', 'EmAndamento', 'AguardandoConfirmacao'];
 
     if (!permitidos.includes(status)) {
       return {
@@ -61,7 +65,7 @@ export function validarStatusParaAcao({
   }
 
   if (acao === 'prorrogar') {
-    const permitidos = ['EmAndamento', 'AguardandoConfirmacao'];
+    const permitidos = ['Agendada', 'EmAndamento', 'AguardandoConfirmacao'];
 
     if (!permitidos.includes(status)) {
       return {

@@ -112,7 +112,12 @@ export function useDetalhesManutencaoPage() {
   }, [manutencao]);
 
   useEffect(() => {
-    if (manutencao?.status === 'AguardandoConfirmacao') {
+    // Inicializa o painel de confirmacao sempre que a OS esta em um estado
+    // que aceita conclusao/prorrogacao/cancelamento — inclui Agendada e
+    // EmAndamento pra cobrir registro retroativo (servico ja executado, so
+    // falta lancar) alem do fluxo normal de AguardandoConfirmacao.
+    const estadosAbertos = ['Agendada', 'EmAndamento', 'AguardandoConfirmacao'];
+    if (estadosAbertos.includes(manutencao?.status)) {
       setConfirmMode(null);
       setManutencaoRealizada(null);
       setDataTerminoReal(toDateTimeLocalValue(new Date()));

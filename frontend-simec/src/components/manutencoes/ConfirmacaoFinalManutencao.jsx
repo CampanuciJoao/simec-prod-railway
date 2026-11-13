@@ -17,6 +17,7 @@ import {
 
 function ConfirmacaoFinalManutencao({
   visible,
+  statusAtual,
   confirmMode,
   setConfirmMode,
   manutencaoRealizada,
@@ -38,9 +39,21 @@ function ConfirmacaoFinalManutencao({
       ? 'Por que a manutencao nao ocorreu?'
       : 'Justificativa operacional';
 
+  // Rotulo do banner muda conforme o estado: prazo vencido (AguardandoConfirmacao)
+  // mantem o alerta original; Agendada/EmAndamento usa linguagem de registro
+  // retroativo — util quando o servico (predial, por exemplo) ja foi
+  // executado e o usuario esta so lancando no sistema.
+  const prazoVencido = statusAtual === 'AguardandoConfirmacao';
+  const tituloBanner = prazoVencido
+    ? 'O prazo da OS terminou'
+    : 'Registrar desfecho da OS';
+  const subtituloBanner = prazoVencido
+    ? 'Informe se ela foi executada e como o equipamento ficou depois disso.'
+    : 'Use esta secao pra concluir, prorrogar ou cancelar a OS — inclusive para registro retroativo (servico ja executado).';
+
   return (
     <PageSection
-      title="Confirmacao final da manutencao"
+      title={prazoVencido ? 'Confirmacao final da manutencao' : 'Finalizar OS / registro retroativo'}
       description="Confirme o desfecho real da OS e o estado final do equipamento."
     >
       <div
@@ -62,10 +75,10 @@ function ConfirmacaoFinalManutencao({
 
         <div>
           <p style={{ color: 'var(--text-primary)', fontWeight: 600 }}>
-            O prazo da OS terminou
+            {tituloBanner}
           </p>
           <p style={{ color: 'var(--text-secondary)' }}>
-            Informe se ela foi executada e como o equipamento ficou depois disso.
+            {subtituloBanner}
           </p>
         </div>
       </div>
@@ -222,6 +235,7 @@ function ConfirmacaoFinalManutencao({
 
 ConfirmacaoFinalManutencao.propTypes = {
   visible: PropTypes.bool,
+  statusAtual: PropTypes.string,
   confirmMode: PropTypes.string,
   setConfirmMode: PropTypes.func.isRequired,
   manutencaoRealizada: PropTypes.bool,

@@ -261,6 +261,8 @@ export async function listarManutencoes({
   equipamentoId,
   unidadeId,
   tipo,
+  categoria,
+  tipoServicoPredial,
   status,
   search,
   page = 1,
@@ -279,71 +281,65 @@ export async function listarManutencoes({
     whereClause.tipo = tipo;
   }
 
+  // Filtros exclusivos de rotinas prediais — permitem ao usuario buscar
+  // "todas as manutencoes prediais" ou "todos os bebedouros" sem ter que
+  // olhar OS por OS.
+  if (categoria) {
+    whereClause.categoria = categoria;
+  }
+
+  if (tipoServicoPredial) {
+    whereClause.tipoServicoPredial = tipoServicoPredial;
+  }
+
   const statusFiltro = expandirFiltroStatusManutencao(status);
   if (statusFiltro !== null) {
     whereClause.status = statusFiltro;
   }
 
+  // Filtros compostos: busca textual + filtro de unidade ambos precisam de
+  // OR interno (match em multiplos campos / match em equipamento ou
+  // unidadePredialId), mas DEVEM se combinar por AND entre si. Usa
+  // whereClause.AND pra nao sobrescrever o OR do outro filtro.
+  const andClauses = [];
+
   if (search) {
-    whereClause.OR = [
-      {
-        numeroOS: {
-          contains: search,
-          mode: 'insensitive',
+    andClauses.push({
+      OR: [
+        { numeroOS: { contains: search, mode: 'insensitive' } },
+        { descricaoProblemaServico: { contains: search, mode: 'insensitive' } },
+        { numeroChamado: { contains: search, mode: 'insensitive' } },
+        { tecnicoResponsavel: { contains: search, mode: 'insensitive' } },
+        {
+          equipamento: {
+            OR: [
+              { modelo: { contains: search, mode: 'insensitive' } },
+              { tag: { contains: search, mode: 'insensitive' } },
+              { unidade: { nomeSistema: { contains: search, mode: 'insensitive' } } },
+            ],
+          },
         },
-      },
-      {
-        descricaoProblemaServico: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        numeroChamado: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        tecnicoResponsavel: {
-          contains: search,
-          mode: 'insensitive',
-        },
-      },
-      {
-        equipamento: {
-          OR: [
-            {
-              modelo: {
-                contains: search,
-                mode: 'insensitive',
-              },
-            },
-            {
-              tag: {
-                contains: search,
-                mode: 'insensitive',
-              },
-            },
-            {
-              unidade: {
-                nomeSistema: {
-                  contains: search,
-                  mode: 'insensitive',
-                },
-              },
-            },
-          ],
-        },
-      },
-    ];
+        // Busca tambem casa com a unidade predial (categoria=Predial nao tem
+        // equipamento mas tem unidadePredialId).
+        { unidadePredial: { nomeSistema: { contains: search, mode: 'insensitive' } } },
+      ],
+    });
   }
 
   if (unidadeId) {
-    whereClause.equipamento = {
-      tenantId,
-      unidadeId,
-    };
+    // Unidade pode ser do equipamento (categoria Equipamento) OU a
+    // unidadePredialId (categoria Predial). Antes o filtro so pegava a
+    // primeira — predial da unidade sumia do resultado.
+    andClauses.push({
+      OR: [
+        { equipamento: { tenantId, unidadeId } },
+        { unidadePredialId: unidadeId },
+      ],
+    });
+  }
+
+  if (andClauses.length > 0) {
+    whereClause.AND = andClauses;
   }
 
   const orderBy =

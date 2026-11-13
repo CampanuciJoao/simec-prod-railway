@@ -180,7 +180,8 @@ function DetalhesManutencaoPage() {
         ) : null}
 
         <ConfirmacaoFinalManutencao
-          visible={page.manutencao.status === 'AguardandoConfirmacao'}
+          visible={['Agendada', 'EmAndamento', 'AguardandoConfirmacao'].includes(page.manutencao.status)}
+          statusAtual={page.manutencao.status}
           confirmMode={page.confirmMode}
           setConfirmMode={page.setConfirmMode}
           manutencaoRealizada={page.manutencaoRealizada}

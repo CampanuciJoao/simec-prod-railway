@@ -127,6 +127,8 @@ export async function listarManutencoesService({
     equipamentoId: filters?.equipamentoId,
     unidadeId: filters?.unidadeId,
     tipo: filters?.tipo,
+    categoria: filters?.categoria,
+    tipoServicoPredial: filters?.tipoServicoPredial,
     status: filters?.status,
     search: filters?.search?.trim() || null,
     page,
