@@ -16,6 +16,12 @@
 //   - sem_historico: nunca foi realizada
 
 import prisma from '../prismaService.js';
+import {
+  gerarNumeroOS,
+  gerarNumeroOSPredial,
+} from './manutencaoSchedulingRules.js';
+import { contarManutencoesDoTenant } from './manutencaoRepository.js';
+import { registrarLog } from '../logService.js';
 
 const DIAS_ALERTA_PROXIMO = 30;
 
@@ -226,4 +232,111 @@ export async function obterHistoricoControleManutencoes({
     ...resto,
     anexosCount: _count?.anexos ?? 0,
   }));
+}
+
+// Registra uma execucao passada (backfill) direto do modal do Controle de
+// Manutencoes. Cria uma Manutencao ja Concluida com dataConclusao na data
+// informada, pra alimentar o historico de rotinas sem o usuario ter que
+// passar pelo fluxo "criar OS -> concluir". Util quando a preventiva foi
+// executada antes do modulo de controle existir ou fora do sistema.
+export async function registrarExecucaoPassadaService({
+  tenantId,
+  usuarioId,
+  equipamentoId = null,
+  unidadePredialId = null,
+  tipoServicoPredial = null,
+  dataExecucao,
+  tecnicoResponsavel = null,
+  descricao = null,
+}) {
+  if (!dataExecucao) {
+    return { ok: false, status: 400, message: 'Data da execucao e obrigatoria.' };
+  }
+
+  const dataConclusao = new Date(dataExecucao);
+  if (Number.isNaN(dataConclusao.getTime())) {
+    return { ok: false, status: 400, message: 'Data da execucao invalida.' };
+  }
+
+  if (dataConclusao.getTime() > Date.now()) {
+    return { ok: false, status: 400, message: 'Nao e possivel registrar execucao no futuro.' };
+  }
+
+  // Exclui escolhas ambiguas: tem que ser OU equipamento OU rotina predial,
+  // nunca os dois (nem nenhum).
+  const ehPredial = !!(unidadePredialId && tipoServicoPredial);
+  const ehEquipamento = !!equipamentoId;
+  if (ehPredial === ehEquipamento) {
+    return {
+      ok: false,
+      status: 400,
+      message: 'Informe equipamentoId OU (unidadePredialId + tipoServicoPredial), nunca ambos.',
+    };
+  }
+
+  // Valida que o alvo existe neste tenant
+  if (ehEquipamento) {
+    const eq = await prisma.equipamento.findFirst({
+      where: { tenantId, id: equipamentoId },
+      select: { id: true, modelo: true, tag: true },
+    });
+    if (!eq) {
+      return { ok: false, status: 404, message: 'Equipamento nao encontrado.' };
+    }
+  } else {
+    const unidade = await prisma.unidade.findFirst({
+      where: { tenantId, id: unidadePredialId },
+      select: { id: true, nomeSistema: true },
+    });
+    if (!unidade) {
+      return { ok: false, status: 404, message: 'Unidade nao encontrada.' };
+    }
+  }
+
+  const sequencia = (await contarManutencoesDoTenant(tenantId)) + 1;
+  const numeroOS = ehPredial
+    ? gerarNumeroOSPredial({ tipo: 'Preventiva', tipoServicoPredial, sequencia })
+    : gerarNumeroOS({ tipo: 'Preventiva', tag: 'RETRO', sequencia });
+
+  const descricaoFinal = String(descricao || '').trim()
+    || 'Registro retroativo de execucao da rotina preventiva.';
+
+  const nova = await prisma.manutencao.create({
+    data: {
+      tenant: { connect: { id: tenantId } },
+      numeroOS,
+      tipo: 'Preventiva',
+      status: 'Concluida',
+      categoria: ehPredial ? 'Predial' : 'Equipamento',
+      ...(ehPredial
+        ? { tipoServicoPredial, unidadePredial: { connect: { tenantId_id: { tenantId, id: unidadePredialId } } } }
+        : { equipamento: { connect: { tenantId_id: { tenantId, id: equipamentoId } } } }),
+      descricaoProblemaServico: descricaoFinal,
+      tecnicoResponsavel: tecnicoResponsavel || null,
+      origemAbertura: 'registro_retroativo',
+      dataConclusao,
+      dataFimReal: dataConclusao,
+      dataInicioReal: dataConclusao,
+    },
+    select: {
+      id: true,
+      numeroOS: true,
+      dataConclusao: true,
+      categoria: true,
+      tipoServicoPredial: true,
+      unidadePredialId: true,
+      equipamentoId: true,
+    },
+  });
+
+  await registrarLog({
+    tenantId,
+    usuarioId,
+    acao: 'CRIAÇÃO',
+    entidade: 'Manutenção',
+    entidadeId: nova.id,
+    detalhes: `Registro retroativo: ${numeroOS} (${ehPredial ? `predial ${tipoServicoPredial}` : 'equipamento'}) concluida em ${dataConclusao.toISOString()}.`,
+  }).catch(() => undefined);
+
+  return { ok: true, data: nova };
 }

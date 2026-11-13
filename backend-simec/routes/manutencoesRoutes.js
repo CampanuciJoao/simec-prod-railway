@@ -33,6 +33,7 @@ import { adaptarManutencaoResponse } from '../services/manutencaoResponseAdapter
 import {
   obterControleManutencoes,
   obterHistoricoControleManutencoes,
+  registrarExecucaoPassadaService,
 } from '../services/manutencao/controleManutencoesService.js';
 import { registrarLog } from '../services/logService.js';
 
@@ -116,6 +117,31 @@ router.get('/controle', async (req, res) => {
   } catch (error) {
     console.error('[MANUTENCAO_CONTROLE_ERROR]', error);
     return res.status(500).json({ message: 'Erro ao buscar controle de manutencoes.' });
+  }
+});
+
+// Registro retroativo de execucao de rotina — cria uma Manutencao ja
+// Concluida com dataConclusao na data informada. Usado pelo modal do
+// Controle pra backfill de rotinas feitas antes do modulo existir.
+router.post('/controle/registrar-execucao-passada', async (req, res) => {
+  try {
+    const resultado = await registrarExecucaoPassadaService({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+      equipamentoId: req.body?.equipamentoId || null,
+      unidadePredialId: req.body?.unidadePredialId || null,
+      tipoServicoPredial: req.body?.tipoServicoPredial || null,
+      dataExecucao: req.body?.dataExecucao || null,
+      tecnicoResponsavel: req.body?.tecnicoResponsavel || null,
+      descricao: req.body?.descricao || null,
+    });
+    if (!resultado.ok) {
+      return res.status(resultado.status || 400).json({ message: resultado.message });
+    }
+    return res.status(201).json(resultado.data);
+  } catch (error) {
+    console.error('[MANUTENCAO_CONTROLE_REGISTRO_PASSADO_ERROR]', error);
+    return res.status(500).json({ message: 'Erro ao registrar execucao passada.' });
   }
 });
 

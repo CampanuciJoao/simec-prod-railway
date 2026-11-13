@@ -5,11 +5,12 @@ import React, { useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
 import { useNavigate } from 'react-router-dom';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faDownload, faCheck, faSpinner, faArrowRight, faPaperclip } from '@fortawesome/free-solid-svg-icons';
+import { faDownload, faCheck, faSpinner, faArrowRight, faPaperclip, faClockRotateLeft, faPlus } from '@fortawesome/free-solid-svg-icons';
 
-import { Drawer, InlineEmptyState, Button } from '@/components/ui';
-import { buscarHistoricoControle } from '@/hooks/manutencoes/useControleManutencoes';
+import { Drawer, InlineEmptyState, Button, Input, Textarea } from '@/components/ui';
+import { buscarHistoricoControle, registrarExecucaoPassada } from '@/hooks/manutencoes/useControleManutencoes';
 import { exportarOSManutencaoPDF } from '@/services/api/pdfApi';
+import { useToast } from '@/contexts/ToastContext';
 
 const TIPOS_SERVICO_PREDIAL_LABELS = {
   LimpezaCaixaDagua: 'Limpeza de caixa d’água',
@@ -20,14 +21,29 @@ const TIPOS_SERVICO_PREDIAL_LABELS = {
   ArtElevador:       'ART do elevador',
 };
 
+function dataHojeISO() {
+  const d = new Date();
+  const ano = d.getFullYear();
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${ano}-${mes}-${dia}`;
+}
+
 export default function ControleHistoricoModal({ item, onClose }) {
   const navigate = useNavigate();
+  const { addToast } = useToast();
   const [historico, setHistorico] = useState([]);
   const [carregando, setCarregando] = useState(false);
   const [baixandoId, setBaixandoId] = useState(null);
 
-  useEffect(() => {
-    if (!item) { setHistorico([]); return; }
+  const [backfillAberto, setBackfillAberto] = useState(false);
+  const [backfillData, setBackfillData] = useState(dataHojeISO());
+  const [backfillTecnico, setBackfillTecnico] = useState('');
+  const [backfillDescricao, setBackfillDescricao] = useState('');
+  const [backfillSalvando, setBackfillSalvando] = useState(false);
+
+  const recarregarHistorico = React.useCallback(() => {
+    if (!item) return;
     setCarregando(true);
     const params = item.tipo === 'equipamento'
       ? { equipamentoId: item.equipamentoId, limite: 10 }
@@ -37,6 +53,45 @@ export default function ControleHistoricoModal({ item, onClose }) {
       .catch(() => setHistorico([]))
       .finally(() => setCarregando(false));
   }, [item]);
+
+  useEffect(() => {
+    if (!item) { setHistorico([]); return; }
+    recarregarHistorico();
+    // Reset do formulario de backfill ao trocar de item
+    setBackfillAberto(false);
+    setBackfillData(dataHojeISO());
+    setBackfillTecnico('');
+    setBackfillDescricao('');
+    setBackfillSalvando(false);
+  }, [item, recarregarHistorico]);
+
+  async function salvarBackfill() {
+    if (!backfillData) {
+      addToast('Informe a data de execucao.', 'warning');
+      return;
+    }
+    setBackfillSalvando(true);
+    try {
+      await registrarExecucaoPassada({
+        equipamentoId: item.tipo === 'equipamento' ? item.equipamentoId : null,
+        unidadePredialId: item.tipo === 'predial' ? item.unidadeId : null,
+        tipoServicoPredial: item.tipo === 'predial' ? item.tipoServicoPredial : null,
+        dataExecucao: backfillData,
+        tecnicoResponsavel: backfillTecnico.trim() || null,
+        descricao: backfillDescricao.trim() || null,
+      });
+      addToast('Execucao registrada no historico.', 'success');
+      setBackfillAberto(false);
+      setBackfillTecnico('');
+      setBackfillDescricao('');
+      setBackfillData(dataHojeISO());
+      recarregarHistorico();
+    } catch (err) {
+      addToast(err?.response?.data?.message || 'Erro ao registrar execucao.', 'error');
+    } finally {
+      setBackfillSalvando(false);
+    }
+  }
 
   if (!item) return null;
 
@@ -79,6 +134,79 @@ export default function ControleHistoricoModal({ item, onClose }) {
                 <> ({item.diasRestantes > 0 ? `faltam ${item.diasRestantes}` : `atrasado ${Math.abs(item.diasRestantes)}`} dias)</>
               )}
             </p>
+          )}
+        </div>
+
+        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border-default)', backgroundColor: 'var(--bg-surface-soft)' }}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                <FontAwesomeIcon icon={faClockRotateLeft} className="mr-2" />
+                Registrar execução anterior
+              </p>
+              <p className="mt-0.5 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                Lance uma preventiva que ja foi feita (antes do modulo existir, ou fora do sistema).
+              </p>
+            </div>
+            {!backfillAberto && (
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                onClick={() => setBackfillAberto(true)}
+              >
+                <FontAwesomeIcon icon={faPlus} />
+                Adicionar
+              </Button>
+            )}
+          </div>
+
+          {backfillAberto && (
+            <div className="mt-3 space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  label="Data da execução"
+                  type="date"
+                  value={backfillData}
+                  max={dataHojeISO()}
+                  onChange={(e) => setBackfillData(e.target.value)}
+                />
+                <Input
+                  label="Técnico responsável (opcional)"
+                  value={backfillTecnico}
+                  onChange={(e) => setBackfillTecnico(e.target.value)}
+                  placeholder="Ex.: Empresa X, equipe interna, etc."
+                />
+              </div>
+              <Textarea
+                label="Observações (opcional)"
+                rows={2}
+                value={backfillDescricao}
+                onChange={(e) => setBackfillDescricao(e.target.value)}
+                placeholder="Detalhes do servico executado."
+              />
+              <div className="flex justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  disabled={backfillSalvando}
+                  onClick={() => setBackfillAberto(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
+                  variant="success"
+                  size="sm"
+                  disabled={backfillSalvando || !backfillData}
+                  onClick={salvarBackfill}
+                >
+                  <FontAwesomeIcon icon={backfillSalvando ? faSpinner : faCheck} spin={backfillSalvando} />
+                  {backfillSalvando ? 'Registrando...' : 'Registrar'}
+                </Button>
+              </div>
+            </div>
           )}
         </div>
 

@@ -39,3 +39,20 @@ export async function buscarHistoricoControle({
   const resp = await api.get('/manutencoes/controle/historico', { params });
   return resp.data || [];
 }
+
+// Backfill: cria uma Manutencao ja Concluida numa data passada pra
+// alimentar o historico da rotina. Usado pelo modal do Controle.
+export async function registrarExecucaoPassada({
+  equipamentoId, unidadePredialId, tipoServicoPredial,
+  dataExecucao, tecnicoResponsavel, descricao,
+}) {
+  const resp = await api.post('/manutencoes/controle/registrar-execucao-passada', {
+    equipamentoId: equipamentoId || null,
+    unidadePredialId: unidadePredialId || null,
+    tipoServicoPredial: tipoServicoPredial || null,
+    dataExecucao,
+    tecnicoResponsavel: tecnicoResponsavel || null,
+    descricao: descricao || null,
+  });
+  return resp.data;
+}
