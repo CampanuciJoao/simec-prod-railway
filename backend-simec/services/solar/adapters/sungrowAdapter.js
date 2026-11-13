@@ -466,8 +466,6 @@ export async function validarCredencial(credential, apiBase) {
 const POINTS_INVERTER_PV = [
   '24',   // Candidato 1 — Total Active Power (CA ou DC, depende do modelo)
   '83',   // Candidato 2 — Total Active Power CA (preferido em SG110CX)
-  '82',   // Reactive Power (sanity)
-  '85',   // Power Factor (sanity)
   '1',    // Yield Today (Wh)
   '2',    // Total Yield (Wh)
   '87',   // Yield This Month (Wh)
@@ -571,13 +569,13 @@ export async function fetchSnapshot(inverter) {
     const p24kw = wToKw(v.p24);
     const p83kw = wToKw(v.p83);
     const powerKw = p83kw != null ? p83kw : p24kw;
-    // Log diagnostico quando os dois existem e divergem — ajuda a mapear
-    // comportamento por modelo e ajustar a preferencia no futuro.
-    if (p24kw != null && p83kw != null && Math.abs(p24kw - p83kw) > 0.5) {
-      console.warn(
-        `[SUNGROW_POWER] Divergencia p24 vs p83 no SN ${sn}: p24=${p24kw}kW p83=${p83kw}kW -> usando p83`
-      );
-    }
+    // Log diagnostico: toda coleta imprime os candidatos usados. Fica
+    // "verboso" mas ajuda a mapear comportamento por modelo de inversor
+    // (SG110CX vs residencial). Reduzir pra warn quando a preferencia
+    // estiver confirmada por campo.
+    console.log(
+      `[SUNGROW_POWER] SN=${sn} p24=${p24kw ?? 'null'}kW p83=${p83kw ?? 'null'}kW -> usando ${p83kw != null ? 'p83' : 'p24'} = ${powerKw ?? 'null'}kW`
+    );
     return {
       soc: null,
       batChargePower: null, batDischargePower: null,
