@@ -329,7 +329,19 @@ export async function fetchSnapshot(inverter) {
     gridConsumptionPower: null,
     epsPower: null,
     runningState: null,
-    currentFault: data?.warnCode ? String(data.warnCode) : null,
+    // Growatt expoe 3 flags no payload: faultCode (hardware grave),
+    // pidFaultCode (isolamento DC — tambem grave) e warnCode (aviso).
+    // "0" ou numero 0 significam "sem falha". Codificamos severidade num
+    // prefixo pro solarFalhasService saber classificar sem segundo lookup:
+    //   F:<codigo> = critica (fault/PID fault) -> nivel 1, Telegram
+    //   W:<codigo> = atencao  (warn)             -> nivel 3, so sino SIMEC
+    currentFault: (() => {
+      const temCodigo = (v) => v != null && String(v).trim() !== '' && String(v).trim() !== '0';
+      if (temCodigo(data?.faultCode)) return `F:${String(data.faultCode).trim()}`;
+      if (temCodigo(data?.pidFaultCode)) return `F:PID-${String(data.pidFaultCode).trim()}`;
+      if (temCodigo(data?.warnCode)) return `W:${String(data.warnCode).trim()}`;
+      return null;
+    })(),
 
     // Geracao
     powerKw: normalizado.powerKw,

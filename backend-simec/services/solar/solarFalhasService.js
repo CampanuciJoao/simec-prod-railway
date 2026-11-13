@@ -86,8 +86,23 @@ async function emitirAlertaResolvido({ falha, plant, tenantId }) {
   }).catch(() => { /* ignora se ja existe */ });
 }
 
+// Nome do app por provider — vai no texto do alerta pro usuario saber
+// onde consultar detalhes da falha (SIMEC nao traduz o codigo bruto do
+// inverter sem a API dedicada do fabricante).
+const APP_POR_PROVIDER = {
+  growatt: 'ShinePhone',
+  foxess: 'FoxESS Cloud',
+  sungrow: 'iSolarCloud',
+};
+
+function appDoProvider(provider) {
+  return APP_POR_PROVIDER[String(provider || '').toLowerCase()] || 'aplicativo do fabricante';
+}
+
 // Fallback para adapters sem fetchFalhas (FoxESS/Growatt): usa
 // currentFault do ultimo snapshot do inverter como "falha ativa" generica.
+// O adapter Growatt grava um prefixo de severidade (F:/W:) pra permitir
+// distinguir falha critica de simples aviso sem precisar da API dedicada.
 async function fetchFalhasFallback(inverter) {
   const ultimo = await prisma.solarSnapshot.findFirst({
     where: { tenantId: inverter.tenantId, inverterId: inverter.id },
@@ -95,13 +110,35 @@ async function fetchFalhasFallback(inverter) {
     select: { currentFault: true, capturedAt: true },
   });
   if (!ultimo?.currentFault) return [];
+
+  const bruto = String(ultimo.currentFault);
+  let severidade = 'desconhecida';
+  let codigo = bruto;
+  if (bruto.startsWith('F:')) { severidade = 'critica'; codigo = bruto.slice(2); }
+  else if (bruto.startsWith('W:')) { severidade = 'atencao'; codigo = bruto.slice(2); }
+
+  // Nivel do SIMEC: 1=critica (Telegram), 2=alarme (Telegram), 3=aviso (so sino)
+  // Growatt critica vira nivel 1, Growatt atencao vira nivel 3. Providers
+  // sem prefixo (FoxESS legado) continuam nivel 2 pra nao mudar comportamento.
+  const nivel = severidade === 'critica' ? 1 : (severidade === 'atencao' ? 3 : 2);
+
+  const app = appDoProvider(inverter.provider);
+  const nome = severidade === 'critica'
+    ? `Falha no inversor (codigo ${codigo})`
+    : (severidade === 'atencao'
+        ? `Aviso do inversor (codigo ${codigo})`
+        : `Falha no inversor (codigo ${codigo})`);
+  const descricao = severidade === 'atencao'
+    ? `Aviso reportado pelo inversor. Verifique no aplicativo ${app} para mais detalhes.`
+    : `Falha no inversor, verifique no aplicativo ${app} para mais detalhes.`;
+
   return [{
-    codigoExterno: `fallback-${ultimo.currentFault}`,
-    codigoTipo: null,
-    nome: String(ultimo.currentFault).slice(0, 100),
-    descricao: `Falha reportada no snapshot (sem API de falhas dedicada para ${inverter.provider})`,
-    nivel: 2, // alarm por padrao
-    codigoReason: String(ultimo.currentFault),
+    codigoExterno: `fallback-${bruto}`,
+    codigoTipo: severidade,
+    nome: nome.slice(0, 100),
+    descricao,
+    nivel,
+    codigoReason: codigo,
     reportadaEm: ultimo.capturedAt,
     rawPayload: null,
   }];
