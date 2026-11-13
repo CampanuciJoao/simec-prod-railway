@@ -455,8 +455,19 @@ export async function validarCredencial(credential, apiBase) {
 // Pontos de inversor PV (device_type=1). IDs sem prefixo no REQUEST.
 // A resposta devolve com 'p' prefixado (p24, p1 ...) mas o pedido usa
 // a forma crua ("24", "1"). Conforme doc oficial Sungrow Appendix 10.
+//
+// POTENCIA ATIVA CA — ha ambiguidade na doc Sungrow entre modelos:
+//   p24  pode ser DC total ou AC total dependendo do firmware
+//   p83  = Total Active Power (CA) no SG110CX e congeneres C&I
+//   p82  = Reactive Power
+//   p85  = Power Factor
+// Pedimos os 3 candidatos e a normalizacao escolhe o primeiro valido que
+// bate com faixa fisica razoavel (ver resolvePotenciaAtivaCaKw).
 const POINTS_INVERTER_PV = [
-  '24',   // Total Active Power (W)
+  '24',   // Candidato 1 — Total Active Power (CA ou DC, depende do modelo)
+  '83',   // Candidato 2 — Total Active Power CA (preferido em SG110CX)
+  '82',   // Reactive Power (sanity)
+  '85',   // Power Factor (sanity)
   '1',    // Yield Today (Wh)
   '2',    // Total Yield (Wh)
   '87',   // Yield This Month (Wh)
@@ -554,13 +565,26 @@ export async function fetchSnapshot(inverter) {
 
   if (deviceType === 1) {
     // Inversor PV puro (sem bateria).
+    // Escolhe potencia ativa CA: prefere p83 (doc mais nova C&I), fallback
+    // p24. Alguns modelos (SG110CX) retornam DC em p24 e CA em p83 — sem
+    // esse branch, o SIMEC mostrava ~7x a potencia real medida pelo portal.
+    const p24kw = wToKw(v.p24);
+    const p83kw = wToKw(v.p83);
+    const powerKw = p83kw != null ? p83kw : p24kw;
+    // Log diagnostico quando os dois existem e divergem — ajuda a mapear
+    // comportamento por modelo e ajustar a preferencia no futuro.
+    if (p24kw != null && p83kw != null && Math.abs(p24kw - p83kw) > 0.5) {
+      console.warn(
+        `[SUNGROW_POWER] Divergencia p24 vs p83 no SN ${sn}: p24=${p24kw}kW p83=${p83kw}kW -> usando p83`
+      );
+    }
     return {
       soc: null,
       batChargePower: null, batDischargePower: null,
       feedinPower: null, gridConsumptionPower: null, epsPower: null,
       runningState: n(v.p29),
       currentFault: null,
-      powerKw: wToKw(v.p24),
+      powerKw,
       generationKwhDay:   wToKw(v.p1),
       generationKwhMonth: wToKw(v.p87),
       generationKwhTotal: wToKw(v.p2),
