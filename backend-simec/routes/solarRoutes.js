@@ -22,6 +22,7 @@ import { encryptCredential, decryptCredential } from '../services/solar/solarCry
 import { getAdapter, listAdapters } from '../services/solar/adapters/index.js';
 import * as sungrowAdapter from '../services/solar/adapters/sungrowAdapter.js';
 import { getRedisConnection } from '../services/queueService.js';
+import { obterDiagnosticoSemanal } from '../services/solar/solarDiagnosticoSemanalService.js';
 
 const router = express.Router();
 
@@ -1151,6 +1152,21 @@ router.get('/plants/:id/quedas', async (req, res) => {
     res.json(quedas);
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Diagnostico semanal POR INVERTER (todos fabricantes) ───────────────────
+// Agrega os ultimos 7 dias de snapshots por inverter: pico/media/min de
+// temperatura, horas offline, horas em modo derated, pico de potencia,
+// quedas de energia no periodo (se tem bateria). Usado no card
+// DiagnosticoSemanalCard do painel /monitoramento?tab=energia.
+router.get('/plants/:id/diagnostico-semanal', async (req, res) => {
+  const tenantId = req.tenantContext;
+  try {
+    const dados = await obterDiagnosticoSemanal({ tenantId, plantId: req.params.id });
+    res.json(dados);
+  } catch (err) {
+    res.status(err.status || 500).json({ error: err.message });
   }
 });
 

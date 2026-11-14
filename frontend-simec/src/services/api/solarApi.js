@@ -92,6 +92,10 @@ export const getSolarAgregadosMensais = (plantId, { limite = 12 } = {}) =>
 export const getSolarAgregadosDiarios = (plantId, { ano, mes } = {}) =>
   api.get(`/solar/plants/${plantId}/agregados-diarios`, { params: { ano, mes } }).then((r) => r.data);
 
+// ─── Diagnostico semanal por inverter (pico temp, horas offline, derated) ──
+export const getSolarDiagnosticoSemanal = (plantId) =>
+  api.get(`/solar/plants/${plantId}/diagnostico-semanal`).then((r) => r.data);
+
 // ─── Relatorios PDF solar (Fase 4) ──────────────────────────────────────────
 // Download via axios (precisa Authorization). Browser salva como attachment.
 async function baixarPdfBlob(path, params, fallbackFilename) {

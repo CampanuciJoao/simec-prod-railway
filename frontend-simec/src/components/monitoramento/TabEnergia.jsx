@@ -21,7 +21,7 @@ import { formatarDataHora } from '@/utils/timeUtils';
 import { useSolarPainel } from '@/hooks/monitoramento/useSolarPainel';
 import {
   getSolarAgregadoMesAtual, getSolarFalhas, getSolarPlantHistoricoAnual,
-  baixarSolarProducaoPdf,
+  baixarSolarProducaoPdf, getSolarDiagnosticoSemanal,
 } from '@/services/api/solarApi';
 import { useToast } from '@/contexts/ToastContext';
 
@@ -279,6 +279,160 @@ function BateriaCard({ bateria, idx }) {
   );
 }
 BateriaCard.propTypes = { bateria: PropTypes.object, idx: PropTypes.number.isRequired };
+
+// Diagnostico semanal por inversor — pico de temperatura, horas offline,
+// horas em derated, pico de potencia. Cross-fabricante (FoxESS/Growatt/
+// Sungrow). Fica logo depois das baterias no painel /monitoramento.
+function DiagnosticoSemanalCard({ plantId }) {
+  const [dados, setDados] = React.useState(null);
+  const [carregando, setCarregando] = React.useState(true);
+  const [erro, setErro] = React.useState(null);
+
+  React.useEffect(() => {
+    if (!plantId) return;
+    let ativo = true;
+    setCarregando(true);
+    setErro(null);
+    getSolarDiagnosticoSemanal(plantId)
+      .then((d) => { if (ativo) setDados(d); })
+      .catch((e) => { if (ativo) setErro(e?.response?.data?.error || e.message); })
+      .finally(() => { if (ativo) setCarregando(false); });
+    return () => { ativo = false; };
+  }, [plantId]);
+
+  if (carregando) return null;
+  if (erro) {
+    return (
+      <Card className="p-5">
+        <p className="text-xs" style={{ color: 'var(--color-danger)' }}>
+          Diagnostico semanal indisponivel: {erro}
+        </p>
+      </Card>
+    );
+  }
+  if (!dados || !dados.inverters?.length) return null;
+
+  const corDaTemp = (t) => {
+    if (t == null) return 'var(--text-muted)';
+    if (t >= 65) return 'var(--color-danger)';
+    if (t >= 55) return 'var(--color-warning)';
+    return 'var(--color-success)';
+  };
+  const corOffline = (h) => {
+    if (h == null) return 'var(--text-muted)';
+    if (h >= 4) return 'var(--color-danger)';
+    if (h >= 1) return 'var(--color-warning)';
+    return 'var(--color-success)';
+  };
+
+  return (
+    <Card className="p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <FontAwesomeIcon icon={faChartLine} style={{ color: 'var(--brand-primary)' }} />
+        <p className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+          Diagnóstico dos últimos 7 dias
+        </p>
+      </div>
+
+      {dados.quedas && (
+        <div
+          className="mb-4 rounded-lg px-3 py-2 text-xs"
+          style={{
+            backgroundColor: 'var(--bg-surface-subtle)',
+            borderLeft: `3px solid ${dados.quedas.total > 0 ? 'var(--color-warning)' : 'var(--color-success)'}`,
+          }}
+        >
+          <strong>Quedas de energia:</strong>{' '}
+          {dados.quedas.total === 0
+            ? 'nenhuma nos últimos 7 dias'
+            : `${dados.quedas.total} ocorrência${dados.quedas.total > 1 ? 's' : ''} · ${dados.quedas.duracaoTotalMin} min no total${dados.quedas.emAndamento > 0 ? ` · ${dados.quedas.emAndamento} em andamento` : ''}`}
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {dados.inverters.map((inv) => (
+          <div
+            key={inv.inverterId}
+            className="rounded-lg p-3"
+            style={{ backgroundColor: 'var(--bg-surface-subtle)' }}
+          >
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FontAwesomeIcon icon={faMicrochip} style={{ color: 'var(--brand-primary)' }} />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold">
+                    {PROVIDER_LABELS[inv.provider] || inv.provider}
+                    {inv.modeloInversor ? ` · ${inv.modeloInversor}` : ''}
+                  </p>
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    SN {inv.inverterSn} · {inv.amostras} leitura{inv.amostras !== 1 ? 's' : ''} no período
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-xs sm:grid-cols-4">
+              <div>
+                <p style={{ color: 'var(--text-muted)' }}>
+                  <FontAwesomeIcon icon={faTemperatureHigh} className="mr-1" />
+                  Pico temperatura
+                </p>
+                <p className="mt-0.5 text-lg font-bold" style={{ color: corDaTemp(inv.picoTempC) }}>
+                  {inv.picoTempC != null ? `${fmt(inv.picoTempC, 1)}°C` : '—'}
+                </p>
+                {inv.tempMinC != null && inv.tempMediaC != null && (
+                  <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                    Min {fmt(inv.tempMinC, 0)}° · Média {fmt(inv.tempMediaC, 0)}°
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <p style={{ color: 'var(--text-muted)' }}>
+                  <FontAwesomeIcon icon={faPlugCircleXmark} className="mr-1" />
+                  Horas offline
+                </p>
+                <p className="mt-0.5 text-lg font-bold" style={{ color: corOffline(inv.horasOffline) }}>
+                  {inv.horasOffline != null ? `${fmt(inv.horasOffline, 1)}h` : '—'}
+                </p>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  de 168h totais ({((inv.horasOffline || 0) / 168 * 100).toFixed(1)}%)
+                </p>
+              </div>
+
+              <div>
+                <p style={{ color: 'var(--text-muted)' }}>
+                  <FontAwesomeIcon icon={faBoltLightning} className="mr-1" />
+                  Horas derated
+                </p>
+                <p className="mt-0.5 text-lg font-bold" style={{ color: inv.horasDerated > 1 ? 'var(--color-warning)' : 'var(--text-primary)' }}>
+                  {inv.horasDerated != null ? `${fmt(inv.horasDerated, 1)}h` : '—'}
+                </p>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  Potência reduzida por temp/rede
+                </p>
+              </div>
+
+              <div>
+                <p style={{ color: 'var(--text-muted)' }}>
+                  <FontAwesomeIcon icon={faBolt} className="mr-1" />
+                  Pico de potência
+                </p>
+                <p className="mt-0.5 text-lg font-bold">
+                  {inv.picoPotenciaKw != null ? `${fmt(inv.picoPotenciaKw, 2)} kW` : '—'}
+                </p>
+                <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>
+                  {inv.ultimaLeitura ? `Último: ${formatarDataHora(inv.ultimaLeitura)}` : 'Sem leitura recente'}
+                </p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Card>
+  );
+}
+DiagnosticoSemanalCard.propTypes = { plantId: PropTypes.string };
 
 function FluxoCard({ composto }) {
   if (!composto) return null;
@@ -789,6 +943,7 @@ function TabEnergia() {
               {bateriasInfo.map((b, idx) => <BateriaCard key={idx} bateria={b} idx={idx} />)}
             </div>
           )}
+          {plant?.id && <DiagnosticoSemanalCard plantId={plant.id} />}
           <GraficoSoc snapshots={historico?.snapshots} plant={plant} />
           {plant?.id && <HistoricoAnual plantId={plant.id} />}
           {plant?.id && <CardFalhas plantId={plant.id} />}
