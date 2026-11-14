@@ -25,6 +25,33 @@ const CATEGORIA_FLAG = {
 // qualquer hora — precisa alerta imediato independente do horario.
 const CATEGORIAS_URGENTES_24_7 = new Set(['GEHC_SAUDE', 'OS_CORRETIVA', 'FOXESS_ENERGIA']);
 
+// Alertas de evento EM ANDAMENTO (problema ativo agora) merecem
+// re-notificacao a cada 24h enquanto nao sao resolvidos. Alertas de
+// RESTABELECIMENTO, resolucao e DIAGNOSTICO retrospectivo (temperatura,
+// pico abaixo, geracao baixa, etc) notificam no maximo 1 vez — nao fica
+// bom receber "Energia restabelecida 715min" todo dia de madrugada por
+// 5 dias enquanto o alerta nao e apagado manualmente.
+//
+// Lista EXPLICITA: se um evento novo deve re-notificar enquanto persiste,
+// precisa ser adicionado aqui. O default e NAO re-notificar.
+const EVENTOS_REALERTA_24H = new Set([
+  // GEHC — equipamento com problema fisico em andamento
+  'GEHC_HELIO_BAIXO', 'GEHC_HELIO_CRITICO', 'GEHC_COMPRESSOR_OFF',
+  'GEHC_TEMPERATURA_ALTA', 'GEHC_FLUXO_BAIXO', 'GEHC_PRESSAO_ANORMAL',
+  'GEHC_MAGNETO_OFFLINE', 'GEHC_EQUIPAMENTO_OFFLINE', 'GEHC_MONITORAMENTO_PARADO',
+  // OS corretiva — visita vencida ou em andamento
+  'OS_CORRETIVA_VISITA_VENCIDA', 'OS_CORRETIVA_VISITA_CONFIRMACAO',
+  // Solar — eventos EM ANDAMENTO (queda ativa, bateria baixa agora,
+  // inversor offline agora, falha critica/alarme ativos, monitoramento
+  // parado). Restabelecimentos, falhas resolvidas, e os insights diarios
+  // (temperatura alta, pico abaixo, geracao baixa, derated, SoC medio)
+  // NAO entram — eles sao retrospectivos e viram spam se re-notificarem.
+  'FOXESS_QUEDA_ENERGIA', 'FOXESS_SOC_BAIXO', 'FOXESS_SOC_CRITICO',
+  'FOXESS_MONITORAMENTO_PARADO',
+  'SOLAR_INVERSOR_OFFLINE', 'SOLAR_OFFLINE_CURTO',
+  'SOLAR_FALHA_CRITICA', 'SOLAR_FALHA_ALARME',
+]);
+
 const HORA_INICIO_COMERCIAL = 9;   // 09:00 no timezone do tenant
 const HORA_FIM_COMERCIAL    = 20;  // 20:00 (inclusivo — dispara ate 19:59)
 
@@ -102,10 +129,13 @@ async function processarTenant(tenantId) {
   const noHorarioComercial = estaEmHorarioComercial(tenant?.timezone);
 
   // Condicao 1: alertas nunca notificados (telegramEnviado=false).
-  // Condicao 2: alertas urgentes 24/7 persistentes (ALTA/MEDIA) que foram
-  //             notificados ha mais de 24h — re-notifica. GEHC_SAUDE e
-  //             FOXESS_ENERGIA entram aqui — operador precisa continuar
-  //             sabendo enquanto o problema persistir.
+  // Condicao 2: alertas de evento EM ANDAMENTO (vide EVENTOS_REALERTA_24H)
+  //             com prioridade ALTA/MEDIA que foram notificados ha mais de
+  //             24h — re-notifica. Isso cobre queda de energia ativa,
+  //             inversor offline, helio baixo etc. NAO cobre insights
+  //             retrospectivos (temperatura alta, pico abaixo, geracao
+  //             baixa) nem restabelecimentos, que viram spam quando
+  //             re-notificam por dias seguidos.
   const limiteReenvio = new Date(Date.now() - REALERTA_INTERVALO_MS);
   const whereAlertas = {
     tenantId,
@@ -113,7 +143,7 @@ async function processarTenant(tenantId) {
       { telegramEnviado: false },
       {
         telegramEnviado: true,
-        tipoCategoria: { in: [...CATEGORIAS_URGENTES_24_7] },
+        tipoEvento: { in: [...EVENTOS_REALERTA_24H] },
         prioridade: { in: ['Alta', 'Media'] },
         telegramEnviadoEm: { lt: limiteReenvio },
       },
@@ -180,7 +210,7 @@ async function processarTenant(tenantId) {
           { telegramEnviado: false },
           {
             telegramEnviado: true,
-            tipoCategoria: { in: [...CATEGORIAS_URGENTES_24_7] },
+            tipoEvento: { in: [...EVENTOS_REALERTA_24H] },
             prioridade: { in: ['Alta', 'Media'] },
             telegramEnviadoEm: { lt: limiteReenvio },
           },

@@ -52,6 +52,13 @@ async function criarAlertaSePrecisa({ tenantId, id, titulo, subtitulo, prioridad
       prioridade, tipo: ALERT_CATEGORIAS.FOXESS_ENERGIA,
       tipoCategoria: ALERT_CATEGORIAS.FOXESS_ENERGIA, tipoEvento,
       link: linkMonitoramentoSolar(plantId),
+      // Insights diagnosticos (temperatura alta, pico abaixo, geracao
+      // baixa, derated, SoC medio) sao retrospectivos e viram spam no
+      // Telegram. Ficam SO no sino SIMEC — operador consulta quando
+      // quiser. Problemas em andamento (queda, SoC baixo agora, inversor
+      // offline) seguem indo pro Telegram por outros caminhos.
+      telegramEnviado: true,
+      telegramEnviadoEm: new Date(),
     },
   });
   return true;
