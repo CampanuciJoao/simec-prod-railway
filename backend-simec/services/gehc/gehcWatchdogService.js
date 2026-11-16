@@ -22,9 +22,14 @@ import prisma from '../prismaService.js';
 import { reagendarJobsGehc } from '../queueService.js';
 import { verificarMonitoramentoParado } from './gehcAlertRepository.js';
 
-const WATCHDOG_LENTO_MS         = 3 * 60 * 60 * 1000;  // 3h
-const WATCHDOG_MORTO_MS         = 6 * 60 * 60 * 1000;  // 6h
-const COOLDOWN_RECOVERY_MS      = 2 * 60 * 60 * 1000;  // 2h entre tentativas
+// Captura esperada a cada 2h. Threshold de "lento" em 2h30 ja e sinal
+// claro de atraso — antes era 3h, mas o usuario reportava "6h a ultima
+// e 8h nao teve" sem o watchdog reagir. Com 2h30, o watchdog seguinte
+// (a cada 30min) ja re-dispara. Cooldown de 1h entre tentativas pra
+// absorver crons que sao lentos (login portal GE leva ~30s).
+const WATCHDOG_LENTO_MS         = 2.5 * 60 * 60 * 1000;  // 2h30
+const WATCHDOG_MORTO_MS         = 6 * 60 * 60 * 1000;    // 6h
+const COOLDOWN_RECOVERY_MS      = 60 * 60 * 1000;        // 1h entre tentativas
 const REDIS_KEY_LAST_RECOVERY   = 'watchdog:gehc:last_recovery';
 const REDIS_TTL_SECONDS         = 24 * 60 * 60;        // 24h
 

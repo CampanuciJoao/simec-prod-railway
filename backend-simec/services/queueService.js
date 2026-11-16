@@ -465,7 +465,7 @@ export async function iniciarJobsDeAlertas() {
     // existirem (compat refactor 2026-11).
     const NOMES_SOLAR_JOBS = [
       'solar-poll', 'solar-watchdog', 'solar-falhas', 'solar-agregados-diario',
-      'solar-agregados-mensal', 'solar-insights',
+      'solar-agregados-mensal', 'solar-insights', 'sungrow-refresh-tokens',
       'foxess-poll', 'foxess-watchdog',
     ];
     const repeatables13 = await queue.getRepeatableJobs();
@@ -508,7 +508,17 @@ export async function iniciarJobsDeAlertas() {
       removeOnComplete: 10,
       removeOnFail: 5,
     });
-    console.log('[QUEUE] Jobs Solar: poll 60s + watchdog 15min + falhas 10min + agregados diario/mensal + insights diario.');
+    // Refresh PROATIVO dos tokens Sungrow. Doc oficial iSolarCloud (Secao
+    // 2.2) recomenda renovar antes que access_token expire. Roda 02:00
+    // UTC pra pegar inverters cujo token vence nas proximas horas.
+    // Access_token ~48h e refresh_token ~30d — renovando diariamente,
+    // ambos ficam sempre frescos e nao precisa re-autorizar OAuth manual.
+    await queue.add('sungrow-refresh-tokens', {}, {
+      repeat: { pattern: '0 2 * * *' },
+      removeOnComplete: 10,
+      removeOnFail: 5,
+    });
+    console.log('[QUEUE] Jobs Solar: poll 60s + watchdog 15min + falhas 10min + agregados diario/mensal + insights diario + sungrow-refresh diario.');
 
     await logQueueState('QUEUE_AFTER_INIT');
     return true;

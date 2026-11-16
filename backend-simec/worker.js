@@ -14,6 +14,7 @@ import { watchdogSolar } from './services/solar/solarWatchdogService.js';
 import { processarFalhasSolar } from './services/solar/solarFalhasService.js';
 import { fecharDiaAnterior, fecharMesAnterior } from './services/solar/solarAgregadosService.js';
 import { processarInsightsSolar } from './services/solar/solarInsightsService.js';
+import { refreshTokensSungrow } from './services/solar/sungrowTokenRefreshService.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
@@ -236,6 +237,14 @@ const alertasWorker = new Worker(
     if (job?.name === 'solar-insights') {
       // Fase 5 — alertas inteligentes (geracao baixa vs baseline, etc).
       const r = await processarInsightsSolar();
+      return { ok: true, ...r };
+    }
+
+    if (job?.name === 'sungrow-refresh-tokens') {
+      // Refresh PROATIVO dos tokens Sungrow (doc 2.2 recomenda).
+      // Mantem access_token e refresh_token sempre frescos pra evitar
+      // precisar re-autorizar OAuth manual.
+      const r = await refreshTokensSungrow();
       return { ok: true, ...r };
     }
 
