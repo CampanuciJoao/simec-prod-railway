@@ -70,31 +70,40 @@ async function limparAlertaReautorizar({ tenantId, inverterId }) {
   if (count > 0) await publicarContagemAlertasParaTenant({ tenantId }).catch(() => {});
 }
 
-async function renovarUm(inverter) {
-  const credential = decryptCredential(inverter.credentialCrypt);
-  if (!credential) {
-    return { inverterId: inverter.id, resultado: 'credencial-invalida' };
+// Agrupa inverters que compartilham credencial OAuth Sungrow.
+// Sungrow emite 1 par (access_token, refresh_token) por Application — se
+// o usuario autorizou a MESMA Application pra 2+ inverters (ex: planta
+// logica 1161721 cobre RM + SEDE como se fossem uma so), eles dividem o
+// mesmo par. E a cada refresh a Sungrow ROTACIONA o refresh_token: o
+// antigo e invalidado. Sem agrupar, o primeiro refresh do loop rouba o
+// token e o segundo cai em result_data.code=-2 (expired).
+// Chave do grupo: appkey + refreshToken atual.
+function agruparPorCredencial(inverters) {
+  const grupos = new Map();
+  const fora = [];
+  for (const inv of inverters) {
+    let credential;
+    try { credential = decryptCredential(inv.credentialCrypt); }
+    catch { fora.push({ inverter: inv, motivo: 'credencial-invalida' }); continue; }
+    if (!credential) {
+      fora.push({ inverter: inv, motivo: 'credencial-invalida' });
+      continue;
+    }
+    if (!credential.refreshToken || !credential.appkey) {
+      // Sem refresh_token nao da pra renovar — provavel OAuth incompleto.
+      // Nao emite alerta aqui — o poll ja vai alertar via watchdog.
+      fora.push({ inverter: inv, motivo: 'sem-refresh-token' });
+      continue;
+    }
+    const chave = `${credential.appkey}::${credential.refreshToken}`;
+    if (!grupos.has(chave)) grupos.set(chave, []);
+    grupos.get(chave).push({ inverter: inv, credential });
   }
-  if (!credential.refreshToken) {
-    // Sem refresh_token nao da pra renovar — provavel OAuth incompleto.
-    // Nao emite alerta aqui — o poll ja vai alertar que o inverter esta
-    // parado pelo caminho normal (watchdog).
-    return { inverterId: inverter.id, resultado: 'sem-refresh-token' };
-  }
+  return { grupos, fora };
+}
 
-  // Se expira em >24h, pula — token ainda fresco.
-  const expiresAt = Number(credential.expiresAt || 0);
-  if (expiresAt && (expiresAt - Date.now()) > MARGEM_RENOVACAO_MS) {
-    return { inverterId: inverter.id, resultado: 'fresco' };
-  }
-
-  try {
-    const novo = await sungrowAdapter.refreshAccessToken({
-      apiBase: inverter.apiBase,
-      appkey: credential.appkey,
-      secretKey: credential.secretKey,
-      refreshToken: credential.refreshToken,
-    });
+async function aplicarNovoCredencialNoGrupo(grupo, novo) {
+  for (const { inverter, credential } of grupo) {
     const novoCredential = {
       ...credential,
       accessToken: novo.accessToken,
@@ -105,18 +114,17 @@ async function renovarUm(inverter) {
       where: { id: inverter.id },
       data: { credentialCrypt: encryptCredential(novoCredential) },
     });
-    // Se tinha alerta de re-autorizacao pendente, limpa.
     await limparAlertaReautorizar({
       tenantId: inverter.tenantId, inverterId: inverter.id,
     });
-    return { inverterId: inverter.id, resultado: 'renovado', novoExpiresEmMs: novo.expiresIn * 1000 };
-  } catch (err) {
-    // Se o refresh falhou, o inverter vai parar de atualizar. Alerta claro
-    // pro usuario re-autorizar.
+  }
+}
+
+async function alertarGrupoFalhou(grupo, erro) {
+  for (const { inverter } of grupo) {
     await emitirAlertaReautorizar({
-      tenantId: inverter.tenantId, inverter, erro: err.message,
+      tenantId: inverter.tenantId, inverter, erro,
     });
-    return { inverterId: inverter.id, resultado: 'falhou', erro: err.message };
   }
 }
 
@@ -128,23 +136,101 @@ export async function refreshTokensSungrow() {
       inverterSn: true, credentialCrypt: true,
     },
   });
-  if (inverters.length === 0) return { total: 0, resultados: [] };
+  if (inverters.length === 0) return { total: 0, grupos: 0, resultados: [] };
+
+  const { grupos, fora } = agruparPorCredencial(inverters);
 
   const resultados = [];
-  for (const inv of inverters) {
-    try {
-      const r = await renovarUm(inv);
-      resultados.push({ sn: inv.inverterSn, ...r });
-      if (r.resultado === 'renovado') {
-        console.log(`[SUNGROW_REFRESH] Inverter ${inv.inverterSn} renovado (novo access_token valido por ${Math.round(r.novoExpiresEmMs / 3600000)}h).`);
-      } else if (r.resultado === 'falhou') {
-        console.warn(`[SUNGROW_REFRESH] Inverter ${inv.inverterSn} FALHOU — precisa re-autorizar: ${r.erro}`);
+  for (const { inverter, motivo } of fora) {
+    resultados.push({ sn: inverter.inverterSn, inverterId: inverter.id, resultado: motivo });
+  }
+
+  for (const grupo of grupos.values()) {
+    const sns = grupo.map((g) => g.inverter.inverterSn).join(', ');
+    const primeiro = grupo[0];
+    // Expiracao e identica no grupo (compartilham tudo). Pula se ainda fresco.
+    const expiresAt = Number(primeiro.credential.expiresAt || 0);
+    if (expiresAt && (expiresAt - Date.now()) > MARGEM_RENOVACAO_MS) {
+      for (const g of grupo) {
+        resultados.push({ sn: g.inverter.inverterSn, inverterId: g.inverter.id, resultado: 'fresco' });
       }
+      continue;
+    }
+    try {
+      const novo = await sungrowAdapter.refreshAccessToken({
+        apiBase: primeiro.inverter.apiBase,
+        appkey: primeiro.credential.appkey,
+        secretKey: primeiro.credential.secretKey,
+        refreshToken: primeiro.credential.refreshToken,
+      });
+      await aplicarNovoCredencialNoGrupo(grupo, novo);
+      for (const g of grupo) {
+        resultados.push({
+          sn: g.inverter.inverterSn, inverterId: g.inverter.id,
+          resultado: 'renovado', novoExpiresEmMs: novo.expiresIn * 1000,
+          tamanhoGrupo: grupo.length,
+        });
+      }
+      console.log(
+        `[SUNGROW_REFRESH] Grupo (${grupo.length} inv): [${sns}] renovado — ` +
+        `novo access_token valido por ${Math.round(novo.expiresIn / 3600)}h.`
+      );
     } catch (err) {
-      console.error(`[SUNGROW_REFRESH] Erro inesperado no inverter ${inv.id}:`, err);
-      resultados.push({ inverterId: inv.id, sn: inv.inverterSn, resultado: 'erro', erro: err.message });
+      await alertarGrupoFalhou(grupo, err.message);
+      for (const g of grupo) {
+        resultados.push({
+          sn: g.inverter.inverterSn, inverterId: g.inverter.id,
+          resultado: 'falhou', erro: err.message, tamanhoGrupo: grupo.length,
+        });
+      }
+      console.warn(`[SUNGROW_REFRESH] Grupo (${grupo.length} inv): [${sns}] FALHOU — ${err.message}`);
     }
   }
 
-  return { total: inverters.length, resultados };
+  return { total: inverters.length, grupos: grupos.size, resultados };
+}
+
+// Usado pelo caminho REATIVO (solarPoller). Quando um refresh ad-hoc
+// acontece durante um poll, propaga o novo par pra todos os inverters
+// irmaos que compartilhavam o refresh_token antigo — senao, no proximo
+// poll eles vao tentar usar o refresh_token que a Sungrow acabou de
+// invalidar e cair em "re-autorizar".
+export async function propagarCredencialSungrow({
+  exceptInverterId, appkey, refreshTokenAntigo, accessTokenNovo, refreshTokenNovo, expiresAtNovo,
+}) {
+  if (!appkey || !refreshTokenAntigo) return { propagados: 0 };
+  const candidatos = await prisma.solarInverter.findMany({
+    where: {
+      provider: 'sungrow',
+      ativo: true,
+      ...(exceptInverterId ? { NOT: { id: exceptInverterId } } : {}),
+    },
+    select: { id: true, tenantId: true, credentialCrypt: true, inverterSn: true },
+  });
+  let propagados = 0;
+  for (const c of candidatos) {
+    let cred;
+    try { cred = decryptCredential(c.credentialCrypt); } catch { continue; }
+    if (!cred) continue;
+    if (cred.appkey !== appkey) continue;
+    if (cred.refreshToken !== refreshTokenAntigo) continue;
+    const novoCred = {
+      ...cred,
+      accessToken: accessTokenNovo,
+      refreshToken: refreshTokenNovo,
+      expiresAt: expiresAtNovo,
+    };
+    try {
+      await prisma.solarInverter.update({
+        where: { id: c.id },
+        data: { credentialCrypt: encryptCredential(novoCred) },
+      });
+      await limparAlertaReautorizar({ tenantId: c.tenantId, inverterId: c.id });
+      propagados++;
+      console.log(`[SUNGROW_REFRESH] Credencial propagada para inverter irmao ${c.inverterSn}`);
+    } catch (err) {
+      console.warn(`[SUNGROW_REFRESH] Falha ao propagar para ${c.inverterSn}: ${err.message}`);
+    }
+  }
+  return { propagados };
 }

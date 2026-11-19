@@ -15,29 +15,47 @@ import { getAdapter } from './adapters/index.js';
 import { decryptCredential, encryptCredential } from './solarCrypto.js';
 import { processarEventosSolar } from './solarAlertRepository.js';
 import * as sungrowAdapter from './adapters/sungrowAdapter.js';
+import { propagarCredencialSungrow } from './sungrowTokenRefreshService.js';
 
 // Se o Sungrow adapter sinalizar TOKEN_EXPIRED, tentamos renovar via
 // refresh_token e persistir o novo credential no banco. Depois disso o
 // caller repete a chamada original com o novo accessToken.
+//
+// IMPORTANTE: Sungrow rotaciona o refresh_token a cada refresh. Se dois
+// ou mais inverters compartilham a MESMA Application OAuth (como RM +
+// SEDE em Rancho Terra), o refresh de um invalida o refresh_token do
+// outro. Depois de renovar, propagamos o novo par pros irmaos — senao,
+// no proximo poll deles, cairiam em "re-autorizar".
 async function tryRefreshSungrowToken(inverter, credential) {
   if (inverter.provider !== 'sungrow' || !credential.refreshToken) return null;
   try {
+    const refreshTokenAntigo = credential.refreshToken;
     const { accessToken, refreshToken, expiresIn } = await sungrowAdapter.refreshAccessToken({
       apiBase: inverter.apiBase,
       appkey: credential.appkey,
       secretKey: credential.secretKey,
       refreshToken: credential.refreshToken,
     });
+    const expiresAtNovo = Date.now() + expiresIn * 1000;
     const novoCredential = {
       ...credential,
       accessToken,
       refreshToken,
-      expiresAt: Date.now() + expiresIn * 1000,
+      expiresAt: expiresAtNovo,
     };
     await prisma.solarInverter.update({
       where: { id: inverter.id },
       data: { credentialCrypt: encryptCredential(novoCredential) },
     });
+    // Propaga pros inverters irmaos que tinham o mesmo (appkey, refresh_token).
+    propagarCredencialSungrow({
+      exceptInverterId: inverter.id,
+      appkey: credential.appkey,
+      refreshTokenAntigo,
+      accessTokenNovo: accessToken,
+      refreshTokenNovo: refreshToken,
+      expiresAtNovo,
+    }).catch((err) => console.warn(`[SOLAR_POLLER] propagar credencial falhou: ${err.message}`));
     return novoCredential;
   } catch (err) {
     console.warn(`[SOLAR_POLLER] Refresh token Sungrow falhou pro inverter ${inverter.id}:`, err.message);
