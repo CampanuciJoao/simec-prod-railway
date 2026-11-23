@@ -7,11 +7,11 @@ import {
 import { useToast } from '../../contexts/ToastContext';
 import { exportarRelatorioPDF, exportarOrcamentoCqPDF } from '@/services/api/pdfApi';
 import {
-  getSolarPlants, baixarSolarProducaoPdf, baixarSolarFalhasPdf,
+  getSolarPlants, baixarSolarProducaoPdf, baixarSolarFalhasPdf, baixarSolarQuedasPdf,
 } from '@/services/api/solarApi';
 import { getErrorMessage } from '../../utils/getErrorMessage';
 
-const TIPOS_SOLAR = new Set(['solarProducao', 'solarFalhas']);
+const TIPOS_SOLAR = new Set(['solarProducao', 'solarFalhas', 'solarQuedas']);
 
 export function useRelatoriosPage() {
   const { addToast } = useToast();
@@ -130,6 +130,10 @@ export function useRelatoriosPage() {
           await baixarSolarProducaoPdf(filtros.plantaId, {
             dataInicio: filtros.dataInicio, dataFim: filtros.dataFim,
           });
+        } else if (filtros.tipoRelatorio === 'solarQuedas') {
+          await baixarSolarQuedasPdf(filtros.plantaId, {
+            dataInicio: filtros.dataInicio, dataFim: filtros.dataFim,
+          });
         } else {
           await baixarSolarFalhasPdf(filtros.plantaId, {
             dataInicio: filtros.dataInicio, dataFim: filtros.dataFim,
@@ -226,6 +230,7 @@ export function useRelatoriosPage() {
       { value: 'inventarioSeguros',      label: 'Relatório de Seguros' },
       { value: 'solarProducao',          label: 'Energia Solar — Produção' },
       { value: 'solarFalhas',            label: 'Energia Solar — Falhas de Inversor' },
+      { value: 'solarQuedas',            label: 'Energia Solar — Quedas de Energia' },
     ],
     []
   );
@@ -325,6 +330,7 @@ export function useRelatoriosPage() {
                 inventarioSeguros: 'Seguros',
                 solarProducao: 'Solar — Produção',
                 solarFalhas: 'Solar — Falhas',
+                solarQuedas: 'Solar — Quedas',
               }[filtros.tipoRelatorio] || filtros.tipoRelatorio
             }`,
             value: filtros.tipoRelatorio,

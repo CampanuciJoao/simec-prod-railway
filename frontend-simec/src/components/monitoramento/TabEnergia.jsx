@@ -543,48 +543,110 @@ function GraficoSoc({ snapshots, plant }) {
 }
 GraficoSoc.propTypes = { snapshots: PropTypes.array, plant: PropTypes.object };
 
+// Formata duracao a partir de minutos pro ingles comum: "2h 15min", "45min".
+function formatarDuracao(minutos) {
+  if (minutos == null) return '—';
+  const total = Math.max(0, Math.round(minutos));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h}h ${m}min`;
+}
+
+function LinhaQueda({ q }) {
+  return (
+    <tr style={{ borderBottom: '1px solid var(--border-soft)' }}>
+      <td className="py-2 pr-3">{formatarDataHora(q.inicioEm)}</td>
+      <td className="py-2 pr-3">
+        {q.fimEm
+          ? formatarDataHora(q.fimEm)
+          : <span style={{ color: 'var(--color-warning)' }}>Em andamento</span>}
+      </td>
+      <td className="py-2 pr-3">{formatarDuracao(q.duracaoMin)}</td>
+      <td className="py-2 pr-3">{q.socInicial != null ? `${fmt(q.socInicial, 0)}%` : '—'}</td>
+      <td className="py-2 pr-3" style={{ color: q.socMinimo != null && q.socMinimo < 20 ? 'var(--color-danger)' : undefined }}>
+        {q.socMinimo != null ? `${fmt(q.socMinimo, 0)}%` : '—'}
+      </td>
+      <td className="py-2 pr-3">{q.socFinal != null ? `${fmt(q.socFinal, 0)}%` : '—'}</td>
+    </tr>
+  );
+}
+LinhaQueda.propTypes = { q: PropTypes.object.isRequired };
+
+function TabelaQuedas({ quedas }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="text-left" style={{ borderBottom: '1px solid var(--border-soft)' }}>
+            <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>Início</th>
+            <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>Fim</th>
+            <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>Duração</th>
+            <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>SoC inicial</th>
+            <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>SoC mín</th>
+            <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>SoC final</th>
+          </tr>
+        </thead>
+        <tbody>
+          {quedas.map((q) => <LinhaQueda key={q.id} q={q} />)}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+TabelaQuedas.propTypes = { quedas: PropTypes.array.isRequired };
+
 function HistoricoQuedas({ quedas }) {
   if (!quedas?.length) {
     return (
       <Card className="p-5">
-        <p className="mb-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Histórico de quedas</p>
+        <p className="mb-2 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Registro de quedas de energia</p>
         <InlineEmptyState message="Nenhuma queda registrada ainda." />
       </Card>
     );
   }
+
+  const UMA_SEMANA_MS = 7 * 24 * 60 * 60 * 1000;
+  const corteSemana = Date.now() - UMA_SEMANA_MS;
+  const quedasSemana = quedas.filter((q) => new Date(q.inicioEm).getTime() >= corteSemana);
+  const quedasAnteriores = quedas.filter((q) => new Date(q.inicioEm).getTime() < corteSemana);
+
+  const totalMinSemana = quedasSemana.reduce((acc, q) => {
+    if (q.duracaoMin != null) return acc + q.duracaoMin;
+    // Queda em andamento — conta ate agora
+    return acc + Math.max(0, Math.round((Date.now() - new Date(q.inicioEm).getTime()) / 60000));
+  }, 0);
+  const emAndamentoSemana = quedasSemana.filter((q) => q.fimEm == null).length;
+
   return (
     <Card className="p-5">
-      <p className="mb-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-        Histórico de quedas ({quedas.length})
-      </p>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="text-left" style={{ borderBottom: '1px solid var(--border-soft)' }}>
-              <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>Início</th>
-              <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>Fim</th>
-              <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>Duração</th>
-              <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>SoC inicial</th>
-              <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>SoC mín</th>
-              <th className="py-2 pr-3 font-semibold" style={{ color: 'var(--text-muted)' }}>SoC final</th>
-            </tr>
-          </thead>
-          <tbody>
-            {quedas.map((q) => (
-              <tr key={q.id} style={{ borderBottom: '1px solid var(--border-soft)' }}>
-                <td className="py-2 pr-3">{formatarDataHora(q.inicioEm)}</td>
-                <td className="py-2 pr-3">{q.fimEm ? formatarDataHora(q.fimEm) : <span style={{ color: 'var(--color-warning)' }}>Em andamento</span>}</td>
-                <td className="py-2 pr-3">{q.duracaoMin != null ? `${q.duracaoMin} min` : '—'}</td>
-                <td className="py-2 pr-3">{q.socInicial != null ? `${fmt(q.socInicial, 0)}%` : '—'}</td>
-                <td className="py-2 pr-3" style={{ color: q.socMinimo != null && q.socMinimo < 20 ? 'var(--color-danger)' : undefined }}>
-                  {q.socMinimo != null ? `${fmt(q.socMinimo, 0)}%` : '—'}
-                </td>
-                <td className="py-2 pr-3">{q.socFinal != null ? `${fmt(q.socFinal, 0)}%` : '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Esta semana · últimos 7 dias</p>
+        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+          {quedasSemana.length === 0
+            ? 'Nenhuma queda'
+            : `${quedasSemana.length} queda${quedasSemana.length > 1 ? 's' : ''} · ${formatarDuracao(totalMinSemana)} sem energia${emAndamentoSemana > 0 ? ` · ${emAndamentoSemana} em andamento` : ''}`}
+        </p>
       </div>
+      {quedasSemana.length === 0
+        ? <InlineEmptyState message="Nenhuma queda nos últimos 7 dias." />
+        : <TabelaQuedas quedas={quedasSemana} />
+      }
+
+      {quedasAnteriores.length > 0 && (
+        <details className="mt-5">
+          <summary
+            className="cursor-pointer text-xs uppercase tracking-wider"
+            style={{ color: 'var(--text-muted)' }}
+          >
+            Histórico anterior ({quedasAnteriores.length})
+          </summary>
+          <div className="mt-3">
+            <TabelaQuedas quedas={quedasAnteriores} />
+          </div>
+        </details>
+      )}
     </Card>
   );
 }

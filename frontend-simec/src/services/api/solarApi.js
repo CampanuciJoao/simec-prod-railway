@@ -133,3 +133,10 @@ export const baixarSolarFalhasPdf = (plantId, { dataInicio, dataFim, inverterId 
     { dataInicio, dataFim, inverterId },
     `simec-solar-falhas-${dataInicio}-${dataFim}.pdf`,
   );
+
+export const baixarSolarQuedasPdf = (plantId, { dataInicio, dataFim } = {}) =>
+  baixarPdfBlob(
+    `/solar/plants/${plantId}/relatorio-quedas-pdf`,
+    { dataInicio, dataFim },
+    `simec-solar-quedas-${dataInicio}-${dataFim}.pdf`,
+  );

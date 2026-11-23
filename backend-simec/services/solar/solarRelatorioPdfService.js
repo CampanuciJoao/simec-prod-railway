@@ -4,10 +4,11 @@
 // O resultado tem layout 100% identico aos relatorios de Inventario /
 // Manutencoes / Historico de equipamento.
 //
-// Tres variantes:
+// Quatro variantes:
 //   1. gerarRelatorioSolarPdf     — mensal (legado, mantido pra compat)
 //   2. gerarRelatorioProducaoPdf  — producao em periodo livre
 //   3. gerarRelatorioFalhasPdf    — falhas de inversor em periodo livre
+//   4. gerarRelatorioQuedasPdf    — quedas de energia em periodo livre (default: 12m)
 
 import prisma from '../prismaService.js';
 import {
@@ -282,6 +283,152 @@ export async function gerarRelatorioFalhasPdf({ tenantId, plantId, dataInicio, d
       f.resolvidaEm ? `Resolvida ${fmtData(f.resolvidaEm)}` : 'Aberta',
     ]),
     emptyMessage: 'Nenhuma falha registrada no período.',
+  });
+
+  const buffer = await finalizeDocument(doc, { showSignature: false });
+  return { buffer, fileName };
+}
+
+// ─── 4) PDF de quedas de energia (periodo livre, default anual) ─────────────
+// Retorna: { buffer, fileName } ou lanca erro com .status.
+//
+// Agregacao em 3 niveis:
+//   - KPIs: total, duracao total sem energia, pior queda, duracao media
+//   - Distribuicao mensal: contagem + min sem energia por mes
+//   - Lista completa: cada queda com inicio, fim, duracao, SoC inicial/min/final
+//
+// Importante: plantas SEM bateria nao tem como ter queda detectada — o
+// inversor simplesmente apaga junto com a rede. O PDF mostra isso de
+// forma clara em vez de ficar em branco.
+function formatarDuracaoMin(minutos) {
+  if (minutos == null) return '—';
+  const total = Math.max(0, Math.round(minutos));
+  const h = Math.floor(total / 60);
+  const m = total % 60;
+  if (h === 0) return `${m} min`;
+  if (m === 0) return `${h} h`;
+  return `${h}h ${m}min`;
+}
+
+export async function gerarRelatorioQuedasPdf({ tenantId, plantId, dataInicio, dataFim }) {
+  const plant = await prisma.solarPlant.findFirst({
+    where: { id: plantId, tenantId },
+    include: { unidade: { select: { id: true, nomeSistema: true } } },
+  });
+  if (!plant) {
+    const err = new Error('Planta nao encontrada'); err.status = 404; throw err;
+  }
+
+  const inicio = new Date(dataInicio + 'T00:00:00.000Z');
+  const fim = new Date(dataFim + 'T23:59:59.999Z');
+  if (Number.isNaN(inicio.getTime()) || Number.isNaN(fim.getTime()) || inicio > fim) {
+    const err = new Error('Datas invalidas (dataInicio <= dataFim, formato YYYY-MM-DD)');
+    err.status = 400; throw err;
+  }
+
+  const options = await injectTenantInfo(
+    { tenantId, unidadeId: plant.unidade?.id, tenantIdFallback: tenantId },
+    {},
+  );
+  const fileName = `relatorio_quedas_energia_${plant.nome.replace(/[^a-z0-9]/gi, '_').toLowerCase()}_${dataInicio}_a_${dataFim}.pdf`;
+
+  const doc = createDocument('RELATÓRIO DE QUEDAS DE ENERGIA', options);
+  drawEntidadeInfoBlock(doc, options?.tenantInfo);
+
+  drawSectionTitle(doc, 'Dados da planta e período');
+  doc.font('Helvetica-Bold').fontSize(10).fillColor('#1e293b')
+    .text(plant.nome, doc.page.margins.left, doc.y);
+  doc.font('Helvetica').fontSize(9).fillColor('#475569')
+    .text(`Período: ${fmtData(inicio)} até ${fmtData(fim)}`, doc.page.margins.left, doc.y + 2);
+  if (plant.unidade?.nomeSistema) {
+    doc.text(`Unidade: ${plant.unidade.nomeSistema}`, doc.page.margins.left, doc.y + 2);
+  }
+  doc.y += 16;
+
+  // Plantas sem bateria: nao registramos quedas. Deixa explicito pro
+  // leitor em vez de tabela vazia confusa.
+  if (!plant.temBateria) {
+    drawSectionTitle(doc, 'Monitoramento de quedas indisponível');
+    doc.font('Helvetica').fontSize(10).fillColor('#475569')
+      .text(
+        'Esta planta não possui bateria (backup EPS). Sem bateria, o inversor desliga junto com a rede da concessionária, impossibilitando a detecção automática de início e fim da queda. ' +
+        'Para capturar quedas nesta planta, é preciso adicionar bateria com modo EPS ou integrar um medidor independente do lado da rede.',
+        doc.page.margins.left, doc.y + 4,
+        { width: doc.page.width - doc.page.margins.left - doc.page.margins.right, align: 'justify' }
+      );
+    const buffer = await finalizeDocument(doc, { showSignature: false });
+    return { buffer, fileName };
+  }
+
+  const quedas = await prisma.solarOutage.findMany({
+    where: { tenantId, plantId, inicioEm: { gte: inicio, lte: fim } },
+    orderBy: { inicioEm: 'desc' },
+  });
+
+  // Normaliza duracao: queda em andamento conta ate agora.
+  const agora = Date.now();
+  const quedasComDur = quedas.map((q) => {
+    const dur = q.duracaoMin != null
+      ? q.duracaoMin
+      : Math.max(0, Math.round((agora - q.inicioEm.getTime()) / 60000));
+    return { ...q, duracaoEfetivaMin: dur };
+  });
+
+  const totalMin   = quedasComDur.reduce((acc, q) => acc + q.duracaoEfetivaMin, 0);
+  const piorQueda  = quedasComDur.reduce((pior, q) => (!pior || q.duracaoEfetivaMin > pior.duracaoEfetivaMin) ? q : pior, null);
+  const duracaoMedia = quedas.length > 0 ? Math.round(totalMin / quedas.length) : 0;
+  const emAndamento  = quedasComDur.filter((q) => q.fimEm == null).length;
+
+  drawKpiCards(doc, [
+    { value: String(quedas.length),                 label: 'Quedas no período',   color: COR_INFO,
+      desc: emAndamento > 0 ? `${emAndamento} em andamento` : 'registradas' },
+    { value: formatarDuracaoMin(totalMin),          label: 'Tempo sem energia',   color: totalMin > 60 ? COR_DANGER : COR_INFO,
+      desc: 'soma de todas as quedas' },
+    { value: formatarDuracaoMin(duracaoMedia),      label: 'Duração média',       color: COR_INFO,
+      desc: 'por evento' },
+    { value: piorQueda ? formatarDuracaoMin(piorQueda.duracaoEfetivaMin) : '—',
+      label: 'Pior queda', color: COR_WARNING,
+      desc: piorQueda ? fmtData(piorQueda.inicioEm) : '—' },
+  ]);
+
+  // Distribuicao por mes — ajuda a ver sazonalidade e meses piores
+  const porMes = new Map();
+  for (const q of quedasComDur) {
+    const d = q.inicioEm;
+    const chave = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    if (!porMes.has(chave)) porMes.set(chave, { count: 0, totalMin: 0 });
+    const agg = porMes.get(chave);
+    agg.count += 1;
+    agg.totalMin += q.duracaoEfetivaMin;
+  }
+  const mesesOrdenados = Array.from(porMes.entries()).sort((a, b) => a[0].localeCompare(b[0]));
+  if (mesesOrdenados.length > 0) {
+    drawSectionTitle(doc, 'Distribuição mensal');
+    drawTable(doc, {
+      headers: ['Mês', 'Quedas', 'Tempo sem energia'],
+      columnWidths: [120, 80, 180],
+      rows: mesesOrdenados.map(([chave, agg]) => {
+        const [ano, mes] = chave.split('-');
+        const nomeMes = new Date(Date.UTC(Number(ano), Number(mes) - 1, 1))
+          .toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+        return [nomeMes, String(agg.count), formatarDuracaoMin(agg.totalMin)];
+      }),
+    });
+  }
+
+  drawSectionTitle(doc, `Quedas registradas (${quedas.length})`);
+  drawTable(doc, {
+    headers: ['Início', 'Fim', 'Duração', 'SoC inicial', 'SoC mínimo', 'SoC final'],
+    columnWidths: [105, 105, 65, 65, 65, 65],
+    rows: quedasComDur.map((q) => [
+      fmtDataHora(q.inicioEm),
+      q.fimEm ? fmtDataHora(q.fimEm) : 'Em andamento',
+      formatarDuracaoMin(q.duracaoEfetivaMin),
+      q.socInicial != null ? `${q.socInicial.toFixed(0)}%` : '—',
+      q.socMinimo != null ? `${q.socMinimo.toFixed(0)}%` : '—',
+      q.socFinal != null ? `${q.socFinal.toFixed(0)}%` : '—',
+    ]),
+    emptyMessage: 'Nenhuma queda registrada no período.',
   });
 
   const buffer = await finalizeDocument(doc, { showSignature: false });

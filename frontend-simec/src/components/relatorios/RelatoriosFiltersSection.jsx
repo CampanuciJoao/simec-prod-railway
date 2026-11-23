@@ -40,7 +40,8 @@ function RelatoriosFiltersSection({
   const isSeguros = filtros.tipoRelatorio === 'inventarioSeguros';
   const isSolarProducao = filtros.tipoRelatorio === 'solarProducao';
   const isSolarFalhas = filtros.tipoRelatorio === 'solarFalhas';
-  const isSolar = isSolarProducao || isSolarFalhas;
+  const isSolarQuedas = filtros.tipoRelatorio === 'solarQuedas';
+  const isSolar = isSolarProducao || isSolarFalhas || isSolarQuedas;
 
   // Cada tipo mostra seu proprio conjunto de filtros — evita poluir a UI
   // com campos que nao se aplicam ao relatorio escolhido.

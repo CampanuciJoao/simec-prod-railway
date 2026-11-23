@@ -1340,4 +1340,25 @@ router.get('/plants/:id/relatorio-falhas-pdf', async (req, res) => {
   }
 });
 
+// ─── PDF de relatorio de quedas de energia (periodo livre, default anual) ────
+// Query: dataInicio, dataFim (YYYY-MM-DD).
+// Plantas sem bateria entregam PDF com aviso explicando por que nao ha dados.
+router.get('/plants/:id/relatorio-quedas-pdf', async (req, res) => {
+  const tenantId = req.tenantContext;
+  const { dataInicio, dataFim } = req.query;
+  if (!dataInicio || !dataFim) {
+    return res.status(400).json({ error: 'dataInicio e dataFim obrigatorios (YYYY-MM-DD)' });
+  }
+  try {
+    const { gerarRelatorioQuedasPdf } = await import('../services/solar/solarRelatorioPdfService.js');
+    const { buffer, fileName } = await gerarRelatorioQuedasPdf({
+      tenantId, plantId: req.params.id, dataInicio, dataFim,
+    });
+    return enviarPdf(res, buffer, fileName);
+  } catch (err) {
+    console.error('[SOLAR_RELATORIO_QUEDAS_PDF]', err);
+    return res.status(err.status || 500).json({ error: err.message });
+  }
+});
+
 export default router;
