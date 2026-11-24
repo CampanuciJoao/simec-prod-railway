@@ -211,9 +211,9 @@ function LembretesPage() {
               value={filtros.escopo}
               onChange={(v) => setFiltros((p) => ({ ...p, escopo: v }))}
               options={[
-                { value: 'meus',    label: 'Que eu recebo' },
-                { value: 'criados', label: 'Que eu criei' },
-                { value: 'todos',   label: 'Todos (criados ou recebidos)' },
+                { value: 'meus',    label: 'Atribuídos a mim' },
+                { value: 'criados', label: 'Criados por mim' },
+                { value: 'todos',   label: 'Todos os lembretes' },
               ]}
             />
             <SelectMenu
@@ -221,12 +221,12 @@ function LembretesPage() {
               value={filtros.status}
               onChange={(v) => setFiltros((p) => ({ ...p, status: v }))}
               options={[
-                { value: 'ABERTOS',    label: 'Abertos (pendentes + enviados)' },
-                { value: 'PENDENTE',   label: 'Só pendentes' },
-                { value: 'ENVIADO',    label: 'Só já disparados' },
+                { value: 'ABERTOS',    label: 'Em aberto' },
+                { value: 'PENDENTE',   label: 'Pendentes' },
+                { value: 'ENVIADO',    label: 'Disparados' },
                 { value: 'CONCLUIDO',  label: 'Concluídos' },
                 { value: 'DESCARTADO', label: 'Descartados' },
-                { value: 'TODOS',      label: 'Todos' },
+                { value: 'TODOS',      label: 'Histórico completo' },
               ]}
             />
           </div>
