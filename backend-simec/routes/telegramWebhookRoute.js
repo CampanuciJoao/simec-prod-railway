@@ -164,6 +164,48 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
       return;
     }
 
+    // /sair ou /desativar — usuario pede pra parar de receber neste chat.
+    // Desativa o TelegramNotificacao correspondente SEM deletar — permite
+    // reativacao futura via /entrar ou via painel admin.
+    if (texto === '/sair' || texto === '/desativar') {
+      try {
+        const r = await prisma.telegramNotificacao.updateMany({
+          where: { chatId, botTipo, ativo: true },
+          data: { ativo: false },
+        });
+        const msg = r.count > 0
+          ? (botTipo === 'LEMBRETES'
+              ? '👋 Pronto, você não vai mais receber lembretes aqui.\nPra voltar, mande /entrar.'
+              : '👋 Pronto, este chat não vai mais receber alertas do SIMEC.\nPra voltar, mande /entrar.')
+          : 'ℹ️ Este chat já estava desativado (ou nunca foi vinculado).';
+        await enviarMensagem(chatId, msg, botTipo).catch((e) =>
+          console.error(`[TG_WH/${botTipo}] msg /sair falhou:`, e.message));
+      } catch (err) {
+        console.error(`[TG_WH/${botTipo}] /sair falhou:`, err.message);
+      }
+      return;
+    }
+
+    // /entrar ou /ativar — reativa chat desativado.
+    if (texto === '/entrar' || texto === '/ativar') {
+      try {
+        const r = await prisma.telegramNotificacao.updateMany({
+          where: { chatId, botTipo, ativo: false },
+          data: { ativo: true },
+        });
+        const msg = r.count > 0
+          ? (botTipo === 'LEMBRETES'
+              ? '✅ Reativado. Você vai receber seus lembretes aqui novamente.'
+              : '✅ Reativado. Este chat volta a receber alertas do SIMEC.')
+          : 'ℹ️ Este chat já está ativo (ou nunca foi vinculado).';
+        await enviarMensagem(chatId, msg, botTipo).catch((e) =>
+          console.error(`[TG_WH/${botTipo}] msg /entrar falhou:`, e.message));
+      } catch (err) {
+        console.error(`[TG_WH/${botTipo}] /entrar falhou:`, err.message);
+      }
+      return;
+    }
+
     if (texto.startsWith('/conectar')) {
       const token = texto.split(/\s+/)[1];
       if (!token) {
