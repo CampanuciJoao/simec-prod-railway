@@ -164,10 +164,11 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
       return;
     }
 
-    // /sair ou /desativar — usuario pede pra parar de receber neste chat.
-    // Desativa o TelegramNotificacao correspondente SEM deletar — permite
-    // reativacao futura via /entrar ou via painel admin.
-    if (texto === '/sair' || texto === '/desativar') {
+    // Comandos pra sair / desativar — usuario pede pra parar de receber neste
+    // chat. Desativa o TelegramNotificacao SEM deletar (permite reativacao).
+    // Aceita varias grafias comuns pra nao frustrar o usuario.
+    const COMANDOS_SAIR = ['/sair', '/exit', '/stop', '/parar', '/cancelar', '/off', '/desativar'];
+    if (COMANDOS_SAIR.includes(texto.toLowerCase())) {
       try {
         const r = await prisma.telegramNotificacao.updateMany({
           where: { chatId, botTipo, ativo: true },
@@ -186,8 +187,9 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
       return;
     }
 
-    // /entrar ou /ativar — reativa chat desativado.
-    if (texto === '/entrar' || texto === '/ativar') {
+    // Comandos pra reativar chat desativado.
+    const COMANDOS_ENTRAR = ['/entrar', '/ativar', '/on', '/voltar'];
+    if (COMANDOS_ENTRAR.includes(texto.toLowerCase())) {
       try {
         const r = await prisma.telegramNotificacao.updateMany({
           where: { chatId, botTipo, ativo: false },
