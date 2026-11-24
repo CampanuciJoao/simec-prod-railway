@@ -109,11 +109,11 @@ function ModalLembrete({
         entidadeLabel: lembreteInicial.entidadeLabel || '',
       });
     } else {
-      // Default: amanha nesse mesmo horario, atribuido pra mim mesmo,
-      // Telegram ligado por padrao (canal mais eficaz pro usuario).
-      const amanha = new Date();
-      amanha.setDate(amanha.getDate() + 1);
-      const { data, hora } = dividirDataHora(amanha.toISOString());
+      // Default: HOJE + 15 minutos. Pequeno horizonte adiante do agora,
+      // suficiente pra o usuario editar antes do dispatch mas perto o
+      // bastante pro caso mais comum (lembrete "pra daqui a pouco").
+      const quandoDefault = new Date(Date.now() + 15 * 60 * 1000);
+      const { data, hora } = dividirDataHora(quandoDefault.toISOString());
       setForm({
         titulo: '',
         descricao: '',
