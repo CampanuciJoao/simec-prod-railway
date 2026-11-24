@@ -82,6 +82,7 @@ function ModalLembrete({
     canalTelegram: true,
     canalTelegramGrupo: false,
     canalEmail: false,
+    alertasAntes: [], // minutos antes do horario
     entidadeTipo: '',
     entidadeId: '',
     entidadeLabel: '',
@@ -110,6 +111,7 @@ function ModalLembrete({
         canalTelegram: canais.includes('TELEGRAM'),
         canalTelegramGrupo: canais.includes('TELEGRAM_GRUPO'),
         canalEmail: canais.includes('EMAIL'),
+        alertasAntes: Array.isArray(lembreteInicial.alertasAntes) ? lembreteInicial.alertasAntes : [],
         entidadeTipo: lembreteInicial.entidadeTipo || '',
         entidadeId: lembreteInicial.entidadeId || '',
         entidadeLabel: lembreteInicial.entidadeLabel || '',
@@ -130,6 +132,7 @@ function ModalLembrete({
         canalTelegram: true,
         canalTelegramGrupo: false,
         canalEmail: false,
+        alertasAntes: [],
         entidadeTipo: entidadeVinculo?.tipo || '',
         entidadeId: entidadeVinculo?.id || '',
         entidadeLabel: entidadeVinculo?.label || '',
@@ -195,6 +198,7 @@ function ModalLembrete({
         lembrarEm,
         recorrencia: form.recorrencia,
         canais,
+        alertasAntes: Array.from(new Set(form.alertasAntes || [])),
         destinatarioId: form.destinatarioId || usuarioAtual?.id,
         entidadeTipo: form.entidadeTipo || null,
         entidadeId: form.entidadeTipo ? form.entidadeId : null,
@@ -335,6 +339,12 @@ function ModalLembrete({
               />
             </div>
 
+            {/* Alertas antecipados — avisos extra antes do horario marcado */}
+            <AlertasAntesPicker
+              valor={form.alertasAntes}
+              onChange={(v) => handleChange('alertasAntes', v)}
+            />
+
             {/* Aviso quando o proprio usuario e o destinatario e nao vinculou
                 o Telegram privado — oferece o modal de vinculacao na hora. */}
             {form.canalTelegram
@@ -412,6 +422,76 @@ function ModalLembrete({
         onClose={() => setVinculoModalOpen(false)}
         onChange={() => setVinculoModalOpen(false)}
       />
+    </div>
+  );
+}
+
+/**
+ * Picker de "avisar antes" — toggles de minutos. Usuario marca quantos
+ * quiser. Lista fechada pra corresponder ao backend (ALERTAS_ANTES_VALIDOS).
+ */
+const OPCOES_ALERTAS_ANTES = [
+  { valor: 5,     label: '5 min' },
+  { valor: 15,    label: '15 min' },
+  { valor: 30,    label: '30 min' },
+  { valor: 60,    label: '1 hora' },
+  { valor: 120,   label: '2 horas' },
+  { valor: 360,   label: '6 horas' },
+  { valor: 720,   label: '12 horas' },
+  { valor: 1440,  label: '1 dia' },
+  { valor: 2880,  label: '2 dias' },
+  { valor: 10080, label: '1 semana' },
+];
+
+function AlertasAntesPicker({ valor, onChange }) {
+  const selecionados = new Set(Array.isArray(valor) ? valor : []);
+  const toggle = (v) => {
+    const novo = new Set(selecionados);
+    if (novo.has(v)) novo.delete(v);
+    else novo.add(v);
+    onChange(Array.from(novo).sort((a, b) => b - a));
+  };
+
+  return (
+    <div
+      className="rounded-xl border p-3"
+      style={{ borderColor: 'var(--border-soft)' }}
+    >
+      <p
+        className="mb-2 text-xs font-semibold uppercase tracking-wider"
+        style={{ color: 'var(--text-muted)' }}
+      >
+        Avisar antes (opcional)
+      </p>
+      <p className="mb-3 text-xs" style={{ color: 'var(--text-muted)' }}>
+        Além da notificação no horário, você pode receber lembretes antecipados
+        pelos mesmos canais marcados acima.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {OPCOES_ALERTAS_ANTES.map((op) => {
+          const ativo = selecionados.has(op.valor);
+          return (
+            <button
+              key={op.valor}
+              type="button"
+              onClick={() => toggle(op.valor)}
+              className="rounded-full px-3 py-1.5 text-xs font-semibold transition"
+              style={{
+                backgroundColor: ativo ? 'var(--brand-primary)' : 'var(--bg-surface-subtle)',
+                color: ativo ? '#ffffff' : 'var(--text-secondary)',
+                border: `1px solid ${ativo ? 'var(--brand-primary)' : 'var(--border-soft)'}`,
+              }}
+            >
+              {op.label}
+            </button>
+          );
+        })}
+      </div>
+      {selecionados.size > 0 && (
+        <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+          {selecionados.size} aviso(s) antecipado(s) selecionado(s).
+        </p>
+      )}
     </div>
   );
 }

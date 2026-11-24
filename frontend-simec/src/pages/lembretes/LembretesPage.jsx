@@ -67,6 +67,17 @@ const STATUS_INFO = {
   DESCARTADO: { label: 'Descartado',  bg: 'var(--bg-surface-subtle)',    color: 'var(--text-muted)' },
 };
 
+function formatarDuracaoRelativa(min) {
+  if (min < 60) return `${min}min`;
+  if (min < 1440) {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m === 0 ? `${h}h` : `${h}h${m}`;
+  }
+  const d = Math.round(min / 1440);
+  return `${d}d`;
+}
+
 function formatarDataHora(iso) {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '—';
@@ -401,6 +412,18 @@ function LembreteCard({
             {Array.isArray(l.canais) && l.canais.length > 0 && (
               <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider">
                 {l.canais.filter((c) => c !== 'PAINEL').map((c) => c.toLowerCase()).join(' · ') || 'só painel'}
+              </span>
+            )}
+            {Array.isArray(l.alertasAntes) && l.alertasAntes.length > 0 && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                style={{
+                  backgroundColor: 'var(--color-warning-soft)',
+                  color: 'var(--color-warning)',
+                }}
+                title={`Avisos antecipados: ${l.alertasAntes.map(formatarDuracaoRelativa).join(', ')}`}
+              >
+                ⏰ {l.alertasAntes.length} aviso(s) antes
               </span>
             )}
           </div>

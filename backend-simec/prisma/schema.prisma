@@ -2442,6 +2442,15 @@ model Lembrete {
   // (PAINEL, TELEGRAM, EMAIL). PAINEL e sempre enviado — os demais sao opt-in.
   canais String[] @default([])
 
+  // Avisos antecipados: minutos antes do lembrarEm pra enviar um lembrete
+  // extra ("reuniao em 15 min", "prazo em 1 dia"). Ex: [1440, 60, 15] dispara
+  // 1 dia, 1 hora e 15 minutos antes. Reusa os mesmos canais do lembrete
+  // principal. Nao bloqueia o disparo principal (sao independentes).
+  alertasAntes     Int[] @default([]) @map("alertas_antes")
+  // Dedup: quais minutos (de alertasAntes) o worker ja disparou. Garante
+  // idempotencia mesmo se o worker rodar duas vezes antes de atualizar.
+  avisosDisparados Int[] @default([]) @map("avisos_disparados")
+
   // Vinculo opcional a uma entidade. Permite "lembrar sobre a OS #123".
   // Nao cria FK por simplicidade (entidade pode ser deletada sem afetar o
   // lembrete, que vira texto solto nesse caso).

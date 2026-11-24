@@ -11,6 +11,10 @@ import { enviarMensagem, telegramConfigurado, formatarAlerta } from '../telegram
 // TELEGRAM_GRUPO — adiciona tambem os chats de grupo do tenant (usuarioId null).
 // EMAIL    — envia pro email do destinatario.
 const CANAIS_VALIDOS = new Set(['PAINEL', 'TELEGRAM', 'TELEGRAM_GRUPO', 'EMAIL']);
+
+// Opcoes validas pra alertasAntes (em minutos). Mantem a lista fechada
+// pra evitar que o front mande valores bizarros. Max 7 dias (10080 min).
+const ALERTAS_ANTES_VALIDOS = new Set([5, 10, 15, 30, 60, 120, 180, 360, 720, 1440, 2880, 4320, 10080]);
 const RECORRENCIAS_VALIDAS = new Set(['UNICA', 'DIARIA', 'SEMANAL', 'MENSAL']);
 const ENTIDADE_TIPOS = new Set(['OS_CORRETIVA', 'EQUIPAMENTO', 'UNIDADE', 'SEGURO', 'CONTRATO']);
 
@@ -59,6 +63,15 @@ function validarPayload(payload, { parcial = false } = {}) {
     erros.push('Entidade vinculada exige entidadeId.');
   }
 
+  if (payload.alertasAntes !== undefined) {
+    if (!Array.isArray(payload.alertasAntes)) {
+      erros.push('alertasAntes deve ser uma lista de minutos.');
+    } else {
+      const invalidos = payload.alertasAntes.filter((n) => !Number.isInteger(n) || !ALERTAS_ANTES_VALIDOS.has(n));
+      if (invalidos.length) erros.push(`alertasAntes invalidos: ${invalidos.join(', ')}.`);
+    }
+  }
+
   return erros;
 }
 
@@ -72,6 +85,7 @@ export async function criarLembrete({
   lembrarEm,
   recorrencia = 'UNICA',
   canais = ['PAINEL'],
+  alertasAntes = [],
   entidadeTipo,
   entidadeId,
   entidadeLabel,
@@ -81,6 +95,7 @@ export async function criarLembrete({
     lembrarEm,
     recorrencia,
     canais,
+    alertasAntes,
     entidadeTipo,
     entidadeId,
   };
@@ -101,6 +116,10 @@ export async function criarLembrete({
   // PAINEL e sempre entregue; garante que esta no array mesmo que o front omita.
   const canaisFinais = Array.from(new Set(['PAINEL', ...(canais || [])]));
 
+  // Dedup + ordena desc (pro worker processar do maior pro menor coerentemente).
+  const alertasAntesFinais = Array.from(new Set((alertasAntes || []).filter((n) => ALERTAS_ANTES_VALIDOS.has(n))))
+    .sort((a, b) => b - a);
+
   const lembrete = await prisma.lembrete.create({
     data: {
       tenantId,
@@ -111,6 +130,7 @@ export async function criarLembrete({
       lembrarEm: new Date(lembrarEm),
       recorrencia,
       canais: canaisFinais,
+      alertasAntes: alertasAntesFinais,
       entidadeTipo: entidadeTipo || null,
       entidadeId: entidadeId || null,
       entidadeLabel: entidadeLabel?.trim() || null,
@@ -200,6 +220,13 @@ export async function atualizarLembrete({ id, tenantId, usuarioId, patch }) {
   if (patch.lembrarEm !== undefined)   data.lembrarEm = new Date(patch.lembrarEm);
   if (patch.recorrencia !== undefined) data.recorrencia = patch.recorrencia;
   if (patch.canais !== undefined)      data.canais = Array.from(new Set(['PAINEL', ...patch.canais]));
+  if (patch.alertasAntes !== undefined) {
+    data.alertasAntes = Array.from(new Set((patch.alertasAntes || []).filter((n) => ALERTAS_ANTES_VALIDOS.has(n))))
+      .sort((a, b) => b - a);
+    // Reset dos avisos ja disparados — permite reenviar se o usuario mudou
+    // a lista ou a data.
+    data.avisosDisparados = [];
+  }
   if (patch.entidadeTipo !== undefined) {
     data.entidadeTipo = patch.entidadeTipo || null;
     data.entidadeId = patch.entidadeId || null;
@@ -323,7 +350,7 @@ function montarLinkEntidade(lembrete) {
   return `${prefixo}/${lembrete.entidadeId}`;
 }
 
-async function enviarPeloTelegram(lembrete) {
+async function enviarPeloTelegram(lembrete, { avisoAntesMinutos = 0 } = {}) {
   // Lembretes usam o bot dedicado (@Lembretes-SIMEC) — separado do bot de
   // alertas do sistema. Fallback: se o token do bot de lembretes nao estiver
   // configurado, nao envia (evita que lembrete caia no grupo de alertas).
@@ -359,10 +386,17 @@ async function enviarPeloTelegram(lembrete) {
   }
 
   const link = montarLinkEntidade(lembrete);
+  const ehAviso = avisoAntesMinutos > 0;
+  const prefixo = ehAviso ? `⏰ Em ${formatarDuracaoMin(avisoAntesMinutos)}` : '🔔';
+  const hora = new Date(lembrete.lembrarEm).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit',
+  });
+
   const texto = formatarAlerta({
-    titulo: `🔔 ${lembrete.titulo}`,
+    titulo: `${prefixo}: ${lembrete.titulo}`,
     subtitulo: [
       lembrete.descricao || null,
+      `Agendado para: ${hora}`,
       `Para: ${lembrete.destinatario?.nome || 'voce'}`,
       lembrete.entidadeLabel ? `Referente a: ${lembrete.entidadeLabel}` : null,
     ].filter(Boolean).join('\n'),
@@ -376,7 +410,7 @@ async function enviarPeloTelegram(lembrete) {
   return { ok: sucessos > 0, enviados: sucessos, total: chats.length };
 }
 
-async function enviarPorEmail(lembrete) {
+async function enviarPorEmail(lembrete, { avisoAntesMinutos = 0 } = {}) {
   const emailDest = lembrete.destinatario?.email;
   if (!emailDest) return { ok: false, motivo: 'sem_email' };
 
@@ -391,19 +425,40 @@ async function enviarPorEmail(lembrete) {
   if (lembrete.entidadeLabel) detalhes['Referente a'] = lembrete.entidadeLabel;
   if (lembrete.descricao)     detalhes['Observacao'] = lembrete.descricao;
 
+  const ehAviso = avisoAntesMinutos > 0;
+  const assunto = ehAviso
+    ? `[SIMEC] ⏰ Em ${formatarDuracaoMin(avisoAntesMinutos)}: ${lembrete.titulo}`
+    : `[SIMEC] Lembrete: ${lembrete.titulo}`;
+  const mensagem = ehAviso
+    ? `Aviso antecipado: este lembrete esta marcado pra daqui ${formatarDuracaoMin(avisoAntesMinutos)}.`
+    : 'Voce tem um lembrete programado no SIMEC:';
+
   await enviarEmail({
     para: emailDest,
-    assunto: `[SIMEC] Lembrete: ${lembrete.titulo}`,
+    assunto,
     dadosTemplate: {
       nomeDestinatario: lembrete.destinatario?.nome || 'usuario',
       tituloAlerta: lembrete.titulo,
-      mensagemPrincipal: 'Voce tem um lembrete programado no SIMEC:',
+      mensagemPrincipal: mensagem,
       detalhes,
       textoBotao: link ? 'Abrir' : 'Ver lembretes',
       linkBotao,
     },
   });
   return { ok: true };
+}
+
+/** Formata minutos em algo humano: "15 min", "1h", "2h 30min", "1 dia", "2 dias". */
+function formatarDuracaoMin(minutos) {
+  const abs = Math.abs(minutos);
+  if (abs < 60) return `${abs} min`;
+  if (abs < 1440) {
+    const h = Math.floor(abs / 60);
+    const m = abs % 60;
+    return m === 0 ? `${h}h` : `${h}h ${m}min`;
+  }
+  const dias = Math.round(abs / 1440);
+  return `${dias} ${dias === 1 ? 'dia' : 'dias'}`;
 }
 
 function emitirRealtime(lembrete) {
@@ -426,11 +481,19 @@ function emitirRealtime(lembrete) {
 }
 
 /**
- * Processa todos os lembretes pendentes cuja hora ja chegou.
- * Chamado pelo worker a cada 1min.
+ * Processa todos os lembretes pendentes cuja hora ja chegou + dispara avisos
+ * antecipados dos que ainda estao no futuro mas cruzaram o limiar (ex: "15min
+ * antes" de um lembrete marcado pra daqui 10min).
+ *
+ * Chamado pelo worker a cada 1min. Idempotente — avisos ja enviados ficam em
+ * avisosDisparados, nao dispara 2 vezes.
  */
 export async function processarLembretesPendentes() {
   const agora = new Date();
+
+  // Avisos antecipados primeiro — processa SEPARADO pra nao conflitar com o
+  // disparo principal (que muda status pra ENVIADO).
+  const avisosResultado = await processarAvisosAntecipados({ agora });
 
   const pendentes = await prisma.lembrete.findMany({
     where: {
@@ -442,7 +505,9 @@ export async function processarLembretesPendentes() {
     orderBy: { lembrarEm: 'asc' },
   });
 
-  if (pendentes.length === 0) return { ok: true, processados: 0 };
+  if (pendentes.length === 0) {
+    return { ok: true, processados: 0, avisosAntecipados: avisosResultado };
+  }
 
   let sucessos = 0;
   let falhas = 0;
@@ -476,6 +541,7 @@ export async function processarLembretesPendentes() {
             lembrarEm:      proximaData,
             recorrencia:    lembrete.recorrencia,
             canais:         lembrete.canais,
+            alertasAntes:   lembrete.alertasAntes,
             entidadeTipo:   lembrete.entidadeTipo,
             entidadeId:     lembrete.entidadeId,
             entidadeLabel:  lembrete.entidadeLabel,
@@ -491,5 +557,68 @@ export async function processarLembretesPendentes() {
     }
   }
 
-  return { ok: true, processados: pendentes.length, sucessos, falhas };
+  return { ok: true, processados: pendentes.length, sucessos, falhas, avisosAntecipados: avisosResultado };
+}
+
+/**
+ * Processa avisos antecipados: pra cada lembrete PENDENTE no futuro com
+ * alertasAntes definido, dispara os avisos cujo limiar (lembrarEm - minutos)
+ * ja passou e que ainda nao foram enviados (nao estao em avisosDisparados).
+ *
+ * Idempotente: marca cada aviso enviado em avisosDisparados pra nao duplicar.
+ * Nao altera o status do lembrete — o disparo principal segue separado.
+ */
+async function processarAvisosAntecipados({ agora }) {
+  const candidatos = await prisma.lembrete.findMany({
+    where: {
+      status: 'PENDENTE',
+      lembrarEm: { gt: agora },  // ainda no futuro — o principal ainda nao chegou
+      // Postgres: alertas_antes != '{}' seleciona lembretes com alguma config
+      NOT: { alertasAntes: { equals: [] } },
+    },
+    include: INCLUDE_RELACOES,
+    take: 500,
+  });
+
+  if (candidatos.length === 0) return { avaliados: 0, enviados: 0 };
+
+  let enviados = 0;
+
+  for (const lembrete of candidatos) {
+    const alvoMs = new Date(lembrete.lembrarEm).getTime();
+    const jaDisparados = new Set(lembrete.avisosDisparados || []);
+
+    // Minutos que ainda nao foram disparados e cujo limiar ja chegou.
+    const paraDisparar = (lembrete.alertasAntes || [])
+      .filter((min) => !jaDisparados.has(min))
+      .filter((min) => (alvoMs - min * 60_000) <= agora.getTime());
+
+    if (paraDisparar.length === 0) continue;
+
+    for (const minutos of paraDisparar) {
+      try {
+        const tarefas = [];
+        if (lembrete.canais.includes('TELEGRAM')) {
+          tarefas.push(enviarPeloTelegram(lembrete, { avisoAntesMinutos: minutos })
+            .catch((e) => console.error(`[LEMBRETE_AVISO] telegram falhou:`, e.message)));
+        }
+        if (lembrete.canais.includes('EMAIL')) {
+          tarefas.push(enviarPorEmail(lembrete, { avisoAntesMinutos: minutos })
+            .catch((e) => console.error(`[LEMBRETE_AVISO] email falhou:`, e.message)));
+        }
+        await Promise.all(tarefas);
+
+        // Marca como disparado ATOMICAMENTE (append sem substituir o array).
+        await prisma.lembrete.update({
+          where: { id: lembrete.id },
+          data: { avisosDisparados: { push: minutos } },
+        });
+        enviados += 1;
+      } catch (err) {
+        console.error(`[LEMBRETE_AVISO] erro no lembrete ${lembrete.id} aviso ${minutos}min:`, err.message);
+      }
+    }
+  }
+
+  return { avaliados: candidatos.length, enviados };
 }
