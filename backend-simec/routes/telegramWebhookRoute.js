@@ -105,9 +105,8 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
     ]);
 
     const mensagemOk = record.usuarioId
-      ? '✅ <b>Telegram vinculado!</b>\n\n' +
-        'Pronto — você vai receber seus lembretes do SIMEC aqui no privado, ' +
-        'sem incomodar o grupo.'
+      ? '✅ <b>Telegram vinculado com sucesso!</b>\n\n' +
+        'Seus lembretes do SIMEC vão chegar aqui no chat privado.'
       : '✅ <b>Vinculação concluída!</b>\n\n' +
         'Este chat agora recebe alertas do SIMEC.\n' +
         'Configure os tipos de alerta em:\n' +
