@@ -233,6 +233,43 @@ router.post('/vincular/forcar-webhook', proteger, admin, async (req, res) => {
   res.json({ dominio: base, resultados });
 });
 
+// GET /api/telegram/vincular/meus-tokens — mostra os ultimos tokens do
+// usuario atual com status (usado/expirado/ativo) e qual seria o link do
+// token ativo. Ajuda a diagnosticar o loop "codigo invalido ou expirado".
+router.get('/vincular/meus-tokens', proteger, async (req, res) => {
+  const tokens = await prisma.telegramVinculacaoToken.findMany({
+    where: { tenantId: req.tenantContext, usuarioId: req.usuario.id },
+    orderBy: { createdAt: 'desc' },
+    take: 10,
+    select: {
+      token: true,
+      botTipo: true,
+      usado: true,
+      expiresAt: true,
+      createdAt: true,
+      chatId: true,
+    },
+  });
+
+  const agora = new Date();
+  const enriquecido = tokens.map((t) => ({
+    ...t,
+    estado: t.usado
+      ? 'USADO'
+      : t.expiresAt < agora
+        ? 'EXPIRADO'
+        : 'ATIVO',
+    minutosRestantes: Math.round((t.expiresAt.getTime() - agora.getTime()) / 60000),
+  }));
+
+  const chatsVinculados = await prisma.telegramNotificacao.findMany({
+    where: { tenantId: req.tenantContext, usuarioId: req.usuario.id },
+    select: { chatId: true, botTipo: true, nome: true, ativo: true, createdAt: true },
+  });
+
+  res.json({ tokens: enriquecido, chatsVinculados });
+});
+
 // DELETE /api/telegram/vincular — desvincula o Telegram privado do usuario
 router.delete('/vincular', proteger, async (req, res) => {
   try {
