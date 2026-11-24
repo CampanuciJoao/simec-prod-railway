@@ -65,6 +65,20 @@ import prisma from './services/prismaService.js';
  * Telegram aceita setWebhook repetido com a mesma URL.
  */
 async function autoRegistrarWebhooksTelegram() {
+  // Roda SO no ambiente production. Em qualquer outro ambiente (ex: "Simec
+  // Testes" no Railway), nao registra — senao sobrescreve o webhook do
+  // production, que e unico por bot. A opt-in explicita via
+  // AUTO_REGISTRAR_TELEGRAM_WEBHOOK=1 permite override em dev local se
+  // alguem quiser testar o webhook localmente com um tunnel (ngrok etc).
+  const env = (process.env.RAILWAY_ENVIRONMENT_NAME || process.env.NODE_ENV || '').toLowerCase();
+  const overrideExplicito = process.env.AUTO_REGISTRAR_TELEGRAM_WEBHOOK === '1';
+  const ehProduction = env === 'production';
+
+  if (!ehProduction && !overrideExplicito) {
+    console.log(`[TELEGRAM_WEBHOOK] Ambiente "${env || 'desconhecido'}" — pulando auto-registro (so roda em production).`);
+    return;
+  }
+
   const dominio = process.env.BACKEND_URL
     || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
 
