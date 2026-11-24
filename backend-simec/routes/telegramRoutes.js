@@ -141,20 +141,49 @@ router.get('/vincular/status', proteger, async (req, res) => {
   }
 });
 
-// GET /api/telegram/vincular/debug — diagnostico rapido: quais envs TELEGRAM_*
-// estao presentes e se o getMe de cada bot responde. Nao expoe valores das
-// envs nem tokens — so lista nomes e resultado da chamada.
+// GET /api/telegram/vincular/debug — diagnostico rapido: envs, getMe e estado
+// atual do webhook de cada bot. Nao expoe tokens — so nomes de env e
+// resposta da API Telegram.
 router.get('/vincular/debug', proteger, async (req, res) => {
   const envsTelegram = Object.keys(process.env)
     .filter((k) => k.toUpperCase().startsWith('TELEGRAM'))
     .sort();
 
+  const { obterInfoBot, telegramConfigurado } = await import('../services/telegram/telegramService.js');
+
   async function testarBot(botTipo) {
     try {
-      const { obterInfoBot, telegramConfigurado } = await import('../services/telegram/telegramService.js');
       if (!telegramConfigurado(botTipo)) return { configurado: false };
       const info = await obterInfoBot(botTipo);
-      return { configurado: true, ok: true, username: info?.username, nome: info?.first_name };
+
+      // getWebhookInfo — mostra se o Telegram ja sabe pra onde mandar msgs
+      let webhookInfo = null;
+      try {
+        const { default: fetch } = await import('node-fetch').catch(() => ({ default: globalThis.fetch }));
+        const svc = await import('../services/telegram/telegramService.js');
+        const token = botTipo === 'LEMBRETES'
+          ? (process.env.TELEGRAM_LEMBRETES_BOT_TOKEN || process.env.TELEGRAM_LEMBERETES_BOT_TOKEN)
+          : process.env.TELEGRAM_BOT_TOKEN;
+        if (token) {
+          const r = await fetch(`https://api.telegram.org/bot${token}/getWebhookInfo`);
+          const j = await r.json();
+          webhookInfo = j.result || null;
+        }
+      } catch (e) {
+        webhookInfo = { erro: e.message };
+      }
+
+      return {
+        configurado: true, ok: true,
+        username: info?.username,
+        nome: info?.first_name,
+        webhook: webhookInfo ? {
+          url: webhookInfo.url || null,
+          pendingUpdates: webhookInfo.pending_update_count ?? null,
+          lastErrorDate: webhookInfo.last_error_date || null,
+          lastErrorMessage: webhookInfo.last_error_message || null,
+        } : null,
+      };
     } catch (err) {
       return { configurado: true, ok: false, erro: err.message };
     }
@@ -169,6 +198,39 @@ router.get('/vincular/debug', proteger, async (req, res) => {
     railwayPublicDomain: process.env.RAILWAY_PUBLIC_DOMAIN || null,
     backendUrl: process.env.BACKEND_URL || null,
   });
+});
+
+// POST /api/telegram/vincular/forcar-webhook — forca re-registro dos webhooks
+// usando o Host da propria request (nao depende de RAILWAY_PUBLIC_DOMAIN).
+// Admin-only, idempotente. Usar quando o auto-registro no boot nao funcionou.
+router.post('/vincular/forcar-webhook', proteger, admin, async (req, res) => {
+  const { registrarWebhook, telegramConfigurado } = await import('../services/telegram/telegramService.js');
+
+  // Resolve dominio: body > BACKEND_URL > RAILWAY_PUBLIC_DOMAIN > Host header
+  const dominio =
+    (req.body && req.body.dominio)
+    || process.env.BACKEND_URL
+    || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null)
+    || `${req.protocol}://${req.get('host')}`;
+
+  const base = dominio.replace(/\/$/, '');
+  const resultados = {};
+
+  for (const [botTipo, path] of [['ALERTAS', '/api/telegram/webhook'], ['LEMBRETES', '/api/telegram/webhook-lembretes']]) {
+    if (!telegramConfigurado(botTipo)) {
+      resultados[botTipo] = { configurado: false };
+      continue;
+    }
+    const url = `${base}${path}`;
+    try {
+      const r = await registrarWebhook(url, botTipo);
+      resultados[botTipo] = { ok: true, url, telegramResponse: r };
+    } catch (err) {
+      resultados[botTipo] = { ok: false, url, erro: err.message };
+    }
+  }
+
+  res.json({ dominio: base, resultados });
 });
 
 // DELETE /api/telegram/vincular — desvincula o Telegram privado do usuario
