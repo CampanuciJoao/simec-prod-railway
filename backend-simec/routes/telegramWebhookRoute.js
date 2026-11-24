@@ -47,7 +47,7 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
       await enviarMensagem(chatId,
         '❌ Código inválido ou expirado.\nGere um novo código no SIMEC e tente novamente.',
         botTipo,
-      ).catch(() => {});
+      ).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
       return;
     }
 
@@ -55,7 +55,7 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
       await enviarMensagem(chatId,
         `❌ Este código é pra o outro bot (${record.botTipo}). Abra o link certo no SIMEC.`,
         botTipo,
-      ).catch(() => {});
+      ).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
       return;
     }
 
@@ -83,7 +83,7 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
           ? '✅ <b>Telegram vinculado!</b>\n\nVocê vai receber seus lembretes do SIMEC aqui no privado.'
           : '✅ Este chat já está vinculado ao SIMEC e recebendo alertas.',
         botTipo,
-      ).catch(() => {});
+      ).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
       return;
     }
 
@@ -113,19 +113,24 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
         'Configure os tipos de alerta em:\n' +
         '<i>Cadastros → Notificações Telegram</i>';
 
-    await enviarMensagem(chatId, mensagemOk, botTipo).catch(() => {});
+    await enviarMensagem(chatId, mensagemOk, botTipo).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
   }
 
   router.post('/', async (req, res) => {
     res.sendStatus(200);
 
     const message = req.body?.message;
-    if (!message?.text) return;
+    if (!message?.text) {
+      console.log(`[TG_WH/${botTipo}] update sem message.text — ignorado`);
+      return;
+    }
 
     const chatId   = String(message.chat.id);
     const chatType = message.chat?.type || null;
     const texto    = message.text.trim();
     const nome     = message.from?.first_name || message.chat?.title || null;
+
+    console.log(`[TG_WH/${botTipo}] recebido de chatId=${chatId} (${chatType}) texto="${texto.slice(0, 80)}"`);
 
     // /start TOKEN → self-service
     if (texto.startsWith('/start ')) {
@@ -145,7 +150,7 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
         'Pra vincular este chat ao seu usuário, gere um link no SIMEC em:\n' +
         '<i>Sino → aba Lembretes → "Meu Telegram"</i>\n\n' +
         'Depois clique no link e aperte "Iniciar" — eu vinculo automaticamente.';
-      await enviarMensagem(chatId, botTipo === 'LEMBRETES' ? msgLembretes : msgAlertas, botTipo).catch(() => {});
+      await enviarMensagem(chatId, botTipo === 'LEMBRETES' ? msgLembretes : msgAlertas, botTipo).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
       return;
     }
 
@@ -155,7 +160,7 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
         await enviarMensagem(chatId,
           '❌ Informe o código gerado no SIMEC.\nExemplo: <code>/conectar AB12CD34</code>',
           botTipo,
-        ).catch(() => {});
+        ).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
         return;
       }
       await processarTokenVinculacao({ chatId, tokenCode: token, nome, chatType });
