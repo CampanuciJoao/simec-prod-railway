@@ -55,7 +55,52 @@ import { proteger } from './middleware/authMiddleware.js';
 import { getLlmRuntimeInfo } from './services/ai/llmService.js';
 import { iniciarJobsDeAlertas } from './services/queueService.js';
 import { getFromR2 } from './services/uploads/fileStorageService.js';
+import { registrarWebhook, telegramConfigurado, getBotUsername } from './services/telegram/telegramService.js';
 import prisma from './services/prismaService.js';
+
+/**
+ * Auto-registra os webhooks dos bots no boot. Usa a URL publica do Railway
+ * (RAILWAY_PUBLIC_DOMAIN, exposta automaticamente pelo Railway em servicos
+ * com dominio) ou BACKEND_URL como fallback explicito. Idempotente — o
+ * Telegram aceita setWebhook repetido com a mesma URL.
+ */
+async function autoRegistrarWebhooksTelegram() {
+  const dominio = process.env.BACKEND_URL
+    || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}` : null);
+
+  if (!dominio) {
+    console.warn('[TELEGRAM_WEBHOOK] RAILWAY_PUBLIC_DOMAIN/BACKEND_URL nao definidos — webhook nao foi registrado automaticamente.');
+    return;
+  }
+
+  const base = dominio.replace(/\/$/, '');
+
+  // ALERTAS — rota historica
+  if (telegramConfigurado('ALERTAS')) {
+    try {
+      const url = `${base}/api/telegram/webhook`;
+      const r = await registrarWebhook(url, 'ALERTAS');
+      const username = await getBotUsername('ALERTAS');
+      console.log(`[TELEGRAM_WEBHOOK] ALERTAS (@${username || '?'}) registrado em ${url}: ${JSON.stringify(r)}`);
+    } catch (err) {
+      console.error('[TELEGRAM_WEBHOOK] ALERTAS falhou:', err.message);
+    }
+  }
+
+  // LEMBRETES — rota nova
+  if (telegramConfigurado('LEMBRETES')) {
+    try {
+      const url = `${base}/api/telegram/webhook-lembretes`;
+      const r = await registrarWebhook(url, 'LEMBRETES');
+      const username = await getBotUsername('LEMBRETES');
+      console.log(`[TELEGRAM_WEBHOOK] LEMBRETES (@${username || '?'}) registrado em ${url}: ${JSON.stringify(r)}`);
+    } catch (err) {
+      console.error('[TELEGRAM_WEBHOOK] LEMBRETES falhou:', err.message);
+    }
+  } else {
+    console.log('[TELEGRAM_WEBHOOK] LEMBRETES nao configurado (TELEGRAM_LEMBRETES_BOT_TOKEN ausente).');
+  }
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -267,6 +312,11 @@ httpServer.listen(PORT, '0.0.0.0', async () => {
   } catch (error) {
     console.error('Erro ao iniciar jobs de alertas:', error.message);
   }
+
+  // Auto-registra webhooks do Telegram (nao bloqueia o boot).
+  autoRegistrarWebhooksTelegram().catch((err) => {
+    console.error('[TELEGRAM_WEBHOOK] erro inesperado:', err.message);
+  });
 });
 
 httpServer.timeout = 120000;
