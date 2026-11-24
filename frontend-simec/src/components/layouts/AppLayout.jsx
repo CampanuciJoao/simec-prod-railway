@@ -12,7 +12,7 @@ import { Sidebar, ImpersonacaoBanner } from '@/components/ui';
 import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
 import AppTopbar from '@/components/layouts/AppTopbar';
 import GuardiaoAceiteTermos from '@/components/lgpd/GuardiaoAceiteTermos';
-import { ModalLembrete } from '@/components/lembretes';
+import { ModalLembrete, ModalVincularTelegram } from '@/components/lembretes';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useAlertas } from '@/contexts/AlertasContext';
@@ -63,6 +63,7 @@ function AppLayout() {
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const [modalLembreteOpen, setModalLembreteOpen] = useState(false);
+  const [modalVincularTelegramOpen, setModalVincularTelegramOpen] = useState(false);
 
   const alertsRef = useRef(null);
 
@@ -231,6 +232,11 @@ function AppLayout() {
     setModalLembreteOpen(true);
   }, []);
 
+  const handleAbrirVincularTelegram = useCallback(() => {
+    setAlertsOpen(false);
+    setModalVincularTelegramOpen(true);
+  }, []);
+
   return (
     <GuardiaoAceiteTermos>
       <div
@@ -269,6 +275,7 @@ function AppLayout() {
             onConcluirLembrete={handleConcluirLembrete}
             onMarcarTodosLembretesLidos={handleMarcarTodosLembretesLidos}
             onCriarLembrete={handleCriarLembrete}
+            onAbrirVincularTelegram={handleAbrirVincularTelegram}
           />
 
           <AppBreadcrumb items={breadcrumbItems} />
@@ -291,6 +298,11 @@ function AppLayout() {
           setModalLembreteOpen(false);
           recarregarLembretes?.();
         }}
+      />
+
+      <ModalVincularTelegram
+        open={modalVincularTelegramOpen}
+        onClose={() => setModalVincularTelegramOpen(false)}
       />
     </GuardiaoAceiteTermos>
   );

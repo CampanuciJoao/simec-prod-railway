@@ -8,6 +8,11 @@ import {
   obterInfoBot,
   telegramConfigurado,
 } from '../services/telegram/telegramService.js';
+import {
+  gerarTokenParaUsuario,
+  statusVinculacaoUsuario,
+  desvincularUsuario,
+} from '../services/telegram/telegramVinculacaoService.js';
 
 const router = Router();
 
@@ -102,6 +107,52 @@ router.post('/gerar-token', proteger, admin, async (req, res) => {
   });
 
   res.json({ token: record.token, expiresAt: record.expiresAt });
+});
+
+// ─── Vinculacao self-service do Telegram privado do USUARIO ──────────────────
+// Nao exige admin. Qualquer usuario autenticado pode vincular seu proprio
+// Telegram particular pra receber lembretes no privado.
+
+// POST /api/telegram/vincular/gerar-token
+router.post('/vincular/gerar-token', proteger, async (req, res) => {
+  try {
+    const r = await gerarTokenParaUsuario({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+    });
+    res.status(201).json(r);
+  } catch (err) {
+    console.error('[TELEGRAM_VINCULAR_TOKEN]', err);
+    res.status(500).json({ message: 'Erro ao gerar token de vinculacao.' });
+  }
+});
+
+// GET /api/telegram/vincular/status — polling do modal
+router.get('/vincular/status', proteger, async (req, res) => {
+  try {
+    const r = await statusVinculacaoUsuario({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+    });
+    res.json(r);
+  } catch (err) {
+    console.error('[TELEGRAM_VINCULAR_STATUS]', err);
+    res.status(500).json({ message: 'Erro ao consultar status.' });
+  }
+});
+
+// DELETE /api/telegram/vincular — desvincula o Telegram privado do usuario
+router.delete('/vincular', proteger, async (req, res) => {
+  try {
+    const r = await desvincularUsuario({
+      tenantId: req.tenantContext,
+      usuarioId: req.usuario.id,
+    });
+    res.json(r);
+  } catch (err) {
+    console.error('[TELEGRAM_DESVINCULAR]', err);
+    res.status(500).json({ message: 'Erro ao desvincular.' });
+  }
 });
 
 export default router;

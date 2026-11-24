@@ -1822,6 +1822,16 @@ model TelegramNotificacao {
   nome     String?
   ativo    Boolean @default(true)
 
+  // Quando preenchido, este chat e o PRIVADO de um usuario especifico (DM).
+  // Quando null, e um chat de grupo/departamental que recebe alertas gerais
+  // (comportamento original). Usado pelos lembretes: por default so disparam
+  // no privado do destinatario; chats de grupo ficam opt-in via checkbox.
+  usuarioId String? @map("usuario_id")
+  // Tipo do chat Telegram (private | group | supergroup | channel). Guardado
+  // pra diagnostico e pra evitar que um chat de grupo seja usado como privado
+  // por engano.
+  chatType  String? @map("chat_type")
+
   recebeAlertasContrato          Boolean @default(true)
   recebeAlertasManutencao        Boolean @default(true)
   recebeAlertasSeguro            Boolean @default(true)
@@ -1837,6 +1847,7 @@ model TelegramNotificacao {
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@unique([tenantId, chatId])
+  @@index([tenantId, usuarioId])
   @@map("telegram_notificacoes")
 }
 
@@ -1848,10 +1859,17 @@ model TelegramVinculacaoToken {
   usado     Boolean  @default(false)
   chatId    String?
 
+  // Se preenchido, o token foi gerado por um usuario especifico (via fluxo
+  // self-service "Vincular meu Telegram"). O webhook usa esse campo pra
+  // marcar a TelegramNotificacao resultante como chat privado desse usuario.
+  // Quando null, e o fluxo antigo (admin vincula um chat de grupo).
+  usuarioId String? @map("usuario_id")
+
   createdAt DateTime @default(now())
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
+  @@index([tenantId, usuarioId])
   @@map("telegram_vinculacao_tokens")
 }
 

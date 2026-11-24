@@ -37,6 +37,7 @@ function AppTopbar({
   onConcluirLembrete,
   onMarcarTodosLembretesLidos,
   onCriarLembrete,
+  onAbrirVincularTelegram,
 }) {
   return (
     <header
@@ -101,6 +102,7 @@ function AppTopbar({
                 onConcluirLembrete={onConcluirLembrete}
                 onMarcarTodosLembretesLidos={onMarcarTodosLembretesLidos}
                 onCriarLembrete={onCriarLembrete}
+                onAbrirVincularTelegram={onAbrirVincularTelegram}
               />
             </div>
 
@@ -148,6 +150,7 @@ AppTopbar.propTypes = {
   onConcluirLembrete: PropTypes.func,
   onMarcarTodosLembretesLidos: PropTypes.func,
   onCriarLembrete: PropTypes.func,
+  onAbrirVincularTelegram: PropTypes.func,
 };
 
 export default AppTopbar;

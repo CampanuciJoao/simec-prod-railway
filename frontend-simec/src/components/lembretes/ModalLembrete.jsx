@@ -16,9 +16,11 @@ import { useToast } from '@/contexts/ToastContext';
 import {
   atualizarLembrete,
   criarLembrete,
+  getStatusVinculacaoUsuario,
   getUsuariosTenant,
 } from '@/services/api';
 import { useAuth } from '@/contexts/AuthContext';
+import ModalVincularTelegram from './ModalVincularTelegram';
 
 const RECORRENCIA_OPTIONS = [
   { value: 'UNICA',   label: 'Uma vez (sem repetir)' },
@@ -78,6 +80,7 @@ function ModalLembrete({
     recorrencia: 'UNICA',
     destinatarioId: '',
     canalTelegram: true,
+    canalTelegramGrupo: false,
     canalEmail: false,
     entidadeTipo: '',
     entidadeId: '',
@@ -85,6 +88,8 @@ function ModalLembrete({
   });
   const [usuarios, setUsuarios] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const [vinculoModalOpen, setVinculoModalOpen] = useState(false);
+  const [telegramVinculado, setTelegramVinculado] = useState(null); // null=nao sabe, true/false
 
   const modoEdicao = Boolean(lembreteInicial?.id);
 
@@ -103,6 +108,7 @@ function ModalLembrete({
         recorrencia: lembreteInicial.recorrencia || 'UNICA',
         destinatarioId: lembreteInicial.destinatarioId || '',
         canalTelegram: canais.includes('TELEGRAM'),
+        canalTelegramGrupo: canais.includes('TELEGRAM_GRUPO'),
         canalEmail: canais.includes('EMAIL'),
         entidadeTipo: lembreteInicial.entidadeTipo || '',
         entidadeId: lembreteInicial.entidadeId || '',
@@ -122,6 +128,7 @@ function ModalLembrete({
         recorrencia: 'UNICA',
         destinatarioId: usuarioAtual?.id || '',
         canalTelegram: true,
+        canalTelegramGrupo: false,
         canalEmail: false,
         entidadeTipo: entidadeVinculo?.tipo || '',
         entidadeId: entidadeVinculo?.id || '',
@@ -137,6 +144,17 @@ function ModalLembrete({
       .then((list) => setUsuarios(Array.isArray(list) ? list : []))
       .catch(() => setUsuarios([]));
   }, [open, usuarios.length]);
+
+  // Checa vinculacao Telegram do USUARIO ATUAL quando o modal abre.
+  // Usado pra mostrar aviso quando o destinatario e ele mesmo e nao vinculou.
+  // Simplificacao: so testa o usuario atual — se ele atribui pra outro, o
+  // backend decide se tem canal privado e devolve motivo no retorno.
+  useEffect(() => {
+    if (!open) return;
+    getStatusVinculacaoUsuario()
+      .then((r) => setTelegramVinculado(r?.status === 'vinculado'))
+      .catch(() => setTelegramVinculado(null));
+  }, [open, vinculoModalOpen]);
 
   const usuariosOptions = useMemo(
     () =>
@@ -167,8 +185,9 @@ function ModalLembrete({
       }
 
       const canais = ['PAINEL'];
-      if (form.canalTelegram) canais.push('TELEGRAM');
-      if (form.canalEmail)    canais.push('EMAIL');
+      if (form.canalTelegram)      canais.push('TELEGRAM');
+      if (form.canalTelegramGrupo) canais.push('TELEGRAM_GRUPO');
+      if (form.canalEmail)         canais.push('EMAIL');
 
       const payload = {
         titulo: form.titulo.trim(),
@@ -299,9 +318,15 @@ function ModalLembrete({
             <div className="flex flex-wrap gap-4">
               <Checkbox label="Painel (no sino)" checked disabled />
               <Checkbox
-                label="Telegram"
+                label="Telegram (privado do destinatário)"
                 checked={form.canalTelegram}
                 onChange={(e) => handleChange('canalTelegram', e.target.checked)}
+              />
+              <Checkbox
+                label="Avisar também no grupo"
+                checked={form.canalTelegramGrupo}
+                onChange={(e) => handleChange('canalTelegramGrupo', e.target.checked)}
+                disabled={!form.canalTelegram}
               />
               <Checkbox
                 label="E-mail"
@@ -309,6 +334,34 @@ function ModalLembrete({
                 onChange={(e) => handleChange('canalEmail', e.target.checked)}
               />
             </div>
+
+            {/* Aviso quando o proprio usuario e o destinatario e nao vinculou
+                o Telegram privado — oferece o modal de vinculacao na hora. */}
+            {form.canalTelegram
+              && telegramVinculado === false
+              && form.destinatarioId === usuarioAtual?.id
+              && !form.canalTelegramGrupo && (
+                <div
+                  className="mt-3 flex flex-col gap-2 rounded-lg border px-3 py-2 text-xs sm:flex-row sm:items-center sm:justify-between"
+                  style={{
+                    borderColor: 'var(--color-warning-soft)',
+                    backgroundColor: 'var(--color-warning-surface)',
+                    color: 'var(--color-warning)',
+                  }}
+                >
+                  <span>
+                    Você ainda não vinculou seu Telegram — este lembrete não vai chegar por lá.
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setVinculoModalOpen(true)}
+                  >
+                    Vincular agora
+                  </Button>
+                </div>
+            )}
           </div>
 
           <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border-soft)' }}>
@@ -353,6 +406,12 @@ function ModalLembrete({
           </div>
         </form>
       </div>
+
+      <ModalVincularTelegram
+        open={vinculoModalOpen}
+        onClose={() => setVinculoModalOpen(false)}
+        onChange={() => setVinculoModalOpen(false)}
+      />
     </div>
   );
 }

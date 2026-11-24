@@ -6,7 +6,11 @@ import prisma from '../prismaService.js';
 import { enviarEmail } from '../emailService.js';
 import { enviarMensagem, telegramConfigurado, formatarAlerta } from '../telegram/telegramService.js';
 
-const CANAIS_VALIDOS = new Set(['PAINEL', 'TELEGRAM', 'EMAIL']);
+// PAINEL   — sempre entregue (sino do SIMEC).
+// TELEGRAM — envia no privado do destinatario (TelegramNotificacao com usuarioId).
+// TELEGRAM_GRUPO — adiciona tambem os chats de grupo do tenant (usuarioId null).
+// EMAIL    — envia pro email do destinatario.
+const CANAIS_VALIDOS = new Set(['PAINEL', 'TELEGRAM', 'TELEGRAM_GRUPO', 'EMAIL']);
 const RECORRENCIAS_VALIDAS = new Set(['UNICA', 'DIARIA', 'SEMANAL', 'MENSAL']);
 const ENTIDADE_TIPOS = new Set(['OS_CORRETIVA', 'EQUIPAMENTO', 'UNIDADE', 'SEGURO', 'CONTRATO']);
 
@@ -322,16 +326,31 @@ function montarLinkEntidade(lembrete) {
 async function enviarPeloTelegram(lembrete) {
   if (!telegramConfigurado()) return { ok: false, motivo: 'bot_nao_configurado' };
 
-  // Busca destinos do tenant que optaram por receber lembretes.
-  // Reusa a tabela TelegramNotificacao existente — qualquer chat ativo
-  // marcado como recebeAlertasManutencao (ou criamos um flag novo depois)
-  // recebe lembretes. Simplificado: enviamos pra TODOS os chats ativos do
-  // tenant marcados como ativo. Pode ser filtrado depois se gerar ruido.
+  // Prioridade: enviar NO PRIVADO do destinatario (TelegramNotificacao com
+  // usuarioId = destinatarioId). Chats de grupo (usuarioId null) so entram
+  // se o criador marcou avisarGrupo=true — guardado no array canais como
+  // "TELEGRAM_GRUPO" alem de "TELEGRAM".
+  const avisarGrupo = Array.isArray(lembrete.canais) && lembrete.canais.includes('TELEGRAM_GRUPO');
+
   const chats = await prisma.telegramNotificacao.findMany({
-    where: { tenantId: lembrete.tenantId, ativo: true },
-    select: { chatId: true },
+    where: {
+      tenantId: lembrete.tenantId,
+      ativo: true,
+      OR: [
+        { usuarioId: lembrete.destinatarioId },                       // privado do destinatario
+        ...(avisarGrupo ? [{ usuarioId: null }] : []),                // grupos (opt-in)
+      ],
+    },
+    select: { chatId: true, usuarioId: true },
   });
-  if (chats.length === 0) return { ok: false, motivo: 'sem_chats_ativos' };
+
+  if (chats.length === 0) {
+    return {
+      ok: false,
+      motivo: 'sem_chat_privado_vinculado',
+      detalhe: 'Destinatario nao vinculou o Telegram privado e grupo nao foi marcado.',
+    };
+  }
 
   const link = montarLinkEntidade(lembrete);
   const texto = formatarAlerta({

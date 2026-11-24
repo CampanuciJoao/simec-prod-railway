@@ -10,6 +10,7 @@ import {
   faClock,
   faEye,
   faLink,
+  faPaperPlane,
   faPlus,
   faXmark,
 } from '@fortawesome/free-solid-svg-icons';
@@ -50,6 +51,7 @@ function NotificationsPanel({
   onConcluirLembrete,
   onMarcarTodosLembretesLidos,
   onCriarLembrete,
+  onAbrirVincularTelegram,
 }) {
   const tz = useTenantTimezone();
   const [aba, setAba] = useState('alertas');
@@ -202,6 +204,14 @@ function NotificationsPanel({
                       label="Novo"
                       tone="brand"
                       title="Criar novo lembrete"
+                    />
+                  )}
+                  {onAbrirVincularTelegram && (
+                    <ToolbarButton
+                      onClick={onAbrirVincularTelegram}
+                      icon={faPaperPlane}
+                      label="Meu Telegram"
+                      title="Vincular meu Telegram pra receber lembretes no privado"
                     />
                   )}
                   {onMarcarTodosLembretesLidos && (
@@ -584,6 +594,7 @@ NotificationsPanel.propTypes = {
   onConcluirLembrete: PropTypes.func,
   onMarcarTodosLembretesLidos: PropTypes.func,
   onCriarLembrete: PropTypes.func,
+  onAbrirVincularTelegram: PropTypes.func,
 };
 
 export default NotificationsPanel;

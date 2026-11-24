@@ -17,3 +17,13 @@ export const deleteTelegramDestinatario = (id) =>
 
 export const gerarTelegramToken = () =>
   api.post('/telegram/gerar-token').then((res) => res.data);
+
+// ─── Vinculacao self-service (usuario comum) ─────────────────────────────────
+export const gerarTokenVinculacaoUsuario = () =>
+  api.post('/telegram/vincular/gerar-token').then((res) => res.data);
+
+export const getStatusVinculacaoUsuario = () =>
+  api.get('/telegram/vincular/status').then((res) => res.data);
+
+export const desvincularTelegramUsuario = () =>
+  api.delete('/telegram/vincular').then((res) => res.data);
