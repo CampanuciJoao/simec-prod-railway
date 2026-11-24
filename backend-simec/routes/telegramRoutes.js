@@ -141,6 +141,36 @@ router.get('/vincular/status', proteger, async (req, res) => {
   }
 });
 
+// GET /api/telegram/vincular/debug — diagnostico rapido: quais envs TELEGRAM_*
+// estao presentes e se o getMe de cada bot responde. Nao expoe valores das
+// envs nem tokens — so lista nomes e resultado da chamada.
+router.get('/vincular/debug', proteger, async (req, res) => {
+  const envsTelegram = Object.keys(process.env)
+    .filter((k) => k.toUpperCase().startsWith('TELEGRAM'))
+    .sort();
+
+  async function testarBot(botTipo) {
+    try {
+      const { obterInfoBot, telegramConfigurado } = await import('../services/telegram/telegramService.js');
+      if (!telegramConfigurado(botTipo)) return { configurado: false };
+      const info = await obterInfoBot(botTipo);
+      return { configurado: true, ok: true, username: info?.username, nome: info?.first_name };
+    } catch (err) {
+      return { configurado: true, ok: false, erro: err.message };
+    }
+  }
+
+  const [alertas, lembretes] = await Promise.all([testarBot('ALERTAS'), testarBot('LEMBRETES')]);
+
+  res.json({
+    envsTelegramPresentes: envsTelegram,
+    bots: { ALERTAS: alertas, LEMBRETES: lembretes },
+    nodeEnv: process.env.NODE_ENV || null,
+    railwayPublicDomain: process.env.RAILWAY_PUBLIC_DOMAIN || null,
+    backendUrl: process.env.BACKEND_URL || null,
+  });
+});
+
 // DELETE /api/telegram/vincular — desvincula o Telegram privado do usuario
 router.delete('/vincular', proteger, async (req, res) => {
   try {
