@@ -245,6 +245,11 @@ const alertasWorker = new Worker(
       // Dispara lembretes cuja hora ja chegou. Roda a cada 1min.
       // Leve: so busca ate 200 PENDENTES com lembrarEm <= now.
       const r = await processarLembretesPendentes();
+      if (r.processados > 0) {
+        console.log(
+          `[LEMBRETE_WORKER] processados=${r.processados} sucessos=${r.sucessos} falhas=${r.falhas || 0}`
+        );
+      }
       return { ok: true, ...r };
     }
 
@@ -506,6 +511,62 @@ const alertasWorker = new Worker(
 
 alertasWorker.on('ready', async () => {
   await logQueueState('ALERTAS_WORKER_READY', alertasQueue);
+
+  // Processa lembretes pendentes imediatamente no startup — garante que,
+  // mesmo que o cron 'lembretes-disparar' demore pra agendar depois de um
+  // deploy, lembretes atrasados sejam enviados assim que o worker sobe.
+  try {
+    const r = await processarLembretesPendentes();
+    if (r.processados > 0) {
+      console.log(
+        `[LEMBRETE_WORKER_STARTUP] processados=${r.processados} sucessos=${r.sucessos} falhas=${r.falhas || 0}`
+      );
+    } else {
+      console.log('[LEMBRETE_WORKER_STARTUP] nenhum lembrete pendente');
+    }
+  } catch (err) {
+    console.error('[LEMBRETE_WORKER_STARTUP] erro:', err.message);
+  }
+
+  // Garante que o cron de lembretes esta registrado, mesmo que o server
+  // tenha reiniciado sem passar por iniciarJobsDeAlertas. Idempotente —
+  // removeRepeatableByKey antes de adicionar, pra nao duplicar.
+  try {
+    const repeatables = await alertasQueue.getRepeatableJobs();
+    for (const job of repeatables) {
+      if (job.name === 'lembretes-disparar') {
+        await alertasQueue.removeRepeatableByKey(job.key);
+      }
+    }
+    await alertasQueue.add('lembretes-disparar', {}, {
+      repeat: { every: 60 * 1000 },
+      removeOnComplete: 50,
+      removeOnFail: 20,
+    });
+    console.log('[LEMBRETE_WORKER_STARTUP] cron lembretes-disparar garantido a cada 1min');
+  } catch (err) {
+    console.error('[LEMBRETE_WORKER_STARTUP] falha ao garantir cron:', err.message);
+  }
+
+  // Setinterval local como ultimo recurso: processa a cada 60s diretamente
+  // no processo do worker, sem depender do agendamento BullMQ. Barato
+  // (handler sai cedo quando nao ha pendentes). Trava evita sobrepor com
+  // uma execucao vinda do proprio BullMQ no mesmo instante.
+  let processando = false;
+  setInterval(() => {
+    if (processando) return;
+    processando = true;
+    processarLembretesPendentes()
+      .then((r) => {
+        if (r.processados > 0) {
+          console.log(
+            `[LEMBRETE_WORKER_TICK] processados=${r.processados} sucessos=${r.sucessos} falhas=${r.falhas || 0}`
+          );
+        }
+      })
+      .catch((err) => console.error('[LEMBRETE_WORKER_TICK] erro:', err.message))
+      .finally(() => { processando = false; });
+  }, 60 * 1000);
 });
 
 alertasWorker.on('failed', (job, err) => {
