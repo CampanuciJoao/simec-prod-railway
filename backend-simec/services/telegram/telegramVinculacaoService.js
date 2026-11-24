@@ -14,6 +14,7 @@
 
 import crypto from 'node:crypto';
 import prisma from '../prismaService.js';
+import { getBotUsername } from './telegramService.js';
 
 const TOKEN_TTL_MS   = 15 * 60 * 1000; // 15 minutos
 const TOKEN_LENGTH   = 8;
@@ -60,9 +61,9 @@ export async function gerarTokenParaUsuario({ tenantId, usuarioId }) {
     data: { tenantId, usuarioId, token, expiresAt },
   });
 
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME || null;
+  const botUsername = await getBotUsername();
   const linkTelegram = botUsername
-    ? `https://t.me/${botUsername.replace(/^@/, '')}?start=${token}`
+    ? `https://t.me/${botUsername}?start=${token}`
     : null;
 
   return {
@@ -111,7 +112,7 @@ export async function statusVinculacaoUsuario({ tenantId, usuarioId }) {
     select: { token: true, expiresAt: true },
   });
 
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME || null;
+  const botUsername = await getBotUsername();
 
   if (tokenAtivo) {
     return {
@@ -119,7 +120,7 @@ export async function statusVinculacaoUsuario({ tenantId, usuarioId }) {
       token: tokenAtivo.token,
       expiresAt: tokenAtivo.expiresAt,
       linkTelegram: botUsername
-        ? `https://t.me/${botUsername.replace(/^@/, '')}?start=${tokenAtivo.token}`
+        ? `https://t.me/${botUsername}?start=${tokenAtivo.token}`
         : null,
       botUsername,
     };

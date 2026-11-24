@@ -64,6 +64,36 @@ export async function obterInfoBot() {
   return callApi('getMe', {});
 }
 
+// Cache in-memory do username do bot. getMe nunca retorna null em producao
+// e o username so muda se o admin renomear o bot no BotFather — seguro
+// cachear pra sempre. Se TELEGRAM_BOT_USERNAME estiver no env, usa ele
+// direto (override manual). Senao, descobre via getMe no primeiro acesso.
+let _botUsernameCache = null;
+let _botUsernamePromise = null;
+
+export async function getBotUsername() {
+  if (process.env.TELEGRAM_BOT_USERNAME) {
+    return String(process.env.TELEGRAM_BOT_USERNAME).replace(/^@/, '');
+  }
+  if (_botUsernameCache) return _botUsernameCache;
+  if (!telegramConfigurado()) return null;
+
+  if (!_botUsernamePromise) {
+    _botUsernamePromise = (async () => {
+      try {
+        const info = await obterInfoBot();
+        _botUsernameCache = info?.username || null;
+        return _botUsernameCache;
+      } catch (err) {
+        console.warn('[TELEGRAM] getBotUsername falhou:', err.message);
+        _botUsernamePromise = null; // permite retry
+        return null;
+      }
+    })();
+  }
+  return _botUsernamePromise;
+}
+
 export function formatarAlerta(alerta) {
   const frontendUrl = (process.env.FRONTEND_URL || '').replace(/\/$/, '');
   const prioEmoji  = PRIORIDADE_EMOJI[alerta.prioridade] || '⚪';
