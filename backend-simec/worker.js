@@ -15,6 +15,7 @@ import { processarFalhasSolar } from './services/solar/solarFalhasService.js';
 import { fecharDiaAnterior, fecharMesAnterior } from './services/solar/solarAgregadosService.js';
 import { processarInsightsSolar } from './services/solar/solarInsightsService.js';
 import { refreshTokensSungrow } from './services/solar/sungrowTokenRefreshService.js';
+import { processarLembretesPendentes } from './services/lembretes/lembreteService.js';
 import { sincronizarDadosGehc } from './services/gehc/gehcSyncService.js';
 import { descobrirEquipamentosGehc } from './services/gehc/gehcDiscovery.js';
 import { temCredenciaisConfiguradas } from './services/gehc/gehcAuthService.js';
@@ -237,6 +238,13 @@ const alertasWorker = new Worker(
     if (job?.name === 'solar-insights') {
       // Fase 5 — alertas inteligentes (geracao baixa vs baseline, etc).
       const r = await processarInsightsSolar();
+      return { ok: true, ...r };
+    }
+
+    if (job?.name === 'lembretes-disparar') {
+      // Dispara lembretes cuja hora ja chegou. Roda a cada 1min.
+      // Leve: so busca ate 200 PENDENTES com lembrarEm <= now.
+      const r = await processarLembretesPendentes();
       return { ok: true, ...r };
     }
 

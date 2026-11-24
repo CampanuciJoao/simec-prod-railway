@@ -2,6 +2,7 @@ import { Route, Navigate, useParams } from 'react-router-dom';
 
 import {
   AlertasPage,
+  LembretesPage,
   AuditoriaDetalhadaPage,
   ContratosPage,
   DetalhesContratoPage,
@@ -55,6 +56,7 @@ function OperacionalRouteElements() {
 
       <Route path="relatorios" element={<RelatoriosPage />} />
       <Route path="alertas" element={<AlertasPage />} />
+      <Route path="lembretes" element={<LembretesPage />} />
       <Route path="auditoria/manutencao/:id" element={<AuditoriaDetalhadaPage />} />
 
       <Route path="orcamentos" element={<OrcamentosPage />} />

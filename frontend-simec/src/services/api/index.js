@@ -12,6 +12,7 @@ export * from './emailsNotificacaoApi';
 export * from './equipamentosApi';
 export * from './historicoAtivoApi';
 export * from './helpApi';
+export * from './lembretesApi';
 export * from './lgpdApi';
 export * from './manutencoesApi';
 export * from './pdfApi';

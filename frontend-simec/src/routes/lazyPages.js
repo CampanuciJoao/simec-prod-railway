@@ -71,6 +71,9 @@ export const RelatoriosPage = React.lazy(() =>
 export const AlertasPage = React.lazy(() =>
   import('@/pages/notificacoes/AlertasPage')
 );
+export const LembretesPage = React.lazy(() =>
+  import('@/pages/lembretes/LembretesPage')
+);
 export const EmailsNotificacaoPage = React.lazy(() =>
   import('@/pages/notificacoes/EmailsNotificacaoPage')
 );

@@ -16,6 +16,7 @@ import ConcluirOsModal from '@/components/osCorretiva/ConcluirOsModal';
 import CancelarOsModal from '@/components/osCorretiva/CancelarOsModal';
 import MoverOsEquipamentoModal from '@/components/osCorretiva/MoverOsEquipamentoModal';
 import { PageLayout, PageState, Button, BackButton, AttachmentSection } from '@/components/ui';
+import { BotaoCriarLembrete } from '@/components/lembretes';
 
 const STATUS_COLORS = {
   Aberta: '#2563eb',
@@ -161,6 +162,12 @@ function DetalhesOsCorretivaPage() {
               <FontAwesomeIcon icon={faFilePdf} />
               Exportar PDF
             </Button>
+
+            <BotaoCriarLembrete
+              entidadeTipo="OS_CORRETIVA"
+              entidadeId={os.id}
+              entidadeLabel={`OS ${os.numeroOs ? '#' + os.numeroOs : ''}`.trim()}
+            />
 
             {/* Editar descrição: restrito a admin. Disponivel inclusive em
                 OS Concluida/Cancelada — typo descoberto depois e o caso

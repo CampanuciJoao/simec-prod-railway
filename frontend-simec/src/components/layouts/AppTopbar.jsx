@@ -12,6 +12,7 @@ import {
   NotificationsPanel,
   ThemeModeToggle,
 } from '@/components/ui';
+import { SinoLembretes } from '@/components/lembretes';
 
 function AppTopbar({
   nomeUsuario,
@@ -88,6 +89,8 @@ function AppTopbar({
                 onMarkAllAsRead={onMarkAllAsRead}
               />
             </div>
+
+            <SinoLembretes />
 
             <ThemeModeToggle />
 

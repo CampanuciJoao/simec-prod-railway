@@ -10,6 +10,7 @@ import PageState from '../../components/ui/feedback/PageState';
 import Button from '../../components/ui/primitives/Button';
 
 import ContratoDetalhesSection from '../../components/contratos/ContratoDetalhesSection';
+import { BotaoCriarLembrete } from '@/components/lembretes';
 
 function DetalhesContratoPage() {
   const page = useDetalhesContratoPage();
@@ -88,10 +89,17 @@ function DetalhesContratoPage() {
         subtitle="Visualize as informações completas do contrato"
         icon={faFileContract}
         actions={
-          <Button variant="secondary" onClick={page.goBack}>
-            <FontAwesomeIcon icon={faArrowLeft} />
-            Voltar
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <BotaoCriarLembrete
+              entidadeTipo="CONTRATO"
+              entidadeId={page.contrato?.id}
+              entidadeLabel={`Contrato ${page.contrato?.numeroContrato || ''}`.trim()}
+            />
+            <Button variant="secondary" onClick={page.goBack}>
+              <FontAwesomeIcon icon={faArrowLeft} />
+              Voltar
+            </Button>
+          </div>
         }
       />
 

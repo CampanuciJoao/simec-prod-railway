@@ -520,6 +520,23 @@ export async function iniciarJobsDeAlertas() {
     });
     console.log('[QUEUE] Jobs Solar: poll 60s + watchdog 15min + falhas 10min + agregados diario/mensal + insights diario + sungrow-refresh diario.');
 
+    // Lembretes pessoais: dispara lembretes cuja hora chegou. Cadencia 1min
+    // (trade-off entre latencia percebida e carga). O handler e idempotente
+    // (status=PENDENTE + lembrarEm<=now) — se nao houver pendentes, retorna
+    // cedo sem tocar no banco pesado.
+    const repeatablesLembretes = await queue.getRepeatableJobs();
+    for (const job of repeatablesLembretes) {
+      if (job.name === 'lembretes-disparar') {
+        await queue.removeRepeatableByKey(job.key);
+      }
+    }
+    await queue.add('lembretes-disparar', {}, {
+      repeat: { every: 60 * 1000 },
+      removeOnComplete: 50,
+      removeOnFail: 20,
+    });
+    console.log('[QUEUE] Job Lembretes (lembretes-disparar) agendado a cada 1min.');
+
     await logQueueState('QUEUE_AFTER_INIT');
     return true;
   } catch (error) {

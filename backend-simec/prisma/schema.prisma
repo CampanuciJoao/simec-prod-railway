@@ -70,8 +70,8 @@ model Tenant {
   tiposTesteQualidade       TipoTesteQualidade[]
   testesQualidade           TesteQualidade[]
   alertaFeedbacks           AlertaFeedback[]
-  impersonacoes             Impersonacao[]               @relation("ImpersonacaoTenantAlvo")
-  logsAuditoriaImpersonadas LogAuditoria[]               @relation("LogAuditoriaActedAs")
+  impersonacoes             Impersonacao[]                @relation("ImpersonacaoTenantAlvo")
+  logsAuditoriaImpersonadas LogAuditoria[]                @relation("LogAuditoriaActedAs")
   llmCallLogs               LlmCallLog[]
   solarPlants               SolarPlant[]
   solarInverters            SolarInverter[]
@@ -83,6 +83,7 @@ model Tenant {
   solarAgregadosDiariosInv  SolarAgregadoDiarioInverter[]
   solarAgregadosMensais     SolarAgregadoMensal[]
   rotinasPrediais           RotinaPredial[]
+  lembretes                 Lembrete[]
 
   @@map("tenants")
 }
@@ -119,16 +120,16 @@ model Unidade {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  tenant            Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  anexos            Anexo[]
-  equipamentos      Equipamento[]
-  veiculos          Veiculo[]
-  segurosCobertos   Seguro[]      @relation("SegurosUnidadesCobertas")
-  contratosCobertos Contrato[]    @relation("ContratosUnidadesCobertas")
-  orcamentos        Orcamento[]
-  solarPlants       SolarPlant[]
-  manutencoesPrediais Manutencao[] @relation("ManutencoesPrediaisPorUnidade")
-  rotinasPrediais   RotinaPredial[]
+  tenant              Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  anexos              Anexo[]
+  equipamentos        Equipamento[]
+  veiculos            Veiculo[]
+  segurosCobertos     Seguro[]        @relation("SegurosUnidadesCobertas")
+  contratosCobertos   Contrato[]      @relation("ContratosUnidadesCobertas")
+  orcamentos          Orcamento[]
+  solarPlants         SolarPlant[]
+  manutencoesPrediais Manutencao[]    @relation("ManutencoesPrediaisPorUnidade")
+  rotinasPrediais     RotinaPredial[]
 
   @@unique([tenantId, nomeSistema])
   @@unique([tenantId, cnpj])
@@ -174,6 +175,8 @@ model Usuario {
   alertaFeedbacks          AlertaFeedback[]
   logsAdminCriados         LogAdmin[]
   impersonacoesIniciadas   Impersonacao[]
+  lembretesCriados         Lembrete[]             @relation("LembreteCriadoPor")
+  lembretesRecebidos       Lembrete[]             @relation("LembreteDestinatario")
 
   @@unique([tenantId, username])
   @@unique([tenantId, email])
@@ -183,29 +186,29 @@ model Usuario {
 }
 
 model Equipamento {
-  id               String            @id @default(uuid())
-  tenantId         String
-  tag              String
-  modelo           String
-  tipo             String?
-  setor            String?
-  apelido          String?
-  fabricante       String?
-  anoFabricacao    String?           @map("ano_fabricacao")
-  dataInstalacao   DateTime?         @map("data_instalacao")
-  status           StatusEquipamento @default(Operante)
-  numeroPatrimonio String?           @map("numero_patrimonio")
-  registroAnvisa   String?           @map("registro_anvisa")
-  aeTitle          String?           @map("ae_title")
-  telefoneSuporte  String?           @map("telefone_suporte")
-  observacoes      String?
-  unidadeId        String
+  id                        String            @id @default(uuid())
+  tenantId                  String
+  tag                       String
+  modelo                    String
+  tipo                      String?
+  setor                     String?
+  apelido                   String?
+  fabricante                String?
+  anoFabricacao             String?           @map("ano_fabricacao")
+  dataInstalacao            DateTime?         @map("data_instalacao")
+  status                    StatusEquipamento @default(Operante)
+  numeroPatrimonio          String?           @map("numero_patrimonio")
+  registroAnvisa            String?           @map("registro_anvisa")
+  aeTitle                   String?           @map("ae_title")
+  telefoneSuporte           String?           @map("telefone_suporte")
+  observacoes               String?
+  unidadeId                 String
   // Frequencia da preventiva padrao em meses (3=trimestral, 6=semestral,
   // 12=anual). Null = equipamento sem rotina preventiva cadastrada (nao
   // entra no Controle de Manutencoes).
-  frequenciaPreventivaMeses Int?     @map("frequencia_preventiva_meses")
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  frequenciaPreventivaMeses Int?              @map("frequencia_preventiva_meses")
+  createdAt                 DateTime          @default(now())
+  updatedAt                 DateTime          @updatedAt
 
   tenant            Tenant                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   unidade           Unidade                @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
@@ -318,20 +321,20 @@ model Manutencao {
   dataHoraAgendamentoInicio DateTime? @map("data_hora_agendamento_inicio")
   dataHoraAgendamentoFim    DateTime? @map("data_hora_agendamento_fim")
 
-  dataInicioReal DateTime? @map("data_inicio_real")
-  dataFimReal    DateTime? @map("data_fim_real")
-  dataConclusao  DateTime? @map("data_conclusao")
-  custoTotal     Float?    @map("custo_total")
+  dataInicioReal     DateTime?           @map("data_inicio_real")
+  dataFimReal        DateTime?           @map("data_fim_real")
+  dataConclusao      DateTime?           @map("data_conclusao")
+  custoTotal         Float?              @map("custo_total")
   // Equipamento-Manutencao: categoria=Equipamento exige equipamentoId;
   // Predial exige tipoServicoPredial + unidadeId.
-  categoria              CategoriaManutencao @default(Equipamento)
-  tipoServicoPredial     TipoServicoPredial? @map("tipo_servico_predial")
+  categoria          CategoriaManutencao @default(Equipamento)
+  tipoServicoPredial TipoServicoPredial? @map("tipo_servico_predial")
   // unidadePredialId so e preenchido quando categoria=Predial.
   // Manutencao de equipamento pega a unidade via relacao com Equipamento.
-  unidadePredialId       String?             @map("unidade_predial_id")
-  equipamentoId          String?             @map("equipamento_id")
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  unidadePredialId   String?             @map("unidade_predial_id")
+  equipamentoId      String?             @map("equipamento_id")
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   tenant         Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   equipamento    Equipamento?       @relation(fields: [tenantId, equipamentoId], references: [tenantId, id], onDelete: Cascade)
@@ -1981,45 +1984,45 @@ model TesteQualidade {
 // fisicamente quando diferente da unidade (ex: usina em terreno remoto
 // cujo credito vai pra Sede).
 model SolarPlant {
-  id             String   @id @default(uuid())
-  tenantId       String
-  unidadeId      String   @map("unidade_id")
-  nome           String
+  id                   String   @id @default(uuid())
+  tenantId             String
+  unidadeId            String   @map("unidade_id")
+  nome                 String
   // Endereco descritivo quando a planta nao fica na propria unidade
   // beneficiaria (ex: "Fazenda Rancho Terra - Zona Rural Dourados").
   // Null = instalada dentro da unidade.
-  localFisico    String?  @map("local_fisico")
+  localFisico          String?  @map("local_fisico")
   // Capacidade nominal da usina em kWp (pico). Usado pra calcular
   // performance ratio e produzir alerta quando geracao < X% do esperado.
-  capacidadeKwp  Float?   @map("capacidade_kwp")
+  capacidadeKwp        Float?   @map("capacidade_kwp")
   // Tarifa de energia da unidade beneficiaria em R$/kWh. Usado pra
   // calcular "R$ economizados no mes". Default R$ 0.85 (media MS).
-  tarifaKwh      Float?   @map("tarifa_kwh")
+  tarifaKwh            Float?   @map("tarifa_kwh")
   // Indica se a planta tem bateria (habilita monitoramento SoC + alertas
   // de queda de energia). false = planta so de geracao.
-  temBateria     Boolean  @default(false) @map("tem_bateria")
+  temBateria           Boolean  @default(false) @map("tem_bateria")
   // Horas tipicas de autonomia (so plantas com bateria). Usado pra
   // mostrar "autonomia restante" no painel.
-  autonomiaHoras Float?   @map("autonomia_horas")
+  autonomiaHoras       Float?   @map("autonomia_horas")
   // Minutos sem snapshot antes do watchdog alertar MEDIA. Default 60
   // (1h). Tier ALTA (3h) e fixo. Configurar null mantem o default do
   // codigo. Usar numero maior em plantas com conectividade intermitente
   // conhecida (ex: zona rural com 3G).
-  alertaOfflineMinutos Int? @map("alerta_offline_minutos")
-  ativo          Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  alertaOfflineMinutos Int?     @map("alerta_offline_minutos")
+  ativo                Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
-  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  unidade   Unidade         @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
-  inverters SolarInverter[]
-  baterias  SolarBattery[]
-  snapshots SolarSnapshot[]
-  quedas    SolarOutage[]
-  falhas    SolarFalha[]
-  agregadosDiarios     SolarAgregadoDiario[]
-  agregadosDiariosInv  SolarAgregadoDiarioInverter[]
-  agregadosMensais     SolarAgregadoMensal[]
+  tenant              Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  unidade             Unidade                       @relation(fields: [tenantId, unidadeId], references: [tenantId, id], onDelete: Cascade)
+  inverters           SolarInverter[]
+  baterias            SolarBattery[]
+  snapshots           SolarSnapshot[]
+  quedas              SolarOutage[]
+  falhas              SolarFalha[]
+  agregadosDiarios    SolarAgregadoDiario[]
+  agregadosDiariosInv SolarAgregadoDiarioInverter[]
+  agregadosMensais    SolarAgregadoMensal[]
 
   // Sem UNIQUE(tenantId, unidadeId) — uma unidade pode ter N plantas
   // (ex: 1 planta na sede + 1 planta em terreno remoto, ambas creditam
@@ -2041,33 +2044,33 @@ model SolarPlant {
 //   - "sungrow"  -> cliente HTTP RSA-signature + iSolarCloud OpenAPI
 //   - novos providers: 1 arquivo adapter por fabricante
 model SolarInverter {
-  id              String   @id @default(uuid())
-  plantId         String   @map("plant_id")
-  tenantId        String
+  id                String    @id @default(uuid())
+  plantId           String    @map("plant_id")
+  tenantId          String
   // Identificador do adapter em codigo. Enum validada no backend.
-  provider        String
-  nome            String?
-  inverterSn      String   @map("inverter_sn")
-  modeloInversor  String?  @map("modelo_inversor")
-  capacidadeKw    Float?   @map("capacidade_kw")
+  provider          String
+  nome              String?
+  inverterSn        String    @map("inverter_sn")
+  modeloInversor    String?   @map("modelo_inversor")
+  capacidadeKw      Float?    @map("capacidade_kw")
   // Credencial(ais) do fabricante, criptografada(s) AES-256-GCM. Para
   // providers que exigem mais de 1 campo (ex: Sungrow = API Key + Access
   // Key + RSA Key), guardamos tudo serializado em JSON criptografado.
   // Formato: '<iv_hex>:<authTag_hex>:<ciphertext_hex_do_JSON>'.
-  credentialCrypt String   @map("credential_crypt") @db.Text
+  credentialCrypt   String    @map("credential_crypt") @db.Text
   // Base URL da API (ex: https://www.foxesscloud.com,
   // https://openapi.growatt.com, https://gateway.isolarcloud.eu).
-  apiBase         String   @map("api_base")
-  ativo           Boolean  @default(true)
+  apiBase           String    @map("api_base")
+  ativo             Boolean   @default(true)
   // Diagnostico OAuth (Sungrow) — ultima tentativa de autorizacao
   // (authorize-url ou callback). Permite a UI mostrar porque a autorizacao
   // nao concluiu sem precisar de log do Railway.
-  lastAuthAttemptAt   DateTime? @map("last_auth_attempt_at")
-  lastAuthError       String?   @map("last_auth_error") @db.Text
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  lastAuthAttemptAt DateTime? @map("last_auth_attempt_at")
+  lastAuthError     String?   @map("last_auth_error") @db.Text
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  plant     SolarPlant      @relation(fields: [plantId], references: [id], onDelete: Cascade)
+  plant            SolarPlant                    @relation(fields: [plantId], references: [id], onDelete: Cascade)
   tenant           Tenant                        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   snapshots        SolarSnapshot[]
   falhas           SolarFalha[]
@@ -2194,31 +2197,31 @@ model SolarOutage {
 // nivel segue a doc Sungrow: 1=fault, 2=alarm, 3=warn, 4=suggestion.
 // Adapters de outros fabricantes normalizam pra esse enum.
 model SolarFalha {
-  id             String   @id @default(uuid())
-  tenantId       String
-  plantId        String   @map("plant_id")
-  inverterId     String   @map("inverter_id")
-  provider       String   // "sungrow" | "foxess" | "growatt"
+  id                  String    @id @default(uuid())
+  tenantId            String
+  plantId             String    @map("plant_id")
+  inverterId          String    @map("inverter_id")
+  provider            String // "sungrow" | "foxess" | "growatt"
   // Codigo unico da falha segundo a API do fabricante. Usado como chave
   // de deduplicacao. Ex Sungrow: "66296.202408.5516fd3031855".
-  codigoExterno  String   @map("codigo_externo")
+  codigoExterno       String    @map("codigo_externo")
   // Codigo normalizado do tipo de falha (ex: fault_type_code=60005 =
   // "Grid Power Outage" na Sungrow). Null quando nao mapeavel.
-  codigoTipo     String?  @map("codigo_tipo")
-  nome           String   // Nome legivel: "Grid Overvoltage", etc
-  descricao      String?  @db.Text
+  codigoTipo          String?   @map("codigo_tipo")
+  nome                String // Nome legivel: "Grid Overvoltage", etc
+  descricao           String?   @db.Text
   // 1=fault | 2=alarm | 3=warn | 4=suggestion (convencao Sungrow)
-  nivel          Int
+  nivel               Int
   // Codigo real do dispositivo (fault_reason). Multiplos separados por "|".
-  codigoReason   String?  @map("codigo_reason")
-  reportadaEm    DateTime @map("reportada_em")
-  resolvidaEm    DateTime? @map("resolvida_em")
+  codigoReason        String?   @map("codigo_reason")
+  reportadaEm         DateTime  @map("reportada_em")
+  resolvidaEm         DateTime? @map("resolvida_em")
   // Quando o adapter ultimo viu essa falha ativa (pra heuristica de
   // resolucao automatica: se nao viu por 2h = considera resolvida).
-  ultimaConfirmacaoEm DateTime @map("ultima_confirmacao_em")
-  rawPayload     Json?    @map("raw_payload")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  ultimaConfirmacaoEm DateTime  @map("ultima_confirmacao_em")
+  rawPayload          Json?     @map("raw_payload")
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
   tenant   Tenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plant    SolarPlant    @relation(fields: [plantId], references: [id], onDelete: Cascade)
@@ -2264,25 +2267,25 @@ model SolarAgregadoDiarioInverter {
 }
 
 model SolarAgregadoDiario {
-  id              String   @id @default(uuid())
-  tenantId        String
-  plantId         String   @map("plant_id")
+  id                  String   @id @default(uuid())
+  tenantId            String
+  plantId             String   @map("plant_id")
   // Data representando o dia (00:00 UTC). Unicidade por planta + dia.
-  dia             DateTime @db.Date
-  kwhGerado       Float?   @map("kwh_gerado")
-  kwhConsumidoRede Float?  @map("kwh_consumido_rede")
-  kwhExportadoRede Float?  @map("kwh_exportado_rede")
-  valorEconomizadoBrl Float? @map("valor_economizado_brl")
-  horasOffline    Float?   @map("horas_offline")
-  falhasAbertas   Int      @default(0) @map("falhas_abertas")
-  falhasResolvidas Int     @default(0) @map("falhas_resolvidas")
-  picosKw         Float?   @map("picos_kw") // potencia maxima do dia
-  tempMaxC        Float?   @map("temp_max_c") // temperatura inversor max
+  dia                 DateTime @db.Date
+  kwhGerado           Float?   @map("kwh_gerado")
+  kwhConsumidoRede    Float?   @map("kwh_consumido_rede")
+  kwhExportadoRede    Float?   @map("kwh_exportado_rede")
+  valorEconomizadoBrl Float?   @map("valor_economizado_brl")
+  horasOffline        Float?   @map("horas_offline")
+  falhasAbertas       Int      @default(0) @map("falhas_abertas")
+  falhasResolvidas    Int      @default(0) @map("falhas_resolvidas")
+  picosKw             Float?   @map("picos_kw") // potencia maxima do dia
+  tempMaxC            Float?   @map("temp_max_c") // temperatura inversor max
   // Performance Ratio aproximado (so calcula se capacidadeKwp conhecida):
   // kwhGerado / (capacidadeKwp * horas de sol estimado 5h). 0.0-1.5.
-  prAprox         Float?   @map("pr_aprox")
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  prAprox             Float?   @map("pr_aprox")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plant  SolarPlant @relation(fields: [plantId], references: [id], onDelete: Cascade)
@@ -2301,26 +2304,26 @@ model SolarAgregadoDiario {
 // Usado no card "Este mes" do monitoramento e como fonte unica do PDF
 // de relatorio mensal (um registro = uma pagina de relatorio).
 model SolarAgregadoMensal {
-  id               String   @id @default(uuid())
-  tenantId         String
-  plantId          String   @map("plant_id")
-  ano              Int
-  mes              Int      // 1-12
-  kwhGerado        Float?   @map("kwh_gerado")
-  kwhConsumidoRede Float?   @map("kwh_consumido_rede")
-  kwhExportadoRede Float?   @map("kwh_exportado_rede")
-  valorEconomizadoBrl Float? @map("valor_economizado_brl")
-  horasOffline     Float?   @map("horas_offline")
-  falhasTotal      Int      @default(0) @map("falhas_total")
-  quedasTotal      Int      @default(0) @map("quedas_total")
-  diasComGeracao   Int?     @map("dias_com_geracao")
-  picosKw          Float?   @map("picos_kw")
-  prAproxMedio     Float?   @map("pr_aprox_medio")
+  id                     String   @id @default(uuid())
+  tenantId               String
+  plantId                String   @map("plant_id")
+  ano                    Int
+  mes                    Int // 1-12
+  kwhGerado              Float?   @map("kwh_gerado")
+  kwhConsumidoRede       Float?   @map("kwh_consumido_rede")
+  kwhExportadoRede       Float?   @map("kwh_exportado_rede")
+  valorEconomizadoBrl    Float?   @map("valor_economizado_brl")
+  horasOffline           Float?   @map("horas_offline")
+  falhasTotal            Int      @default(0) @map("falhas_total")
+  quedasTotal            Int      @default(0) @map("quedas_total")
+  diasComGeracao         Int?     @map("dias_com_geracao")
+  picosKw                Float?   @map("picos_kw")
+  prAproxMedio           Float?   @map("pr_aprox_medio")
   // Comparativo com mes anterior (preenchido na virada do mes):
   // 0.15 = +15%; -0.08 = -8%.
-  variacaoKwhMesAnterior Float? @map("variacao_kwh_mes_anterior")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  variacaoKwhMesAnterior Float?   @map("variacao_kwh_mes_anterior")
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
 
   tenant Tenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   plant  SolarPlant @relation(fields: [plantId], references: [id], onDelete: Cascade)
@@ -2359,4 +2362,79 @@ model RotinaPredial {
   @@unique([tenantId, unidadeId, tipoServicoPredial])
   @@index([tenantId, ativa])
   @@map("rotinas_prediais")
+}
+
+// ─── Lembretes pessoais ──────────────────────────────────────────────────────
+//
+// Lembretes criados por usuarios, atribuiveis a outro usuario do mesmo tenant.
+// Entrega multi-canal (painel + Telegram + email) no horario marcado.
+// Suporta recorrencia (1x, diario, semanal, mensal) e vinculo opcional a uma
+// entidade do SIMEC (OS corretiva, equipamento, unidade, seguro).
+//
+// Fluxo:
+//   PENDENTE -> (worker dispara no lembrarEm) -> ENVIADO
+//   usuario pode marcar CONCLUIDO ou DESCARTADO a qualquer momento.
+//   Se recorrente, apos ENVIADO o worker calcula proxima ocorrencia e cria
+//   NOVO lembrete filho com status=PENDENTE (mantem o historico).
+enum LembreteStatus {
+  PENDENTE
+  ENVIADO
+  CONCLUIDO
+  DESCARTADO
+}
+
+enum LembreteRecorrencia {
+  UNICA
+  DIARIA
+  SEMANAL
+  MENSAL
+}
+
+enum LembreteEntidadeTipo {
+  OS_CORRETIVA
+  EQUIPAMENTO
+  UNIDADE
+  SEGURO
+  CONTRATO
+}
+
+model Lembrete {
+  id             String              @id @default(uuid())
+  tenantId       String
+  criadoPorId    String              @map("criado_por_id")
+  destinatarioId String              @map("destinatario_id")
+  titulo         String
+  descricao      String?             @db.Text
+  lembrarEm      DateTime            @map("lembrar_em")
+  recorrencia    LembreteRecorrencia @default(UNICA)
+  status         LembreteStatus      @default(PENDENTE)
+
+  // Canais marcados para entrega. Guardados como strings em array
+  // (PAINEL, TELEGRAM, EMAIL). PAINEL e sempre enviado — os demais sao opt-in.
+  canais String[] @default([])
+
+  // Vinculo opcional a uma entidade. Permite "lembrar sobre a OS #123".
+  // Nao cria FK por simplicidade (entidade pode ser deletada sem afetar o
+  // lembrete, que vira texto solto nesse caso).
+  entidadeTipo  LembreteEntidadeTipo?
+  entidadeId    String?               @map("entidade_id")
+  entidadeLabel String?               @map("entidade_label")
+
+  enviadoEm   DateTime? @map("enviado_em")
+  concluidoEm DateTime? @map("concluido_em")
+  // Marca o momento em que o usuario leu a notificacao in-app.
+  // Usado pelo badge do sino: pendente+enviado-naoLido => conta pro badge.
+  lidoEm      DateTime? @map("lido_em")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant       Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  criadoPor    Usuario @relation("LembreteCriadoPor", fields: [tenantId, criadoPorId], references: [tenantId, id], onDelete: Cascade)
+  destinatario Usuario @relation("LembreteDestinatario", fields: [tenantId, destinatarioId], references: [tenantId, id], onDelete: Cascade)
+
+  @@index([tenantId, destinatarioId, status])
+  @@index([status, lembrarEm])
+  @@index([tenantId, status, lembrarEm])
+  @@map("lembretes")
 }

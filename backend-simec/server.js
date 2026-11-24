@@ -45,6 +45,7 @@ import superadminAuditoriaRoutes from './routes/superadminAuditoriaRoutes.js';
 import superadminAprendizadoRoutes from './routes/superadminAprendizadoRoutes.js';
 import superadminLlmCallLogRoutes from './routes/superadminLlmCallLogRoutes.js';
 import superadminLicaoAuditoriaRoutes from './routes/superadminLicaoAuditoriaRoutes.js';
+import lembretesRoutes from './routes/lembretesRoutes.js';
 
 import cookieParser from 'cookie-parser';
 import { metricsMiddleware } from './middleware/metricsMiddleware.js';
@@ -224,6 +225,7 @@ app.use('/api/solar', solarRoutes);
 app.use('/api/alert-config', alertConfigRoutes);
 app.use('/api/telegram', telegramRoutes);
 app.use('/api/controle-qualidade', controleQualidadeRoutes);
+app.use('/api/lembretes', lembretesRoutes);
 
 app.use('/api', (req, res) => {
   console.warn(`[404] ${req.method} ${req.originalUrl} — rota não encontrada`);

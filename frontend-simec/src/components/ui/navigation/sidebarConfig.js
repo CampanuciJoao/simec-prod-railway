@@ -13,6 +13,7 @@ import {
   faBuildingShield,
   faFileInvoiceDollar,
   faHeartPulse,
+  faBell,
 } from '@fortawesome/free-solid-svg-icons';
 
 export const sidebarConfig = [
@@ -36,6 +37,11 @@ export const sidebarConfig = [
     path: '/alertas',
     icon: faExclamationTriangle,
     showBadge: true,
+  },
+  {
+    label: 'Lembretes',
+    path: '/lembretes',
+    icon: faBell,
   },
   {
     label: 'Contratos',

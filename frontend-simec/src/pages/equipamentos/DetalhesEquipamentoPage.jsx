@@ -14,6 +14,7 @@ import {
   PageHeader,
   PageLayout,
 } from '@/components/ui';
+import { BotaoCriarLembrete } from '@/components/lembretes';
 
 function DetalhesEquipamentoPage() {
   const {
@@ -78,7 +79,16 @@ function DetalhesEquipamentoPage() {
           title={`Detalhes do Equipamento: ${equipamento.modelo}`}
           subtitle={`Nº série: ${equipamento.tag || 'N/A'}`}
           icon={faMicrochip}
-          actions={backAction}
+          actions={
+            <div className="flex flex-wrap items-center gap-2">
+              <BotaoCriarLembrete
+                entidadeTipo="EQUIPAMENTO"
+                entidadeId={equipamento.id}
+                entidadeLabel={`Equipamento ${equipamento.modelo || equipamento.tag || ''}`.trim()}
+              />
+              {backAction}
+            </div>
+          }
         />
 
         <DetalhesEquipamentoTabs

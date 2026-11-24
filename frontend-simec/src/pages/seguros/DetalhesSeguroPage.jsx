@@ -16,6 +16,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { useDetalhesSeguroPage } from '@/hooks/seguros/useDetalhesSeguroPage';
 import { CancelarSeguroModal } from '@/components/seguros';
+import { BotaoCriarLembrete } from '@/components/lembretes';
 
 import {
   PageLayout,
@@ -167,6 +168,11 @@ function DetalhesSeguroPage() {
         icon={faShieldAlt}
         actions={
           <div className="flex flex-wrap gap-2">
+            <BotaoCriarLembrete
+              entidadeTipo="SEGURO"
+              entidadeId={seguro.id}
+              entidadeLabel={`Apólice ${seguro.apoliceNumero || ''}`.trim()}
+            />
             {isAtivo && (
               <Button variant="primary" onClick={() => navigate(`/seguros/renovar/${seguro.id}`)}>
                 <FontAwesomeIcon icon={faRotate} />

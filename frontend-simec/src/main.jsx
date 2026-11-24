@@ -5,6 +5,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ToastProvider } from '@/contexts/ToastContext';
 import { AlertasProvider } from '@/contexts/AlertasContext';
+import { LembretesProvider } from '@/contexts/LembretesContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 import App from '@/App';
@@ -27,7 +28,9 @@ root.render(
         <AuthProvider>
           <ToastProvider>
             <AlertasProvider>
-              <App />
+              <LembretesProvider>
+                <App />
+              </LembretesProvider>
             </AlertasProvider>
           </ToastProvider>
         </AuthProvider>
