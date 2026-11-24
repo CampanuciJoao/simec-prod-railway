@@ -41,14 +41,32 @@ const CATEGORIA_LABEL = {
 };
 
 // ─── Multi-bot: resolve qual token/env usar ────────────────────────────────
+// Cada bot aceita MULTIPLOS nomes de env como fallback — tolera typos
+// historicos e permite rename gradual. O primeiro nome encontrado ganha.
 const BOT_ENV = {
-  ALERTAS:   { tokenEnv: 'TELEGRAM_BOT_TOKEN',           usernameEnv: 'TELEGRAM_BOT_USERNAME' },
-  LEMBRETES: { tokenEnv: 'TELEGRAM_LEMBRETES_BOT_TOKEN', usernameEnv: 'TELEGRAM_LEMBRETES_BOT_USERNAME' },
+  ALERTAS: {
+    tokenEnv:    ['TELEGRAM_BOT_TOKEN'],
+    usernameEnv: ['TELEGRAM_BOT_USERNAME'],
+  },
+  LEMBRETES: {
+    // Aceita 'TELEGRAM_LEMBRETES_BOT_TOKEN' (nome correto) e tambem
+    // 'TELEGRAM_LEMBERETES_BOT_TOKEN' (grafia alternativa ja em producao).
+    tokenEnv:    ['TELEGRAM_LEMBRETES_BOT_TOKEN',    'TELEGRAM_LEMBERETES_BOT_TOKEN'],
+    usernameEnv: ['TELEGRAM_LEMBRETES_BOT_USERNAME', 'TELEGRAM_LEMBERETES_BOT_USERNAME'],
+  },
 };
 
+function resolveEnv(keys) {
+  const list = Array.isArray(keys) ? keys : [keys];
+  for (const k of list) {
+    if (process.env[k]) return process.env[k];
+  }
+  return null;
+}
+
 function getTokenPorTipo(botTipo = 'ALERTAS') {
-  const envKey = BOT_ENV[botTipo]?.tokenEnv || BOT_ENV.ALERTAS.tokenEnv;
-  return process.env[envKey] || null;
+  const spec = BOT_ENV[botTipo] || BOT_ENV.ALERTAS;
+  return resolveEnv(spec.tokenEnv);
 }
 
 export function telegramConfigurado(botTipo = 'ALERTAS') {
@@ -97,9 +115,10 @@ const _botUsernameCache = {};
 const _botUsernamePromises = {};
 
 export async function getBotUsername(botTipo = 'ALERTAS') {
-  const envKey = BOT_ENV[botTipo]?.usernameEnv;
-  if (envKey && process.env[envKey]) {
-    return String(process.env[envKey]).replace(/^@/, '');
+  const spec = BOT_ENV[botTipo] || BOT_ENV.ALERTAS;
+  const envValue = resolveEnv(spec.usernameEnv);
+  if (envValue) {
+    return String(envValue).replace(/^@/, '');
   }
   if (_botUsernameCache[botTipo]) return _botUsernameCache[botTipo];
   if (!telegramConfigurado(botTipo)) return null;
