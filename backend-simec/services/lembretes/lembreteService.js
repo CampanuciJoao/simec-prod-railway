@@ -377,7 +377,17 @@ async function enviarPeloTelegram(lembrete, { avisoAntesMinutos = 0 } = {}) {
     select: { chatId: true, usuarioId: true },
   });
 
+  console.log(
+    `[LEMBRETE_TG] lembrete=${lembrete.id} destinatarioId=${lembrete.destinatarioId} ` +
+    `avisarGrupo=${avisarGrupo} chatsEncontrados=${chats.length} ` +
+    `chatIds=[${chats.map((c) => `${c.chatId}(user=${c.usuarioId || 'grupo'})`).join(', ')}]`
+  );
+
   if (chats.length === 0) {
+    console.warn(
+      `[LEMBRETE_TG] SEM CHAT pra lembrete=${lembrete.id} destinatarioId=${lembrete.destinatarioId} ` +
+      `tenantId=${lembrete.tenantId} — verificar se o destinatario vinculou o Telegram privado.`
+    );
     return {
       ok: false,
       motivo: 'sem_chat_privado_vinculado',
@@ -406,6 +416,14 @@ async function enviarPeloTelegram(lembrete, { avisoAntesMinutos = 0 } = {}) {
   });
 
   const resultados = await Promise.allSettled(chats.map((c) => enviarMensagem(c.chatId, texto, 'LEMBRETES')));
+  resultados.forEach((r, i) => {
+    const chat = chats[i];
+    if (r.status === 'fulfilled') {
+      console.log(`[LEMBRETE_TG] ✓ enviado chatId=${chat.chatId} lembrete=${lembrete.id}`);
+    } else {
+      console.error(`[LEMBRETE_TG] ✗ falhou chatId=${chat.chatId} lembrete=${lembrete.id} erro=${r.reason?.message || r.reason}`);
+    }
+  });
   const sucessos = resultados.filter((r) => r.status === 'fulfilled').length;
   return { ok: sucessos > 0, enviados: sucessos, total: chats.length };
 }
