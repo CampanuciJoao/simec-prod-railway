@@ -324,21 +324,27 @@ function montarLinkEntidade(lembrete) {
 }
 
 async function enviarPeloTelegram(lembrete) {
-  if (!telegramConfigurado()) return { ok: false, motivo: 'bot_nao_configurado' };
+  // Lembretes usam o bot dedicado (@Lembretes-SIMEC) — separado do bot de
+  // alertas do sistema. Fallback: se o token do bot de lembretes nao estiver
+  // configurado, nao envia (evita que lembrete caia no grupo de alertas).
+  if (!telegramConfigurado('LEMBRETES')) {
+    return { ok: false, motivo: 'bot_lembretes_nao_configurado' };
+  }
 
   // Prioridade: enviar NO PRIVADO do destinatario (TelegramNotificacao com
-  // usuarioId = destinatarioId). Chats de grupo (usuarioId null) so entram
-  // se o criador marcou avisarGrupo=true — guardado no array canais como
-  // "TELEGRAM_GRUPO" alem de "TELEGRAM".
+  // usuarioId = destinatarioId e botTipo = LEMBRETES). Chats de grupo
+  // (usuarioId null) so entram se o criador marcou avisarGrupo=true —
+  // guardado no array canais como "TELEGRAM_GRUPO" alem de "TELEGRAM".
   const avisarGrupo = Array.isArray(lembrete.canais) && lembrete.canais.includes('TELEGRAM_GRUPO');
 
   const chats = await prisma.telegramNotificacao.findMany({
     where: {
       tenantId: lembrete.tenantId,
       ativo: true,
+      botTipo: 'LEMBRETES',
       OR: [
-        { usuarioId: lembrete.destinatarioId },                       // privado do destinatario
-        ...(avisarGrupo ? [{ usuarioId: null }] : []),                // grupos (opt-in)
+        { usuarioId: lembrete.destinatarioId },        // privado do destinatario
+        ...(avisarGrupo ? [{ usuarioId: null }] : []), // grupos vinculados ao bot de lembretes (opt-in)
       ],
     },
     select: { chatId: true, usuarioId: true },
@@ -348,7 +354,7 @@ async function enviarPeloTelegram(lembrete) {
     return {
       ok: false,
       motivo: 'sem_chat_privado_vinculado',
-      detalhe: 'Destinatario nao vinculou o Telegram privado e grupo nao foi marcado.',
+      detalhe: 'Destinatario nao vinculou o bot Lembretes-SIMEC e grupo nao foi marcado.',
     };
   }
 
@@ -365,7 +371,7 @@ async function enviarPeloTelegram(lembrete) {
     link,
   });
 
-  const resultados = await Promise.allSettled(chats.map((c) => enviarMensagem(c.chatId, texto)));
+  const resultados = await Promise.allSettled(chats.map((c) => enviarMensagem(c.chatId, texto, 'LEMBRETES')));
   const sucessos = resultados.filter((r) => r.status === 'fulfilled').length;
   return { ok: sucessos > 0, enviados: sucessos, total: chats.length };
 }

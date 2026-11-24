@@ -34,7 +34,7 @@ import gehcAprendizadoRoutes from './routes/gehcAprendizadoRoutes.js';
 import solarRoutes, { sungrowCallbackPublic } from './routes/solarRoutes.js';
 import alertConfigRoutes from './routes/alertConfigRoutes.js';
 import telegramRoutes from './routes/telegramRoutes.js';
-import telegramWebhookRoute from './routes/telegramWebhookRoute.js';
+import telegramWebhookRoute, { criarWebhookRouter } from './routes/telegramWebhookRoute.js';
 import lgpdRoutes from './routes/lgpdRoutes.js';
 import controleQualidadeRoutes from './routes/controleQualidadeRoutes.js';
 import metricsRoutes from './routes/metricsRoutes.js';
@@ -163,6 +163,13 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/agent', agentRoutes);
 app.use('/api/telegram/webhook', telegramWebhookRoute);
+// Webhook do segundo bot (Lembretes-SIMEC). URL publico separado; precisa
+// ser registrado no BotFather do @Lembretes-SIMEC via setWebhook apontando
+// pra esta rota.
+app.use('/api/telegram/webhook-lembretes', criarWebhookRouter({
+  botTipo: 'LEMBRETES',
+  secretEnv: 'TELEGRAM_LEMBRETES_WEBHOOK_SECRET',
+}));
 // LGPD: documentos legais (publicos) + aceites (proteger interno na rota)
 app.use('/api/lgpd', lgpdRoutes);
 // Sungrow OAuth callback: publico por natureza (iSolarCloud redireciona o

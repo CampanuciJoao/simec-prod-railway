@@ -1,3 +1,16 @@
+// Cliente da Telegram Bot API com suporte a MULTIPLOS bots.
+//
+// Hoje o SIMEC opera 2 bots independentes:
+//   - ALERTAS   → bot historico (@Alertas-SIMEC). Env var TELEGRAM_BOT_TOKEN.
+//                 Recebe alertas do sistema nos chats de grupo/departamentais.
+//   - LEMBRETES → bot novo (@Lembretes-SIMEC). Env var TELEGRAM_LEMBRETES_BOT_TOKEN.
+//                 Recebe lembretes pessoais no PRIVADO de cada usuario.
+//
+// Toda funcao exportada aceita `botTipo` opcional (default: 'ALERTAS') pra
+// escolher qual bot usar. Nao mexer no default — o codigo antigo que chama
+// enviarMensagem/callApi sem passar botTipo continua caindo no bot de
+// alertas, que e o comportamento esperado.
+
 const PRIORIDADE_EMOJI = { Alta: '🔴', Media: '🟡', Baixa: '🔵' };
 
 const CATEGORIA_EMOJI = {
@@ -12,6 +25,7 @@ const CATEGORIA_EMOJI = {
   // dados antigos, mas o rotulo visivel ao usuario e "Energia Solar"
   // (cobre Sungrow, Growatt e FoxESS).
   FOXESS_ENERGIA:    '☀️',
+  LEMBRETE:          '🔔',
 };
 
 const CATEGORIA_LABEL = {
@@ -23,15 +37,27 @@ const CATEGORIA_LABEL = {
   RECOMENDACAO:      'Recomendação',
   CONTROLE_QUALIDADE:'Controle de Qualidade',
   FOXESS_ENERGIA:    'Energia Solar',
+  LEMBRETE:          'Lembrete',
 };
 
-export function telegramConfigurado() {
-  return !!process.env.TELEGRAM_BOT_TOKEN;
+// ─── Multi-bot: resolve qual token/env usar ────────────────────────────────
+const BOT_ENV = {
+  ALERTAS:   { tokenEnv: 'TELEGRAM_BOT_TOKEN',           usernameEnv: 'TELEGRAM_BOT_USERNAME' },
+  LEMBRETES: { tokenEnv: 'TELEGRAM_LEMBRETES_BOT_TOKEN', usernameEnv: 'TELEGRAM_LEMBRETES_BOT_USERNAME' },
+};
+
+function getTokenPorTipo(botTipo = 'ALERTAS') {
+  const envKey = BOT_ENV[botTipo]?.tokenEnv || BOT_ENV.ALERTAS.tokenEnv;
+  return process.env[envKey] || null;
 }
 
-async function callApi(method, body) {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
-  if (!token) throw new Error('TELEGRAM_BOT_TOKEN não configurado.');
+export function telegramConfigurado(botTipo = 'ALERTAS') {
+  return !!getTokenPorTipo(botTipo);
+}
+
+async function callApi(method, body, botTipo = 'ALERTAS') {
+  const token = getTokenPorTipo(botTipo);
+  if (!token) throw new Error(`Token do bot ${botTipo} não configurado.`);
 
   const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: 'POST',
@@ -40,58 +66,58 @@ async function callApi(method, body) {
   });
 
   const json = await res.json();
-  if (!json.ok) throw new Error(`Telegram [${method}]: ${json.description}`);
+  if (!json.ok) throw new Error(`Telegram [${botTipo}/${method}]: ${json.description}`);
   return json.result;
 }
 
-export async function enviarMensagem(chatId, texto) {
+export async function enviarMensagem(chatId, texto, botTipo = 'ALERTAS') {
   return callApi('sendMessage', {
     chat_id: chatId,
     text: texto,
     parse_mode: 'HTML',
     disable_web_page_preview: true,
-  });
+  }, botTipo);
 }
 
-export async function registrarWebhook(webhookUrl) {
+export async function registrarWebhook(webhookUrl, botTipo = 'ALERTAS') {
   return callApi('setWebhook', {
     url: webhookUrl,
     allowed_updates: ['message'],
-  });
+  }, botTipo);
 }
 
-export async function obterInfoBot() {
-  return callApi('getMe', {});
+export async function obterInfoBot(botTipo = 'ALERTAS') {
+  return callApi('getMe', {}, botTipo);
 }
 
-// Cache in-memory do username do bot. getMe nunca retorna null em producao
-// e o username so muda se o admin renomear o bot no BotFather — seguro
-// cachear pra sempre. Se TELEGRAM_BOT_USERNAME estiver no env, usa ele
-// direto (override manual). Senao, descobre via getMe no primeiro acesso.
-let _botUsernameCache = null;
-let _botUsernamePromise = null;
+// Cache in-memory de username por botTipo. getMe nunca retorna null em
+// producao e username so muda se renomear o bot no BotFather. Env var tem
+// prioridade pra overrides em dev.
+const _botUsernameCache = {};
+const _botUsernamePromises = {};
 
-export async function getBotUsername() {
-  if (process.env.TELEGRAM_BOT_USERNAME) {
-    return String(process.env.TELEGRAM_BOT_USERNAME).replace(/^@/, '');
+export async function getBotUsername(botTipo = 'ALERTAS') {
+  const envKey = BOT_ENV[botTipo]?.usernameEnv;
+  if (envKey && process.env[envKey]) {
+    return String(process.env[envKey]).replace(/^@/, '');
   }
-  if (_botUsernameCache) return _botUsernameCache;
-  if (!telegramConfigurado()) return null;
+  if (_botUsernameCache[botTipo]) return _botUsernameCache[botTipo];
+  if (!telegramConfigurado(botTipo)) return null;
 
-  if (!_botUsernamePromise) {
-    _botUsernamePromise = (async () => {
+  if (!_botUsernamePromises[botTipo]) {
+    _botUsernamePromises[botTipo] = (async () => {
       try {
-        const info = await obterInfoBot();
-        _botUsernameCache = info?.username || null;
-        return _botUsernameCache;
+        const info = await obterInfoBot(botTipo);
+        _botUsernameCache[botTipo] = info?.username || null;
+        return _botUsernameCache[botTipo];
       } catch (err) {
-        console.warn('[TELEGRAM] getBotUsername falhou:', err.message);
-        _botUsernamePromise = null; // permite retry
+        console.warn(`[TELEGRAM] getBotUsername(${botTipo}) falhou:`, err.message);
+        _botUsernamePromises[botTipo] = null; // permite retry
         return null;
       }
     })();
   }
-  return _botUsernamePromise;
+  return _botUsernamePromises[botTipo];
 }
 
 export function formatarAlerta(alerta) {

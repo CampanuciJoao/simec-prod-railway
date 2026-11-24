@@ -32,15 +32,20 @@ function gerarTokenAleatorio() {
 
 /**
  * Gera (ou reusa) um token ativo pra vincular o Telegram privado do usuario
- * atual. Invalida tokens anteriores do mesmo usuario — garante que so ha 1
- * valido por vez.
+ * atual. Invalida tokens anteriores do mesmo usuario/bot — garante que so ha
+ * 1 valido por vez pra cada bot.
+ *
+ * botTipo default: LEMBRETES (self-service do usuario comum). Alertas
+ * continuam seguindo o fluxo admin antigo.
  */
-export async function gerarTokenParaUsuario({ tenantId, usuarioId }) {
-  // Invalida tokens pendentes do usuario (nao usados e nao expirados).
+export async function gerarTokenParaUsuario({ tenantId, usuarioId, botTipo = 'LEMBRETES' }) {
+  // Invalida tokens pendentes do usuario pro MESMO bot (preserva tokens
+  // ativos pra outro bot, caso o usuario esteja vinculando os dois).
   await prisma.telegramVinculacaoToken.updateMany({
     where: {
       tenantId,
       usuarioId,
+      botTipo,
       usado: false,
       expiresAt: { gt: new Date() },
     },
@@ -58,10 +63,10 @@ export async function gerarTokenParaUsuario({ tenantId, usuarioId }) {
   const expiresAt = new Date(Date.now() + TOKEN_TTL_MS);
 
   await prisma.telegramVinculacaoToken.create({
-    data: { tenantId, usuarioId, token, expiresAt },
+    data: { tenantId, usuarioId, token, expiresAt, botTipo },
   });
 
-  const botUsername = await getBotUsername();
+  const botUsername = await getBotUsername(botTipo);
   const linkTelegram = botUsername
     ? `https://t.me/${botUsername}?start=${token}`
     : null;
@@ -71,6 +76,7 @@ export async function gerarTokenParaUsuario({ tenantId, usuarioId }) {
     expiresAt,
     linkTelegram,
     botUsername,
+    botTipo,
     ttlSegundos: Math.floor(TOKEN_TTL_MS / 1000),
   };
 }
@@ -83,14 +89,15 @@ export async function gerarTokenParaUsuario({ tenantId, usuarioId }) {
  *
  * Usado pelo polling do modal no frontend e pelo card "Meu Telegram" do perfil.
  */
-export async function statusVinculacaoUsuario({ tenantId, usuarioId }) {
+export async function statusVinculacaoUsuario({ tenantId, usuarioId, botTipo = 'LEMBRETES' }) {
   const chat = await prisma.telegramNotificacao.findFirst({
-    where: { tenantId, usuarioId, ativo: true },
+    where: { tenantId, usuarioId, botTipo, ativo: true },
     select: { id: true, chatId: true, nome: true, createdAt: true, chatType: true },
   });
   if (chat) {
     return {
       status: 'vinculado',
+      botTipo,
       chat: {
         id: chat.id,
         chatId: chat.chatId,
@@ -105,6 +112,7 @@ export async function statusVinculacaoUsuario({ tenantId, usuarioId }) {
     where: {
       tenantId,
       usuarioId,
+      botTipo,
       usado: false,
       expiresAt: { gt: new Date() },
     },
@@ -112,11 +120,12 @@ export async function statusVinculacaoUsuario({ tenantId, usuarioId }) {
     select: { token: true, expiresAt: true },
   });
 
-  const botUsername = await getBotUsername();
+  const botUsername = await getBotUsername(botTipo);
 
   if (tokenAtivo) {
     return {
       status: 'aguardando',
+      botTipo,
       token: tokenAtivo.token,
       expiresAt: tokenAtivo.expiresAt,
       linkTelegram: botUsername
@@ -126,16 +135,17 @@ export async function statusVinculacaoUsuario({ tenantId, usuarioId }) {
     };
   }
 
-  return { status: 'nao-vinculado', botUsername };
+  return { status: 'nao-vinculado', botTipo, botUsername };
 }
 
 /**
- * Remove o vinculo Telegram privado do usuario. Nao afeta chats de grupo
- * do tenant (que tem usuarioId null).
+ * Remove o vinculo Telegram privado do usuario (apenas o bot especificado).
+ * Nao afeta chats de grupo do tenant (que tem usuarioId null) nem o vinculo
+ * no outro bot.
  */
-export async function desvincularUsuario({ tenantId, usuarioId }) {
+export async function desvincularUsuario({ tenantId, usuarioId, botTipo = 'LEMBRETES' }) {
   const r = await prisma.telegramNotificacao.deleteMany({
-    where: { tenantId, usuarioId },
+    where: { tenantId, usuarioId, botTipo },
   });
   return { ok: true, removidos: r.count };
 }

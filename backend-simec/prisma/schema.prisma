@@ -1831,6 +1831,12 @@ model TelegramNotificacao {
   // pra diagnostico e pra evitar que um chat de grupo seja usado como privado
   // por engano.
   chatType  String? @map("chat_type")
+  // Qual bot do Telegram este chat esta vinculado: ALERTAS (bot original,
+  // alertas do sistema) ou LEMBRETES (bot novo, lembretes pessoais). Um
+  // mesmo usuario pode ter um registro em cada — sao chats diferentes com
+  // bots diferentes. Default ALERTAS pra retrocompatibilidade (chats
+  // existentes continuam recebendo alertas pelo bot original).
+  botTipo   String  @default("ALERTAS") @map("bot_tipo")
 
   recebeAlertasContrato          Boolean @default(true)
   recebeAlertasManutencao        Boolean @default(true)
@@ -1846,8 +1852,11 @@ model TelegramNotificacao {
 
   tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
-  @@unique([tenantId, chatId])
+  // Chave de unicidade ampliada pra incluir botTipo — permite o mesmo chat
+  // humano ter entradas separadas por bot.
+  @@unique([tenantId, chatId, botTipo])
   @@index([tenantId, usuarioId])
+  @@index([tenantId, botTipo, usuarioId])
   @@map("telegram_notificacoes")
 }
 
@@ -1864,6 +1873,8 @@ model TelegramVinculacaoToken {
   // marcar a TelegramNotificacao resultante como chat privado desse usuario.
   // Quando null, e o fluxo antigo (admin vincula um chat de grupo).
   usuarioId String? @map("usuario_id")
+  // Bot alvo da vinculacao. Self-service default: LEMBRETES.
+  botTipo   String  @default("LEMBRETES") @map("bot_tipo")
 
   createdAt DateTime @default(now())
 
