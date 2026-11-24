@@ -245,8 +245,9 @@ function ModalVincularTelegram({ open, onClose, onChange }) {
                   }}
                 >
                   <FontAwesomeIcon icon={faTriangleExclamation} className="mr-1" />
-                  Bot do Telegram não configurado. Peça ao administrador
-                  pra definir <code>TELEGRAM_BOT_USERNAME</code>.
+                  Bot de lembretes ainda não disponível. Confira no Railway
+                  se <code>TELEGRAM_LEMBRETES_BOT_TOKEN</code> está setado
+                  no serviço <strong>backend</strong> e se o deploy já terminou.
                 </div>
               )}
               <Button onClick={handleGerarLink} disabled={gerando || !status?.botUsername}>
