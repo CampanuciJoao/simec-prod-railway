@@ -12,7 +12,6 @@ import {
   NotificationsPanel,
   ThemeModeToggle,
 } from '@/components/ui';
-import { SinoLembretes } from '@/components/lembretes';
 
 function AppTopbar({
   nomeUsuario,
@@ -30,6 +29,14 @@ function AppTopbar({
   onMarkAsRead,
   onDismiss,
   onMarkAllAsRead,
+  // Lembretes — plugados no mesmo sino do painel unificado
+  lembretes,
+  lembretesBadge,
+  lembretesLoading,
+  onOpenLembrete,
+  onConcluirLembrete,
+  onMarcarTodosLembretesLidos,
+  onCriarLembrete,
 }) {
   return (
     <header
@@ -77,20 +84,25 @@ function AppTopbar({
             <div ref={alertsRef}>
               <NotificationsPanel
                 open={alertsOpen}
+                onToggle={onToggleAlerts}
+                onClose={onCloseAlerts}
+                sseConnected={sseConnected}
                 alertas={alertas}
                 loading={alertasLoading}
                 contadorNaoVistos={contadorNaoVistos}
-                sseConnected={sseConnected}
-                onToggle={onToggleAlerts}
-                onClose={onCloseAlerts}
                 onOpenAlert={onOpenAlert}
                 onMarkAsRead={onMarkAsRead}
                 onDismiss={onDismiss}
                 onMarkAllAsRead={onMarkAllAsRead}
+                lembretes={lembretes}
+                lembretesBadge={lembretesBadge}
+                lembretesLoading={lembretesLoading}
+                onOpenLembrete={onOpenLembrete}
+                onConcluirLembrete={onConcluirLembrete}
+                onMarcarTodosLembretesLidos={onMarcarTodosLembretesLidos}
+                onCriarLembrete={onCriarLembrete}
               />
             </div>
-
-            <SinoLembretes />
 
             <ThemeModeToggle />
 
@@ -129,6 +141,13 @@ AppTopbar.propTypes = {
   onMarkAsRead: PropTypes.func.isRequired,
   onDismiss: PropTypes.func.isRequired,
   onMarkAllAsRead: PropTypes.func,
+  lembretes: PropTypes.array,
+  lembretesBadge: PropTypes.object,
+  lembretesLoading: PropTypes.bool,
+  onOpenLembrete: PropTypes.func,
+  onConcluirLembrete: PropTypes.func,
+  onMarcarTodosLembretesLidos: PropTypes.func,
+  onCriarLembrete: PropTypes.func,
 };
 
 export default AppTopbar;

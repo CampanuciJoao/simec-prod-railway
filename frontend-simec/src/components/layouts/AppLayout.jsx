@@ -12,10 +12,26 @@ import { Sidebar, ImpersonacaoBanner } from '@/components/ui';
 import AppBreadcrumb from '@/components/layouts/AppBreadcrumb';
 import AppTopbar from '@/components/layouts/AppTopbar';
 import GuardiaoAceiteTermos from '@/components/lgpd/GuardiaoAceiteTermos';
+import { ModalLembrete } from '@/components/lembretes';
 
 import { useAuth } from '@/contexts/AuthContext';
 import { useAlertas } from '@/contexts/AlertasContext';
+import { useLembretes } from '@/contexts/LembretesContext';
+import { useToast } from '@/contexts/ToastContext';
+import {
+  concluirLembrete,
+  marcarLembreteLido,
+  marcarTodosLembretesLidos,
+} from '@/services/api';
 import { getBreadcrumbItems } from '@/utils/breadcrumbConfig';
+
+const ROTAS_ENTIDADE_LEMBRETE = {
+  OS_CORRETIVA: (id) => `/manutencoes/ocorrencia/${id}`,
+  EQUIPAMENTO:  (id) => `/equipamentos/detalhes/${id}`,
+  UNIDADE:      (id) => `/unidades/${id}`,
+  SEGURO:       (id) => `/seguros/detalhes/${id}`,
+  CONTRATO:     (id) => `/contratos/detalhes/${id}`,
+};
 
 function AppLayout() {
   const location = useLocation();
@@ -24,6 +40,8 @@ function AppLayout() {
   const auth = useAuth?.();
   const usuario = auth?.usuario || auth?.user || null;
   const logout = auth?.logout || auth?.signOut || null;
+
+  const toast = useToast();
 
   const {
     alertas = [],
@@ -35,8 +53,16 @@ function AppLayout() {
     marcarTodosVistos,
   } = useAlertas();
 
+  const {
+    lembretes = [],
+    badge: lembretesBadge,
+    loading: lembretesLoading,
+    recarregar: recarregarLembretes,
+  } = useLembretes();
+
   const [alertsOpen, setAlertsOpen] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [modalLembreteOpen, setModalLembreteOpen] = useState(false);
 
   const alertsRef = useRef(null);
 
@@ -154,6 +180,57 @@ function AppLayout() {
     }
   }, [marcarTodosVistos]);
 
+  // ─── Lembretes — handlers que o painel unificado chama ────────────────────
+  const handleOpenLembrete = useCallback(
+    async (lembrete) => {
+      try {
+        if (!lembrete?.lidoEm) await marcarLembreteLido(lembrete.id);
+      } catch (err) {
+        console.error('[APP_LAYOUT_LEMBRETE_LIDO]', err);
+      } finally {
+        setAlertsOpen(false);
+        if (lembrete?.entidadeTipo && lembrete?.entidadeId) {
+          const rota = ROTAS_ENTIDADE_LEMBRETE[lembrete.entidadeTipo];
+          if (rota) {
+            navigate(rota(lembrete.entidadeId));
+            recarregarLembretes?.();
+            return;
+          }
+        }
+        navigate('/lembretes');
+        recarregarLembretes?.();
+      }
+    },
+    [navigate, recarregarLembretes]
+  );
+
+  const handleConcluirLembrete = useCallback(
+    async (lembrete) => {
+      try {
+        await concluirLembrete(lembrete.id);
+        toast?.addToast?.('Lembrete concluído.', 'success');
+        recarregarLembretes?.();
+      } catch (err) {
+        toast?.addToast?.(err?.response?.data?.message || 'Erro ao concluir.', 'error');
+      }
+    },
+    [toast, recarregarLembretes]
+  );
+
+  const handleMarcarTodosLembretesLidos = useCallback(async () => {
+    try {
+      await marcarTodosLembretesLidos();
+      recarregarLembretes?.();
+    } catch (err) {
+      toast?.addToast?.('Erro ao marcar como lidos.', 'error');
+    }
+  }, [toast, recarregarLembretes]);
+
+  const handleCriarLembrete = useCallback(() => {
+    setAlertsOpen(false);
+    setModalLembreteOpen(true);
+  }, []);
+
   return (
     <GuardiaoAceiteTermos>
       <div
@@ -185,6 +262,13 @@ function AppLayout() {
             onMarkAsRead={handleMarkAsRead}
             onDismiss={handleDismiss}
             onMarkAllAsRead={handleMarkAllAsRead}
+            lembretes={lembretes}
+            lembretesBadge={lembretesBadge}
+            lembretesLoading={lembretesLoading}
+            onOpenLembrete={handleOpenLembrete}
+            onConcluirLembrete={handleConcluirLembrete}
+            onMarcarTodosLembretesLidos={handleMarcarTodosLembretesLidos}
+            onCriarLembrete={handleCriarLembrete}
           />
 
           <AppBreadcrumb items={breadcrumbItems} />
@@ -198,6 +282,16 @@ function AppLayout() {
       <div className="fixed bottom-4 right-4 z-50">
         <ChatBot />
       </div>
+
+      {/* Modal de criacao de lembrete acessivel a partir do sino unificado */}
+      <ModalLembrete
+        open={modalLembreteOpen}
+        onClose={() => setModalLembreteOpen(false)}
+        onSaved={() => {
+          setModalLembreteOpen(false);
+          recarregarLembretes?.();
+        }}
+      />
     </GuardiaoAceiteTermos>
   );
 }
