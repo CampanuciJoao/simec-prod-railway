@@ -136,7 +136,18 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
     if (texto.startsWith('/start ')) {
       const token = texto.slice('/start '.length).trim();
       if (token) {
-        await processarTokenVinculacao({ chatId, tokenCode: token, nome, chatType });
+        try {
+          await processarTokenVinculacao({ chatId, tokenCode: token, nome, chatType });
+          console.log(`[TG_WH/${botTipo}] processarTokenVinculacao OK pra chatId=${chatId}`);
+        } catch (err) {
+          console.error(`[TG_WH/${botTipo}] processarTokenVinculacao FALHOU:`, err.message, err.stack);
+          // Tenta avisar o usuario no chat que algo quebrou
+          await enviarMensagem(
+            chatId,
+            `⚠️ Erro interno ao vincular. Avise o administrador.\n<code>${err.message}</code>`,
+            botTipo,
+          ).catch((e) => console.error(`[TG_WH/${botTipo}] msg de erro tambem falhou:`, e.message));
+        }
         return;
       }
     }
@@ -163,7 +174,11 @@ export function criarWebhookRouter({ botTipo, secretEnv }) {
         ).catch((e) => console.error(`[TG_WH/${botTipo}] enviarMensagem falhou:`, e.message));
         return;
       }
-      await processarTokenVinculacao({ chatId, tokenCode: token, nome, chatType });
+      try {
+        await processarTokenVinculacao({ chatId, tokenCode: token, nome, chatType });
+      } catch (err) {
+        console.error(`[TG_WH/${botTipo}] processarTokenVinculacao(/conectar) FALHOU:`, err.message, err.stack);
+      }
     }
   });
 
