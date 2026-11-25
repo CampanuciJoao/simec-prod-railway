@@ -186,4 +186,74 @@ router.post('/marcar-todos-lidos', async (req, res) => {
   }
 });
 
+// GET /api/lembretes/debug/estado — diagnostico de por que lembretes nao
+// chegam no Telegram. Exige usuario autenticado; mostra apenas registros
+// do PROPRIO tenant pra nao vazar dados cross-tenant.
+router.get('/debug/estado', async (req, res) => {
+  try {
+    const tenantId = req.tenantContext;
+    const usuarioId = req.usuario.id;
+
+    const chatsLembretes = await prisma.telegramNotificacao.findMany({
+      where: { tenantId, botTipo: 'LEMBRETES' },
+      select: { id: true, chatId: true, nome: true, usuarioId: true, chatType: true, ativo: true, criadoEm: true },
+      orderBy: { criadoEm: 'desc' },
+    });
+
+    const lembretes = await prisma.lembrete.findMany({
+      where: { tenantId },
+      orderBy: { criadoEm: 'desc' },
+      take: 10,
+      select: {
+        id: true, titulo: true, status: true, lembrarEm: true, enviadoEm: true,
+        criadoPorId: true, destinatarioId: true, canais: true, alertasAntes: true,
+        avisosDisparados: true, criadoEm: true,
+      },
+    });
+
+    const simulacao = [];
+    for (const l of lembretes.filter(x => x.canais?.includes('TELEGRAM'))) {
+      const avisarGrupo = l.canais.includes('TELEGRAM_GRUPO');
+      const match = await prisma.telegramNotificacao.findMany({
+        where: {
+          tenantId: l.tenantId || tenantId,
+          ativo: true,
+          botTipo: 'LEMBRETES',
+          OR: [
+            { usuarioId: l.destinatarioId },
+            ...(avisarGrupo ? [{ usuarioId: null }] : []),
+          ],
+        },
+        select: { chatId: true, usuarioId: true, nome: true, chatType: true, ativo: true },
+      });
+      simulacao.push({
+        lembreteId: l.id,
+        titulo: l.titulo,
+        destinatarioId: l.destinatarioId,
+        avisarGrupo,
+        matchCount: match.length,
+        matches: match,
+      });
+    }
+
+    const env = {
+      TELEGRAM_LEMBRETES_BOT_TOKEN: !!process.env.TELEGRAM_LEMBRETES_BOT_TOKEN,
+      TELEGRAM_LEMBERETES_BOT_TOKEN: !!process.env.TELEGRAM_LEMBERETES_BOT_TOKEN,
+      TELEGRAM_BOT_TOKEN: !!process.env.TELEGRAM_BOT_TOKEN,
+    };
+
+    res.json({
+      meuUsuarioId: usuarioId,
+      tenantId,
+      env,
+      chatsLembretes,
+      lembretesRecentes: lembretes,
+      simulacaoMatch: simulacao,
+    });
+  } catch (err) {
+    console.error('[LEMBRETES_DEBUG]', err);
+    res.status(500).json({ message: err.message, stack: err.stack });
+  }
+});
+
 export default router;
